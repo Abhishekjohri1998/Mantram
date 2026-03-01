@@ -21,8 +21,15 @@ import SuperAdminDashboard from './pages/SuperAdminDashboard'
 import CreditsPage from './pages/CreditsPage'
 
 import { CreditProvider } from './context/CreditContext'
+import UnderConstruction from './pages/UnderConstruction'
 
 function App() {
+  const isProduction = window.location.hostname.includes('mantram.ai');
+
+  if (isProduction) {
+    return <UnderConstruction />
+  }
+
   return (
     <BrowserRouter>
       <AuthProvider>
