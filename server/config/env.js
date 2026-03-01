@@ -1,0 +1,49 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
+export default {
+    port: process.env.PORT || 3001,
+    nodeEnv: process.env.NODE_ENV || 'development',
+    mongoUri: process.env.MONGODB_URI || 'mongodb://localhost:27017/da-mantram',
+    jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-me',
+    jwtExpire: process.env.JWT_EXPIRE || '7d',
+    frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+
+    // AI Provider Config — Claude primary, Gemini for images
+    ai: {
+        defaultTextProvider: process.env.DEFAULT_TEXT_PROVIDER || 'anthropic',
+        defaultImageProvider: process.env.DEFAULT_IMAGE_PROVIDER || 'gemini',
+        defaultTextModel: process.env.DEFAULT_TEXT_MODEL || 'claude-sonnet-4-20250514',
+        defaultImageModel: process.env.DEFAULT_IMAGE_MODEL || 'gemini-2.0-flash-exp-image-generation',
+        providers: {
+            gemini: {
+                apiKey: process.env.GEMINI_API_KEY,
+                imageApiKey: process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY,
+            },
+            openai: { apiKey: process.env.OPENAI_API_KEY },
+            anthropic: { apiKey: process.env.ANTHROPIC_API_KEY },
+        },
+    },
+
+    // Google OAuth
+    google: {
+        clientId: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackUrl: process.env.GOOGLE_CALLBACK_URL,
+    },
+
+    // AWS S3
+    aws: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        bucket: process.env.AWS_S3_BUCKET,
+        region: process.env.AWS_REGION || 'ap-south-1',
+    },
+
+    // Meta / Facebook
+    facebook: {
+        appId: process.env.FACEBOOK_APP_ID,
+        appSecret: process.env.FACEBOOK_APP_SECRET,
+        redirectUri: process.env.FACEBOOK_REDIRECT_URI,
+    },
+};
