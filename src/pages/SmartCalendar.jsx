@@ -128,7 +128,7 @@ export default function SmartCalendar() {
                             <select
                                 value={country}
                                 onChange={e => setOverrideCountry(e.target.value)}
-                                className="input-glass py-2 pl-3 pr-8 rounded-xl text-xs text-white bg-white/[0.04] cursor-pointer appearance-none min-w-[150px]"
+                                className="input-glass py-2 pl-3 pr-8 rounded-xl text-sm text-white bg-white/[0.04] cursor-pointer appearance-none min-w-[150px]"
                             >
                                 {COUNTRIES.map(c => (
                                     <option key={c.id} value={c.id}>{c.flag} {c.label}</option>
@@ -141,7 +141,7 @@ export default function SmartCalendar() {
                             {Object.entries(EVENT_COLORS).filter(([k]) => k !== 'brand').map(([key, val]) => (
                                 <div key={key} className="flex items-center gap-1.5">
                                     <div className="w-2.5 h-2.5 rounded-full" style={{ background: val.dot }} />
-                                    <span className="text-[10px] text-slate-500">{val.label}</span>
+                                    <span className="text-sm text-slate-500">{val.label}</span>
                                 </div>
                             ))}
                         </div>
@@ -153,7 +153,7 @@ export default function SmartCalendar() {
                     <div className="glass-panel rounded-2xl p-5 mb-6 border border-primary/10">
                         <div className="flex items-center gap-2 mb-3">
                             <span className="material-symbols-outlined text-primary">trending_up</span>
-                            <h3 className="text-sm font-bold text-white">Upcoming Opportunities</h3>
+                            <h3 className="text-base font-bold text-white">Upcoming Opportunities</h3>
                         </div>
                         <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-thin">
                             {upcoming.slice(0, 6).map((e, i) => (
@@ -161,13 +161,13 @@ export default function SmartCalendar() {
                                     className="flex-shrink-0 glass-panel rounded-xl p-3 min-w-[180px] hover:bg-white/[0.05] transition-all cursor-pointer border border-white/[0.06] group text-left">
                                     <div className="flex items-center justify-between mb-1">
                                         <span className="text-lg">{e.emoji}</span>
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${e.daysUntil <= 3 ? 'bg-rose-500/20 text-rose-400' : e.daysUntil <= 7 ? 'bg-amber-500/20 text-amber-400' : 'bg-primary/20 text-primary'}`}>
+                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${e.daysUntil <= 3 ? 'bg-rose-500/20 text-rose-400' : e.daysUntil <= 7 ? 'bg-amber-500/20 text-amber-400' : 'bg-primary/20 text-primary'}`}>
                                             {e.daysUntil === 0 ? 'TODAY' : e.daysUntil === 1 ? 'TOMORROW' : `${e.daysUntil} days`}
                                         </span>
                                     </div>
-                                    <p className="text-sm font-semibold text-white truncate">{e.name}</p>
-                                    <p className="text-[10px] text-slate-500 mt-0.5">Tone: {e.tone}</p>
-                                    <div className="flex items-center gap-1 mt-2 text-primary text-[10px] font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <p className="text-base font-semibold text-white truncate">{e.name}</p>
+                                    <p className="text-sm text-slate-500 mt-0.5">Tone: {e.tone}</p>
+                                    <div className="flex items-center gap-1 mt-2 text-primary text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
                                         <span className="material-symbols-outlined text-xs">auto_awesome</span> Generate Content
                                     </div>
                                 </button>
@@ -227,12 +227,12 @@ export default function SmartCalendar() {
                                                 return (
                                                     <div key={j} className="flex items-center gap-1 truncate">
                                                         <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color.dot }} />
-                                                        <span className="text-[9px] truncate" style={{ color: color.dot }}>{e.emoji} {e.name}</span>
+                                                        <span className="text-xs truncate" style={{ color: color.dot }}>{e.emoji} {e.name}</span>
                                                     </div>
                                                 )
                                             })}
                                             {dayObj.events.length > 3 && (
-                                                <span className="text-[9px] text-slate-500">+{dayObj.events.length - 3} more</span>
+                                                <span className="text-sm text-slate-500">+{dayObj.events.length - 3} more</span>
                                             )}
                                         </div>
                                     )}
@@ -271,7 +271,7 @@ export default function SmartCalendar() {
                                                         <span className="text-2xl">{e.emoji}</span>
                                                         <div>
                                                             <p className="font-bold text-white text-sm">{e.name}</p>
-                                                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: color.border + '30', color: color.border }}>{color.label}</span>
+                                                            <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: color.border + '30', color: color.border }}>{color.label}</span>
                                                         </div>
                                                     </div>
                                                     <div className="text-[11px] text-slate-400 mb-3">

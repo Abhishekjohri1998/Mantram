@@ -40,7 +40,7 @@ function ScoreRing({ score, size = 100, label, color = 'primary' }) {
                     style={{ transition: 'stroke-dashoffset 1s ease' }} />
             </svg>
             <span className="text-2xl font-black text-white -mt-16">{score}</span>
-            {label && <p className="text-[10px] text-slate-500 mt-3 font-bold">{label}</p>}
+            {label && <p className="text-sm text-slate-500 mt-3 font-bold">{label}</p>}
         </div>
     )
 }
@@ -48,7 +48,7 @@ function ScoreRing({ score, size = 100, label, color = 'primary' }) {
 // ── Issue Badge ───────────────────────────────────────────────────────────
 function SeverityBadge({ severity }) {
     const c = SEVERITY_COLORS[severity] || 'slate'
-    return <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-${c}-500/10 text-${c}-400 uppercase`}>{severity}</span>
+    return <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full bg-${c}-500/10 text-${c}-400 uppercase`}>{severity}</span>
 }
 
 // ── Main Component ────────────────────────────────────────────────────────
@@ -232,19 +232,19 @@ export default function SeoStudio() {
                 {askResult && (
                     <div className="glass-panel rounded-2xl p-6 mb-6 animate-fade-in">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-sm font-bold text-white flex items-center gap-2"><span className="material-symbols-outlined text-primary text-sm">psychology</span> AI Answer</h3>
+                            <h3 className="text-base font-bold text-white flex items-center gap-2"><span className="material-symbols-outlined text-primary text-sm">psychology</span> AI Answer</h3>
                             <button onClick={() => setAskResult(null)} className="text-slate-500 hover:text-slate-300 cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
                         </div>
                         <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap mb-4">{askResult.answer}</div>
                         {askResult.actionItems?.length > 0 && (
                             <div className="space-y-2 mb-4">{askResult.actionItems.map((a, i) => (
-                                <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-white/3"><span className="text-primary text-xs mt-0.5">▸</span><div><p className="text-xs font-bold text-white">{a.title}</p><p className="text-[11px] text-slate-400">{a.description}</p></div></div>
+                                <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-white/3"><span className="text-primary text-xs mt-0.5">▸</span><div><p className="text-sm font-bold text-white">{a.title}</p><p className="text-[11px] text-slate-400">{a.description}</p></div></div>
                             ))}</div>
                         )}
                         {askResult.followUpQuestions?.length > 0 && (
                             <div className="flex flex-wrap gap-2">{askResult.followUpQuestions.map((q, i) => (
                                 <button key={i} onClick={() => { setAskQuery(q); setAskResult(null) }}
-                                    className="text-[10px] px-3 py-1.5 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 cursor-pointer transition-all">{q}</button>
+                                    className="text-xs px-3 py-1.5 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 cursor-pointer transition-all">{q}</button>
                             ))}</div>
                         )}
                         {askResult.suggestedWorkflow && (
@@ -277,14 +277,14 @@ export default function SeoStudio() {
                                         </div>
                                         <div>
                                             <h3 className="text-base font-bold text-white">{activeBrand.name}</h3>
-                                            <p className="text-xs text-slate-400 flex items-center gap-2">
+                                            <p className="text-sm text-slate-400 flex items-center gap-2">
                                                 <span className="material-symbols-outlined text-emerald-400 text-xs">language</span>
                                                 {website || 'No website set'}
-                                                {activeBrand.dna?.industry && <span className="px-2 py-0.5 rounded-full bg-white/5 text-[10px]">{activeBrand.dna.industry}</span>}
+                                                {activeBrand.dna?.industry && <span className="px-2 py-0.5 rounded-full bg-white/5 text-xs">{activeBrand.dna.industry}</span>}
                                             </p>
                                         </div>
                                     </div>
-                                    {!website && <button onClick={() => navigate(`/brand-dna`)} className="text-xs text-primary hover:text-primary-light cursor-pointer font-bold">Add Website →</button>}
+                                    {!website && <button onClick={() => navigate(`/brand-dna`)} className="text-sm text-primary hover:text-primary-light cursor-pointer font-bold">Add Website →</button>}
                                 </div>
 
                                 {error && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 mb-4"><p className="text-rose-400 text-xs">{error}</p></div>}
@@ -292,7 +292,7 @@ export default function SeoStudio() {
                                 {/* Competitor Management */}
                                 <div className="glass-panel rounded-2xl p-5 mb-6">
                                     <button onClick={() => setShowCompetitors(!showCompetitors)} className="flex items-center justify-between w-full cursor-pointer">
-                                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                        <h3 className="text-base font-bold text-white flex items-center gap-2">
                                             <span className="material-symbols-outlined text-amber-400 text-lg">swords</span>
                                             Competitors ({competitors.length})
                                         </h3>
@@ -304,8 +304,8 @@ export default function SeoStudio() {
                                                 <div className="flex flex-wrap gap-2">
                                                     {competitors.map((c, i) => (
                                                         <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10">
-                                                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${c.addedBy === 'user' ? 'bg-blue-500/10 text-blue-400' : 'bg-violet-500/10 text-violet-400'}`}>{c.addedBy === 'user' ? 'YOU' : 'AI'}</span>
-                                                            <span className="text-xs text-slate-300">{c.name || c.url}</span>
+                                                            <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${c.addedBy === 'user' ? 'bg-blue-500/10 text-blue-400' : 'bg-violet-500/10 text-violet-400'}`}>{c.addedBy === 'user' ? 'YOU' : 'AI'}</span>
+                                                            <span className="text-sm text-slate-300">{c.name || c.url}</span>
                                                             <button onClick={(e) => { e.stopPropagation(); removeCompetitor(c.url) }} className="text-slate-600 hover:text-rose-400 cursor-pointer transition-colors">
                                                                 <span className="material-symbols-outlined text-xs">close</span>
                                                             </button>
@@ -320,9 +320,9 @@ export default function SeoStudio() {
                                                     onKeyDown={e => e.key === 'Enter' && addCompetitor()}
                                                     placeholder="Add competitor URL (e.g. competitor.com)" className="input-glass flex-1 py-2 text-xs" />
                                                 <button onClick={addCompetitor} disabled={compLoading || !newCompUrl.trim()}
-                                                    className="px-3 py-2 rounded-xl bg-white/5 text-xs text-slate-400 hover:bg-primary/10 hover:text-primary cursor-pointer transition-all font-bold disabled:opacity-30">Add</button>
+                                                    className="px-3 py-2 rounded-xl bg-white/5 text-sm text-slate-400 hover:bg-primary/10 hover:text-primary cursor-pointer transition-all font-bold disabled:opacity-30">Add</button>
                                                 <button onClick={discoverCompetitors} disabled={compLoading}
-                                                    className="px-3 py-2 rounded-xl bg-violet-500/10 text-xs text-violet-400 hover:bg-violet-500/20 cursor-pointer transition-all font-bold flex items-center gap-1 disabled:opacity-30">
+                                                    className="px-3 py-2 rounded-xl bg-violet-500/10 text-sm text-violet-400 hover:bg-violet-500/20 cursor-pointer transition-all font-bold flex items-center gap-1 disabled:opacity-30">
                                                     {compLoading ? <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span> : <span className="material-symbols-outlined text-xs">auto_awesome</span>}
                                                     Auto-Discover
                                                 </button>
@@ -357,13 +357,13 @@ export default function SeoStudio() {
                                 {/* ═══ GOOGLE ANALYTICS & SEARCH CONSOLE DASHBOARD ═══ */}
                                 <div className="glass-panel rounded-2xl p-6 mb-8">
                                     <div className="flex items-center justify-between mb-4">
-                                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                        <h3 className="text-base font-bold text-white flex items-center gap-2">
                                             <span className="material-symbols-outlined text-blue-400 text-lg">monitoring</span> Analytics & Search Performance
                                         </h3>
                                         {gaConnected ? (
                                             <div className="flex items-center gap-3">
-                                                <span className="text-[10px] text-emerald-400 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Connected — {gaEmail}</span>
-                                                <button onClick={disconnectGA} className="text-[10px] text-rose-400 hover:text-rose-300 cursor-pointer">Disconnect</button>
+                                                <span className="text-sm text-emerald-400 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Connected — {gaEmail}</span>
+                                                <button onClick={disconnectGA} className="text-sm text-rose-400 hover:text-rose-300 cursor-pointer">Disconnect</button>
                                             </div>
                                         ) : (
                                             <button onClick={connectGA} className="px-4 py-2 rounded-xl bg-blue-500/10 text-blue-400 text-xs font-bold hover:bg-blue-500/20 cursor-pointer transition-all flex items-center gap-2">
@@ -377,30 +377,30 @@ export default function SeoStudio() {
                                             {/* Property & Site selectors */}
                                             <div className="flex gap-3 mb-4">
                                                 <div className="flex-1">
-                                                    <label className="text-[10px] text-slate-500 font-bold mb-1 block">GA4 Property</label>
+                                                    <label className="text-sm text-slate-500 font-bold mb-1 block">GA4 Property</label>
                                                     <select value={gaSelectedProp} onChange={e => { setGaSelectedProp(e.target.value); loadGAReport(e.target.value) }}
-                                                        className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:border-primary focus:outline-none cursor-pointer">
+                                                        className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:border-primary focus:outline-none cursor-pointer">
                                                         <option value="">Select property...</option>
                                                         {gaProperties.map((p, i) => <option key={i} value={p.propertyId}>{p.propertyName} ({p.accountName})</option>)}
                                                     </select>
                                                 </div>
                                                 <div className="flex-1">
-                                                    <label className="text-[10px] text-slate-500 font-bold mb-1 block">Search Console Site</label>
+                                                    <label className="text-sm text-slate-500 font-bold mb-1 block">Search Console Site</label>
                                                     <select value={gaSelectedSite} onChange={e => { setGaSelectedSite(e.target.value); loadGSCReport(e.target.value) }}
-                                                        className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:border-primary focus:outline-none cursor-pointer">
+                                                        className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:border-primary focus:outline-none cursor-pointer">
                                                         <option value="">Select site...</option>
                                                         {gaSites.map((s, i) => <option key={i} value={s.siteUrl}>{s.siteUrl}</option>)}
                                                     </select>
                                                 </div>
                                             </div>
 
-                                            {gaLoading && <div className="text-center py-8"><span className="material-symbols-outlined text-primary animate-spin text-2xl">progress_activity</span><p className="text-xs text-slate-500 mt-2">Loading analytics...</p></div>}
+                                            {gaLoading && <div className="text-center py-8"><span className="material-symbols-outlined text-primary animate-spin text-2xl">progress_activity</span><p className="text-sm text-slate-500 mt-2">Loading analytics...</p></div>}
 
                                             {/* GA4 Report */}
                                             {gaReport && !gaLoading && (
                                                 <div className="space-y-4">
                                                     {/* Summary stats */}
-                                                    <div className="grid grid-cols-4 gap-3">
+                                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                                         {[{ label: 'Users', value: gaReport.summary.totalUsers?.toLocaleString(), icon: 'person', color: 'blue' },
                                                         { label: 'Sessions', value: gaReport.summary.totalSessions?.toLocaleString(), icon: 'browse_activity', color: 'emerald' },
                                                         { label: 'Page Views', value: gaReport.summary.totalPageViews?.toLocaleString(), icon: 'visibility', color: 'violet' },
@@ -409,7 +409,7 @@ export default function SeoStudio() {
                                                             <div key={s.label} className={`p-3 rounded-xl bg-${s.color}-500/5 border border-${s.color}-500/10`}>
                                                                 <div className="flex items-center gap-2 mb-1">
                                                                     <span className={`material-symbols-outlined text-${s.color}-400 text-sm`}>{s.icon}</span>
-                                                                    <span className="text-[10px] text-slate-500 font-bold">{s.label}</span>
+                                                                    <span className="text-sm text-slate-500 font-bold">{s.label}</span>
                                                                 </div>
                                                                 <p className="text-lg font-black text-white">{s.value}</p>
                                                             </div>
@@ -419,7 +419,7 @@ export default function SeoStudio() {
                                                     {/* Traffic Sparkline */}
                                                     {gaReport.traffic?.length > 0 && (
                                                         <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                                                            <h4 className="text-[10px] text-slate-500 font-bold mb-3">DAILY TRAFFIC (Last 30 days)</h4>
+                                                            <h4 className="text-sm text-slate-500 font-bold mb-3">DAILY TRAFFIC (Last 30 days)</h4>
                                                             <div className="flex items-end gap-0.5 h-16">
                                                                 {gaReport.traffic.map((d, i) => {
                                                                     const max = Math.max(...gaReport.traffic.map(t => t.sessions || 1))
@@ -434,24 +434,24 @@ export default function SeoStudio() {
                                                     <div className="grid grid-cols-2 gap-3">
                                                         {gaReport.channels?.length > 0 && (
                                                             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                                                                <h4 className="text-[10px] text-slate-500 font-bold mb-2">TRAFFIC CHANNELS</h4>
+                                                                <h4 className="text-sm text-slate-500 font-bold mb-2">TRAFFIC CHANNELS</h4>
                                                                 <div className="space-y-1.5">{gaReport.channels.slice(0, 6).map((c, i) => {
                                                                     const max = gaReport.channels[0]?.sessions || 1
                                                                     return (<div key={i} className="flex items-center gap-2">
-                                                                        <span className="text-[10px] text-slate-400 w-24 truncate">{c.channel}</span>
+                                                                        <span className="text-sm text-slate-400 w-24 truncate">{c.channel}</span>
                                                                         <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"><div className="h-full bg-primary/60 rounded-full" style={{ width: `${(c.sessions / max) * 100}%` }} /></div>
-                                                                        <span className="text-[10px] text-white font-bold w-10 text-right">{c.sessions}</span>
+                                                                        <span className="text-sm text-white font-bold w-10 text-right">{c.sessions}</span>
                                                                     </div>)
                                                                 })}</div>
                                                             </div>
                                                         )}
                                                         {gaReport.topPages?.length > 0 && (
                                                             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                                                                <h4 className="text-[10px] text-slate-500 font-bold mb-2">TOP PAGES</h4>
+                                                                <h4 className="text-sm text-slate-500 font-bold mb-2">TOP PAGES</h4>
                                                                 <div className="space-y-1.5">{gaReport.topPages.slice(0, 6).map((p, i) => (
                                                                     <div key={i} className="flex items-center justify-between">
-                                                                        <span className="text-[10px] text-slate-300 truncate flex-1 mr-2">{p.path}</span>
-                                                                        <span className="text-[10px] text-primary font-bold">{p.views}</span>
+                                                                        <span className="text-sm text-slate-300 truncate flex-1 mr-2">{p.path}</span>
+                                                                        <span className="text-sm text-primary font-bold">{p.views}</span>
                                                                     </div>
                                                                 ))}</div>
                                                             </div>
@@ -463,16 +463,16 @@ export default function SeoStudio() {
                                             {/* Search Console Report */}
                                             {gscReport && !gaLoading && (
                                                 <div className="space-y-4 mt-4">
-                                                    <h4 className="text-xs font-bold text-white flex items-center gap-2"><span className="material-symbols-outlined text-emerald-400 text-sm">search</span> Search Console — SERP Performance</h4>
+                                                    <h4 className="text-sm font-bold text-white flex items-center gap-2"><span className="material-symbols-outlined text-emerald-400 text-sm">search</span> Search Console — SERP Performance</h4>
                                                     {/* Summary */}
-                                                    <div className="grid grid-cols-4 gap-3">
+                                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                                         {[{ label: 'Clicks', value: gscReport.summary.totalClicks?.toLocaleString(), color: 'blue' },
                                                         { label: 'Impressions', value: gscReport.summary.totalImpressions?.toLocaleString(), color: 'violet' },
                                                         { label: 'Avg Position', value: gscReport.summary.avgPosition?.toFixed(1), color: 'amber' },
                                                         { label: 'Avg CTR', value: `${(gscReport.summary.avgCtr * 100).toFixed(1)}%`, color: 'emerald' },
                                                         ].map(s => (
                                                             <div key={s.label} className={`p-3 rounded-xl bg-${s.color}-500/5 border border-${s.color}-500/10`}>
-                                                                <span className="text-[10px] text-slate-500 font-bold">{s.label}</span>
+                                                                <span className="text-sm text-slate-500 font-bold">{s.label}</span>
                                                                 <p className="text-lg font-black text-white">{s.value}</p>
                                                             </div>
                                                         ))}
@@ -482,24 +482,24 @@ export default function SeoStudio() {
                                                     <div className="grid grid-cols-2 gap-3">
                                                         {gscReport.keywords?.length > 0 && (
                                                             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                                                                <h4 className="text-[10px] text-slate-500 font-bold mb-2">TOP KEYWORDS (SERP Positions)</h4>
+                                                                <h4 className="text-sm text-slate-500 font-bold mb-2">TOP KEYWORDS (SERP Positions)</h4>
                                                                 <div className="space-y-1.5">{gscReport.keywords.slice(0, 10).map((k, i) => (
                                                                     <div key={i} className="flex items-center gap-2">
-                                                                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold min-w-[32px] text-center ${k.position <= 3 ? 'bg-emerald-500/10 text-emerald-400' : k.position <= 10 ? 'bg-blue-500/10 text-blue-400' : k.position <= 20 ? 'bg-amber-500/10 text-amber-400' : 'bg-slate-500/10 text-slate-400'}`}>#{k.position.toFixed(0)}</span>
-                                                                        <span className="text-[10px] text-slate-300 flex-1 truncate">{k.keyword}</span>
-                                                                        <span className="text-[10px] text-primary font-bold">{k.clicks}</span>
+                                                                        <span className={`text-xs px-1.5 py-0.5 rounded font-bold min-w-[32px] text-center ${k.position <= 3 ? 'bg-emerald-500/10 text-emerald-400' : k.position <= 10 ? 'bg-blue-500/10 text-blue-400' : k.position <= 20 ? 'bg-amber-500/10 text-amber-400' : 'bg-slate-500/10 text-slate-400'}`}>#{k.position.toFixed(0)}</span>
+                                                                        <span className="text-sm text-slate-300 flex-1 truncate">{k.keyword}</span>
+                                                                        <span className="text-sm text-primary font-bold">{k.clicks}</span>
                                                                     </div>
                                                                 ))}</div>
                                                             </div>
                                                         )}
                                                         {gscReport.pages?.length > 0 && (
                                                             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                                                                <h4 className="text-[10px] text-slate-500 font-bold mb-2">TOP PAGES (by Clicks)</h4>
+                                                                <h4 className="text-sm text-slate-500 font-bold mb-2">TOP PAGES (by Clicks)</h4>
                                                                 <div className="space-y-1.5">{gscReport.pages.slice(0, 10).map((p, i) => (
                                                                     <div key={i} className="flex items-center gap-2">
-                                                                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold min-w-[32px] text-center ${p.position <= 10 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>#{p.position.toFixed(0)}</span>
-                                                                        <span className="text-[10px] text-slate-300 flex-1 truncate">{new URL(p.page).pathname}</span>
-                                                                        <span className="text-[10px] text-primary font-bold">{p.clicks}</span>
+                                                                        <span className={`text-xs px-1.5 py-0.5 rounded font-bold min-w-[32px] text-center ${p.position <= 10 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>#{p.position.toFixed(0)}</span>
+                                                                        <span className="text-sm text-slate-300 flex-1 truncate">{new URL(p.page).pathname}</span>
+                                                                        <span className="text-sm text-primary font-bold">{p.clicks}</span>
                                                                     </div>
                                                                 ))}</div>
                                                             </div>
@@ -511,15 +511,15 @@ export default function SeoStudio() {
                                     ) : (
                                         <div className="text-center py-6">
                                             <span className="material-symbols-outlined text-slate-600 text-4xl block mb-2">monitoring</span>
-                                            <p className="text-xs text-slate-500 mb-1">Connect Google Analytics & Search Console to see real data</p>
-                                            <p className="text-[10px] text-slate-600">Traffic trends, SERP positions, top pages, keyword rankings & more</p>
+                                            <p className="text-sm text-slate-500 mb-1">Connect Google Analytics & Search Console to see real data</p>
+                                            <p className="text-xs text-slate-600">Traffic trends, SERP positions, top pages, keyword rankings & more</p>
                                         </div>
                                     )}
                                 </div>
 
                                 {/* Advanced menu toggle */}
                                 <button onClick={() => setShowAdvMenu(!showAdvMenu)}
-                                    className="text-xs text-slate-500 hover:text-slate-300 font-bold mb-4 flex items-center gap-1 cursor-pointer transition-all">
+                                    className="text-sm text-slate-500 hover:text-slate-300 font-bold mb-4 flex items-center gap-1 cursor-pointer transition-all">
                                     <span className="material-symbols-outlined text-sm">{showAdvMenu ? 'expand_less' : 'expand_more'}</span> Advanced Tools
                                 </button>
                                 {showAdvMenu && (
@@ -528,7 +528,7 @@ export default function SeoStudio() {
                                             <button key={m.id} onClick={() => { setAdvPage(m.id); setView('advanced-page') }}
                                                 className="glass-panel rounded-xl p-4 text-left hover:bg-white/[0.04] cursor-pointer transition-all flex items-center gap-3">
                                                 <span className="material-symbols-outlined text-slate-400 text-lg">{m.icon}</span>
-                                                <span className="text-xs text-slate-300 font-medium">{m.label}</span>
+                                                <span className="text-sm text-slate-300 font-medium">{m.label}</span>
                                             </button>
                                         ))}
                                     </div>
@@ -557,7 +557,7 @@ export default function SeoStudio() {
                 {/* ═══ WORKFLOW RESULTS ═══ */}
                 {view === 'workflow-result' && !loading && results && (
                     <div ref={resultRef} className="animate-fade-in">
-                        <button onClick={goHome} className="flex items-center gap-2 text-slate-400 hover:text-white text-xs font-bold mb-6 cursor-pointer transition-all">
+                        <button onClick={goHome} className="flex items-center gap-2 text-slate-400 hover:text-white text-sm font-bold mb-6 cursor-pointer transition-all">
                             <span className="material-symbols-outlined text-sm">arrow_back</span> Back to SEO Studio
                         </button>
 
@@ -566,8 +566,8 @@ export default function SeoStudio() {
                             <div className="glass-panel rounded-xl p-3 mb-4 flex items-start gap-2">
                                 <span className="material-symbols-outlined text-emerald-400 text-sm mt-0.5">verified</span>
                                 <div>
-                                    <p className="text-[10px] text-emerald-400 font-bold">GROUNDED IN REAL RESEARCH</p>
-                                    <p className="text-[10px] text-slate-500">{results.researchSources.length} pages crawled: {results.researchSources.slice(0, 4).join(', ')}{results.researchSources.length > 4 ? ` +${results.researchSources.length - 4} more` : ''}</p>
+                                    <p className="text-sm text-emerald-400 font-bold">GROUNDED IN REAL RESEARCH</p>
+                                    <p className="text-sm text-slate-500">{results.researchSources.length} pages crawled: {results.researchSources.slice(0, 4).join(', ')}{results.researchSources.length > 4 ? ` +${results.researchSources.length - 4} more` : ''}</p>
                                 </div>
                             </div>
                         )}
@@ -583,7 +583,7 @@ export default function SeoStudio() {
                     <div className="text-center py-20">
                         <span className="material-symbols-outlined text-rose-400 text-4xl mb-4 block">error</span>
                         <p className="text-rose-400 text-sm mb-4">{error}</p>
-                        <button onClick={goHome} className="text-xs text-slate-400 hover:text-white cursor-pointer">← Back</button>
+                        <button onClick={goHome} className="text-sm text-slate-400 hover:text-white cursor-pointer">← Back</button>
                     </div>
                 )}
             </div>
@@ -605,11 +605,11 @@ function HealthCheckResults({ results }) {
         {/* Summary */}
         <div className="glass-panel rounded-2xl p-6 mb-6">
             <p className="text-sm text-slate-300 leading-relaxed">{results.summary}</p>
-            <p className="text-xs text-primary font-bold mt-2">{results.topOpportunity}</p>
+            <p className="text-sm text-primary font-bold mt-2">{results.topOpportunity}</p>
         </div>
 
         {/* Score Cards */}
-        <div className="grid grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
             {[{ s: results.seoHealthScore, l: 'SEO Health', c: 'emerald' }, { s: results.aiVisibilityScore, l: 'AI Visibility', c: 'violet' },
             { s: results.technicalScore, l: 'Technical', c: 'blue' }, { s: results.contentScore, l: 'Content', c: 'amber' },
             { s: results.authorityScore, l: 'Authority', c: 'rose' }].map(x => (
@@ -620,7 +620,7 @@ function HealthCheckResults({ results }) {
         </div>
 
         {/* Action Board */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <ActionBucket title="🔧 Fix Now" items={results.fixNow} color="rose" />
             <ActionBucket title="✏️ Create Next" items={results.createNext} color="emerald" />
             <ActionBucket title="👁️ Monitor" items={results.monitor} color="blue" />
@@ -629,11 +629,11 @@ function HealthCheckResults({ results }) {
         {/* Issues List */}
         <div className="glass-panel rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold text-white">{issues.length} Issues Found</h3>
+                <h3 className="text-base font-bold text-white">{issues.length} Issues Found</h3>
                 <div className="flex gap-1">
                     {['all', ...SEVERITY_ORDER].map(s => (
                         <button key={s} onClick={() => setIssueFilter(s)}
-                            className={`text-[10px] px-2.5 py-1 rounded-full font-bold cursor-pointer transition-all ${issueFilter === s ? 'bg-primary/20 text-primary' : 'bg-white/5 text-slate-500 hover:text-slate-300'}`}>
+                            className={`text-xs px-2.5 py-1 rounded-full font-bold cursor-pointer transition-all ${issueFilter === s ? 'bg-primary/20 text-primary' : 'bg-white/5 text-slate-500 hover:text-slate-300'}`}>
                             {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)} {s !== 'all' && `(${issues.filter(i => i.severity === s).length})`}
                         </button>
                     ))}
@@ -655,7 +655,7 @@ function TrafficResults({ results }) {
         {/* Quick Wins */}
         {results.quickWins?.length > 0 && (
             <div className="glass-panel rounded-2xl p-6 mb-6">
-                <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2"><span className="text-lg">⚡</span> Quick Wins</h3>
+                <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2"><span className="text-lg">⚡</span> Quick Wins</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     {results.quickWins.map((w, i) => (
                         <div key={i} className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
@@ -669,20 +669,20 @@ function TrafficResults({ results }) {
 
         {/* Keyword Clusters */}
         <div className="glass-panel rounded-2xl p-6 mb-6">
-            <h3 className="text-sm font-bold text-white mb-4">Keyword Clusters</h3>
+            <h3 className="text-base font-bold text-white mb-4">Keyword Clusters</h3>
             <div className="space-y-4">
                 {(results.keywordClusters || []).map((cluster, i) => (
                     <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
                         <div className="flex items-center justify-between mb-2">
-                            <h4 className="text-xs font-bold text-white">{cluster.clusterName}</h4>
+                            <h4 className="text-sm font-bold text-white">{cluster.clusterName}</h4>
                             <div className="flex items-center gap-2">
-                                <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${cluster.difficulty === 'easy' ? 'bg-emerald-500/10 text-emerald-400' : cluster.difficulty === 'medium' ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-400'}`}>{cluster.difficulty}</span>
-                                <span className="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-bold">{cluster.intent}</span>
-                                <span className="text-[10px] text-primary font-bold">{cluster.opportunityScore}/100</span>
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${cluster.difficulty === 'easy' ? 'bg-emerald-500/10 text-emerald-400' : cluster.difficulty === 'medium' ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-400'}`}>{cluster.difficulty}</span>
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-bold">{cluster.intent}</span>
+                                <span className="text-sm text-primary font-bold">{cluster.opportunityScore}/100</span>
                             </div>
                         </div>
                         <div className="flex flex-wrap gap-1.5 mb-2">{cluster.keywords?.map((k, j) => (
-                            <span key={j} className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-slate-400">{typeof k === 'string' ? k : k.keyword}</span>
+                            <span key={j} className="text-xs px-2 py-0.5 rounded-full bg-white/5 text-slate-400">{typeof k === 'string' ? k : k.keyword}</span>
                         ))}</div>
                         {cluster.suggestedTitle && <p className="text-[11px] text-slate-500">📝 <span className="text-slate-300">{cluster.suggestedTitle}</span> ({cluster.recommendedPageType})</p>}
                     </div>
@@ -694,22 +694,22 @@ function TrafficResults({ results }) {
         <div className="grid grid-cols-2 gap-4 mb-6">
             {results.risingKeywords?.length > 0 && (
                 <div className="glass-panel rounded-2xl p-6">
-                    <h3 className="text-sm font-bold text-white mb-3">📈 Rising Keywords</h3>
+                    <h3 className="text-base font-bold text-white mb-3">📈 Rising Keywords</h3>
                     <div className="space-y-2">{results.risingKeywords.map((k, i) => (
                         <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-white/3">
-                            <span className="text-xs text-white font-medium">{k.keyword}</span>
-                            <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${k.trend === 'breakout' ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'}`}>{k.trend}</span>
+                            <span className="text-sm text-white font-medium">{k.keyword}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${k.trend === 'breakout' ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'}`}>{k.trend}</span>
                         </div>
                     ))}</div>
                 </div>
             )}
             {results.seasonalPeaks?.length > 0 && (
                 <div className="glass-panel rounded-2xl p-6">
-                    <h3 className="text-sm font-bold text-white mb-3">🗓️ Seasonal Peaks</h3>
+                    <h3 className="text-base font-bold text-white mb-3">🗓️ Seasonal Peaks</h3>
                     <div className="space-y-2">{results.seasonalPeaks.map((p, i) => (
                         <div key={i} className="p-2 rounded-lg bg-white/3">
-                            <p className="text-xs text-white font-medium">{p.keyword} <span className="text-primary text-[10px]">→ {p.peakMonth}</span></p>
-                            <p className="text-[10px] text-slate-500">{p.reason}</p>
+                            <p className="text-sm text-white font-medium">{p.keyword} <span className="text-primary text-xs">→ {p.peakMonth}</span></p>
+                            <p className="text-sm text-slate-500">{p.reason}</p>
                         </div>
                     ))}</div>
                 </div>
@@ -719,10 +719,10 @@ function TrafficResults({ results }) {
         {/* 30-day plan */}
         {results.thirtyDayPlan?.length > 0 && (
             <div className="glass-panel rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-4">📅 30-Day Traffic Plan</h3>
-                <div className="grid grid-cols-4 gap-3">{results.thirtyDayPlan.map((w, i) => (
+                <h3 className="text-base font-bold text-white mb-4">📅 30-Day Traffic Plan</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{results.thirtyDayPlan.map((w, i) => (
                     <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                        <p className="text-[10px] text-primary font-bold mb-2">Week {w.week}</p>
+                        <p className="text-sm text-primary font-bold mb-2">Week {w.week}</p>
                         <ul className="space-y-1">{w.actions?.map((a, j) => <li key={j} className="text-[11px] text-slate-400 flex items-start gap-1"><span className="text-primary mt-0.5">▸</span>{a}</li>)}</ul>
                     </div>
                 ))}</div>
@@ -740,13 +740,13 @@ function CompetitorResults({ results }) {
             {(results.competitors || []).map((c, i) => (
                 <div key={i} className="glass-panel rounded-2xl p-5">
                     <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-sm font-bold text-white">{c.name}</h4>
-                        <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${c.estimatedAuthority === 'high' ? 'bg-rose-500/10 text-rose-400' : c.estimatedAuthority === 'medium' ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}`}>{c.estimatedAuthority} authority</span>
+                        <h4 className="text-base font-bold text-white">{c.name}</h4>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${c.estimatedAuthority === 'high' ? 'bg-rose-500/10 text-rose-400' : c.estimatedAuthority === 'medium' ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}`}>{c.estimatedAuthority} authority</span>
                     </div>
-                    <p className="text-[10px] text-slate-500 mb-3">{c.url} • {c.contentVelocity}</p>
+                    <p className="text-sm text-slate-500 mb-3">{c.url} • {c.contentVelocity}</p>
                     <div className="grid grid-cols-2 gap-2">
-                        <div><p className="text-[9px] text-emerald-400 font-bold mb-1">STRENGTHS</p>{c.strengths?.map((s, j) => <p key={j} className="text-[10px] text-slate-400">+ {s}</p>)}</div>
-                        <div><p className="text-[9px] text-rose-400 font-bold mb-1">WEAKNESSES</p>{c.weaknesses?.map((w, j) => <p key={j} className="text-[10px] text-slate-400">- {w}</p>)}</div>
+                        <div><p className="text-sm text-emerald-400 font-bold mb-1">STRENGTHS</p>{c.strengths?.map((s, j) => <p key={j} className="text-sm text-slate-400">+ {s}</p>)}</div>
+                        <div><p className="text-sm text-rose-400 font-bold mb-1">WEAKNESSES</p>{c.weaknesses?.map((w, j) => <p key={j} className="text-sm text-slate-400">- {w}</p>)}</div>
                     </div>
                 </div>
             ))}
@@ -755,21 +755,21 @@ function CompetitorResults({ results }) {
         {/* Why They Win + Outrank Plan */}
         <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="glass-panel rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-3">❌ Why They Win</h3>
+                <h3 className="text-base font-bold text-white mb-3">❌ Why They Win</h3>
                 <div className="space-y-3">{(results.whyTheyWin || []).map((w, i) => (
                     <div key={i} className="p-3 rounded-xl bg-rose-500/5 border border-rose-500/10">
                         <p className="text-xs font-bold text-rose-400 mb-1">{w.reason}</p>
-                        <p className="text-[10px] text-slate-400 mb-1">{w.evidence}</p>
-                        <p className="text-[10px] text-emerald-400">✓ Fix: {w.fix}</p>
+                        <p className="text-sm text-slate-400 mb-1">{w.evidence}</p>
+                        <p className="text-sm text-emerald-400">✓ Fix: {w.fix}</p>
                     </div>
                 ))}</div>
             </div>
             <div className="glass-panel rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-3">🎯 Outrank Plan</h3>
+                <h3 className="text-base font-bold text-white mb-3">🎯 Outrank Plan</h3>
                 <div className="space-y-2">{(results.outrankPlan || []).map((p, i) => (
                     <div key={i} className="flex items-start gap-3 p-2 rounded-lg bg-white/3">
                         <span className="text-xs font-black text-primary w-5">{p.priority}</span>
-                        <div><p className="text-xs font-bold text-white">{p.action}</p><p className="text-[10px] text-slate-500">{p.timeline} • {p.effort}</p></div>
+                        <div><p className="text-sm font-bold text-white">{p.action}</p><p className="text-sm text-slate-500">{p.timeline} • {p.effort}</p></div>
                     </div>
                 ))}</div>
             </div>
@@ -778,12 +778,12 @@ function CompetitorResults({ results }) {
         {/* Gap Opportunities */}
         {results.gapOpportunities?.length > 0 && (
             <div className="glass-panel rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-3">💡 Gap Opportunities</h3>
+                <h3 className="text-base font-bold text-white mb-3">💡 Gap Opportunities</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{results.gapOpportunities.map((g, i) => (
                     <div key={i} className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-                        <p className="text-xs font-bold text-white mb-1">{g.topic}</p>
-                        <p className="text-[10px] text-slate-400">{g.strategy}</p>
-                        <p className="text-[10px] text-emerald-400 mt-1">→ {g.suggestedContent}</p>
+                        <p className="text-sm font-bold text-white mb-1">{g.topic}</p>
+                        <p className="text-sm text-slate-400">{g.strategy}</p>
+                        <p className="text-sm text-emerald-400 mt-1">→ {g.suggestedContent}</p>
                     </div>
                 ))}</div>
             </div>
@@ -809,12 +809,12 @@ function AIVisibilityResults({ results }) {
         </div>
 
         {/* Breakdown */}
-        <div className="grid grid-cols-5 gap-3 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
             {sections.map(s => bd[s.key] && (
                 <div key={s.key} className="glass-panel rounded-2xl p-4 text-center">
                     <span className="text-lg">{s.icon}</span>
                     <p className="text-xl font-black text-white mt-1">{bd[s.key].score}</p>
-                    <p className="text-[10px] text-slate-500">{s.label}</p>
+                    <p className="text-sm text-slate-500">{s.label}</p>
                 </div>
             ))}
         </div>
@@ -823,7 +823,7 @@ function AIVisibilityResults({ results }) {
         <div className="space-y-4 mb-6">
             {sections.map(s => bd[s.key] && (
                 <div key={s.key} className="glass-panel rounded-2xl p-5">
-                    <h4 className="text-xs font-bold text-white mb-2">{s.icon} {s.label} — <span className="text-primary">{bd[s.key].score}/100</span></h4>
+                    <h4 className="text-sm font-bold text-white mb-2">{s.icon} {s.label} — <span className="text-primary">{bd[s.key].score}/100</span></h4>
                     <p className="text-[11px] text-slate-400 mb-3">{bd[s.key].currentState}</p>
                     {bd[s.key].recommendations && <div className="space-y-2">{(Array.isArray(bd[s.key].recommendations) ? bd[s.key].recommendations : []).map((r, i) => (
                         <div key={i} className="text-[11px] text-slate-300 flex items-start gap-2"><span className="text-emerald-400">✓</span>{typeof r === 'string' ? r : r.title || r.description}</div>
@@ -838,13 +838,13 @@ function AIVisibilityResults({ results }) {
         {/* AI-Ready Templates */}
         {results.aiReadyTemplates?.length > 0 && (
             <div className="glass-panel rounded-2xl p-6 mb-6">
-                <h3 className="text-sm font-bold text-white mb-4">📝 AI-Ready Templates</h3>
+                <h3 className="text-base font-bold text-white mb-4">📝 AI-Ready Templates</h3>
                 <div className="space-y-3">{results.aiReadyTemplates.map((t, i) => (
                     <div key={i} className="p-4 rounded-xl bg-violet-500/5 border border-violet-500/10">
                         <p className="text-xs font-bold text-violet-400 mb-1">{t.name}</p>
-                        <p className="text-[10px] text-slate-500 mb-2">{t.description}</p>
-                        <pre className="text-[10px] text-slate-300 bg-black/30 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">{t.template}</pre>
-                        {t.example && <div className="mt-2"><p className="text-[9px] text-slate-600 font-bold">EXAMPLE:</p><p className="text-[10px] text-slate-400 italic">{t.example}</p></div>}
+                        <p className="text-sm text-slate-500 mb-2">{t.description}</p>
+                        <pre className="text-sm text-slate-300 bg-black/30 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">{t.template}</pre>
+                        {t.example && <div className="mt-2"><p className="text-xs text-slate-600 font-bold">EXAMPLE:</p><p className="text-sm text-slate-400 italic">{t.example}</p></div>}
                     </div>
                 ))}</div>
             </div>
@@ -853,12 +853,12 @@ function AIVisibilityResults({ results }) {
         {/* Priority Actions */}
         {results.priorityActions?.length > 0 && (
             <div className="glass-panel rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-3">🎯 Priority Actions</h3>
+                <h3 className="text-base font-bold text-white mb-3">🎯 Priority Actions</h3>
                 <div className="space-y-2">{results.priorityActions.map((p, i) => (
                     <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
                         <span className="text-xs font-black text-primary w-5">{p.priority}</span>
-                        <div className="flex-1"><p className="text-xs font-bold text-white">{p.action}</p><p className="text-[10px] text-slate-400">{p.details}</p></div>
-                        <div className="flex gap-1"><span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${p.impact === 'high' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>{p.impact}</span></div>
+                        <div className="flex-1"><p className="text-sm font-bold text-white">{p.action}</p><p className="text-sm text-slate-400">{p.details}</p></div>
+                        <div className="flex gap-1"><span className={`text-xs px-2 py-0.5 rounded-full font-bold ${p.impact === 'high' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>{p.impact}</span></div>
                     </div>
                 ))}</div>
             </div>
@@ -872,11 +872,11 @@ function AIVisibilityResults({ results }) {
 function ActionBucket({ title, items, color }) {
     return (
         <div className={`glass-panel rounded-2xl p-5 border border-${color}-500/10`}>
-            <h4 className="text-xs font-bold text-white mb-3">{title}</h4>
+            <h4 className="text-sm font-bold text-white mb-3">{title}</h4>
             <div className="space-y-2">{(items || []).map((item, i) => (
                 <div key={i} className="p-2 rounded-lg bg-white/3">
                     <p className="text-[11px] font-bold text-white">{item.title}</p>
-                    <p className="text-[10px] text-slate-500">{item.description || item.keyword || item.metric}</p>
+                    <p className="text-sm text-slate-500">{item.description || item.keyword || item.metric}</p>
                 </div>
             ))}</div>
         </div>
@@ -889,8 +889,8 @@ function IssueCard({ issue }) {
         <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] cursor-pointer hover:bg-white/[0.04] transition-all" onClick={() => setExpanded(!expanded)}>
             <div className="flex items-center gap-3">
                 <SeverityBadge severity={issue.severity} />
-                <span className={`text-[9px] px-1.5 py-0.5 rounded-full bg-white/5 text-slate-500`}>{issue.category}</span>
-                <p className="text-xs text-white font-medium flex-1">{issue.title}</p>
+                <span className={`text-xs px-1.5 py-0.5 rounded-full bg-white/5 text-slate-500`}>{issue.category}</span>
+                <p className="text-sm text-white font-medium flex-1">{issue.title}</p>
                 <span className="material-symbols-outlined text-slate-600 text-sm">{expanded ? 'expand_less' : 'expand_more'}</span>
             </div>
             {expanded && (
@@ -898,7 +898,7 @@ function IssueCard({ issue }) {
                     <p className="text-[11px] text-slate-400">{issue.description}</p>
                     {issue.impact && <p className="text-[11px] text-amber-400">⚡ Impact: {issue.impact}</p>}
                     {issue.fix && <p className="text-[11px] text-emerald-400">✓ Fix: {issue.fix}</p>}
-                    {issue.effort && <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${issue.effort === 'quick-fix' ? 'bg-emerald-500/10 text-emerald-400' : issue.effort === 'moderate' ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-400'}`}>{issue.effort}</span>}
+                    {issue.effort && <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${issue.effort === 'quick-fix' ? 'bg-emerald-500/10 text-emerald-400' : issue.effort === 'moderate' ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-400'}`}>{issue.effort}</span>}
                 </div>
             )}
         </div>

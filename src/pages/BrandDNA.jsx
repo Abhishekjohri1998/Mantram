@@ -94,7 +94,7 @@ function AddProductModal({ brandId, onClose, onSaved, editProduct }) {
 
                     {/* Title */}
                     <div>
-                        <label className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-1 block">Name *</label>
+                        <label className="text-sm text-slate-500 font-bold uppercase tracking-widest mb-1 block">Name *</label>
                         <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
                             placeholder="e.g. Wireless Earbuds Pro, Logo Design Service"
                             className="input-glass w-full py-2.5 px-3.5 rounded-xl text-sm" />
@@ -102,7 +102,7 @@ function AddProductModal({ brandId, onClose, onSaved, editProduct }) {
 
                     {/* Description */}
                     <div>
-                        <label className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-1 block">Description</label>
+                        <label className="text-sm text-slate-500 font-bold uppercase tracking-widest mb-1 block">Description</label>
                         <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                             placeholder="Describe the product or service..."
                             rows={3} className="input-glass w-full py-2.5 px-3.5 rounded-xl text-sm resize-none" />
@@ -110,7 +110,7 @@ function AddProductModal({ brandId, onClose, onSaved, editProduct }) {
 
                     {/* Image URL */}
                     <div>
-                        <label className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-1 block">Image URL</label>
+                        <label className="text-sm text-slate-500 font-bold uppercase tracking-widest mb-1 block">Image URL</label>
                         <input value={form.imageUrl} onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))}
                             placeholder="https://example.com/product-image.jpg"
                             className="input-glass w-full py-2.5 px-3.5 rounded-xl text-sm" />
@@ -123,12 +123,12 @@ function AddProductModal({ brandId, onClose, onSaved, editProduct }) {
                     {/* Category + SubCategory */}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <label className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-1 block">Category</label>
+                            <label className="text-sm text-slate-500 font-bold uppercase tracking-widest mb-1 block">Category</label>
                             <input value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
                                 placeholder="e.g. Electronics" className="input-glass w-full py-2.5 px-3.5 rounded-xl text-sm" />
                         </div>
                         <div>
-                            <label className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-1 block">Sub-Category</label>
+                            <label className="text-sm text-slate-500 font-bold uppercase tracking-widest mb-1 block">Sub-Category</label>
                             <input value={form.subCategory} onChange={e => setForm(f => ({ ...f, subCategory: e.target.value }))}
                                 placeholder="e.g. Earphones" className="input-glass w-full py-2.5 px-3.5 rounded-xl text-sm" />
                         </div>
@@ -137,12 +137,12 @@ function AddProductModal({ brandId, onClose, onSaved, editProduct }) {
                     {/* Price */}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <label className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-1 block">Price (₹)</label>
+                            <label className="text-sm text-slate-500 font-bold uppercase tracking-widest mb-1 block">Price (₹)</label>
                             <input type="number" value={form.priceAmount} onChange={e => setForm(f => ({ ...f, priceAmount: e.target.value }))}
                                 placeholder="999" className="input-glass w-full py-2.5 px-3.5 rounded-xl text-sm" />
                         </div>
                         <div>
-                            <label className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-1 block">MRP (₹)</label>
+                            <label className="text-sm text-slate-500 font-bold uppercase tracking-widest mb-1 block">MRP (₹)</label>
                             <input type="number" value={form.priceMrp} onChange={e => setForm(f => ({ ...f, priceMrp: e.target.value }))}
                                 placeholder="1499" className="input-glass w-full py-2.5 px-3.5 rounded-xl text-sm" />
                         </div>
@@ -150,7 +150,7 @@ function AddProductModal({ brandId, onClose, onSaved, editProduct }) {
 
                     {/* Features */}
                     <div>
-                        <label className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-1 block">Key Features (one per line)</label>
+                        <label className="text-sm text-slate-500 font-bold uppercase tracking-widest mb-1 block">Key Features (one per line)</label>
                         <textarea value={form.features} onChange={e => setForm(f => ({ ...f, features: e.target.value }))}
                             placeholder={"Active Noise Cancellation\n40-hour battery life\nIPX5 water resistant"}
                             rows={3} className="input-glass w-full py-2.5 px-3.5 rounded-xl text-sm resize-none font-mono" />
@@ -158,7 +158,7 @@ function AddProductModal({ brandId, onClose, onSaved, editProduct }) {
 
                     {/* Tags */}
                     <div>
-                        <label className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-1 block">Tags (comma-separated)</label>
+                        <label className="text-sm text-slate-500 font-bold uppercase tracking-widest mb-1 block">Tags (comma-separated)</label>
                         <input value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))}
                             placeholder="wireless, bluetooth, premium" className="input-glass w-full py-2.5 px-3.5 rounded-xl text-sm" />
                     </div>
@@ -220,17 +220,17 @@ function ProductCard({ product, onEdit, onDelete, onEnrich }) {
                     </span>
                 )}
                 {/* Type badge */}
-                <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase ${product.type === 'service' ? 'bg-violet-500/20 text-violet-400' : 'bg-emerald-500/20 text-emerald-400'
+                <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-lg text-xs font-bold uppercase ${product.type === 'service' ? 'bg-violet-500/20 text-violet-400' : 'bg-emerald-500/20 text-emerald-400'
                     }`}>
                     {product.type}
                 </span>
                 {product.aiEnriched && (
-                    <span className="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-primary/20 text-primary text-[10px] font-bold">
+                    <span className="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-primary/20 text-primary text-xs font-bold">
                         ✨ AI Enriched
                     </span>
                 )}
                 {product.source !== 'manual' && (
-                    <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-lg bg-white/10 text-white/60 text-[10px] font-bold capitalize">
+                    <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-lg bg-white/10 text-white/60 text-xs font-bold capitalize">
                         via {product.source}
                     </span>
                 )}
@@ -238,38 +238,38 @@ function ProductCard({ product, onEdit, onDelete, onEnrich }) {
 
             {/* Info */}
             <div className="p-4">
-                <h4 className="text-sm font-bold text-white truncate">{product.title}</h4>
+                <h4 className="text-base font-bold text-white truncate">{product.title}</h4>
                 <div className="flex items-center gap-1.5 mt-1">
                     {product.source && product.source !== 'manual' && (
-                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${product.source === 'shopify_public' || product.source === 'shopify' ? 'bg-green-500/15 text-green-400' :
-                                product.source === 'website_scan' ? 'bg-blue-500/15 text-blue-400' : 'bg-slate-500/15 text-slate-400'
+                        <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${product.source === 'shopify_public' || product.source === 'shopify' ? 'bg-green-500/15 text-green-400' :
+                            product.source === 'website_scan' ? 'bg-blue-500/15 text-blue-400' : 'bg-slate-500/15 text-slate-400'
                             }`}>
                             {product.source === 'shopify_public' || product.source === 'shopify' ? '🛒 Shopify' :
                                 product.source === 'website_scan' ? '🌐 Scanned' : product.source}
                         </span>
                     )}
                     {product.aiEnriched && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 font-bold">✨ AI</span>
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 font-bold">✨ AI</span>
                     )}
                 </div>
                 {product.category && (
-                    <p className="text-[10px] text-slate-500 mt-0.5">{product.category}{product.subCategory ? ` › ${product.subCategory}` : ''}</p>
+                    <p className="text-sm text-slate-500 mt-0.5">{product.category}{product.subCategory ? ` › ${product.subCategory}` : ''}</p>
                 )}
                 {price > 0 && (
                     <div className="flex items-center gap-2 mt-1.5">
                         <span className="text-sm font-extrabold text-primary">₹{price.toLocaleString()}</span>
                         {product.price?.mrp > price && (
-                            <span className="text-xs text-slate-500 line-through">₹{product.price.mrp.toLocaleString()}</span>
+                            <span className="text-sm text-slate-500 line-through">₹{product.price.mrp.toLocaleString()}</span>
                         )}
                     </div>
                 )}
                 {product.features?.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
                         {product.features.slice(0, 2).map((f, i) => (
-                            <span key={i} className="px-1.5 py-0.5 rounded bg-white/[0.04] text-[10px] text-slate-400 truncate max-w-[120px]">{f}</span>
+                            <span key={i} className="px-1.5 py-0.5 rounded bg-white/[0.04] text-sm text-slate-400 truncate max-w-[120px]">{f}</span>
                         ))}
                         {product.features.length > 2 && (
-                            <span className="text-[10px] text-slate-500">+{product.features.length - 2} more</span>
+                            <span className="text-sm text-slate-500">+{product.features.length - 2} more</span>
                         )}
                     </div>
                 )}
@@ -277,17 +277,17 @@ function ProductCard({ product, onEdit, onDelete, onEnrich }) {
                 {/* Actions */}
                 <div className="flex gap-1.5 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => onEdit(product)} title="Edit"
-                        className="flex-1 py-1.5 rounded-lg glass-panel text-[10px] text-slate-400 hover:text-white transition-all cursor-pointer font-bold">
+                        className="flex-1 py-1.5 rounded-lg glass-panel text-sm text-slate-400 hover:text-white transition-all cursor-pointer font-bold">
                         <span className="material-symbols-outlined text-xs">edit</span> Edit
                     </button>
                     <button onClick={handleEnrich} disabled={enriching} title="AI Enrich"
-                        className="flex-1 py-1.5 rounded-lg glass-panel text-[10px] text-primary hover:bg-primary/10 transition-all cursor-pointer font-bold disabled:opacity-50">
+                        className="flex-1 py-1.5 rounded-lg glass-panel text-sm text-primary hover:bg-primary/10 transition-all cursor-pointer font-bold disabled:opacity-50">
                         <span className={`material-symbols-outlined text-xs ${enriching ? 'animate-spin' : ''}`}>
                             {enriching ? 'progress_activity' : 'auto_awesome'}
                         </span> {enriching ? '...' : 'Enrich'}
                     </button>
                     <button onClick={handleDelete} disabled={deleting} title="Archive"
-                        className="py-1.5 px-2 rounded-lg glass-panel text-[10px] text-rose-400 hover:bg-rose-400/10 transition-all cursor-pointer disabled:opacity-50">
+                        className="py-1.5 px-2 rounded-lg glass-panel text-sm text-rose-400 hover:bg-rose-400/10 transition-all cursor-pointer disabled:opacity-50">
                         <span className="material-symbols-outlined text-xs">delete</span>
                     </button>
                 </div>
@@ -409,9 +409,9 @@ function ProductCatalog({ brandId, brandWebsite }) {
                 <div className="mb-5 p-4 rounded-xl bg-cyan-500/5 border border-cyan-500/20 animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
                         <span className="material-symbols-outlined text-cyan-400 text-lg">smart_toy</span>
-                        <h4 className="text-sm font-bold text-white">AI Product Scanner</h4>
+                        <h4 className="text-base font-bold text-white">AI Product Scanner</h4>
                     </div>
-                    <p className="text-xs text-slate-400 mb-3">
+                    <p className="text-sm text-slate-400 mb-3">
                         {brandWebsite
                             ? `Your brand website (${brandWebsite}) is pre-filled. Change the URL below if you have a different products page.`
                             : 'Enter your website URL — our AI agent will discover all products/services and auto-add them to your catalog.'}
@@ -439,8 +439,8 @@ function ProductCatalog({ brandId, brandWebsite }) {
                     <div className="flex items-center gap-3">
                         <span className="material-symbols-outlined text-2xl text-cyan-400 animate-spin">progress_activity</span>
                         <div>
-                            <p className="text-sm font-bold text-white">AI Agent is scanning your website...</p>
-                            <p className="text-xs text-slate-400 mt-0.5">Discovering products, extracting details, images, and pricing. This may take a minute.</p>
+                            <p className="text-base font-bold text-white">AI Agent is scanning your website...</p>
+                            <p className="text-sm text-slate-400 mt-0.5">Discovering products, extracting details, images, and pricing. This may take a minute.</p>
                         </div>
                     </div>
                 </div>
@@ -466,7 +466,7 @@ function ProductCatalog({ brandId, brandWebsite }) {
                         </button>
                     </div>
                     {scanResult.productsCreated > 0 && (
-                        <p className="text-xs text-slate-400 mt-1 ml-7">
+                        <p className="text-sm text-slate-400 mt-1 ml-7">
                             ✅ {scanResult.productsCreated} products added
                             {scanResult.productsSkipped > 0 && ` • ⏭️ ${scanResult.productsSkipped} duplicates skipped`}
                         </p>
@@ -512,12 +512,12 @@ function ProductCatalog({ brandId, brandWebsite }) {
                     {total > 12 && (
                         <div className="flex items-center justify-center gap-3 mt-5">
                             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
-                                className="glass-panel py-1.5 px-3 rounded-lg text-xs text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer">
+                                className="glass-panel py-1.5 px-3 rounded-lg text-sm text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer">
                                 <span className="material-symbols-outlined text-sm">chevron_left</span> Prev
                             </button>
-                            <span className="text-xs text-slate-500">Page {page} of {Math.ceil(total / 12)}</span>
+                            <span className="text-sm text-slate-500">Page {page} of {Math.ceil(total / 12)}</span>
                             <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / 12)}
-                                className="glass-panel py-1.5 px-3 rounded-lg text-xs text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer">
+                                className="glass-panel py-1.5 px-3 rounded-lg text-sm text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer">
                                 Next <span className="material-symbols-outlined text-sm">chevron_right</span>
                             </button>
                         </div>
@@ -591,15 +591,15 @@ export default function BrandDNA() {
                     {brand.website && <p className="text-sm text-primary">{brand.website}</p>}
                     {dna.brandDescription && <p className="text-sm text-slate-400 mt-1 line-clamp-2">{dna.brandDescription}</p>}
                     <div className="flex gap-2 mt-2">
-                        {dna.industry && <span className="px-2 py-0.5 rounded-lg bg-white/[0.06] text-[10px] text-slate-400">{dna.industry}</span>}
-                        <span className="px-2 py-0.5 rounded-lg bg-white/[0.06] text-[10px] text-slate-400 capitalize">{brand.onboardingMethod}</span>
-                        <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${brand.status === 'active' ? 'bg-emerald-400/10 text-emerald-400' : 'bg-slate-500/10 text-slate-500'}`}>{brand.status}</span>
+                        {dna.industry && <span className="px-2 py-0.5 rounded-lg bg-white/[0.06] text-sm text-slate-400">{dna.industry}</span>}
+                        <span className="px-2 py-0.5 rounded-lg bg-white/[0.06] text-sm text-slate-400 capitalize">{brand.onboardingMethod}</span>
+                        <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${brand.status === 'active' ? 'bg-emerald-400/10 text-emerald-400' : 'bg-slate-500/10 text-slate-500'}`}>{brand.status}</span>
                     </div>
                 </div>
                 {brand.aiContext?.totalFeedback > 0 && (
                     <div className="text-center glass-panel px-5 py-3 rounded-xl">
                         <p className="text-2xl font-extrabold text-primary">{brand.aiContext.totalFeedback}</p>
-                        <p className="text-[10px] text-slate-500">AI learnings</p>
+                        <p className="text-sm text-slate-500">AI learnings</p>
                     </div>
                 )}
             </div>
@@ -616,9 +616,9 @@ export default function BrandDNA() {
                                 <div key={i} className="text-center group">
                                     <div className="w-16 h-16 rounded-xl border border-white/[0.1] shadow-lg group-hover:scale-110 transition-transform"
                                         style={{ background: c.hex }} />
-                                    <p className="text-xs text-white mt-2 font-medium">{c.name}</p>
-                                    <p className="text-[10px] text-slate-500 font-mono">{c.hex}</p>
-                                    <p className="text-[10px] text-primary capitalize">{c.usage}</p>
+                                    <p className="text-sm text-white mt-2 font-medium">{c.name}</p>
+                                    <p className="text-sm text-slate-500 font-mono">{c.hex}</p>
+                                    <p className="text-sm text-primary capitalize">{c.usage}</p>
                                 </div>
                             ))}
                         </div>
@@ -640,9 +640,9 @@ export default function BrandDNA() {
                                 { label: 'Accent', data: dna.fonts.accent },
                             ].filter(f => f.data?.family).map((f, i) => (
                                 <div key={i} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                                    <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">{f.label} Font</p>
+                                    <p className="text-sm text-slate-500 uppercase tracking-widest mb-1">{f.label} Font</p>
                                     <p className="text-lg text-white font-bold" style={{ fontFamily: f.data.family }}>{f.data.family}</p>
-                                    <p className="text-xs text-slate-400">Weight: {f.data.weight || 'Regular'} • Style: {f.data.style || 'Normal'}</p>
+                                    <p className="text-sm text-slate-400">Weight: {f.data.weight || 'Regular'} • Style: {f.data.style || 'Normal'}</p>
                                 </div>
                             ))}
                         </div>
@@ -669,7 +669,7 @@ export default function BrandDNA() {
                                 )}
                                 {voice.keywords?.length > 0 && (
                                     <div className="mt-4">
-                                        <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Brand Keywords</p>
+                                        <p className="text-sm text-slate-500 uppercase tracking-widest mb-2">Brand Keywords</p>
                                         <div className="flex flex-wrap gap-2">
                                             {voice.keywords.map((k, i) => (
                                                 <span key={i} className="px-3 py-1 rounded-lg bg-primary/10 text-primary text-xs font-medium">{k}</span>
@@ -688,14 +688,14 @@ export default function BrandDNA() {
                                 ].filter(v => v.value !== undefined).map((v, i) => (
                                     <div key={i} className="p-3 rounded-xl bg-white/[0.03]">
                                         <div className="flex items-center justify-between mb-1.5">
-                                            <span className="text-xs font-bold text-white">{v.label}</span>
-                                            <span className="text-xs text-primary font-bold">{v.value}%</span>
+                                            <span className="text-sm font-bold text-white">{v.label}</span>
+                                            <span className="text-sm text-primary font-bold">{v.value}%</span>
                                         </div>
                                         <div className="relative">
                                             <div className="progress-bar"><div className="progress-bar-fill" style={{ width: `${v.value}%` }} /></div>
                                             <div className="flex justify-between mt-1">
-                                                <span className="text-[10px] text-slate-600">{v.low}</span>
-                                                <span className="text-[10px] text-slate-600">{v.high}</span>
+                                                <span className="text-xs text-slate-600">{v.low}</span>
+                                                <span className="text-xs text-slate-600">{v.high}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -716,7 +716,7 @@ export default function BrandDNA() {
                         <div className="space-y-4">
                             {dna.contentStyle.dos?.length > 0 && (
                                 <div>
-                                    <p className="text-xs text-emerald-400 font-bold mb-2">✅ ALWAYS</p>
+                                    <p className="text-sm text-emerald-400 font-bold mb-2">✅ ALWAYS</p>
                                     <ul className="space-y-1.5">
                                         {dna.contentStyle.dos.map((d, i) => (
                                             <li key={i} className="text-sm text-slate-300 flex items-start gap-2">
@@ -728,7 +728,7 @@ export default function BrandDNA() {
                             )}
                             {dna.contentStyle.donts?.length > 0 && (
                                 <div>
-                                    <p className="text-xs text-rose-400 font-bold mb-2">❌ NEVER</p>
+                                    <p className="text-sm text-rose-400 font-bold mb-2">❌ NEVER</p>
                                     <ul className="space-y-1.5">
                                         {dna.contentStyle.donts.map((d, i) => (
                                             <li key={i} className="text-sm text-slate-300 flex items-start gap-2">
@@ -753,24 +753,59 @@ export default function BrandDNA() {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="p-3 rounded-xl bg-white/[0.03] text-center">
                                 <p className="text-2xl font-extrabold text-primary">{brand.aiContext?.totalFeedback || 0}</p>
-                                <p className="text-[10px] text-slate-500">Feedback Signals</p>
+                                <p className="text-sm text-slate-500">Feedback Signals</p>
                             </div>
                             <div className="p-3 rounded-xl bg-white/[0.03] text-center">
                                 <p className="text-2xl font-extrabold text-emerald-400">
                                     {brand.aiContext?.avgRating ? `${(brand.aiContext.avgRating * 100).toFixed(0)}%` : '—'}
                                 </p>
-                                <p className="text-[10px] text-slate-500">Satisfaction</p>
+                                <p className="text-sm text-slate-500">Satisfaction</p>
                             </div>
                         </div>
                         <div className="p-4 rounded-xl bg-gradient-to-r from-primary/5 to-purple-500/5 border border-primary/10">
-                            <p className="text-xs text-primary font-bold mb-1">🧠 How the AI learns</p>
-                            <p className="text-[10px] text-slate-400 leading-relaxed">
+                            <p className="text-sm text-primary font-bold mb-1">🧠 How the AI learns</p>
+                            <p className="text-sm text-slate-400 leading-relaxed">
                                 Every like, dislike, edit, and regeneration teaches the AI your preferences.
                                 After enough feedback, generated content becomes indistinguishable from your own writing.
                             </p>
                         </div>
                     </div>
                 </div>
+
+                {/* ═══════════════════ BRAND IMAGES ═══════════════════ */}
+                {(dna.brandImages?.length > 0 || dna.bannerImages?.length > 0) && (
+                    <div className="col-span-12 glass-panel rounded-2xl p-6 animate-fade-in" style={{ animationDelay: '460ms' }}>
+                        <div className="flex items-center justify-between mb-5">
+                            <h3 className="font-bold text-white flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary">photo_library</span>
+                                Brand Images
+                                <span className="ml-2 px-2 py-0.5 rounded-lg bg-primary/10 text-primary text-xs font-bold">
+                                    {(dna.brandImages || dna.bannerImages || []).length}
+                                </span>
+                            </h3>
+                            <p className="text-sm text-slate-500">Scraped from your website • Available in Creative Studio</p>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                            {/* Upload placeholder */}
+                            <div className="rounded-xl border-2 border-dashed border-white/[0.08] hover:border-primary/30 flex flex-col items-center justify-center py-8 cursor-pointer transition-colors bg-white/[0.02]">
+                                <span className="material-symbols-outlined text-2xl text-slate-600 mb-1">cloud_upload</span>
+                                <span className="text-sm text-slate-500">Upload More</span>
+                            </div>
+                            {(dna.brandImages || dna.bannerImages || []).map((img, i) => (
+                                <div key={i} className="rounded-xl overflow-hidden border border-white/[0.08] bg-white/[0.03] group relative">
+                                    <img src={img.url} alt={img.alt || `Brand image ${i + 1}`}
+                                        className="w-full h-28 object-cover group-hover:scale-105 transition-transform duration-300"
+                                        onError={e => e.target.parentElement.style.display = 'none'} />
+                                    {img.source && (
+                                        <span className="absolute bottom-1 right-1 text-[8px] text-white/60 bg-black/40 px-1.5 py-0.5 rounded capitalize backdrop-blur-sm">
+                                            {img.source}
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* ═══════════════════ PRODUCTS & SERVICES CATALOG ═══════════════════ */}
                 <ProductCatalog brandId={brand._id} brandWebsite={brand.website || ''} />

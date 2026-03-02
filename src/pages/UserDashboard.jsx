@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import { content as contentAPI, creatives as creativesAPI, trends as trendsAPI } from '../services/api'
 import { getUpcomingEvents, EVENT_COLORS } from '../data/calendarData'
+import SmartCommandBox from '../components/SmartCommandBox'
 
 export default function UserDashboard() {
     const navigate = useNavigate()
@@ -13,7 +14,6 @@ export default function UserDashboard() {
     const [recentContent, setRecentContent] = useState([])
     const [stats, setStats] = useState({ content: 0, creatives: 0 })
     const [loadingContent, setLoadingContent] = useState(true)
-    const [quickInput, setQuickInput] = useState('')
     const [trendingTopics, setTrendingTopics] = useState([])
     const [trendsLoading, setTrendsLoading] = useState(false)
     const [trendsError, setTrendsError] = useState('')
@@ -67,39 +67,20 @@ export default function UserDashboard() {
         return () => clearInterval(interval)
     }, [activeBrand?._id])
 
-    const handleQuickCreate = () => {
-        if (!quickInput.trim()) return
-        navigate(`/content-studio?prompt=${encodeURIComponent(quickInput)}`)
-    }
+
 
     return (
         <DashboardLayout>
             {/* Welcome Header */}
-            <div className="mb-8">
-                <h2 className="text-3xl font-extrabold tracking-tight mb-1">
+            <div className="mb-6 lg:mb-8">
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight mb-1">
                     Welcome back, <span className="text-primary">{user?.name || 'User'}</span>
                 </h2>
-                <p className="text-slate-400 text-sm">Your AI marketing command center.</p>
+                <p className="text-slate-400 text-xs sm:text-sm">Your AI marketing command center.</p>
             </div>
 
-            {/* Quick Create Box */}
-            <div className="glass-panel rounded-2xl p-5 mb-6 border border-primary/10 bg-gradient-to-r from-primary/5 to-transparent">
-                <div className="flex items-center gap-3 mb-3">
-                    <span className="material-symbols-outlined text-primary text-xl">auto_awesome</span>
-                    <h3 className="font-bold text-white text-sm">Quick Create</h3>
-                </div>
-                <div className="relative">
-                    <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-primary text-lg">edit_note</span>
-                    <input value={quickInput} onChange={e => setQuickInput(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleQuickCreate()}
-                        placeholder="E.g., 'Instagram post for Diwali sale' or 'LinkedIn thought leadership on AI'"
-                        className="input-glass w-full pl-12 pr-24 py-3.5 text-white rounded-xl text-sm" />
-                    <button onClick={handleQuickCreate}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 btn-primary py-2 px-4 rounded-lg text-xs cursor-pointer">
-                        Create →
-                    </button>
-                </div>
-            </div>
+            {/* 🤖 Smart Command Box — Agentic AI Assistant */}
+            <SmartCommandBox variant="dashboard" className="mb-6" />
 
             {/* Stats Row */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -109,12 +90,12 @@ export default function UserDashboard() {
                     { label: 'Creatives Made', value: user?.usage?.creativesGenerated || stats.creatives, icon: 'image', color: 'text-purple-400' },
                     { label: 'Upcoming Events', value: upcoming.length, icon: 'calendar_month', color: 'text-amber-400' },
                 ].map((s, i) => (
-                    <div key={i} className="glass-panel rounded-2xl p-5 animate-fade-in" style={{ animationDelay: `${i * 80}ms` }}>
+                    <div key={i} className="glass-panel rounded-2xl p-4 lg:p-5 animate-fade-in" style={{ animationDelay: `${i * 80}ms` }}>
                         <div className="flex items-center justify-between mb-3">
                             <span className={`material-symbols-outlined text-xl ${s.color}`}>{s.icon}</span>
                         </div>
-                        <p className="text-2xl font-extrabold text-white">{s.value}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
+                        <p className="text-xl lg:text-2xl font-extrabold text-white">{s.value}</p>
+                        <p className="text-sm text-slate-500 mt-0.5">{s.label}</p>
                     </div>
                 ))}
             </div>
@@ -124,17 +105,17 @@ export default function UserDashboard() {
                 <div className="col-span-12 lg:col-span-8 space-y-6">
                     {/* Upcoming Festivals */}
                     {upcoming.length > 0 && (
-                        <div className="glass-panel rounded-2xl p-6">
+                        <div className="glass-panel rounded-2xl p-4 lg:p-6">
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="font-bold text-white flex items-center gap-2">
                                     <span className="material-symbols-outlined text-amber-400">celebration</span>
                                     Upcoming Opportunities
                                 </h3>
-                                <button onClick={() => navigate('/smart-calendar')} className="text-xs text-primary hover:text-primary-light transition-colors cursor-pointer font-bold flex items-center gap-1">
+                                <button onClick={() => navigate('/smart-calendar')} className="text-sm text-primary hover:text-primary-light transition-colors cursor-pointer font-bold flex items-center gap-1">
                                     View Calendar →
                                 </button>
                             </div>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                                 {upcoming.slice(0, 6).map((e, i) => {
                                     const color = EVENT_COLORS[e.type] || EVENT_COLORS.global
                                     return (
@@ -144,16 +125,16 @@ export default function UserDashboard() {
                                             style={{ animationDelay: `${i * 60}ms`, borderColor: color.border + '20' }}>
                                             <div className="flex items-center justify-between mb-1.5">
                                                 <span className="text-xl">{e.emoji}</span>
-                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full
+                                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full
                                                     ${e.daysUntil <= 3 ? 'bg-rose-500/20 text-rose-400' :
                                                         e.daysUntil <= 7 ? 'bg-amber-500/20 text-amber-400' :
                                                             'bg-primary/20 text-primary'}`}>
                                                     {e.daysUntil === 0 ? 'TODAY' : e.daysUntil === 1 ? 'TOMORROW' : `${e.daysUntil}d`}
                                                 </span>
                                             </div>
-                                            <p className="text-sm font-bold text-white truncate">{e.name}</p>
-                                            <p className="text-[10px] text-slate-500">Suggested: {e.tone} • {e.formats?.join(', ')}</p>
-                                            <div className="flex items-center gap-1 mt-2 text-primary text-[10px] font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <p className="text-base font-bold text-white truncate">{e.name}</p>
+                                            <p className="text-sm text-slate-500">Suggested: {e.tone} • {e.formats?.join(', ')}</p>
+                                            <div className="flex items-center gap-1 mt-2 text-primary text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <span className="material-symbols-outlined text-xs">auto_awesome</span> Generate Content
                                             </div>
                                         </button>
@@ -164,14 +145,14 @@ export default function UserDashboard() {
                     )}
 
                     {/* 🔥 Trending Now */}
-                    <div className="glass-panel rounded-2xl p-6 border border-rose-500/10 bg-gradient-to-br from-rose-500/[0.03] to-orange-500/[0.03]">
+                    <div className="glass-panel rounded-2xl p-4 lg:p-6 border border-rose-500/10 bg-gradient-to-br from-rose-500/[0.03] to-orange-500/[0.03]">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="font-bold text-white flex items-center gap-2">
                                 <span className="material-symbols-outlined text-rose-400">local_fire_department</span>
                                 Trending Now
                                 <span className="flex items-center gap-1 ml-1">
                                     <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-                                    <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider">Live</span>
+                                    <span className="text-sm text-emerald-400 font-bold uppercase tracking-wider">Live</span>
                                 </span>
                             </h3>
                             <button
@@ -185,7 +166,7 @@ export default function UserDashboard() {
                                         setTrendingTopics(data.trends || [])
                                     } catch { } finally { setTrendsLoading(false) }
                                 }}
-                                className="text-xs text-rose-400 hover:text-rose-300 transition-colors cursor-pointer font-bold flex items-center gap-1">
+                                className="text-sm text-rose-400 hover:text-rose-300 transition-colors cursor-pointer font-bold flex items-center gap-1">
                                 <span className="material-symbols-outlined text-sm">refresh</span> Refresh
                             </button>
                         </div>
@@ -214,33 +195,33 @@ export default function UserDashboard() {
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-0.5">
-                                                <p className="text-sm font-bold text-white truncate">{trend.title}</p>
+                                                <p className="text-base font-bold text-white truncate">{trend.title}</p>
                                                 {trend.urgency === 'high' && (
-                                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold shrink-0">🔥 HOT</span>
+                                                    <span className="text-xs px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold shrink-0">🔥 HOT</span>
                                                 )}
                                             </div>
                                             {trend.contentIdea && (
-                                                <p className="text-xs text-slate-400 truncate">💡 {trend.contentIdea}</p>
+                                                <p className="text-sm text-slate-400 truncate">💡 {trend.contentIdea}</p>
                                             )}
                                             {trend.angle && (
-                                                <p className="text-[10px] text-slate-500 truncate mt-0.5">🎯 {trend.angle}</p>
+                                                <p className="text-sm text-slate-500 truncate mt-0.5">🎯 {trend.angle}</p>
                                             )}
                                             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                                <span className="text-[10px] text-slate-600">{trend.source}</span>
+                                                <span className="text-xs text-slate-600">{trend.source}</span>
                                                 {trend.traffic && (
-                                                    <span className="text-[10px] text-slate-600">• {trend.traffic}</span>
+                                                    <span className="text-xs text-slate-600">• {trend.traffic}</span>
                                                 )}
                                                 {trend.relevance && (
-                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${trend.relevance >= 80 ? 'bg-emerald-500/15 text-emerald-400' :
+                                                    <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${trend.relevance >= 80 ? 'bg-emerald-500/15 text-emerald-400' :
                                                         trend.relevance >= 60 ? 'bg-amber-500/15 text-amber-400' : 'bg-slate-500/15 text-slate-400'
                                                         }`}>{trend.relevance}% match</span>
                                                 )}
                                                 {trend.format && (
-                                                    <span className="text-[10px] text-primary/60 font-medium">{trend.format}</span>
+                                                    <span className="text-sm text-primary/60 font-medium">{trend.format}</span>
                                                 )}
                                             </div>
                                             {trend.hashtags?.length > 0 && (
-                                                <p className="text-[10px] text-blue-400/50 mt-1 truncate">{trend.hashtags.slice(0, 3).join(' ')}</p>
+                                                <p className="text-sm text-blue-400/50 mt-1 truncate">{trend.hashtags.slice(0, 3).join(' ')}</p>
                                             )}
                                         </div>
                                         <button
@@ -252,7 +233,7 @@ export default function UserDashboard() {
                                                 })
                                                 navigate(`/content-studio?${params.toString()}`)
                                             }}
-                                            className="shrink-0 px-3 py-2 rounded-lg bg-rose-500/10 text-rose-400 text-[10px] font-bold hover:bg-rose-500/20 transition-all cursor-pointer opacity-60 group-hover:opacity-100 flex items-center gap-1 border border-rose-500/20">
+                                            className="shrink-0 px-3 py-2 rounded-lg bg-rose-500/10 text-rose-400 text-xs font-bold hover:bg-rose-500/20 transition-all cursor-pointer opacity-60 group-hover:opacity-100 flex items-center gap-1 border border-rose-500/20">
                                             <span className="material-symbols-outlined text-xs">auto_awesome</span>
                                             Create
                                         </button>
@@ -263,13 +244,13 @@ export default function UserDashboard() {
                     </div>
 
                     {/* Brand Projects */}
-                    <div className="glass-panel rounded-2xl p-6">
+                    <div className="glass-panel rounded-2xl p-4 lg:p-6">
                         <div className="flex items-center justify-between mb-5">
                             <h3 className="font-bold text-white flex items-center gap-2">
                                 <span className="material-symbols-outlined text-primary">storefront</span>
                                 Your Brands
                             </h3>
-                            <button onClick={() => navigate('/onboarding')} className="text-xs text-primary hover:text-primary-light transition-colors cursor-pointer font-bold flex items-center gap-1">
+                            <button onClick={() => navigate('/onboarding')} className="text-sm text-primary hover:text-primary-light transition-colors cursor-pointer font-bold flex items-center gap-1">
                                 <span className="material-symbols-outlined text-sm">add</span> Add Brand
                             </button>
                         </div>
@@ -302,16 +283,16 @@ export default function UserDashboard() {
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2">
                                                 <p className="font-bold text-white">{brand.name}</p>
-                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${brand.status === 'active' ? 'bg-emerald-400/10 text-emerald-400' : 'bg-slate-500/10 text-slate-500'
+                                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${brand.status === 'active' ? 'bg-emerald-400/10 text-emerald-400' : 'bg-slate-500/10 text-slate-500'
                                                     }`}>{brand.status || 'active'}</span>
                                             </div>
-                                            <p className="text-xs text-slate-500">{brand.website || brand.onboardingMethod || 'No website'}</p>
+                                            <p className="text-sm text-slate-500">{brand.website || brand.onboardingMethod || 'No website'}</p>
                                         </div>
                                         <div className="text-right">
                                             {brand.dna?.voice?.personality && (
-                                                <p className="text-xs text-primary font-medium">{brand.dna.voice.personality}</p>
+                                                <p className="text-sm text-primary font-medium">{brand.dna.voice.personality}</p>
                                             )}
-                                            <p className="text-[10px] text-slate-600 mt-0.5">{new Date(brand.updatedAt || brand.createdAt).toLocaleDateString()}</p>
+                                            <p className="text-xs text-slate-600 mt-0.5">{new Date(brand.updatedAt || brand.createdAt).toLocaleDateString()}</p>
                                         </div>
                                         <span className="material-symbols-outlined text-slate-600">chevron_right</span>
                                     </div>
@@ -321,13 +302,13 @@ export default function UserDashboard() {
                     </div>
 
                     {/* Recent Content */}
-                    <div className="glass-panel rounded-2xl p-6">
+                    <div className="glass-panel rounded-2xl p-4 lg:p-6">
                         <div className="flex items-center justify-between mb-5">
                             <h3 className="font-bold text-white flex items-center gap-2">
                                 <span className="material-symbols-outlined text-primary">history</span>
                                 Recent Content
                             </h3>
-                            <button onClick={() => navigate('/content-studio')} className="text-xs text-primary hover:text-primary-light transition-colors cursor-pointer font-bold">
+                            <button onClick={() => navigate('/content-studio')} className="text-sm text-primary hover:text-primary-light transition-colors cursor-pointer font-bold">
                                 View All →
                             </button>
                         </div>
@@ -352,9 +333,9 @@ export default function UserDashboard() {
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm text-white truncate">{c.content?.substring(0, 80)}</p>
-                                            <p className="text-[10px] text-slate-500">{c.type} • {c.brand?.name || ''} • {new Date(c.createdAt).toLocaleDateString()}</p>
+                                            <p className="text-sm text-slate-500">{c.type} • {c.brand?.name || ''} • {new Date(c.createdAt).toLocaleDateString()}</p>
                                         </div>
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${c.status === 'published' ? 'bg-emerald-400/10 text-emerald-400' :
+                                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${c.status === 'published' ? 'bg-emerald-400/10 text-emerald-400' :
                                             c.status === 'approved' ? 'bg-primary/10 text-primary' :
                                                 'bg-slate-500/10 text-slate-500'
                                             }`}>{c.status}</span>
@@ -368,7 +349,7 @@ export default function UserDashboard() {
                 {/* Right Sidebar */}
                 <div className="col-span-12 lg:col-span-4 space-y-6">
                     {/* Quick Actions */}
-                    <div className="glass-panel rounded-2xl p-6">
+                    <div className="glass-panel rounded-2xl p-4 lg:p-6">
                         <h3 className="font-bold text-white flex items-center gap-2 mb-4">
                             <span className="material-symbols-outlined text-primary">flash_on</span>
                             Quick Actions
@@ -386,7 +367,7 @@ export default function UserDashboard() {
                                     <span className="material-symbols-outlined text-primary">{a.icon}</span>
                                     <div>
                                         <p className="text-sm text-white font-medium">{a.label}</p>
-                                        <p className="text-[10px] text-slate-500">{a.desc}</p>
+                                        <p className="text-sm text-slate-500">{a.desc}</p>
                                     </div>
                                 </button>
                             ))}
@@ -395,7 +376,7 @@ export default function UserDashboard() {
 
                     {/* Today's Suggestion */}
                     {upcoming.length > 0 && (
-                        <div className="glass-panel rounded-2xl p-6 bg-gradient-to-br from-amber-500/5 to-orange-500/5 border border-amber-500/10">
+                        <div className="glass-panel rounded-2xl p-4 lg:p-6 bg-gradient-to-br from-amber-500/5 to-orange-500/5 border border-amber-500/10">
                             <h3 className="font-bold text-white flex items-center gap-2 mb-3">
                                 <span className="material-symbols-outlined text-amber-400">tips_and_updates</span>
                                 AI Suggestion
@@ -405,7 +386,7 @@ export default function UserDashboard() {
                                     <span className="text-lg mr-1">{upcoming[0].emoji}</span>
                                     <strong>{upcoming[0].name}</strong> is {upcoming[0].daysUntil === 0 ? 'today' : upcoming[0].daysUntil === 1 ? 'tomorrow' : `in ${upcoming[0].daysUntil} days`}!
                                 </p>
-                                <p className="text-xs text-slate-500">
+                                <p className="text-sm text-slate-500">
                                     Suggested tone: <span className="text-amber-400">{upcoming[0].tone}</span> • Best formats: {upcoming[0].formats?.join(', ')}
                                 </p>
                                 <button onClick={() => navigate(`/content-studio?occasion=${encodeURIComponent(upcoming[0].name)}&tone=${upcoming[0].tone}`)}
@@ -418,14 +399,14 @@ export default function UserDashboard() {
                     )}
 
                     {/* Subscription */}
-                    <div className="glass-panel rounded-2xl p-6">
+                    <div className="glass-panel rounded-2xl p-4 lg:p-6">
                         <h3 className="font-bold text-white flex items-center gap-2 mb-4">
                             <span className="material-symbols-outlined text-amber-400">diamond</span>
                             Subscription
                         </h3>
                         <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-purple-500/10 border border-primary/20">
                             <p className="text-lg font-extrabold text-white capitalize">{user?.plan || 'Starter'} Plan</p>
-                            <p className="text-xs text-slate-400 mt-1">
+                            <p className="text-sm text-slate-400 mt-1">
                                 {user?.plan === 'enterprise' ? 'Unlimited access' :
                                     user?.plan === 'professional' ? '50 generations/month' : '10 generations/month'}
                             </p>

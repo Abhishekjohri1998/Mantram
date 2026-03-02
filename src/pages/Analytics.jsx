@@ -84,7 +84,7 @@ export default function Analytics() {
                             <div key={i} className="glass-panel rounded-2xl p-5 animate-fade-in" style={{ animationDelay: `${i * 80}ms` }}>
                                 <span className={`material-symbols-outlined text-xl ${s.color} mb-2 block`}>{s.icon}</span>
                                 <p className="text-2xl font-extrabold text-white">{s.value}</p>
-                                <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
+                                <p className="text-sm text-slate-500 mt-0.5">{s.label}</p>
                             </div>
                         ))}
                     </div>
@@ -104,7 +104,7 @@ export default function Analytics() {
                                             <div key={type}>
                                                 <div className="flex items-center justify-between mb-1">
                                                     <span className="text-sm text-white capitalize font-medium">{type}</span>
-                                                    <span className="text-xs text-slate-400">{count} ({pct}%)</span>
+                                                    <span className="text-sm text-slate-400">{count} ({pct}%)</span>
                                                 </div>
                                                 <div className="w-full h-2 rounded-full bg-white/[0.05]">
                                                     <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: colors[type] || '#2B4BEE' }} />
@@ -127,17 +127,17 @@ export default function Analytics() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="p-4 rounded-xl bg-white/[0.03] text-center">
                                         <p className="text-2xl font-extrabold text-primary">{avgScore || '—'}%</p>
-                                        <p className="text-[10px] text-slate-500 mt-1">Avg Brand Alignment</p>
+                                        <p className="text-sm text-slate-500 mt-1">Avg Brand Alignment</p>
                                     </div>
                                     <div className="p-4 rounded-xl bg-white/[0.03] text-center">
                                         <p className="text-2xl font-extrabold text-emerald-400">{activeBrand?.aiContext?.totalFeedback || 0}</p>
-                                        <p className="text-[10px] text-slate-500 mt-1">Feedback Signals</p>
+                                        <p className="text-sm text-slate-500 mt-1">Feedback Signals</p>
                                     </div>
                                 </div>
 
                                 <div className="p-4 rounded-xl bg-gradient-to-r from-primary/5 to-purple-500/5 border border-primary/10">
-                                    <p className="text-xs text-primary font-bold mb-1">📈 AI Improvement</p>
-                                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                                    <p className="text-sm text-primary font-bold mb-1">📈 AI Improvement</p>
+                                    <p className="text-sm text-slate-400 leading-relaxed">
                                         {(activeBrand?.aiContext?.totalFeedback || 0) > 10
                                             ? 'The AI has received enough feedback to start producing noticeably better content aligned with your brand.'
                                             : 'Keep using the Content Studio and providing feedback — the AI improves after ~10 interactions.'}
@@ -155,7 +155,7 @@ export default function Analytics() {
                                 <p className="text-slate-500 text-sm text-center py-8">No content generated yet.</p>
                             ) : (
                                 <div className="space-y-2">
-                                    <div className="grid grid-cols-12 text-[10px] text-slate-500 uppercase tracking-widest font-bold px-4 py-2">
+                                    <div className="grid grid-cols-12 text-sm text-slate-500 uppercase tracking-widest font-bold px-4 py-2">
                                         <div className="col-span-1">Type</div>
                                         <div className="col-span-5">Preview</div>
                                         <div className="col-span-2">Status</div>
@@ -173,18 +173,18 @@ export default function Analytics() {
                                                 <p className="text-sm text-white truncate">{c.content?.substring(0, 60)}</p>
                                             </div>
                                             <div className="col-span-2">
-                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${c.status === 'published' ? 'bg-emerald-400/10 text-emerald-400' :
+                                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${c.status === 'published' ? 'bg-emerald-400/10 text-emerald-400' :
                                                         c.status === 'approved' ? 'bg-primary/10 text-primary' :
                                                             'bg-slate-500/10 text-slate-500'
                                                     }`}>{c.status}</span>
                                             </div>
                                             <div className="col-span-2">
                                                 {c.aiMeta?.brandAlignmentScore ? (
-                                                    <span className="text-xs text-emerald-400 font-bold">{c.aiMeta.brandAlignmentScore}%</span>
-                                                ) : <span className="text-xs text-slate-500">—</span>}
+                                                    <span className="text-sm text-emerald-400 font-bold">{c.aiMeta.brandAlignmentScore}%</span>
+                                                ) : <span className="text-sm text-slate-500">—</span>}
                                             </div>
                                             <div className="col-span-2">
-                                                <span className="text-[10px] text-slate-500">{new Date(c.createdAt).toLocaleDateString()}</span>
+                                                <span className="text-sm text-slate-500">{new Date(c.createdAt).toLocaleDateString()}</span>
                                             </div>
                                         </div>
                                     ))}

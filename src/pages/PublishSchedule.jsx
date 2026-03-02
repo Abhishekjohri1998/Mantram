@@ -118,7 +118,7 @@ export default function PublishSchedule() {
                             <span className="material-symbols-outlined text-lg">{tab.icon}</span>
                             {tab.label}
                             {counts[tab.id] > 0 && (
-                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${activeTab === tab.id ? 'bg-white/20' : 'bg-white/[0.06]'}`}>{counts[tab.id]}</span>
+                                <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${activeTab === tab.id ? 'bg-white/20' : 'bg-white/[0.06]'}`}>{counts[tab.id]}</span>
                             )}
                         </button>
                     ))}
@@ -146,11 +146,11 @@ export default function PublishSchedule() {
                                                 <h3 className="font-bold text-white truncate">
                                                     {item.title || `${item.type} content`}
                                                 </h3>
-                                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary uppercase">
+                                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary uppercase">
                                                     {item.type}
                                                 </span>
                                                 {(item.platform || item.channel) && (
-                                                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${ch.bg} ${ch.text}`}>
+                                                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ch.bg} ${ch.text}`}>
                                                         {ch.icon} {item.platform || item.channel}
                                                     </span>
                                                 )}
@@ -159,11 +159,11 @@ export default function PublishSchedule() {
                                                 {item.content?.substring(0, 300)}
                                             </p>
                                             <div className="flex items-center gap-3 mt-2">
-                                                <span className="text-[10px] text-slate-600">
+                                                <span className="text-xs text-slate-600">
                                                     {new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                                 </span>
                                                 {item.brand?.name && (
-                                                    <span className="text-[10px] text-slate-600">• {item.brand.name}</span>
+                                                    <span className="text-xs text-slate-600">• {item.brand.name}</span>
                                                 )}
                                             </div>
                                         </div>
@@ -180,7 +180,7 @@ export default function PublishSchedule() {
                                             </button>
                                             {item.status === 'draft' && (
                                                 <button onClick={() => handleStatusChange(item._id, 'approved')}
-                                                    className="px-3 py-2 rounded-lg bg-emerald-500/10 text-emerald-400 text-[10px] font-bold hover:bg-emerald-500/20 transition-all cursor-pointer flex items-center gap-1 border border-emerald-500/20">
+                                                    className="px-3 py-2 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 transition-all cursor-pointer flex items-center gap-1 border border-emerald-500/20">
                                                     <span className="material-symbols-outlined text-sm">check</span>
                                                     Approve
                                                 </button>
@@ -193,7 +193,7 @@ export default function PublishSchedule() {
                                                 </button>
                                             )}
                                             {item.status === 'published' && (
-                                                <span className="px-3 py-2 rounded-lg bg-emerald-500/10 text-emerald-400 text-[10px] font-bold flex items-center gap-1">
+                                                <span className="px-3 py-2 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-bold flex items-center gap-1">
                                                     <span className="material-symbols-outlined text-sm">task_alt</span>
                                                     Published
                                                 </span>
@@ -230,7 +230,7 @@ export default function PublishSchedule() {
                         <span className="material-symbols-outlined text-primary text-xl">rocket_launch</span>
                         <h3 className="font-bold text-white">Coming in V2</h3>
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {[
                             { icon: 'schedule_send', label: 'Auto Scheduling', desc: 'AI picks the best time to post' },
                             { icon: 'share', label: 'Direct Publishing', desc: 'Push to Instagram, Facebook, LinkedIn' },
@@ -239,7 +239,7 @@ export default function PublishSchedule() {
                             <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02]">
                                 <span className="material-symbols-outlined text-primary text-lg">{f.icon}</span>
                                 <div>
-                                    <p className="text-sm font-semibold text-white">{f.label}</p>
+                                    <p className="text-base font-semibold text-white">{f.label}</p>
                                     <p className="text-[11px] text-slate-500">{f.desc}</p>
                                 </div>
                             </div>

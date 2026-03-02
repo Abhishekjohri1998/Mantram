@@ -69,7 +69,16 @@ export const brands = {
     create: (data) => apiFetch('/brands', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => apiFetch(`/brands/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     updateDNA: (id, dnaUpdates) => apiFetch(`/brands/${id}/dna`, { method: 'PUT', body: JSON.stringify(dnaUpdates) }),
+    updateAutonomy: (id, settings) => apiFetch(`/brands/${id}/autonomy`, { method: 'PUT', body: JSON.stringify(settings) }),
     delete: (id) => apiFetch(`/brands/${id}`, { method: 'DELETE' }),
+    // Custom Templates
+    getTemplates: (id) => apiFetch(`/brands/${id}/templates`),
+    saveTemplate: (id, data) => apiFetch(`/brands/${id}/templates`, { method: 'POST', body: JSON.stringify(data) }),
+    deleteTemplate: (id, templateId) => apiFetch(`/brands/${id}/templates/${templateId}`, { method: 'DELETE' }),
+    // Custom Categories
+    getCategories: (id) => apiFetch(`/brands/${id}/categories`),
+    saveCategory: (id, data) => apiFetch(`/brands/${id}/categories`, { method: 'POST', body: JSON.stringify(data) }),
+    deleteCategory: (id, categoryId) => apiFetch(`/brands/${id}/categories/${categoryId}`, { method: 'DELETE' }),
 };
 
 // ============ Content API ============
@@ -260,6 +269,11 @@ export const brainstormStudio = {
     chat: (data) => apiFetch('/brainstorm-studio/chat', { method: 'POST', body: JSON.stringify(data) }),
 };
 
+// ============ Agent Command API ============
+export const agentCommand = {
+    chat: (data) => apiFetch('/agent-command/chat', { method: 'POST', body: JSON.stringify(data) }),
+};
+
 // ============ SEO Studio API ============
 export const seoStudio = {
     healthCheck: (data) => apiFetch('/seo-studio/health-check', { method: 'POST', body: JSON.stringify(data) }),
@@ -287,3 +301,66 @@ export const googleAnalytics = {
     searchConsoleSites: () => apiFetch('/google-analytics/search-console/sites'),
     searchConsoleReport: (data) => apiFetch('/google-analytics/search-console/report', { method: 'POST', body: JSON.stringify(data) }),
 };
+
+// ============ Conversations API (Conversation Studio) ============
+export const conversations = {
+    list: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/conversations?${query}`);
+    },
+    get: (id) => apiFetch(`/conversations/${id}`),
+    reply: (id, data) => apiFetch(`/conversations/${id}/reply`, { method: 'POST', body: JSON.stringify(data) }),
+    takeover: (id) => apiFetch(`/conversations/${id}/takeover`, { method: 'POST' }),
+    resolve: (id) => apiFetch(`/conversations/${id}/resolve`, { method: 'POST' }),
+    toggleAI: (id, enabled) => apiFetch(`/conversations/${id}/ai-mode`, { method: 'POST', body: JSON.stringify({ enabled }) }),
+    suggestions: (id) => apiFetch(`/conversations/${id}/suggestions`),
+    stats: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/conversations/stats/overview?${query}`);
+    },
+};
+
+// ============ Contacts API (Conversation Studio CRM) ============
+export const contacts = {
+    list: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/contacts?${query}`);
+    },
+    get: (id) => apiFetch(`/contacts/${id}`),
+    update: (id, data) => apiFetch(`/contacts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id) => apiFetch(`/contacts/${id}`, { method: 'DELETE' }),
+    stats: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/contacts/stats/overview?${query}`);
+    },
+};
+
+// ============ Automations API (Conversation Studio) ============
+export const automations = {
+    recipes: () => apiFetch('/automations/recipes'),
+    fromRecipe: (data) => apiFetch('/automations/from-recipe', { method: 'POST', body: JSON.stringify(data) }),
+    create: (data) => apiFetch('/automations', { method: 'POST', body: JSON.stringify(data) }),
+    list: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/automations?${query}`);
+    },
+    get: (id) => apiFetch(`/automations/${id}`),
+    update: (id, data) => apiFetch(`/automations/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    toggle: (id) => apiFetch(`/automations/${id}/toggle`, { method: 'POST' }),
+    delete: (id) => apiFetch(`/automations/${id}`, { method: 'DELETE' }),
+    stats: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/automations/stats/overview?${query}`);
+    },
+};
+
+// ============ Routing Rules API (AI Smart Routing) ============
+export const routingRules = {
+    list: (brandId) => apiFetch(`/routing-rules?brandId=${brandId}`),
+    create: (data) => apiFetch('/routing-rules', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id, data) => apiFetch(`/routing-rules/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id, brandId) => apiFetch(`/routing-rules/${id}?brandId=${brandId}`, { method: 'DELETE' }),
+    reorder: (data) => apiFetch('/routing-rules/reorder', { method: 'POST', body: JSON.stringify(data) }),
+    test: (data) => apiFetch('/routing-rules/test', { method: 'POST', body: JSON.stringify(data) }),
+};
+

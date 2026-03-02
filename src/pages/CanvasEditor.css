@@ -1,0 +1,1850 @@
+/* ─── Canvas Editor — Full Layout System ─── */
+
+.canvas-editor {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: #0a0e1a;
+    color: #e2e8f0;
+    overflow: hidden;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* ─── Top Toolbar ─── */
+.ce-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    padding: 0 16px;
+    background: rgba(15, 20, 35, 0.95);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(16px);
+    z-index: 50;
+    flex-shrink: 0;
+}
+
+.ce-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ce-toolbar-center {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
+    padding: 4px;
+}
+
+.ce-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ce-back-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #94a3b8;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ce-back-btn:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.ce-tool-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 20px;
+}
+
+.ce-tool-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #e2e8f0;
+}
+
+.ce-tool-btn.active {
+    background: rgba(99, 102, 241, 0.2);
+    color: #818cf8;
+}
+
+.ce-tool-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.ce-tool-btn-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    height: 36px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.ce-tool-btn-label:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #e2e8f0;
+}
+
+.ce-tool-btn-label.active {
+    background: rgba(99, 102, 241, 0.2);
+    color: #818cf8;
+}
+
+.ce-divider {
+    width: 1px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.08);
+    margin: 0 4px;
+}
+
+.ce-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
+}
+
+.ce-mode-btn {
+    padding: 6px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #64748b;
+    background: transparent;
+}
+
+.ce-mode-btn.active {
+    background: rgba(99, 102, 241, 0.2);
+    color: #818cf8;
+    box-shadow: 0 0 12px rgba(99, 102, 241, 0.1);
+}
+
+.ce-mode-btn:hover:not(.active) {
+    color: #94a3b8;
+}
+
+.ce-save-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 20px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.ce-save-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+}
+
+/* ─── Main Content Area ─── */
+.ce-main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* ─── Left Sidebar (Advanced Mode) — Canva-style Icon Rail + Panel ─── */
+.ce-sidebar-left {
+    display: flex;
+    flex-direction: row;
+    flex-shrink: 0;
+    height: 100%;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ce-sidebar-left.collapsed {
+    width: 0;
+    overflow: hidden;
+}
+
+/* ── Vertical Icon Rail ── */
+.ce-icon-rail {
+    width: 72px;
+    background: rgba(8, 12, 24, 0.98);
+    border-right: 1px solid rgba(255, 255, 255, 0.04);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 0;
+    gap: 2px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex-shrink: 0;
+    z-index: 10;
+}
+
+.ce-icon-rail::-webkit-scrollbar {
+    width: 0;
+}
+
+.ce-rail-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 60px;
+    height: 56px;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    padding: 4px 0;
+}
+
+.ce-rail-btn .ce-rail-icon {
+    font-size: 22px;
+    transition: all 0.2s;
+}
+
+.ce-rail-btn .ce-rail-label {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.ce-rail-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #94a3b8;
+}
+
+.ce-rail-btn.active {
+    background: rgba(99, 102, 241, 0.12);
+    color: #a5b4fc;
+}
+
+.ce-rail-btn.active::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    top: 12px;
+    bottom: 12px;
+    width: 3px;
+    background: #818cf8;
+    border-radius: 0 3px 3px 0;
+}
+
+/* AI tab highlight */
+.ce-rail-btn.ai-tab {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(236, 72, 153, 0.08));
+    border: 1px solid rgba(139, 92, 246, 0.15);
+}
+
+.ce-rail-btn.ai-tab:hover {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(236, 72, 153, 0.15));
+    border-color: rgba(139, 92, 246, 0.3);
+}
+
+.ce-rail-btn.ai-tab.active {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(236, 72, 153, 0.2));
+    border-color: rgba(139, 92, 246, 0.5);
+    color: #c4b5fd;
+}
+
+.ce-rail-btn.ai-tab.active::before {
+    background: linear-gradient(to bottom, #8b5cf6, #ec4899);
+}
+
+/* ── Content Panel ── */
+.ce-content-panel {
+    width: 320px;
+    background: rgba(12, 16, 30, 0.97);
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(20px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
+}
+
+.ce-content-panel.panel-collapsed {
+    width: 0;
+    opacity: 0;
+    border-right: none;
+}
+
+.ce-content-panel-inner {
+    width: 320px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.ce-content-panel-inner::-webkit-scrollbar {
+    width: 4px;
+}
+
+.ce-content-panel-inner::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.2);
+    border-radius: 4px;
+}
+
+/* ── Sidebar Tab Navigation (kept for compatibility, hidden now) ── */
+.ce-sidebar-tabs {
+    display: none;
+}
+
+.ce-tab-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.ce-layers-panel {
+    flex-shrink: 0;
+    border-top: 1px solid rgba(99, 102, 241, 0.15);
+}
+
+.ce-asset-search {
+    width: calc(100% - 24px);
+    margin: 0 12px 8px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    color: #e2e8f0;
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.ce-asset-search:focus {
+    border-color: rgba(99, 102, 241, 0.5);
+}
+
+.ce-asset-search::placeholder {
+    color: #475569;
+}
+
+/* ─── Asset Grid (Icons/Stickers) ─── */
+.ce-asset-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    padding: 0 12px 12px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.ce-asset-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 4px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ce-asset-card:hover {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: rgba(99, 102, 241, 0.3);
+    transform: translateY(-1px);
+}
+
+.ce-asset-name {
+    font-size: 8px;
+    font-weight: 600;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+    color: #64748b;
+}
+
+/* ─── Font List ─── */
+.ce-font-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0 12px 12px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.ce-font-preview {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: #94a3b8;
+}
+
+.ce-font-preview:hover {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: rgba(99, 102, 241, 0.3);
+    color: #c7d2fe;
+}
+
+.ce-font-sample {
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ce-font-label {
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+/* ─── Category Pills (Stickers) ─── */
+.ce-category-pills {
+    display: flex;
+    gap: 4px;
+    padding: 0 12px 8px;
+    flex-wrap: wrap;
+}
+
+.ce-category-pill {
+    padding: 4px 10px;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.ce-category-pill:hover {
+    color: #94a3b8;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.ce-category-pill.active {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: rgba(99, 102, 241, 0.4);
+    color: #818cf8;
+}
+
+/* ─── Photo Grid (Unsplash) ─── */
+.ce-photo-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    padding: 0 12px 12px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.ce-photo-thumb {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.02);
+    transition: all 0.2s;
+    padding: 0;
+    aspect-ratio: 1;
+}
+
+.ce-photo-thumb:hover {
+    border-color: rgba(99, 102, 241, 0.4);
+    transform: translateY(-1px);
+}
+
+.ce-photo-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.ce-photo-author {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 4px 6px;
+    font-size: 8px;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+    text-align: left;
+}
+
+/* ─── Search Button (Photos) ─── */
+.ce-search-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin: 0 12px 8px;
+    padding: 8px;
+    background: rgba(99, 102, 241, 0.15);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 8px;
+    color: #818cf8;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ce-search-btn:hover {
+    background: rgba(99, 102, 241, 0.25);
+}
+
+.ce-search-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ─── Loading & Empty States ─── */
+.ce-loading-spinner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px;
+    font-size: 12px;
+    color: #818cf8;
+    font-weight: 600;
+}
+
+.ce-spin {
+    animation: ceSpin 1s linear infinite;
+}
+
+@keyframes ceSpin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.ce-empty-state {
+    text-align: center;
+    color: #475569;
+    font-size: 11px;
+    padding: 24px 12px;
+    grid-column: 1 / -1;
+}
+
+/* ─── Setup Notice (Unsplash) ─── */
+.ce-setup-notice {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    margin: 0 12px 8px;
+    padding: 12px;
+    background: rgba(251, 191, 36, 0.08);
+    border: 1px solid rgba(251, 191, 36, 0.2);
+    border-radius: 10px;
+    text-align: center;
+}
+
+.ce-setup-notice p {
+    font-size: 11px;
+    color: #94a3b8;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.ce-setup-notice code {
+    background: rgba(255, 255, 255, 0.08);
+    padding: 1px 4px;
+    border-radius: 4px;
+    font-size: 10px;
+    color: #fbbf24;
+}
+
+/* ─── Gradient Grid ─── */
+.ce-gradient-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    padding: 0 12px 12px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.ce-gradient-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    background: transparent;
+    transition: all 0.2s;
+}
+
+.ce-gradient-card:hover {
+    border-color: rgba(99, 102, 241, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+}
+
+.ce-gradient-preview {
+    height: 60px;
+    border-radius: 10px 10px 0 0;
+}
+
+.ce-gradient-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: #94a3b8;
+    padding: 4px 8px 6px;
+    text-align: center;
+}
+
+/* ─── Brand Color Swatches ─── */
+.ce-brand-colors {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
+.ce-brand-color-swatch {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 4px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.ce-brand-color-swatch:hover {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: rgba(99, 102, 241, 0.3);
+    transform: translateY(-1px);
+}
+
+.ce-swatch-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+.ce-swatch-label {
+    font-size: 8px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+}
+
+/* ─── AI Panel Styles ─── */
+.ce-ai-prompt-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    margin: 0 12px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(139, 92, 246, 0.15);
+    border-radius: 14px;
+    transition: border-color 0.3s;
+}
+
+.ce-ai-prompt-bar:focus-within {
+    border-color: rgba(139, 92, 246, 0.5);
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.08);
+}
+
+.ce-ai-prompt-input {
+    width: 100%;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    color: #e2e8f0;
+    font-size: 13px;
+    outline: none;
+    resize: none;
+    font-family: inherit;
+    min-height: 44px;
+    max-height: 120px;
+}
+
+.ce-ai-prompt-input::placeholder {
+    color: #475569;
+}
+
+.ce-ai-prompt-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.ce-ai-mode-toggle {
+    display: flex;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
+    padding: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ce-ai-mode-btn {
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    background: transparent;
+    color: #64748b;
+    transition: all 0.15s;
+}
+
+.ce-ai-mode-btn.active {
+    background: rgba(139, 92, 246, 0.2);
+    color: #c4b5fd;
+}
+
+.ce-ai-model-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    color: #64748b;
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ce-ai-send-btn {
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #8b5cf6, #6366f1);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.ce-ai-send-btn:hover {
+    transform: scale(1.08);
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+}
+
+.ce-ai-send-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ══ AI Editor Panel ══ */
+.ce-ai-panel {
+    overflow-y: auto;
+}
+
+.ce-ai-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 14px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ce-ai-header-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #e2e8f0;
+    letter-spacing: 0.5px;
+}
+
+.ce-ai-model-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 9px;
+    font-weight: 700;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(99, 102, 241, 0.15));
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    color: #c4b5fd;
+    letter-spacing: 0.5px;
+}
+
+/* ── 4 Tool Cards Grid ── */
+.ce-ai-tool-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 12px 14px;
+}
+
+.ce-ai-tool-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 14px 6px 10px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.ce-ai-tool-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 14px;
+    opacity: 0;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(99, 102, 241, 0.08));
+    transition: opacity 0.25s;
+}
+
+.ce-ai-tool-card:hover {
+    border-color: rgba(139, 92, 246, 0.25);
+    transform: translateY(-1px);
+}
+
+.ce-ai-tool-card:hover::before {
+    opacity: 1;
+}
+
+.ce-ai-tool-card.active {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(99, 102, 241, 0.12));
+    border-color: rgba(139, 92, 246, 0.5);
+    color: #c4b5fd;
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.08);
+}
+
+.ce-ai-tool-card.active::before {
+    opacity: 1;
+}
+
+.ce-ai-tool-card-icon {
+    font-size: 22px !important;
+    position: relative;
+    z-index: 1;
+}
+
+.ce-ai-tool-card-label {
+    font-size: 11px;
+    font-weight: 700;
+    position: relative;
+    z-index: 1;
+    letter-spacing: 0.3px;
+}
+
+.ce-ai-tool-card-desc {
+    font-size: 8.5px;
+    color: #64748b;
+    position: relative;
+    z-index: 1;
+    font-weight: 500;
+}
+
+.ce-ai-tool-card.active .ce-ai-tool-card-desc {
+    color: #a78bfa;
+}
+
+/* ── Tool Body ── */
+.ce-ai-tool-body {
+    padding: 0 14px 14px;
+}
+
+.ce-ai-tool-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.ce-ai-tool-hint {
+    font-size: 10.5px;
+    color: #64748b;
+    line-height: 1.6;
+    margin: 0;
+    padding: 8px 0 2px;
+    font-weight: 500;
+}
+
+/* ── Mask Controls ── */
+.ce-ai-mask-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: rgba(255, 60, 60, 0.04);
+    border: 1px solid rgba(255, 60, 60, 0.12);
+    border-radius: 10px;
+}
+
+.ce-ai-mask-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #94a3b8;
+}
+
+.ce-ai-mask-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #475569;
+    transition: all 0.3s;
+}
+
+.ce-ai-mask-dot.active {
+    background: #f87171;
+    box-shadow: 0 0 8px rgba(248, 113, 113, 0.5);
+    animation: ceMaskPulse 1.5s infinite;
+}
+
+@keyframes ceMaskPulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 8px rgba(248, 113, 113, 0.5);
+    }
+
+    50% {
+        box-shadow: 0 0 14px rgba(248, 113, 113, 0.8);
+    }
+}
+
+.ce-ai-mask-clear {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.ce-ai-mask-clear:hover {
+    background: rgba(248, 113, 113, 0.1);
+    border-color: rgba(248, 113, 113, 0.3);
+    color: #fca5a5;
+}
+
+/* ── Brush Slider ── */
+.ce-ai-brush-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 2px 0;
+}
+
+.ce-ai-brush-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: #64748b;
+    min-width: 36px;
+}
+
+.ce-ai-brush-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, rgba(139, 92, 246, 0.3), rgba(139, 92, 246, 0.1));
+    outline: none;
+    cursor: pointer;
+}
+
+.ce-ai-brush-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #8b5cf6;
+    border: 2px solid #1e1b4b;
+    cursor: pointer;
+    transition: transform 0.15s;
+}
+
+.ce-ai-brush-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+.ce-ai-brush-value {
+    font-size: 10px;
+    font-weight: 700;
+    color: #c4b5fd;
+    min-width: 34px;
+    text-align: right;
+}
+
+/* ── Replace Image Upload ── */
+.ce-ai-replace-upload {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ce-ai-replace-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ce-ai-replace-label:hover {
+    background: rgba(99, 102, 241, 0.06);
+    border-color: rgba(99, 102, 241, 0.3);
+    color: #c7d2fe;
+}
+
+.ce-ai-replace-preview {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.ce-ai-replace-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.ce-ai-replace-remove {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.7);
+    border: none;
+    color: white;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── Background Tool ── */
+.ce-ai-bg-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.ce-ai-bg-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ce-ai-bg-btn:hover {
+    border-color: rgba(139, 92, 246, 0.25);
+    background: rgba(139, 92, 246, 0.06);
+}
+
+.ce-ai-bg-btn.active {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(99, 102, 241, 0.12));
+    border-color: rgba(139, 92, 246, 0.4);
+    color: #c4b5fd;
+}
+
+.ce-ai-bg-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 14px;
+    margin-top: 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: linear-gradient(135deg, #7c3aed, #6366f1);
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    color: white;
+    box-shadow: 0 4px 16px rgba(139, 92, 246, 0.25);
+}
+
+.ce-ai-bg-action-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(139, 92, 246, 0.35);
+}
+
+.ce-ai-bg-action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ── AI Prompt Bar ── */
+.ce-ai-prompt-bar {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.ce-ai-prompt-input {
+    flex: 1;
+    resize: none;
+    font-size: 12px;
+    font-family: inherit;
+    padding: 10px 12px;
+    border-radius: 10px;
+    line-height: 1.5;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #e2e8f0;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.ce-ai-prompt-input:focus {
+    border-color: rgba(139, 92, 246, 0.4);
+}
+
+.ce-ai-prompt-input::placeholder {
+    color: #475569;
+}
+
+.ce-ai-send-btn {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #7c3aed, #6366f1);
+    border: none;
+    color: white;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ce-ai-send-btn:hover {
+    transform: scale(1.05);
+}
+
+.ce-ai-send-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ── AI Error ── */
+.ce-ai-error {
+    margin: 8px 14px;
+    padding: 10px 12px;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 10px;
+    font-size: 11px;
+    color: #f87171;
+}
+
+/* AI Shimmer Loading */
+.ce-ai-shimmer {
+    position: relative;
+    height: 180px;
+    margin: 8px 14px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid rgba(139, 92, 246, 0.1);
+}
+
+.ce-ai-shimmer::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.08), transparent);
+    animation: ceShimmer 1.5s infinite;
+}
+
+@keyframes ceShimmer {
+    to {
+        left: 100%;
+    }
+}
+
+.ce-ai-shimmer-text {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    font-weight: 600;
+    color: #8b5cf6;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+}
+
+/* AI Result Preview */
+.ce-ai-result {
+    margin: 8px 14px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    background: rgba(139, 92, 246, 0.04);
+}
+
+.ce-ai-result img {
+    width: 100%;
+    display: block;
+}
+
+.ce-ai-result-actions {
+    display: flex;
+    gap: 6px;
+    padding: 10px;
+}
+
+.ce-ai-result-btn {
+    flex: 1;
+    padding: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.ce-ai-result-btn:hover {
+    background: rgba(99, 102, 241, 0.12);
+    color: #c7d2fe;
+}
+
+.ce-ai-result-btn.primary {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(99, 102, 241, 0.2));
+    border-color: rgba(139, 92, 246, 0.4);
+    color: #c4b5fd;
+}
+
+.ce-panel {
+    padding: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ce-panel-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #64748b;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Element buttons grid */
+.ce-element-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.ce-element-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 14px 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.ce-element-btn:hover {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: rgba(99, 102, 241, 0.3);
+    color: #c7d2fe;
+    transform: translateY(-1px);
+}
+
+/* Layer list */
+.ce-layer-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.ce-layer-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.ce-layer-item.active {
+    background: rgba(99, 102, 241, 0.15);
+    color: #c7d2fe;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.ce-layer-thumb {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    object-fit: cover;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ce-layer-name {
+    flex: 1;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ce-layer-visibility {
+    opacity: 0.5;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.ce-layer-visibility:hover {
+    opacity: 1;
+}
+
+/* ─── Canvas Container ─── */
+.ce-canvas-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #080c16;
+    position: relative;
+    overflow: hidden;
+}
+
+.ce-canvas-wrapper {
+    position: relative;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+    border-radius: 4px;
+    overflow: visible;
+}
+
+.ce-canvas-info {
+    position: absolute;
+    bottom: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: #475569;
+    white-space: nowrap;
+}
+
+/* Zoom controls */
+.ce-zoom-controls {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    background: rgba(15, 20, 35, 0.9);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
+}
+
+.ce-zoom-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #94a3b8;
+    min-width: 42px;
+    text-align: center;
+}
+
+/* ─── Right Sidebar (Advanced Mode) ─── */
+.ce-sidebar-right {
+    width: 260px;
+    background: rgba(15, 20, 35, 0.95);
+    border-left: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    flex-shrink: 0;
+    transition: width 0.3s ease;
+}
+
+.ce-sidebar-right.collapsed {
+    width: 0;
+    overflow: hidden;
+}
+
+/* Property rows */
+.ce-prop-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.ce-prop-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: #64748b;
+    width: 28px;
+    text-transform: uppercase;
+}
+
+.ce-prop-input {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 12px;
+    color: #e2e8f0;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.ce-prop-input:focus {
+    border-color: rgba(99, 102, 241, 0.5);
+}
+
+/* Brand colors */
+.ce-color-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.ce-color-swatch:hover {
+    transform: scale(1.15);
+}
+
+.ce-color-swatch.active {
+    border-color: #fff;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+/* Brand font buttons */
+.ce-font-btn {
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    color: #94a3b8;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.ce-font-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #e2e8f0;
+}
+
+.ce-font-btn.active {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: rgba(99, 102, 241, 0.3);
+    color: #818cf8;
+}
+
+/* Slider */
+.ce-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    outline: none;
+}
+
+.ce-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #818cf8;
+    cursor: pointer;
+}
+
+/* ─── Bottom Bar (Platform Presets) ─── */
+.ce-bottom-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 48px;
+    padding: 0 16px;
+    background: rgba(15, 20, 35, 0.95);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    flex-shrink: 0;
+    overflow-x: auto;
+}
+
+.ce-preset-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.ce-preset-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #94a3b8;
+}
+
+.ce-preset-btn.active {
+    background: rgba(99, 102, 241, 0.15);
+    border-color: rgba(99, 102, 241, 0.3);
+    color: #818cf8;
+}
+
+/* ─── Simple Mode specific ─── */
+.ce-simple-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 16px;
+    justify-content: center;
+    background: rgba(15, 20, 35, 0.95);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ce-simple-tool {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 10px;
+    font-weight: 600;
+    min-width: 70px;
+}
+
+.ce-simple-tool:hover {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: rgba(99, 102, 241, 0.3);
+    color: #c7d2fe;
+    transform: translateY(-2px);
+}
+
+.ce-simple-tool .material-symbols-outlined {
+    font-size: 24px;
+}
+
+/* ─── Modals & Popovers ─── */
+.ce-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.ce-modal {
+    background: #12172b;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    padding: 24px;
+    width: 90%;
+    max-width: 440px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.ce-modal h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 16px;
+}
+
+.ce-modal input,
+.ce-modal textarea {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: #e2e8f0;
+    font-size: 13px;
+    outline: none;
+    margin-bottom: 12px;
+}
+
+.ce-modal input:focus,
+.ce-modal textarea:focus {
+    border-color: rgba(99, 102, 241, 0.5);
+}
+
+/* Filters panel */
+.ce-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.ce-filter-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.ce-filter-btn:hover,
+.ce-filter-btn.active {
+    background: rgba(99, 102, 241, 0.15);
+    border-color: rgba(99, 102, 241, 0.3);
+    color: #c7d2fe;
+}
+
+/* Toast notification */
+.ce-toast {
+    position: fixed;
+    bottom: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 20, 35, 0.95);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 12px;
+    padding: 10px 20px;
+    font-size: 13px;
+    color: #c7d2fe;
+    font-weight: 600;
+    z-index: 200;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+    animation: ceToastIn 0.3s ease;
+}
+
+@keyframes ceToastIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* Alignment guides */
+.ce-guide-h,
+.ce-guide-v {
+    position: absolute;
+    background: #818cf8;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.ce-guide-h {
+    height: 1px;
+    left: 0;
+    right: 0;
+}
+
+.ce-guide-v {
+    width: 1px;
+    top: 0;
+    bottom: 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+
+    .ce-sidebar-left,
+    .ce-sidebar-right {
+        display: none;
+    }
+
+    .ce-toolbar {
+        padding: 0 8px;
+    }
+
+    .ce-toolbar-center {
+        display: none;
+    }
+
+    .ce-bottom-bar {
+        gap: 4px;
+        padding: 0 8px;
+    }
+
+    .ce-preset-btn {
+        font-size: 10px;
+        padding: 4px 8px;
+    }
+
+    .ce-simple-tools {
+        padding: 8px;
+        gap: 4px;
+    }
+
+    .ce-simple-tool {
+        padding: 8px 10px;
+        min-width: 56px;
+    }
+}

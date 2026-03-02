@@ -50,6 +50,60 @@ const brandSchema = new mongoose.Schema({
         region: { type: String, default: '' },
         defaultLanguage: { type: String, default: 'english' },
         languageStyle: { type: String, default: 'pure' },
+        // All images scraped from the brand's homepage
+        brandImages: [{
+            url: { type: String },
+            source: { type: String, default: 'website' },
+            alt: { type: String, default: '' },
+        }],
+    },
+
+    // Custom Categories — user-created template categories (e.g. Birthday, Anniversary)
+    customCategories: [{
+        categoryId: { type: String, required: true },
+        label: { type: String, required: true },
+        icon: { type: String, default: 'auto_awesome' },
+        color: { type: String, default: '#f59e0b' },
+        description: { type: String, default: '' },
+        referenceImageUrl: { type: String, default: '' },
+        basePromptFormula: { type: String, default: '' }, // AI-extracted style formula
+        createdAt: { type: Date, default: Date.now },
+    }],
+
+    // Custom Templates — user-created sub-templates within categories
+    customTemplates: [{
+        templateId: { type: String, required: true },
+        label: { type: String, required: true },
+        icon: { type: String, default: 'auto_awesome' },
+        description: { type: String, default: '' },
+        category: { type: String, default: '' }, // parent category id (e.g. 'sales', 'events')
+        type: { type: String, default: 'instagram-post' },
+        style: { type: String, default: 'modern' },
+        promptFormula: { type: String, default: '' },
+        referenceImageUrl: { type: String, default: '' },
+        fields: [{ key: String, label: String, type: { type: String, default: 'text' }, placeholder: String }],
+        createdAt: { type: Date, default: Date.now },
+    }],
+
+    // Autonomous Agent Settings
+    autonomy: {
+        enabled: { type: Boolean, default: true },
+        autoReplyConfidence: { type: Number, default: 75, min: 30, max: 100 },
+        maxAutoRepliesPerConvo: { type: Number, default: 5 },
+        commentAutoReply: { type: Boolean, default: false },
+        commentToDM: { type: Boolean, default: true },
+        callBookingEnabled: { type: Boolean, default: false },
+        callBookingLink: { type: String, default: '' },
+        followUpEnabled: { type: Boolean, default: false },
+        followUpDelayHours: { type: Number, default: 24 },
+        businessHours: {
+            enabled: { type: Boolean, default: false },
+            start: { type: String, default: '09:00' },
+            end: { type: String, default: '18:00' },
+            timezone: { type: String, default: 'Asia/Kolkata' },
+        },
+        escalationEmail: { type: String, default: '' },
+        rateLimitPerConvo: { type: Number, default: 3 }, // max auto-replies per 5 min
     },
 
     // Extracted raw data from website scan
