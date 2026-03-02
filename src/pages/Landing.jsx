@@ -35,8 +35,8 @@ export default function Landing() {
             <nav className="sticky top-0 z-50 w-full px-6 py-4 flex justify-center">
                 <header className="max-w-7xl w-full flex items-center justify-between glass-panel px-8 py-3 rounded-full">
                     <div className="flex items-center gap-3">
-                        <div className="size-8 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/20">
-                            <span className="material-symbols-outlined text-white text-xl">auto_awesome</span>
+                        <div className="size-8 rounded-lg overflow-hidden shadow-lg shadow-primary/20">
+                            <img src="/mantram-logo.png" alt="Mantram AI" className="size-8" />
                         </div>
                         <h2 className="text-white text-xl font-bold tracking-tight">Mantram AI</h2>
                     </div>
@@ -261,8 +261,8 @@ export default function Landing() {
             <footer className="w-full border-t border-white/[0.05] py-12 px-6 mt-20">
                 <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
                     <div className="flex items-center gap-3">
-                        <div className="size-6 bg-primary rounded flex items-center justify-center">
-                            <span className="material-symbols-outlined text-white text-xs">auto_awesome</span>
+                        <div className="size-6 rounded overflow-hidden">
+                            <img src="/mantram-logo.png" alt="Mantram AI" className="size-6" />
                         </div>
                         <span className="text-white font-bold">Mantram AI</span>
                     </div>

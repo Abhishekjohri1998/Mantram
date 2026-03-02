@@ -20,7 +20,7 @@ import {
     CRITIC_PROMPT,
     EDITOR_PROMPT,
 } from './prompts.js';
-import { estimateCost, submitVideoGeneration, getGenerationStatus } from './falClient.js';
+import { estimateCost, submitVideoGeneration, getGenerationStatus, getGrokGenerationStatus } from './falClient.js';
 import { getPastProjects } from './selfLearning.js';
 
 // ── Helper: Call Claude Sonnet and parse JSON response ──
@@ -224,7 +224,7 @@ export async function modelRouterNode(state) {
 // NODE 5: VIDEO GENERATOR — Submit to fal.ai
 // ══════════════════════════════════════════════════════════════════════════════
 export async function videoGeneratorNode(state) {
-    console.log('🎥 Node: Video Generator — submitting to fal.ai...');
+    console.log('🎥 Node: Video Generator — submitting to fal.ai / Grok...');
 
     const model = state.routing?.selectedModel || 'kling-3.0';
     const resolution = state.routing?.resolution || '1080p';
@@ -239,7 +239,7 @@ export async function videoGeneratorNode(state) {
     // Pass shots for Kling multi-prompt support
     const shots = state.script?.shots || [];
 
-    const { requestId, endpoint, statusUrl, resultUrl } = await submitVideoGeneration({
+    const { requestId, endpoint, statusUrl, resultUrl, provider } = await submitVideoGeneration({
         model,
         prompt,
         imageUrl,
@@ -255,8 +255,9 @@ export async function videoGeneratorNode(state) {
         generation: {
             falRequestId: requestId,
             falEndpoint: endpoint,
-            falStatusUrl: statusUrl,   // Exact URL from fal.ai for polling
-            falResultUrl: resultUrl,   // Exact URL from fal.ai for fetching result
+            falStatusUrl: statusUrl,   // null for Grok
+            falResultUrl: resultUrl,   // null for Grok
+            provider: provider || 'fal', // 'grok' or 'fal'
             videoUrl: '',
             thumbnailUrl: '',
             progress: 5,
@@ -273,10 +274,17 @@ export async function videoGeneratorNode(state) {
 export async function pollGenerationStatus(state) {
     if (!state.generation?.falRequestId) return state;
 
-    // Use stored fal.ai URLs for accurate polling
-    const statusUrl = state.generation?.falStatusUrl || null;
-    const resultUrl = state.generation?.falResultUrl || null;
-    const statusResult = await getGenerationStatus(state.generation.falRequestId, statusUrl, resultUrl);
+    let statusResult;
+
+    // Branch polling based on provider
+    if (state.generation?.provider === 'grok' || state.routing?.selectedModel === 'grok-imagine') {
+        statusResult = await getGrokGenerationStatus(state.generation.falRequestId);
+    } else {
+        // fal.ai polling — use stored URLs
+        const statusUrl = state.generation?.falStatusUrl || null;
+        const resultUrl = state.generation?.falResultUrl || null;
+        statusResult = await getGenerationStatus(state.generation.falRequestId, statusUrl, resultUrl);
+    }
 
     return {
         ...state,

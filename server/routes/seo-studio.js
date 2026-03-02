@@ -35,6 +35,26 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
     } catch (e) { console.warn('GPT-4o-mini error:', e.message); }
   }
 
+  // Try Grok (xAI) — excellent for real-time trend/keyword data
+  const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+  if (grokKey) {
+    try {
+      const resp = await fetch('https://api.x.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${grokKey}` },
+        body: JSON.stringify({
+          model: 'grok-3-mini-fast',
+          messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+          temperature, max_tokens: maxTokens,
+          ...(json ? { response_format: { type: 'json_object' } } : {}),
+        }),
+      });
+      const data = await resp.json();
+      if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
+      if (data.error) console.warn('Grok failed:', data.error.message);
+    } catch (e) { console.warn('Grok error:', e.message); }
+  }
+
   // Fallback to Gemini
   const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
   if (geminiKey) {

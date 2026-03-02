@@ -51,4 +51,22 @@ export default {
         appSecret: process.env.FACEBOOK_APP_SECRET,
         redirectUri: process.env.FACEBOOK_REDIRECT_URI,
     },
+
+    // Meta Ads (Marketing API)
+    metaAds: {
+        appId: process.env.META_ADS_APP_ID || process.env.FACEBOOK_APP_ID,
+        appSecret: process.env.META_ADS_APP_SECRET || process.env.FACEBOOK_APP_SECRET,
+    },
+
+    // Google Ads
+    googleAds: {
+        developerToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
+        clientId: process.env.GOOGLE_ADS_CLIENT_ID || process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_ADS_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET,
+    },
+
+    // xAI Grok (Real-time trend intelligence)
+    grok: {
+        apiKey: process.env.GROK_API_KEY || process.env.XAI_API_KEY,
+    },
 };

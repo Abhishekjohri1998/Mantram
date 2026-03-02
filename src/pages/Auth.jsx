@@ -69,8 +69,8 @@ export default function Auth() {
                 {/* Logo */}
                 <div className="text-center mb-8">
                     <div className="inline-flex items-center gap-3 mb-4">
-                        <div className="size-10 flex items-center justify-center bg-primary/10 rounded-xl">
-                            <span className="material-symbols-outlined text-primary text-3xl">auto_awesome</span>
+                        <div className="size-10 rounded-xl overflow-hidden">
+                            <img src="/mantram-logo.png" alt="Mantram AI" className="size-10" />
                         </div>
                         <h1 className="text-2xl font-extrabold text-white tracking-tight">Mantram AI</h1>
                     </div>

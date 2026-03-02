@@ -7,7 +7,7 @@ const integrationSchema = new mongoose.Schema({
     platform: {
         type: String,
         required: true,
-        enum: ['shopify', 'instagram', 'facebook', 'linkedin', 'twitter', 'google-analytics'],
+        enum: ['shopify', 'instagram', 'facebook', 'linkedin', 'twitter', 'google-analytics', 'meta-ads', 'google-ads'],
     },
 
     status: {
@@ -46,6 +46,14 @@ const integrationSchema = new mongoose.Schema({
         // Twitter / X
         twitterUserId: { type: String, default: '' },
         twitterUsername: { type: String, default: '' },
+
+        // Meta Ads
+        metaAdAccountId: { type: String, default: '' },
+        metaBusinessId: { type: String, default: '' },
+
+        // Google Ads
+        googleAdsCustomerId: { type: String, default: '' },
+        googleAdsManagerId: { type: String, default: '' },
     },
 
     // Sync metadata

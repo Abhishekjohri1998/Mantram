@@ -162,6 +162,15 @@ export const trends = {
     now: (geo = 'IN') => apiFetch(`/trends/now?geo=${geo}`),
     brandMatch: (brandId, geo = 'IN') => apiFetch(`/trends/brand-match?brandId=${brandId}&geo=${geo}`),
     refresh: (geo = 'IN') => apiFetch(`/trends/refresh?geo=${geo}`, { method: 'POST' }),
+    grokTopics: (params = {}) => { const q = new URLSearchParams(params).toString(); return apiFetch(`/trends/grok-topics?${q}`); },
+    grokSeo: (params = {}) => { const q = new URLSearchParams(params).toString(); return apiFetch(`/trends/grok-seo?${q}`); },
+    grokContent: (params = {}) => { const q = new URLSearchParams(params).toString(); return apiFetch(`/trends/grok-content?${q}`); },
+    grokCompetitors: (params = {}) => { const q = new URLSearchParams(params).toString(); return apiFetch(`/trends/grok-competitors?${q}`); },
+};
+
+// ============ Dashboard Summary API ============
+export const dashboardSummary = {
+    get: (brandId) => apiFetch(`/dashboard-summary${brandId ? `?brandId=${brandId}` : ''}`),
 };
 
 // ============ Social Media API ============

@@ -12,6 +12,7 @@
 import config from '../../config/env.js';
 
 const FAL_BASE_URL = 'https://queue.fal.run';
+const GROK_BASE_URL = 'https://api.x.ai/v1';
 
 // ── Model Endpoint Map (verified from fal.ai docs) ──
 const MODEL_ENDPOINTS = {
@@ -38,6 +39,7 @@ const MODEL_AVAILABLE = {
     'kling-3.0': true,
     'veo-3.1': true,
     'seedance-1.0': true,
+    'grok-imagine': true,
 };
 
 // ── Cost table (USD per second of video) ──
@@ -45,6 +47,7 @@ const COST_PER_SECOND = {
     'kling-3.0': { fast: 0.07, quality: 0.12 },
     'veo-3.1': { fast: 0.15, quality: 0.40 },
     'seedance-1.0': { fast: 0.05, quality: 0.08 },
+    'grok-imagine': { fast: 0.08, quality: 0.08 },
 };
 
 // ── Duration limits per model ──
@@ -52,6 +55,7 @@ const DURATION_LIMITS = {
     'kling-3.0': { min: 3, max: 15, supported: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] },
     'veo-3.1': { min: 5, max: 8, supported: [5, 6, 7, 8] },
     'seedance-1.0': { min: 5, max: 10, supported: [5, 10] },
+    'grok-imagine': { min: 1, max: 15, supported: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] },
 };
 
 // ── Resolution config ──
@@ -142,7 +146,107 @@ function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, sho
         };
     }
 
-    throw new Error(`Unknown model: ${model}`);
+    throw new Error(`Unknown fal.ai model: ${model}`);
+}
+
+// ── Grok API key helper ──
+function getGrokApiKey() {
+    const key = config.grok?.apiKey || process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+    if (!key) throw new Error('GROK_API_KEY not configured. Add it to .env');
+    return key;
+}
+
+/**
+ * Submit video generation to Grok Imagine API (xAI native, not fal.ai)
+ * Returns { requestId, provider: 'grok' }
+ */
+async function submitGrokVideoGeneration({ prompt, imageUrl, duration, resolution, aspectRatio }) {
+    const apiKey = getGrokApiKey();
+    const dur = Math.min(Math.max(duration || 5, 1), 15);
+    const res = resolution === '480p' ? '480p' : '720p'; // Grok only supports 480p/720p
+
+    const payload = {
+        model: 'grok-imagine-video',
+        prompt,
+        duration: dur,
+        aspect_ratio: aspectRatio || '16:9',
+        resolution: res,
+    };
+
+    // Image-to-video
+    if (imageUrl) {
+        payload.image_url = imageUrl;
+    }
+
+    console.log(`🎬 Submitting to Grok Imagine: grok-imagine-video (${dur}s, ${res})`);
+
+    const response = await fetch(`${GROK_BASE_URL}/videos/generations`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        const errText = await response.text();
+        console.error(`❌ Grok Imagine error (${response.status}):`, errText);
+        throw new Error(`Grok video submission failed (${response.status}): ${errText}`);
+    }
+
+    const data = await response.json();
+    console.log(`✅ Grok Imagine queued: requestId=${data.request_id}`);
+
+    return {
+        requestId: data.request_id,
+        provider: 'grok',
+    };
+}
+
+/**
+ * Poll Grok Imagine video generation status
+ * Returns { status, progress, videoUrl }
+ */
+export async function getGrokGenerationStatus(requestId) {
+    const apiKey = getGrokApiKey();
+
+    const response = await fetch(`${GROK_BASE_URL}/videos/${requestId}`, {
+        headers: { 'Authorization': `Bearer ${apiKey}` },
+    });
+
+    if (!response.ok) {
+        console.error(`❌ Grok status check failed: ${response.status}`);
+        return { status: 'FAILED', progress: 0, error: `Status check failed: ${response.status}` };
+    }
+
+    const data = await response.json();
+    console.log(`📊 Grok Imagine status for ${requestId}: ${data.status}`);
+
+    if (data.status === 'done') {
+        return {
+            status: 'COMPLETED',
+            progress: 100,
+            videoUrl: data.video?.url || '',
+            thumbnailUrl: '',
+            audioUrl: '',
+            duration: data.video?.duration || 0,
+        };
+    }
+
+    if (data.status === 'expired') {
+        return {
+            status: 'FAILED',
+            progress: 0,
+            error: 'Grok video generation request expired. Try again.',
+        };
+    }
+
+    // pending
+    return {
+        status: 'IN_PROGRESS',
+        progress: 40,
+    };
 }
 
 /**
@@ -153,8 +257,22 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     const apiKey = getApiKey();
 
     if (!MODEL_AVAILABLE[model]) {
-        throw new Error(`Model '${model}' is not available. Use kling-3.0, veo-3.1, or seedance-1.0.`);
+        throw new Error(`Model '${model}' is not available. Use kling-3.0, veo-3.1, seedance-1.0, or grok-imagine.`);
     }
+
+    // ── Grok Imagine: use native xAI API instead of fal.ai ──
+    if (model === 'grok-imagine') {
+        const result = await submitGrokVideoGeneration({ prompt, imageUrl, duration, resolution });
+        return {
+            requestId: result.requestId,
+            endpoint: 'grok-imagine-video',
+            statusUrl: null,
+            resultUrl: null,
+            provider: 'grok',
+        };
+    }
+
+    // ── fal.ai models ──
 
     const endpoints = MODEL_ENDPOINTS[model];
     if (!endpoints) throw new Error(`Unknown video model: ${model}`);
@@ -334,6 +452,17 @@ export function getModelsInfo() {
             features: ['multi-shot', 'native-audio', 'voice-ids', 'image-to-video', '3-15s'],
             available: true,
             recommended: true,
+        },
+        {
+            id: 'grok-imagine',
+            name: 'Grok Imagine',
+            description: 'xAI native video — fast, affordable, 1-15s, text & image-to-video',
+            bestFor: 'Social reels, creative experiments, quick turnaround',
+            costPerSecond: COST_PER_SECOND['grok-imagine'],
+            duration: DURATION_LIMITS['grok-imagine'],
+            features: ['text-to-video', 'image-to-video', 'native-audio', '1-15s', 'fast'],
+            available: !!(config.grok?.apiKey || process.env.GROK_API_KEY || process.env.XAI_API_KEY),
+            recommended: false,
         },
         {
             id: 'veo-3.1',

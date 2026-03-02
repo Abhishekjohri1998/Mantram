@@ -13,6 +13,7 @@ const navItems = [
     { icon: 'send', label: 'Publish & Schedule', to: '/publish' },
     { icon: 'forum', label: 'Conversation Studio', to: '/conversations' },
     { icon: 'travel_explore', label: 'SEO Studio', to: '/seo-studio' },
+    { icon: 'monitoring', label: 'Ad Studio', to: '/performance-marketing' },
 ]
 
 const bottomItems = [
@@ -66,8 +67,8 @@ export default function Sidebar({ mobileOpen, onClose }) {
         <>
             {/* Logo */}
             <div className="p-4 lg:p-6 flex items-center gap-3">
-                <div className="size-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20 flex-shrink-0">
-                    <span className="material-symbols-outlined text-2xl">auto_awesome</span>
+                <div className="size-10 rounded-xl overflow-hidden flex-shrink-0 shadow-lg shadow-primary/20">
+                    <img src="/mantram-logo.png" alt="Mantram AI" className="size-10" />
                 </div>
                 <div className="min-w-0">
                     <h1 className="text-lg font-bold leading-tight text-white truncate">Mantram AI</h1>

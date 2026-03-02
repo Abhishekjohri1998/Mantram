@@ -27,6 +27,7 @@ import Insights from './pages/Insights'
 import SuperAdminDashboard from './pages/SuperAdminDashboard'
 import CreditsPage from './pages/CreditsPage'
 import VideoStudio from './pages/VideoStudio'
+import PerformanceMarketing from './pages/PerformanceMarketing'
 
 function App() {
   return (
@@ -51,6 +52,7 @@ function App() {
               <Route path="/creative-studio" element={<ProtectedRoute><CreativeStudio /></ProtectedRoute>} />
               <Route path="/creative-studio/editor" element={<ProtectedRoute><CanvasEditor /></ProtectedRoute>} />
               <Route path="/video-studio" element={<ProtectedRoute><VideoStudio /></ProtectedRoute>} />
+              <Route path="/performance-marketing" element={<ProtectedRoute><PerformanceMarketing /></ProtectedRoute>} />
               <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
               <Route path="/smart-calendar" element={<ProtectedRoute><SmartCalendar /></ProtectedRoute>} />
               <Route path="/publish" element={<ProtectedRoute><PublishSchedule /></ProtectedRoute>} />

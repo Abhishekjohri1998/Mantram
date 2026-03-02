@@ -140,15 +140,18 @@ ${brandContext}
 
 AVAILABLE MODELS:
 - kling-3.0: Best for realistic motion, physics, multi-shot storyboards. 3-15s duration. Native audio + voice IDs. RECOMMENDED DEFAULT. Cost: ~$0.07/s
+- grok-imagine: xAI Grok native video. 1-15s. Text-to-video and image-to-video. Fast & affordable. 720p max. Good for social content. Cost: ~$0.08/s
 - veo-3.1: Best for cinematic quality + native audio. 5-8s per clip (can extend). Premium. Cost: ~$0.15/s
 - seedance-1.0: Fast & affordable. 5-10s. Good for quick prototypes. Cost: ~$0.05/s
 
 ROUTING RULES:
 - Default to kling-3.0 for most videos — supports multi-shot, best value
 - Multiple shots/storyboard? → kling-3.0 (only model with multi_prompt)
+- Social reel / quick creative? → grok-imagine (fast, flexible duration 1-15s)
 - Cinematic/premium with audio? → veo-3.1
-- Quick/budget/prototype? → seedance-1.0
+- Quick/budget/prototype? → seedance-1.0 or grok-imagine
 - Default to FAST mode unless user requests quality
+- NOTE: grok-imagine max resolution is 720p — don't use for 1080p requests
 
 RESPONSE FORMAT — respond with ONLY valid JSON:
 {

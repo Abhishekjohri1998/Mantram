@@ -30,6 +30,9 @@ import videoStudioRoutes from './routes/video-studio.js';
 import contentAgenticRoutes from './routes/content-agentic.js';
 import creativeAgenticRoutes from './routes/creative-agentic.js';
 import orchestratorRoutes from './routes/orchestrator-routes.js';
+import pmStudioRoutes from './routes/performance-marketing.js';
+import pmConnectionRoutes from './routes/pm-connections.js';
+import dashboardSummaryRoutes from './routes/dashboard-summary.js';
 
 const app = express();
 
@@ -77,6 +80,9 @@ app.use('/api/video-studio', videoStudioRoutes);
 app.use('/api/content/agentic', contentAgenticRoutes);
 app.use('/api/creatives/agentic', creativeAgenticRoutes);
 app.use('/api/orchestrate', orchestratorRoutes);
+app.use('/api/pm-studio', pmStudioRoutes);
+app.use('/api/pm-studio', pmConnectionRoutes);
+app.use('/api/dashboard-summary', dashboardSummaryRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
