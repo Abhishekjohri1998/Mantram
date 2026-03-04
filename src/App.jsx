@@ -29,7 +29,16 @@ import CreditsPage from './pages/CreditsPage'
 import VideoStudio from './pages/VideoStudio'
 import PerformanceMarketing from './pages/PerformanceMarketing'
 
+import { CreditProvider } from './context/CreditContext'
+import UnderConstruction from './pages/UnderConstruction'
+
 function App() {
+  const isProduction = window.location.hostname.includes('mantram.ai');
+
+  if (isProduction) {
+    return <UnderConstruction />
+  }
+
   return (
     <BrowserRouter>
       <AuthProvider>
