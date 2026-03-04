@@ -1,10 +1,19 @@
-import { useState, createContext, useContext } from 'react'
+import { useState, createContext, useContext, Component } from 'react'
 import Sidebar from './Sidebar'
 import Header from './Header'
+import FidatoWidget from './FidatoWidget'
 
 // Context to share sidebar toggle across components
 const SidebarContext = createContext()
 export const useSidebar = () => useContext(SidebarContext)
+
+// Error boundary to prevent Fidato crashes from breaking the whole page
+class FidatoErrorBoundary extends Component {
+    constructor(props) { super(props); this.state = { hasError: false } }
+    static getDerivedStateFromError() { return { hasError: true } }
+    componentDidCatch(err) { console.warn('Fidato widget error (isolated):', err?.message) }
+    render() { return this.state.hasError ? null : this.props.children }
+}
 
 export default function DashboardLayout({ children, title, subtitle }) {
     const [mobileOpen, setMobileOpen] = useState(false)
@@ -23,6 +32,9 @@ export default function DashboardLayout({ children, title, subtitle }) {
                         {children}
                     </div>
                 </main>
+                <FidatoErrorBoundary>
+                    <FidatoWidget />
+                </FidatoErrorBoundary>
             </div>
         </SidebarContext.Provider>
     )

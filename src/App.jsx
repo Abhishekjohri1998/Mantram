@@ -28,6 +28,8 @@ import SuperAdminDashboard from './pages/SuperAdminDashboard'
 import CreditsPage from './pages/CreditsPage'
 import VideoStudio from './pages/VideoStudio'
 import PerformanceMarketing from './pages/PerformanceMarketing'
+import D2CAnalytics from './pages/D2CAnalytics'
+import BrandManagement from './pages/BrandManagement'
 
 import { CreditProvider } from './context/CreditContext'
 import UnderConstruction from './pages/UnderConstruction'
@@ -53,6 +55,7 @@ function App() {
               {/* Protected routes — require authentication */}
               <Route path="/nexus" element={<ProtectedRoute><Nexus /></ProtectedRoute>} />
               <Route path="/brand-dna" element={<ProtectedRoute><BrandDNA /></ProtectedRoute>} />
+              <Route path="/brands" element={<ProtectedRoute><BrandManagement /></ProtectedRoute>} />
               <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute><UserDashboard /></ProtectedRoute>} />
               <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
@@ -62,6 +65,7 @@ function App() {
               <Route path="/creative-studio/editor" element={<ProtectedRoute><CanvasEditor /></ProtectedRoute>} />
               <Route path="/video-studio" element={<ProtectedRoute><VideoStudio /></ProtectedRoute>} />
               <Route path="/performance-marketing" element={<ProtectedRoute><PerformanceMarketing /></ProtectedRoute>} />
+              <Route path="/d2c-analytics" element={<ProtectedRoute><D2CAnalytics /></ProtectedRoute>} />
               <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
               <Route path="/smart-calendar" element={<ProtectedRoute><SmartCalendar /></ProtectedRoute>} />
               <Route path="/publish" element={<ProtectedRoute><PublishSchedule /></ProtectedRoute>} />

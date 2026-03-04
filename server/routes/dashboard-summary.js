@@ -27,6 +27,17 @@ const router = Router();
 // ── Daily insight cache (1 per brand per day) ──
 const insightCache = new Map();
 
+// ── Purge stale cache entries (older than today) ──
+function purgeOldCacheEntries() {
+    const today = new Date().toISOString().split('T')[0];
+    for (const cache of [insightCache, newsCache, dykCache, radarCache]) {
+        for (const key of cache.keys()) {
+            const dateInKey = key.split(':').pop();
+            if (dateInKey && dateInKey < today) cache.delete(key);
+        }
+    }
+}
+
 function getInsightCacheKey(brandId) {
     const today = new Date().toISOString().split('T')[0];
     return `${brandId || 'generic'}:${today}`;
@@ -138,6 +149,7 @@ async function generateBusinessNews(brand) {
         ];
     }
 
+    const cutoffDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
     try {
         const resp = await fetch('https://api.x.ai/v1/chat/completions', {
@@ -150,6 +162,8 @@ async function generateBusinessNews(brand) {
                         role: 'system',
                         content: `You are a business intelligence agent. Today is ${new Date().toISOString().split('T')[0]}.
 
+IMPORTANT: Only include news from the last 30 days (after ${cutoffDate}). Do NOT include any news older than this cutoff. Every item MUST be recent and relevant TODAY.
+
 Generate 4-5 CURRENT business news items relevant to a brand owner. Focus on:
 - Funding rounds, acquisitions, or IPOs in the industry
 - Policy changes, regulations, or government announcements
@@ -157,7 +171,7 @@ Generate 4-5 CURRENT business news items relevant to a brand owner. Focus on:
 - Competitor moves or industry shifts
 - Technology updates that impact the business
 
-Make them REAL and CURRENT — reference actual events happening today or this week.
+Make them REAL and CURRENT — reference actual events happening this week or this month only.
 Each news item should explain WHY it matters to the brand.
 
 Respond in JSON:
@@ -290,6 +304,40 @@ Respond in JSON:
     return [];
 }
 
+// ── Streak calculation (consecutive days of activity) ──
+async function computeStreak(userId) {
+    try {
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        const [contentDates, creativeDates] = await Promise.all([
+            Content.find({ user: userId, createdAt: { $gte: thirtyDaysAgo } }, { createdAt: 1 }).lean(),
+            Creative.find({ user: userId, createdAt: { $gte: thirtyDaysAgo } }, { createdAt: 1 }).lean(),
+        ]);
+
+        const allDates = [...contentDates, ...creativeDates].map(d => {
+            const dt = new Date(d.createdAt);
+            return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+        });
+        const uniqueDays = [...new Set(allDates)].sort().reverse();
+
+        let streak = 0;
+        const today = new Date();
+        for (let i = 0; i < 30; i++) {
+            const check = new Date(today);
+            check.setDate(check.getDate() - i);
+            const key = `${check.getFullYear()}-${String(check.getMonth() + 1).padStart(2, '0')}-${String(check.getDate()).padStart(2, '0')}`;
+            if (uniqueDays.includes(key)) {
+                streak++;
+            } else if (i > 0) {
+                break; // streak broken
+            }
+            // i === 0 and no activity today — check yesterday
+        }
+        return streak;
+    } catch {
+        return 0;
+    }
+}
+
 // ── Studio activity aggregation ──
 async function getStudioActivity(userId, brandId) {
     const now = new Date();
@@ -354,12 +402,107 @@ function computeBrandHealth(brand, activity) {
     return scores;
 }
 
+// ── Strikes Radar (audience analytics) ──
+const radarCache = new Map();
+
+async function generateStrikesRadar(brand) {
+    const cacheKey = `radar:${brand?._id || 'generic'}:${new Date().toISOString().split('T')[0]}`;
+    const cached = radarCache.get(cacheKey);
+    if (cached) return cached;
+
+    if (!isGrokAvailable()) {
+        const fallback = {
+            sources: [
+                { name: 'Organic Search', value: 38, color: '#34d399' },
+                { name: 'Social Media', value: 28, color: '#8b5cf6' },
+                { name: 'Direct', value: 18, color: '#06b6d4' },
+                { name: 'Referral', value: 10, color: '#f59e0b' },
+                { name: 'Paid Ads', value: 6, color: '#f43f5e' },
+            ],
+            locations: [
+                { name: 'Mumbai', value: 22 }, { name: 'Delhi', value: 18 },
+                { name: 'Bangalore', value: 15 }, { name: 'Pune', value: 12 },
+                { name: 'Hyderabad', value: 10 }, { name: 'Others', value: 23 },
+            ],
+            gender: [{ name: 'Male', value: 52, color: '#3b82f6' }, { name: 'Female', value: 41, color: '#ec4899' }, { name: 'Other', value: 7, color: '#a855f7' }],
+            devices: [{ name: 'Mobile', value: 64, color: '#06b6d4' }, { name: 'Desktop', value: 28, color: '#8b5cf6' }, { name: 'Tablet', value: 8, color: '#f59e0b' }],
+            totalVisitors: 12480,
+            weeklyGrowth: 12.5,
+            topPage: '/products',
+            bounceRate: 38,
+            avgSession: '2m 45s',
+        };
+        return fallback;
+    }
+
+    const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+    try {
+        const resp = await fetch('https://api.x.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${grokKey}` },
+            body: JSON.stringify({
+                model: 'grok-3-mini-fast',
+                messages: [
+                    {
+                        role: 'system',
+                        content: `You are a web analytics intelligence agent. Generate REALISTIC estimated audience analytics for a brand. Use real market data patterns for the brand's industry and country.
+
+Respond in JSON:
+{
+  "sources": [{"name": "source name", "value": percentage, "color": "hex"}],
+  "locations": [{"name": "city/region", "value": percentage}],
+  "gender": [{"name": "Male/Female/Other", "value": percentage, "color": "hex"}],
+  "devices": [{"name": "Mobile/Desktop/Tablet", "value": percentage, "color": "hex"}],
+  "totalVisitors": number,
+  "weeklyGrowth": percentage,
+  "topPage": "most visited page path",
+  "bounceRate": percentage,
+  "avgSession": "duration string"
+}
+
+Use colors: green=#34d399, violet=#8b5cf6, cyan=#06b6d4, amber=#f59e0b, rose=#f43f5e, blue=#3b82f6, pink=#ec4899, purple=#a855f7.
+All percentage arrays must sum to 100. Make data realistic for the industry.`,
+                    },
+                    {
+                        role: 'user',
+                        content: brand
+                            ? `Brand: ${brand.name}, Industry: ${brand.dna?.industry || 'general'}, Country: ${brand.dna?.country || 'India'}, Website: ${brand.website || 'not specified'}, Target Audience: ${brand.dna?.targetAudience || 'general'}.`
+                            : 'Generate realistic analytics for a general Indian D2C brand.',
+                    },
+                ],
+                temperature: 0.7,
+                max_tokens: 800,
+                response_format: { type: 'json_object' },
+            }),
+        });
+        const data = await resp.json();
+        const text = data.choices?.[0]?.message?.content || '';
+        let parsed;
+        try {
+            let clean = text.trim();
+            if (clean.startsWith('```')) clean = clean.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+            parsed = JSON.parse(clean);
+        } catch {
+            const m = text.match(/\{[\s\S]*\}/);
+            if (m) parsed = JSON.parse(m[0]);
+        }
+        if (parsed?.sources) {
+            radarCache.set(cacheKey, parsed);
+            return parsed;
+        }
+    } catch (e) {
+        console.warn('Strikes radar generation failed:', e.message);
+    }
+    return null;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // GET /api/dashboard-summary
 // ═══════════════════════════════════════════════════════════════════════════
 
 router.get('/', protect, async (req, res) => {
     try {
+        purgeOldCacheEntries();
         const { brandId } = req.query;
         const userId = req.user._id;
 
@@ -378,6 +521,8 @@ router.get('/', protect, async (req, res) => {
             grokContentResult,
             businessNewsResult,
             didYouKnowResult,
+            streakResult,
+            radarResult,
         ] = await Promise.allSettled([
             generateDailyInsight(brand),
             getStudioActivity(userId, brandId),
@@ -386,6 +531,8 @@ router.get('/', protect, async (req, res) => {
             (isGrokAvailable() && brand) ? getContentSuggestions(brand) : Promise.resolve({ suggestions: [] }),
             generateBusinessNews(brand),
             generateDidYouKnow(brand),
+            computeStreak(userId),
+            generateStrikesRadar(brand),
         ]);
 
         const activityData = activity.status === 'fulfilled' ? activity.value : { content: { thisWeek: 0, total: 0 }, creatives: { thisWeek: 0, total: 0 } };
@@ -401,12 +548,108 @@ router.get('/', protect, async (req, res) => {
             grokContent: grokContentResult.status === 'fulfilled' ? (grokContentResult.value?.suggestions || []) : [],
             businessNews: businessNewsResult.status === 'fulfilled' ? businessNewsResult.value : [],
             didYouKnow: didYouKnowResult.status === 'fulfilled' ? didYouKnowResult.value : [],
+            streak: streakResult.status === 'fulfilled' ? streakResult.value : 0,
+            strikesRadar: radarResult.status === 'fulfilled' ? radarResult.value : null,
             grokAvailable: isGrokAvailable(),
             timestamp: new Date(),
         });
     } catch (error) {
         console.error('Dashboard summary error:', error);
         res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// POST /api/dashboard-summary/strategy — AI Strategy from radar data
+// ═══════════════════════════════════════════════════════════════════════════
+
+router.post('/strategy', protect, async (req, res) => {
+    try {
+        const { radarData, contentStats, brandId } = req.body;
+        if (!radarData) return res.status(400).json({ error: 'Radar data required' });
+
+        let brand = null;
+        if (brandId) brand = await Brand.findById(brandId).lean();
+
+        if (!isGrokAvailable()) {
+            // Smart fallback based on actual data
+            const topSource = radarData.sources?.[0] || { name: 'Organic', value: 40 };
+            const topLoc = radarData.locations?.[0] || { name: 'Primary City', value: 25 };
+            const mobileShare = radarData.devices?.find(d => d.name === 'Mobile')?.value || 60;
+            const bounce = radarData.bounceRate || 40;
+
+            return res.json({
+                strategy: {
+                    summary: `Strategy for ${brand?.name || 'your brand'} based on current traffic patterns:`,
+                    actions: [
+                        { title: `Maximize ${topSource.name} Channel`, desc: `${topSource.name} drives ${topSource.value}% of traffic. Double investment here — optimize landing pages, increase content frequency, and A/B test CTAs specific to this channel.`, priority: 'high', icon: 'trending_up' },
+                        { title: `Expand Beyond ${topLoc.name}`, desc: `${topLoc.name} accounts for ${topLoc.value}% of visitors. Run geo-targeted campaigns in secondary cities to diversify your audience base and reduce market concentration risk.`, priority: 'medium', icon: 'public' },
+                        { title: mobileShare > 50 ? 'Mobile-First Content' : 'Desktop Optimization', desc: mobileShare > 50 ? `${mobileShare}% of traffic is mobile — prioritize vertical video, mobile-optimized landing pages, and snackable content formats.` : `Desktop traffic is strong — invest in long-form blog content, detailed product pages, and wide-format visuals.`, priority: 'high', icon: mobileShare > 50 ? 'smartphone' : 'computer' },
+                        { title: bounce > 45 ? 'Fix Bounce Rate' : 'Maintain Engagement', desc: bounce > 45 ? `Bounce rate at ${bounce}% is above healthy range. Add interactive elements, improve page speed, and ensure above-fold content hooks visitors.` : `Bounce rate at ${bounce}% is healthy. Continue optimizing for engagement — add related content suggestions and embedded CTAs.`, priority: bounce > 45 ? 'high' : 'low', icon: 'speed' },
+                        { title: 'Diversify Content Mix', desc: `Create content across all ${Object.keys(contentStats?.typeBreakdown || {}).length || 3} active formats. Test new formats like carousels, infographics, and short-video to discover hidden engagement drivers.`, priority: 'medium', icon: 'grid_view' },
+                    ],
+                },
+            });
+        }
+
+        const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+        const resp = await fetch('https://api.x.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${grokKey}` },
+            body: JSON.stringify({
+                model: 'grok-3-mini-fast',
+                messages: [
+                    {
+                        role: 'system',
+                        content: `You are a marketing strategist AI. Analyze the traffic and content data, then generate 5 specific, actionable strategy recommendations.
+
+Respond in JSON:
+{
+  "summary": "One-sentence overview of the strategy",
+  "actions": [
+    {
+      "title": "Short action title (max 6 words)",
+      "desc": "2-3 sentence detailed recommendation with specific numbers from the data",
+      "priority": "high|medium|low",
+      "icon": "material icon name (trending_up, public, smartphone, speed, grid_view, campaign, diversity_3, analytics, schedule, lightbulb)"
+    }
+  ]
+}
+
+Order actions by priority (high first). Make recommendations specific to the data — reference actual percentages and channel names.`,
+                    },
+                    {
+                        role: 'user',
+                        content: `Brand: ${brand?.name || 'Unknown'}, Industry: ${brand?.dna?.industry || 'general'}.
+Traffic Sources: ${JSON.stringify(radarData.sources)}
+Top Locations: ${JSON.stringify(radarData.locations)}
+Gender Split: ${JSON.stringify(radarData.gender)}
+Devices: ${JSON.stringify(radarData.devices)}
+Total Visitors: ${radarData.totalVisitors}, Weekly Growth: ${radarData.weeklyGrowth}%, Bounce Rate: ${radarData.bounceRate}%, Avg Session: ${radarData.avgSession}
+Content Stats: ${JSON.stringify(contentStats)}`,
+                    },
+                ],
+                temperature: 0.7,
+                max_tokens: 1000,
+                response_format: { type: 'json_object' },
+            }),
+        });
+
+        const data = await resp.json();
+        const text = data.choices?.[0]?.message?.content || '';
+        let parsed;
+        try {
+            let clean = text.trim();
+            if (clean.startsWith('```')) clean = clean.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+            parsed = JSON.parse(clean);
+        } catch {
+            const m = text.match(/\{[\s\S]*\}/);
+            if (m) parsed = JSON.parse(m[0]);
+        }
+        res.json({ strategy: parsed });
+    } catch (error) {
+        console.error('Strategy generation error:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 

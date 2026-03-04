@@ -21,6 +21,8 @@ export default function Integrations() {
     const { activeBrand } = useBrand()
     const [platformStatus, setPlatformStatus] = useState({})
     const [shopifyDomain, setShopifyDomain] = useState('')
+    const [shopifyToken, setShopifyToken] = useState('')
+    const [shopifyMode, setShopifyMode] = useState('token') // 'oauth' or 'token'
     const [products, setProducts] = useState([])
     const [productSearch, setProductSearch] = useState('')
     const [loading, setLoading] = useState({})
@@ -76,16 +78,34 @@ export default function Integrations() {
     // ── Connect Shopify ──
     const connectShopify = async () => {
         if (!shopifyDomain) return alert('Enter your Shopify store domain')
-        setLoading(l => ({ ...l, shopify: true }))
-        try {
-            const data = await shopifyAPI.connect(shopifyDomain)
-            if (data.authUrl) {
-                window.open(data.authUrl, '_blank', 'width=600,height=700')
+
+        if (shopifyMode === 'token') {
+            // Direct token connection
+            if (!shopifyToken) return alert('Paste your Admin API Access Token')
+            setLoading(l => ({ ...l, shopify: true }))
+            try {
+                const data = await shopifyAPI.connectToken(shopifyDomain, shopifyToken)
+                alert(`✅ Connected to ${data.shopName}!`)
+                setShopifyToken('')
+                loadStatus()
+            } catch (err) {
+                alert(`Connection failed: ${err.message}`)
+            } finally {
+                setLoading(l => ({ ...l, shopify: false }))
             }
-        } catch (err) {
-            alert(`Shopify connection failed: ${err.message}`)
-        } finally {
-            setLoading(l => ({ ...l, shopify: false }))
+        } else {
+            // OAuth flow
+            setLoading(l => ({ ...l, shopify: true }))
+            try {
+                const data = await shopifyAPI.connect(shopifyDomain)
+                if (data.authUrl) {
+                    window.open(data.authUrl, '_blank', 'width=600,height=700')
+                }
+            } catch (err) {
+                alert(`Shopify connection failed: ${err.message}`)
+            } finally {
+                setLoading(l => ({ ...l, shopify: false }))
+            }
         }
     }
 
@@ -171,15 +191,41 @@ export default function Integrations() {
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="flex items-center gap-3">
+                                    <div className="space-y-3">
+                                        {/* Mode toggle */}
+                                        <div className="flex gap-2 mb-2">
+                                            <button onClick={() => setShopifyMode('token')}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${shopifyMode === 'token' ? 'bg-[#96BF48]/20 text-[#96BF48] border border-[#96BF48]/30' : 'bg-white/[0.04] text-slate-400 border border-white/[0.06]'}`}>
+                                                🔑 Access Token
+                                            </button>
+                                            <button onClick={() => setShopifyMode('oauth')}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${shopifyMode === 'oauth' ? 'bg-[#96BF48]/20 text-[#96BF48] border border-[#96BF48]/30' : 'bg-white/[0.04] text-slate-400 border border-white/[0.06]'}`}>
+                                                🔗 OAuth
+                                            </button>
+                                        </div>
+
                                         <input
                                             type="text" value={shopifyDomain} onChange={e => setShopifyDomain(e.target.value)}
                                             placeholder="my-store.myshopify.com"
-                                            className="flex-1 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white text-sm placeholder:text-slate-500 focus:border-primary focus:outline-none"
+                                            className="w-full px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white text-sm placeholder:text-slate-500 focus:border-primary focus:outline-none"
                                         />
+
+                                        {shopifyMode === 'token' && (
+                                            <>
+                                                <input
+                                                    type="password" value={shopifyToken} onChange={e => setShopifyToken(e.target.value)}
+                                                    placeholder="Admin API Access Token (shpat_...)"
+                                                    className="w-full px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white text-sm placeholder:text-slate-500 focus:border-primary focus:outline-none"
+                                                />
+                                                <p className="text-[11px] text-slate-500">
+                                                    Go to your Shopify Admin → Settings → Apps and sales channels → Develop apps → Create an app → Configure Admin API scopes (read_products, read_orders, read_customers) → Install → Copy the Access Token
+                                                </p>
+                                            </>
+                                        )}
+
                                         <button onClick={connectShopify} disabled={loading.shopify}
-                                            className="btn-primary px-6 py-3 rounded-xl text-sm font-medium whitespace-nowrap">
-                                            {loading.shopify ? 'Connecting...' : 'Connect Shopify'}
+                                            className="btn-primary w-full py-3 rounded-xl text-sm font-medium">
+                                            {loading.shopify ? 'Connecting...' : shopifyMode === 'token' ? '🔗 Connect with Token' : '🔗 Connect via OAuth'}
                                         </button>
                                     </div>
                                 )}

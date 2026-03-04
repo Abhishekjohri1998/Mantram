@@ -9,7 +9,7 @@ const SHOPIFY_API_VERSION = '2024-01';
 /**
  * Build Shopify OAuth authorization URL
  */
-export function getShopifyAuthUrl(shopDomain, clientId, redirectUri, scopes = 'read_products') {
+export function getShopifyAuthUrl(shopDomain, clientId, redirectUri, scopes = 'read_products,read_orders,read_customers,read_inventory') {
     const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
     return `https://${cleanDomain}/admin/oauth/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}`;
 }
@@ -31,30 +31,17 @@ export async function exchangeShopifyToken(shopDomain, clientId, clientSecret, c
     return await response.json(); // { access_token, scope }
 }
 
-/**
- * Fetch all products from a Shopify store (paginated)
- */
-export async function fetchShopifyProducts(accessToken, shopDomain, limit = 250) {
-    const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    const allProducts = [];
-    let url = `https://${cleanDomain}/admin/api/${SHOPIFY_API_VERSION}/products.json?limit=${limit}&status=active`;
-
+// ── Generic paginated fetcher ──
+async function paginatedFetch(accessToken, url) {
+    const all = [];
     while (url) {
         const response = await fetch(url, {
-            headers: {
-                'X-Shopify-Access-Token': accessToken,
-                'Content-Type': 'application/json',
-            },
+            headers: { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' },
         });
-
-        if (!response.ok) {
-            throw new Error(`Shopify API error: ${response.status} ${response.statusText}`);
-        }
-
+        if (!response.ok) throw new Error(`Shopify API error: ${response.status} ${response.statusText}`);
         const data = await response.json();
-        allProducts.push(...(data.products || []));
-
-        // Check for pagination (Link header)
+        const key = Object.keys(data).find(k => Array.isArray(data[k]));
+        if (key) all.push(...data[key]);
         const linkHeader = response.headers.get('link');
         url = null;
         if (linkHeader) {
@@ -62,9 +49,56 @@ export async function fetchShopifyProducts(accessToken, shopDomain, limit = 250)
             if (nextMatch) url = nextMatch[1];
         }
     }
+    return all;
+}
 
-    console.log(`  📦 Fetched ${allProducts.length} products from Shopify`);
-    return allProducts;
+/**
+ * Fetch all products from a Shopify store (paginated)
+ */
+export async function fetchShopifyProducts(accessToken, shopDomain, limit = 250) {
+    const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const url = `https://${cleanDomain}/admin/api/${SHOPIFY_API_VERSION}/products.json?limit=${limit}&status=active`;
+    const products = await paginatedFetch(accessToken, url);
+    console.log(`  📦 Fetched ${products.length} products from Shopify`);
+    return products;
+}
+
+/**
+ * Fetch orders from Shopify (paginated, last N days)
+ */
+export async function fetchShopifyOrders(accessToken, shopDomain, { days = 60, status = 'any', limit = 250 } = {}) {
+    const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const url = `https://${cleanDomain}/admin/api/${SHOPIFY_API_VERSION}/orders.json?limit=${limit}&status=${status}&created_at_min=${since}&order=created_at+desc`;
+    const orders = await paginatedFetch(accessToken, url);
+    console.log(`  🧾 Fetched ${orders.length} orders from Shopify (last ${days} days)`);
+    return orders;
+}
+
+/**
+ * Fetch customers from Shopify (paginated)
+ */
+export async function fetchShopifyCustomers(accessToken, shopDomain, { limit = 250 } = {}) {
+    const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const url = `https://${cleanDomain}/admin/api/${SHOPIFY_API_VERSION}/customers.json?limit=${limit}&order=created_at+desc`;
+    const customers = await paginatedFetch(accessToken, url);
+    console.log(`  👥 Fetched ${customers.length} customers from Shopify`);
+    return customers;
+}
+
+/**
+ * Fetch order count
+ */
+export async function fetchShopifyOrderCount(accessToken, shopDomain, { days = 60, status = 'any' } = {}) {
+    const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const response = await fetch(
+        `https://${cleanDomain}/admin/api/${SHOPIFY_API_VERSION}/orders/count.json?status=${status}&created_at_min=${since}`,
+        { headers: { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' } }
+    );
+    if (!response.ok) return 0;
+    const data = await response.json();
+    return data.count || 0;
 }
 
 /**

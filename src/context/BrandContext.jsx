@@ -1,14 +1,24 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { brands as brandsAPI } from '../services/api.js';
 import { useAuth } from './AuthContext.jsx';
 
 const BrandContext = createContext(null);
+const STORAGE_KEY = 'mantram_active_brand';
 
 export function BrandProvider({ children }) {
     const { isAuthenticated } = useAuth();
     const [brands, setBrands] = useState([]);
-    const [activeBrand, setActiveBrand] = useState(null);
+    const [activeBrand, setActiveBrandState] = useState(null);
     const [loading, setLoading] = useState(false);
+    const initializedRef = useRef(false);
+
+    // Wrapper that also persists to localStorage
+    const setActiveBrand = useCallback((brand) => {
+        setActiveBrandState(brand);
+        if (brand?._id) {
+            localStorage.setItem(STORAGE_KEY, brand._id);
+        }
+    }, []);
 
     // Fetch brands when authenticated
     const fetchBrands = useCallback(async () => {
@@ -38,11 +48,29 @@ export function BrandProvider({ children }) {
             }
 
             const data = await brandsAPI.list();
-            setBrands(data.brands || []);
-            // Auto-select first brand if none active
-            if (!activeBrand && data.brands?.length) {
-                setActiveBrand(data.brands[0]);
+            const brandList = data.brands || [];
+            setBrands(brandList);
+
+            if (brandList.length === 0) {
+                setActiveBrand(null);
+                return;
             }
+
+            // Restore previously selected brand from localStorage
+            const savedBrandId = localStorage.getItem(STORAGE_KEY);
+            const savedBrand = savedBrandId
+                ? brandList.find(b => b._id === savedBrandId)
+                : null;
+
+            if (savedBrand) {
+                // Restore saved brand (even if activeBrand is already set, refresh the data)
+                setActiveBrand(savedBrand);
+            } else if (!activeBrand || !brandList.find(b => b._id === activeBrand._id)) {
+                // No saved brand or saved brand no longer exists → pick first
+                setActiveBrand(brandList[0]);
+            }
+
+            initializedRef.current = true;
         } catch (err) {
             console.error('Failed to fetch brands:', err);
         } finally {
@@ -52,15 +80,16 @@ export function BrandProvider({ children }) {
 
     useEffect(() => { fetchBrands(); }, [fetchBrands]);
 
-    const selectBrand = (brand) => {
+    // Public selectBrand — updates state + localStorage
+    const selectBrand = useCallback((brand) => {
         setActiveBrand(brand);
-        localStorage.setItem('mantram_active_brand', brand._id);
-    };
+        console.log(`🏷️ Brand switched to: ${brand?.name || 'none'}`);
+    }, [setActiveBrand]);
 
-    const addBrand = (brand) => {
+    const addBrand = useCallback((brand) => {
         setBrands(prev => [brand, ...prev]);
         setActiveBrand(brand);
-    };
+    }, [setActiveBrand]);
 
     const updateBrand = async (id, updates) => {
         const data = await brandsAPI.update(id, updates);
@@ -76,10 +105,28 @@ export function BrandProvider({ children }) {
         return data.brand;
     };
 
+    const deleteBrand = async (id) => {
+        await brandsAPI.delete(id);
+        setBrands(prev => {
+            const remaining = prev.filter(b => b._id !== id);
+            // If deleted brand was active, switch to next available
+            if (activeBrand?._id === id) {
+                if (remaining.length > 0) {
+                    setActiveBrand(remaining[0]);
+                } else {
+                    setActiveBrand(null);
+                    localStorage.removeItem(STORAGE_KEY);
+                }
+            }
+            return remaining;
+        });
+    };
+
     return (
         <BrandContext.Provider value={{
             brands, activeBrand, loading,
-            selectBrand, addBrand, updateBrand, updateBrandDNA, fetchBrands,
+            hasBrands: brands.length > 0,
+            selectBrand, addBrand, updateBrand, updateBrandDNA, deleteBrand, fetchBrands,
         }}>
             {children}
         </BrandContext.Provider>
