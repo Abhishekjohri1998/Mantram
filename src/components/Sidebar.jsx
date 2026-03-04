@@ -5,22 +5,31 @@ import { credits as creditsAPI } from '../services/api'
 
 const navItems = [
     { icon: 'dashboard', label: 'Dashboard', to: '/dashboard' },
-    { icon: 'psychology', label: 'Brainstorm Studio', to: '/brainstorm' },
-    { icon: 'edit_note', label: 'Content Studio', to: '/content-studio' },
-    { icon: 'auto_fix_high', label: 'Creative Studio', to: '/creative-studio' },
-    { icon: 'movie', label: 'Video Studio', to: '/video-studio' },
-    { icon: 'calendar_month', label: 'Smart Calendar', to: '/smart-calendar' },
+    { icon: 'psychology', label: 'Brainstorm Studio', to: '/brainstorm', studioKey: 'brainstormStudio' },
+    { icon: 'edit_note', label: 'Content Studio', to: '/content-studio', studioKey: 'contentStudio' },
+    { icon: 'auto_fix_high', label: 'Creative Studio', to: '/creative-studio', studioKey: 'creativeStudio' },
+    { icon: 'movie', label: 'Video Studio', to: '/video-studio', studioKey: 'videoStudio' },
+    { icon: 'calendar_month', label: 'Smart Calendar', to: '/smart-calendar', studioKey: 'smartCalendar' },
     { icon: 'send', label: 'Publish & Schedule', to: '/publish' },
-    { icon: 'forum', label: 'Conversation Studio', to: '/conversations' },
-    { icon: 'travel_explore', label: 'SEO Studio', to: '/seo-studio' },
-    { icon: 'monitoring', label: 'Ad Studio', to: '/performance-marketing' },
+    { icon: 'forum', label: 'Conversation Studio', to: '/conversations', studioKey: 'conversationStudio' },
+    { icon: 'travel_explore', label: 'SEO Studio', to: '/seo-studio', studioKey: 'seoStudio' },
+    { icon: 'monitoring', label: 'Ad Studio', to: '/performance-marketing', studioKey: 'adStudio' },
+    { icon: 'storefront', label: 'D2C Analytics', to: '/d2c-analytics', studioKey: 'd2cAnalytics' },
 ]
 
 const bottomItems = [
-    { icon: 'badge', label: 'Brand Profiles', to: '/brand-dna' },
+    { icon: 'cases', label: 'Brand Manager', to: '/brands' },
     { icon: 'electrical_services', label: 'Integrations', to: '/integrations' },
     { icon: 'settings', label: 'Settings', to: '/team' },
 ]
+
+// Filter nav items based on team member's studio access
+function getVisibleNavItems(user) {
+    if (!user?.organization || user.role === 'admin' || user.role === 'superadmin' || user.teamRole === 'owner') {
+        return navItems // owners see everything
+    }
+    return navItems.filter(item => !item.studioKey || user.studioAccess?.[item.studioKey] !== false)
+}
 
 export default function Sidebar({ mobileOpen, onClose }) {
     const { user } = useAuth()
@@ -86,7 +95,7 @@ export default function Sidebar({ mobileOpen, onClose }) {
             {/* Main Nav */}
             <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
                 <p className="px-3 pt-4 pb-2 text-xs text-slate-600 uppercase tracking-widest font-bold">Create</p>
-                {navItems.map((item) => (
+                {getVisibleNavItems(user).map((item) => (
                     <NavLink
                         key={item.label}
                         to={item.to}

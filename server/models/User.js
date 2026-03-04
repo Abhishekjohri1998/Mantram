@@ -12,7 +12,23 @@ const userSchema = new mongoose.Schema({
 
     // Team / Organization
     organization: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    teamRole: { type: String, default: '' },
+    teamRole: { type: String, enum: ['owner', 'manager', 'member', ''], default: '' },
+
+    // Per-studio access (for team members)
+    studioAccess: {
+        contentStudio: { type: Boolean, default: true },
+        creativeStudio: { type: Boolean, default: true },
+        seoStudio: { type: Boolean, default: true },
+        brainstormStudio: { type: Boolean, default: true },
+        videoStudio: { type: Boolean, default: true },
+        d2cAnalytics: { type: Boolean, default: false },
+        adStudio: { type: Boolean, default: false },
+        smartCalendar: { type: Boolean, default: true },
+        conversationStudio: { type: Boolean, default: false },
+    },
+
+    // Which brands this team member can access
+    brandAccess: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Brand' }],
 
     // Credits
     credits: {
@@ -37,6 +53,8 @@ const userSchema = new mongoose.Schema({
         defaultTextProvider: { type: String, default: '' },
         defaultImageProvider: { type: String, default: '' },
         defaultTextModel: { type: String, default: '' },
+        fidatoPopup: { type: Boolean, default: true },
+        fidatoEnabled: { type: Boolean, default: true },
     },
 
     lastActive: { type: Date, default: Date.now },

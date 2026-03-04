@@ -109,6 +109,20 @@ const brandSchema = new mongoose.Schema({
     // Extracted raw data from website scan
     rawScanData: { type: mongoose.Schema.Types.Mixed, default: {} },
 
+    // Brand Knowledge Bank — user-supplied knowledge (text, docs, URLs)
+    knowledge: {
+        entries: [{
+            id: { type: String, required: true },
+            sourceType: { type: String, enum: ['text', 'file', 'url'], required: true },
+            title: { type: String, default: '' },
+            content: { type: String, default: '' }, // extracted text content
+            sourceUrl: { type: String, default: '' },
+            fileName: { type: String, default: '' },
+            charCount: { type: Number, default: 0 },
+            addedAt: { type: Date, default: Date.now },
+        }],
+    },
+
     // AI Learning — accumulated knowledge about this brand
     aiContext: {
         systemPrompt: { type: String, default: '' }, // built from DNA + learning

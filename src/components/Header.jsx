@@ -1,18 +1,25 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useBrand } from '../context/BrandContext'
 import { credits as creditsAPI } from '../services/api'
 
 export default function Header({ title, subtitle, onMenuToggle }) {
     const { user, logout } = useAuth()
+    const { brands, activeBrand, selectBrand } = useBrand()
     const navigate = useNavigate()
     const [showMenu, setShowMenu] = useState(false)
+    const [showBrandMenu, setShowBrandMenu] = useState(false)
     const [creditBalance, setCreditBalance] = useState(null)
     const menuRef = useRef(null)
+    const brandMenuRef = useRef(null)
 
-    // Close menu on outside click
+    // Close menus on outside click
     useEffect(() => {
-        const handleClick = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setShowMenu(false) }
+        const handleClick = (e) => {
+            if (menuRef.current && !menuRef.current.contains(e.target)) setShowMenu(false)
+            if (brandMenuRef.current && !brandMenuRef.current.contains(e.target)) setShowBrandMenu(false)
+        }
         document.addEventListener('mousedown', handleClick)
         return () => document.removeEventListener('mousedown', handleClick)
     }, [])
@@ -72,6 +79,50 @@ export default function Header({ title, subtitle, onMenuToggle }) {
             </div>
 
             <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
+                {/* Global Brand Switcher */}
+                {brands.length > 0 && (
+                    <div className="relative" ref={brandMenuRef}>
+                        <button
+                            onClick={() => setShowBrandMenu(!showBrandMenu)}
+                            className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] transition-all cursor-pointer group"
+                            title={`Active brand: ${activeBrand?.name || 'None'}`}
+                        >
+                            <div className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                                style={{ background: activeBrand?.dna?.colors?.[0]?.hex || '#8b5cf6' }}>
+                                {activeBrand?.name?.charAt(0) || '?'}
+                            </div>
+                            <span className="text-sm font-medium text-white max-w-[100px] truncate hidden sm:block">
+                                {activeBrand?.name || 'Select Brand'}
+                            </span>
+                            <span className="material-symbols-outlined text-slate-500 text-sm">unfold_more</span>
+                        </button>
+
+                        {showBrandMenu && (
+                            <div className="absolute right-0 top-full mt-2 w-56 glass-panel rounded-xl border border-white/[0.1] shadow-2xl shadow-black/50 overflow-hidden animate-fade-in z-50">
+                                <div className="px-3 py-2 border-b border-white/[0.06]">
+                                    <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Switch Brand</p>
+                                </div>
+                                <div className="p-1 max-h-64 overflow-y-auto">
+                                    {brands.filter(b => b.status !== 'archived').map(brand => (
+                                        <button key={brand._id}
+                                            onClick={() => { selectBrand(brand); setShowBrandMenu(false) }}
+                                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all cursor-pointer ${activeBrand?._id === brand._id ? 'bg-primary/10 text-white' : 'text-slate-300 hover:bg-white/[0.05] hover:text-white'
+                                                }`}>
+                                            <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                                                style={{ background: brand.dna?.colors?.[0]?.hex || '#8b5cf6' }}>
+                                                {brand.name?.charAt(0)}
+                                            </div>
+                                            <span className="text-sm font-medium truncate flex-1">{brand.name}</span>
+                                            {activeBrand?._id === brand._id && (
+                                                <span className="material-symbols-outlined text-primary text-sm">check_circle</span>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
                 {/* Credit Balance Badge — compact on mobile */}
                 {creditBalance && !creditBalance.unlimited && (
                     <button

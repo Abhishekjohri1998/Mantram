@@ -6,7 +6,7 @@ import { content as contentAPI, creatives as creativesAPI, agents } from '../ser
 
 export default function Nexus() {
     const navigate = useNavigate()
-    const { activeBrand, brands, selectBrand } = useBrand()
+    const { activeBrand } = useBrand()
     const [aiHealth, setAiHealth] = useState(null)
     const [contentCount, setContentCount] = useState(0)
     const [creativeCount, setCreativeCount] = useState(0)
@@ -31,11 +31,6 @@ export default function Nexus() {
                     </h2>
                     <p className="text-slate-400 text-sm">Your brand command center — everything in one place.</p>
                 </div>
-                <select value={brand?._id || ''} onChange={e => { const b = brands.find(b => b._id === e.target.value); if (b) selectBrand(b) }}
-                    className="input-glass py-2 px-3 rounded-xl text-xs bg-white/[0.04] cursor-pointer">
-                    {brands.length === 0 && <option value="">No brands</option>}
-                    {brands.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
-                </select>
             </div>
 
             {!brand ? (

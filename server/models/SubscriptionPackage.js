@@ -19,6 +19,11 @@ const subscriptionPackageSchema = new mongoose.Schema({
         creativeStudio: { type: Boolean, default: false },
         seoStudio: { type: Boolean, default: false },
         brainstormStudio: { type: Boolean, default: false },
+        videoStudio: { type: Boolean, default: false },
+        d2cAnalytics: { type: Boolean, default: false },
+        adStudio: { type: Boolean, default: false },
+        smartCalendar: { type: Boolean, default: false },
+        conversationStudio: { type: Boolean, default: false },
     },
 
     // Credit allocation

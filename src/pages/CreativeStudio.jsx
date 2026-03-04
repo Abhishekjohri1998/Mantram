@@ -8,7 +8,7 @@ import VoiceInput from '../components/VoiceInput'
 
 export default function CreativeStudio() {
     const navigate = useNavigate()
-    const { brands, activeBrand, selectBrand } = useBrand()
+    const { activeBrand } = useBrand()
     const [searchParams, setSearchParams] = useSearchParams()
     const [selectedType, setSelectedType] = useState('instagram-post')
     const [prompt, setPrompt] = useState('')
@@ -387,12 +387,20 @@ export default function CreativeStudio() {
             setSearchParams({}, { replace: true })
         }
 
-        // Check if coming with mode=photoshoot from Content Studio
+        // Check if coming with mode=photoshoot from Content Studio or Brand DNA
         const mode = searchParams.get('mode')
         if (mode === 'photoshoot') {
             setStudioMode('photoshoot')
             const brief = searchParams.get('brief')
             if (brief) setPhotoshootBrief(brief)
+
+            // Read image passed from Brand DNA via sessionStorage
+            const passedImage = window.sessionStorage.getItem('photoshootImage')
+            if (passedImage) {
+                setProductImage(passedImage)
+                window.sessionStorage.removeItem('photoshootImage')
+            }
+
             setSearchParams({}, { replace: true })
         }
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -1044,19 +1052,6 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     <h2 className="text-3xl font-extrabold tracking-tight mb-1">Creative <span className="text-primary">Studio</span></h2>
                     <p className="text-slate-400 text-sm">AI visual content generation, aligned with your brand identity.</p>
                 </div>
-                <select
-                    value={activeBrand?._id || ''}
-                    onChange={e => {
-                        const b = brands.find(b => b._id === e.target.value)
-                        if (b) selectBrand(b)
-                    }}
-                    className="input-glass py-2 px-3 rounded-xl text-xs bg-white/[0.04] border-white/[0.08] cursor-pointer"
-                >
-                    {brands.length === 0 && <option value="">No brands</option>}
-                    {brands.map(b => (
-                        <option key={b._id} value={b._id}>{b.name}</option>
-                    ))}
-                </select>
             </div>
 
             {/* Studio Mode Toggle */}

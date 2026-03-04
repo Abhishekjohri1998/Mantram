@@ -11,6 +11,7 @@ import creativeRoutes from './routes/creatives.js';
 import adminRoutes from './routes/admin.js';
 import agentRoutes from './routes/agents.js';
 import shopifyRoutes from './routes/shopify.js';
+import shopifyAnalyticsRoutes from './routes/shopifyAnalytics.js';
 import socialRoutes from './routes/social.js';
 import voiceRoutes from './routes/voice.js';
 import brainstormRoutes from './routes/brainstorm-studio.js';
@@ -33,6 +34,8 @@ import orchestratorRoutes from './routes/orchestrator-routes.js';
 import pmStudioRoutes from './routes/performance-marketing.js';
 import pmConnectionRoutes from './routes/pm-connections.js';
 import dashboardSummaryRoutes from './routes/dashboard-summary.js';
+import teamRoutes from './routes/team.js';
+import fidatoRoutes from './routes/fidato.js';
 
 const app = express();
 
@@ -41,7 +44,15 @@ connectDB();
 
 // Middleware
 app.use(cors({ origin: config.frontendUrl, credentials: true }));
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({
+    limit: '50mb',
+    // Capture raw body for Shopify webhook HMAC verification
+    verify: (req, _res, buf) => {
+        if (req.originalUrl && req.originalUrl.startsWith('/api/shopify/webhooks')) {
+            req.rawBody = buf.toString('utf8');
+        }
+    },
+}));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Request logging in dev
@@ -60,6 +71,7 @@ app.use('/api/creatives', creativeRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/agents', agentRoutes);
 app.use('/api/shopify', shopifyRoutes);
+app.use('/api/shopify-analytics', shopifyAnalyticsRoutes);
 app.use('/api/social', socialRoutes);
 app.use('/api/voice', voiceRoutes);
 app.use('/api/brainstorm-studio', brainstormRoutes);
@@ -83,6 +95,8 @@ app.use('/api/orchestrate', orchestratorRoutes);
 app.use('/api/pm-studio', pmStudioRoutes);
 app.use('/api/pm-studio', pmConnectionRoutes);
 app.use('/api/dashboard-summary', dashboardSummaryRoutes);
+app.use('/api/team', teamRoutes);
+app.use('/api/fidato', fidatoRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
