@@ -61,7 +61,7 @@ export default function TeamDashboard() {
                     <div key={i} className="glass-panel rounded-2xl p-5 animate-fade-in" style={{ animationDelay: `${i * 80}ms` }}>
                         <span className={`material-symbols-outlined text-xl ${s.color} mb-2 block`}>{s.icon}</span>
                         <p className="text-2xl font-extrabold text-white">{s.value}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
+                        <p className="text-sm text-slate-500 mt-0.5">{s.label}</p>
                     </div>
                 ))}
             </div>
@@ -96,14 +96,14 @@ export default function TeamDashboard() {
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2">
                                                     <p className="text-sm text-white font-bold">{m.name}</p>
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${rc.bg} ${rc.text}`}>{m.role}</span>
-                                                    {m._id === user?.id && <span className="text-[10px] text-slate-500">(You)</span>}
+                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${rc.bg} ${rc.text}`}>{m.role}</span>
+                                                    {m._id === user?.id && <span className="text-sm text-slate-500">(You)</span>}
                                                 </div>
-                                                <p className="text-xs text-slate-500">{m.email}</p>
+                                                <p className="text-sm text-slate-500">{m.email}</p>
                                             </div>
                                             <div className="text-right">
-                                                <p className="text-xs text-slate-400">{m.usage?.contentGenerated || 0} content</p>
-                                                <p className="text-[10px] text-slate-600">
+                                                <p className="text-sm text-slate-400">{m.usage?.contentGenerated || 0} content</p>
+                                                <p className="text-xs text-slate-600">
                                                     Last active: {m.lastActive ? new Date(m.lastActive).toLocaleDateString() : '—'}
                                                 </p>
                                             </div>
@@ -135,7 +135,7 @@ export default function TeamDashboard() {
                                         </div>
                                         <div className="flex-1">
                                             <p className="text-sm text-white font-medium">{b.name}</p>
-                                            <p className="text-[10px] text-slate-500">{b.dna?.voice?.personality || 'No voice set'}</p>
+                                            <p className="text-sm text-slate-500">{b.dna?.voice?.personality || 'No voice set'}</p>
                                         </div>
                                     </div>
                                 ))}
@@ -151,16 +151,16 @@ export default function TeamDashboard() {
                         <div className="space-y-3">
                             {teamMembers.slice(0, 4).map((m, i) => (
                                 <div key={i} className="flex items-start gap-3">
-                                    <div className="size-6 rounded-full bg-primary/20 flex items-center justify-center text-primary text-[10px] font-bold shrink-0 mt-0.5">
+                                    <div className="size-6 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold shrink-0 mt-0.5">
                                         {m.name?.charAt(0)}
                                     </div>
                                     <div>
-                                        <p className="text-xs text-white"><span className="font-bold">{m.name}</span> generated {m.usage?.contentGenerated || 0} pieces of content</p>
-                                        <p className="text-[10px] text-slate-600">{m.lastActive ? new Date(m.lastActive).toLocaleString() : 'Recently'}</p>
+                                        <p className="text-sm text-white"><span className="font-bold">{m.name}</span> generated {m.usage?.contentGenerated || 0} pieces of content</p>
+                                        <p className="text-xs text-slate-600">{m.lastActive ? new Date(m.lastActive).toLocaleString() : 'Recently'}</p>
                                     </div>
                                 </div>
                             ))}
-                            {teamMembers.length === 0 && <p className="text-xs text-slate-500">No recent activity.</p>}
+                            {teamMembers.length === 0 && <p className="text-sm text-slate-500">No recent activity.</p>}
                         </div>
                     </div>
                 </div>

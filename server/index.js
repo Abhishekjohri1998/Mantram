@@ -19,6 +19,20 @@ import googleAnalyticsRoutes from './routes/google-analytics.js';
 import productRoutes from './routes/products.js';
 import trendRoutes from './routes/trends.js';
 import superadminRoutes, { creditRouter } from './routes/superadmin.js';
+import conversationRoutes from './routes/conversations.js';
+import contactRoutes from './routes/contacts.js';
+import webhookRoutes from './routes/webhooks.js';
+import automationRoutes from './routes/automations.js';
+import routingRulesRoutes from './routes/routingRules.js';
+import canvasAssetsRoutes from './routes/canvasAssets.js';
+import agentCommandRoutes from './routes/agentCommand.js';
+import videoStudioRoutes from './routes/video-studio.js';
+import contentAgenticRoutes from './routes/content-agentic.js';
+import creativeAgenticRoutes from './routes/creative-agentic.js';
+import orchestratorRoutes from './routes/orchestrator-routes.js';
+import pmStudioRoutes from './routes/performance-marketing.js';
+import pmConnectionRoutes from './routes/pm-connections.js';
+import dashboardSummaryRoutes from './routes/dashboard-summary.js';
 
 const app = express();
 
@@ -55,6 +69,20 @@ app.use('/api/products', productRoutes);
 app.use('/api/trends', trendRoutes);
 app.use('/api/superadmin', superadminRoutes);
 app.use('/api/credits', creditRouter);
+app.use('/api/conversations', conversationRoutes);
+app.use('/api/contacts', contactRoutes);
+app.use('/api/webhooks', webhookRoutes);
+app.use('/api/automations', automationRoutes);
+app.use('/api/routing-rules', routingRulesRoutes);
+app.use('/api/canvas-assets', canvasAssetsRoutes);
+app.use('/api/agent-command', agentCommandRoutes);
+app.use('/api/video-studio', videoStudioRoutes);
+app.use('/api/content/agentic', contentAgenticRoutes);
+app.use('/api/creatives/agentic', creativeAgenticRoutes);
+app.use('/api/orchestrate', orchestratorRoutes);
+app.use('/api/pm-studio', pmStudioRoutes);
+app.use('/api/pm-studio', pmConnectionRoutes);
+app.use('/api/dashboard-summary', dashboardSummaryRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -82,6 +110,14 @@ app.listen(config.port, () => {
     console.log(`\n🚀 Mantram AI Server running on port ${config.port}`);
     console.log(`📡 AI Provider: ${config.ai.defaultTextProvider} (${config.ai.defaultTextModel})`);
     console.log(`🌐 Frontend: ${config.frontendUrl}\n`);
+
+    // Start follow-up scheduler (every 30 minutes)
+    import('./services/autonomousAgent.js').then(({ runFollowUpCheck }) => {
+        setInterval(() => {
+            runFollowUpCheck().catch(err => console.warn('⚠️ Follow-up check failed:', err.message));
+        }, 30 * 60 * 1000);
+        console.log('🤖 Autonomous Agent active — Follow-up scheduler running every 30 min');
+    }).catch(() => { });
 });
 
 export default app;

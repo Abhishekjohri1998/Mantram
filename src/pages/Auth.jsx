@@ -1,14 +1,36 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+
+const PLAN_LABELS = {
+    starter: 'Starter — Free',
+    professional: 'Professional — $49/mo',
+    enterprise: 'Enterprise — $199/mo',
+}
 
 export default function Auth() {
     const navigate = useNavigate()
-    const { login, register } = useAuth()
+    const [searchParams] = useSearchParams()
+    const { login, register, isAuthenticated, loading: authLoading } = useAuth()
     const [isLogin, setIsLogin] = useState(true)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [form, setForm] = useState({ name: '', email: '', password: '', company: '' })
+
+    const redirect = searchParams.get('redirect') || '/dashboard'
+    const plan = searchParams.get('plan')
+    const scanUrl = searchParams.get('scanUrl')
+
+    // If already authenticated, redirect immediately
+    useEffect(() => {
+        if (!authLoading && isAuthenticated) {
+            let dest = redirect
+            if (scanUrl) {
+                dest = `/onboarding?scanUrl=${encodeURIComponent(scanUrl)}`
+            }
+            navigate(dest, { replace: true })
+        }
+    }, [isAuthenticated, authLoading, navigate, redirect, scanUrl])
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -20,7 +42,12 @@ export default function Auth() {
             } else {
                 await register(form.name, form.email, form.password, form.company)
             }
-            navigate('/dashboard')
+            // After auth, redirect to intended destination
+            let dest = redirect
+            if (scanUrl) {
+                dest = `/onboarding?scanUrl=${encodeURIComponent(scanUrl)}`
+            }
+            navigate(dest, { replace: true })
         } catch (err) {
             setError(err.message || 'Something went wrong')
         } finally {
@@ -42,14 +69,30 @@ export default function Auth() {
                 {/* Logo */}
                 <div className="text-center mb-8">
                     <div className="inline-flex items-center gap-3 mb-4">
-                        <div className="size-10 flex items-center justify-center bg-primary/10 rounded-xl">
-                            <span className="material-symbols-outlined text-primary text-3xl">auto_awesome</span>
+                        <div className="size-10 rounded-xl overflow-hidden">
+                            <img src="/mantram-logo.png" alt="Mantram AI" className="size-10" />
                         </div>
                         <h1 className="text-2xl font-extrabold text-white tracking-tight">Mantram AI</h1>
                     </div>
                     <p className="text-slate-400 text-sm">
                         {isLogin ? 'Welcome back. Sign in to continue.' : 'Create your account to get started.'}
                     </p>
+
+                    {/* Plan context banner */}
+                    {plan && PLAN_LABELS[plan] && (
+                        <div className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 border border-primary/20 text-primary text-xs font-bold">
+                            <span className="material-symbols-outlined text-sm">verified</span>
+                            {isLogin ? 'Sign in' : 'Sign up'} for {PLAN_LABELS[plan]}
+                        </div>
+                    )}
+
+                    {/* Scan URL context */}
+                    {scanUrl && (
+                        <div className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold">
+                            <span className="material-symbols-outlined text-sm">language</span>
+                            {isLogin ? 'Sign in' : 'Sign up'} to scan {scanUrl}
+                        </div>
+                    )}
                 </div>
 
                 {/* Auth Card */}
@@ -72,7 +115,7 @@ export default function Auth() {
                         {!isLogin && (
                             <>
                                 <div>
-                                    <label className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-1.5 block">Full Name</label>
+                                    <label className="text-sm text-slate-500 font-bold uppercase tracking-widest mb-1.5 block">Full Name</label>
                                     <div className="relative">
                                         <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-lg">person</span>
                                         <input
@@ -83,7 +126,7 @@ export default function Auth() {
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-1.5 block">Company</label>
+                                    <label className="text-sm text-slate-500 font-bold uppercase tracking-widest mb-1.5 block">Company</label>
                                     <div className="relative">
                                         <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-lg">business</span>
                                         <input
@@ -97,7 +140,7 @@ export default function Auth() {
                         )}
 
                         <div>
-                            <label className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-1.5 block">Email</label>
+                            <label className="text-sm text-slate-500 font-bold uppercase tracking-widest mb-1.5 block">Email</label>
                             <div className="relative">
                                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-lg">mail</span>
                                 <input
@@ -109,7 +152,7 @@ export default function Auth() {
                         </div>
 
                         <div>
-                            <label className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-1.5 block">Password</label>
+                            <label className="text-sm text-slate-500 font-bold uppercase tracking-widest mb-1.5 block">Password</label>
                             <div className="relative">
                                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-lg">lock</span>
                                 <input

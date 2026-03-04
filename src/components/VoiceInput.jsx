@@ -216,7 +216,7 @@ export default function VoiceInput({ onResult, language = 'english', className =
                             <span className="w-1 h-2 bg-rose-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                             <span className="w-1 h-3 bg-rose-400 rounded-full animate-bounce" style={{ animationDelay: '450ms' }} />
                         </span>
-                        <span className="text-[10px] text-rose-400 font-bold font-mono">{formatDuration(duration)}</span>
+                        <span className="text-sm text-rose-400 font-bold font-mono">{formatDuration(duration)}</span>
                     </div>
                 </div>
             )}
@@ -225,8 +225,8 @@ export default function VoiceInput({ onResult, language = 'english', className =
             {processing && (
                 <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 whitespace-nowrap z-50">
                     <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-1.5 flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-xs text-amber-400 animate-spin">progress_activity</span>
-                        <span className="text-[10px] text-amber-400 font-bold">Whisper AI transcribing...</span>
+                        <span className="material-symbols-outlined text-sm text-amber-400 animate-spin">progress_activity</span>
+                        <span className="text-sm text-amber-400 font-bold">Whisper AI transcribing...</span>
                     </div>
                 </div>
             )}
@@ -235,7 +235,7 @@ export default function VoiceInput({ onResult, language = 'english', className =
             {error && (
                 <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 whitespace-nowrap z-50">
                     <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-1.5">
-                        <span className="text-[10px] text-rose-400 font-bold">{error}</span>
+                        <span className="text-sm text-rose-400 font-bold">{error}</span>
                     </div>
                 </div>
             )}

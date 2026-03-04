@@ -34,7 +34,7 @@ export function CreditBadge({ action, className = '' }) {
     const canAfford = unlimited || !balance || balance.remaining >= cost
 
     return (
-        <span className={`inline-flex items-center gap-0.5 ml-1.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-all ${unlimited
+        <span className={`inline-flex items-center gap-0.5 ml-1.5 px-1.5 py-0.5 rounded-md text-xs font-bold transition-all ${unlimited
                 ? 'bg-white/[0.08] text-slate-400'
                 : canAfford
                     ? 'bg-emerald-500/10 text-emerald-400'
@@ -93,13 +93,13 @@ export function CreditTooltipWrapper({ action, children, position = 'top' }) {
                             </span>
                         </div>
                         {!canAfford && (
-                            <div className="text-rose-400 text-[10px] mt-1 flex items-center gap-1">
+                            <div className="text-rose-400 text-xs mt-1 flex items-center gap-1">
                                 <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>warning</span>
                                 Insufficient credits ({balance?.remaining || 0} remaining)
                             </div>
                         )}
                         {unlimited && (
-                            <div className="text-emerald-400 text-[10px] mt-1 flex items-center gap-1">
+                            <div className="text-emerald-400 text-xs mt-1 flex items-center gap-1">
                                 <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>all_inclusive</span>
                                 Unlimited plan — no deduction
                             </div>

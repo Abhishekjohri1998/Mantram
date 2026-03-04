@@ -141,7 +141,7 @@ export default function Integrations() {
                                         <div className="w-14 h-14 rounded-xl bg-[#96BF48]/10 flex items-center justify-center text-2xl font-bold text-[#96BF48]">S</div>
                                         <div>
                                             <h3 className="font-bold text-white">Shopify</h3>
-                                            <p className="text-xs text-slate-400">Sync products & inventory</p>
+                                            <p className="text-sm text-slate-400">Sync products & inventory</p>
                                         </div>
                                     </div>
                                     <StatusBadge status={shopifyStatus.status || 'disconnected'} />
@@ -204,7 +204,7 @@ export default function Integrations() {
                                                     </div>
                                                     <div>
                                                         <h3 className="font-bold text-white text-sm">{platform.name}</h3>
-                                                        <p className="text-[10px] text-slate-500">{platform.desc}</p>
+                                                        <p className="text-sm text-slate-500">{platform.desc}</p>
                                                     </div>
                                                 </div>
                                                 <StatusBadge status={status.status || 'disconnected'} />
@@ -212,14 +212,14 @@ export default function Integrations() {
 
                                             {status.connected ? (
                                                 <div className="flex items-center justify-between">
-                                                    <div className="text-xs text-slate-400">
+                                                    <div className="text-sm text-slate-400">
                                                         <span className="text-white font-medium">{status.displayName}</span>
                                                         {status.publishCount > 0 && (
                                                             <span className="ml-2">• {status.publishCount} posts</span>
                                                         )}
                                                     </div>
                                                     <button onClick={() => disconnectPlatform(platform.id)}
-                                                        className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded-lg hover:bg-red-500/10">
+                                                        className="text-sm text-red-400 hover:text-red-300 px-2 py-1 rounded-lg hover:bg-red-500/10">
                                                         Disconnect
                                                     </button>
                                                 </div>
@@ -246,7 +246,7 @@ export default function Integrations() {
                                 {['WooCommerce', 'Amazon', 'Pinterest', 'YouTube'].map(name => (
                                     <div key={name} className="glass-panel rounded-xl p-4 opacity-50 text-center">
                                         <p className="text-sm font-medium text-slate-400">{name}</p>
-                                        <p className="text-[10px] text-slate-600 mt-1">Coming soon</p>
+                                        <p className="text-xs text-slate-600 mt-1">Coming soon</p>
                                     </div>
                                 ))}
                             </div>
@@ -295,7 +295,7 @@ export default function Integrations() {
                                         )}
                                         <div className="p-4">
                                             <h3 className="font-bold text-white text-sm truncate">{product.title}</h3>
-                                            <p className="text-xs text-slate-500 mt-0.5">{product.productType || product.vendor}</p>
+                                            <p className="text-sm text-slate-500 mt-0.5">{product.productType || product.vendor}</p>
                                             <div className="flex items-center justify-between mt-3">
                                                 <span className="text-primary font-bold text-sm">
                                                     ₹{product.variants?.[0]?.price || '—'}
@@ -303,7 +303,7 @@ export default function Integrations() {
                                                 {product.tags?.length > 0 && (
                                                     <div className="flex gap-1">
                                                         {product.tags.slice(0, 2).map((tag, i) => (
-                                                            <span key={i} className="text-[9px] px-2 py-0.5 rounded-full bg-white/[0.05] text-slate-400">{tag}</span>
+                                                            <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-white/[0.05] text-slate-400">{tag}</span>
                                                         ))}
                                                     </div>
                                                 )}
@@ -330,7 +330,7 @@ function StatusBadge({ status }) {
     }
     const c = config[status] || config.disconnected
     return (
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium ${c.bg} ${c.text}`}>
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${c.bg} ${c.text}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
             {c.label}
         </span>

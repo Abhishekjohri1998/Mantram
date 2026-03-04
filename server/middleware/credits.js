@@ -22,6 +22,7 @@ const ACTION_LABELS = {
     brainstorm: 'Brainstorm Generate', brainstormRefine: 'Brainstorm Refine',
     brainstormChat: 'Brainstorm Chat', brainstormScreenplay: 'Screenplay Generation',
     trendRefresh: 'Trend Refresh',
+    videoBrainstorm: 'Video Brainstorm', videoGenerate: 'Video Generation', videoEdit: 'Video Edit',
 };
 
 // Default credit costs (used when SystemSettings has no override)
@@ -42,6 +43,9 @@ const DEFAULT_CREDIT_COSTS = {
     brainstormChat: 2,
     brainstormScreenplay: 5,
     trendRefresh: 1,
+    videoBrainstorm: 2,
+    videoGenerate: 15,
+    videoEdit: 5,
 };
 
 // Cache for credit costs (refresh every 5 minutes)

@@ -56,7 +56,14 @@ ABSOLUTE RULES:
 8. DO include specific details, numbers, and concrete examples over vague claims
 9. DO write with the confidence of someone who KNOWS this brand inside-out
 10. DO match the reading level and vocabulary of the target audience
-11. Your content should pass AI detection tools — it must read as genuinely human`;
+11. Your content should pass AI detection tools — it must read as genuinely human
+
+FORMATTING RULES — CRITICAL:
+- Do NOT use markdown formatting: no **bold**, no *italic*, no ## headers, no - bullet lists
+- Write PLAIN TEXT only — the user will copy-paste this directly, so no special characters
+- Use line breaks and spacing for structure instead of markdown syntax
+- For lists, use simple numbers (1. 2. 3.) or just line breaks — no dashes or bullets
+- Hashtags for social media are fine (#trending) but NOT markdown headers (## Title)`;
     }
 
     /**

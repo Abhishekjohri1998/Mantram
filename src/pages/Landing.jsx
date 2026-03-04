@@ -1,14 +1,42 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 export default function Landing() {
+    const navigate = useNavigate()
+    const { isAuthenticated } = useAuth()
+    const [scanUrl, setScanUrl] = useState('')
+
+    const handleScan = (e) => {
+        e.preventDefault()
+        const url = scanUrl.trim()
+        if (!url) return
+
+        if (isAuthenticated) {
+            // Already logged in — go straight to onboarding with URL
+            navigate(`/onboarding?scanUrl=${encodeURIComponent(url)}`)
+        } else {
+            // Need to login first, then redirect to onboarding with URL
+            navigate(`/auth?redirect=${encodeURIComponent('/onboarding')}&scanUrl=${encodeURIComponent(url)}`)
+        }
+    }
+
+    const handlePricing = (planName) => {
+        if (isAuthenticated) {
+            navigate('/dashboard')
+        } else {
+            navigate(`/auth?plan=${planName.toLowerCase()}`)
+        }
+    }
+
     return (
         <div className="relative min-h-screen w-full flex flex-col overflow-x-hidden liquid-gradient">
             {/* Navbar */}
             <nav className="sticky top-0 z-50 w-full px-6 py-4 flex justify-center">
                 <header className="max-w-7xl w-full flex items-center justify-between glass-panel px-8 py-3 rounded-full">
                     <div className="flex items-center gap-3">
-                        <div className="size-8 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/20">
-                            <span className="material-symbols-outlined text-white text-xl">auto_awesome</span>
+                        <div className="size-8 rounded-lg overflow-hidden shadow-lg shadow-primary/20">
+                            <img src="/mantram-logo.png" alt="Mantram AI" className="size-8" />
                         </div>
                         <h2 className="text-white text-xl font-bold tracking-tight">Mantram AI</h2>
                     </div>
@@ -16,11 +44,16 @@ export default function Landing() {
                         <a className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">Product</a>
                         <a className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">Intelligence</a>
                         <a className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">Case Studies</a>
-                        <a className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">Pricing</a>
+                        <a href="#pricing" className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">Pricing</a>
                     </div>
                     <div className="flex items-center gap-4">
-                        <Link to="/dashboard" className="hidden sm:block text-slate-300 text-sm font-medium px-4 hover:text-white transition-colors">Login</Link>
-                        <Link to="/onboarding" className="bg-primary hover:bg-primary-light text-white text-sm font-bold py-2.5 px-6 rounded-full transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-primary/20">
+                        {isAuthenticated ? (
+                            <Link to="/dashboard" className="hidden sm:block text-slate-300 text-sm font-medium px-4 hover:text-white transition-colors">Dashboard</Link>
+                        ) : (
+                            <Link to="/auth" className="hidden sm:block text-slate-300 text-sm font-medium px-4 hover:text-white transition-colors">Login</Link>
+                        )}
+                        <Link to={isAuthenticated ? '/onboarding' : '/auth?redirect=%2Fonboarding'}
+                            className="bg-primary hover:bg-primary-light text-white text-sm font-bold py-2.5 px-6 rounded-full transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-primary/20">
                             Get Started Free
                         </Link>
                     </div>
@@ -57,19 +90,22 @@ export default function Landing() {
                     {/* URL Input */}
                     <div className="max-w-2xl mx-auto w-full group">
                         <div className="glass-panel p-2 rounded-2xl md:rounded-3xl shadow-2xl transition-all duration-500 hover:border-primary/40 focus-within:border-primary/50 focus-within:ring-4 focus-within:ring-primary/10">
-                            <form className="flex flex-col md:flex-row gap-2" onSubmit={(e) => { e.preventDefault(); }}>
+                            <form className="flex flex-col md:flex-row gap-2" onSubmit={handleScan}>
                                 <div className="flex-grow flex items-center px-4 gap-3">
                                     <span className="material-symbols-outlined text-slate-500">language</span>
                                     <input
                                         className="w-full bg-transparent border-none text-white focus:ring-0 focus:outline-none placeholder:text-slate-600 text-lg py-4"
                                         placeholder="https://your-website.com"
                                         type="url"
+                                        value={scanUrl}
+                                        onChange={(e) => setScanUrl(e.target.value)}
+                                        required
                                     />
                                 </div>
-                                <Link to="/onboarding" className="bg-primary hover:bg-primary-light text-white px-10 py-4 rounded-xl md:rounded-2xl font-bold text-lg flex items-center justify-center gap-2 transition-all shadow-xl shadow-primary/20">
+                                <button type="submit" className="bg-primary hover:bg-primary-light text-white px-10 py-4 rounded-xl md:rounded-2xl font-bold text-lg flex items-center justify-center gap-2 transition-all shadow-xl shadow-primary/20 cursor-pointer">
                                     Scan
                                     <span className="material-symbols-outlined">auto_awesome</span>
-                                </Link>
+                                </button>
                             </form>
                         </div>
                     </div>
@@ -103,8 +139,8 @@ export default function Landing() {
                     ].map((f, i) => (
                         <div key={i} className="glass-panel p-8 rounded-3xl group hover:bg-white/[0.05] transition-all duration-300" style={{ animationDelay: `${0.3 + i * 0.1}s`, animationFillMode: 'both' }}>
                             <div className={`size-12 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform ${f.color === 'primary' ? 'bg-primary/20 text-primary' :
-                                    f.color === 'purple-400' ? 'bg-purple-500/20 text-purple-400' :
-                                        'bg-emerald-500/20 text-emerald-400'
+                                f.color === 'purple-400' ? 'bg-purple-500/20 text-purple-400' :
+                                    'bg-emerald-500/20 text-emerald-400'
                                 }`}>
                                 <span className="material-symbols-outlined text-3xl">{f.icon}</span>
                             </div>
@@ -140,7 +176,7 @@ export default function Landing() {
             </section>
 
             {/* Pricing Section */}
-            <section className="max-w-7xl mx-auto w-full px-6 py-24">
+            <section id="pricing" className="max-w-7xl mx-auto w-full px-6 py-24">
                 <div className="text-center mb-16">
                     <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Choose your <span className="text-gradient">plan</span></h2>
                     <p className="text-slate-400 max-w-xl mx-auto">Start free, scale as you grow. Every plan includes AI-powered brand intelligence.</p>
@@ -169,15 +205,15 @@ export default function Landing() {
                                     </li>
                                 ))}
                             </ul>
-                            <Link
-                                to="/onboarding"
-                                className={`w-full py-3 rounded-xl font-bold text-sm text-center block transition-all ${plan.popular
-                                        ? 'bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary-light'
-                                        : 'bg-white/[0.06] text-white hover:bg-white/[0.1]'
+                            <button
+                                onClick={() => handlePricing(plan.name)}
+                                className={`w-full py-3 rounded-xl font-bold text-sm text-center block transition-all cursor-pointer ${plan.popular
+                                    ? 'bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary-light'
+                                    : 'bg-white/[0.06] text-white hover:bg-white/[0.1]'
                                     }`}
                             >
                                 Get Started
-                            </Link>
+                            </button>
                         </div>
                     ))}
                 </div>
@@ -225,8 +261,8 @@ export default function Landing() {
             <footer className="w-full border-t border-white/[0.05] py-12 px-6 mt-20">
                 <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
                     <div className="flex items-center gap-3">
-                        <div className="size-6 bg-primary rounded flex items-center justify-center">
-                            <span className="material-symbols-outlined text-white text-xs">auto_awesome</span>
+                        <div className="size-6 rounded overflow-hidden">
+                            <img src="/mantram-logo.png" alt="Mantram AI" className="size-6" />
                         </div>
                         <span className="text-white font-bold">Mantram AI</span>
                     </div>

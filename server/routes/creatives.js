@@ -11,21 +11,29 @@ import { getSetting } from '../models/SystemSettings.js';
 
 const router = Router();
 
-// ── Brand context builder ───────────────────────────────────────────────
-function buildBrandPromptContext(brand) {
+// ── Build a natural-language brand description (NO labels, NO structured metadata)
+// Image models render any label/noun as visible text, so this must be purely descriptive
+function buildBrandDescription(brand) {
     const parts = [];
-    parts.push(`BRAND: ${brand.name}`);
-    if (brand.dna?.industry) parts.push(`Industry: ${brand.dna.industry}`);
-    if (brand.dna?.audience) parts.push(`Target audience: ${brand.dna.audience}`);
-    if (brand.dna?.voice?.personality) parts.push(`Brand personality: ${brand.dna.voice.personality}`);
-    if (brand.dna?.voice?.tone) parts.push(`Tone of voice: ${brand.dna.voice.tone}`);
-    const colors = brand.dna?.colors?.map(c => `${c.hex}${c.name ? ` (${c.name})` : ''}`).join(', ');
-    if (colors) parts.push(`Brand colors: ${colors}`);
-    const fontsObj = brand.dna?.fonts || {};
-    const fontNames = Object.values(fontsObj).map(f => f?.family).filter(Boolean);
-    if (fontNames.length) parts.push(`Brand fonts: ${fontNames.join(', ')}`);
-    if (brand.dna?.tagline) parts.push(`Tagline: ${brand.dna.tagline}`);
-    return parts.join('\n');
+    if (brand.dna?.industry) parts.push(`${brand.dna.industry}`);
+    parts.push(`brand called ${brand.name}`);
+    if (brand.dna?.voice?.personality) parts.push(`with a ${brand.dna.voice.personality} feel`);
+    return parts.join(' ');
+}
+
+// Convert brand colors to a short natural phrase (NO labels like "Teal:", NO lists)
+function getColorPhrase(brand) {
+    const colors = brand.dna?.colors || [];
+    if (!colors.length) return '';
+    // Map to simple color words, stripping jargon like "Professional", "Accent"
+    const simpleNames = colors.map(c => {
+        if (!c.name) return '';
+        return c.name.toLowerCase()
+            .replace(/\b(professional|accent|primary|secondary|brand|deep|soft|ocean)\b/gi, '')
+            .trim();
+    }).filter(Boolean).slice(0, 3);
+    if (!simpleNames.length) return '';
+    return simpleNames.join(' and ') + ' color tones';
 }
 
 // ── Helper: extract base64 from data URI ────────────────────────────────
@@ -97,9 +105,9 @@ router.post('/generate', protect, requireCredits('creative'), async (req, res) =
         const brand = await Brand.findById(brandId);
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
 
-        // Build brand-aware context
-        const brandContext = buildBrandPromptContext(brand);
-        const brandColors = brand.dna?.colors?.map(c => c.hex).join(', ') || '';
+        // Build natural-language brand description (no labels)
+        const brandDesc = buildBrandDescription(brand);
+        const colorPhrase = getColorPhrase(brand);
 
         const sizeMap = {
             'instagram-post': '1080x1080 square',
@@ -110,7 +118,24 @@ router.post('/generate', protect, requireCredits('creative'), async (req, res) =
             'banner': '1920x480 wide banner',
             'twitter-post': '1200x675 landscape',
         };
-        const platformSize = sizeMap[type] || '1080x1080 square';
+        let platformSize = sizeMap[type] || '1080x1080 square';
+
+        // Aspect ratio override — user-selected ratio takes priority
+        const ratioMap = {
+            '1:1': '1080x1080 square',
+            '16:9': '1920x1080 widescreen landscape',
+            '9:16': '1080x1920 vertical/story',
+            '2:3': '1080x1620 portrait',
+            '3:4': '1080x1440 portrait',
+            '1:2': '1080x2160 tall vertical',
+            '2:1': '2160x1080 wide horizontal',
+            '4:5': '1080x1350 social post',
+            '3:2': '1620x1080 standard landscape',
+            '4:3': '1440x1080 classic landscape',
+        };
+        if (options?.aspectRatio && ratioMap[options.aspectRatio]) {
+            platformSize = ratioMap[options.aspectRatio];
+        }
 
         let result;
 
@@ -168,29 +193,18 @@ router.post('/generate', protect, requireCredits('creative'), async (req, res) =
         // Logo overlay instructions — tell AI NOT to draw a logo; client-side compositing adds the real one
         let logoInstructions = '';
         if (options?.addLogo && brand.dna?.logo?.url) {
-            logoInstructions = `\nLOGO: Do NOT draw or generate any logo, watermark, or brand icon in the image. The real logo will be overlaid separately after generation. Keep the composition clean.`;
+            logoInstructions = `Do NOT draw or generate any logo, watermark, or brand icon in the image.`;
         }
 
-        const fullPrompt = `Create a professional ${type.replace('-', ' ')} creative for the following brand:
+        // Compose a fully natural-language prompt — NO structured metadata, NO labels
+        const styleWord = options?.style || 'modern';
+        const textOverlayPart = options?.textOverlay ? ` with the text "${options.textOverlay}" prominently displayed` : '';
+        const colorPart = colorPhrase ? ` using ${colorPhrase}` : '';
+        const refPart = referenceInstructions.length > 0 ? '\n' + referenceInstructions.join('\n') : '';
 
-${brandContext}
+        const fullPrompt = `Generate a ${styleWord}, polished graphic for a ${brandDesc}. ${prompt}${textOverlayPart}. The design should have ${colorPart ? colorPart : 'a professional color scheme'}. Make it visually striking and ready to post.${refPart}${logoInstructions ? '\n' + logoInstructions : ''}
 
-FORMAT: ${platformSize}
-STYLE: ${options?.style || 'modern'}, professional, on-brand
-${brandColors ? `USE BRAND COLORS: ${brandColors} — for backgrounds, accents, typography, and design elements` : ''}
-${options?.textOverlay ? `TEXT TO INCLUDE: "${options.textOverlay}" — make it prominent and readable` : ''}
-${referenceInstructions.length > 0 ? '\n' + referenceInstructions.join('\n') : ''}
-${logoInstructions}
-
-USER REQUEST: ${prompt}
-
-IMPORTANT RULES:
-- The output MUST look like a polished, ready-to-post ${type.replace('-', ' ')} creative
-- Use the brand colors throughout — not random colors
-- The design should match the brand's personality (${brand.dna?.voice?.personality || 'professional'})
-- Make it visually striking and professional
-- Text should be readable and well-positioned
-- Consider the platform's best practices for ${type.replace('-', ' ')} content`;
+The output must be ONLY the finished design filling the entire image from edge to edge. Do not add any labels, titles, font names, color names, color swatches, palette bars, hex codes, dimension text, watermarks, borders, frames, or any metadata anywhere in or around the image.`;
 
         if (hasImages) {
             // Multi-image Gemini call (reference images + prompt)
@@ -235,14 +249,8 @@ IMPORTANT RULES:
             }
         }
 
-        // Apply watermark if enabled and image exists
+        // Watermark disabled for creative output — clean designs only
         let imageUrl = result.imageUrl || '';
-        if (imageUrl && imageUrl.startsWith('data:image/')) {
-            const watermarkEnabled = await getSetting('watermark_enabled', true);
-            if (watermarkEnabled) {
-                imageUrl = await addWatermark(imageUrl, { enabled: true });
-            }
-        }
 
         const creative = await Creative.create({
             user: req.user._id,

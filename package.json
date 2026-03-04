@@ -12,15 +12,18 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tabler/icons-react": "^3.37.1",
     "bcryptjs": "^3.0.3",
     "bull": "^4.16.5",
     "cheerio": "^1.2.0",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "fabric": "^7.2.0",
     "formdata-node": "^6.0.3",
     "google-trends-api": "^4.9.2",
     "jsonwebtoken": "^9.0.3",
+    "lucide-react": "^0.575.0",
     "mongoose": "^9.2.2",
     "multer": "^2.0.2",
     "puppeteer": "^24.37.5",

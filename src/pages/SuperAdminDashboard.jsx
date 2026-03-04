@@ -129,7 +129,7 @@ export default function SuperAdminDashboard() {
         <div className="glass-panel rounded-2xl p-5">
             <span className={`material-symbols-outlined text-2xl mb-3 block ${color}`}>{icon}</span>
             <p className="text-3xl font-extrabold text-white">{typeof value === 'number' ? value.toLocaleString() : value}</p>
-            <p className="text-xs text-slate-500 mt-1">{label}</p>
+            <p className="text-sm text-slate-500 mt-1">{label}</p>
         </div>
     )
 
@@ -165,29 +165,29 @@ export default function SuperAdminDashboard() {
                     <div>
                         {loading ? <div className="flex items-center justify-center py-20 text-slate-500"><span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>Loading...</div> : stats && (
                             <>
-                                <div className="grid grid-cols-5 gap-3 mb-5">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
                                     <Card icon="group" color="text-blue-400" value={stats.totalUsers} label="Users" />
                                     <Card icon="branding_watermark" color="text-purple-400" value={stats.totalBrands} label="Brands" />
                                     <Card icon="article" color="text-emerald-400" value={stats.totalContent} label="Content" />
                                     <Card icon="image" color="text-pink-400" value={stats.totalCreatives} label="Creatives" />
                                     <Card icon="inventory_2" color="text-cyan-400" value={stats.totalProducts} label="Products" />
                                 </div>
-                                <div className="grid grid-cols-4 gap-3 mb-5">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
                                     <div className="glass-panel rounded-2xl p-5">
-                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-amber-400">payments</span><span className="text-xs font-bold text-white">Revenue</span></div>
+                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-amber-400">payments</span><span className="text-sm font-bold text-white">Revenue</span></div>
                                         <p className="text-2xl font-extrabold text-amber-400">₹{(stats.totalRevenue || 0).toLocaleString()}</p>
-                                        <p className="text-[10px] text-slate-600 mt-1">{stats.totalSubscriptions} active subs</p>
+                                        <p className="text-xs text-slate-600 mt-1">{stats.totalSubscriptions} active subs</p>
                                     </div>
                                     <div className="glass-panel rounded-2xl p-5">
-                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-cyan-400">token</span><span className="text-xs font-bold text-white">Credits Used</span></div>
+                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-cyan-400">token</span><span className="text-sm font-bold text-white">Credits Used</span></div>
                                         <p className="text-2xl font-extrabold text-cyan-400">{(stats.totalCreditsUsed || 0).toLocaleString()}</p>
                                     </div>
                                     <div className="glass-panel rounded-2xl p-5">
-                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-emerald-400">hub</span><span className="text-xs font-bold text-white">Integrations</span></div>
+                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-emerald-400">hub</span><span className="text-sm font-bold text-white">Integrations</span></div>
                                         <p className="text-2xl font-extrabold text-emerald-400">{stats.totalIntegrations}</p>
                                     </div>
                                     <div className="glass-panel rounded-2xl p-5">
-                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-rose-400">rate_review</span><span className="text-xs font-bold text-white">AI Feedback</span></div>
+                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-rose-400">rate_review</span><span className="text-sm font-bold text-white">AI Feedback</span></div>
                                         <p className="text-2xl font-extrabold text-rose-400">{stats.totalFeedback}</p>
                                     </div>
                                 </div>
@@ -197,7 +197,7 @@ export default function SuperAdminDashboard() {
                                         <div className="flex gap-3">{(stats.planDistribution || []).map(p => (
                                             <div key={p._id || 'none'} className="flex-1 glass-panel rounded-xl p-3 text-center">
                                                 <p className="text-xl font-extrabold text-white">{p.count}</p>
-                                                <p className="text-[10px] font-bold mt-1 capitalize text-slate-400">{p._id || 'None'}</p>
+                                                <p className="text-xs font-bold mt-1 capitalize text-slate-400">{p._id || 'None'}</p>
                                             </div>
                                         ))}</div>
                                     </div>
@@ -205,10 +205,10 @@ export default function SuperAdminDashboard() {
                                         <h3 className="font-bold text-white text-sm mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-emerald-400 text-lg">bar_chart</span>Content by Type</h3>
                                         <div className="space-y-2">{(stats.contentByType || []).map(c => (
                                             <div key={c._id} className="flex items-center justify-between">
-                                                <span className="text-xs text-slate-400 capitalize">{c._id}</span>
+                                                <span className="text-sm text-slate-400 capitalize">{c._id}</span>
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-24 h-1.5 rounded-full bg-white/[0.06]"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (c.count / Math.max(1, stats.totalContent)) * 100)}%` }} /></div>
-                                                    <span className="text-xs font-bold text-white w-6 text-right">{c.count}</span>
+                                                    <span className="text-sm font-bold text-white w-6 text-right">{c.count}</span>
                                                 </div>
                                             </div>
                                         ))}</div>
@@ -220,11 +220,11 @@ export default function SuperAdminDashboard() {
                                         <div key={u._id} className="flex items-center justify-between p-2.5 rounded-xl hover:bg-white/[0.03] transition-all">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">{u.name?.[0]?.toUpperCase()}</div>
-                                                <div><p className="text-xs font-bold text-white">{u.name}</p><p className="text-[10px] text-slate-600">{u.email}</p></div>
+                                                <div><p className="text-sm font-bold text-white">{u.name}</p><p className="text-xs text-slate-600">{u.email}</p></div>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold capitalize ${u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 'bg-slate-500/15 text-slate-400'}`}>{u.plan}</span>
-                                                <span className="text-[10px] text-slate-600">{new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                                                <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 'bg-slate-500/15 text-slate-400'}`}>{u.plan}</span>
+                                                <span className="text-xs text-slate-600">{new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
                                             </div>
                                         </div>
                                     ))}</div>
@@ -254,16 +254,16 @@ export default function SuperAdminDashboard() {
                                         <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary font-bold shrink-0">{u.name?.[0]?.toUpperCase()}</div>
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2">
-                                                <p className="text-sm font-bold text-white truncate">{u.name}</p>
-                                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold capitalize ${u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 'bg-slate-500/15 text-slate-400'}`}>{u.plan}</span>
-                                                <span className="text-[9px] px-1.5 py-0.5 rounded font-bold capitalize bg-white/[0.05] text-slate-500">{u.role}</span>
+                                                <p className="text-base font-bold text-white truncate">{u.name}</p>
+                                                <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 'bg-slate-500/15 text-slate-400'}`}>{u.plan}</span>
+                                                <span className="text-xs px-1.5 py-0.5 rounded font-bold capitalize bg-white/[0.05] text-slate-500">{u.role}</span>
                                             </div>
                                             <p className="text-[11px] text-slate-600 truncate">{u.email} {u.company ? `• ${u.company}` : ''}</p>
                                         </div>
                                     </div>
                                     <div className="text-center mx-4 shrink-0">
-                                        <p className="text-sm font-bold text-white">{u.creditBalance?.unlimited ? '∞' : `${u.creditBalance?.remaining || 0}`}</p>
-                                        <p className="text-[9px] text-slate-600">credits</p>
+                                        <p className="text-base font-bold text-white">{u.creditBalance?.unlimited ? '∞' : `${u.creditBalance?.remaining || 0}`}</p>
+                                        <p className="text-xs text-slate-600">credits</p>
                                     </div>
                                     <div className="flex items-center gap-1 shrink-0">
                                         <button onClick={() => setCreditModal(u)} title="Add Credits" className="p-2 rounded-lg hover:bg-emerald-500/10 text-slate-500 hover:text-emerald-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">add_circle</span></button>
@@ -293,7 +293,7 @@ export default function SuperAdminDashboard() {
                                     <span className="material-symbols-outlined text-indigo-400">inventory_2</span>
                                     Subscription Packages ({packages.length})
                                 </h3>
-                                <p className="text-xs text-slate-500 mt-1">AI-driven package builder — design, suggest, and manage subscription tiers</p>
+                                <p className="text-sm text-slate-500 mt-1">AI-driven package builder — design, suggest, and manage subscription tiers</p>
                             </div>
                             <div className="flex gap-2">
                                 <button onClick={handleSeedDefaults} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-slate-400 text-xs font-medium hover:bg-white/[0.06] flex items-center gap-1.5 cursor-pointer">
@@ -316,7 +316,7 @@ export default function SuperAdminDashboard() {
                                     <div className="flex items-center gap-2 mb-4">
                                         <span className="material-symbols-outlined text-purple-400">auto_awesome</span>
                                         <h4 className="font-bold text-white text-sm">AI-Recommended Packages</h4>
-                                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold">Based on platform analytics</span>
+                                        <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold">Based on platform analytics</span>
                                         <button onClick={() => setAiSuggestions(null)} className="ml-auto text-slate-600 hover:text-slate-400 cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
                                     </div>
                                     {/* Analytics summary */}
@@ -325,16 +325,16 @@ export default function SuperAdminDashboard() {
                                             {[{ l: 'Users', v: aiAnalytics.totalUsers, c: 'text-blue-400' }, { l: 'Content', v: aiAnalytics.totalContent, c: 'text-emerald-400' }, { l: 'Creatives', v: aiAnalytics.totalCreatives, c: 'text-pink-400' }, { l: 'SEO Audits', v: aiAnalytics.seoUsage, c: 'text-cyan-400' }].map(a => (
                                                 <div key={a.l} className="px-3 py-2 rounded-lg bg-white/[0.03] text-center">
                                                     <p className={`text-sm font-bold ${a.c}`}>{a.v}</p>
-                                                    <p className="text-[9px] text-slate-600">{a.l}</p>
+                                                    <p className="text-xs text-slate-600">{a.l}</p>
                                                 </div>
                                             ))}
-                                            {aiAnalytics.contentHeavy && <span className="self-center text-[9px] px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 font-bold">Content-Heavy</span>}
-                                            {aiAnalytics.creativeHeavy && <span className="self-center text-[9px] px-2 py-1 rounded bg-pink-500/10 text-pink-400 font-bold">Creative-Heavy</span>}
-                                            {aiAnalytics.seoActive && <span className="self-center text-[9px] px-2 py-1 rounded bg-cyan-500/10 text-cyan-400 font-bold">SEO Active</span>}
+                                            {aiAnalytics.contentHeavy && <span className="self-center text-xs px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 font-bold">Content-Heavy</span>}
+                                            {aiAnalytics.creativeHeavy && <span className="self-center text-xs px-2 py-1 rounded bg-pink-500/10 text-pink-400 font-bold">Creative-Heavy</span>}
+                                            {aiAnalytics.seoActive && <span className="self-center text-xs px-2 py-1 rounded bg-cyan-500/10 text-cyan-400 font-bold">SEO Active</span>}
                                         </div>
                                     )}
                                     {/* Suggestion cards */}
-                                    <div className="grid grid-cols-3 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                         {aiSuggestions.map((s, i) => (
                                             <div key={i} className="relative rounded-xl border border-white/[0.08] p-4 hover:border-purple-500/30 transition-all" style={{ background: `linear-gradient(135deg, ${s.color}08, transparent)` }}>
                                                 {s.badge && <span className="absolute -top-2 right-3 text-[8px] px-2 py-0.5 rounded-full font-bold text-white" style={{ background: s.color }}>{s.badge}</span>}
@@ -342,7 +342,7 @@ export default function SuperAdminDashboard() {
                                                     <span className="material-symbols-outlined text-lg" style={{ color: s.color }}>{s.icon || 'star'}</span>
                                                     <h5 className="font-bold text-white text-sm">{s.name}</h5>
                                                 </div>
-                                                <p className="text-[10px] text-slate-500 mb-3 line-clamp-2">{s.description}</p>
+                                                <p className="text-sm text-slate-500 mb-3 line-clamp-2">{s.description}</p>
                                                 {/* Studios */}
                                                 <div className="flex gap-1 mb-2">
                                                     {Object.entries(s.studios || {}).map(([k, v]) => (
@@ -351,12 +351,12 @@ export default function SuperAdminDashboard() {
                                                 </div>
                                                 <div className="flex items-baseline gap-2 mb-2">
                                                     <span className="text-lg font-extrabold text-white">₹{s.pricing?.monthly?.toLocaleString()}</span>
-                                                    <span className="text-[10px] text-slate-600">/mo</span>
-                                                    <span className="text-[10px] text-slate-500 ml-auto">{s.credits?.monthly >= 999999 ? '∞' : s.credits?.monthly} credits</span>
+                                                    <span className="text-xs text-slate-600">/mo</span>
+                                                    <span className="text-sm text-slate-500 ml-auto">{s.credits?.monthly >= 999999 ? '∞' : s.credits?.monthly} credits</span>
                                                 </div>
                                                 {/* AI rationale */}
-                                                <p className="text-[9px] text-purple-400/70 italic mb-3 line-clamp-2">🤖 {s.aiRationale}</p>
-                                                <button onClick={() => handleAdoptSuggestion(s)} className="w-full py-2 rounded-lg text-xs font-bold text-white cursor-pointer hover:opacity-90 transition-all" style={{ background: `linear-gradient(135deg, ${s.color}, ${s.color}cc)` }}>
+                                                <p className="text-xs text-purple-400/70 italic mb-3 line-clamp-2">🤖 {s.aiRationale}</p>
+                                                <button onClick={() => handleAdoptSuggestion(s)} className="w-full py-2 rounded-lg text-sm font-bold text-white cursor-pointer hover:opacity-90 transition-all" style={{ background: `linear-gradient(135deg, ${s.color}, ${s.color}cc)` }}>
                                                     Adopt This Package
                                                 </button>
                                             </div>
@@ -374,7 +374,7 @@ export default function SuperAdminDashboard() {
                                     {editingPkg ? `Edit: ${editingPkg.name}` : 'Create New Package'}
                                 </h4>
                                 {/* Row 1: Basic info */}
-                                <div className="grid grid-cols-4 gap-3 mb-4">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                                     <input type="text" placeholder="Package Name *" value={pkgForm.name} onChange={e => setPkgForm(f => ({ ...f, name: e.target.value }))} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" required />
                                     <input type="text" placeholder="Tagline" value={pkgForm.tagline} onChange={e => setPkgForm(f => ({ ...f, tagline: e.target.value }))} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" />
                                     <select value={pkgForm.tier} onChange={e => setPkgForm(f => ({ ...f, tier: Number(e.target.value) }))} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none cursor-pointer">
@@ -386,12 +386,12 @@ export default function SuperAdminDashboard() {
 
                                 {/* Row 2: Studio Access */}
                                 <h5 className="text-xs font-bold text-slate-400 mb-2 flex items-center gap-1.5"><span className="material-symbols-outlined text-sm text-indigo-400">apps</span>Studio Access</h5>
-                                <div className="grid grid-cols-4 gap-3 mb-4">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                                     {Object.entries(studioNames).map(([key, label]) => (
                                         <button key={key} type="button" onClick={() => setPkgForm(f => ({ ...f, studios: { ...f.studios, [key]: !f.studios[key] } }))}
                                             className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${pkgForm.studios[key] ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-white/[0.06] bg-white/[0.02]'}`}>
                                             <div className="flex items-center justify-between">
-                                                <span className="text-xs font-bold text-white">{label}</span>
+                                                <span className="text-sm font-bold text-white">{label}</span>
                                                 <span className={`material-symbols-outlined text-sm ${pkgForm.studios[key] ? 'text-emerald-400' : 'text-slate-700'}`}>{pkgForm.studios[key] ? 'check_circle' : 'cancel'}</span>
                                             </div>
                                         </button>
@@ -400,13 +400,13 @@ export default function SuperAdminDashboard() {
 
                                 {/* Row 3: Credits */}
                                 <h5 className="text-xs font-bold text-slate-400 mb-2 flex items-center gap-1.5"><span className="material-symbols-outlined text-sm text-amber-400">token</span>Credits & Costs</h5>
-                                <div className="grid grid-cols-5 gap-3 mb-4">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
                                     <div>
-                                        <label className="text-[10px] text-slate-600 block mb-1">Monthly Credits</label>
+                                        <label className="text-xs text-slate-600 block mb-1">Monthly Credits</label>
                                         <input type="number" value={pkgForm.credits.monthly} onChange={e => setPkgForm(f => ({ ...f, credits: { ...f.credits, monthly: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] text-slate-600 block mb-1">Signup Bonus</label>
+                                        <label className="text-xs text-slate-600 block mb-1">Signup Bonus</label>
                                         <input type="number" value={pkgForm.credits.bonusOnSignup} onChange={e => setPkgForm(f => ({ ...f, credits: { ...f.credits, bonusOnSignup: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" />
                                     </div>
                                     <div className="flex items-end">
@@ -416,11 +416,11 @@ export default function SuperAdminDashboard() {
                                         </button>
                                     </div>
                                     <div>
-                                        <label className="text-[10px] text-slate-600 block mb-1">Content Cost</label>
+                                        <label className="text-xs text-slate-600 block mb-1">Content Cost</label>
                                         <input type="number" value={pkgForm.creditCosts.content} onChange={e => setPkgForm(f => ({ ...f, creditCosts: { ...f.creditCosts, content: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] text-slate-600 block mb-1">Creative Cost</label>
+                                        <label className="text-xs text-slate-600 block mb-1">Creative Cost</label>
                                         <input type="number" value={pkgForm.creditCosts.creative} onChange={e => setPkgForm(f => ({ ...f, creditCosts: { ...f.creditCosts, creative: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" />
                                     </div>
                                 </div>
@@ -428,14 +428,14 @@ export default function SuperAdminDashboard() {
                                 {/* Row 4: Limits + Pricing */}
                                 <h5 className="text-xs font-bold text-slate-400 mb-2 flex items-center gap-1.5"><span className="material-symbols-outlined text-sm text-blue-400">tune</span>Limits & Pricing</h5>
                                 <div className="grid grid-cols-7 gap-3 mb-4">
-                                    <div><label className="text-[10px] text-slate-600 block mb-1">Max Brands</label><input type="number" value={pkgForm.limits.maxBrands} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, maxBrands: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
-                                    <div><label className="text-[10px] text-slate-600 block mb-1">Team Seats</label><input type="number" value={pkgForm.limits.maxTeamMembers} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, maxTeamMembers: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
-                                    <div><label className="text-[10px] text-slate-600 block mb-1">Products</label><input type="number" value={pkgForm.limits.maxProducts} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, maxProducts: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
-                                    <div><label className="text-[10px] text-slate-600 block mb-1">Sched. Posts</label><input type="number" value={pkgForm.limits.maxScheduledPosts} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, maxScheduledPosts: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
-                                    <div><label className="text-[10px] text-slate-600 block mb-1">Social Accs</label><input type="number" value={pkgForm.limits.socialIntegrations} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, socialIntegrations: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
-                                    <div><label className="text-[10px] text-slate-600 block mb-1">₹ Monthly</label><input type="number" value={pkgForm.pricing.monthly} onChange={e => setPkgForm(f => ({ ...f, pricing: { ...f.pricing, monthly: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
-                                    <div><label className="text-[10px] text-slate-600 block mb-1">₹ Quarterly</label><input type="number" value={pkgForm.pricing.quarterly} onChange={e => setPkgForm(f => ({ ...f, pricing: { ...f.pricing, quarterly: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
-                                    <div><label className="text-[10px] text-slate-600 block mb-1">₹ Yearly</label><input type="number" value={pkgForm.pricing.yearly} onChange={e => setPkgForm(f => ({ ...f, pricing: { ...f.pricing, yearly: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
+                                    <div><label className="text-xs text-slate-600 block mb-1">Max Brands</label><input type="number" value={pkgForm.limits.maxBrands} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, maxBrands: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
+                                    <div><label className="text-xs text-slate-600 block mb-1">Team Seats</label><input type="number" value={pkgForm.limits.maxTeamMembers} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, maxTeamMembers: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
+                                    <div><label className="text-xs text-slate-600 block mb-1">Products</label><input type="number" value={pkgForm.limits.maxProducts} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, maxProducts: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
+                                    <div><label className="text-xs text-slate-600 block mb-1">Sched. Posts</label><input type="number" value={pkgForm.limits.maxScheduledPosts} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, maxScheduledPosts: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
+                                    <div><label className="text-xs text-slate-600 block mb-1">Social Accs</label><input type="number" value={pkgForm.limits.socialIntegrations} onChange={e => setPkgForm(f => ({ ...f, limits: { ...f.limits, socialIntegrations: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
+                                    <div><label className="text-xs text-slate-600 block mb-1">₹ Monthly</label><input type="number" value={pkgForm.pricing.monthly} onChange={e => setPkgForm(f => ({ ...f, pricing: { ...f.pricing, monthly: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
+                                    <div><label className="text-xs text-slate-600 block mb-1">₹ Quarterly</label><input type="number" value={pkgForm.pricing.quarterly} onChange={e => setPkgForm(f => ({ ...f, pricing: { ...f.pricing, quarterly: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
+                                    <div><label className="text-xs text-slate-600 block mb-1">₹ Yearly</label><input type="number" value={pkgForm.pricing.yearly} onChange={e => setPkgForm(f => ({ ...f, pricing: { ...f.pricing, yearly: Number(e.target.value) } }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" /></div>
                                 </div>
 
                                 {/* Row 5: Features */}
@@ -446,7 +446,7 @@ export default function SuperAdminDashboard() {
                                 </div>
                                 <div className="flex flex-wrap gap-1.5 mb-4">
                                     {pkgForm.features.map((f, i) => (
-                                        <span key={i} className="text-[10px] px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center gap-1">
+                                        <span key={i} className="text-xs px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center gap-1">
                                             {f.name}
                                             <button type="button" onClick={() => removeFeature(i)} className="text-emerald-600 hover:text-rose-400 cursor-pointer">×</button>
                                         </span>
@@ -455,7 +455,7 @@ export default function SuperAdminDashboard() {
 
                                 {/* Row 6: Color + actions */}
                                 <div className="flex items-center gap-3">
-                                    <label className="text-[10px] text-slate-600">Color</label>
+                                    <label className="text-xs text-slate-600">Color</label>
                                     <input type="color" value={pkgForm.color} onChange={e => setPkgForm(f => ({ ...f, color: e.target.value }))} className="w-8 h-8 rounded cursor-pointer bg-transparent border-0" />
                                     <input type="text" placeholder="Icon name" value={pkgForm.icon} onChange={e => setPkgForm(f => ({ ...f, icon: e.target.value }))} className="px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none w-32" />
                                     <div className="flex-1" />
@@ -467,7 +467,7 @@ export default function SuperAdminDashboard() {
 
                         {/* Existing Packages Grid */}
                         {packages.length > 0 ? (
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {packages.map(pkg => (
                                     <div key={pkg._id} className="relative glass-panel rounded-2xl overflow-hidden hover:border-white/[0.12] transition-all" style={{ borderTop: `3px solid ${pkg.color || '#6366f1'}` }}>
                                         {pkg.badge && <span className="absolute top-3 right-3 text-[8px] px-2 py-0.5 rounded-full font-bold text-white" style={{ background: pkg.color }}>{pkg.badge}</span>}
@@ -477,20 +477,20 @@ export default function SuperAdminDashboard() {
                                                 <h4 className="text-base font-extrabold text-white">{pkg.name}</h4>
                                                 {pkg.generatedByAI && <span className="text-[8px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 font-bold">AI</span>}
                                             </div>
-                                            {pkg.tagline && <p className="text-[10px] text-slate-500 mb-3">{pkg.tagline}</p>}
+                                            {pkg.tagline && <p className="text-sm text-slate-500 mb-3">{pkg.tagline}</p>}
 
                                             {/* Price */}
                                             <div className="flex items-baseline gap-1 mb-3">
                                                 <span className="text-2xl font-extrabold text-white">₹{(pkg.pricing?.monthly || 0).toLocaleString()}</span>
                                                 <span className="text-xs text-slate-600">/mo</span>
-                                                {pkg.pricing?.quarterly > 0 && <span className="text-[10px] text-slate-500 ml-1">₹{(pkg.pricing?.quarterly || 0).toLocaleString()}/qtr</span>}
-                                                {pkg.pricing?.yearly > 0 && <span className="text-[10px] text-slate-500 ml-1">₹{(pkg.pricing?.yearly || 0).toLocaleString()}/yr</span>}
+                                                {pkg.pricing?.quarterly > 0 && <span className="text-sm text-slate-500 ml-1">₹{(pkg.pricing?.quarterly || 0).toLocaleString()}/qtr</span>}
+                                                {pkg.pricing?.yearly > 0 && <span className="text-sm text-slate-500 ml-1">₹{(pkg.pricing?.yearly || 0).toLocaleString()}/yr</span>}
                                             </div>
 
                                             {/* Studios */}
                                             <div className="flex gap-1 mb-3">
                                                 {Object.entries(pkg.studios || {}).map(([k, v]) => (
-                                                    <span key={k} className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${v ? 'bg-emerald-500/15 text-emerald-400' : 'bg-white/[0.04] text-slate-700 line-through'}`}>{studioNames[k]?.split(' ')[0]}</span>
+                                                    <span key={k} className={`text-xs px-2 py-0.5 rounded-full font-bold ${v ? 'bg-emerald-500/15 text-emerald-400' : 'bg-white/[0.04] text-slate-700 line-through'}`}>{studioNames[k]?.split(' ')[0]}</span>
                                                 ))}
                                             </div>
 
@@ -501,11 +501,11 @@ export default function SuperAdminDashboard() {
                                                     <p className="text-[8px] text-slate-600">credits/mo</p>
                                                 </div>
                                                 <div className="flex-1 p-2 rounded-lg bg-white/[0.03]">
-                                                    <p className="text-sm font-bold text-white">{pkg.limits?.maxBrands >= 999 ? '∞' : pkg.limits?.maxBrands || 0}</p>
+                                                    <p className="text-base font-bold text-white">{pkg.limits?.maxBrands >= 999 ? '∞' : pkg.limits?.maxBrands || 0}</p>
                                                     <p className="text-[8px] text-slate-600">brands</p>
                                                 </div>
                                                 <div className="flex-1 p-2 rounded-lg bg-white/[0.03]">
-                                                    <p className="text-sm font-bold text-white">{pkg.limits?.maxTeamMembers || 0}</p>
+                                                    <p className="text-base font-bold text-white">{pkg.limits?.maxTeamMembers || 0}</p>
                                                     <p className="text-[8px] text-slate-600">seats</p>
                                                 </div>
                                             </div>
@@ -516,10 +516,10 @@ export default function SuperAdminDashboard() {
                                                     {pkg.features.slice(0, 5).map((f, i) => (
                                                         <div key={i} className="flex items-center gap-1.5">
                                                             <span className={`material-symbols-outlined text-xs ${f.included ? 'text-emerald-400' : 'text-slate-700'}`}>{f.included ? 'check' : 'close'}</span>
-                                                            <span className={`text-[10px] ${f.included ? 'text-slate-400' : 'text-slate-700 line-through'}`}>{f.name}</span>
+                                                            <span className={`text-xs ${f.included ? 'text-slate-400' : 'text-slate-700 line-through'}`}>{f.name}</span>
                                                         </div>
                                                     ))}
-                                                    {pkg.features.length > 5 && <p className="text-[9px] text-slate-600 pl-5">+{pkg.features.length - 5} more</p>}
+                                                    {pkg.features.length > 5 && <p className="text-xs text-slate-600 pl-5">+{pkg.features.length - 5} more</p>}
                                                 </div>
                                             )}
 
@@ -527,7 +527,7 @@ export default function SuperAdminDashboard() {
                                             <div className="flex items-center gap-2 mb-3">
                                                 {pkg.credits?.rollover && <span className="text-[8px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 font-bold">Rollover</span>}
                                                 {pkg.isDefault && <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold">DEFAULT</span>}
-                                                <span className="text-[9px] text-slate-600 ml-auto">{pkg.subscriberCount || 0} users</span>
+                                                <span className="text-xs text-slate-600 ml-auto">{pkg.subscriberCount || 0} users</span>
                                             </div>
 
                                             {/* Actions */}
@@ -566,7 +566,7 @@ export default function SuperAdminDashboard() {
                         {showSubForm && (
                             <form onSubmit={handleCreateSub} className="glass-panel rounded-2xl p-6 mb-5 border border-primary/20">
                                 <h4 className="font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-primary text-lg">card_membership</span>Assign Subscription</h4>
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     <select value={subForm.userId} onChange={e => setSubForm(f => ({ ...f, userId: e.target.value }))} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" required>
                                         <option value="">Select User</option>
                                         {users.map(u => <option key={u._id} value={u._id}>{u.name} ({u.email})</option>)}
@@ -592,14 +592,14 @@ export default function SuperAdminDashboard() {
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center"><span className="material-symbols-outlined text-blue-400">card_membership</span></div>
                                         <div>
-                                            <p className="text-sm font-bold text-white">{s.user?.name || 'Unknown'} <span className="text-slate-500 text-xs font-normal">({s.user?.email})</span></p>
+                                            <p className="text-base font-bold text-white">{s.user?.name || 'Unknown'} <span className="text-slate-500 text-xs font-normal">({s.user?.email})</span></p>
                                             <p className="text-[11px] text-slate-500 capitalize">{s.plan} • {s.billingCycle} • {s.status}</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-6">
-                                        <div className="text-center"><p className="text-sm font-bold text-white">{s.credits?.used || 0}/{s.credits?.total || 0}</p><p className="text-[9px] text-slate-600">credits used</p></div>
-                                        <div className="text-center"><p className="text-sm font-bold text-amber-400">₹{(s.price || 0).toLocaleString()}</p><p className="text-[9px] text-slate-600">paid</p></div>
-                                        <div className="text-center"><p className="text-xs text-slate-400">{s.endDate ? new Date(s.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</p><p className="text-[9px] text-slate-600">expires</p></div>
+                                        <div className="text-center"><p className="text-base font-bold text-white">{s.credits?.used || 0}/{s.credits?.total || 0}</p><p className="text-xs text-slate-600">credits used</p></div>
+                                        <div className="text-center"><p className="text-sm font-bold text-amber-400">₹{(s.price || 0).toLocaleString()}</p><p className="text-xs text-slate-600">paid</p></div>
+                                        <div className="text-center"><p className="text-sm text-slate-400">{s.endDate ? new Date(s.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</p><p className="text-xs text-slate-600">expires</p></div>
                                     </div>
                                 </div>
                             </div>
@@ -618,7 +618,7 @@ export default function SuperAdminDashboard() {
                         {showCouponForm && (
                             <form onSubmit={handleCreateCoupon} className="glass-panel rounded-2xl p-6 mb-5 border border-primary/20">
                                 <h4 className="font-bold text-white mb-4">Create Coupon</h4>
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     <input type="text" placeholder="CODE (e.g. WELCOME50)" value={couponForm.code} onChange={e => setCouponForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none uppercase" required />
                                     <select value={couponForm.discountType} onChange={e => setCouponForm(f => ({ ...f, discountType: e.target.value }))} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none cursor-pointer">
                                         <option value="credits">Bonus Credits</option><option value="percentage">% Discount</option><option value="fixed">Fixed ₹ Off</option>
@@ -640,13 +640,13 @@ export default function SuperAdminDashboard() {
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center"><span className="material-symbols-outlined text-primary">confirmation_number</span></div>
                                         <div>
-                                            <div className="flex items-center gap-2"><p className="text-sm font-bold text-white font-mono">{c.code}</p>
-                                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${c.isValid ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>{c.isValid ? 'ACTIVE' : 'INACTIVE'}</span></div>
-                                            <p className="text-xs text-slate-500">{c.discountType === 'credits' ? `+${c.discountValue} credits` : c.discountType === 'percentage' ? `${c.discountValue}% off` : `₹${c.discountValue} off`}{c.description && ` — ${c.description}`}</p>
+                                            <div className="flex items-center gap-2"><p className="text-base font-bold text-white font-mono">{c.code}</p>
+                                                <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${c.isValid ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>{c.isValid ? 'ACTIVE' : 'INACTIVE'}</span></div>
+                                            <p className="text-sm text-slate-500">{c.discountType === 'credits' ? `+${c.discountValue} credits` : c.discountType === 'percentage' ? `${c.discountValue}% off` : `₹${c.discountValue} off`}{c.description && ` — ${c.description}`}</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-4">
-                                        <div className="text-center"><p className="text-sm font-bold text-white">{c.usedCount || 0}{c.maxUses > 0 ? `/${c.maxUses}` : ''}</p><p className="text-[9px] text-slate-600">uses</p></div>
+                                        <div className="text-center"><p className="text-base font-bold text-white">{c.usedCount || 0}{c.maxUses > 0 ? `/${c.maxUses}` : ''}</p><p className="text-xs text-slate-600">uses</p></div>
                                         <div className="flex gap-1">
                                             <button onClick={() => handleToggleCoupon(c._id, c.isActive)} className={`p-2 rounded-lg cursor-pointer ${c.isActive ? 'hover:bg-amber-500/10 text-amber-400' : 'hover:bg-emerald-500/10 text-emerald-400'}`}><span className="material-symbols-outlined text-base">{c.isActive ? 'pause' : 'play_arrow'}</span></button>
                                             <button onClick={() => handleDeleteCoupon(c._id)} className="p-2 rounded-lg hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 cursor-pointer"><span className="material-symbols-outlined text-base">delete</span></button>
@@ -663,19 +663,19 @@ export default function SuperAdminDashboard() {
                 {tab === 'content' && (
                     <div>
                         <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-purple-400">branding_watermark</span>{totalBrands} Brands</h3>
-                        <div className="grid grid-cols-3 gap-3 mb-8">{brands.map(b => (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">{brands.map(b => (
                             <div key={b._id} className="glass-panel rounded-2xl p-4">
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-2">
                                         <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400 text-xs font-bold">{b.name?.[0]?.toUpperCase()}</div>
-                                        <div><p className="text-sm font-bold text-white">{b.name}</p><p className="text-[10px] text-slate-600">{b.user?.name} • {b.user?.email}</p></div>
+                                        <div><p className="text-base font-bold text-white">{b.name}</p><p className="text-xs text-slate-600">{b.user?.name} • {b.user?.email}</p></div>
                                     </div>
                                     <button onClick={() => handleDeleteBrand(b._id, b.name)} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-slate-600 hover:text-rose-400 cursor-pointer"><span className="material-symbols-outlined text-sm">delete</span></button>
                                 </div>
                                 <div className="flex gap-3 text-center">
-                                    <div className="flex-1 p-2 rounded-lg bg-white/[0.02]"><p className="text-sm font-bold text-white">{b.contentCount}</p><p className="text-[9px] text-slate-600">Content</p></div>
-                                    <div className="flex-1 p-2 rounded-lg bg-white/[0.02]"><p className="text-sm font-bold text-white">{b.creativeCount}</p><p className="text-[9px] text-slate-600">Creatives</p></div>
-                                    <div className="flex-1 p-2 rounded-lg bg-white/[0.02]"><p className="text-sm font-bold text-white">{b.productCount}</p><p className="text-[9px] text-slate-600">Products</p></div>
+                                    <div className="flex-1 p-2 rounded-lg bg-white/[0.02]"><p className="text-base font-bold text-white">{b.contentCount}</p><p className="text-xs text-slate-600">Content</p></div>
+                                    <div className="flex-1 p-2 rounded-lg bg-white/[0.02]"><p className="text-base font-bold text-white">{b.creativeCount}</p><p className="text-xs text-slate-600">Creatives</p></div>
+                                    <div className="flex-1 p-2 rounded-lg bg-white/[0.02]"><p className="text-base font-bold text-white">{b.productCount}</p><p className="text-xs text-slate-600">Products</p></div>
                                 </div>
                             </div>
                         ))}</div>
@@ -683,14 +683,14 @@ export default function SuperAdminDashboard() {
                         <div className="space-y-2">{content.map(c => (
                             <div key={c._id} className="glass-panel rounded-2xl p-3 flex items-center justify-between">
                                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold capitalize ${c.status === 'published' ? 'bg-emerald-500/15 text-emerald-400' : c.status === 'approved' ? 'bg-blue-500/15 text-blue-400' : 'bg-slate-500/15 text-slate-400'}`}>{c.status}</span>
-                                    <p className="text-xs text-white truncate max-w-[300px]">{c.title || c.prompt?.slice(0, 60) || 'Untitled'}</p>
-                                    <span className="text-[10px] text-slate-600 capitalize">{c.type}</span>
-                                    <span className="text-[10px] text-slate-700">{c.brand?.name}</span>
+                                    <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${c.status === 'published' ? 'bg-emerald-500/15 text-emerald-400' : c.status === 'approved' ? 'bg-blue-500/15 text-blue-400' : 'bg-slate-500/15 text-slate-400'}`}>{c.status}</span>
+                                    <p className="text-sm text-white truncate max-w-[300px]">{c.title || c.prompt?.slice(0, 60) || 'Untitled'}</p>
+                                    <span className="text-xs text-slate-600 capitalize">{c.type}</span>
+                                    <span className="text-xs text-slate-700">{c.brand?.name}</span>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
-                                    <span className="text-[10px] text-slate-600">{c.user?.name}</span>
-                                    <span className="text-[10px] text-slate-700">{new Date(c.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                                    <span className="text-xs text-slate-600">{c.user?.name}</span>
+                                    <span className="text-xs text-slate-700">{new Date(c.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
                                     <button onClick={() => handleDeleteContent(c._id)} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-slate-600 hover:text-rose-400 cursor-pointer"><span className="material-symbols-outlined text-sm">delete</span></button>
                                 </div>
                             </div>
@@ -704,15 +704,15 @@ export default function SuperAdminDashboard() {
                         {/* AI Providers */}
                         <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-cyan-400">smart_toy</span>AI Providers</h3>
                         {aiHealth && (
-                            <div className="grid grid-cols-3 gap-3 mb-6">{Object.entries(aiHealth.providers || {}).map(([p, active]) => (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">{Object.entries(aiHealth.providers || {}).map(([p, active]) => (
                                 <div key={p} className={`glass-panel rounded-2xl p-5 ${active ? 'border border-emerald-500/20' : 'border border-rose-500/20 opacity-60'}`}>
                                     <div className="flex items-center justify-between mb-2">
-                                        <p className="text-sm font-bold text-white capitalize">{p}</p>
-                                        <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${active ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>{active ? 'ACTIVE' : 'NO KEY'}</span>
+                                        <p className="text-base font-bold text-white capitalize">{p}</p>
+                                        <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${active ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>{active ? 'ACTIVE' : 'NO KEY'}</span>
                                     </div>
                                     {aiHealth.providerUsage?.find(u => u._id === p) && (
-                                        <div><p className="text-xs text-slate-500">{aiHealth.providerUsage.find(u => u._id === p).count} generations</p>
-                                            <p className="text-xs text-slate-500">Sentiment: {aiHealth.providerUsage.find(u => u._id === p).avgSentiment?.toFixed(2)}</p></div>
+                                        <div><p className="text-sm text-slate-500">{aiHealth.providerUsage.find(u => u._id === p).count} generations</p>
+                                            <p className="text-sm text-slate-500">Sentiment: {aiHealth.providerUsage.find(u => u._id === p).avgSentiment?.toFixed(2)}</p></div>
                                     )}
                                 </div>
                             ))}</div>
@@ -722,11 +722,11 @@ export default function SuperAdminDashboard() {
                         {aiHealth?.recentFeedback?.length > 0 && (
                             <div className="glass-panel rounded-2xl p-5 mb-6">
                                 <h4 className="font-bold text-white text-sm mb-3">Feedback (Last 24h)</h4>
-                                <div className="grid grid-cols-4 gap-3">{aiHealth.recentFeedback.map(f => (
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{aiHealth.recentFeedback.map(f => (
                                     <div key={f._id} className="p-3 rounded-xl bg-white/[0.02] text-center">
                                         <p className="text-lg font-bold text-white">{f.count}</p>
-                                        <p className="text-[10px] text-slate-500 capitalize">{f._id?.replace('_', ' ')}</p>
-                                        <p className={`text-[10px] font-bold ${f.avgSentiment > 0 ? 'text-emerald-400' : f.avgSentiment < 0 ? 'text-rose-400' : 'text-slate-500'}`}>{f.avgSentiment?.toFixed(2)}</p>
+                                        <p className="text-sm text-slate-500 capitalize">{f._id?.replace('_', ' ')}</p>
+                                        <p className={`text-xs font-bold ${f.avgSentiment > 0 ? 'text-emerald-400' : f.avgSentiment < 0 ? 'text-rose-400' : 'text-slate-500'}`}>{f.avgSentiment?.toFixed(2)}</p>
                                     </div>
                                 ))}</div>
                             </div>
@@ -737,21 +737,21 @@ export default function SuperAdminDashboard() {
                         {systemSettings && (
                             <div className="glass-panel rounded-2xl p-5 space-y-4">
                                 <div className="flex items-center justify-between">
-                                    <div><p className="text-sm font-bold text-white">Watermark on Creatives</p><p className="text-xs text-slate-500">Add brand watermark to generated images</p></div>
+                                    <div><p className="text-base font-bold text-white">Watermark on Creatives</p><p className="text-sm text-slate-500">Add brand watermark to generated images</p></div>
                                     <button onClick={() => handleToggleSetting('watermarkEnabled', !systemSettings.watermarkEnabled)}
                                         className={`w-12 h-6 rounded-full transition-all cursor-pointer ${systemSettings.watermarkEnabled ? 'bg-emerald-500' : 'bg-slate-700'}`}>
                                         <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-all ${systemSettings.watermarkEnabled ? 'translate-x-6' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                    <div><p className="text-sm font-bold text-white">Maintenance Mode</p><p className="text-xs text-slate-500">Block access for regular users</p></div>
+                                    <div><p className="text-base font-bold text-white">Maintenance Mode</p><p className="text-sm text-slate-500">Block access for regular users</p></div>
                                     <button onClick={() => handleToggleSetting('maintenanceMode', !systemSettings.maintenanceMode)}
                                         className={`w-12 h-6 rounded-full transition-all cursor-pointer ${systemSettings.maintenanceMode ? 'bg-rose-500' : 'bg-slate-700'}`}>
                                         <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-all ${systemSettings.maintenanceMode ? 'translate-x-6' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                    <div><p className="text-sm font-bold text-white">Default AI Provider</p><p className="text-xs text-slate-500">Primary model for content generation</p></div>
+                                    <div><p className="text-base font-bold text-white">Default AI Provider</p><p className="text-sm text-slate-500">Primary model for content generation</p></div>
                                     <select value={systemSettings.defaultProvider || 'gemini'} onChange={e => handleToggleSetting('defaultProvider', e.target.value)}
                                         className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none cursor-pointer">
                                         <option value="gemini">Gemini</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option>
@@ -759,23 +759,23 @@ export default function SuperAdminDashboard() {
                                 </div>
                                 <div className="pt-2 border-t border-white/[0.06]">
                                     <div className="flex items-center justify-between mb-3">
-                                        <div><p className="text-sm font-bold text-white">Credit Costs</p><p className="text-xs text-slate-500">Credits deducted per AI operation</p></div>
+                                        <div><p className="text-base font-bold text-white">Credit Costs</p><p className="text-sm text-slate-500">Credits deducted per AI operation</p></div>
                                         <div className="flex gap-2">
                                             {!editingCosts ? (
-                                                <button onClick={() => setEditingCosts({ ...(creditCosts || {}) })} className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-xs text-slate-400 hover:text-white cursor-pointer flex items-center gap-1"><span className="material-symbols-outlined text-sm">edit</span>Edit</button>
+                                                <button onClick={() => setEditingCosts({ ...(creditCosts || {}) })} className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-slate-400 hover:text-white cursor-pointer flex items-center gap-1"><span className="material-symbols-outlined text-sm">edit</span>Edit</button>
                                             ) : (
                                                 <>
-                                                    <button onClick={handleResetCosts} className="px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:text-rose-400 cursor-pointer">Reset Defaults</button>
-                                                    <button onClick={() => setEditingCosts(null)} className="px-3 py-1.5 rounded-lg text-xs text-slate-400 cursor-pointer">Cancel</button>
+                                                    <button onClick={handleResetCosts} className="px-3 py-1.5 rounded-lg text-sm text-slate-500 hover:text-rose-400 cursor-pointer">Reset Defaults</button>
+                                                    <button onClick={() => setEditingCosts(null)} className="px-3 py-1.5 rounded-lg text-sm text-slate-400 cursor-pointer">Cancel</button>
                                                     <button onClick={handleSaveCosts} className="btn-primary px-4 py-1.5 rounded-lg text-xs cursor-pointer">Save</button>
                                                 </>
                                             )}
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-4 gap-2">
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                         {Object.entries(editingCosts || creditCosts || {}).map(([key, val]) => (
                                             <div key={key} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06]">
-                                                <span className="text-[10px] text-slate-400">{creditCostLabels[key] || key}</span>
+                                                <span className="text-sm text-slate-400">{creditCostLabels[key] || key}</span>
                                                 {editingCosts ? (
                                                     <input type="number" min={0} value={editingCosts[key] ?? val} onChange={e => setEditingCosts(prev => ({ ...prev, [key]: Number(e.target.value) }))} className="w-12 text-right text-xs font-bold text-amber-400 bg-transparent outline-none border-b border-amber-500/30" />
                                                 ) : (
@@ -799,7 +799,7 @@ export default function SuperAdminDashboard() {
                                     <div key={p} className="glass-panel rounded-2xl p-4 text-center">
                                         <p className="text-2xl mb-1">{platformIcons[p] || '🔌'}</p>
                                         <p className="text-lg font-extrabold text-white">{count}</p>
-                                        <p className="text-[10px] text-slate-500 capitalize">{p}</p>
+                                        <p className="text-sm text-slate-500 capitalize">{p}</p>
                                     </div>
                                 ))}</div>
                                 <div className="space-y-2">{(integrations.integrations || []).map(i => (
@@ -807,14 +807,14 @@ export default function SuperAdminDashboard() {
                                         <div className="flex items-center gap-3">
                                             <span className="text-xl">{platformIcons[i.platform] || '🔌'}</span>
                                             <div>
-                                                <p className="text-sm font-bold text-white capitalize">{i.platform} {i.displayName && `• ${i.displayName}`}</p>
+                                                <p className="text-base font-bold text-white capitalize">{i.platform} {i.displayName && `• ${i.displayName}`}</p>
                                                 <p className="text-[11px] text-slate-600">{i.user?.name} ({i.user?.email}) {i.brand?.name ? `• ${i.brand.name}` : ''}</p>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-4">
-                                            <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${i.status === 'connected' ? 'bg-emerald-500/15 text-emerald-400' : i.status === 'expired' ? 'bg-amber-500/15 text-amber-400' : 'bg-slate-500/15 text-slate-400'}`}>{i.status}</span>
-                                            {i.publishCount > 0 && <span className="text-xs text-slate-500">{i.publishCount} published</span>}
-                                            <span className="text-[10px] text-slate-700">{i.lastSyncAt ? new Date(i.lastSyncAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'Never synced'}</span>
+                                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${i.status === 'connected' ? 'bg-emerald-500/15 text-emerald-400' : i.status === 'expired' ? 'bg-amber-500/15 text-amber-400' : 'bg-slate-500/15 text-slate-400'}`}>{i.status}</span>
+                                            {i.publishCount > 0 && <span className="text-sm text-slate-500">{i.publishCount} published</span>}
+                                            <span className="text-xs text-slate-700">{i.lastSyncAt ? new Date(i.lastSyncAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'Never synced'}</span>
                                         </div>
                                     </div>
                                 ))}</div>
@@ -829,7 +829,7 @@ export default function SuperAdminDashboard() {
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setCreditModal(null)}>
                         <div className="glass-panel rounded-2xl p-6 w-[400px] border border-primary/20" onClick={e => e.stopPropagation()}>
                             <h3 className="font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-emerald-400">add_circle</span>Add Credits — {creditModal.name}</h3>
-                            <p className="text-xs text-slate-500 mb-4">Current: {creditModal.creditBalance?.remaining || 0} credits</p>
+                            <p className="text-sm text-slate-500 mb-4">Current: {creditModal.creditBalance?.remaining || 0} credits</p>
                             <input type="number" value={creditAmount} onChange={e => setCreditAmount(e.target.value)} placeholder="Credits to add" className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none mb-4" />
                             <div className="flex gap-3 mb-4">{[25, 50, 100, 500].map(n => (
                                 <button key={n} onClick={() => setCreditAmount(String(n))} className="flex-1 py-2 rounded-lg bg-white/[0.04] text-slate-400 text-xs font-bold hover:bg-primary/10 hover:text-primary cursor-pointer">+{n}</button>
@@ -845,12 +845,12 @@ export default function SuperAdminDashboard() {
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setPlanModal(null)}>
                         <div className="glass-panel rounded-2xl p-6 w-[420px] border border-primary/20" onClick={e => e.stopPropagation()}>
                             <h3 className="font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-blue-400">upgrade</span>Change Plan — {planModal.name}</h3>
-                            <p className="text-xs text-slate-500 mb-4">Current: <strong className="text-white capitalize">{planModal.plan}</strong></p>
+                            <p className="text-sm text-slate-500 mb-4">Current: <strong className="text-white capitalize">{planModal.plan}</strong></p>
                             <div className="space-y-2">{Object.entries(pc).map(([plan, cfg]) => (
                                 <button key={plan} onClick={() => handleChangePlan(planModal._id, plan)} className={`w-full p-4 rounded-xl text-left transition-all cursor-pointer border ${planModal.plan === plan ? 'border-primary/40 bg-primary/10' : 'border-white/[0.06] hover:bg-white/[0.04]'}`}>
                                     <div className="flex justify-between items-center">
-                                        <div><p className="text-sm font-bold text-white capitalize">{plan}</p><p className="text-[11px] text-slate-500">{cfg.cr} credits • {cfg.p}</p></div>
-                                        {planModal.plan === plan && <span className="text-[9px] px-2 py-0.5 rounded bg-primary/20 text-primary font-bold">CURRENT</span>}
+                                        <div><p className="text-base font-bold text-white capitalize">{plan}</p><p className="text-[11px] text-slate-500">{cfg.cr} credits • {cfg.p}</p></div>
+                                        {planModal.plan === plan && <span className="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary font-bold">CURRENT</span>}
                                     </div>
                                 </button>
                             ))}</div>

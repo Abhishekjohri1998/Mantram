@@ -79,7 +79,7 @@ export default function CreditsPage() {
                         <div className="flex flex-wrap items-center gap-8">
                             {/* Main balance */}
                             <div className="flex-1 min-w-[200px]">
-                                <p className="text-xs text-slate-500 uppercase tracking-wider font-bold mb-1">Credit Balance</p>
+                                <p className="text-sm text-slate-500 uppercase tracking-wider font-bold mb-1">Credit Balance</p>
                                 {balance?.unlimited ? (
                                     <div className="flex items-center gap-2">
                                         <span className="material-symbols-outlined text-3xl text-amber-400">all_inclusive</span>
@@ -115,8 +115,8 @@ export default function CreditsPage() {
                                     <div key={s.label} className="text-center p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] min-w-[120px]">
                                         <span className={`material-symbols-outlined text-xl text-${s.color}-400 mb-1`}>{s.icon}</span>
                                         <p className="text-xl font-black text-white">{s.value}</p>
-                                        <p className="text-[10px] text-slate-500 uppercase font-bold">{s.label}</p>
-                                        <p className="text-[10px] text-slate-600">{s.sub}</p>
+                                        <p className="text-sm text-slate-500 uppercase font-bold">{s.label}</p>
+                                        <p className="text-xs text-slate-600">{s.sub}</p>
                                     </div>
                                 ))}
                             </div>
@@ -143,7 +143,7 @@ export default function CreditsPage() {
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {/* Usage by Action */}
                             <div className="glass-panel rounded-2xl border border-white/[0.08] p-6">
-                                <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
+                                <h3 className="text-base font-bold text-white flex items-center gap-2 mb-4">
                                     <span className="material-symbols-outlined text-lg text-primary">pie_chart</span>
                                     Credits by Operation
                                 </h3>
@@ -166,10 +166,10 @@ export default function CreditsPage() {
                                                             <span className={`material-symbols-outlined text-sm text-${color}-400`}>
                                                                 {ACTION_ICONS[a._id] || 'token'}
                                                             </span>
-                                                            <span className="text-xs text-slate-300 font-medium">{a.description || a._id}</span>
+                                                            <span className="text-sm text-slate-300 font-medium">{a.description || a._id}</span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-xs text-slate-500">{a.count} ops</span>
+                                                            <span className="text-sm text-slate-500">{a.count} ops</span>
                                                             <span className={`text-xs font-bold text-${color}-400`}>{a.total}</span>
                                                         </div>
                                                     </div>
@@ -188,7 +188,7 @@ export default function CreditsPage() {
 
                             {/* Daily Trend */}
                             <div className="glass-panel rounded-2xl border border-white/[0.08] p-6">
-                                <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
+                                <h3 className="text-base font-bold text-white flex items-center gap-2 mb-4">
                                     <span className="material-symbols-outlined text-lg text-cyan-400">show_chart</span>
                                     Daily Usage (Last 7 Days)
                                 </h3>
@@ -207,10 +207,10 @@ export default function CreditsPage() {
                                                 const day = new Date(d._id).toLocaleDateString('en-IN', { weekday: 'short' })
                                                 return (
                                                     <div key={d._id} className="flex-1 flex flex-col items-center gap-1">
-                                                        <span className="text-[10px] text-slate-500 font-bold">{d.total}</span>
+                                                        <span className="text-sm text-slate-500 font-bold">{d.total}</span>
                                                         <div className="w-full rounded-t-md bg-primary/30 hover:bg-primary/50 transition-all"
                                                             style={{ height: `${h}%` }} />
-                                                        <span className="text-[9px] text-slate-600 font-medium">{day}</span>
+                                                        <span className="text-xs text-slate-600 font-medium">{day}</span>
                                                     </div>
                                                 )
                                             })
@@ -223,10 +223,10 @@ export default function CreditsPage() {
                         /* Transaction History */
                         <div className="glass-panel rounded-2xl border border-white/[0.08] overflow-hidden">
                             <div className="p-4 border-b border-white/[0.06] flex items-center justify-between">
-                                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                <h3 className="text-base font-bold text-white flex items-center gap-2">
                                     <span className="material-symbols-outlined text-lg text-primary">receipt_long</span>
                                     Recent Transactions
-                                    <span className="text-xs text-slate-500 font-normal ml-1">({usageTotal} total)</span>
+                                    <span className="text-sm text-slate-500 font-normal ml-1">({usageTotal} total)</span>
                                 </h3>
                             </div>
 
@@ -250,16 +250,16 @@ export default function CreditsPage() {
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-sm text-white font-medium truncate">{u.description || u.action}</p>
-                                                        <p className="text-[10px] text-slate-600 truncate">
+                                                        <p className="text-xs text-slate-600 truncate">
                                                             {u.metadata?.route || ''} {u.metadata?.brandName ? `• ${u.metadata.brandName}` : ''}
                                                         </p>
                                                     </div>
                                                     <div className="text-right flex-shrink-0">
                                                         <p className="text-sm font-bold text-rose-400">-{u.cost}</p>
-                                                        <p className="text-[10px] text-slate-600">{formatTime(u.createdAt)}</p>
+                                                        <p className="text-xs text-slate-600">{formatTime(u.createdAt)}</p>
                                                     </div>
                                                     <div className="text-right flex-shrink-0 w-16">
-                                                        <p className="text-[10px] text-slate-500">Balance</p>
+                                                        <p className="text-sm text-slate-500">Balance</p>
                                                         <p className="text-xs font-bold text-slate-400">{u.balanceAfter}</p>
                                                     </div>
                                                 </div>
@@ -270,7 +270,7 @@ export default function CreditsPage() {
                                     {/* Pagination */}
                                     {pages > 1 && (
                                         <div className="p-4 border-t border-white/[0.06] flex items-center justify-between">
-                                            <p className="text-xs text-slate-500">
+                                            <p className="text-sm text-slate-500">
                                                 Page {page} of {pages} ({usageTotal} records)
                                             </p>
                                             <div className="flex gap-2">

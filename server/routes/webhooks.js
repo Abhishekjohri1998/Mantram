@@ -1,0 +1,280 @@
+/**
+ * Meta Webhook Routes
+ * Handles Instagram & Facebook webhook verification and real-time event processing.
+ * Processes incoming DMs, comments, and sends replies via Meta Graph API.
+ */
+
+import { Router } from 'express';
+import { runAutonomousPipeline, handleCommentAutonomously } from '../services/autonomousAgent.js';
+import Integration from '../models/Integration.js';
+import Conversation from '../models/Conversation.js';
+
+const router = Router();
+
+const VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN || 'mantram_verify_2025';
+const PAGE_ACCESS_TOKEN = process.env.META_PAGE_ACCESS_TOKEN;
+const META_API_VERSION = 'v21.0';
+const META_GRAPH_URL = `https://graph.facebook.com/${META_API_VERSION}`;
+
+// ── GET /api/webhooks/meta — Webhook verification (Meta requires this) ──
+
+router.get('/meta', (req, res) => {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+
+    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+        console.log('✅ Meta webhook verified');
+        return res.status(200).send(challenge);
+    }
+
+    console.warn('⚠️ Meta webhook verification failed', { mode, tokenMatch: token === VERIFY_TOKEN });
+    return res.sendStatus(403);
+});
+
+// ── POST /api/webhooks/meta — Receive real events from Meta ──
+
+router.post('/meta', async (req, res) => {
+    // Immediately respond 200 (Meta retries on slow responses)
+    res.sendStatus(200);
+
+    try {
+        const body = req.body;
+
+        // ── Debug: log every incoming webhook payload ──
+        console.log('🔔 WEBHOOK RECEIVED:', JSON.stringify(body).substring(0, 500));
+        console.log('🔔 Object type:', body.object);
+        console.log('🔔 Entries:', (body.entry || []).length);
+
+        if (body.object === 'instagram' || body.object === 'page') {
+            for (const entry of body.entry || []) {
+                const pageId = entry.id;
+                console.log('🔔 Processing entry for page:', pageId);
+                console.log('🔔 Has messaging:', !!entry.messaging, '| Has changes:', !!entry.changes);
+
+                // ── Instagram / Facebook DMs ──
+                if (entry.messaging) {
+                    for (const event of entry.messaging) {
+                        console.log('📨 DM event:', JSON.stringify(event).substring(0, 300));
+                        await handleIncomingDM(event, body.object, pageId);
+                    }
+                }
+
+                // ── Comments (Instagram / Facebook) ──
+                if (entry.changes) {
+                    for (const change of entry.changes) {
+                        console.log('💬 Change event field:', change.field);
+                        if (change.field === 'comments' || change.field === 'feed') {
+                            await handleComment(change, body.object, pageId);
+                        }
+                    }
+                }
+            }
+        } else {
+            console.warn('⚠️ Unknown webhook object type:', body.object);
+        }
+    } catch (error) {
+        console.error('❌ Webhook processing error:', error.message);
+    }
+});
+
+// ── Handle incoming DM ──
+
+async function handleIncomingDM(event, platform, pageId) {
+    try {
+        if (!event.message || !event.message.text) {
+            console.log('📎 Non-text message received (attachment/media), skipping');
+            return;
+        }
+
+        // Skip echo messages (messages sent by us)
+        if (event.message.is_echo) return;
+
+        const senderId = event.sender?.id;
+        const messageText = event.message.text;
+        const timestamp = event.timestamp;
+
+        console.log(`📨 [${platform}] DM from ${senderId}: "${messageText.substring(0, 60)}..."`);
+
+        // Find which brand/user this page belongs to
+        const integration = await Integration.findOne({
+            $or: [
+                { 'platformData.pageId': pageId },
+                { 'platformData.igBusinessId': pageId },
+            ],
+            platform: { $in: ['instagram', 'facebook'] },
+            status: 'connected',
+        }).select('+accessToken +platformData.pageAccessToken');
+
+        if (!integration) {
+            console.warn(`⚠️ No integration found for page ${pageId}. Using env token.`);
+        }
+
+        const userId = integration?.user;
+        const brandId = integration?.brand;
+
+        // Get sender profile info from Meta
+        const senderInfo = await getSenderProfile(senderId, integration);
+
+        // ── Run through autonomous agent pipeline ──
+        const result = await runAutonomousPipeline({
+            userId: userId?.toString(),
+            brandId: brandId?.toString(),
+            platform: platform === 'instagram' ? 'instagram' : 'facebook',
+            senderInfo: {
+                id: senderId,
+                name: senderInfo.name || `User ${senderId.slice(-4)}`,
+                username: senderInfo.username || '',
+                profilePic: senderInfo.profile_pic || '',
+            },
+            messageContent: messageText,
+            channel: platform === 'instagram' ? 'instagram_dm' : 'facebook_messenger',
+            metadata: {
+                messageId: event.message.mid,
+                timestamp,
+                pageId,
+            },
+        });
+
+        console.log(`✅ Pipeline complete: ${result.pipeline?.action || 'unknown'} [${(result.pipeline?.steps || []).join(' → ')}]`);
+    } catch (error) {
+        console.error('❌ Error handling DM:', error.message);
+    }
+}
+
+// ── Handle comments ──
+
+async function handleComment(change, platform, pageId) {
+    try {
+        const value = change.value;
+        if (!value) return;
+
+        const commentText = value.text || value.message;
+        const commenterId = value.from?.id;
+        const commenterName = value.from?.name || value.from?.username || 'Unknown';
+        const commentId = value.comment_id || value.id;
+        const postId = value.post_id || value.media_id;
+
+        if (!commentText) return;
+
+        console.log(`💬 [${platform}] Comment from ${commenterName}: "${(commentText).substring(0, 60)}"`);
+
+        // Find brand for this page
+        const integration = await Integration.findOne({
+            $or: [
+                { 'platformData.pageId': pageId },
+                { 'platformData.igBusinessId': pageId },
+            ],
+            platform: { $in: ['instagram', 'facebook'] },
+            status: 'connected',
+        });
+
+        const brandId = integration?.brand;
+
+        // Run through autonomous comment handler
+        const result = await handleCommentAutonomously({
+            brandId: brandId?.toString(),
+            commentText,
+            commenterId,
+            commenterName,
+            postId,
+            commentId,
+            platform,
+            pageId,
+        });
+
+        console.log(`💬 Comment result: ${result.action}`);
+    } catch (error) {
+        console.error('❌ Error handling comment:', error.message);
+    }
+}
+
+// ── Get sender profile from Meta ──
+
+async function getSenderProfile(senderId, integration) {
+    try {
+        const token = integration?.platformData?.pageAccessToken || integration?.accessToken || PAGE_ACCESS_TOKEN;
+        if (!token) return {};
+
+        const response = await fetch(`${META_GRAPH_URL}/${senderId}?fields=name,profile_pic,username&access_token=${token}`);
+        if (!response.ok) return {};
+
+        return await response.json();
+    } catch {
+        return {};
+    }
+}
+
+// ── Send reply via Meta Graph API ──
+
+export async function sendMetaReply(recipientId, messageText, platform = 'instagram') {
+    try {
+        const token = PAGE_ACCESS_TOKEN;
+        if (!token) {
+            console.error('❌ No META_PAGE_ACCESS_TOKEN configured');
+            return { success: false, error: 'No access token' };
+        }
+
+        const endpoint = platform === 'instagram'
+            ? `${META_GRAPH_URL}/me/messages`
+            : `${META_GRAPH_URL}/me/messages`;
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                recipient: { id: recipientId },
+                message: { text: messageText },
+                access_token: token,
+            }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.error('❌ Meta API error:', data.error?.message || 'Unknown');
+            return { success: false, error: data.error?.message };
+        }
+
+        console.log(`✅ Reply sent to ${recipientId}: "${messageText.substring(0, 40)}..."`);
+        return { success: true, messageId: data.message_id };
+    } catch (error) {
+        console.error('❌ Error sending Meta reply:', error.message);
+        return { success: false, error: error.message };
+    }
+}
+
+// ── Send quick reply buttons via Meta ──
+
+export async function sendMetaQuickReplies(recipientId, text, buttons, platform = 'instagram') {
+    try {
+        const token = PAGE_ACCESS_TOKEN;
+        if (!token) return { success: false, error: 'No access token' };
+
+        const quick_replies = buttons.map(btn => ({
+            content_type: 'text',
+            title: btn.label || btn.title,
+            payload: btn.payload || btn.label || btn.title,
+        }));
+
+        const response = await fetch(`${META_GRAPH_URL}/me/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                recipient: { id: recipientId },
+                message: { text, quick_replies },
+                access_token: token,
+            }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) return { success: false, error: data.error?.message };
+
+        return { success: true, messageId: data.message_id };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
+
+
+export default router;

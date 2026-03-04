@@ -79,7 +79,7 @@ export default function Nexus() {
                             <div key={i} className="glass-panel rounded-2xl p-5 animate-fade-in" style={{ animationDelay: `${i * 80}ms` }}>
                                 <span className={`material-symbols-outlined text-xl ${s.color} mb-2 block`}>{s.icon}</span>
                                 <p className="text-2xl font-extrabold text-white">{s.value}</p>
-                                <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
+                                <p className="text-sm text-slate-500 mt-0.5">{s.label}</p>
                             </div>
                         ))}
                     </div>
@@ -99,7 +99,7 @@ export default function Nexus() {
                                     style={{ animationDelay: `${i * 80 + 200}ms` }}>
                                     <span className="material-symbols-outlined text-3xl text-white mb-3 block">{a.icon}</span>
                                     <p className="text-white font-bold">{a.label}</p>
-                                    <p className="text-xs text-slate-400 mt-1">{a.desc}</p>
+                                    <p className="text-sm text-slate-400 mt-1">{a.desc}</p>
                                 </button>
                             ))}
                         </div>
@@ -119,9 +119,9 @@ export default function Nexus() {
                                             { label: 'Formality', value: voice.formality },
                                         ].filter(v => v.value).map((v, i) => (
                                             <div key={i} className="flex items-center gap-2">
-                                                <span className="text-[10px] text-slate-500 w-14">{v.label}</span>
+                                                <span className="text-sm text-slate-500 w-14">{v.label}</span>
                                                 <div className="progress-bar flex-1"><div className="progress-bar-fill" style={{ width: `${v.value}%` }} /></div>
-                                                <span className="text-[10px] text-slate-400 w-6 text-right">{v.value}%</span>
+                                                <span className="text-sm text-slate-400 w-6 text-right">{v.value}%</span>
                                             </div>
                                         ))}
                                     </div>
@@ -137,13 +137,13 @@ export default function Nexus() {
                                     <div className="space-y-2">
                                         {aiHealth.providers?.map((p, i) => (
                                             <div key={i} className="flex items-center justify-between">
-                                                <span className="text-xs text-slate-400 capitalize">{p.name}</span>
+                                                <span className="text-sm text-slate-400 capitalize">{p.name}</span>
                                                 <span className={`w-2 h-2 rounded-full ${p.available ? 'bg-emerald-400' : 'bg-rose-400'}`} />
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-xs text-slate-500">Checking AI status...</p>
+                                    <p className="text-sm text-slate-500">Checking AI status...</p>
                                 )}
                             </div>
 

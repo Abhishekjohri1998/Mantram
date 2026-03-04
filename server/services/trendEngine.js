@@ -11,6 +11,7 @@
 
 import googleTrends from 'google-trends-api';
 import Parser from 'rss-parser';
+import { getTrendingTopics, isGrokAvailable } from './grokTrends.js';
 
 const rssParser = new Parser({
     timeout: 10000,
@@ -107,19 +108,42 @@ export async function fetchAllTrends(geo = 'IN') {
         return cache.raw;
     }
 
-    console.log('🔥 Fetching fresh trends from Google...');
+    console.log('🔥 Fetching fresh trends from Google + Grok...');
 
-    const [googleRSS, googleDaily, googleRealtime] = await Promise.allSettled([
+    const sources = [
         fetchGoogleTrendsRSS(geo),
         fetchGoogleTrendsDaily(geo),
         fetchGoogleTrendsRealtime(geo),
-    ]);
-
-    const allTrends = [
-        ...(googleRSS.status === 'fulfilled' ? googleRSS.value : []),
-        ...(googleDaily.status === 'fulfilled' ? googleDaily.value : []),
-        ...(googleRealtime.status === 'fulfilled' ? googleRealtime.value : []),
     ];
+
+    // Add Grok as 4th source if available
+    if (isGrokAvailable()) {
+        sources.push(
+            getTrendingTopics('general', geo === 'IN' ? 'India' : geo)
+                .then(data => (data?.trends || []).map(t => ({
+                    title: t.topic || '',
+                    description: t.description || '',
+                    url: '',
+                    source: 'Grok xAI',
+                    sourceIcon: 'smart_toy',
+                    category: t.category || 'viral',
+                    traffic: `${t.viralScore || 0}/100 viral`,
+                    pubDate: new Date(),
+                    contentIdea: t.contentIdea || '',
+                    marketingAngle: t.marketingAngle || '',
+                    hashtags: t.hashtags || [],
+                    format: t.format || '',
+                    urgency: t.urgency || 'medium',
+                })))
+                .catch(() => [])
+        );
+    }
+
+    const settled = await Promise.allSettled(sources);
+
+    const allTrends = settled
+        .filter(r => r.status === 'fulfilled')
+        .flatMap(r => r.value || []);
 
     // Deduplicate
     const seen = new Set();

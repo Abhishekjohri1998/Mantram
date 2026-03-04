@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
+import SmartCommandBox from '../components/SmartCommandBox'
+import { stripMarkdown } from '../utils/stripMarkdown'
 import { brainstormStudio as bsAPI } from '../services/api'
 import { useBrand } from '../context/BrandContext'
 
@@ -46,7 +48,7 @@ function ScoreBar({ score, color, label, icon }) {
                 <div className={`h-full rounded-full ${color} transition-all duration-700`}
                     style={{ width: `${score * 10}%` }} />
             </div>
-            <span className="text-[10px] text-slate-400 w-4 text-right">{score}</span>
+            <span className="text-sm text-slate-400 w-4 text-right">{score}</span>
         </div>
     )
 }
@@ -70,7 +72,7 @@ function IdeaCard({ idea, index, onExpand, onAction, isFilm, onFeedback, feedbac
                         <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
                             {isFilm ? `Film ${index + 1}` : `Concept ${index + 1}`}
                         </span>
-                        <span className="text-[10px] text-slate-500">
+                        <span className="text-sm text-slate-500">
                             Score: {avgScore}/10
                         </span>
                         {feedbackState === 'like' && <span className="text-xs">✅</span>}
@@ -98,17 +100,17 @@ function IdeaCard({ idea, index, onExpand, onAction, isFilm, onFeedback, feedbac
                 <p className="text-sm text-primary/90 italic mb-2">"{idea.hook}"</p>
             )}
 
-            <p className="text-xs text-slate-300 leading-relaxed mb-3">{idea.synopsis || idea.description}</p>
+            <p className="text-sm text-slate-300 leading-relaxed mb-3">{idea.synopsis || idea.description}</p>
 
             {/* Film metadata */}
             <div className="flex flex-wrap gap-2 mb-3">
-                {idea.format && <span className="text-[10px] bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded-full">🎬 {idea.format}</span>}
-                {idea.emotion && <span className="text-[10px] bg-rose-500/10 text-rose-300 px-2 py-0.5 rounded-full">💫 {idea.emotion}</span>}
-                {idea.targetPersona && <span className="text-[10px] bg-violet-500/10 text-violet-300 px-2 py-0.5 rounded-full">🎯 {idea.targetPersona}</span>}
-                {idea.visualStyle && <span className="text-[10px] bg-cyan-500/10 text-cyan-300 px-2 py-0.5 rounded-full">🎨 {idea.visualStyle}</span>}
-                {idea.visualDirection && !idea.visualStyle && <span className="text-[10px] bg-cyan-500/10 text-cyan-300 px-2 py-0.5 rounded-full">🎨 {idea.visualDirection}</span>}
-                {idea.targetPlatform && <span className="text-[10px] bg-blue-500/10 text-blue-300 px-2 py-0.5 rounded-full">📺 {idea.targetPlatform}</span>}
-                {idea.platforms?.map(p => <span key={p} className="text-[10px] bg-white/5 text-slate-400 px-2 py-0.5 rounded-full">{p}</span>)}
+                {idea.format && <span className="text-xs bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded-full">🎬 {idea.format}</span>}
+                {idea.emotion && <span className="text-xs bg-rose-500/10 text-rose-300 px-2 py-0.5 rounded-full">💫 {idea.emotion}</span>}
+                {idea.targetPersona && <span className="text-xs bg-violet-500/10 text-violet-300 px-2 py-0.5 rounded-full">🎯 {idea.targetPersona}</span>}
+                {idea.visualStyle && <span className="text-xs bg-cyan-500/10 text-cyan-300 px-2 py-0.5 rounded-full">🎨 {idea.visualStyle}</span>}
+                {idea.visualDirection && !idea.visualStyle && <span className="text-xs bg-cyan-500/10 text-cyan-300 px-2 py-0.5 rounded-full">🎨 {idea.visualDirection}</span>}
+                {idea.targetPlatform && <span className="text-xs bg-blue-500/10 text-blue-300 px-2 py-0.5 rounded-full">📺 {idea.targetPlatform}</span>}
+                {idea.platforms?.map(p => <span key={p} className="text-xs bg-white/5 text-slate-400 px-2 py-0.5 rounded-full">{p}</span>)}
             </div>
 
             {/* Scores */}
@@ -391,16 +393,16 @@ export default function BrainstormStudio() {
                     </button>
                     {['Intent', 'Brief', 'Confirm', 'Ideas', ...(step === 5 ? ['Refine'] : [])].map((s, i) => (
                         <div key={s} className="flex items-center gap-2">
-                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold transition-all
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all
                                 ${step > i ? 'bg-primary text-white' : step === i ? 'bg-primary/20 text-primary border border-primary/40' : 'bg-white/5 text-slate-600'}`}>
                                 {step > i ? '✓' : i + 1}
                             </div>
-                            <span className={`text-[10px] font-bold ${step >= i ? 'text-slate-300' : 'text-slate-600'}`}>{s}</span>
+                            <span className={`text-xs font-bold ${step >= i ? 'text-slate-300' : 'text-slate-600'}`}>{s}</span>
                             {i < (['Intent', 'Brief', 'Confirm', 'Ideas', ...(step === 5 ? ['Refine'] : [])].length - 1) && <div className={`w-8 h-px ${step > i ? 'bg-primary/40' : 'bg-white/5'}`} />}
                         </div>
                     ))}
                     <div className="ml-auto">
-                        <span className="text-xs text-slate-500">{intentLabel}</span>
+                        <span className="text-sm text-slate-500">{intentLabel}</span>
                     </div>
                 </div>
             )}
@@ -420,7 +422,18 @@ export default function BrainstormStudio() {
                     <div className="text-center mb-10">
                         <span className="material-symbols-outlined text-5xl text-primary mb-3 block">psychology</span>
                         <h2 className="text-2xl font-black text-white mb-2">What are we building?</h2>
-                        <p className="text-sm text-slate-400 max-w-lg mx-auto">Choose your brainstorm type. I'll ask you a few smart questions, confirm my understanding, then generate multi-layer strategy ideas scored on impact.</p>
+                        <p className="text-sm text-slate-400 max-w-lg mx-auto">Just tell me what you need, or pick a brainstorm type below.</p>
+                    </div>
+
+                    {/* Smart Command Box — free-form agentic input */}
+                    <div className="max-w-2xl mx-auto mb-10">
+                        <SmartCommandBox variant="brainstorm" />
+                    </div>
+
+                    <div className="flex items-center gap-3 max-w-4xl mx-auto mb-6">
+                        <div className="flex-1 h-px bg-white/[0.06]" />
+                        <span className="text-sm text-slate-500 font-bold uppercase tracking-wider">Or choose a brainstorm type</span>
+                        <div className="flex-1 h-px bg-white/[0.06]" />
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
@@ -431,8 +444,8 @@ export default function BrainstormStudio() {
                                 <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
                                     <span className="material-symbols-outlined text-white text-lg">{item.icon}</span>
                                 </div>
-                                <h3 className="text-sm font-bold text-white mb-1">{item.label}</h3>
-                                <p className="text-[10px] text-slate-500 leading-relaxed">{item.desc}</p>
+                                <h3 className="text-base font-bold text-white mb-1">{item.label}</h3>
+                                <p className="text-sm text-slate-500 leading-relaxed">{item.desc}</p>
                             </button>
                         ))}
                     </div>
@@ -455,7 +468,7 @@ export default function BrainstormStudio() {
                             <div className="flex items-start gap-3">
                                 <span className="material-symbols-outlined text-primary text-lg mt-0.5">neurology</span>
                                 <div>
-                                    <p className="text-[10px] text-primary font-bold uppercase mb-1">Brand Insight</p>
+                                    <p className="text-sm text-primary font-bold uppercase mb-1">Brand Insight</p>
                                     <p className="text-sm text-white leading-relaxed">{brandInsight}</p>
                                 </div>
                             </div>
@@ -472,7 +485,7 @@ export default function BrainstormStudio() {
                                     </div>
                                     <div className="glass-panel rounded-2xl rounded-tl-md px-4 py-3 max-w-lg">
                                         <p className="text-sm text-white font-medium">{q.q}</p>
-                                        {q.optional && <span className="text-[10px] text-slate-500 italic">Optional — press Enter to skip</span>}
+                                        {q.optional && <span className="text-sm text-slate-500 italic">Optional — press Enter to skip</span>}
                                     </div>
                                 </div>
 
@@ -511,7 +524,7 @@ export default function BrainstormStudio() {
                                                         setCurrentAnswer(prev => prev.trim() ? `${prev.trim()}, ${kw}` : kw)
                                                         inputRef.current?.focus()
                                                     }}
-                                                        className="text-[10px] px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
+                                                        className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
                                                         {kw}
                                                     </button>
                                                 ))}
@@ -559,7 +572,7 @@ export default function BrainstormStudio() {
                                 <div className="glass-panel rounded-2xl rounded-tl-md p-5 flex-1">
                                     <div className="flex items-center gap-2 mb-3">
                                         <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">Strategy AI</span>
-                                        <span className="text-[10px] text-slate-500">Here's what I understand:</span>
+                                        <span className="text-sm text-slate-500">Here's what I understand:</span>
                                     </div>
                                     <p className="text-sm text-white leading-relaxed">{confirmation.summary}</p>
                                 </div>
@@ -575,7 +588,7 @@ export default function BrainstormStudio() {
                                     </button>
                                 </CreditTooltipWrapper>
 
-                                <p className="text-[10px] text-slate-500 text-center my-1">Or adjust direction:</p>
+                                <p className="text-sm text-slate-500 text-center my-1">Or adjust direction:</p>
 
                                 <div className="flex flex-wrap gap-2">
                                     {confirmation.refinements?.map((r, i) => (
@@ -583,14 +596,14 @@ export default function BrainstormStudio() {
                                             setAnswers(prev => ({ ...prev, refinementHint: r }))
                                             generateIdeas(r)
                                         }}
-                                            className="glass-panel px-4 py-2.5 rounded-xl text-xs text-slate-300 hover:text-white hover:border-primary/30 cursor-pointer transition-all">
+                                            className="glass-panel px-4 py-2.5 rounded-xl text-sm text-slate-300 hover:text-white hover:border-primary/30 cursor-pointer transition-all">
                                             {r}
                                         </button>
                                     ))}
                                 </div>
 
                                 <button onClick={() => { setStep(1); setCurrentQ(0) }}
-                                    className="text-xs text-slate-500 hover:text-slate-300 mt-2 cursor-pointer transition-colors">
+                                    className="text-sm text-slate-500 hover:text-slate-300 mt-2 cursor-pointer transition-colors">
                                     ← Go back and change answers
                                 </button>
                             </div>
@@ -609,7 +622,7 @@ export default function BrainstormStudio() {
                                 <span className="absolute -bottom-1 -right-1 material-symbols-outlined text-2xl text-amber-400 animate-pulse">stars</span>
                             </div>
                             <h3 className="text-lg font-bold text-white mb-2">{loadingMsg}</h3>
-                            <p className="text-xs text-slate-500 max-w-md mx-auto mt-2">
+                            <p className="text-sm text-slate-500 max-w-md mx-auto mt-2">
                                 5 specialist agents are working together: Strategist, Creative Director, Naming Expert, Execution Planner, and Performance Analyst
                             </p>
                             <div className="flex items-center justify-center gap-3 mt-6">
@@ -620,7 +633,7 @@ export default function BrainstormStudio() {
                                                 {['psychology', 'palette', 'abc', 'assignment', 'assessment'][i]}
                                             </span>
                                         </div>
-                                        <span className="text-[9px] text-slate-500">{agent}</span>
+                                        <span className="text-sm text-slate-500">{agent}</span>
                                     </div>
                                 ))}
                             </div>
@@ -632,7 +645,7 @@ export default function BrainstormStudio() {
                                 <div className="flex items-center gap-2 mb-4">
                                     <span className="material-symbols-outlined text-primary">{intent === 'ad-film' ? 'movie' : 'campaign'}</span>
                                     <h3 className="text-lg font-bold text-white">{intent === 'ad-film' ? 'Film Concepts' : 'Campaign Concepts'}</h3>
-                                    <span className="text-xs text-slate-500 ml-1">{intent === 'ad-film' ? '👍 Approve a film to generate screenplay' : 'Layer 1 — Big Ideas'}</span>
+                                    <span className="text-sm text-slate-500 ml-1">{intent === 'ad-film' ? '👍 Approve a film to generate screenplay' : 'Layer 1 — Big Ideas'}</span>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     {(ideas.filmConcepts || ideas.campaignConcepts)?.map((idea, i) => (
@@ -657,19 +670,19 @@ export default function BrainstormStudio() {
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         {ideas.productionApproaches.map((p, i) => (
                                             <div key={i} className="glass-panel rounded-2xl p-5 animate-fade-in">
-                                                <p className="text-[10px] text-primary font-bold mb-3 uppercase">{p.filmRef}</p>
+                                                <p className="text-sm text-primary font-bold mb-3 uppercase">{p.filmRef}</p>
                                                 <div className="space-y-3">
                                                     <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-                                                        <p className="text-[10px] text-emerald-400 font-bold mb-1">💰 Low Budget</p>
-                                                        <p className="text-xs text-slate-300">{p.lowBudget}</p>
+                                                        <p className="text-sm text-emerald-400 font-bold mb-1">💰 Low Budget</p>
+                                                        <p className="text-sm text-slate-300">{p.lowBudget}</p>
                                                     </div>
                                                     <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/10">
-                                                        <p className="text-[10px] text-amber-400 font-bold mb-1">💎 Mid Budget</p>
-                                                        <p className="text-xs text-slate-300">{p.midBudget}</p>
+                                                        <p className="text-sm text-amber-400 font-bold mb-1">💎 Mid Budget</p>
+                                                        <p className="text-sm text-slate-300">{p.midBudget}</p>
                                                     </div>
                                                     <div className="p-3 rounded-xl bg-violet-500/5 border border-violet-500/10">
-                                                        <p className="text-[10px] text-violet-400 font-bold mb-1">🎬 High Budget</p>
-                                                        <p className="text-xs text-slate-300">{p.highBudget}</p>
+                                                        <p className="text-sm text-violet-400 font-bold mb-1">🎬 High Budget</p>
+                                                        <p className="text-sm text-slate-300">{p.highBudget}</p>
                                                     </div>
                                                 </div>
                                             </div>
@@ -683,41 +696,41 @@ export default function BrainstormStudio() {
                                     <div className="flex items-center gap-2 mb-4">
                                         <span className="material-symbols-outlined text-amber-400">lightbulb</span>
                                         <h3 className="text-lg font-bold text-white">Tactical Ideas</h3>
-                                        <span className="text-xs text-slate-500 ml-1">Layer 2 — Execution Angles</span>
+                                        <span className="text-sm text-slate-500 ml-1">Layer 2 — Execution Angles</span>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         {ideas.tacticalIdeas.map((t, i) => (
                                             <div key={i} className="glass-panel rounded-2xl p-5 animate-fade-in" style={{ animationDelay: `${i * 100}ms` }}>
-                                                <p className="text-[10px] text-primary font-bold mb-3 uppercase">{t.campaignRef}</p>
+                                                <p className="text-sm text-primary font-bold mb-3 uppercase">{t.campaignRef}</p>
                                                 <div className="space-y-2.5">
                                                     {t.reelIdea && (
                                                         <div className="flex items-start gap-2">
                                                             <span className="text-xs">🎬</span>
-                                                            <div><p className="text-[10px] text-slate-500 font-bold">Reel Idea</p><p className="text-xs text-white">{t.reelIdea}</p></div>
+                                                            <div><p className="text-sm text-slate-500 font-bold">Reel Idea</p><p className="text-sm text-white">{t.reelIdea}</p></div>
                                                         </div>
                                                     )}
                                                     {t.influencerAngle && (
                                                         <div className="flex items-start gap-2">
                                                             <span className="text-xs">🤝</span>
-                                                            <div><p className="text-[10px] text-slate-500 font-bold">Influencer</p><p className="text-xs text-white">{t.influencerAngle}</p></div>
+                                                            <div><p className="text-sm text-slate-500 font-bold">Influencer</p><p className="text-sm text-white">{t.influencerAngle}</p></div>
                                                         </div>
                                                     )}
                                                     {t.hashtag && (
                                                         <div className="flex items-start gap-2">
                                                             <span className="text-xs">#️⃣</span>
-                                                            <p className="text-xs text-primary font-bold">{t.hashtag}</p>
+                                                            <p className="text-sm text-primary font-bold">{t.hashtag}</p>
                                                         </div>
                                                     )}
                                                     {t.contestIdea && (
                                                         <div className="flex items-start gap-2">
                                                             <span className="text-xs">🎉</span>
-                                                            <div><p className="text-[10px] text-slate-500 font-bold">Contest</p><p className="text-xs text-white">{t.contestIdea}</p></div>
+                                                            <div><p className="text-sm text-slate-500 font-bold">Contest</p><p className="text-sm text-white">{t.contestIdea}</p></div>
                                                         </div>
                                                     )}
                                                     {t.ugcPrompt && (
                                                         <div className="flex items-start gap-2">
                                                             <span className="text-xs">📱</span>
-                                                            <div><p className="text-[10px] text-slate-500 font-bold">UGC</p><p className="text-xs text-white">{t.ugcPrompt}</p></div>
+                                                            <div><p className="text-sm text-slate-500 font-bold">UGC</p><p className="text-sm text-white">{t.ugcPrompt}</p></div>
                                                         </div>
                                                     )}
                                                 </div>
@@ -733,7 +746,7 @@ export default function BrainstormStudio() {
                                     <div className="flex items-center gap-2 mb-4">
                                         <span className="material-symbols-outlined text-emerald-400">abc</span>
                                         <h3 className="text-lg font-bold text-white">Naming Ideas</h3>
-                                        <span className="text-xs text-slate-500 ml-1">Layer 3 — Names & Taglines</span>
+                                        <span className="text-sm text-slate-500 ml-1">Layer 3 — Names & Taglines</span>
                                     </div>
                                     <div className="glass-panel rounded-2xl p-5">
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -744,11 +757,11 @@ export default function BrainstormStudio() {
                                                     {Array.isArray(items) && items.map((item, i) => (
                                                         <div key={i} className="mb-2 py-1.5 border-b border-white/5 last:border-0">
                                                             {typeof item === 'string' ? (
-                                                                <p className="text-xs text-white">{item}</p>
+                                                                <p className="text-sm text-white">{item}</p>
                                                             ) : (
                                                                 <>
                                                                     <p className="text-sm text-white font-bold">{item.name}</p>
-                                                                    <p className="text-[10px] text-slate-400">{item.meaning}</p>
+                                                                    <p className="text-sm text-slate-400">{item.meaning}</p>
                                                                 </>
                                                             )}
                                                         </div>
@@ -789,7 +802,7 @@ export default function BrainstormStudio() {
                                     <div className="flex items-center gap-2 mb-4">
                                         <span className="material-symbols-outlined text-blue-400">assignment</span>
                                         <h3 className="text-lg font-bold text-white">Execution Plan</h3>
-                                        <span className="text-xs text-slate-500 ml-1">Layer 4 — Rollout Strategy</span>
+                                        <span className="text-sm text-slate-500 ml-1">Layer 4 — Rollout Strategy</span>
                                     </div>
                                     <div className="glass-panel rounded-2xl p-5">
                                         {/* Phases */}
@@ -797,11 +810,11 @@ export default function BrainstormStudio() {
                                             {ideas.executionPlan.phases?.map((phase, i) => (
                                                 <div key={i} className="p-4 rounded-xl bg-white/3 border border-white/5">
                                                     <div className="flex items-center gap-2 mb-2">
-                                                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${i === 0 ? 'bg-amber-500/20 text-amber-400' : i === 1 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                                                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i === 0 ? 'bg-amber-500/20 text-amber-400' : i === 1 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}`}>
                                                             {i + 1}
                                                         </span>
-                                                        <h4 className="text-sm font-bold text-white">{phase.name}</h4>
-                                                        <span className="text-[10px] text-slate-500 ml-auto">{phase.duration}</span>
+                                                        <h4 className="text-base font-bold text-white">{phase.name}</h4>
+                                                        <span className="text-sm text-slate-500 ml-auto">{phase.duration}</span>
                                                     </div>
                                                     <ul className="space-y-1">
                                                         {phase.actions?.map((a, j) => (
@@ -820,7 +833,7 @@ export default function BrainstormStudio() {
                                                 {Object.entries(ideas.executionPlan.contentMap).map(([type, count]) => (
                                                     <div key={type} className="text-center px-4 py-2 rounded-xl bg-primary/5 border border-primary/10">
                                                         <p className="text-lg font-black text-primary">{count}</p>
-                                                        <p className="text-[10px] text-slate-400 capitalize">{type}</p>
+                                                        <p className="text-sm text-slate-400 capitalize">{type}</p>
                                                     </div>
                                                 ))}
                                             </div>
@@ -829,8 +842,8 @@ export default function BrainstormStudio() {
                                         {/* Launch Day */}
                                         {ideas.executionPlan.launchDayStrategy && (
                                             <div className="p-3 rounded-xl bg-gradient-to-r from-primary/10 to-transparent border-l-2 border-primary">
-                                                <p className="text-[10px] text-primary font-bold mb-1">🚀 LAUNCH DAY STRATEGY</p>
-                                                <p className="text-xs text-slate-300">{ideas.executionPlan.launchDayStrategy}</p>
+                                                <p className="text-sm text-primary font-bold mb-1">🚀 LAUNCH DAY STRATEGY</p>
+                                                <p className="text-sm text-slate-300">{ideas.executionPlan.launchDayStrategy}</p>
                                             </div>
                                         )}
                                     </div>
@@ -842,12 +855,12 @@ export default function BrainstormStudio() {
                                 <div className="glass-panel rounded-2xl p-5 mb-8">
                                     <div className="flex items-center gap-2 mb-3">
                                         <span className="material-symbols-outlined text-primary">auto_fix_high</span>
-                                        <p className="text-sm font-bold text-white">Want to refine?</p>
+                                        <p className="text-base font-bold text-white">Want to refine?</p>
                                     </div>
                                     <div className="flex flex-wrap gap-2">
                                         {ideas.followUpSuggestions.map((s, i) => (
                                             <button key={i} onClick={() => generateIdeas(s)}
-                                                className="glass-panel px-4 py-2.5 rounded-xl text-xs text-slate-300 hover:text-white hover:border-primary/30 cursor-pointer transition-all">
+                                                className="glass-panel px-4 py-2.5 rounded-xl text-sm text-slate-300 hover:text-white hover:border-primary/30 cursor-pointer transition-all">
                                                 {s}
                                             </button>
                                         ))}
@@ -859,7 +872,7 @@ export default function BrainstormStudio() {
                                             className="input-glass flex-1 py-2.5 text-xs"
                                             onKeyDown={e => { if (e.key === 'Enter' && e.target.value.trim()) { generateIdeas(e.target.value.trim()); e.target.value = '' } }} />
                                         <button onClick={resetAll}
-                                            className="px-4 py-2.5 rounded-xl glass-panel text-xs text-slate-400 hover:text-white cursor-pointer transition-all">
+                                            className="px-4 py-2.5 rounded-xl glass-panel text-sm text-slate-400 hover:text-white cursor-pointer transition-all">
                                             Start Over
                                         </button>
                                     </div>
@@ -877,7 +890,7 @@ export default function BrainstormStudio() {
                     <div className="glass-panel rounded-3xl p-8 max-w-2xl w-full max-h-[85vh] overflow-y-auto animate-fade-in">
                         <div className="flex items-center justify-between mb-6">
                             <div>
-                                <span className="text-xs text-primary font-bold bg-primary/10 px-2 py-0.5 rounded-full">Deep Dive</span>
+                                <span className="text-sm text-primary font-bold bg-primary/10 px-2 py-0.5 rounded-full">Deep Dive</span>
                                 <h2 className="text-xl font-black text-white mt-2">{expandedIdea.title}</h2>
                             </div>
                             <button onClick={() => setExpandedIdea(null)} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 cursor-pointer">
@@ -893,10 +906,10 @@ export default function BrainstormStudio() {
 
                                 {/* Film metadata chips */}
                                 <div className="flex flex-wrap gap-2 mb-4">
-                                    {expandedIdea.format && <span className="text-[10px] bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded-full">🎬 {expandedIdea.format}</span>}
-                                    {expandedIdea.emotion && <span className="text-[10px] bg-rose-500/10 text-rose-300 px-2 py-0.5 rounded-full">💫 {expandedIdea.emotion}</span>}
-                                    {expandedIdea.visualStyle && <span className="text-[10px] bg-cyan-500/10 text-cyan-300 px-2 py-0.5 rounded-full">🎨 {expandedIdea.visualStyle}</span>}
-                                    {expandedIdea.targetPlatform && <span className="text-[10px] bg-blue-500/10 text-blue-300 px-2 py-0.5 rounded-full">📺 {expandedIdea.targetPlatform}</span>}
+                                    {expandedIdea.format && <span className="text-xs bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded-full">🎬 {expandedIdea.format}</span>}
+                                    {expandedIdea.emotion && <span className="text-xs bg-rose-500/10 text-rose-300 px-2 py-0.5 rounded-full">💫 {expandedIdea.emotion}</span>}
+                                    {expandedIdea.visualStyle && <span className="text-xs bg-cyan-500/10 text-cyan-300 px-2 py-0.5 rounded-full">🎨 {expandedIdea.visualStyle}</span>}
+                                    {expandedIdea.targetPlatform && <span className="text-xs bg-blue-500/10 text-blue-300 px-2 py-0.5 rounded-full">📺 {expandedIdea.targetPlatform}</span>}
                                 </div>
 
                                 {/* Film detail fields */}
@@ -904,36 +917,36 @@ export default function BrainstormStudio() {
                                     {expandedIdea.openingShot && (
                                         <div className="flex items-start gap-2">
                                             <span className="text-xs">🎬</span>
-                                            <div><p className="text-[10px] text-slate-500 font-bold">Opening Shot</p><p className="text-sm text-white">{expandedIdea.openingShot}</p></div>
+                                            <div><p className="text-sm text-slate-500 font-bold">Opening Shot</p><p className="text-sm text-white">{expandedIdea.openingShot}</p></div>
                                         </div>
                                     )}
                                     {expandedIdea.closingShot && (
                                         <div className="flex items-start gap-2">
                                             <span className="text-xs">🎥</span>
-                                            <div><p className="text-[10px] text-slate-500 font-bold">Closing Shot</p><p className="text-sm text-white">{expandedIdea.closingShot}</p></div>
+                                            <div><p className="text-sm text-slate-500 font-bold">Closing Shot</p><p className="text-sm text-white">{expandedIdea.closingShot}</p></div>
                                         </div>
                                     )}
                                     {expandedIdea.castSuggestion && (
                                         <div className="flex items-start gap-2">
                                             <span className="text-xs">🎭</span>
-                                            <div><p className="text-[10px] text-slate-500 font-bold">Cast Suggestion</p><p className="text-sm text-white">{expandedIdea.castSuggestion}</p></div>
+                                            <div><p className="text-sm text-slate-500 font-bold">Cast Suggestion</p><p className="text-sm text-white">{expandedIdea.castSuggestion}</p></div>
                                         </div>
                                     )}
                                     {expandedIdea.musicMood && (
                                         <div className="flex items-start gap-2">
                                             <span className="text-xs">🎵</span>
-                                            <div><p className="text-[10px] text-slate-500 font-bold">Music Mood</p><p className="text-sm text-white">{expandedIdea.musicMood}</p></div>
+                                            <div><p className="text-sm text-slate-500 font-bold">Music Mood</p><p className="text-sm text-white">{expandedIdea.musicMood}</p></div>
                                         </div>
                                     )}
                                 </div>
 
                                 {/* Film scores */}
-                                <div className="grid grid-cols-4 gap-3 mb-6">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
                                     {FILM_SCORE_META.map(s => (
                                         <div key={s.key} className="text-center p-3 rounded-xl bg-white/3">
                                             <span className="text-lg">{s.icon}</span>
                                             <p className="text-xl font-black text-white mt-1">{expandedIdea.scores?.[s.key] || 0}</p>
-                                            <p className="text-[10px] text-slate-500">{s.label}</p>
+                                            <p className="text-sm text-slate-500">{s.label}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -956,12 +969,12 @@ export default function BrainstormStudio() {
                                 <p className="text-sm text-slate-300 leading-relaxed mb-6">{expandedIdea.description}</p>
 
                                 {/* Scores */}
-                                <div className="grid grid-cols-4 gap-3 mb-6">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
                                     {SCORE_META.map(s => (
                                         <div key={s.key} className="text-center p-3 rounded-xl bg-white/3">
                                             <span className="text-lg">{s.icon}</span>
                                             <p className="text-xl font-black text-white mt-1">{expandedIdea.scores?.[s.key] || 0}</p>
-                                            <p className="text-[10px] text-slate-500">{s.label}</p>
+                                            <p className="text-sm text-slate-500">{s.label}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -971,13 +984,13 @@ export default function BrainstormStudio() {
                                     {expandedIdea.targetPersona && (
                                         <div className="flex items-start gap-2">
                                             <span className="text-xs">🎯</span>
-                                            <div><p className="text-[10px] text-slate-500 font-bold">Target Persona</p><p className="text-sm text-white">{expandedIdea.targetPersona}</p></div>
+                                            <div><p className="text-sm text-slate-500 font-bold">Target Persona</p><p className="text-sm text-white">{expandedIdea.targetPersona}</p></div>
                                         </div>
                                     )}
                                     {expandedIdea.visualDirection && (
                                         <div className="flex items-start gap-2">
                                             <span className="text-xs">🎨</span>
-                                            <div><p className="text-[10px] text-slate-500 font-bold">Visual Direction</p><p className="text-sm text-white">{expandedIdea.visualDirection}</p></div>
+                                            <div><p className="text-sm text-slate-500 font-bold">Visual Direction</p><p className="text-sm text-white">{expandedIdea.visualDirection}</p></div>
                                         </div>
                                     )}
                                 </div>
@@ -1012,7 +1025,7 @@ export default function BrainstormStudio() {
                         </button>
                         <div className="flex-1">
                             <h3 className="text-base font-bold text-white">{chatFilm.title}</h3>
-                            <p className="text-[10px] text-slate-500">Refine this film concept with your creative director</p>
+                            <p className="text-sm text-slate-500">Refine this film concept with your creative director</p>
                         </div>
                         <button onClick={() => generateScreenplay(chatFilm)}
                             className="px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 cursor-pointer transition-all flex items-center gap-1.5">
@@ -1027,13 +1040,13 @@ export default function BrainstormStudio() {
                                 <span className="material-symbols-outlined text-primary text-sm">movie</span>
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-xs text-primary font-bold mb-1">Current Concept</p>
-                                {chatFilm.logline && <p className="text-xs text-white italic mb-1">"{chatFilm.logline}"</p>}
+                                <p className="text-sm text-primary font-bold mb-1">Current Concept</p>
+                                {chatFilm.logline && <p className="text-sm text-white italic mb-1">"{chatFilm.logline}"</p>}
                                 <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2">{chatFilm.synopsis || chatFilm.description}</p>
                                 <div className="flex flex-wrap gap-1.5 mt-2">
-                                    {chatFilm.format && <span className="text-[9px] bg-amber-500/10 text-amber-300 px-1.5 py-0.5 rounded-full">{chatFilm.format}</span>}
-                                    {chatFilm.emotion && <span className="text-[9px] bg-rose-500/10 text-rose-300 px-1.5 py-0.5 rounded-full">{chatFilm.emotion}</span>}
-                                    {chatFilm.visualStyle && <span className="text-[9px] bg-cyan-500/10 text-cyan-300 px-1.5 py-0.5 rounded-full">{chatFilm.visualStyle}</span>}
+                                    {chatFilm.format && <span className="text-xs bg-amber-500/10 text-amber-300 px-1.5 py-0.5 rounded-full">{chatFilm.format}</span>}
+                                    {chatFilm.emotion && <span className="text-xs bg-rose-500/10 text-rose-300 px-1.5 py-0.5 rounded-full">{chatFilm.emotion}</span>}
+                                    {chatFilm.visualStyle && <span className="text-xs bg-cyan-500/10 text-cyan-300 px-1.5 py-0.5 rounded-full">{chatFilm.visualStyle}</span>}
                                 </div>
                             </div>
                         </div>
@@ -1052,7 +1065,7 @@ export default function BrainstormStudio() {
                                     <div className="flex flex-wrap gap-1.5 mt-3">
                                         {['Make it more emotional', 'Change the visual style', 'Adjust the story arc', 'Different music mood', 'Change the cast direction'].map(s => (
                                             <button key={s} onClick={() => sendChatMessage(s)}
-                                                className="text-[10px] px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
+                                                className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
                                                 {s}
                                             </button>
                                         ))}
@@ -1072,12 +1085,12 @@ export default function BrainstormStudio() {
                                     ? 'bg-primary/10 border border-primary/20 rounded-tr-md'
                                     : 'glass-panel rounded-tl-md'
                                     }`}>
-                                    <p className="text-sm text-white whitespace-pre-wrap">{msg.text}</p>
+                                    <p className="text-sm text-white whitespace-pre-wrap">{stripMarkdown(msg.text)}</p>
                                     {msg.suggestions?.length > 0 && (
                                         <div className="flex flex-wrap gap-1.5 mt-3">
                                             {msg.suggestions.map((s, j) => (
                                                 <button key={j} onClick={() => sendChatMessage(s)}
-                                                    className="text-[10px] px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
+                                                    className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
                                                     {s}
                                                 </button>
                                             ))}
@@ -1098,7 +1111,7 @@ export default function BrainstormStudio() {
                                     <span className="material-symbols-outlined text-primary text-sm animate-spin">progress_activity</span>
                                 </div>
                                 <div className="glass-panel rounded-2xl rounded-tl-md px-4 py-3">
-                                    <p className="text-xs text-slate-400">Thinking creatively...</p>
+                                    <p className="text-sm text-slate-400">Thinking creatively...</p>
                                 </div>
                             </div>
                         )}
@@ -1126,7 +1139,7 @@ export default function BrainstormStudio() {
                     <div className="text-center">
                         <span className="material-symbols-outlined text-6xl text-primary animate-spin block mb-4">movie</span>
                         <h3 className="text-lg font-bold text-white mb-2">Writing your screenplay...</h3>
-                        <p className="text-xs text-slate-400">Scene by scene, shot by shot</p>
+                        <p className="text-sm text-slate-400">Scene by scene, shot by shot</p>
                     </div>
                 </div>
             )}
@@ -1138,9 +1151,9 @@ export default function BrainstormStudio() {
                     <div className="glass-panel rounded-3xl p-8 max-w-3xl w-full max-h-[90vh] overflow-y-auto animate-fade-in">
                         <div className="flex items-center justify-between mb-6">
                             <div>
-                                <span className="text-xs text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">📜 Screenplay</span>
+                                <span className="text-sm text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">📜 Screenplay</span>
                                 <h2 className="text-xl font-black text-white mt-2">{screenplay.title}</h2>
-                                <p className="text-xs text-slate-400 mt-1">{screenplay.format} · {screenplay.totalScenes} scenes</p>
+                                <p className="text-sm text-slate-400 mt-1">{screenplay.format} · {screenplay.totalScenes} scenes</p>
                             </div>
                             <button onClick={() => setScreenplay(null)} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 cursor-pointer">
                                 <span className="material-symbols-outlined text-slate-400">close</span>
@@ -1154,15 +1167,15 @@ export default function BrainstormStudio() {
                                     <div className="flex items-center gap-3 mb-3">
                                         <span className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">{scene.sceneNumber}</span>
                                         <div className="flex-1">
-                                            <p className="text-xs font-bold text-white">{scene.location}</p>
-                                            <p className="text-[10px] text-slate-500">{scene.duration} · {scene.mood}</p>
+                                            <p className="text-sm font-bold text-white">{scene.location}</p>
+                                            <p className="text-sm text-slate-500">{scene.duration} · {scene.mood}</p>
                                         </div>
-                                        <span className="text-[10px] bg-cyan-500/10 text-cyan-300 px-2 py-0.5 rounded-full">{scene.cameraDirection}</span>
+                                        <span className="text-xs bg-cyan-500/10 text-cyan-300 px-2 py-0.5 rounded-full">{scene.cameraDirection}</span>
                                     </div>
-                                    <p className="text-xs text-slate-300 mb-2"><span className="text-[10px] text-slate-500 font-bold">VISUAL:</span> {scene.visual}</p>
-                                    <p className="text-xs text-white mb-2"><span className="text-[10px] text-slate-500 font-bold">ACTION:</span> {scene.action}</p>
-                                    {scene.dialogue && <p className="text-xs text-primary italic mb-2"><span className="text-[10px] text-slate-500 font-bold">DIALOGUE:</span> "{scene.dialogue}"</p>}
-                                    <p className="text-[10px] text-amber-300"><span className="text-slate-500 font-bold">🎵</span> {scene.music}</p>
+                                    <p className="text-sm text-slate-300 mb-2"><span className="text-sm text-slate-500 font-bold">VISUAL:</span> {scene.visual}</p>
+                                    <p className="text-sm text-white mb-2"><span className="text-sm text-slate-500 font-bold">ACTION:</span> {scene.action}</p>
+                                    {scene.dialogue && <p className="text-sm text-primary italic mb-2"><span className="text-sm text-slate-500 font-bold">DIALOGUE:</span> "{scene.dialogue}"</p>}
+                                    <p className="text-sm text-amber-300"><span className="text-slate-500 font-bold">🎵</span> {scene.music}</p>
                                 </div>
                             ))}
                         </div>
@@ -1170,28 +1183,28 @@ export default function BrainstormStudio() {
                         {/* End Card */}
                         {screenplay.endCard && (
                             <div className="p-4 rounded-2xl bg-gradient-to-r from-primary/10 to-transparent border border-primary/15 mb-4">
-                                <p className="text-[10px] text-primary font-bold mb-2">END CARD</p>
+                                <p className="text-sm text-primary font-bold mb-2">END CARD</p>
                                 <p className="text-sm text-white font-bold">{screenplay.endCard.tagline}</p>
-                                <p className="text-xs text-slate-300 mt-1">{screenplay.endCard.visual}</p>
-                                {screenplay.endCard.superText && <p className="text-xs text-slate-400 mt-1">{screenplay.endCard.superText}</p>}
+                                <p className="text-sm text-slate-300 mt-1">{screenplay.endCard.visual}</p>
+                                {screenplay.endCard.superText && <p className="text-sm text-slate-400 mt-1">{screenplay.endCard.superText}</p>}
                             </div>
                         )}
 
                         {/* Director Notes */}
                         {screenplay.directorNotes && (
                             <div className="p-4 rounded-xl bg-white/3 mb-4">
-                                <p className="text-[10px] text-amber-400 font-bold mb-1">🎬 Director's Notes</p>
-                                <p className="text-xs text-slate-300">{screenplay.directorNotes}</p>
+                                <p className="text-sm text-amber-400 font-bold mb-1">🎬 Director's Notes</p>
+                                <p className="text-sm text-slate-300">{screenplay.directorNotes}</p>
                             </div>
                         )}
 
                         {/* Budget Options */}
                         {screenplay.estimatedBudget && (
-                            <div className="grid grid-cols-3 gap-3 mb-6">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
                                 {Object.entries(screenplay.estimatedBudget).map(([tier, desc]) => (
                                     <div key={tier} className="p-3 rounded-xl bg-white/3 text-center">
-                                        <p className="text-[10px] text-primary font-bold mb-1 uppercase">{tier}</p>
-                                        <p className="text-[10px] text-slate-400">{desc}</p>
+                                        <p className="text-sm text-primary font-bold mb-1 uppercase">{tier}</p>
+                                        <p className="text-sm text-slate-400">{desc}</p>
                                     </div>
                                 ))}
                             </div>

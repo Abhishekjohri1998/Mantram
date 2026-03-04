@@ -41,12 +41,16 @@ export async function scanWebsite(url, aiRouter) {
     const bannerImages = extractBannerImages($, url);
     console.log(`  🖼️  Banner images found: ${bannerImages.length}`);
 
+    // Extract ALL images from the homepage
+    const allImages = extractAllImages($, url);
+    console.log(`  📷 Total homepage images found: ${allImages.length}`);
+
     // Use AI to analyze voice, tone, Content Style Guide, and name colors
     let voiceAnalysis = {};
     try {
         if (aiRouter && contentSamples.length > 0) {
             const colorContext = colors.length > 0
-                ? `\nBrand colors found on the website: ${colors.map(c => c.hex).join(', ')}`
+                ? `\nAll colors extracted from website CSS: ${colors.slice(0, 12).map(c => `${c.hex} (score:${c.score}, sources:${c.sources.join(',')})`).join(', ')}`
                 : '';
             const bannerContext = bannerImages.length > 0
                 ? `\nBanner/hero images found: ${bannerImages.map(b => b.url).join(', ')}`
@@ -54,43 +58,89 @@ export async function scanWebsite(url, aiRouter) {
 
             voiceAnalysis = await aiRouter.analyzeText({
                 text: contentSamples.join('\n\n') + colorContext + bannerContext,
-                task: `You are a brand strategist. Analyze this website's brand identity comprehensively.
+                task: `You are a brand strategist and visual identity expert. Analyze this website's brand identity.
 Return ONLY valid JSON (no markdown, no explanation) with these fields:
 
 {
   "personality": "e.g. Professional & Innovative",
   "description": "2-3 sentences about brand voice",
-  "tone": 50,          // 0=casual, 100=formal
-  "clarity": 50,       // 0=abstract, 100=clear  
-  "warmth": 50,        // 0=cold, 100=warm
-  "formality": 50,     // 0=casual, 100=corporate
-  "wit": 25,           // 0=serious, 100=humorous
+  "tone": 50,
+  "clarity": 50,
+  "warmth": 50,
+  "formality": 50,
+  "wit": 25,
   "keywords": ["5-10 brand keywords"],
   "sampleQuote": "best example of brand voice from the content",
   "industry": "detected industry",
   "targetAudience": "who the brand targets",
   "contentStyle": {
-    "dos": ["5-8 writing rules to follow, e.g. Use active voice, Start with a hook, Include data points"],
-    "donts": ["5-8 things to avoid, e.g. Never use jargon, Avoid passive voice, Don't use ALL CAPS"],
-    "keyPhrases": ["5-10 signature phrases or words the brand uses frequently"],
-    "writingStyle": "1-2 sentence description of the writing style",
-    "ctaStyle": "How the brand writes calls-to-action (e.g. action-oriented, soft ask, urgency-driven)",
+    "dos": ["5-8 writing rules to follow"],
+    "donts": ["5-8 things to avoid"],
+    "keyPhrases": ["5-10 signature phrases"],
+    "writingStyle": "1-2 sentence description",
+    "ctaStyle": "How CTAs are written",
     "emojiUsage": "none/minimal/moderate/heavy",
     "hashtagStyle": "none/minimal/trend-based/branded",
     "sentenceLength": "short/mixed/long"
-  }${colors.length > 0 ? ',\n  "colorNames": ["give each color a descriptive name like Royal Blue, Sunset Orange for: ' + colors.map(c => c.hex).join(', ') + '"]' : ''}
-}`,
+  },
+  "brandColors": [
+    { "hex": "#000000", "name": "Jet Black", "usage": "primary" },
+    { "hex": "#BBF00A", "name": "Electric Lime", "usage": "accent" }
+  ]
+}
+
+IMPORTANT for brandColors:
+- Pick ONLY 4-5 colors that are the TRUE brand identity colors
+- Include the background/base color if it's intentional (e.g. black for dark-themed brands like Apple, ACwO)
+- Include the primary accent color (the color that stands out most — CTAs, highlights, links)
+- Include white ONLY if it's a deliberate brand color (not just default text)
+- Include any secondary/supporting brand colors  
+- DO NOT include generic CSS framework colors, utility grays, or Tailwind defaults
+- Each color needs: hex (uppercase), name (descriptive like "Royal Blue" not "Brand Color 1"), usage (primary/secondary/accent/background)
+- Order: primary first, then secondary, accent, background`,
             });
         }
     } catch (err) {
         console.error('Voice analysis failed:', err.message);
     }
 
-    // Apply AI-generated color names if available
-    const namedColors = colors.map((c, i) => ({
-        ...c,
-        name: voiceAnalysis.colorNames?.[i] || c.name,
-    }));
+    // Use AI-curated brand colors if available, otherwise run a separate focused AI call
+    let namedColors;
+    if (voiceAnalysis.brandColors?.length >= 3) {
+        namedColors = voiceAnalysis.brandColors.map(c => ({
+            hex: (c.hex || '').toUpperCase(),
+            name: c.name || 'Brand Color',
+            usage: c.usage || 'accent',
+        }));
+        console.log(`  \u{1F3A8} AI selected ${namedColors.length} brand colors`);
+    } else if (aiRouter && colors.length > 0) {
+        // Separate focused AI call for brand color curation
+        try {
+            const colorResult = await aiRouter.analyzeText({
+                text: `Website: ${url}\nBrand: ${brandName || meta.title}\nIndustry: ${voiceAnalysis.industry || 'unknown'}\nCSS Colors found: ${colors.slice(0, 15).map(c => c.hex).join(', ')}`,
+                task: `Pick EXACTLY 4-5 TRUE brand identity colors from the CSS colors list.\nReturn ONLY JSON: {"brandColors": [{"hex": "#000000", "name": "Jet Black", "usage": "primary"}]}\n\nRules:\n- Pick ONLY colors that represent the brand identity (logo, accent, background)\n- Black (#000000) and white (#FFFFFF) ARE valid if used intentionally as brand colors\n- Give descriptive names ("Electric Lime" not "Green")\n- usage: primary/secondary/accent/background\n- Order: primary first\n- EXCLUDE generic UI/framework colors that aren't part of brand identity`,
+            });
+            if (colorResult.brandColors?.length >= 3) {
+                namedColors = colorResult.brandColors.map(c => ({
+                    hex: (c.hex || '').toUpperCase(),
+                    name: c.name || 'Brand Color',
+                    usage: c.usage || 'accent',
+                }));
+                console.log(`  \u{1F3A8} Separate AI call selected ${namedColors.length} brand colors`);
+            }
+        } catch (err) {
+            console.error('Brand color curation failed:', err.message);
+        }
+    }
+
+    // Final fallback: use top 5 from CSS scoring
+    if (!namedColors || namedColors.length < 3) {
+        namedColors = colors.slice(0, 5).map((c, i) => ({
+            hex: c.hex,
+            name: `Brand Color ${i + 1}`,
+            usage: i === 0 ? 'primary' : i === 1 ? 'secondary' : 'accent',
+        }));
+    }
 
     // Build Content Style Guide
     const contentStyle = voiceAnalysis.contentStyle || {
@@ -173,7 +223,8 @@ Rules:
                 keywords: voiceAnalysis.keywords || [],
             },
             contentStyle,
-            bannerImages: bannerImages.slice(0, 5),
+            bannerImages: bannerImages.slice(0, 15),
+            brandImages: allImages,
             brandDescription: meta.description || '',
             targetAudience: voiceAnalysis.targetAudience || '',
             industry: voiceAnalysis.industry || '',
@@ -286,6 +337,10 @@ function extractMeta($, url) {
 function resolveUrl(src, baseUrl) {
     if (!src || src.startsWith('data:')) return null;
     try {
+        // Handle Shopify template URLs: replace {width} with 600
+        src = src.replace(/\{width\}/g, '600');
+        // Handle protocol-relative URLs
+        if (src.startsWith('//')) src = 'https:' + src;
         if (src.startsWith('http')) return src;
         return new URL(src, baseUrl).href;
     } catch { return null; }
@@ -423,18 +478,17 @@ function normalizeHex(hex) {
 }
 
 function isGenericColor(hex) {
+    // Only block truly non-brand values — NOT black/white/grays
+    // Black, white, and near-black CAN be legitimate brand colors (e.g., ACwO, Apple, Nike)
     const normalized = hex.toUpperCase();
-    const generics = new Set([
-        '#000000', '#FFFFFF', '#000', '#FFF',
-        '#111111', '#222222', '#333333', '#444444', '#555555',
-        '#666666', '#777777', '#888888', '#999999',
-        '#AAAAAA', '#BBBBBB', '#CCCCCC', '#DDDDDD', '#EEEEEE',
+    const blocked = new Set([
         '#F5F5F5', '#F0F0F0', '#E0E0E0', '#D0D0D0',
         '#F8F8F8', '#FAFAFA', '#FCFCFC',
-        '#111827', '#1F2937', '#374151', '#4B5563', '#6B7280',
-        '#9CA3AF', '#D1D5DB', '#E5E7EB', '#F3F4F6', '#F9FAFB', // Tailwind grays
+        // Only block obvious Tailwind/framework utility grays  
+        '#9CA3AF', '#D1D5DB', '#E5E7EB', '#F3F4F6', '#F9FAFB',
+        '#6B7280', '#4B5563', '#374151',
     ]);
-    return generics.has(normalized);
+    return blocked.has(normalized);
 }
 
 function rgbToHex(r, g, b) {
@@ -770,5 +824,124 @@ function extractBannerImages($, baseUrl) {
     for (const b of banners) {
         if (!seen.has(b.url)) { seen.add(b.url); unique.push(b); }
     }
-    return unique.slice(0, 5);
+    return unique.slice(0, 15);
+}
+
+// ============================================================================
+// EXTRACT ALL IMAGES — Comprehensive image scraping from homepage
+// ============================================================================
+
+function extractAllImages($, baseUrl) {
+    const images = [];
+    const seen = new Set();
+
+    // Skip patterns — tiny icons, tracking pixels, SVGs, base64 data URIs
+    const skipPatterns = [
+        /1x1/, /pixel/, /tracking/, /spacer/, /blank/,
+        /\.gif$/i, /\.svg/i, /gravatar/i, /googleusercontent/i,
+        /facebook\.com\/tr/, /analytics/, /beacon/,
+        /icon/i, /badge/i, /logo.*small/i,
+    ];
+
+    function addImage(url, alt, source) {
+        if (!url || url.startsWith('data:')) return;
+        const resolved = resolveUrl(url, baseUrl);
+        if (!resolved || seen.has(resolved)) return;
+        if (skipPatterns.some(p => p.test(resolved))) return;
+        seen.add(resolved);
+        images.push({ url: resolved, alt: (alt || '').slice(0, 200), source: source || 'page' });
+    }
+
+    // ── 1. All <img> tags with lazy-loading support ──
+    $('img').each((_, el) => {
+        const src = $(el).attr('src') || $(el).attr('data-src') || $(el).attr('data-original') || $(el).attr('data-lazy-src') || '';
+        const srcset = $(el).attr('srcset') || $(el).attr('data-srcset') || '';
+        const alt = $(el).attr('alt') || '';
+        const width = parseInt($(el).attr('width') || '0');
+        const height = parseInt($(el).attr('height') || '0');
+
+        // Skip tiny images
+        if ((width > 0 && width < 40) || (height > 0 && height < 40)) return;
+
+        // Pick best source: prefer srcset largest, then src
+        let bestSrc = src;
+        if (srcset) {
+            const parts = srcset.split(',').map(s => s.trim());
+            let maxW = 0;
+            for (const part of parts) {
+                const [url, desc] = part.split(/\s+/);
+                const w = parseInt(desc) || 0;
+                if (w > maxW && url) { maxW = w; bestSrc = url; }
+            }
+        }
+
+        // Determine context
+        const parent = $(el).closest('[class*="hero"], [class*="banner"], [class*="slider"], [class*="product"], [class*="carousel"], section, article');
+        const pc = (parent.attr('class') || '').toLowerCase();
+        let source = 'page';
+        if (pc.match(/hero|banner|slider|carousel/)) source = 'hero';
+        else if (pc.match(/product|catalog|item/)) source = 'product';
+
+        addImage(bestSrc, alt, source);
+    });
+
+    // ── 2. <source> elements in <picture> tags ──
+    $('picture source, source[srcset]').each((_, el) => {
+        const srcset = $(el).attr('srcset') || '';
+        if (!srcset) return;
+        // Get the first (often desktop) URL from srcset
+        const parts = srcset.split(',').map(s => s.trim());
+        let bestUrl = '';
+        let maxW = 0;
+        for (const part of parts) {
+            const [url, desc] = part.split(/\s+/);
+            const w = parseInt(desc) || 0;
+            if (w > maxW && url) { maxW = w; bestUrl = url; }
+            else if (!bestUrl && url) bestUrl = url;
+        }
+        if (bestUrl) addImage(bestUrl, '', 'hero');
+    });
+
+    // ── 3. CSS background images ──
+    $('[style*="background"]').each((_, el) => {
+        const style = $(el).attr('style') || '';
+        const bgMatch = style.match(/background(?:-image)?:\s*url\(['"]?([^'")]+)/i);
+        if (bgMatch) addImage(bgMatch[1], '', 'background');
+    });
+
+    // ── 4. JSON-LD structured data images ──
+    $('script[type="application/ld+json"]').each((_, el) => {
+        try {
+            const data = JSON.parse($(el).text());
+            const items = Array.isArray(data) ? data : [data];
+            for (const item of items) {
+                if (item.image) {
+                    const imgs = Array.isArray(item.image) ? item.image : [item.image];
+                    imgs.forEach(img => {
+                        const url = typeof img === 'string' ? img : img?.url;
+                        if (url) addImage(url, item.name || '', 'structured-data');
+                    });
+                }
+                // Product images
+                if (item['@type'] === 'Product' && item.offers?.image) {
+                    addImage(item.offers.image, item.name || '', 'product');
+                }
+            }
+        } catch { /* ignore invalid JSON-LD */ }
+    });
+
+    // ── 5. Shopify product JSON in script tags ──
+    $('script').each((_, el) => {
+        const text = $(el).text();
+        // Look for Shopify product image patterns
+        const imgMatches = text.matchAll(/"(?:featured_image|src|url)":\s*"(https?:\/\/cdn\.shopify\.com\/[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/gi);
+        for (const match of imgMatches) {
+            if (match[1] && !match[1].includes('icon') && !match[1].includes('badge')) {
+                addImage(match[1], '', 'product');
+            }
+        }
+    });
+
+    console.log(`  📷 extractAllImages: found ${images.length} images total`);
+    return images.slice(0, 30);
 }

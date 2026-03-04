@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { content as contentAPI, agents as agentsAPI, creatives as creativesAPI, products as productsAPI } from '../services/api'
 import { useBrand } from '../context/BrandContext'
+import { stripMarkdown } from '../utils/stripMarkdown'
 import VoiceInput from '../components/VoiceInput'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
 
@@ -200,7 +201,7 @@ function SmartInput({ onParse, onSkip }) {
                 </div>
             </div>
             <p className="text-xs text-slate-600 mt-3">
-                <span className="material-symbols-outlined text-[10px] align-middle mr-0.5">mic</span>
+                <span className="material-symbols-outlined text-xs align-middle mr-0.5">mic</span>
                 Speak in Hindi, Tamil, Spanish, or any language • Or type below ↓
             </p>
         </div>
@@ -219,7 +220,7 @@ function StepGoal({ onSelect }) {
                         style={{ animationDelay: `${i * 80} ms` }}>
                         <span className="material-symbols-outlined text-3xl mb-3 block" style={{ color: g.accent }}>{g.icon}</span>
                         <p className="text-lg font-bold text-white group-hover:text-primary transition-colors">{g.label}</p>
-                        <p className="text-xs text-slate-400 mt-1">{g.desc}</p>
+                        <p className="text-sm text-slate-400 mt-1">{g.desc}</p>
                     </button>
                 ))}
             </div>
@@ -247,7 +248,7 @@ function StepSubType({ goal, onSelect, onBack }) {
                         className="glass-panel rounded-xl p-4 text-left hover:bg-white/[0.06] hover:border-primary/30 transition-all cursor-pointer animate-fade-in group"
                         style={{ animationDelay: `${i * 60} ms` }}>
                         <span className="material-symbols-outlined text-xl text-slate-400 group-hover:text-primary transition-colors mb-2 block">{st.icon}</span>
-                        <p className="text-sm font-bold text-white">{st.label}</p>
+                        <p className="text-base font-bold text-white">{st.label}</p>
                     </button>
                 ))}
             </div>
@@ -278,7 +279,7 @@ function StepChannel({ onSelect, onBack, goal }) {
             </button>
             <h3 className="text-xl font-extrabold text-white mb-2">Where will this be <span className="text-primary">published?</span></h3>
             <p className="text-sm text-slate-400 mb-6">Content will be auto-optimized for the selected platform{selected.length > 1 ? 's' : ''}.</p>
-            <div className="grid grid-cols-3 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {CHANNELS.map((ch, i) => (
                     <button key={ch.id} onClick={() => handleToggle(ch.id)}
                         className={`glass - panel rounded - xl p - 4 text - center transition - all cursor - pointer animate - fade -in ${selected.includes(ch.id) || (ch.id === 'multi' && selected.length > 2)
@@ -437,7 +438,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                             } `}>
                         <span className="material-symbols-outlined text-sm">{t.icon}</span> {t.label}
                         {t.id === 'library' && libraryCounts.all > 0 && (
-                            <span className="bg-white/20 text-[9px] px-1.5 py-0.5 rounded-full">{libraryCounts.all}</span>
+                            <span className="bg-white/20 text-xs px-1.5 py-0.5 rounded-full">{libraryCounts.all}</span>
                         )}
                     </button>
                 ))}
@@ -491,7 +492,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                             className="border-2 border-dashed border-white/[0.1] rounded-2xl p-10 text-center hover:border-primary/40 transition-colors">
                             <span className="material-symbols-outlined text-4xl text-slate-600 mb-3 block">add_photo_alternate</span>
                             <p className="text-slate-400 mb-2 text-sm">Drag & drop a product image or creative</p>
-                            <p className="text-[10px] text-slate-600 mb-3">AI will analyze the image and create a content brief</p>
+                            <p className="text-xs text-slate-600 mb-3">AI will analyze the image and create a content brief</p>
                             <label className="btn-primary py-2 px-5 rounded-xl text-xs cursor-pointer inline-block">
                                 Choose Image
                                 <input type="file" className="hidden" onChange={(e) => {
@@ -519,7 +520,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                                 </button>
                                 {files[0] && (
                                     <div className="absolute bottom-3 left-3 bg-black/60 rounded-lg px-2.5 py-1">
-                                        <span className="text-[10px] text-white">{files[0].name} • {(files[0].size / 1024).toFixed(0)} KB</span>
+                                        <span className="text-sm text-white">{files[0].name} • {(files[0].size / 1024).toFixed(0)} KB</span>
                                     </div>
                                 )}
                             </div>
@@ -552,8 +553,8 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                             {analyzing && (
                                 <div className="glass-panel rounded-2xl p-6 text-center mb-4 animate-fade-in">
                                     <span className="material-symbols-outlined text-3xl text-primary animate-spin block mb-2">progress_activity</span>
-                                    <p className="text-sm font-bold text-white">Analyzing image with <span className="text-primary">Gemini Vision AI</span></p>
-                                    <p className="text-[10px] text-slate-500 mt-1">Detecting products, colors, mood, text, and marketing angles...</p>
+                                    <p className="text-base font-bold text-white">Analyzing image with <span className="text-primary">Gemini Vision AI</span></p>
+                                    <p className="text-sm text-slate-500 mt-1">Detecting products, colors, mood, text, and marketing angles...</p>
                                 </div>
                             )}
 
@@ -569,10 +570,10 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                                 <div className="glass-panel rounded-2xl p-5 mb-4 animate-fade-in">
                                     <div className="flex items-center gap-2 mb-3">
                                         <span className="material-symbols-outlined text-emerald-400">check_circle</span>
-                                        <h4 className="text-sm font-bold text-white">AI Image Analysis</h4>
-                                        <span className="text-[10px] text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full font-bold">Gemini Vision</span>
+                                        <h4 className="text-base font-bold text-white">AI Image Analysis</h4>
+                                        <span className="text-sm text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full font-bold">Gemini Vision</span>
                                     </div>
-                                    <div className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto">
+                                    <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto">
                                         {imageAnalysis}
                                     </div>
                                 </div>
@@ -611,7 +612,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                             <button key={cat.id} onClick={() => { setLibraryCategory(cat.id); loadLibrary(cat.id) }}
                                 className={`px - 4 py - 2 rounded - xl text - xs font - bold transition - all cursor - pointer ${libraryCategory === cat.id ? 'bg-primary/20 text-primary border border-primary/30' : 'glass-panel text-slate-400 hover:text-white'} `}>
                                 {cat.label}
-                                <span className="ml-1.5 text-[10px] opacity-60">{cat.count}</span>
+                                <span className="ml-1.5 text-xs opacity-60">{cat.count}</span>
                             </button>
                         ))}
                     </div>
@@ -629,13 +630,13 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                         <div className="text-center py-10 glass-panel rounded-2xl">
                             <span className="material-symbols-outlined text-4xl text-slate-700 mb-3 block">photo_library</span>
                             <h4 className="text-sm font-bold text-slate-500 mb-1">No images yet</h4>
-                            <p className="text-[10px] text-slate-600">Generate images in AI Photoshoot or upload images to build your library.</p>
+                            <p className="text-xs text-slate-600">Generate images in AI Photoshoot or upload images to build your library.</p>
                         </div>
                     )}
 
                     {/* Image grid */}
                     {!libraryLoading && libraryImages.length > 0 && (
-                        <div className="grid grid-cols-3 gap-3 max-h-[400px] overflow-y-auto pr-1">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto pr-1">
                             {libraryImages.map(img => (
                                 <button key={img._id} onClick={() => {
                                     setImagePreview(img.imageUrl)
@@ -656,7 +657,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                                         className="w-full h-full object-cover" />
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                                     <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <p className="text-[10px] text-white font-bold truncate">{img.title || 'Untitled'}</p>
+                                        <p className="text-sm text-white font-bold truncate">{img.title || 'Untitled'}</p>
                                         <div className="flex items-center gap-1 mt-0.5">
                                             <span className={`text - [8px] px - 1.5 py - 0.5 rounded - full font - bold ${img.type === 'uploaded' ? 'bg-blue-500/30 text-blue-300' : img.type === 'ai-photoshoot' ? 'bg-amber-500/30 text-amber-300' : 'bg-emerald-500/30 text-emerald-300'} `}>
                                                 {img.type === 'uploaded' ? 'Uploaded' : img.type === 'ai-photoshoot' ? 'Photoshoot' : 'Generated'}
@@ -689,8 +690,8 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                         <div className="glass-panel p-4 rounded-xl border border-cyan-500/20 flex items-center gap-3 animate-fade-in">
                             <span className="material-symbols-outlined text-xl text-cyan-400 animate-spin">progress_activity</span>
                             <div>
-                                <p className="text-sm font-bold text-white">AI finding relevant products...</p>
-                                <p className="text-xs text-slate-400">Matching your context to your product catalog</p>
+                                <p className="text-base font-bold text-white">AI finding relevant products...</p>
+                                <p className="text-sm text-slate-400">Matching your context to your product catalog</p>
                             </div>
                         </div>
                     )}
@@ -700,8 +701,8 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-2">
                                     <span className="material-symbols-outlined text-sm text-cyan-400">smart_toy</span>
-                                    <h4 className="text-sm font-bold text-white">AI Product Match</h4>
-                                    <span className="bg-cyan-500/20 text-cyan-400 text-[9px] px-2 py-0.5 rounded-full font-bold">{suggestedProducts.length} found</span>
+                                    <h4 className="text-base font-bold text-white">AI Product Match</h4>
+                                    <span className="bg-cyan-500/20 text-cyan-400 text-xs px-2 py-0.5 rounded-full font-bold">{suggestedProducts.length} found</span>
                                 </div>
                                 <button onClick={() => setShowProductPanel(false)} className="text-slate-500 hover:text-white cursor-pointer">
                                     <span className="material-symbols-outlined text-sm">close</span>
@@ -718,14 +719,14 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                                                 <img src={p.images[0].url} alt={p.title}
                                                     className="w-full h-20 object-cover rounded-lg mb-2 bg-white/5" />
                                             )}
-                                            <p className="text-xs font-bold text-white truncate">{p.title}</p>
+                                            <p className="text-sm font-bold text-white truncate">{p.title}</p>
                                             {p.price?.amount > 0 && (
-                                                <p className="text-[10px] text-emerald-400 mt-0.5">₹{p.price.amount}</p>
+                                                <p className="text-sm text-emerald-400 mt-0.5">₹{p.price.amount}</p>
                                             )}
                                             {isAttached && (
                                                 <div className="flex items-center gap-1 mt-1.5">
-                                                    <span className="material-symbols-outlined text-xs text-cyan-400">check_circle</span>
-                                                    <span className="text-[9px] text-cyan-400 font-bold">Attached</span>
+                                                    <span className="material-symbols-outlined text-sm text-cyan-400">check_circle</span>
+                                                    <span className="text-sm text-cyan-400 font-bold">Attached</span>
                                                 </div>
                                             )}
                                         </button>
@@ -733,7 +734,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                                 })}
                             </div>
                             {attachedProducts.length > 0 && (
-                                <p className="text-xs text-cyan-400/70 mt-2 flex items-center gap-1">
+                                <p className="text-sm text-cyan-400/70 mt-2 flex items-center gap-1">
                                     <span className="material-symbols-outlined text-xs">inventory_2</span>
                                     {attachedProducts.length} product{attachedProducts.length > 1 ? 's' : ''} will be included in your content
                                 </p>
@@ -746,7 +747,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
             <button onClick={handleContextComplete}
                 className="btn-primary w-full py-3.5 rounded-xl mt-6 text-sm font-bold flex items-center justify-center gap-2">
                 {attachedProducts.length > 0 && (
-                    <span className="bg-white/20 text-[10px] px-2 py-0.5 rounded-full">{attachedProducts.length} product{attachedProducts.length > 1 ? 's' : ''}</span>
+                    <span className="bg-white/20 text-xs px-2 py-0.5 rounded-full">{attachedProducts.length} product{attachedProducts.length > 1 ? 's' : ''}</span>
                 )}
                 Continue →
             </button>
@@ -818,7 +819,7 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
 
             {/* Language Selector */}
             <div className="mb-6">
-                <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-3">
+                <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-3">
                     <span className="material-symbols-outlined text-xs align-middle mr-1">translate</span>
                     Language
                 </p>
@@ -834,14 +835,14 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
 
                 {/* Language Style — only show for non-English */}
                 {language !== 'english' && (
-                    <div className="grid grid-cols-3 gap-2 mt-3 animate-fade-in">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3 animate-fade-in">
                         {LANG_STYLES.map(s => (
                             <button key={s.id} onClick={() => setLangStyle(s.id)}
                                 className={`glass - panel rounded - xl p - 3 text - center transition - all cursor - pointer
                                     ${langStyle === s.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'} `}>
                                 <span className={`material - symbols - outlined text - lg block mb - 1 ${langStyle === s.id ? 'text-primary' : 'text-slate-500'} `}>{s.icon}</span>
                                 <p className={`text - xs font - bold ${langStyle === s.id ? 'text-white' : 'text-slate-400'} `}>{s.label}</p>
-                                <p className="text-[10px] text-slate-600">{s.desc}</p>
+                                <p className="text-xs text-slate-600">{s.desc}</p>
                             </button>
                         ))}
                     </div>
@@ -850,7 +851,7 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                 {/* Script / Font — only for non-Latin regional languages */}
                 {language !== 'english' && (
                     <div className="mt-4 animate-fade-in">
-                        <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-2">
+                        <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">
                             <span className="material-symbols-outlined text-xs align-middle mr-1">font_download</span>
                             Script / Font
                         </p>
@@ -861,7 +862,7 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                                         ${scriptType === s.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'} `}>
                                     <span className={`material - symbols - outlined text - lg block mb - 1 ${scriptType === s.id ? 'text-primary' : 'text-slate-500'} `}>{s.icon}</span>
                                     <p className={`text - xs font - bold ${scriptType === s.id ? 'text-white' : 'text-slate-400'} `}>{s.label}</p>
-                                    <p className="text-[10px] text-slate-600 mt-0.5">{s.desc}</p>
+                                    <p className="text-xs text-slate-600 mt-0.5">{s.desc}</p>
                                 </button>
                             ))}
                         </div>
@@ -871,8 +872,8 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
 
             {/* Tone */}
             <div className="mb-6">
-                <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-3">Tone & Style</p>
-                <div className="grid grid-cols-3 gap-2">
+                <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-3">Tone & Style</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {TONES.map(t => (
                         <button key={t.id} onClick={() => setTone(t.id)}
                             className={`glass - panel rounded - xl p - 3 text - center transition - all cursor - pointer ${tone === t.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'
@@ -886,15 +887,15 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
 
             {/* Length */}
             <div className="mb-6">
-                <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-3">Length</p>
-                <div className="grid grid-cols-3 gap-2">
+                <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-3">Length</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {LENGTHS.map(l => (
                         <button key={l.id} onClick={() => setLength(l.id)}
                             className={`glass - panel rounded - xl p - 3 text - center transition - all cursor - pointer ${length === l.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'
                                 } `}>
                             <span className={`material - symbols - outlined text - lg block mb - 1 ${length === l.id ? 'text-primary' : 'text-slate-500'} `}>{l.icon}</span>
                             <p className={`text - xs font - bold ${length === l.id ? 'text-white' : 'text-slate-400'} `}>{l.label}</p>
-                            <p className="text-[10px] text-slate-600">{l.desc}</p>
+                            <p className="text-xs text-slate-600">{l.desc}</p>
                         </button>
                     ))}
                 </div>
@@ -903,14 +904,14 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
             {/* Sell Style (for promote/launch) */}
             {showSellStyle && (
                 <div className="mb-6">
-                    <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-3">Selling Approach</p>
-                    <div className="grid grid-cols-3 gap-2">
+                    <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-3">Selling Approach</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {SELL_STYLES.map(s => (
                             <button key={s.id} onClick={() => setSellStyle(s.id)}
                                 className={`glass - panel rounded - xl p - 3 text - center transition - all cursor - pointer ${sellStyle === s.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'
                                     } `}>
                                 <p className={`text - xs font - bold ${sellStyle === s.id ? 'text-white' : 'text-slate-400'} `}>{s.label}</p>
-                                <p className="text-[10px] text-slate-600 mt-0.5">{s.desc}</p>
+                                <p className="text-xs text-slate-600 mt-0.5">{s.desc}</p>
                             </button>
                         ))}
                     </div>
@@ -920,7 +921,7 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
             {/* ── AI Model (Advanced — collapsed by default) ── */}
             <div className="mb-6">
                 <button onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="flex items-center gap-1.5 text-[10px] text-slate-600 hover:text-slate-400 transition-colors cursor-pointer w-full">
+                    className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-400 transition-colors cursor-pointer w-full">
                     <span className="material-symbols-outlined text-xs">{showAdvanced ? 'expand_less' : 'tune'}</span>
                     <span className="uppercase tracking-widest font-bold">AI Model</span>
                     <span className="flex-1 h-px bg-white/[0.06]" />
@@ -938,11 +939,11 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                                         <span className={`material - symbols - outlined text - base ${modelOverride === p.id ? 'text-primary' : 'text-slate-500'} `}>{p.icon}</span>
                                         <span className={`text - xs font - bold ${modelOverride === p.id ? 'text-white' : 'text-slate-400'} `}>{p.label}</span>
                                     </div>
-                                    <p className="text-[9px] text-slate-600">{p.desc}</p>
+                                    <p className="text-xs text-slate-600">{p.desc}</p>
                                 </button>
                             ))}
                         </div>
-                        <p className="text-[9px] text-slate-600 mt-2 text-center">Auto mode picks the best model based on your language and content type</p>
+                        <p className="text-xs text-slate-600 mt-2 text-center">Auto mode picks the best model based on your language and content type</p>
                     </div>
                 )}
             </div>
@@ -1052,21 +1053,21 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
             {prStep === 0 && (
                 <div className="space-y-5">
                     <div>
-                        <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-2">Headline</p>
+                        <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">Headline</p>
                         <input value={headline} onChange={e => setHeadline(e.target.value)}
                             placeholder="e.g. XYZ Corp Launches AI-Powered Platform for SMBs"
                             className="input-glass w-full py-3 px-4 rounded-xl text-sm" />
-                        <p className="text-[10px] text-slate-600 mt-1">Leave blank to auto-generate from your description</p>
+                        <p className="text-xs text-slate-600 mt-1">Leave blank to auto-generate from your description</p>
                     </div>
                     <div>
-                        <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-2">What is this press release about?</p>
+                        <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">What is this press release about?</p>
                         <textarea value={purpose} onChange={e => setPurpose(e.target.value)} rows={4}
                             placeholder="Describe the announcement in detail. What happened? Why is this important? Include key facts, numbers, dates."
                             className="input-glass w-full py-3 px-4 rounded-xl text-sm resize-none" />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-2">Language</p>
+                            <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">Language</p>
                             <div className="flex gap-2">
                                 {LANGUAGES.map(l => (
                                     <button key={l.id} onClick={() => setLanguage(l.id)}
@@ -1078,7 +1079,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                             </div>
                         </div>
                         <div>
-                            <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-2">Tone</p>
+                            <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">Tone</p>
                             <div className="flex gap-2 flex-wrap">
                                 {PR_TONES.map(t => (
                                     <button key={t.id} onClick={() => setTone(t.id)}
@@ -1100,7 +1101,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
             {/* Step 1: Distribution Channels */}
             {prStep === 1 && (
                 <div className="space-y-5">
-                    <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-3">
+                    <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-3">
                         Where will this be distributed? <span className="text-slate-600 normal-case">Select all that apply</span>
                     </p>
                     <div className="grid grid-cols-2 gap-3">
@@ -1112,7 +1113,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                                     <span className={`text - xs font - bold ${distribution.includes(d.id) ? 'text-white' : 'text-slate-400'} `}>{d.label}</span>
                                     {distribution.includes(d.id) && <span className="material-symbols-outlined text-rose-400 text-sm ml-auto">check_circle</span>}
                                 </div>
-                                <p className="text-[9px] text-slate-600">{d.desc}</p>
+                                <p className="text-xs text-slate-600">{d.desc}</p>
                             </button>
                         ))}
                     </div>
@@ -1126,13 +1127,13 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
             {/* Step 2: Spokesperson Quotes */}
             {prStep === 2 && (
                 <div className="space-y-5">
-                    <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-1">Spokesperson Quotes</p>
-                    <p className="text-[10px] text-slate-600 mb-3">Add quotes from key people. AI can also draft quotes if you leave the quote field blank.</p>
+                    <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-1">Spokesperson Quotes</p>
+                    <p className="text-xs text-slate-600 mb-3">Add quotes from key people. AI can also draft quotes if you leave the quote field blank.</p>
 
                     {quotes.map((q, idx) => (
                         <div key={idx} className="glass-panel rounded-xl p-4 space-y-3">
                             <div className="flex items-center justify-between">
-                                <span className="text-xs text-white font-bold">Quote #{idx + 1}</span>
+                                <span className="text-sm text-white font-bold">Quote #{idx + 1}</span>
                                 {quotes.length > 1 && (
                                     <button onClick={() => removeQuote(idx)} className="text-slate-600 hover:text-rose-400 cursor-pointer">
                                         <span className="material-symbols-outlined text-sm">close</span>
@@ -1151,7 +1152,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                         </div>
                     ))}
                     <button onClick={addQuote}
-                        className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer">
+                        className="text-sm text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer">
                         <span className="material-symbols-outlined text-sm">add</span> Add Another Quote
                     </button>
                     <button onClick={() => setPrStep(3)}
@@ -1166,12 +1167,12 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                 <div className="space-y-5">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-2">City / Dateline</p>
+                            <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">City / Dateline</p>
                             <input value={city} onChange={e => setCity(e.target.value)}
                                 placeholder="e.g. Mumbai, New Delhi" className="input-glass w-full py-2.5 px-3 rounded-lg text-xs" />
                         </div>
                         <div>
-                            <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-2">Date</p>
+                            <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">Date</p>
                             <input value={dateline} onChange={e => setDateline(e.target.value)}
                                 className="input-glass w-full py-2.5 px-3 rounded-lg text-xs" />
                         </div>
@@ -1183,8 +1184,8 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                             <input type="checkbox" checked={embargo} onChange={e => setEmbargo(e.target.checked)}
                                 className="accent-rose-500" />
                             <div>
-                                <p className="text-xs text-white font-bold">Embargoed Release</p>
-                                <p className="text-[10px] text-slate-600">Not for publication until a specific date</p>
+                                <p className="text-sm text-white font-bold">Embargoed Release</p>
+                                <p className="text-xs text-slate-600">Not for publication until a specific date</p>
                             </div>
                         </label>
                         {embargo && (
@@ -1195,7 +1196,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
 
                     {/* Company Boilerplate */}
                     <div>
-                        <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-2">About the Company (Boilerplate)</p>
+                        <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">About the Company (Boilerplate)</p>
                         <textarea value={boilerplate} onChange={e => setBoilerplate(e.target.value)} rows={3}
                             placeholder="Brief company description — auto-filled from brand profile if available"
                             className="input-glass w-full py-2 px-3 rounded-xl text-xs resize-none" />
@@ -1203,8 +1204,8 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
 
                     {/* Media Contact */}
                     <div>
-                        <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-2">Media Contact</p>
-                        <div className="grid grid-cols-3 gap-3">
+                        <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">Media Contact</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                             <input value={contactName} onChange={e => setContactName(e.target.value)}
                                 placeholder="Contact Name" className="input-glass py-2 px-3 rounded-lg text-xs" />
                             <input value={contactEmail} onChange={e => setContactEmail(e.target.value)}
@@ -1216,7 +1217,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
 
                     {/* CTA */}
                     <div>
-                        <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-2">Call to Action (Optional)</p>
+                        <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">Call to Action (Optional)</p>
                         <input value={cta} onChange={e => setCta(e.target.value)}
                             placeholder="e.g. Visit www.example.com for more info"
                             className="input-glass w-full py-2.5 px-3 rounded-lg text-xs" />
@@ -1225,7 +1226,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                     {/* ── AI Model (Advanced — collapsed by default) ── */}
                     <div className="mb-6">
                         <button onClick={() => setShowAdvanced(!showAdvanced)}
-                            className="flex items-center gap-1.5 text-[10px] text-slate-600 hover:text-slate-400 transition-colors cursor-pointer w-full">
+                            className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-400 transition-colors cursor-pointer w-full">
                             <span className="material-symbols-outlined text-xs">{showAdvanced ? 'expand_less' : 'tune'}</span>
                             <span className="uppercase tracking-widest font-bold">AI Model</span>
                             <span className="flex-1 h-px bg-white/[0.06]" />
@@ -1243,11 +1244,11 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                                                 <span className={`material - symbols - outlined text - base ${modelOverride === p.id ? 'text-primary' : 'text-slate-500'} `}>{p.icon}</span>
                                                 <span className={`text - xs font - bold ${modelOverride === p.id ? 'text-white' : 'text-slate-400'} `}>{p.label}</span>
                                             </div>
-                                            <p className="text-[9px] text-slate-600">{p.desc}</p>
+                                            <p className="text-xs text-slate-600">{p.desc}</p>
                                         </button>
                                     ))}
                                 </div>
-                                <p className="text-[9px] text-slate-600 mt-2 text-center">Auto mode picks the best model based on your language and content type</p>
+                                <p className="text-xs text-slate-600 mt-2 text-center">Auto mode picks the best model based on your language and content type</p>
                             </div>
                         )}
                     </div>
@@ -1280,7 +1281,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
     useEffect(() => { setEditContent(result?.content || '') }, [result?.content])
 
     const handleCopy = () => {
-        navigator.clipboard.writeText(editing ? editContent : result.content)
+        navigator.clipboard.writeText(stripMarkdown(editing ? editContent : result.content))
         setCopied(true)
         setTimeout(() => setCopied(false), 2000)
     }
@@ -1331,9 +1332,9 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
 
                 <div className="glass-panel rounded-2xl p-6 mb-6">
                     <div className="flex items-center gap-2 mb-3">
-                        <span className="text-xs text-emerald-400 font-bold bg-emerald-400/10 px-2.5 py-1 rounded-lg">✓ Approved</span>
-                        <span className="text-xs text-primary font-bold bg-primary/10 px-2.5 py-1 rounded-lg">{result.type}</span>
-                        <span className="text-[10px] text-slate-500">{result.content?.split(/\s+/).length} words</span>
+                        <span className="text-sm text-emerald-400 font-bold bg-emerald-400/10 px-2.5 py-1 rounded-lg">✓ Approved</span>
+                        <span className="text-sm text-primary font-bold bg-primary/10 px-2.5 py-1 rounded-lg">{result.type}</span>
+                        <span className="text-sm text-slate-500">{result.content?.split(/\s+/).length} words</span>
                     </div>
                     <p className="text-sm text-slate-300 leading-relaxed line-clamp-3">{result.content}</p>
                 </div>
@@ -1344,15 +1345,15 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                         <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-3 group-hover:scale-110 transition-transform">
                             <span className="material-symbols-outlined text-2xl">image</span>
                         </div>
-                        <h4 className="text-sm font-bold text-white mb-1">Create Matching Visual</h4>
+                        <h4 className="text-base font-bold text-white mb-1">Create Matching Visual</h4>
                         <p className="text-[11px] text-slate-500">Generate an image that matches this content in Creative Studio</p>
                     </button>
-                    <button onClick={() => { navigator.clipboard.writeText(result.content); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+                    <button onClick={() => { navigator.clipboard.writeText(stripMarkdown(result.content)); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
                         className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-emerald-500/30 transition-all cursor-pointer text-left group border border-white/[0.06]">
                         <div className="size-12 rounded-xl bg-emerald-400/10 flex items-center justify-center text-emerald-400 mb-3 group-hover:scale-110 transition-transform">
                             <span className="material-symbols-outlined text-2xl">{copied ? 'check' : 'content_copy'}</span>
                         </div>
-                        <h4 className="text-sm font-bold text-white mb-1">{copied ? 'Copied!' : 'Copy to Clipboard'}</h4>
+                        <h4 className="text-base font-bold text-white mb-1">{copied ? 'Copied!' : 'Copy to Clipboard'}</h4>
                         <p className="text-[11px] text-slate-500">Copy the content to paste on your platform</p>
                     </button>
                     <button onClick={onNewContent}
@@ -1360,13 +1361,13 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                         <div className="size-12 rounded-xl bg-violet-400/10 flex items-center justify-center text-violet-400 mb-3 group-hover:scale-110 transition-transform">
                             <span className="material-symbols-outlined text-2xl">add_circle</span>
                         </div>
-                        <h4 className="text-sm font-bold text-white mb-1">Create New Content</h4>
+                        <h4 className="text-base font-bold text-white mb-1">Create New Content</h4>
                         <p className="text-[11px] text-slate-500">Start a new content generation from scratch</p>
                     </button>
                 </div>
                 <div className="p-3 rounded-xl bg-primary/5 border border-primary/10 text-center">
-                    <p className="text-[10px] text-primary font-bold">🧠 AI is learning from your acceptance</p>
-                    <p className="text-[10px] text-slate-500">Future content will align closer to this style and tone</p>
+                    <p className="text-sm text-primary font-bold">🧠 AI is learning from your acceptance</p>
+                    <p className="text-sm text-slate-500">Future content will align closer to this style and tone</p>
                 </div>
             </div>
         )
@@ -1378,7 +1379,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h3 className="text-xl font-extrabold text-white">Your Content is <span className="text-primary">Ready</span></h3>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-sm text-slate-400 mt-1">
                         Generated for {activeBrand?.name} • Brand voice: {activeBrand?.dna?.voice?.personality || 'Active'}
                     </p>
                 </div>
@@ -1388,7 +1389,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                         <span className="material-symbols-outlined text-sm">{editing ? 'edit_off' : 'edit'}</span>
                         {editing ? 'Done Editing' : 'Edit & Refine'}
                     </button>
-                    <button onClick={onNewContent} className="btn-glass px-4 py-2 rounded-xl text-xs text-slate-400 hover:text-white border border-white/[0.1] cursor-pointer">
+                    <button onClick={onNewContent} className="btn-glass px-4 py-2 rounded-xl text-sm text-slate-400 hover:text-white border border-white/[0.1] cursor-pointer">
                         <span className="material-symbols-outlined text-sm">add</span> New
                     </button>
                 </div>
@@ -1398,10 +1399,10 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
             <div className="glass-panel rounded-2xl p-8 mb-4">
                 {/* Meta */}
                 <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/[0.06]">
-                    <span className="text-xs text-primary font-bold bg-primary/10 px-2.5 py-1 rounded-lg">{result.type}</span>
-                    <span className="text-[10px] text-slate-500">{(editing ? editContent : result.content)?.split(/\s+/).length} words</span>
+                    <span className="text-sm text-primary font-bold bg-primary/10 px-2.5 py-1 rounded-lg">{result.type}</span>
+                    <span className="text-sm text-slate-500">{(editing ? editContent : result.content)?.split(/\s+/).length} words</span>
                     {result.aiMeta?.provider && (
-                        <span className="text-[10px] text-slate-500 bg-white/[0.04] px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="text-sm text-slate-500 bg-white/[0.04] px-2 py-0.5 rounded-full flex items-center gap-1">
                             {result.aiMeta.routingIcon || '🤖'} {result.aiMeta.provider}
                             {result.aiMeta.routingReason && <span className="text-slate-600">— {result.aiMeta.routingReason}</span>}
                         </span>
@@ -1420,7 +1421,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                         rows={Math.max(6, editContent.split('\n').length + 2)} />
                 ) : (
                     <div className="text-white text-base leading-relaxed whitespace-pre-wrap">
-                        {result.content}
+                        {stripMarkdown(result.content)}
                     </div>
                 )}
             </div>
@@ -1428,14 +1429,14 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
             {/* AI Refine Bar — always visible when editing */}
             {editing && (
                 <div className="glass-panel rounded-2xl p-4 mb-4 animate-fade-in">
-                    <p className="text-xs text-amber-400 font-bold mb-3 flex items-center gap-1">
+                    <p className="text-sm text-amber-400 font-bold mb-3 flex items-center gap-1">
                         <span className="material-symbols-outlined text-sm">auto_fix_high</span> AI Refine
                     </p>
                     {/* Quick suggestions */}
                     <div className="flex flex-wrap gap-1.5 mb-3">
                         {REFINE_SUGGESTIONS.map(s => (
                             <button key={s} onClick={() => { setRefineInput(s); }}
-                                className="text-[10px] px-2.5 py-1 rounded-full bg-white/[0.04] text-slate-400 hover:bg-amber-400/10 hover:text-amber-400 transition-all cursor-pointer border border-white/[0.06] font-medium">
+                                className="text-xs px-2.5 py-1 rounded-full bg-white/[0.04] text-slate-400 hover:bg-amber-400/10 hover:text-amber-400 transition-all cursor-pointer border border-white/[0.06] font-medium">
                                 {s}
                             </button>
                         ))}
@@ -1500,7 +1501,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                 </button>
                 <CreditTooltipWrapper action="contentRefine">
                     <button onClick={onRegenerate} disabled={generating}
-                        className="flex-1 glass-panel py-2.5 rounded-xl text-xs text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer font-bold disabled:opacity-30">
+                        className="flex-1 glass-panel py-2.5 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer font-bold disabled:opacity-30">
                         <span className={`material-symbols-outlined text-sm ${generating ? 'animate-spin' : ''}`}>{generating ? 'progress_activity' : 'refresh'}</span>
                         {generating ? 'Regenerating...' : 'Regenerate'} {!generating && <CreditBadge action="contentRefine" />}
                     </button>
@@ -1509,8 +1510,8 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
 
             {/* Learning note */}
             <div className="mt-6 p-3 rounded-xl bg-primary/5 border border-primary/10 text-center">
-                <p className="text-[10px] text-primary font-bold">🧠 Every action teaches the AI your preferences</p>
-                <p className="text-[10px] text-slate-500">Accept → AI replicates style • Edit → AI learns your preferences • Refine → AI adapts to your feedback</p>
+                <p className="text-sm text-primary font-bold">🧠 Every action teaches the AI your preferences</p>
+                <p className="text-sm text-slate-500">Accept → AI replicates style • Edit → AI learns your preferences • Refine → AI adapts to your feedback</p>
             </div>
         </div>
     )
@@ -1540,7 +1541,7 @@ function ContentHistory({ brandId, onSelect, visible, onToggle }) {
             <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
                 <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-primary">history</span>
-                    <h3 className="text-sm font-bold text-white">Content History</h3>
+                    <h3 className="text-base font-bold text-white">Content History</h3>
                 </div>
                 <button onClick={onToggle} className="text-slate-500 hover:text-white transition-colors cursor-pointer">
                     <span className="material-symbols-outlined text-sm">close</span>
@@ -1552,7 +1553,7 @@ function ContentHistory({ brandId, onSelect, visible, onToggle }) {
                 {loading ? (
                     <div className="text-center py-12">
                         <span className="material-symbols-outlined text-2xl text-primary animate-spin">progress_activity</span>
-                        <p className="text-xs text-slate-500 mt-2">Loading history...</p>
+                        <p className="text-sm text-slate-500 mt-2">Loading history...</p>
                     </div>
                 ) : items.length === 0 ? (
                     <div className="text-center py-12">
@@ -1567,10 +1568,10 @@ function ContentHistory({ brandId, onSelect, visible, onToggle }) {
                             <span className={`text - [10px] font - bold px - 2 py - 0.5 rounded ${item.status === 'approved' ? 'bg-emerald-400/10 text-emerald-400' : 'bg-primary/10 text-primary'} `}>
                                 {item.status === 'approved' ? '✓ Approved' : item.type}
                             </span>
-                            {item.platform && <span className="text-[10px] text-slate-500">{item.platform}</span>}
+                            {item.platform && <span className="text-sm text-slate-500">{item.platform}</span>}
                         </div>
-                        <p className="text-xs text-white line-clamp-2 mb-1">{item.content}</p>
-                        <p className="text-[10px] text-slate-600">
+                        <p className="text-sm text-white line-clamp-2 mb-1">{item.content}</p>
+                        <p className="text-xs text-slate-600">
                             {new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </p>
                     </button>
@@ -1661,8 +1662,8 @@ function StepProductPicker({ brandId, selectedProduct, onSelect, onBack }) {
                                         )}
                                     </div>
                                     <div className="p-3">
-                                        <p className="text-xs font-bold text-white truncate">{p.title}</p>
-                                        {p.category && <p className="text-[10px] text-slate-500 mt-0.5">{p.category}</p>}
+                                        <p className="text-sm font-bold text-white truncate">{p.title}</p>
+                                        {p.category && <p className="text-sm text-slate-500 mt-0.5">{p.category}</p>}
                                         {p.price?.amount > 0 && (
                                             <p className="text-xs font-bold text-primary mt-1">₹{p.price.amount.toLocaleString()}</p>
                                         )}
@@ -1675,7 +1676,7 @@ function StepProductPicker({ brandId, selectedProduct, onSelect, onBack }) {
                     {/* Skip option */}
                     <div className="text-center mt-5">
                         <button onClick={() => onSelect(null)}
-                            className="text-xs text-slate-500 hover:text-white transition-colors cursor-pointer underline underline-offset-4">
+                            className="text-sm text-slate-500 hover:text-white transition-colors cursor-pointer underline underline-offset-4">
                             or write product content without selecting a specific product
                         </button>
                     </div>
@@ -2085,11 +2086,11 @@ SPOKESPERSON QUOTES:`
                     {activeBrand && (
                         <div className="flex items-center gap-2 glass-panel px-3 py-1.5 rounded-xl">
                             <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                            <span className="text-[10px] text-slate-400">{activeBrand.name}</span>
+                            <span className="text-sm text-slate-400">{activeBrand.name}</span>
                         </div>
                     )}
                     <select value={activeBrand?._id || ''} onChange={e => { const b = brands.find(b => b._id === e.target.value); if (b) selectBrand(b) }}
-                        className="input-glass py-1.5 px-2.5 rounded-xl text-[10px] bg-white/[0.04] cursor-pointer">
+                        className="input-glass py-1.5 px-2.5 rounded-xl text-xs bg-white/[0.04] cursor-pointer">
                         {brands.length === 0 && <option value="">No brands</option>}
                         {brands.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
                     </select>
@@ -2122,11 +2123,11 @@ SPOKESPERSON QUOTES:`
                     <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/10 border border-primary/20">
                         <span className="text-2xl">{prefilledOccasion.emoji || '🎯'}</span>
                         <div className="flex-1">
-                            <p className="text-sm font-bold text-white">Creating content for <span className="text-primary">{prefilledOccasion.name}</span></p>
-                            <p className="text-xs text-slate-400 mt-0.5">Suggested tone: {prefilledOccasion.tone || 'festive'} • Select your channel below</p>
+                            <p className="text-base font-bold text-white">Creating content for <span className="text-primary">{prefilledOccasion.name}</span></p>
+                            <p className="text-sm text-slate-400 mt-0.5">Suggested tone: {prefilledOccasion.tone || 'festive'} • Select your channel below</p>
                         </div>
                         <button onClick={() => { setPrefilledOccasion(null); setStep(0); setGoal(null); setContext(null) }}
-                            className="text-xs text-slate-500 hover:text-white transition-colors cursor-pointer">
+                            className="text-sm text-slate-500 hover:text-white transition-colors cursor-pointer">
                             <span className="material-symbols-outlined text-sm">close</span>
                         </button>
                     </div>
@@ -2163,11 +2164,11 @@ SPOKESPERSON QUOTES:`
                         <div className="max-w-2xl mx-auto mt-6 glass-panel rounded-2xl p-6 text-center animate-fade-in">
                             <span className="material-symbols-outlined text-3xl text-primary animate-spin block mb-3">progress_activity</span>
                             <p className="text-white font-bold">Generating with brand intelligence...</p>
-                            <p className="text-xs text-slate-400 mt-1">
+                            <p className="text-sm text-slate-400 mt-1">
                                 Using {activeBrand?.name}'s voice DNA + RLHF learnings for human-authentic output
                             </p>
                             <div className="flex items-center justify-center gap-2 mt-3">
-                                <span className="text-[10px] text-primary/70 bg-primary/10 px-2.5 py-0.5 rounded-full font-medium">
+                                <span className="text-sm text-primary/70 bg-primary/10 px-2.5 py-0.5 rounded-full font-medium">
                                     🤖 {modelOverride === 'auto'
                                         ? `Smart routing: ${toneSettings?.language !== 'english' ? toneSettings?.language?.charAt(0).toUpperCase() + toneSettings?.language?.slice(1) + ' → best model' : 'English → optimal model'}`
                                         : `Using: ${availableProviders.find(p => p.id === modelOverride)?.label || modelOverride}`}
@@ -2198,7 +2199,7 @@ SPOKESPERSON QUOTES:`
                         <div className="max-w-2xl mx-auto mt-6 glass-panel rounded-2xl p-6 text-center animate-fade-in">
                             <span className="material-symbols-outlined text-3xl text-rose-400 animate-spin block mb-3">progress_activity</span>
                             <p className="text-white font-bold">Crafting your press release...</p>
-                            <p className="text-xs text-slate-400 mt-1">Using brand DNA + PR best practices for professional output</p>
+                            <p className="text-sm text-slate-400 mt-1">Using brand DNA + PR best practices for professional output</p>
                         </div>
                     )}
                     {error && (

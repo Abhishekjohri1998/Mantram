@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { credits as creditsAPI } from '../services/api'
 
-export default function Header({ title, subtitle }) {
+export default function Header({ title, subtitle, onMenuToggle }) {
     const { user, logout } = useAuth()
     const navigate = useNavigate()
     const [showMenu, setShowMenu] = useState(false)
@@ -43,29 +43,40 @@ export default function Header({ title, subtitle }) {
     const creditColor = creditPercent > 50 ? 'emerald' : creditPercent > 20 ? 'amber' : 'rose'
 
     return (
-        <header className="sticky top-0 z-10 glass-panel border-b border-white/[0.06] px-8 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <header className="sticky top-0 z-10 glass-panel border-b border-white/[0.06] px-3 sm:px-5 lg:px-8 py-3 lg:py-4 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+                {/* Hamburger — visible on mobile/tablet */}
+                <button
+                    onClick={onMenuToggle}
+                    className="lg:hidden p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer flex-shrink-0"
+                >
+                    <span className="material-symbols-outlined text-xl">menu</span>
+                </button>
+
                 {title && (
-                    <div>
-                        <h2 className="text-xl font-bold text-white">{title}</h2>
-                        {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
+                    <div className="min-w-0">
+                        <h2 className="text-base sm:text-lg lg:text-xl font-bold text-white truncate">{title}</h2>
+                        {subtitle && <p className="text-xs sm:text-sm text-slate-500 truncate">{subtitle}</p>}
                     </div>
                 )}
-                <div className="relative ml-4">
+
+                {/* Search — hidden on mobile, shown on md+ */}
+                <div className="relative ml-2 sm:ml-4 hidden md:block">
                     <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-lg">search</span>
                     <input
                         type="text"
                         placeholder="Search anything..."
-                        className="bg-white/[0.04] border border-white/[0.08] rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/40 focus:border-primary/40 outline-none w-64 transition-all"
+                        className="bg-white/[0.04] border border-white/[0.08] rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/40 focus:border-primary/40 outline-none w-48 lg:w-64 transition-all"
                     />
                 </div>
             </div>
-            <div className="flex items-center gap-3">
-                {/* Credit Balance Badge */}
+
+            <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
+                {/* Credit Balance Badge — compact on mobile */}
                 {creditBalance && !creditBalance.unlimited && (
                     <button
                         onClick={() => { navigate('/credits'); setShowMenu(false) }}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] transition-all cursor-pointer group"
+                        className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] transition-all cursor-pointer group"
                         title="Credit Balance — Click to view details"
                     >
                         <div className="relative">
@@ -78,9 +89,9 @@ export default function Header({ title, subtitle }) {
                             <span className={`text-sm font-bold text-${creditColor}-400`}>
                                 {creditBalance.remaining}
                             </span>
-                            <span className="text-[10px] text-slate-600 font-medium">/ {creditBalance.total}</span>
+                            <span className="text-xs text-slate-600 font-medium hidden lg:inline">/ {creditBalance.total}</span>
                         </div>
-                        <div className="w-12 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                        <div className="w-12 h-1.5 rounded-full bg-white/[0.06] overflow-hidden hidden lg:block">
                             <div
                                 className={`h-full rounded-full transition-all bg-${creditColor}-500`}
                                 style={{ width: `${creditPercent}%` }}
@@ -89,51 +100,55 @@ export default function Header({ title, subtitle }) {
                     </button>
                 )}
                 {creditBalance?.unlimited && (
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/5 border border-amber-500/10">
+                    <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/5 border border-amber-500/10">
                         <span className="material-symbols-outlined text-lg text-amber-400">all_inclusive</span>
-                        <span className="text-xs font-bold text-amber-400">Unlimited</span>
+                        <span className="text-xs font-bold text-amber-400 hidden md:inline">Unlimited</span>
                     </div>
                 )}
 
+                {/* Notifications */}
                 <button className="p-2 text-slate-400 hover:text-white transition-colors relative rounded-xl hover:bg-white/[0.04]">
-                    <span className="material-symbols-outlined">notifications</span>
+                    <span className="material-symbols-outlined text-xl">notifications</span>
                     <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border-2 border-[#080a14]"></span>
                 </button>
-                <button className="p-2 text-slate-400 hover:text-white transition-colors rounded-xl hover:bg-white/[0.04]">
-                    <span className="material-symbols-outlined">help</span>
+
+                {/* Help — hidden on small mobile */}
+                <button className="hidden sm:block p-2 text-slate-400 hover:text-white transition-colors rounded-xl hover:bg-white/[0.04]">
+                    <span className="material-symbols-outlined text-xl">help</span>
                 </button>
 
                 {/* User Profile Menu */}
                 <div className="relative" ref={menuRef}>
                     <button
                         onClick={() => setShowMenu(!showMenu)}
-                        className="flex items-center gap-3 pl-4 border-l border-white/[0.08] cursor-pointer hover:bg-white/[0.03] rounded-xl pr-2 py-1 transition-all"
+                        className="flex items-center gap-2 sm:gap-3 sm:pl-3 sm:border-l border-white/[0.08] cursor-pointer hover:bg-white/[0.03] rounded-xl pr-1 sm:pr-2 py-1 transition-all"
                     >
-                        <div className="text-right">
-                            <p className="text-sm font-semibold text-white">{user?.name || 'User'}</p>
-                            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">
+                        {/* User name — hidden on mobile */}
+                        <div className="text-right hidden md:block">
+                            <p className="text-base font-semibold text-white">{user?.name || 'User'}</p>
+                            <p className="text-sm text-slate-500 uppercase tracking-wider font-medium">
                                 {user?.role === 'admin' ? 'Admin' : user?.plan || 'Starter'}
                             </p>
                         </div>
-                        <div className="size-10 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white font-bold text-sm border-2 border-primary/30">
+                        <div className="size-9 sm:size-10 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white font-bold text-sm border-2 border-primary/30 flex-shrink-0">
                             {initials}
                         </div>
-                        <span className="material-symbols-outlined text-slate-500 text-sm">expand_more</span>
+                        <span className="material-symbols-outlined text-slate-500 text-sm hidden sm:block">expand_more</span>
                     </button>
 
                     {/* Dropdown Menu */}
                     {showMenu && (
-                        <div className="absolute right-0 top-full mt-2 w-64 glass-panel rounded-xl border border-white/[0.1] shadow-2xl shadow-black/50 overflow-hidden animate-fade-in z-50">
+                        <div className="absolute right-0 top-full mt-2 w-56 sm:w-64 glass-panel rounded-xl border border-white/[0.1] shadow-2xl shadow-black/50 overflow-hidden animate-fade-in z-50">
                             <div className="p-3 border-b border-white/[0.06]">
-                                <p className="text-sm font-bold text-white">{user?.name}</p>
-                                <p className="text-[10px] text-slate-500">{user?.email}</p>
+                                <p className="text-base font-bold text-white">{user?.name}</p>
+                                <p className="text-sm text-slate-500 truncate">{user?.email}</p>
                             </div>
 
-                            {/* Credit balance in dropdown */}
+                            {/* Credit balance in dropdown (always visible — especially useful on mobile) */}
                             {creditBalance && !creditBalance.unlimited && (
                                 <div className="px-3 py-2 border-b border-white/[0.06]">
                                     <div className="flex items-center justify-between mb-1">
-                                        <span className="text-[10px] text-slate-500 font-bold uppercase">Credits</span>
+                                        <span className="text-sm text-slate-500 font-bold uppercase">Credits</span>
                                         <span className={`text-xs font-bold text-${creditColor}-400`}>
                                             {creditBalance.remaining} / {creditBalance.total}
                                         </span>

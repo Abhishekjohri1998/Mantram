@@ -69,7 +69,7 @@ export default function AdminDashboard() {
                     <div key={i} className="glass-panel rounded-2xl p-5 animate-fade-in" style={{ animationDelay: `${i * 80}ms` }}>
                         <span className={`material-symbols-outlined text-xl ${s.color} mb-2 block`}>{s.icon}</span>
                         <p className="text-2xl font-extrabold text-white">{s.value}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
+                        <p className="text-sm text-slate-500 mt-0.5">{s.label}</p>
                     </div>
                 ))}
             </div>
@@ -88,7 +88,7 @@ export default function AdminDashboard() {
                             <p className="text-slate-500 text-sm text-center py-8">No users found.</p>
                         ) : (
                             <div className="space-y-2">
-                                <div className="grid grid-cols-12 text-[10px] text-slate-500 uppercase tracking-widest font-bold px-4 py-2">
+                                <div className="grid grid-cols-12 text-sm text-slate-500 uppercase tracking-widest font-bold px-4 py-2">
                                     <div className="col-span-4">User</div>
                                     <div className="col-span-2">Role</div>
                                     <div className="col-span-2">Plan</div>
@@ -104,28 +104,28 @@ export default function AdminDashboard() {
                                             </div>
                                             <div>
                                                 <p className="text-sm text-white font-medium">{u.name}</p>
-                                                <p className="text-[10px] text-slate-500">{u.email}</p>
+                                                <p className="text-sm text-slate-500">{u.email}</p>
                                             </div>
                                         </div>
                                         <div className="col-span-2">
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${u.role === 'admin' ? 'bg-amber-400/10 text-amber-400' :
+                                            <span className={`text-xs font-bold px-2 py-0.5 rounded ${u.role === 'admin' ? 'bg-amber-400/10 text-amber-400' :
                                                     u.role === 'team-member' ? 'bg-primary/10 text-primary' :
                                                         'bg-white/[0.06] text-slate-400'
                                                 }`}>{u.role}</span>
                                         </div>
                                         <div className="col-span-2">
-                                            <span className="text-xs text-white capitalize">{u.plan}</span>
+                                            <span className="text-sm text-white capitalize">{u.plan}</span>
                                         </div>
                                         <div className="col-span-2">
-                                            <span className="text-xs text-slate-400">{u.usage?.contentGenerated || 0}</span>
+                                            <span className="text-sm text-slate-400">{u.usage?.contentGenerated || 0}</span>
                                         </div>
                                         <div className="col-span-2">
-                                            <span className="text-[10px] text-slate-500">{new Date(u.createdAt).toLocaleDateString()}</span>
+                                            <span className="text-sm text-slate-500">{new Date(u.createdAt).toLocaleDateString()}</span>
                                         </div>
                                     </div>
                                 ))}
                                 {users.length < totalUsers && (
-                                    <button onClick={loadMore} className="w-full text-center py-3 text-xs text-primary hover:text-primary-light cursor-pointer font-bold">
+                                    <button onClick={loadMore} className="w-full text-center py-3 text-sm text-primary hover:text-primary-light cursor-pointer font-bold">
                                         Load More Users
                                     </button>
                                 )}
@@ -149,17 +149,17 @@ export default function AdminDashboard() {
                                             <span className={`w-2.5 h-2.5 rounded-full ${p.status === 'healthy' ? 'bg-emerald-400' : p.status === 'degraded' ? 'bg-amber-400' : 'bg-rose-400'}`} />
                                             <span className="text-sm text-white capitalize font-medium">{p.name}</span>
                                         </div>
-                                        <span className="text-[10px] text-slate-400 capitalize">{p.status || (p.available ? 'healthy' : 'unavailable')}</span>
+                                        <span className="text-sm text-slate-400 capitalize">{p.status || (p.available ? 'healthy' : 'unavailable')}</span>
                                     </div>
                                 ))}
                             </div>
                         ) : (
-                            <p className="text-xs text-slate-500">AI health data unavailable.</p>
+                            <p className="text-sm text-slate-500">AI health data unavailable.</p>
                         )}
 
                         {aiHealth?.usage && (
                             <div className="mt-4 p-3 rounded-xl bg-white/[0.03]">
-                                <p className="text-xs text-slate-500">Total API Calls</p>
+                                <p className="text-sm text-slate-500">Total API Calls</p>
                                 <p className="text-lg font-extrabold text-white">{aiHealth.usage.total || 0}</p>
                             </div>
                         )}
@@ -194,11 +194,11 @@ export default function AdminDashboard() {
                         </h3>
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                                <span className="text-xs text-slate-400">Total Feedback</span>
+                                <span className="text-sm text-slate-400">Total Feedback</span>
                                 <span className="text-sm text-white font-bold">{stats?.totalFeedback || 0}</span>
                             </div>
                             <div className="flex items-center justify-between">
-                                <span className="text-xs text-slate-400">Avg Sentiment</span>
+                                <span className="text-sm text-slate-400">Avg Sentiment</span>
                                 <span className={`text-sm font-bold ${(stats?.avgSentiment || 0) > 0.3 ? 'text-emerald-400' :
                                         (stats?.avgSentiment || 0) > 0 ? 'text-amber-400' : 'text-slate-400'
                                     }`}>{stats?.avgSentiment ? `${(stats.avgSentiment * 100).toFixed(0)}%` : '—'}</span>
