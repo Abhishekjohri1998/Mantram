@@ -69,7 +69,10 @@ export const brands = {
     create: (data) => apiFetch('/brands', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => apiFetch(`/brands/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     updateDNA: (id, dnaUpdates) => apiFetch(`/brands/${id}/dna`, { method: 'PUT', body: JSON.stringify(dnaUpdates) }),
+    updateKnowledge: (id, section, data) => apiFetch(`/brands/${id}/knowledge`, { method: 'PUT', body: JSON.stringify({ section, data }) }),
+    updateStatus: (id, status) => apiFetch(`/brands/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
     updateAutonomy: (id, settings) => apiFetch(`/brands/${id}/autonomy`, { method: 'PUT', body: JSON.stringify(settings) }),
+    getAuditLog: (id, page = 1) => apiFetch(`/brands/${id}/audit-log?page=${page}`),
     delete: (id) => apiFetch(`/brands/${id}`, { method: 'DELETE' }),
     // Custom Templates
     getTemplates: (id) => apiFetch(`/brands/${id}/templates`),
@@ -79,6 +82,18 @@ export const brands = {
     getCategories: (id) => apiFetch(`/brands/${id}/categories`),
     saveCategory: (id, data) => apiFetch(`/brands/${id}/categories`, { method: 'POST', body: JSON.stringify(data) }),
     deleteCategory: (id, categoryId) => apiFetch(`/brands/${id}/categories/${categoryId}`, { method: 'DELETE' }),
+    // Knowledge Bank
+    getKnowledgeEntries: (id) => apiFetch(`/brands/${id}/knowledge/entries`),
+    ingestKnowledge: (id, formData) => {
+        // Use raw fetch for FormData (file uploads)
+        const token = localStorage.getItem('mantram_token') || '';
+        return fetch(`${API_BASE}/brands/${id}/knowledge/ingest`, {
+            method: 'POST',
+            headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: formData,
+        }).then(r => r.json());
+    },
+    deleteKnowledgeEntry: (id, entryId) => apiFetch(`/brands/${id}/knowledge/entries/${entryId}`, { method: 'DELETE' }),
 };
 
 // ============ Content API ============
@@ -130,6 +145,7 @@ export const agents = {
 // ============ Shopify API ============
 export const shopify = {
     connect: (shopDomain) => apiFetch('/shopify/connect', { method: 'POST', body: JSON.stringify({ shopDomain }) }),
+    connectToken: (shopDomain, accessToken) => apiFetch('/shopify/connect-token', { method: 'POST', body: JSON.stringify({ shopDomain, accessToken }) }),
     sync: (brandId) => apiFetch('/shopify/sync', { method: 'POST', body: JSON.stringify({ brandId }) }),
     products: (params = {}) => {
         const query = new URLSearchParams(params).toString();
@@ -171,6 +187,63 @@ export const trends = {
 // ============ Dashboard Summary API ============
 export const dashboardSummary = {
     get: (brandId) => apiFetch(`/dashboard-summary${brandId ? `?brandId=${brandId}` : ''}`),
+};
+
+// ============ D2C Shopify Analytics API ============
+export const shopifyAnalytics = {
+    overview: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/shopify-analytics/overview?${query}`);
+    },
+    aiInsights: (data) => apiFetch('/shopify-analytics/ai-insights', { method: 'POST', body: JSON.stringify(data) }),
+    boostPlan: (data) => apiFetch('/shopify-analytics/boost-plan', { method: 'POST', body: JSON.stringify(data) }),
+    sync: () => apiFetch('/shopify-analytics/sync', { method: 'POST' }),
+    creativeCockpit: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/shopify-analytics/creative-cockpit?${query}`);
+    },
+    cohortLtv: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/shopify-analytics/cohort-ltv?${query}`);
+    },
+    profitability: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/shopify-analytics/profitability?${query}`);
+    },
+    aiCopilot: (data) => apiFetch('/shopify-analytics/ai-copilot', { method: 'POST', body: JSON.stringify(data) }),
+    snapshot: () => apiFetch('/shopify-analytics/snapshot'),
+};
+
+// ============ Team Management API ============
+export const team = {
+    // Members
+    getMembers: () => apiFetch('/team/members'),
+    getPlanLimits: () => apiFetch('/team/plan-limits'),
+    invite: (data) => apiFetch('/team/invite', { method: 'POST', body: JSON.stringify(data) }),
+    updateAccess: (memberId, data) => apiFetch(`/team/members/${memberId}/access`, { method: 'PUT', body: JSON.stringify(data) }),
+    updateMemberBrands: (memberId, brandIds) => apiFetch(`/team/members/${memberId}/brands`, { method: 'PUT', body: JSON.stringify({ brandIds }) }),
+    removeMember: (memberId) => apiFetch(`/team/members/${memberId}`, { method: 'DELETE' }),
+    revokeInvite: (inviteId) => apiFetch(`/team/invites/${inviteId}`, { method: 'DELETE' }),
+    // Chat
+    getChannels: () => apiFetch('/team/chat/channels'),
+    getMessages: (channelId, page = 1) => apiFetch(`/team/chat/${channelId}/messages?page=${page}`),
+    sendMessage: (channelId, data) => apiFetch(`/team/chat/${channelId}/send`, { method: 'POST', body: JSON.stringify(data) }),
+    react: (channelId, data) => apiFetch(`/team/chat/${channelId}/react`, { method: 'POST', body: JSON.stringify(data) }),
+    // Approvals
+    getApprovals: (params = '') => apiFetch(`/team/approvals?${params}`),
+    createApproval: (data) => apiFetch('/team/approvals', { method: 'POST', body: JSON.stringify(data) }),
+    updateApproval: (id, data) => apiFetch(`/team/approvals/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    // AI
+    teamHealth: () => apiFetch('/team/ai/team-health', { method: 'POST' }),
+};
+
+// ============ Fidato AI Assistant ============
+export const fidato = {
+    chat: (message, brandId) => apiFetch('/fidato/chat', { method: 'POST', body: JSON.stringify({ message, brandId }) }),
+    briefing: (brandId) => apiFetch('/fidato/briefing', { method: 'POST', body: JSON.stringify({ brandId }) }),
+    notifications: (brandId) => apiFetch(`/fidato/notifications${brandId ? `?brandId=${brandId}` : ''}`),
+    updatePreferences: (prefs) => apiFetch('/fidato/preferences', { method: 'POST', body: JSON.stringify(prefs) }),
+    clear: () => apiFetch('/fidato/clear', { method: 'POST' }),
 };
 
 // ============ Social Media API ============

@@ -355,14 +355,34 @@ router.post('/ai-photoshoot', optionalAuth, async (req, res) => {
             return res.status(500).json({ success: false, error: 'Gemini API key not configured' });
         }
 
-        // Extract base64 from data URL using string ops (regex fails on large strings)
-        const commaIdx = image.indexOf(',');
-        if (commaIdx === -1 || !image.startsWith('data:image/')) {
-            return res.status(400).json({ success: false, error: 'Invalid image format' });
+        // Support both base64 data URLs and regular image URLs
+        let mimeType, base64Data;
+
+        if (image.startsWith('data:image/')) {
+            // Already base64 data URL
+            const commaIdx = image.indexOf(',');
+            if (commaIdx === -1) {
+                return res.status(400).json({ success: false, error: 'Invalid image format' });
+            }
+            const header = image.substring(0, commaIdx);
+            mimeType = header.split(':')[1].split(';')[0];
+            base64Data = image.substring(commaIdx + 1);
+        } else if (image.startsWith('http://') || image.startsWith('https://')) {
+            // URL — fetch and convert to base64 server-side
+            try {
+                const imgResp = await fetch(image);
+                if (!imgResp.ok) throw new Error(`Failed to fetch image: ${imgResp.status}`);
+                const arrayBuffer = await imgResp.arrayBuffer();
+                const buffer = Buffer.from(arrayBuffer);
+                mimeType = imgResp.headers.get('content-type') || 'image/jpeg';
+                base64Data = buffer.toString('base64');
+            } catch (fetchErr) {
+                console.error('Failed to fetch image URL:', fetchErr.message);
+                return res.status(400).json({ success: false, error: 'Could not download image from URL. Try uploading directly.' });
+            }
+        } else {
+            return res.status(400).json({ success: false, error: 'Invalid image format. Send base64 data URL or image URL.' });
         }
-        const header = image.substring(0, commaIdx);
-        const mimeType = header.split(':')[1].split(';')[0];
-        const base64Data = image.substring(commaIdx + 1);
 
         // Build prompt based on fidelity level
         const sceneDesc = scene || 'professional studio';

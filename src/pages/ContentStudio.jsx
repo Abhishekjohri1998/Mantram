@@ -1691,7 +1691,7 @@ function StepProductPicker({ brandId, selectedProduct, onSelect, onBack }) {
 // ============================================================================
 
 export default function ContentStudio() {
-    const { brands, activeBrand, selectBrand } = useBrand()
+    const { activeBrand } = useBrand()
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const [step, setStep] = useState(0)   // 0=goal, 1=subtype, 2=channel, 3=context, 4=tone, 5=result
@@ -2083,17 +2083,6 @@ SPOKESPERSON QUOTES:`
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    {activeBrand && (
-                        <div className="flex items-center gap-2 glass-panel px-3 py-1.5 rounded-xl">
-                            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                            <span className="text-sm text-slate-400">{activeBrand.name}</span>
-                        </div>
-                    )}
-                    <select value={activeBrand?._id || ''} onChange={e => { const b = brands.find(b => b._id === e.target.value); if (b) selectBrand(b) }}
-                        className="input-glass py-1.5 px-2.5 rounded-xl text-xs bg-white/[0.04] cursor-pointer">
-                        {brands.length === 0 && <option value="">No brands</option>}
-                        {brands.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
-                    </select>
                     <button onClick={() => setShowHistory(!showHistory)}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${showHistory ? 'bg-primary/20 text-primary' : 'glass-panel text-slate-400 hover:text-white'}`}>
                         <span className="material-symbols-outlined text-sm">history</span>

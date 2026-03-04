@@ -26,6 +26,7 @@
     "lucide-react": "^0.575.0",
     "mongoose": "^9.2.2",
     "multer": "^2.0.2",
+    "pdf-parse": "^2.4.5",
     "puppeteer": "^24.37.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
