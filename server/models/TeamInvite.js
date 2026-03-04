@@ -48,6 +48,6 @@ teamInviteSchema.pre('save', function () {
 
 teamInviteSchema.index({ organization: 1, status: 1 });
 teamInviteSchema.index({ email: 1, status: 1 });
-teamInviteSchema.index({ token: 1 });
+// Redundant token index removed (unique: true already creates it)
 
 export default mongoose.model('TeamInvite', teamInviteSchema);

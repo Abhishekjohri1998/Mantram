@@ -118,6 +118,6 @@ const videoProjectSchema = new mongoose.Schema({
 
 // Indexes
 videoProjectSchema.index({ user: 1, status: 1, createdAt: -1 });
-videoProjectSchema.index({ brand: 1 });
+// Removed redundant brand index here as it's defined inline
 
 export default mongoose.model('VideoProject', videoProjectSchema);
