@@ -125,8 +125,11 @@ jobs:
             done
             
             if [ "$success" = false ]; then
-              echo "❌ Backend health check failed! Showing logs:"
-              pm2 logs mantram-server --lines 50 --no-daemon & sleep 5 && kill $!
+              echo "❌ Backend health check failed! Showing logs from $CURRENT_LINK/backend/logs/:"
+              echo "--- ERROR LOG ---"
+              cat $CURRENT_LINK/backend/logs/error.log || echo "No error log found"
+              echo "--- OUT LOG ---"
+              cat $CURRENT_LINK/backend/logs/out.log || echo "No out log found"
               exit 1
             fi
             
