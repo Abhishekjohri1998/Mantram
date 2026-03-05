@@ -5,8 +5,8 @@
 module.exports = {
     apps: [{
         name: 'mantram-server',
-        script: 'backend/index.js',
-        cwd: '/home/ec2-user/Mantram',
+        script: 'index.js',
+        cwd: '/home/ec2-user/Mantram/backend',
 
         // Cluster mode for zero-downtime reloads
         instances: 2,
@@ -31,8 +31,8 @@ module.exports = {
         wait_ready: false,
 
         // Logging
-        error_file: 'backend/logs/error.log',
-        out_file: 'backend/logs/out.log',
+        error_file: 'logs/error.log',
+        out_file: 'logs/out.log',
         merge_logs: true,
         log_date_format: 'YYYY-MM-DD HH:mm:ss',
     }]
