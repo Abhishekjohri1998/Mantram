@@ -43,7 +43,7 @@ const router = Router();
 // Validate :id parameter — skip non-ObjectId values so named routes like /advanced/generate work
 router.param('id', (req, res, next, id) => {
     if (!mongoose.isValidObjectId(id)) {
-        return res.status(400).json({ success: false, error: `Invalid project ID: ${id}` });
+        return next('route'); // Skip to next matching route instead of erroring
     }
     next();
 });
@@ -619,11 +619,125 @@ router.get('/models/capabilities', protect, (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
+// POST /api/video-studio/upload-image — Upload base64 image → hosted URL
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/upload-image', protect, async (req, res) => {
+    try {
+        const { imageData } = req.body; // base64 data URI
+        if (!imageData) return res.status(400).json({ success: false, error: 'imageData is required' });
+
+        if (!imageData.startsWith('data:')) {
+            // Already a URL
+            return res.json({ success: true, url: imageData });
+        }
+
+        // Extract base64 and mime type
+        const match = imageData.match(/^data:(image\/\w+);base64,(.+)$/);
+        if (!match) return res.status(400).json({ success: false, error: 'Invalid base64 image data' });
+
+        const mimeType = match[1];
+        const base64 = match[2];
+
+        // Upload to fal storage
+        const { default: firstFrameModule } = await import('../agents/videoStudio/firstFrame.js');
+        // Use the uploadToFalStorage function directly
+        const falKey = process.env.FAL_KEY;
+        if (!falKey) return res.status(500).json({ success: false, error: 'FAL_KEY not configured' });
+
+        const buffer = Buffer.from(base64, 'base64');
+        const ext = mimeType.includes('png') ? 'png' : 'jpg';
+        const filename = `ref-image-${Date.now()}.${ext}`;
+
+        // Try fal initiate upload
+        let hostedUrl = null;
+        try {
+            const initResp = await fetch('https://fal.ai/api/storage/upload/initiate', {
+                method: 'POST',
+                headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ file_name: filename, content_type: mimeType }),
+            });
+            if (initResp.ok) {
+                const data = await initResp.json();
+                if (data.upload_url) {
+                    const putResp = await fetch(data.upload_url, {
+                        method: 'PUT', headers: { 'Content-Type': mimeType }, body: buffer,
+                    });
+                    if (putResp.ok && data.file_url) hostedUrl = data.file_url;
+                }
+            }
+        } catch (e) { console.warn('fal upload error:', e.message); }
+
+        // Fallback: base64 upload via REST
+        if (!hostedUrl) {
+            try {
+                const resp = await fetch('https://rest.alpha.fal.ai/storage/upload/base64', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: base64, content_type: mimeType, file_name: filename }),
+                });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    hostedUrl = data.url || data.file_url;
+                }
+            } catch (e) { console.warn('fal base64 upload error:', e.message); }
+        }
+
+        if (hostedUrl) {
+            console.log(`📤 Image uploaded: ${hostedUrl.substring(0, 80)}...`);
+            res.json({ success: true, url: hostedUrl });
+        } else {
+            res.status(500).json({ success: false, error: 'Failed to upload image' });
+        }
+    } catch (err) {
+        console.error('Upload image error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/video-studio/generate-first-frame — AI-generate a first frame image
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/generate-first-frame', protect, async (req, res) => {
+    try {
+        const { prompt, brandId } = req.body;
+        if (!prompt || !prompt.trim()) {
+            return res.status(400).json({ success: false, error: 'Prompt is required' });
+        }
+
+        // Build brand-aware image prompt
+        let imgPrompt = `Create a high-quality, cinematic first frame for an ad film: ${prompt.trim()}. Photorealistic, professional studio quality, suitable as the opening shot of a premium advertisement.`;
+        if (brandId) {
+            try {
+                const brand = await Brand.findById(brandId).lean();
+                if (brand) {
+                    if (brand.dna?.colorPalette?.length) imgPrompt += ` Use brand colors: ${brand.dna.colorPalette.join(', ')}.`;
+                    if (brand.dna?.visualStyle) imgPrompt += ` Visual style: ${brand.dna.visualStyle}.`;
+                }
+            } catch (e) { console.warn('Brand load failed:', e.message); }
+        }
+
+        console.log('🖼️ Generating first frame from prompt:', imgPrompt.substring(0, 100) + '...');
+
+        const { geminiImageGenerate } = await import('../agents/videoStudio/firstFrame.js');
+        const result = await geminiImageGenerate(imgPrompt);
+
+        if (result?.imageUrl) {
+            res.json({ success: true, imageUrl: result.imageUrl });
+        } else {
+            res.status(500).json({ success: false, error: 'Failed to generate first frame image' });
+        }
+    } catch (err) {
+        console.error('Generate first frame error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 // POST /api/video-studio/enhance-prompt — AI-enhance a raw video prompt
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/enhance-prompt', protect, async (req, res) => {
     try {
-        const { prompt, model, duration, aspectRatio, brandId } = req.body;
+        const { prompt, model, duration, aspectRatio, brandId, style } = req.body;
         if (!prompt || !prompt.trim()) {
             return res.status(400).json({ success: false, error: 'Prompt is required' });
         }
@@ -653,10 +767,32 @@ router.post('/enhance-prompt', protect, async (req, res) => {
             }
         }
 
-        // Use Claude with brand context for reliable prompt enhancement
         const aiRouter = getAIRouter();
+        const isAdFilm = style === 'adfilm';
 
-        const systemPrompt = `You are a cinematic AI video prompt enhancer. Take the user's raw prompt and rewrite it into a detailed, production-ready video generation prompt.
+        const systemPrompt = isAdFilm
+            ? `You are an expert AD FILM DIRECTOR and video prompt engineer. Transform the user's raw idea into a cinematic, production-ready video generation prompt structured like a professional ad film.
+
+AD FILM STRUCTURE (adapt timing to ${duration || 6}s total):
+- HOOK (0-${Math.max(1, Math.round((duration || 6) * 0.15))}s): Attention-grabbing opening — extreme close-up, dramatic reveal, or unexpected visual
+- STORY (${Math.max(1, Math.round((duration || 6) * 0.15))}-${Math.round((duration || 6) * 0.7)}s): Build emotional connection — show the problem/desire, then the solution
+- CALL TO ACTION (${Math.round((duration || 6) * 0.7)}-${duration || 6}s): Brand reveal, tagline, product hero shot with confident energy
+
+CINEMATIC RULES:
+- Specify camera movements: dolly in, tracking shot, crane up, rack focus, slow push
+- Lighting direction: golden hour, rim lighting, volumetric haze, studio three-point
+- Color grading: match brand palette if provided, use warm/cool contrast for emotion
+- Vocal/Music direction: describe the voice-over tone (confident, aspirational, intimate), music mood (uplifting strings, electronic pulse, acoustic warmth)
+- Pacing: match cuts to music beats, use slow-motion for hero moments
+- End with brand logo/tagline reveal with premium feel
+
+Duration: ${duration || 6}s | Aspect ratio: ${aspectRatio || '16:9'} | Model: ${model || 'seedance-2.0'}
+${brandContext}
+${brandContext ? '- CRITICAL: Weave the brand name, tagline, colors, and voice into the CTA. The ad must FEEL like this brand.' : ''}
+- If the user mentions @image1, @image2 etc., keep those tags as-is in the prompt
+- Output ONLY valid JSON: {"enhancedPrompt": "...", "changes": ["change1", "change2"]}`
+
+            : `You are a cinematic AI video prompt enhancer. Take the user's raw prompt and rewrite it into a detailed, production-ready video generation prompt.
 
 Rules:
 - Add specific visual details: lighting, camera angle, movement, color palette
@@ -665,6 +801,7 @@ Rules:
 - Duration: ${duration || 5}s, Aspect ratio: ${aspectRatio || '16:9'}, Model: ${model || 'general'}
 ${brandContext}
 ${brandContext ? '- IMPORTANT: Align the visual style, colors, mood, and tone with the brand identity above' : ''}
+- If the user mentions @image1, @image2 etc., keep those tags as-is in the prompt
 - Output ONLY valid JSON: {"enhancedPrompt": "...", "changes": ["change1", "change2"]}`;
 
         const result = await aiRouter.generateText({
@@ -708,7 +845,15 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
             return res.status(400).json({ success: false, error: 'Prompt is required' });
         }
 
+        console.log(`📸 Advanced generate: ${(referenceImages || []).length} ref images, firstImage: ${firstImageUrl ? 'yes' : 'no'}, model: ${model}, quality: ${qualityMode}`);
+
         // Create project in advanced mode
+        // Format referenceImages for schema: [{url, label}]
+        // Skip base64 data URIs for storage (too large for MongoDB) — they're already embedded in the prompt via <img> tags
+        const formattedRefImages = (referenceImages || [])
+            .filter(r => typeof r === 'string' ? !r.startsWith('data:') : !r?.url?.startsWith('data:'))
+            .map((r, i) => typeof r === 'string' ? { url: r, label: `@image${i + 1}` } : r);
+
         const project = await VideoProject.create({
             user: req.user._id,
             brand: brandId || null,
@@ -717,9 +862,9 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
             mode: 'advanced',
             advancedConfig: {
                 prompt: prompt.trim(),
-                firstImageUrl: firstImageUrl || '',
-                lastImageUrl: lastImageUrl || '',
-                referenceImages: referenceImages || [],
+                firstImageUrl: (firstImageUrl && !firstImageUrl.startsWith('data:')) ? firstImageUrl : '',
+                lastImageUrl: (lastImageUrl && !lastImageUrl.startsWith('data:')) ? lastImageUrl : '',
+                referenceImages: formattedRefImages,
                 aspectRatio: aspectRatio || '16:9',
                 duration: duration || 5,
                 generateAudio: generateAudio !== false,
@@ -747,6 +892,7 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
             firstImageUrl: firstImageUrl || '',
             generateAudio: generateAudio !== false,
             aspectRatio: aspectRatio || '16:9',
+            referenceImages: referenceImages || [],
         });
 
         // Update project with generation details

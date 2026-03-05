@@ -11,6 +11,10 @@ const WORKFLOWS = [
     { id: 'traffic', icon: 'trending_up', title: 'Get Me Traffic', subtitle: 'What should I rank for?', desc: 'Keyword clusters, content gaps & topic suggestions', color: 'blue', creditAction: 'seoTraffic' },
     { id: 'competitors', icon: 'swords', title: 'Beat Competitors', subtitle: 'Why are they ahead?', desc: 'Competitor gap analysis & outrank plan', color: 'amber', creditAction: 'seoCompetitors' },
     { id: 'ai-visibility', icon: 'smart_toy', title: 'AI Visibility', subtitle: 'Will AI recommend my brand?', desc: 'AI search optimization & LLM discoverability', color: 'violet', creditAction: 'seoAiVisibility' },
+    { id: 'competitor-warroom', icon: 'shield', title: 'Competitor War Room', subtitle: 'Side-by-side battle analysis', desc: 'Scoring matrix, keyword battles & 90-day playbook', color: 'rose', creditAction: 'seoCompetitors' },
+    { id: 'llm-probe', icon: 'psychology', title: 'LLM Brand Probe', subtitle: 'Do AI models know your brand?', desc: 'Live test: asks AI about your brand & checks if you get mentioned', color: 'cyan', creditAction: 'seoAiVisibility' },
+    { id: 'auto-fix', icon: 'build', title: 'Auto-Fix Issues', subtitle: 'Copy-paste code fixes', desc: 'Generate ready-to-implement fixes from your last audit', color: 'teal', creditAction: 'seoAuditPage' },
+    { id: 'prompt-mining', icon: 'chat_bubble', title: 'AI Prompt Mining', subtitle: 'What prompts should cite you?', desc: 'Discover AI prompts where your brand should be recommended', color: 'orange', creditAction: 'seoAiVisibility' },
 ]
 
 const ADV_MENU = [
@@ -164,6 +168,10 @@ export default function SeoStudio() {
         'traffic': ['Crawling your website content...', 'Analyzing existing topics & gaps...', 'Researching keyword opportunities...', 'Building traffic strategy...'],
         'competitors': ['Crawling your website...', 'Researching competitor sites...', 'Comparing content & structure...', 'Building outrank plan...'],
         'ai-visibility': ['Crawling your website...', 'Checking schema & JSON-LD...', 'Analyzing heading structure & FAQs...', 'Evaluating AI discoverability...', 'Generating optimization templates...'],
+        'competitor-warroom': ['Crawling your website...', 'Crawling competitor sites in parallel...', 'Building scoring matrix...', 'Analyzing keyword battles...', 'Creating 90-day battle plan...'],
+        'llm-probe': ['Preparing brand probes...', 'Asking AI Model 1 about your brand...', 'Asking AI Model 2 about your brand...', 'Analyzing mention patterns...', 'Scoring visibility & sentiment...', 'Generating strategic analysis...'],
+        'auto-fix': ['Analyzing issues...', 'Generating code fixes...', 'Building schema blocks...', 'Creating implementation guide...'],
+        'prompt-mining': ['Analyzing your industry...', 'Mining AI prompt patterns...', 'Scoring visibility per prompt...', 'Building content calendar...'],
     }
 
     const runWorkflow = async (workflowId) => {
@@ -177,8 +185,21 @@ export default function SeoStudio() {
 
         try {
             const payload = { url: website, brand: brandPayload, brandId: activeBrand?._id, country: activeBrand?.dna?.country || 'India', industry: activeBrand?.dna?.industry }
-            if (workflowId === 'competitors') payload.competitorUrls = competitors.map(c => c.url).filter(Boolean)
-            const apiFn = { 'health-check': seoAPI.healthCheck, 'traffic': seoAPI.traffic, 'competitors': seoAPI.competitors, 'ai-visibility': seoAPI.aiVisibility }[workflowId]
+            if (workflowId === 'competitors' || workflowId === 'competitor-warroom') payload.competitorUrls = competitors.map(c => c.url).filter(Boolean)
+
+            // Auto-fix needs previous issues
+            if (workflowId === 'auto-fix') {
+                const lastIssues = results?.issues || []
+                if (lastIssues.length === 0) { setError('Run a Health Check first to find issues, then use Auto-Fix.'); setLoading(false); clearInterval(interval); return }
+                payload.issues = lastIssues
+            }
+
+            const apiFn = {
+                'health-check': seoAPI.healthCheck, 'traffic': seoAPI.traffic,
+                'competitors': seoAPI.competitors, 'ai-visibility': seoAPI.aiVisibility,
+                'competitor-warroom': seoAPI.competitorWarRoom, 'llm-probe': seoAPI.llmProbe,
+                'auto-fix': seoAPI.autoFix, 'prompt-mining': seoAPI.promptMining,
+            }[workflowId]
             const data = await apiFn(payload)
             if (data.success !== false) {
                 setResults(data)
@@ -576,6 +597,10 @@ export default function SeoStudio() {
                         {activeWorkflow === 'traffic' && <TrafficResults results={results} />}
                         {activeWorkflow === 'competitors' && <CompetitorResults results={results} />}
                         {activeWorkflow === 'ai-visibility' && <AIVisibilityResults results={results} />}
+                        {activeWorkflow === 'competitor-warroom' && <WarRoomResults results={results} />}
+                        {activeWorkflow === 'llm-probe' && <LLMProbeResults results={results} />}
+                        {activeWorkflow === 'auto-fix' && <AutoFixResults results={results} />}
+                        {activeWorkflow === 'prompt-mining' && <PromptMiningResults results={results} />}
                     </div>
                 )}
 
@@ -899,6 +924,364 @@ function IssueCard({ issue }) {
                     {issue.impact && <p className="text-[11px] text-amber-400">⚡ Impact: {issue.impact}</p>}
                     {issue.fix && <p className="text-[11px] text-emerald-400">✓ Fix: {issue.fix}</p>}
                     {issue.effort && <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${issue.effort === 'quick-fix' ? 'bg-emerald-500/10 text-emerald-400' : issue.effort === 'moderate' ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-400'}`}>{issue.effort}</span>}
+                </div>
+            )}
+        </div>
+    )
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// WAR ROOM RESULTS
+// ══════════════════════════════════════════════════════════════════════════
+
+function WarRoomResults({ results }) {
+    const r = results
+    const VERDICT_COLORS = { 'winning': 'emerald', 'competitive': 'blue', 'behind': 'amber', 'far-behind': 'rose' }
+    const verdictColor = VERDICT_COLORS[r.overallVerdict] || 'slate'
+
+    return (
+        <div className="space-y-6">
+            {/* Executive Summary */}
+            <div className="glass-panel rounded-2xl p-6">
+                <div className="flex items-center gap-3 mb-3">
+                    <span className="material-symbols-outlined text-rose-400 text-2xl">shield</span>
+                    <h2 className="text-xl font-black text-white">Competitor War Room</h2>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold bg-${verdictColor}-500/15 text-${verdictColor}-400 uppercase`}>{r.overallVerdict}</span>
+                </div>
+                <p className="text-sm text-slate-300 leading-relaxed">{r.executiveSummary}</p>
+            </div>
+
+            {/* Scoring Matrix */}
+            {r.brandScore && (
+                <div className="glass-panel rounded-2xl p-6">
+                    <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-primary">grid_view</span> Scoring Matrix</h3>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="text-slate-500 text-xs text-left">
+                                    <th className="p-2">Entity</th>
+                                    {['technical', 'content', 'schema', 'aiReadiness', 'authority', 'overall'].map(k => (
+                                        <th key={k} className="p-2 text-center capitalize">{k.replace('aiReadiness', 'AI Ready')}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr className="border-t border-white/5">
+                                    <td className="p-2 text-white font-bold flex items-center gap-1"><span className="material-symbols-outlined text-primary text-xs">star</span> Your Brand</td>
+                                    {['technical', 'content', 'schema', 'aiReadiness', 'authority', 'overall'].map(k => (
+                                        <td key={k} className="p-2 text-center">
+                                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${r.brandScore[k] >= 70 ? 'bg-emerald-400/10 text-emerald-400' : r.brandScore[k] >= 40 ? 'bg-amber-400/10 text-amber-400' : 'bg-rose-400/10 text-rose-400'}`}>{r.brandScore[k]}</span>
+                                        </td>
+                                    ))}
+                                </tr>
+                                {r.competitorScores?.map((c, i) => (
+                                    <tr key={i} className="border-t border-white/5">
+                                        <td className="p-2 text-slate-300 font-medium">{c.name}</td>
+                                        {['technical', 'content', 'schema', 'aiReadiness', 'authority', 'overall'].map(k => (
+                                            <td key={k} className="p-2 text-center">
+                                                <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${c.scores?.[k] >= 70 ? 'bg-emerald-400/10 text-emerald-400' : c.scores?.[k] >= 40 ? 'bg-amber-400/10 text-amber-400' : 'bg-rose-400/10 text-rose-400'}`}>{c.scores?.[k] || '—'}</span>
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* Keyword Battles */}
+            {r.keywordBattles?.length > 0 && (
+                <div className="glass-panel rounded-2xl p-6">
+                    <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-amber-400">flash_on</span> Keyword Battles</h3>
+                    <div className="space-y-3">
+                        {r.keywordBattles.map((kb, i) => (
+                            <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm font-bold text-white">{kb.keyword}</span>
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${kb.priority === 'critical' ? 'bg-rose-400/10 text-rose-400' : kb.priority === 'high' ? 'bg-amber-400/10 text-amber-400' : 'bg-slate-500/10 text-slate-400'}`}>{kb.priority}</span>
+                                    </div>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${kb.brandPosition === 'dominant' || kb.brandPosition === 'strong' ? 'bg-emerald-400/10 text-emerald-400' : kb.brandPosition === 'absent' ? 'bg-rose-400/10 text-rose-400' : 'bg-amber-400/10 text-amber-400'}`}>You: {kb.brandPosition}</span>
+                                </div>
+                                {kb.competitors?.map((c, j) => (
+                                    <p key={j} className="text-[11px] text-slate-500"><span className="text-slate-400 font-bold">{c.name}</span>: {c.position} — {c.whyTheyRank}</p>
+                                ))}
+                                <p className="text-xs text-primary mt-1 font-medium">→ {kb.winStrategy}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Offensive Playbook */}
+            {r.offensivePlaybook?.length > 0 && (
+                <ActionBucket title="🗡️ Offensive Playbook" items={r.offensivePlaybook.map(a => ({
+                    title: `#${a.priority} ${a.action}`,
+                    description: `Target: ${a.target} | Timeline: ${a.timeline} | Impact: ${a.expectedImpact}`
+                }))} color="rose" />
+            )}
+
+            {/* Defensive Playbook */}
+            {r.defensivePlaybook?.length > 0 && (
+                <ActionBucket title="🛡️ Defensive Playbook" items={r.defensivePlaybook.map(a => ({
+                    title: a.risk, description: `Defense: ${a.defense} | Urgency: ${a.urgency}`
+                }))} color="amber" />
+            )}
+
+            {/* 90-Day Plan */}
+            {r.ninety_day_battleplan && (
+                <div className="glass-panel rounded-2xl p-6">
+                    <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-cyan-400">calendar_month</span> 90-Day Battle Plan</h3>
+                    <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{r.ninety_day_battleplan}</p>
+                </div>
+            )}
+        </div>
+    )
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// LLM BRAND PROBE RESULTS
+// ══════════════════════════════════════════════════════════════════════════
+
+function LLMProbeResults({ results }) {
+    const r = results
+    return (
+        <div className="space-y-6">
+            {/* Visibility Dashboard */}
+            <div className="glass-panel rounded-2xl p-6">
+                <div className="flex items-center gap-3 mb-4">
+                    <span className="material-symbols-outlined text-cyan-400 text-2xl">psychology</span>
+                    <h2 className="text-xl font-black text-white">LLM Brand Probe — {r.brandName}</h2>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div className="text-center p-4 rounded-xl bg-white/[0.03]">
+                        <ScoreRing score={r.visibilityScore} size={70} label="Visibility" color={r.visibilityScore >= 50 ? 'emerald' : r.visibilityScore >= 25 ? 'amber' : 'rose'} />
+                    </div>
+                    <div className="text-center p-4 rounded-xl bg-white/[0.03]">
+                        <ScoreRing score={r.sentimentScore} size={70} label="Sentiment" color={r.sentimentScore >= 50 ? 'emerald' : 'amber'} />
+                    </div>
+                    <div className="text-center p-4 rounded-xl bg-white/[0.03]">
+                        <p className="text-3xl font-black text-white">{r.mentionCount}<span className="text-lg text-slate-500">/{r.totalProbes}</span></p>
+                        <p className="text-xs text-slate-500 mt-1">Mentions</p>
+                    </div>
+                    <div className="text-center p-4 rounded-xl bg-white/[0.03]">
+                        <p className="text-sm font-bold text-slate-400">{r.industry}</p>
+                        <p className="text-xs text-slate-600">{r.location}</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Probe Results */}
+            <div className="glass-panel rounded-2xl p-6">
+                <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-cyan-400">quiz</span> Probe Results</h3>
+                <div className="space-y-3">
+                    {r.probeResults?.map((p, i) => (
+                        <div key={i} className={`p-4 rounded-xl border transition-all ${p.mentioned ? 'bg-emerald-400/5 border-emerald-400/20' : 'bg-white/[0.02] border-white/[0.06]'}`}>
+                            <div className="flex items-center justify-between mb-2">
+                                <p className="text-sm text-white font-medium">"{p.prompt}"</p>
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${p.mentioned ? 'bg-emerald-400/10 text-emerald-400' : 'bg-rose-400/10 text-rose-400'}`}>
+                                    {p.mentioned ? '✓ MENTIONED' : '✗ NOT FOUND'}
+                                </span>
+                            </div>
+                            {p.mentioned && <p className="text-xs text-slate-500">Sentiment: <span className={`font-bold ${p.sentiment === 'positive' ? 'text-emerald-400' : p.sentiment === 'mixed' ? 'text-amber-400' : 'text-slate-400'}`}>{p.sentiment}</span> | Position: {p.position}</p>}
+                            {p.competitorsMentioned?.length > 0 && <p className="text-xs text-amber-400 mt-1">⚠ Competitors also cited: {p.competitorsMentioned.join(', ')}</p>}
+                            {p.responseSnippet && <p className="text-xs text-slate-600 mt-2 italic line-clamp-2">{p.responseSnippet}</p>}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Strategic Analysis */}
+            {r.strategicAnalysis && (
+                <div className="glass-panel rounded-2xl p-6">
+                    <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-violet-400">strategy</span> Strategic Analysis</h3>
+                    <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{r.strategicAnalysis}</p>
+                </div>
+            )}
+
+            {/* Improvement Actions */}
+            {r.improvementActions?.length > 0 && (
+                <ActionBucket title="🎯 How to Get Cited" items={r.improvementActions.map(a => ({
+                    title: `#${a.priority} ${a.action}`, description: `${a.why} → ${a.expectedOutcome}`
+                }))} color="cyan" />
+            )}
+
+            {/* Content to Create */}
+            {r.contentToCreate?.length > 0 && (
+                <div className="glass-panel rounded-2xl p-6">
+                    <h3 className="text-base font-bold text-white mb-3">📝 Content to Create for AI Citation</h3>
+                    <div className="space-y-2">
+                        {r.contentToCreate.map((c, i) => (
+                            <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-white/[0.03]">
+                                <span className="text-cyan-400 text-xs mt-0.5">▸</span>
+                                <p className="text-sm text-slate-300">{c}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// AUTO-FIX RESULTS
+// ══════════════════════════════════════════════════════════════════════════
+
+function AutoFixResults({ results }) {
+    const r = results
+    const [copiedIdx, setCopiedIdx] = useState(null)
+
+    const copyCode = (code, idx) => {
+        navigator.clipboard.writeText(code)
+        setCopiedIdx(idx)
+        setTimeout(() => setCopiedIdx(null), 2000)
+    }
+
+    return (
+        <div className="space-y-6">
+            <div className="glass-panel rounded-2xl p-6">
+                <div className="flex items-center gap-3 mb-2">
+                    <span className="material-symbols-outlined text-teal-400 text-2xl">build</span>
+                    <h2 className="text-xl font-black text-white">Auto-Fix — Ready-to-Implement</h2>
+                </div>
+                {r.priorityOrder && <p className="text-sm text-slate-400 mb-4">{r.priorityOrder}</p>}
+            </div>
+
+            {/* Combined Schema Block */}
+            {r.combinedSchemaBlock && (
+                <div className="glass-panel rounded-2xl p-6">
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-base font-bold text-white flex items-center gap-2"><span className="material-symbols-outlined text-sm text-violet-400">data_object</span> Combined Schema Block</h3>
+                        <button onClick={() => copyCode(r.combinedSchemaBlock, 'combined')} className="px-3 py-1 rounded-lg bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 cursor-pointer transition-all">
+                            {copiedIdx === 'combined' ? '✓ Copied!' : 'Copy All Schema'}
+                        </button>
+                    </div>
+                    <pre className="bg-[#0a0d1a] rounded-xl p-4 overflow-x-auto text-xs text-slate-300 font-mono border border-white/5">{r.combinedSchemaBlock}</pre>
+                </div>
+            )}
+
+            {/* Individual Fixes */}
+            {r.fixes?.map((fix, i) => (
+                <div key={i} className="glass-panel rounded-2xl p-5">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                            <SeverityBadge severity={fix.severity} />
+                            <span className="text-xs px-1.5 py-0.5 rounded-full bg-teal-400/10 text-teal-400 font-bold">{fix.fixType}</span>
+                            <h4 className="text-sm font-bold text-white">{fix.issueTitle}</h4>
+                        </div>
+                        <span className="text-xs text-slate-500">{fix.effort}</span>
+                    </div>
+                    <p className="text-xs text-slate-400 mb-3">{fix.description}</p>
+
+                    {/* Code Block */}
+                    <div className="relative mb-3">
+                        <button onClick={() => copyCode(fix.code, i)}
+                            className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-white/10 text-xs text-slate-300 hover:bg-primary/20 hover:text-primary cursor-pointer transition-all z-10">
+                            {copiedIdx === i ? '✓ Copied!' : 'Copy'}
+                        </button>
+                        <pre className="bg-[#0a0d1a] rounded-xl p-4 overflow-x-auto text-xs text-emerald-300 font-mono border border-white/5 max-h-60">{fix.code}</pre>
+                    </div>
+
+                    <div className="flex items-center gap-4 text-[11px] text-slate-500">
+                        <span>📍 {fix.implementationGuide}</span>
+                        <span>📈 {fix.expectedImpact}</span>
+                    </div>
+                </div>
+            ))}
+        </div>
+    )
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// PROMPT MINING RESULTS
+// ══════════════════════════════════════════════════════════════════════════
+
+function PromptMiningResults({ results }) {
+    const r = results
+    const VIS_COLORS = { 'likely-cited': 'emerald', 'possibly-cited': 'amber', 'unlikely-cited': 'orange', 'definitely-not-cited': 'rose' }
+
+    return (
+        <div className="space-y-6">
+            {/* Summary Dashboard */}
+            <div className="glass-panel rounded-2xl p-6">
+                <div className="flex items-center gap-3 mb-4">
+                    <span className="material-symbols-outlined text-orange-400 text-2xl">chat_bubble</span>
+                    <h2 className="text-xl font-black text-white">AI Prompt Mining — {r.industry}</h2>
+                </div>
+                {r.visibilitySummary && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="text-center p-3 rounded-xl bg-emerald-400/5 border border-emerald-400/10">
+                            <p className="text-2xl font-black text-emerald-400">{r.visibilitySummary.likelyCitedCount}</p>
+                            <p className="text-[10px] text-slate-500 font-bold">LIKELY CITED</p>
+                        </div>
+                        <div className="text-center p-3 rounded-xl bg-amber-400/5 border border-amber-400/10">
+                            <p className="text-2xl font-black text-amber-400">{r.visibilitySummary.possiblyCitedCount}</p>
+                            <p className="text-[10px] text-slate-500 font-bold">POSSIBLY CITED</p>
+                        </div>
+                        <div className="text-center p-3 rounded-xl bg-rose-400/5 border border-rose-400/10">
+                            <p className="text-2xl font-black text-rose-400">{r.visibilitySummary.unlikelyCitedCount}</p>
+                            <p className="text-[10px] text-slate-500 font-bold">UNLIKELY CITED</p>
+                        </div>
+                        <div className="text-center p-3 rounded-xl bg-white/[0.03]">
+                            <p className={`text-lg font-bold ${r.visibilitySummary.overallReadiness === 'ready' ? 'text-emerald-400' : r.visibilitySummary.overallReadiness === 'partially-ready' ? 'text-amber-400' : 'text-rose-400'}`}>{r.visibilitySummary.overallReadiness?.replace('-', ' ').toUpperCase()}</p>
+                            <p className="text-[10px] text-slate-500 font-bold">READINESS</p>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Prompt Categories */}
+            {r.promptCategories?.map((cat, ci) => (
+                <div key={ci} className="glass-panel rounded-2xl p-6">
+                    <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-sm text-orange-400">category</span> {cat.category}
+                    </h3>
+                    <div className="space-y-3">
+                        {cat.prompts?.map((p, pi) => {
+                            const visColor = VIS_COLORS[p.currentVisibility] || 'slate'
+                            return (
+                                <div key={pi} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <p className="text-sm text-white font-medium flex-1">"{p.prompt}"</p>
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ml-2 whitespace-nowrap bg-${visColor}-400/10 text-${visColor}-400`}>{p.currentVisibility?.replace(/-/g, ' ')}</span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 mb-1">{p.whyOrWhyNot}</p>
+                                    <p className="text-xs text-primary font-medium">→ {p.actionableStrategy}</p>
+                                    {p.competitorsLikelyCited?.length > 0 && <p className="text-[10px] text-amber-400 mt-1">Competitors: {p.competitorsLikelyCited.join(', ')}</p>}
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+            ))}
+
+            {/* Priority Actions */}
+            {r.topPriorityActions?.length > 0 && (
+                <ActionBucket title="🎯 Top Priority Actions" items={r.topPriorityActions.map(a => ({
+                    title: `#${a.priority} ${a.action}`,
+                    description: `Covers ${a.promptsCovered} prompts | Effort: ${a.effort} | ${a.expectedOutcome}`
+                }))} color="orange" />
+            )}
+
+            {/* Content Calendar */}
+            {r.contentCalendar?.length > 0 && (
+                <div className="glass-panel rounded-2xl p-6">
+                    <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-blue-400">event</span> Content Calendar</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {r.contentCalendar.map((w, i) => (
+                            <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                                <p className="text-xs text-primary font-bold mb-1">WEEK {w.week}</p>
+                                <p className="text-sm text-white font-bold mb-1">{w.content}</p>
+                                <p className="text-xs text-slate-500">Format: {w.format} | Targets: {w.targetPrompts?.join(', ').substring(0, 80)}</p>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
         </div>

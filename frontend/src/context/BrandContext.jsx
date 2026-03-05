@@ -48,7 +48,9 @@ export function BrandProvider({ children }) {
             }
 
             const data = await brandsAPI.list();
-            const brandList = data.brands || [];
+            // Safety filter: exclude archived brands from global state
+            // (backend already filters, but this is a double-safety layer)
+            const brandList = (data.brands || []).filter(b => b.status !== 'archived');
             setBrands(brandList);
 
             if (brandList.length === 0) {
@@ -59,7 +61,7 @@ export function BrandProvider({ children }) {
             // Restore previously selected brand from localStorage
             const savedBrandId = localStorage.getItem(STORAGE_KEY);
             const savedBrand = savedBrandId
-                ? brandList.find(b => b._id === savedBrandId)
+                ? brandList.find(b => b._id === savedBrandId && b.status !== 'archived')
                 : null;
 
             if (savedBrand) {

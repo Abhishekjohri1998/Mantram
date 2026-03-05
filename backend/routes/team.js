@@ -339,7 +339,8 @@ router.get('/chat/channels', protect, async (req, res) => {
     try {
         const orgId = getOrgId(req.user);
         const brands = await Brand.find({
-            $or: [{ user: orgId }, { sharedWith: req.user._id }]
+            $or: [{ user: orgId }, { sharedWith: req.user._id }],
+            status: { $ne: 'archived' },
         }).select('name dna.colors');
 
         const channels = [

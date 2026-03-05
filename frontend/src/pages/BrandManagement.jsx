@@ -71,27 +71,40 @@ function DeleteBrandModal({ brand, onClose, onConfirm }) {
 // ============================================================================
 export default function BrandManagement() {
     const navigate = useNavigate()
-    const { brands, activeBrand, selectBrand, deleteBrand, fetchBrands } = useBrand()
+    const { activeBrand, selectBrand, deleteBrand, fetchBrands } = useBrand()
+    const [allBrands, setAllBrands] = useState([])
     const [search, setSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState('all') // 'all', 'active', 'archived'
     const [deleteTarget, setDeleteTarget] = useState(null)
     const [togglingId, setTogglingId] = useState(null)
     const [planLimits, setPlanLimits] = useState(null)
 
+    // Fetch ALL brands (including archived) for this management page
+    const fetchAllBrands = useCallback(async () => {
+        try {
+            const data = await brandsAPI.list({ include: 'all' })
+            setAllBrands(data.brands || [])
+        } catch (err) {
+            console.error('Failed to fetch all brands:', err)
+        }
+    }, [])
+
+    useEffect(() => { fetchAllBrands() }, [fetchAllBrands])
+
     // Load plan limits once
     useEffect(() => {
         teamAPI.getPlanLimits().then(setPlanLimits).catch(() => { })
     }, [])
 
-    // Filter brands
-    const filteredBrands = brands.filter(b => {
+    // Filter brands (from local state that includes archived)
+    const filteredBrands = allBrands.filter(b => {
         const matchesSearch = !search || b.name?.toLowerCase().includes(search.toLowerCase()) || b.website?.toLowerCase().includes(search.toLowerCase())
         const matchesStatus = statusFilter === 'all' || b.status === statusFilter
         return matchesSearch && matchesStatus
     })
 
-    const activeBrands = brands.filter(b => b.status === 'active' || !b.status)
-    const archivedBrands = brands.filter(b => b.status === 'archived')
+    const activeBrands = allBrands.filter(b => b.status === 'active' || !b.status)
+    const archivedBrands = allBrands.filter(b => b.status === 'archived')
 
     // Toggle archive/restore
     const handleToggleStatus = async (brand) => {
@@ -99,7 +112,8 @@ export default function BrandManagement() {
         setTogglingId(brand._id)
         try {
             await brandsAPI.updateStatus(brand._id, newStatus)
-            await fetchBrands()
+            await fetchAllBrands()  // Refresh local list
+            await fetchBrands()     // Refresh global context (so header updates)
         } catch (err) {
             console.error('Failed to update brand status:', err)
         } finally {
@@ -112,6 +126,7 @@ export default function BrandManagement() {
         if (!deleteTarget) return
         try {
             await deleteBrand(deleteTarget._id)
+            setAllBrands(prev => prev.filter(b => b._id !== deleteTarget._id))
             setDeleteTarget(null)
         } catch (err) {
             alert(`Failed to delete: ${err.message}`)
@@ -136,7 +151,7 @@ export default function BrandManagement() {
                 <div>
                     <h2 className="text-3xl font-extrabold tracking-tight mb-1">Brand <span className="text-primary">Manager</span></h2>
                     <p className="text-slate-400 text-sm">
-                        {planLimits ? `${brands.length}/${planLimits.maxBrands} brands · ${planLimits.plan} plan` : `${brands.length} brand${brands.length !== 1 ? 's' : ''} · Manage your brand portfolio`}
+                        {planLimits ? `${allBrands.length}/${planLimits.maxBrands} brands · ${planLimits.plan} plan` : `${allBrands.length} brand${allBrands.length !== 1 ? 's' : ''} · Manage your brand portfolio`}
                     </p>
                 </div>
                 <button onClick={() => navigate('/onboarding')}
@@ -148,7 +163,7 @@ export default function BrandManagement() {
             {/* Stats Row */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 {[
-                    { label: 'Total Brands', value: brands.length, icon: 'cases', color: '#8b5cf6' },
+                    { label: 'Total Brands', value: allBrands.length, icon: 'cases', color: '#8b5cf6' },
                     { label: 'Active', value: activeBrands.length, icon: 'check_circle', color: '#34d399' },
                     { label: 'Archived', value: archivedBrands.length, icon: 'archive', color: '#f59e0b' },
                     { label: 'Plan Limit', value: planLimits?.maxBrands || '∞', icon: 'diamond', color: '#06b6d4' },
@@ -182,7 +197,7 @@ export default function BrandManagement() {
             {/* Brand Cards */}
             {filteredBrands.length === 0 ? (
                 <div className="glass-panel rounded-2xl p-12 text-center animate-fade-in">
-                    {brands.length === 0 ? (
+                    {allBrands.length === 0 ? (
                         <>
                             <div className="size-20 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
                                 <span className="material-symbols-outlined text-4xl text-primary">add_business</span>

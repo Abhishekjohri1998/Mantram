@@ -210,20 +210,18 @@ function SmartInput({ onParse, onSkip }) {
 
 function StepGoal({ onSelect }) {
     return (
-        <div className="animate-fade-in">
-            <h3 className="text-xl font-extrabold text-white text-center mb-2">What's the <span className="text-primary">goal?</span></h3>
-            <p className="text-sm text-slate-400 text-center mb-8">Start with your intent — everything else follows naturally.</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
-                {GOALS.map((g, i) => (
-                    <button key={g.id} onClick={() => onSelect(g.id)}
-                        className={`glass - panel rounded - 2xl p - 6 text - left hover: scale - [1.03] transition - all cursor - pointer bg - gradient - to - br ${g.color} group animate - fade -in `}
-                        style={{ animationDelay: `${i * 80} ms` }}>
-                        <span className="material-symbols-outlined text-3xl mb-3 block" style={{ color: g.accent }}>{g.icon}</span>
-                        <p className="text-lg font-bold text-white group-hover:text-primary transition-colors">{g.label}</p>
-                        <p className="text-sm text-slate-400 mt-1">{g.desc}</p>
-                    </button>
-                ))}
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
+            {GOALS.map((g, i) => (
+                <button key={g.id} onClick={() => onSelect(g.id)}
+                    className="glass-panel rounded-2xl p-5 text-left hover:border-primary/30 hover:scale-[1.02] transition-all cursor-pointer group animate-fade-in"
+                    style={{ animationDelay: `${i * 60}ms` }}>
+                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${g.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+                        <span className="material-symbols-outlined text-white text-lg">{g.icon}</span>
+                    </div>
+                    <h3 className="text-base font-bold text-white mb-1">{g.label}</h3>
+                    <p className="text-sm text-slate-500 leading-relaxed">{g.desc}</p>
+                </button>
+            ))}
         </div>
     )
 }
@@ -246,7 +244,7 @@ function StepSubType({ goal, onSelect, onBack }) {
                 {goalData?.subTypes.map((st, i) => (
                     <button key={st.id} onClick={() => onSelect(st.id)}
                         className="glass-panel rounded-xl p-4 text-left hover:bg-white/[0.06] hover:border-primary/30 transition-all cursor-pointer animate-fade-in group"
-                        style={{ animationDelay: `${i * 60} ms` }}>
+                        style={{ animationDelay: `${i * 60}ms` }}>
                         <span className="material-symbols-outlined text-xl text-slate-400 group-hover:text-primary transition-colors mb-2 block">{st.icon}</span>
                         <p className="text-base font-bold text-white">{st.label}</p>
                     </button>
@@ -282,15 +280,15 @@ function StepChannel({ onSelect, onBack, goal }) {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {CHANNELS.map((ch, i) => (
                     <button key={ch.id} onClick={() => handleToggle(ch.id)}
-                        className={`glass - panel rounded - xl p - 4 text - center transition - all cursor - pointer animate - fade -in ${selected.includes(ch.id) || (ch.id === 'multi' && selected.length > 2)
+                        className={`glass-panel rounded-xl p-4 text-center transition-all cursor-pointer animate-fade-in ${selected.includes(ch.id) || (ch.id === 'multi' && selected.length > 2)
                             ? 'bg-primary/15 border-primary/40'
                             : 'hover:bg-white/[0.05] hover:border-white/[0.15]'
-                            } `}
-                        style={{ animationDelay: `${i * 50} ms` }}>
+                            }`}
+                        style={{ animationDelay: `${i * 50}ms` }}>
                         <span className="material-symbols-outlined text-2xl mb-1.5 block" style={{
                             color: selected.includes(ch.id) ? '#2B4BEE' : '#64748b'
                         }}>{ch.fallbackIcon}</span>
-                        <p className={`text - xs font - bold ${selected.includes(ch.id) ? 'text-white' : 'text-slate-400'} `}>{ch.label}</p>
+                        <p className={`text-xs font-bold ${selected.includes(ch.id) ? 'text-white' : 'text-slate-400'} `}>{ch.label}</p>
                     </button>
                 ))}
             </div>
@@ -434,7 +432,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                     { id: 'library', icon: 'photo_library', label: 'Image Bank' },
                 ].map(t => (
                     <button key={t.id} onClick={() => setContextType(t.id)}
-                        className={`flex items - center gap - 2 px - 4 py - 2.5 rounded - xl text - xs font - bold transition - all cursor - pointer ${contextType === t.id ? 'bg-primary text-white' : 'glass-panel text-slate-400 hover:text-white'
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${contextType === t.id ? 'bg-primary text-white' : 'glass-panel text-slate-400 hover:text-white'
                             } `}>
                         <span className="material-symbols-outlined text-sm">{t.icon}</span> {t.label}
                         {t.id === 'library' && libraryCounts.all > 0 && (
@@ -610,7 +608,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                             { id: 'generated', label: 'AI Generated', count: libraryCounts.generated },
                         ].map(cat => (
                             <button key={cat.id} onClick={() => { setLibraryCategory(cat.id); loadLibrary(cat.id) }}
-                                className={`px - 4 py - 2 rounded - xl text - xs font - bold transition - all cursor - pointer ${libraryCategory === cat.id ? 'bg-primary/20 text-primary border border-primary/30' : 'glass-panel text-slate-400 hover:text-white'} `}>
+                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${libraryCategory === cat.id ? 'bg-primary/20 text-primary border border-primary/30' : 'glass-panel text-slate-400 hover:text-white'} `}>
                                 {cat.label}
                                 <span className="ml-1.5 text-xs opacity-60">{cat.count}</span>
                             </button>
@@ -659,7 +657,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                                     <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <p className="text-sm text-white font-bold truncate">{img.title || 'Untitled'}</p>
                                         <div className="flex items-center gap-1 mt-0.5">
-                                            <span className={`text - [8px] px - 1.5 py - 0.5 rounded - full font - bold ${img.type === 'uploaded' ? 'bg-blue-500/30 text-blue-300' : img.type === 'ai-photoshoot' ? 'bg-amber-500/30 text-amber-300' : 'bg-emerald-500/30 text-emerald-300'} `}>
+                                            <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold ${img.type === 'uploaded' ? 'bg-blue-500/30 text-blue-300' : img.type === 'ai-photoshoot' ? 'bg-amber-500/30 text-amber-300' : 'bg-emerald-500/30 text-emerald-300'} `}>
                                                 {img.type === 'uploaded' ? 'Uploaded' : img.type === 'ai-photoshoot' ? 'Photoshoot' : 'Generated'}
                                             </span>
                                             <span className="text-[8px] text-slate-400">{new Date(img.createdAt).toLocaleDateString()}</span>
@@ -713,7 +711,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                                     const isAttached = attachedProducts.some(ap => ap._id === p._id)
                                     return (
                                         <button key={p._id} onClick={() => toggleProduct(p)}
-                                            className={`glass - panel rounded - xl p - 2.5 text - left transition - all cursor - pointer border ${isAttached ? 'border-cyan-400/50 bg-cyan-400/5 ring-1 ring-cyan-400/30' : 'border-white/5 hover:border-cyan-400/20'
+                                            className={`glass-panel rounded-xl p-2.5 text-left transition-all cursor-pointer border ${isAttached ? 'border-cyan-400/50 bg-cyan-400/5 ring-1 ring-cyan-400/30' : 'border-white/5 hover:border-cyan-400/20'
                                                 } `}>
                                             {p.images?.[0]?.url && (
                                                 <img src={p.images[0].url} alt={p.title}
@@ -826,7 +824,7 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                 <div className="flex flex-wrap gap-2 mb-3">
                     {LANGUAGES.map(l => (
                         <button key={l.id} onClick={() => setLanguage(l.id)}
-                            className={`px - 3 py - 2 rounded - xl text - xs font - medium transition - all cursor - pointer flex items - center gap - 1.5
+                            className={`px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5
                                 ${language === l.id ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white/[0.04] text-slate-400 hover:bg-white/[0.06] border border-white/[0.06]'} `}>
                             <span className="text-sm">{l.flag}</span> {l.label}
                         </button>
@@ -838,10 +836,10 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3 animate-fade-in">
                         {LANG_STYLES.map(s => (
                             <button key={s.id} onClick={() => setLangStyle(s.id)}
-                                className={`glass - panel rounded - xl p - 3 text - center transition - all cursor - pointer
+                                className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer
                                     ${langStyle === s.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'} `}>
-                                <span className={`material - symbols - outlined text - lg block mb - 1 ${langStyle === s.id ? 'text-primary' : 'text-slate-500'} `}>{s.icon}</span>
-                                <p className={`text - xs font - bold ${langStyle === s.id ? 'text-white' : 'text-slate-400'} `}>{s.label}</p>
+                                <span className={`material-symbols-outlined text-lg block mb-1 ${langStyle === s.id ? 'text-primary' : 'text-slate-500'} `}>{s.icon}</span>
+                                <p className={`text-xs font-bold ${langStyle === s.id ? 'text-white' : 'text-slate-400'} `}>{s.label}</p>
                                 <p className="text-xs text-slate-600">{s.desc}</p>
                             </button>
                         ))}
@@ -858,10 +856,10 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                         <div className="grid grid-cols-2 gap-2">
                             {SCRIPT_OPTIONS.map(s => (
                                 <button key={s.id} onClick={() => setScriptType(s.id)}
-                                    className={`glass - panel rounded - xl p - 3 text - center transition - all cursor - pointer
+                                    className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer
                                         ${scriptType === s.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'} `}>
-                                    <span className={`material - symbols - outlined text - lg block mb - 1 ${scriptType === s.id ? 'text-primary' : 'text-slate-500'} `}>{s.icon}</span>
-                                    <p className={`text - xs font - bold ${scriptType === s.id ? 'text-white' : 'text-slate-400'} `}>{s.label}</p>
+                                    <span className={`material-symbols-outlined text-lg block mb-1 ${scriptType === s.id ? 'text-primary' : 'text-slate-500'} `}>{s.icon}</span>
+                                    <p className={`text-xs font-bold ${scriptType === s.id ? 'text-white' : 'text-slate-400'} `}>{s.label}</p>
                                     <p className="text-xs text-slate-600 mt-0.5">{s.desc}</p>
                                 </button>
                             ))}
@@ -876,10 +874,10 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {TONES.map(t => (
                         <button key={t.id} onClick={() => setTone(t.id)}
-                            className={`glass - panel rounded - xl p - 3 text - center transition - all cursor - pointer ${tone === t.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'
+                            className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${tone === t.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'
                                 } `}>
-                            <span className={`material - symbols - outlined text - lg block mb - 1 ${tone === t.id ? 'text-primary' : 'text-slate-500'} `}>{t.icon}</span>
-                            <p className={`text - xs font - bold ${tone === t.id ? 'text-white' : 'text-slate-400'} `}>{t.label}</p>
+                            <span className={`material-symbols-outlined text-lg block mb-1 ${tone === t.id ? 'text-primary' : 'text-slate-500'} `}>{t.icon}</span>
+                            <p className={`text-xs font-bold ${tone === t.id ? 'text-white' : 'text-slate-400'} `}>{t.label}</p>
                         </button>
                     ))}
                 </div>
@@ -891,10 +889,10 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {LENGTHS.map(l => (
                         <button key={l.id} onClick={() => setLength(l.id)}
-                            className={`glass - panel rounded - xl p - 3 text - center transition - all cursor - pointer ${length === l.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'
+                            className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${length === l.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'
                                 } `}>
-                            <span className={`material - symbols - outlined text - lg block mb - 1 ${length === l.id ? 'text-primary' : 'text-slate-500'} `}>{l.icon}</span>
-                            <p className={`text - xs font - bold ${length === l.id ? 'text-white' : 'text-slate-400'} `}>{l.label}</p>
+                            <span className={`material-symbols-outlined text-lg block mb-1 ${length === l.id ? 'text-primary' : 'text-slate-500'} `}>{l.icon}</span>
+                            <p className={`text-xs font-bold ${length === l.id ? 'text-white' : 'text-slate-400'} `}>{l.label}</p>
                             <p className="text-xs text-slate-600">{l.desc}</p>
                         </button>
                     ))}
@@ -908,9 +906,9 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {SELL_STYLES.map(s => (
                             <button key={s.id} onClick={() => setSellStyle(s.id)}
-                                className={`glass - panel rounded - xl p - 3 text - center transition - all cursor - pointer ${sellStyle === s.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'
+                                className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${sellStyle === s.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'
                                     } `}>
-                                <p className={`text - xs font - bold ${sellStyle === s.id ? 'text-white' : 'text-slate-400'} `}>{s.label}</p>
+                                <p className={`text-xs font-bold ${sellStyle === s.id ? 'text-white' : 'text-slate-400'} `}>{s.label}</p>
                                 <p className="text-xs text-slate-600 mt-0.5">{s.desc}</p>
                             </button>
                         ))}
@@ -925,7 +923,7 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                     <span className="material-symbols-outlined text-xs">{showAdvanced ? 'expand_less' : 'tune'}</span>
                     <span className="uppercase tracking-widest font-bold">AI Model</span>
                     <span className="flex-1 h-px bg-white/[0.06]" />
-                    <span className={`px - 2 py - 0.5 rounded - full text - [9px] font - bold ${modelOverride === 'auto' ? 'bg-primary/10 text-primary' : 'bg-amber-400/10 text-amber-400'} `}>
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${modelOverride === 'auto' ? 'bg-primary/10 text-primary' : 'bg-amber-400/10 text-amber-400'} `}>
                         {modelOverride === 'auto' ? '🤖 Auto' : `👤 ${(availableProviders.find(p => p.id === modelOverride)?.label || modelOverride)} `}
                     </span>
                 </button>
@@ -934,10 +932,10 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                         <div className="grid grid-cols-2 gap-2">
                             {availableProviders.map(p => (
                                 <button key={p.id} onClick={() => setModelOverride(p.id)}
-                                    className={`glass - panel rounded - xl p - 3 text - left transition - all cursor - pointer ${modelOverride === p.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'} `}>
+                                    className={`glass-panel rounded-xl p-3 text-left transition-all cursor-pointer ${modelOverride === p.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'} `}>
                                     <div className="flex items-center gap-2 mb-1">
-                                        <span className={`material - symbols - outlined text - base ${modelOverride === p.id ? 'text-primary' : 'text-slate-500'} `}>{p.icon}</span>
-                                        <span className={`text - xs font - bold ${modelOverride === p.id ? 'text-white' : 'text-slate-400'} `}>{p.label}</span>
+                                        <span className={`material-symbols-outlined text-base ${modelOverride === p.id ? 'text-primary' : 'text-slate-500'} `}>{p.icon}</span>
+                                        <span className={`text-xs font-bold ${modelOverride === p.id ? 'text-white' : 'text-slate-400'} `}>{p.label}</span>
                                     </div>
                                     <p className="text-xs text-slate-600">{p.desc}</p>
                                 </button>
@@ -1045,7 +1043,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
             {/* Progress dots */}
             <div className="flex gap-1 mb-8">
                 {stepTitles.map((_, i) => (
-                    <div key={i} className={`h - 1.5 flex - 1 rounded - full transition - all ${i <= prStep ? 'bg-rose-400' : 'bg-white/[0.06]'} `} />
+                    <div key={i} className={`h-1.5 flex-1 rounded-full transition-all ${i <= prStep ? 'bg-rose-400' : 'bg-white/[0.06]'} `} />
                 ))}
             </div>
 
@@ -1071,7 +1069,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                             <div className="flex gap-2">
                                 {LANGUAGES.map(l => (
                                     <button key={l.id} onClick={() => setLanguage(l.id)}
-                                        className={`px - 3 py - 2 rounded - xl text - xs font - medium transition - all cursor - pointer flex items - center gap - 1.5
+                                        className={`px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5
                                             ${language === l.id ? 'bg-rose-500 text-white' : 'bg-white/[0.04] text-slate-400 hover:bg-white/[0.06] border border-white/[0.06]'} `}>
                                         <span className="text-sm">{l.flag}</span> {l.label}
                                     </button>
@@ -1083,7 +1081,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                             <div className="flex gap-2 flex-wrap">
                                 {PR_TONES.map(t => (
                                     <button key={t.id} onClick={() => setTone(t.id)}
-                                        className={`px - 3 py - 2 rounded - xl text - xs font - medium transition - all cursor - pointer flex items - center gap - 1.5
+                                        className={`px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5
                                             ${tone === t.id ? 'bg-rose-500 text-white' : 'bg-white/[0.04] text-slate-400 hover:bg-white/[0.06] border border-white/[0.06]'} `}>
                                         <span className="material-symbols-outlined text-xs">{t.icon}</span> {t.label}
                                     </button>
@@ -1107,10 +1105,10 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                     <div className="grid grid-cols-2 gap-3">
                         {PR_DISTRIBUTION.map(d => (
                             <button key={d.id} onClick={() => toggleDistribution(d.id)}
-                                className={`glass - panel rounded - xl p - 4 text - left transition - all cursor - pointer ${distribution.includes(d.id) ? 'bg-rose-500/15 border-rose-400/40' : 'hover:bg-white/[0.05]'} `}>
+                                className={`glass-panel rounded-xl p-4 text-left transition-all cursor-pointer ${distribution.includes(d.id) ? 'bg-rose-500/15 border-rose-400/40' : 'hover:bg-white/[0.05]'} `}>
                                 <div className="flex items-center gap-2 mb-1">
-                                    <span className={`material - symbols - outlined text - lg ${distribution.includes(d.id) ? 'text-rose-400' : 'text-slate-500'} `}>{d.icon}</span>
-                                    <span className={`text - xs font - bold ${distribution.includes(d.id) ? 'text-white' : 'text-slate-400'} `}>{d.label}</span>
+                                    <span className={`material-symbols-outlined text-lg ${distribution.includes(d.id) ? 'text-rose-400' : 'text-slate-500'} `}>{d.icon}</span>
+                                    <span className={`text-xs font-bold ${distribution.includes(d.id) ? 'text-white' : 'text-slate-400'} `}>{d.label}</span>
                                     {distribution.includes(d.id) && <span className="material-symbols-outlined text-rose-400 text-sm ml-auto">check_circle</span>}
                                 </div>
                                 <p className="text-xs text-slate-600">{d.desc}</p>
@@ -1230,7 +1228,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                             <span className="material-symbols-outlined text-xs">{showAdvanced ? 'expand_less' : 'tune'}</span>
                             <span className="uppercase tracking-widest font-bold">AI Model</span>
                             <span className="flex-1 h-px bg-white/[0.06]" />
-                            <span className={`px - 2 py - 0.5 rounded - full text - [9px] font - bold ${modelOverride === 'auto' ? 'bg-primary/10 text-primary' : 'bg-amber-400/10 text-amber-400'} `}>
+                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${modelOverride === 'auto' ? 'bg-primary/10 text-primary' : 'bg-amber-400/10 text-amber-400'} `}>
                                 {modelOverride === 'auto' ? '🤖 Auto' : `👤 ${(availableProviders.find(p => p.id === modelOverride)?.label || modelOverride)} `}
                             </span>
                         </button>
@@ -1239,10 +1237,10 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                                 <div className="grid grid-cols-2 gap-2">
                                     {availableProviders.map(p => (
                                         <button key={p.id} onClick={() => setModelOverride(p.id)}
-                                            className={`glass - panel rounded - xl p - 3 text - left transition - all cursor - pointer ${modelOverride === p.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'} `}>
+                                            className={`glass-panel rounded-xl p-3 text-left transition-all cursor-pointer ${modelOverride === p.id ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'} `}>
                                             <div className="flex items-center gap-2 mb-1">
-                                                <span className={`material - symbols - outlined text - base ${modelOverride === p.id ? 'text-primary' : 'text-slate-500'} `}>{p.icon}</span>
-                                                <span className={`text - xs font - bold ${modelOverride === p.id ? 'text-white' : 'text-slate-400'} `}>{p.label}</span>
+                                                <span className={`material-symbols-outlined text-base ${modelOverride === p.id ? 'text-primary' : 'text-slate-500'} `}>{p.icon}</span>
+                                                <span className={`text-xs font-bold ${modelOverride === p.id ? 'text-white' : 'text-slate-400'} `}>{p.label}</span>
                                             </div>
                                             <p className="text-xs text-slate-600">{p.desc}</p>
                                         </button>
@@ -1385,7 +1383,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                 </div>
                 <div className="flex gap-2">
                     <button onClick={() => { setEditing(!editing); if (!editing) setTimeout(() => refineRef.current?.focus(), 100) }}
-                        className={`flex items - center gap - 1.5 px - 4 py - 2 rounded - xl text - xs font - bold transition - all cursor - pointer ${editing ? 'bg-amber-400/20 text-amber-400 border border-amber-400/30' : 'glass-panel text-slate-400 hover:text-white border border-white/[0.1]'} `}>
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${editing ? 'bg-amber-400/20 text-amber-400 border border-amber-400/30' : 'glass-panel text-slate-400 hover:text-white border border-white/[0.1]'} `}>
                         <span className="material-symbols-outlined text-sm">{editing ? 'edit_off' : 'edit'}</span>
                         {editing ? 'Done Editing' : 'Edit & Refine'}
                     </button>
@@ -1463,7 +1461,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
             {/* Actions */}
             <div className="flex gap-3 mb-4">
                 <button onClick={handleCopy}
-                    className={`flex - 1 flex items - center justify - center gap - 2 py - 3 rounded - xl text - sm font - bold transition - all cursor - pointer ${copied ? 'bg-emerald-400/20 text-emerald-400 border border-emerald-400/30' : 'glass-panel text-white hover:bg-white/[0.06]'} `}>
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer ${copied ? 'bg-emerald-400/20 text-emerald-400 border border-emerald-400/30' : 'glass-panel text-white hover:bg-white/[0.06]'} `}>
                     <span className="material-symbols-outlined text-lg">{copied ? 'check' : 'content_copy'}</span>
                     {copied ? 'Copied!' : 'Copy'}
                 </button>
@@ -1486,14 +1484,14 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
 
             <div className="flex gap-2">
                 <button onClick={() => onFeedback('thumbs', { thumbs: 'up' })}
-                    className={`flex - 1 glass - panel py - 2.5 rounded - xl text - xs font - bold transition - all cursor - pointer ${contentFeedback === 'liked'
+                    className={`flex-1 glass-panel py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${contentFeedback === 'liked'
                         ? 'text-emerald-400 bg-emerald-400/15 border border-emerald-400/30'
                         : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/5'
                         } `}>
                     <span className="material-symbols-outlined text-sm">thumb_up</span> {contentFeedback === 'liked' ? 'Liked ✓' : 'Good'}
                 </button>
                 <button onClick={() => onFeedback('thumbs', { thumbs: 'down' })}
-                    className={`flex - 1 glass - panel py - 2.5 rounded - xl text - xs font - bold transition - all cursor - pointer ${contentFeedback === 'disliked'
+                    className={`flex-1 glass-panel py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${contentFeedback === 'disliked'
                         ? 'text-rose-400 bg-rose-400/15 border border-rose-400/30'
                         : 'text-slate-400 hover:text-rose-400 hover:bg-rose-400/5'
                         } `}>
@@ -1536,48 +1534,52 @@ function ContentHistory({ brandId, onSelect, visible, onToggle }) {
     if (!visible) return null
 
     return (
-        <div className="fixed right-0 top-0 h-screen w-80 bg-[#0c0f1a] border-l border-white/[0.08] z-50 flex flex-col animate-fade-in shadow-2xl">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
-                <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-primary">history</span>
-                    <h3 className="text-base font-bold text-white">Content History</h3>
-                </div>
-                <button onClick={onToggle} className="text-slate-500 hover:text-white transition-colors cursor-pointer">
-                    <span className="material-symbols-outlined text-sm">close</span>
-                </button>
-            </div>
-
-            {/* List */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {loading ? (
-                    <div className="text-center py-12">
-                        <span className="material-symbols-outlined text-2xl text-primary animate-spin">progress_activity</span>
-                        <p className="text-sm text-slate-500 mt-2">Loading history...</p>
+        <>
+            {/* Backdrop overlay */}
+            <div className="fixed inset-0 bg-black/40 z-40 animate-fade-in" onClick={onToggle} />
+            <div className="fixed right-0 top-0 h-screen w-80 bg-[#0c0f1a]/95 backdrop-blur-xl border-l border-white/[0.08] z-50 flex flex-col animate-fade-in shadow-2xl">
+                {/* Header */}
+                <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
+                    <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary">history</span>
+                        <h3 className="text-base font-bold text-white">Content History</h3>
                     </div>
-                ) : items.length === 0 ? (
-                    <div className="text-center py-12">
-                        <span className="material-symbols-outlined text-4xl text-slate-700 block mb-2">inbox</span>
-                        <p className="text-sm text-slate-500">No content generated yet</p>
-                        <p className="text-xs text-slate-600 mt-1">Generated content will appear here</p>
-                    </div>
-                ) : items.map(item => (
-                    <button key={item._id} onClick={() => onSelect(item)}
-                        className="w-full text-left glass-panel rounded-xl p-3 hover:bg-white/[0.05] transition-all cursor-pointer border border-white/[0.06] group">
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className={`text - [10px] font - bold px - 2 py - 0.5 rounded ${item.status === 'approved' ? 'bg-emerald-400/10 text-emerald-400' : 'bg-primary/10 text-primary'} `}>
-                                {item.status === 'approved' ? '✓ Approved' : item.type}
-                            </span>
-                            {item.platform && <span className="text-sm text-slate-500">{item.platform}</span>}
-                        </div>
-                        <p className="text-sm text-white line-clamp-2 mb-1">{item.content}</p>
-                        <p className="text-xs text-slate-600">
-                            {new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        </p>
+                    <button onClick={onToggle} className="text-slate-500 hover:text-white transition-colors cursor-pointer">
+                        <span className="material-symbols-outlined text-sm">close</span>
                     </button>
-                ))}
+                </div>
+
+                {/* List */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {loading ? (
+                        <div className="text-center py-12">
+                            <span className="material-symbols-outlined text-2xl text-primary animate-spin">progress_activity</span>
+                            <p className="text-sm text-slate-500 mt-2">Loading history...</p>
+                        </div>
+                    ) : items.length === 0 ? (
+                        <div className="text-center py-12">
+                            <span className="material-symbols-outlined text-4xl text-slate-700 block mb-2">inbox</span>
+                            <p className="text-sm text-slate-500">No content generated yet</p>
+                            <p className="text-xs text-slate-600 mt-1">Generated content will appear here</p>
+                        </div>
+                    ) : items.map(item => (
+                        <button key={item._id} onClick={() => onSelect(item)}
+                            className="w-full text-left glass-panel rounded-xl p-3 hover:bg-white/[0.05] transition-all cursor-pointer border border-white/[0.06] group">
+                            <div className="flex items-center gap-2 mb-1">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${item.status === 'approved' ? 'bg-emerald-400/10 text-emerald-400' : 'bg-primary/10 text-primary'}`}>
+                                    {item.status === 'approved' ? '✓ Approved' : item.type}
+                                </span>
+                                {item.platform && <span className="text-sm text-slate-500">{item.platform}</span>}
+                            </div>
+                            <p className="text-sm text-white line-clamp-2 mb-1">{item.content}</p>
+                            <p className="text-xs text-slate-600">
+                                {new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                        </button>
+                    ))}
+                </div>
             </div>
-        </div>
+        </>
     )
 }
 
@@ -1650,7 +1652,7 @@ function StepProductPicker({ brandId, selectedProduct, onSelect, onBack }) {
                             const isSelected = selectedProduct?._id === p._id
                             return (
                                 <button key={p._id} onClick={() => onSelect(p)}
-                                    className={`text - left glass - panel rounded - xl overflow - hidden transition - all cursor - pointer hover: scale - [1.02] ${isSelected ? 'ring-2 ring-primary border-primary/40' : 'hover:border-white/20'
+                                    className={`text-left glass-panel rounded-xl overflow-hidden transition-all cursor-pointer hover:scale-[1.02] ${isSelected ? 'ring-2 ring-primary border-primary/40' : 'hover:border-white/20'
                                         } `}>
                                     <div className="h-28 bg-gradient-to-br from-white/[0.03] to-white/[0.01] flex items-center justify-center overflow-hidden">
                                         {p.images?.[0]?.url ? (
@@ -2073,66 +2075,82 @@ SPOKESPERSON QUOTES:`
     const totalSteps = 6
 
     return (
-        <DashboardLayout>
-            {/* Header */}
-            <div className="flex items-end justify-between mb-4">
-                <div>
-                    <h2 className="text-3xl font-extrabold tracking-tight mb-1">Content <span className="text-primary">Studio</span></h2>
-                    <p className="text-slate-400 text-sm">
-                        {step < 5 ? 'Tell us your goal — we\'ll handle the rest.' : 'Your brand-aligned content is ready.'}
-                    </p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <button onClick={() => setShowHistory(!showHistory)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${showHistory ? 'bg-primary/20 text-primary' : 'glass-panel text-slate-400 hover:text-white'}`}>
-                        <span className="material-symbols-outlined text-sm">history</span>
-                        History
+        <DashboardLayout title="Content Studio" subtitle="AI-powered content for every channel">
+            {/* Progress Stepper (shown at steps 1-4) */}
+            {step > 0 && step < 5 && (
+                <div className="flex items-center gap-2 mb-8 max-w-3xl mx-auto">
+                    <button onClick={resetAll} className="text-slate-400 hover:text-white transition-colors cursor-pointer">
+                        <span className="material-symbols-outlined text-sm">arrow_back</span>
                     </button>
-                </div>
-            </div>
-
-            {/* Progress Bar */}
-            {step < 5 && (
-                <div className="flex items-center gap-1 mb-8 max-w-2xl mx-auto">
                     {stepLabels.slice(0, 5).map((lbl, i) => (
-                        <div key={i} className="flex items-center gap-1 flex-1">
-                            <div className={`h-1.5 rounded-full flex-1 transition-all duration-500 ${i < step ? 'bg-primary' : i === step ? 'bg-primary/40' : 'bg-white/[0.06]'
-                                }`} />
+                        <div key={lbl} className="flex items-center gap-2">
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all
+                                ${step > i ? 'bg-primary text-white' : step === i ? 'bg-primary/20 text-primary border border-primary/40' : 'bg-white/5 text-slate-600'}`}>
+                                {step > i ? '✓' : i + 1}
+                            </div>
+                            <span className={`text-xs font-bold ${step >= i ? 'text-slate-300' : 'text-slate-600'}`}>{lbl}</span>
+                            {i < 4 && <div className={`w-8 h-px ${step > i ? 'bg-primary/40' : 'bg-white/5'}`} />}
                         </div>
                     ))}
-                </div>
-            )}
-
-            {/* Smart Input (shown at step 0) */}
-            {step === 0 && <SmartInput onParse={handleSmartParse} />}
-
-            {/* Pre-filled Context Banner */}
-            {prefilledOccasion && step >= 2 && step <= 4 && (
-                <div className="max-w-2xl mx-auto mb-6 animate-fade-in">
-                    <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/10 border border-primary/20">
-                        <span className="text-2xl">{prefilledOccasion.emoji || '🎯'}</span>
-                        <div className="flex-1">
-                            <p className="text-base font-bold text-white">Creating content for <span className="text-primary">{prefilledOccasion.name}</span></p>
-                            <p className="text-sm text-slate-400 mt-0.5">Suggested tone: {prefilledOccasion.tone || 'festive'} • Select your channel below</p>
-                        </div>
-                        <button onClick={() => { setPrefilledOccasion(null); setStep(0); setGoal(null); setContext(null) }}
-                            className="text-sm text-slate-500 hover:text-white transition-colors cursor-pointer">
-                            <span className="material-symbols-outlined text-sm">close</span>
+                    <div className="ml-auto">
+                        <button onClick={() => setShowHistory(!showHistory)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${showHistory ? 'bg-primary/20 text-primary' : 'glass-panel text-slate-400 hover:text-white'}`}>
+                            <span className="material-symbols-outlined text-sm">history</span>
+                            History
                         </button>
                     </div>
                 </div>
             )}
 
-            {/* Steps */}
-            {step === 0 && <StepGoal onSelect={(g) => {
-                if (g === 'press_release') {
-                    setGoal(g); setStep(6)  // Jump to PR wizard
-                } else if (g === 'product_content') {
-                    setGoal(g); setStep(7)  // Jump to product picker
-                } else {
-                    setGoal(g); setStep(1)
-                }
-            }} />}
+            {/* ========== STEP 0: HERO + GOAL SELECTION ========== */}
+            {step === 0 && (
+                <div className="animate-fade-in">
+                    {/* Hero Section */}
+                    <div className="text-center mb-10">
+                        <span className="material-symbols-outlined text-5xl text-primary mb-3 block">edit_note</span>
+                        <h2 className="text-2xl font-black text-white mb-2">What do you want to <span className="text-primary">create?</span></h2>
+                        <p className="text-sm text-slate-400 max-w-lg mx-auto">Tell us what you need — we'll handle the rest.</p>
+                    </div>
+
+                    {/* Smart Input */}
+                    <SmartInput onParse={handleSmartParse} />
+
+                    {/* Divider */}
+                    <div className="flex items-center gap-3 max-w-4xl mx-auto mb-6">
+                        <div className="flex-1 h-px bg-white/[0.06]" />
+                        <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Or pick your content type</span>
+                        <div className="flex-1 h-px bg-white/[0.06]" />
+                    </div>
+
+                    {/* Pre-filled Context Banner */}
+                    {prefilledOccasion && step >= 2 && step <= 4 && (
+                        <div className="max-w-2xl mx-auto mb-6 animate-fade-in">
+                            <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/10 border border-primary/20">
+                                <span className="text-2xl">{prefilledOccasion.emoji || '🎯'}</span>
+                                <div className="flex-1">
+                                    <p className="text-base font-bold text-white">Creating content for <span className="text-primary">{prefilledOccasion.name}</span></p>
+                                    <p className="text-sm text-slate-400 mt-0.5">Suggested tone: {prefilledOccasion.tone || 'festive'} • Select your channel below</p>
+                                </div>
+                                <button onClick={() => { setPrefilledOccasion(null); setStep(0); setGoal(null); setContext(null) }}
+                                    className="text-sm text-slate-500 hover:text-white transition-colors cursor-pointer">
+                                    <span className="material-symbols-outlined text-sm">close</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Steps */}
+                    <StepGoal onSelect={(g) => {
+                        if (g === 'press_release') {
+                            setGoal(g); setStep(6)  // Jump to PR wizard
+                        } else if (g === 'product_content') {
+                            setGoal(g); setStep(7)  // Jump to product picker
+                        } else {
+                            setGoal(g); setStep(1)
+                        }
+                    }} />
+                </div>
+            )}
             {step === 1 && <StepSubType goal={goal} onSelect={(s) => {
                 setSubType(s);
                 if (goal === 'product_content') {

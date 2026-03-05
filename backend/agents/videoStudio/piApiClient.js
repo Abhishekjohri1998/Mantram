@@ -28,6 +28,7 @@
  */
 
 import config from '../../config/env.js';
+import sharp from 'sharp';
 
 const PIAPI_BASE_URL = 'https://api.piapi.ai';
 
@@ -41,44 +42,210 @@ function getPiApiKey() {
 }
 
 /**
+ * Resize/pad a base64 image to match the target aspect ratio.
+ * PiAPI Seedance 2 has a known bug where reference image aspect ratio
+ * overrides the requested aspect_ratio. This function is the workaround.
+ * Returns a new base64 data URI with the correct aspect ratio.
+ */
+async function resizeToAspectRatio(base64DataUri, targetRatio) {
+    try {
+        const match = base64DataUri.match(/^data:([\w/+]+);base64,(.+)$/);
+        if (!match) return base64DataUri;
+
+        const mimeType = match[1];
+        const buffer = Buffer.from(match[2], 'base64');
+
+        // Parse target ratio
+        const [rw, rh] = targetRatio.split(':').map(Number);
+        if (!rw || !rh) return base64DataUri;
+
+        const metadata = await sharp(buffer).metadata();
+        const { width, height } = metadata;
+        const currentRatio = width / height;
+        const targetRatioFloat = rw / rh;
+
+        // If already close enough, skip
+        if (Math.abs(currentRatio - targetRatioFloat) < 0.05) return base64DataUri;
+
+        let newWidth, newHeight;
+        if (currentRatio > targetRatioFloat) {
+            // Image is wider than target — pad top/bottom
+            newWidth = width;
+            newHeight = Math.round(width / targetRatioFloat);
+        } else {
+            // Image is taller than target — pad left/right
+            newHeight = height;
+            newWidth = Math.round(height * targetRatioFloat);
+        }
+
+        const resized = await sharp(buffer)
+            .resize(newWidth, newHeight, {
+                fit: 'contain',
+                background: { r: 0, g: 0, b: 0, alpha: 1 },
+            })
+            .png()
+            .toBuffer();
+
+        console.log(`📐 Resized ref image: ${width}x${height} → ${newWidth}x${newHeight} (target ${targetRatio})`);
+        return `data:image/png;base64,${resized.toString('base64')}`;
+    } catch (e) {
+        console.warn(`⚠️ Image resize failed: ${e.message}`);
+        return base64DataUri;
+    }
+}
+
+/**
+ * Upload a base64 image to a free file hosting service to get a public URL.
+ * Uses 0x0.st (primary) and catbox.moe (fallback) — both free, no auth needed.
+ * Returns hosted URL or null.
+ */
+async function uploadImageToHostedUrl(base64DataUri) {
+    // Extract base64 and mime type
+    const match = base64DataUri.match(/^data:([\w/+]+);base64,(.+)$/);
+    if (!match) {
+        console.warn('⚠️ Invalid base64 data URI');
+        return null;
+    }
+
+    const mimeType = match[1];
+    const base64Data = match[2];
+    const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg';
+    const fileName = `ref-${Date.now()}.${ext}`;
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    console.log(`📤 Uploading ref image to catbox.moe (${fileName}, ${Math.round(buffer.length / 1024)}KB)...`);
+
+    // catbox.moe — free, no auth, tested and working
+    try {
+        const { Blob } = await import('buffer');
+        const formData = new FormData();
+        formData.append('reqtype', 'fileupload');
+        const blob = new Blob([buffer], { type: mimeType });
+        formData.append('fileToUpload', blob, fileName);
+
+        const resp = await fetch('https://catbox.moe/user/api.php', {
+            method: 'POST',
+            body: formData,
+        });
+        const text = await resp.text();
+        console.log(`📥 catbox response (${resp.status}): ${text.trim().substring(0, 200)}`);
+        if (resp.ok && text.trim().startsWith('http')) {
+            console.log(`✅ Image hosted at: ${text.trim()}`);
+            return text.trim();
+        }
+        console.warn(`⚠️ catbox upload failed (${resp.status}): ${text.trim().substring(0, 200)}`);
+    } catch (e) {
+        console.warn(`⚠️ catbox upload error: ${e.message}`);
+    }
+
+    console.warn('⚠️ Image upload failed');
+    return null;
+}
+
+/**
  * Submit video generation to PiAPI (Seedance 2.0)
  * Returns { taskId, provider: 'piapi' }
  * 
- * Per PiAPI docs:
- *   - model MUST be "seedance"
- *   - task_type MUST be "seedance-2-preview"
- *   - duration is an integer (not string)
- *   - Images are embedded in the prompt text, NOT as a separate image_url field
- *     Syntax: <img>IMAGE_URL</img> Description of what's in the image
+ * Per PiAPI docs (piapi.ai/docs/seedance-api/seedance-2-preview):
+ *   - model: "seedance"
+ *   - task_type: "seedance-2-preview" or "seedance-2-fast-preview"
+ *   - input: { prompt, duration (int), aspect_ratio }
+ *   - Images are embedded IN the prompt as <img>URL</img> tags
+ *   - NO separate image_urls field
+ *   - Base64 images must be uploaded to PiAPI ephemeral storage first
  */
-export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, aspectRatio, generateAudio = true }) {
+export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, aspectRatio, generateAudio = true, referenceImages = [], qualityMode = 'fast' }) {
     const apiKey = getPiApiKey();
 
     const dur = Math.min(Math.max(duration || 5, 4), 15);
 
-    // Per PiAPI docs: images are referenced IN the prompt text, not as a separate field
-    // Syntax: <img>IMAGE_URL</img> prompt text describing the scene
+    console.log(`🎞️ PiAPI received: ${referenceImages.length} ref images, imageUrl: ${imageUrl ? 'yes' : 'no'}, quality: ${qualityMode}`);
+
     let finalPrompt = prompt;
-    if (imageUrl && imageUrl.startsWith('http')) {
-        // Embed image reference in prompt per PiAPI Seedance 2.0 docs
-        finalPrompt = `<img>${imageUrl}</img> ${prompt}`;
-        console.log(`📸 Embedded image reference in prompt: ${imageUrl.substring(0, 80)}...`);
+    const imageUrls = []; // Only for first-frame images
+
+    // Upload reference images to catbox and embed URLs in prompt
+    // IMPORTANT: ref images go ONLY in the prompt (not in image_urls)
+    // Putting them in image_urls makes Seedance treat them as first frames,
+    // which overrides the user's selected aspect ratio (confirmed PiAPI bug)
+    if (referenceImages && referenceImages.length > 0) {
+        for (let i = 0; i < referenceImages.length; i++) {
+            let url = referenceImages[i];
+            if (!url) continue;
+
+            // If base64, upload to get hosted URL
+            if (url.startsWith('data:')) {
+                const hostedUrl = await uploadImageToHostedUrl(url);
+                if (hostedUrl) {
+                    url = hostedUrl;
+                } else {
+                    console.warn(`⚠️ Could not upload ref image ${i + 1}, skipping`);
+                    continue;
+                }
+            }
+
+            console.log(`📸 Ref image ${i + 1} hosted: ${url.substring(0, 60)}...`);
+
+            // Add to image_urls for PiAPI's @imageN referencing
+            imageUrls.push(url);
+
+            // Ensure @imageN tag exists in prompt
+            const tag = `@image${i + 1}`;
+            if (!finalPrompt.includes(tag)) {
+                finalPrompt += ` Use ${tag} as visual reference.`;
+                console.log(`📸 Appended ${tag} reference to prompt`);
+            }
+        }
     }
 
-    // Build task input per official docs
+    // Handle first frame image — this one IS supposed to control aspect ratio
+    if (imageUrl) {
+        let url = imageUrl;
+        if (url.startsWith('data:')) {
+            const hostedUrl = await uploadImageToHostedUrl(url);
+            if (hostedUrl) url = hostedUrl;
+            else url = null;
+        }
+        if (url) {
+            imageUrls.unshift(url); // First frame goes first in image_urls
+            console.log(`📸 First frame ready: ${url.substring(0, 60)}...`);
+        }
+    }
+
+    // Clean any remaining <img> tags from prompt (legacy)
+    finalPrompt = finalPrompt.replace(/<img>[^<]*<\/img>/g, '').trim();
+
+    // Build task input
     const taskInput = {
         prompt: finalPrompt,
         aspect_ratio: aspectRatio || '16:9',
-        duration: dur,          // INTEGER per docs, not String(dur)
+        duration: dur,
     };
 
+    // Add image_urls (contains first frame + ref images for @imageN referencing)
+    if (imageUrls.length > 0) {
+        taskInput.image_urls = imageUrls;
+        console.log(`📸 Sending ${imageUrls.length} image(s) via input.image_urls:`, imageUrls.map(u => u.substring(0, 60)));
+    }
+
+    // Use fast or quality task_type based on user selection
+    const taskType = qualityMode === 'quality' ? 'seedance-2-preview' : 'seedance-2-fast-preview';
+    console.log(`🎯 PiAPI task_type: ${taskType} (quality mode: ${qualityMode})`);
+
     const payload = {
-        model: 'seedance',                  // Per docs: "seedance", NOT "seedance-2-0"
-        task_type: 'seedance-2-preview',    // Per docs: always "seedance-2-preview"
+        model: 'seedance',                  // Per docs: "seedance"
+        task_type: taskType,
         input: taskInput,
     };
 
-    console.log(`🎬 Submitting to PiAPI (Seedance 2.0):`, JSON.stringify(payload, null, 2).substring(0, 500));
+    console.log(`🎬 Submitting to PiAPI (Seedance 2.0):`, JSON.stringify({
+        ...payload,
+        input: {
+            ...payload.input,
+            prompt: payload.input.prompt.substring(0, 200) + '...',
+            image_urls: payload.input.image_urls?.map(u => u.substring(0, 60) + '...'),
+        }
+    }, null, 2));
 
     const response = await fetch(`${PIAPI_BASE_URL}/api/v1/task`, {
         method: 'POST',

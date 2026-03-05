@@ -16,547 +16,613 @@ async function api(path, opts = {}) {
     return data
 }
 
-// ── Default model capabilities (fetched from API on mount) ──
-const DEFAULT_CAPS = {
-    'kling-3.0': { id: 'kling-3.0', name: 'Kling 3.0', icon: '🎥', duration: { min: 3, max: 15, native: 15 }, resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16', '1:1'], features: { firstFrame: true, lastFrame: true, referenceImages: false, extendVideo: false, nativeAudio: true }, recommended: true, description: 'Best motion & physics — multi-shot, native audio', bestFor: 'Product demos, action shots', costPerSecond: { fast: 0.07, quality: 0.12 } },
-    'veo-3.1': { id: 'veo-3.1', name: 'Google Veo 3.1', icon: '🎬', duration: { min: 4, max: 8, native: 8, extendChunk: 7 }, resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16'], features: { firstFrame: true, lastFrame: true, referenceImages: true, extendVideo: true, nativeAudio: true }, recommended: false, description: 'Cinematic quality + extend-video', bestFor: 'Premium brand films', costPerSecond: { fast: 0.15, quality: 0.40 } },
-    'veo-3.1-fast': { id: 'veo-3.1-fast', name: 'Veo 3.1 Fast', icon: '⚡', duration: { min: 4, max: 8, native: 8 }, resolutions: ['720p', '1080p'], aspectRatios: ['16:9', '9:16'], features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: true, nativeAudio: true }, recommended: false, description: 'Faster & cheaper Veo 3.1', bestFor: 'Quick iterations', costPerSecond: { fast: 0.08, quality: 0.15 } },
-    'seedance-1.0': { id: 'seedance-1.0', name: 'Seedance 1.0', icon: '🌱', duration: { min: 5, max: 10, native: 10 }, resolutions: ['720p', '1080p'], aspectRatios: ['16:9', '9:16', '1:1', '4:3'], features: { firstFrame: true, lastFrame: true, referenceImages: false, extendVideo: true, nativeAudio: false }, recommended: false, description: 'Fast & affordable', bestFor: 'Quick prototypes', costPerSecond: { fast: 0.05, quality: 0.08 } },
-    'seedance-2.0': { id: 'seedance-2.0', name: 'Seedance 2.0 Pro', icon: '🎞️', duration: { min: 4, max: 15, native: 15 }, resolutions: ['720p', '1080p'], aspectRatios: ['16:9', '9:16', '1:1', '4:3', '21:9'], features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: true, nativeAudio: true, cameraControl: true }, recommended: false, description: 'Cinematic + camera control', bestFor: 'Premium ads', costPerSecond: { fast: 0.08, quality: 0.15 } },
-    'grok-imagine': { id: 'grok-imagine', name: 'Grok Imagine', icon: '🤖', duration: { min: 1, max: 15, native: 15 }, resolutions: ['480p', '720p'], aspectRatios: ['16:9', '9:16', '1:1'], features: { firstFrame: true, lastFrame: false, referenceImages: false, extendVideo: false, nativeAudio: false }, recommended: false, description: 'xAI native — fast & affordable', bestFor: 'Social reels', costPerSecond: { fast: 0.08, quality: 0.08 } },
+/* ── Models ── */
+const MODELS = {
+    'seedance-2.0': { id: 'seedance-2.0', name: 'Seedance 2.0', icon: '🎞️', dur: [4, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'], has: { firstFrame: true, refImages: true, refVideo: true, refAudio: true, audio: true }, cost: 0.08 },
+    'kling-3.0': { id: 'kling-3.0', name: 'Kling 3.0', icon: '🎥', dur: [3, 15], ratios: ['16:9', '9:16', '1:1'], has: { firstFrame: true, lastFrame: true, audio: true }, cost: 0.07 },
+    'veo-3.1': { id: 'veo-3.1', name: 'Veo 3.1', icon: '🎬', dur: [4, 8], ratios: ['16:9', '9:16'], has: { firstFrame: true, lastFrame: true, refImages: true, audio: true }, cost: 0.15 },
+    'veo-3.1-fast': { id: 'veo-3.1-fast', name: 'Veo 3.1 Fast', icon: '⚡', dur: [4, 8], ratios: ['16:9', '9:16'], has: { firstFrame: true, refImages: true, audio: true }, cost: 0.08 },
+    'seedance-1.0': { id: 'seedance-1.0', name: 'Seedance 1.0', icon: '🌱', dur: [5, 10], ratios: ['16:9', '9:16', '1:1', '4:3'], has: { firstFrame: true, lastFrame: true }, cost: 0.05 },
+    'grok-imagine': { id: 'grok-imagine', name: 'Grok Imagine', icon: '🤖', dur: [1, 15], ratios: ['16:9', '9:16', '1:1'], has: { firstFrame: true }, cost: 0.08 },
 }
 
+/* ── CSS-in-JS (Safari + Chrome + Firefox safe) ── */
+const css = `
+.adv-wrap { max-width: 640px; margin: 0 auto; padding: 8px 16px 24px; }
+.adv-wrap * { box-sizing: border-box; }
+.adv-err { padding: 12px 16px; border-radius: 12px; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #fca5a5; font-size: 13px; display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+.adv-err button { background: none; border: none; color: #fca5a5; cursor: pointer; padding: 0; }
+
+/* Prompt Card */
+.adv-prompt-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; padding: 20px; margin-bottom: 20px; }
+.adv-textarea { width: 100%; background: transparent; border: none; outline: none; resize: vertical; color: #f1f5f9; font-size: 15px; line-height: 1.6; font-family: inherit; min-height: 100px; }
+.adv-textarea::placeholder { color: rgba(148,163,184,0.5); }
+.adv-prompt-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.04); }
+
+/* Ref tags row */
+.adv-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.04); }
+.adv-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px 3px 3px; border-radius: 8px; background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.2); }
+.adv-tag img { width: 22px; height: 22px; border-radius: 6px; object-fit: cover; }
+.adv-tag span { font-size: 11px; color: #c4b5fd; font-weight: 600; }
+.adv-tag button { background: none; border: none; color: #f87171; cursor: pointer; padding: 0; font-size: 12px; margin-left: 2px; }
+.adv-tag .uploading { font-size: 10px; color: #64748b; font-style: italic; }
+
+/* @ Autocomplete */
+.adv-autocomplete { position: absolute; bottom: 100%; left: 12px; background: #1e1e26; border: 1px solid rgba(139,92,246,0.3); border-radius: 10px; padding: 6px; display: flex; gap: 6px; z-index: 10; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+.adv-ac-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); min-width: 60px; -webkit-appearance: none; appearance: none; }
+.adv-ac-item:hover { border-color: rgba(139,92,246,0.4); background: rgba(139,92,246,0.08); }
+.adv-ac-item img { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; }
+.adv-ac-item span { font-size: 10px; color: #c4b5fd; font-weight: 600; }
+
+/* Enhance Button */
+.adv-enhance { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid rgba(139,92,246,0.25); background: linear-gradient(135deg, rgba(124,58,237,0.2), rgba(6,182,212,0.2)); color: #c4b5fd; -webkit-appearance: none; appearance: none; }
+.adv-enhance:disabled { opacity: 0.4; cursor: default; }
+.adv-chars { font-size: 11px; color: #475569; }
+
+/* Config Row */
+.adv-config { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; margin-bottom: 20px; }
+.adv-config-item { display: flex; flex-direction: column; gap: 4px; }
+.adv-config-label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+.adv-select { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 8px 12px; color: #e2e8f0; font-size: 13px; outline: none; cursor: pointer; font-weight: 500; -webkit-appearance: menulist-button; appearance: auto; }
+.adv-select option { background: #1c1c20; color: #e2e8f0; }
+.adv-quality-row { display: flex; gap: 4px; }
+.adv-pill { padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.04); color: #94a3b8; -webkit-appearance: none; appearance: none; }
+.adv-pill.active { background: rgba(139,92,246,0.12); color: #c4b5fd; border-color: rgba(139,92,246,0.3); }
+
+/* Feature Cards Grid */
+.adv-features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
+@media (max-width: 480px) { .adv-features { grid-template-columns: 1fr; } }
+.adv-fcard { padding: 16px; border-radius: 14px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); }
+.adv-fcard.has-content { background: rgba(139,92,246,0.06); border-color: rgba(139,92,246,0.25); }
+.adv-fcard-head { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+.adv-fcard-head .icon { font-size: 18px; }
+.adv-fcard-head .title { font-size: 13px; font-weight: 700; color: #e2e8f0; }
+.adv-fcard-head .remove { margin-left: auto; background: none; border: none; color: #f87171; cursor: pointer; font-size: 16px; padding: 0; }
+.adv-fcard-head .hint { margin-left: auto; font-size: 10px; color: #64748b; }
+.adv-fcard-preview { width: 100%; height: 80px; border-radius: 10px; object-fit: cover; border: 1px solid rgba(255,255,255,0.08); display: block; }
+.adv-fcard-btns { display: flex; gap: 8px; }
+.adv-fcard-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 10px 8px; border-radius: 10px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); color: #94a3b8; -webkit-appearance: none; appearance: none; }
+.adv-fcard-btn:hover { border-color: rgba(139,92,246,0.3); color: #c4b5fd; }
+.adv-fcard-btn.ai { background: linear-gradient(135deg, rgba(124,58,237,0.12), rgba(6,182,212,0.12)); color: #c4b5fd; border-color: rgba(139,92,246,0.2); }
+.adv-fcard-btn.ai:disabled { opacity: 0.5; }
+.adv-fcard-attached { font-size: 12px; color: #94a3b8; }
+
+/* Ref Images specific */
+.adv-ref-grid { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.adv-ref-thumb { position: relative; width: 52px; height: 52px; flex-shrink: 0; }
+.adv-ref-thumb img { width: 100%; height: 100%; border-radius: 8px; object-fit: cover; border: 1px solid rgba(255,255,255,0.08); display: block; }
+.adv-ref-thumb .label { position: absolute; bottom: -3px; left: 0; right: 0; text-align: center; font-size: 8px; color: #c4b5fd; font-weight: 700; }
+.adv-ref-thumb .del { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; border-radius: 50%; background: #ef4444; color: #fff; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
+.adv-ref-add { width: 52px; height: 52px; border-radius: 8px; border: 2px dashed rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; cursor: pointer; color: #64748b; background: none; -webkit-appearance: none; appearance: none; }
+
+/* Library */
+.adv-library { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 16px; margin-bottom: 20px; }
+.adv-library-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.adv-library-head span { font-size: 13px; font-weight: 700; color: #e2e8f0; }
+.adv-library-head button { background: none; border: none; color: #94a3b8; cursor: pointer; }
+.adv-library-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-height: 160px; overflow-y: auto; }
+.adv-library-grid img { width: 100%; height: 56px; border-radius: 8px; object-fit: cover; cursor: pointer; border: 1px solid rgba(255,255,255,0.06); display: block; }
+.adv-library-grid img:hover { border-color: rgba(139,92,246,0.4); }
+
+/* Generate Button */
+.adv-generate { width: 100%; padding: 16px; border-radius: 16px; font-weight: 700; font-size: 15px; cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; gap: 10px; color: #fff; background: linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%); box-shadow: 0 4px 24px rgba(124,58,237,0.3); -webkit-appearance: none; appearance: none; }
+.adv-generate:disabled { opacity: 0.5; cursor: default; background: rgba(255,255,255,0.06); color: #475569; box-shadow: none; }
+
+/* Generating / Done phases */
+.adv-gen-card { max-width: 480px; margin: 0 auto; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; overflow: hidden; }
+.adv-gen-preview { position: relative; width: 100%; padding-bottom: 56.25%; background: linear-gradient(135deg, #0f172a, #1e293b); }
+.adv-gen-preview img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.4; }
+.adv-gen-preview .badges { position: absolute; top: 12px; left: 12px; display: flex; gap: 8px; }
+.adv-gen-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.adv-gen-info { padding: 16px 20px; }
+.adv-progress-bar { width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.06); overflow: hidden; }
+.adv-progress-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #7c3aed, #06b6d4); transition: width 1s ease; }
+
+.adv-done-card { max-width: 600px; margin: 0 auto; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; overflow: hidden; margin-bottom: 16px; }
+.adv-done-card video { width: 100%; display: block; }
+.adv-done-btns { display: flex; gap: 12px; max-width: 600px; margin: 0 auto; }
+.adv-btn-secondary { flex: 1; padding: 12px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid rgba(139,92,246,0.25); background: rgba(139,92,246,0.12); color: #c4b5fd; -webkit-appearance: none; appearance: none; }
+.adv-btn-primary { padding: 12px 20px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; border: none; background: linear-gradient(135deg, #7c3aed, #06b6d4); color: #fff; text-decoration: none; -webkit-appearance: none; appearance: none; }
+
+@keyframes adv-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.adv-spin { animation: adv-spin 1s linear infinite; }
+`
+
 export default function AdvancedMode({ activeBrand }) {
-    // ── State ──
-    const [caps, setCaps] = useState(DEFAULT_CAPS)
-    const [model, setModel] = useState('kling-3.0')
+    const [model, setModel] = useState('seedance-2.0')
     const [prompt, setPrompt] = useState('')
-    const [duration, setDuration] = useState(5)
-    const [resolution, setResolution] = useState('1080p')
+    const [duration, setDuration] = useState(6)
     const [aspectRatio, setAspectRatio] = useState('16:9')
-    const [qualityMode, setQualityMode] = useState('fast')
-    const [generateAudio, setGenerateAudio] = useState(true)
-    const [firstImageUrl, setFirstImageUrl] = useState('')
-    const [lastImageUrl, setLastImageUrl] = useState('')
+    const [quality, setQuality] = useState('fast')
+    const [phase, setPhase] = useState('compose')
+
+    const [firstFrame, setFirstFrame] = useState(null)
+    const [lastFrame, setLastFrame] = useState(null)
+    const [refImages, setRefImages] = useState([])
+    const [refVideo, setRefVideo] = useState(null)
+    const [refAudio, setRefAudio] = useState(null)
+
     const [enhancing, setEnhancing] = useState(false)
+    const [generatingFrame, setGeneratingFrame] = useState(false)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
-    const [projectId, setProjectId] = useState(null)
     const [generation, setGeneration] = useState(null)
-    const [durationPlan, setDurationPlan] = useState(null)
-    const [costPreview, setCostPreview] = useState(null)
-    const [phase, setPhase] = useState('compose') // compose | generating | review
-    const [imgMode, setImgMode] = useState(null) // null | 'first' | 'last' — which image panel is active
-    const [imgTab, setImgTab] = useState('upload') // 'upload' | 'generate' | 'library'
-    const [aiImgPrompt, setAiImgPrompt] = useState('')
-    const [aiImgLoading, setAiImgLoading] = useState(false)
+    const [projectId, setProjectId] = useState(null)
+    const [showLibrary, setShowLibrary] = useState(false)
+    const [libraryFor, setLibraryFor] = useState(null)
     const [libraryImages, setLibraryImages] = useState([])
     const [libraryLoading, setLibraryLoading] = useState(false)
-    const fileRef = useRef(null)
-    const lastFileRef = useRef(null)
+    const [showAutocomplete, setShowAutocomplete] = useState(false)
+
+    const firstFrameRef = useRef(null)
+    const lastFrameRef = useRef(null)
+    const refImgRef = useRef(null)
+    const refVideoRef = useRef(null)
+    const refAudioRef = useRef(null)
     const pollRef = useRef(null)
+    const promptRef = useRef(null)
 
-    const cap = caps[model] || caps['kling-3.0']
+    const m = MODELS[model] || MODELS['seedance-2.0']
+    const credits = Math.ceil(m.cost * duration * 30)
 
-    // Fetch capabilities once
     useEffect(() => {
-        api('/video-studio/models/capabilities').then(d => {
-            if (d.capabilities) setCaps(d.capabilities)
-        }).catch(() => { })
-    }, [])
-
-    // Clamp values when model changes
-    useEffect(() => {
-        const c = caps[model]
-        if (!c) return
-        if (duration < c.duration.min) setDuration(c.duration.min)
-        if (duration > c.duration.max && !c.features?.extendVideo) setDuration(c.duration.max)
-        if (!c.resolutions.includes(resolution)) setResolution(c.resolutions[c.resolutions.length - 1])
-        if (!c.aspectRatios.includes(aspectRatio)) setAspectRatio(c.aspectRatios[0])
-        if (!c.features?.lastFrame) setLastImageUrl('')
+        if (duration < m.dur[0]) setDuration(m.dur[0])
+        if (duration > m.dur[1]) setDuration(m.dur[1])
+        if (!m.ratios.includes(aspectRatio)) setAspectRatio(m.ratios[0])
+        if (!m.has.lastFrame) setLastFrame(null)
+        if (!m.has.refVideo) setRefVideo(null)
+        if (!m.has.refAudio) setRefAudio(null)
+        if (!m.has.refImages) setRefImages([])
     }, [model])
 
-    // Live cost
-    useEffect(() => {
-        const costRate = cap.costPerSecond?.[qualityMode] || 0.07
-        const resMult = resolution === '720p' ? 0.7 : 1
-        const usd = +(costRate * duration * resMult).toFixed(2)
-        setCostPreview({ usd, inr: Math.round(usd * 85), credits: Math.ceil(usd * 30) })
-    }, [model, duration, resolution, qualityMode])
+    useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
 
-    // ── Enhance prompt with AI ──
+    // ── Library ──
+    async function loadLibrary(target) {
+        setLibraryFor(target); setShowLibrary(true)
+        if (libraryImages.length > 0) return
+        setLibraryLoading(true)
+        try {
+            const data = await creativesAPI.imageBank({ limit: 30, brandId: activeBrand?._id || '' })
+            setLibraryImages(data.images || data.creatives || [])
+        } catch { setLibraryImages([]) }
+        setLibraryLoading(false)
+    }
+    function pickFromLibrary(img) {
+        const url = img.url || img.imageUrl || img.outputUrl
+        if (!url) return
+        if (libraryFor === 'first') setFirstFrame({ url, source: 'library' })
+        else if (libraryFor === 'last') setLastFrame({ url, source: 'library' })
+        else if (libraryFor === 'ref') setRefImages(prev => [...prev, { id: `r${Date.now()}`, url, label: `@image${prev.length + 1}` }])
+        setShowLibrary(false)
+    }
+
+    // ── Upload base64 → hosted URL ──
+    async function uploadImage(base64DataUri) {
+        try {
+            const d = await api('/video-studio/upload-image', {
+                method: 'POST', body: JSON.stringify({ imageData: base64DataUri }),
+            })
+            return d.url || base64DataUri
+        } catch { return base64DataUri }
+    }
+
+    // ── File uploads (auto-upload to get hosted URLs) ──
+    function onFile(e, setter) {
+        const f = e.target.files?.[0]; if (!f) return
+        const r = new FileReader()
+        r.onload = async () => {
+            setter({ url: r.result, source: 'upload', uploading: true })
+            const hostedUrl = await uploadImage(r.result)
+            setter({ url: hostedUrl, source: 'upload', uploading: false })
+        }
+        r.readAsDataURL(f)
+    }
+    function onRefFile(e) {
+        const f = e.target.files?.[0]; if (!f) return
+        const r = new FileReader()
+        r.onload = async () => {
+            const id = `r${Date.now()}`
+            setRefImages(prev => [...prev, { id, url: r.result, uploading: true }])
+            const hostedUrl = await uploadImage(r.result)
+            setRefImages(prev => prev.map(img => img.id === id ? { ...img, url: hostedUrl, uploading: false } : img))
+        }
+        r.readAsDataURL(f)
+    }
+    function onMediaFile(e, setter) {
+        const f = e.target.files?.[0]; if (!f) return
+        setter({ url: URL.createObjectURL(f), name: f.name })
+    }
+
+    // ── @ Autocomplete ──
+    function handlePromptChange(e) {
+        const val = e.target.value
+        setPrompt(val)
+        // Check if user just typed @
+        const cursorPos = e.target.selectionStart
+        const textBeforeCursor = val.substring(0, cursorPos)
+        if (textBeforeCursor.endsWith('@') && refImages.length > 0) {
+            setShowAutocomplete(true)
+        } else {
+            setShowAutocomplete(false)
+        }
+    }
+    function insertTag(index) {
+        const tag = `@image${index + 1}`
+        const textarea = promptRef.current
+        if (textarea) {
+            const cursorPos = textarea.selectionStart
+            // Replace the @ with the full tag
+            const before = prompt.substring(0, cursorPos - 1) // remove the @
+            const after = prompt.substring(cursorPos)
+            setPrompt(before + tag + ' ' + after)
+        } else {
+            setPrompt(prev => prev + tag + ' ')
+        }
+        setShowAutocomplete(false)
+    }
+
+    // ── AI First Frame ──
+    async function generateFirstFrame() {
+        if (!prompt.trim()) { setError('Write your ad idea first'); return }
+        setGeneratingFrame(true); setError('')
+        try {
+            const d = await api('/video-studio/generate-first-frame', {
+                method: 'POST', body: JSON.stringify({ prompt: prompt.trim(), brandId: activeBrand?._id }),
+            })
+            if (d.imageUrl) setFirstFrame({ url: d.imageUrl, source: 'ai' })
+            else setError('Could not generate image')
+        } catch (e) { setError(e.message) }
+        setGeneratingFrame(false)
+    }
+
+    // ── Enhance ──
     async function handleEnhance() {
         if (!prompt.trim()) return
-        setEnhancing(true)
+        setEnhancing(true); setError('')
         try {
             const d = await api('/video-studio/enhance-prompt', {
-                method: 'POST',
-                body: JSON.stringify({ prompt, model, duration, aspectRatio, brandId: activeBrand?._id }),
+                method: 'POST', body: JSON.stringify({ prompt, model, duration, aspectRatio, brandId: activeBrand?._id, style: 'adfilm' }),
             })
             setPrompt(d.enhancedPrompt || prompt)
         } catch (e) { setError(e.message) }
         setEnhancing(false)
     }
 
-    // ── Generate video ──
+    // ── Build prompt — leave @image tags as descriptive context ──
+    // Images are sent separately via referenceImages array → PiAPI's image_urls
+    function buildFinalPrompt() {
+        return prompt.trim()
+    }
+
+    // ── Generate ──
     async function handleGenerate() {
-        if (!prompt.trim()) { setError('Write a prompt first'); return }
+        if (!prompt.trim()) { setError('Write your ad idea first'); return }
         setLoading(true); setError('')
         try {
+            // Send ALL ref images (base64 or URL) — PiAPI supports both
+            const allRefUrls = refImages.map(r => r.url).filter(Boolean)
+            console.log(`🎬 Sending ${allRefUrls.length} ref images to backend`)
+
             const d = await api('/video-studio/advanced/generate', {
                 method: 'POST',
                 body: JSON.stringify({
-                    prompt, model, duration, resolution, aspectRatio,
-                    firstImageUrl, lastImageUrl, generateAudio, qualityMode,
+                    prompt: buildFinalPrompt(), model, duration, resolution: '1080p', aspectRatio,
+                    firstImageUrl: firstFrame?.url || '',
+                    lastImageUrl: lastFrame?.url || '',
+                    generateAudio: !!m.has.audio, qualityMode: quality,
                     brandId: activeBrand?._id || null,
+                    referenceImages: allRefUrls,
                 }),
             })
-            setProjectId(d.project._id)
-            setGeneration(d.project.generation)
-            setDurationPlan(d.project.durationPlan)
-            setPhase('generating')
-            startPolling(d.project._id)
+            setProjectId(d.project._id); setGeneration(d.project.generation); setPhase('generating'); startPolling(d.project._id)
         } catch (e) { setError(e.message) }
         setLoading(false)
     }
 
-    // ── Poll status ──
     const startPolling = useCallback((pid) => {
         if (pollRef.current) clearInterval(pollRef.current)
         pollRef.current = setInterval(async () => {
             try {
                 const d = await api(`/video-studio/${pid}/status`)
                 setGeneration(d.project.generation)
-                if (d.project.generation?.status === 'COMPLETED' || d.project.status === 'critique') {
-                    clearInterval(pollRef.current)
-                    setPhase('review')
-                } else if (d.project.generation?.status === 'FAILED') {
-                    clearInterval(pollRef.current)
-                    setError('Video generation failed. Edit your prompt and try again.')
-                    setPhase('review')
-                }
+                if (['COMPLETED'].includes(d.project.generation?.status) || d.project.status === 'critique') { clearInterval(pollRef.current); setPhase('done') }
+                else if (d.project.generation?.status === 'FAILED') { clearInterval(pollRef.current); setError(d.project.generation?.error || 'Failed'); setPhase('done') }
             } catch { }
         }, 5000)
     }, [])
 
-    useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
+    // Build dynamic feature list based on model
+    const features = []
+    if (m.has.firstFrame) features.push('firstFrame')
+    if (m.has.lastFrame) features.push('lastFrame')
+    if (m.has.refImages) features.push('refImages')
+    if (m.has.refVideo) features.push('refVideo')
+    if (m.has.refAudio) features.push('refAudio')
 
-    // ── Image upload ──
-    function handleImageUpload(setter, ref) {
-        return (e) => {
-            const f = e.target.files?.[0]
-            if (!f) return
-            const r = new FileReader()
-            r.onload = () => setter(r.result)
-            r.readAsDataURL(f)
-        }
-    }
-
-    // ── Load library images ──
-    async function loadLibrary() {
-        if (libraryImages.length > 0) return
-        setLibraryLoading(true)
-        try {
-            const data = await creativesAPI.imageBank({ limit: 30, brandId: activeBrand?._id || '' })
-            setLibraryImages(data.images || data.creatives || [])
-        } catch (e) {
-            console.error('Library load error:', e)
-            setLibraryImages([])
-        }
-        setLibraryLoading(false)
-    }
-
-    // ── AI generate image ──
-    async function handleAiGenerateImage(setter) {
-        if (!aiImgPrompt.trim()) return
-        if (!activeBrand?._id) { setError('Select a brand first to generate images'); return }
-        setAiImgLoading(true)
-        try {
-            const d = await api('/creatives/generate', {
-                method: 'POST',
-                body: JSON.stringify({
-                    prompt: aiImgPrompt,
-                    brandId: activeBrand._id,
-                    type: 'instagram-post',
-                }),
-            })
-            const url = d.creative?.imageUrl || d.imageUrl || d.image?.url || d.url || ''
-            if (url) { setter(url); setImgMode(null); setAiImgPrompt('') }
-            else setError('AI image generation returned no image')
-        } catch (e) { setError(e.message) }
-        setAiImgLoading(false)
-    }
-
-    // ── Open image panel ──
-    function openImagePanel(which) {
-        setImgMode(imgMode === which ? null : which)
-        setImgTab('upload')
-        if (imgMode !== which) loadLibrary()
-    }
-
-    const exceedsNative = duration > cap.duration.native
-
-    // ════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════
     // RENDER
-    // ════════════════════════════════════════════════════════════════════
-
-    // ── GENERATING PHASE ──
-    if (phase === 'generating') {
-        return (
-            <div className="flex flex-col items-center justify-center py-16">
-                <div className="relative mb-8">
-                    <div className="w-32 h-32 rounded-full border-4 border-violet-500/20 flex items-center justify-center">
-                        <span className="material-symbols-outlined text-5xl text-violet-400 animate-pulse">movie</span>
-                    </div>
-                    <div className="absolute inset-0 w-32 h-32 rounded-full border-4 border-transparent border-t-violet-500 animate-spin" />
-                </div>
-                <h2 className="text-xl font-bold text-white mb-2">Creating Your Video</h2>
-                <p className="text-sm text-slate-400 mb-6">
-                    {generation?.status === 'IN_QUEUE' ? '⏳ In queue — waiting for GPU...' :
-                        generation?.status === 'IN_PROGRESS' ? '🎥 Rendering frames...' : '🎬 Processing...'}
-                </p>
-                <div className="w-full max-w-md h-3 rounded-full bg-white/[0.06] overflow-hidden mb-4">
-                    <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-cyan-500 transition-all duration-1000"
-                        style={{ width: `${generation?.progress || 5}%` }} />
-                </div>
-                <p className="text-sm text-slate-500">{generation?.progress || 5}% — usually 1-3 minutes</p>
-                {durationPlan && durationPlan.totalSegments > 1 && (
-                    <div className="mt-4 p-3 rounded-xl bg-violet-500/10 border border-violet-500/20 text-sm text-violet-300 max-w-md text-center">
-                        📐 {durationPlan.note}
-                    </div>
-                )}
-            </div>
-        )
-    }
-
-    // ── REVIEW PHASE ──
-    if (phase === 'review') {
-        return (
-            <div className="space-y-6">
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                    <span className="material-symbols-outlined text-emerald-400">rate_review</span>
-                    Your Video is Ready
-                </h2>
-                {generation?.videoUrl ? (
-                    <div className="glass-panel rounded-2xl overflow-hidden border border-white/[0.08]">
-                        <video controls className="w-full aspect-video bg-black" src={generation.videoUrl} />
-                    </div>
-                ) : (
-                    <div className="glass-panel rounded-2xl p-12 text-center border border-white/[0.08]">
-                        <span className="material-symbols-outlined text-4xl text-slate-600 mb-3 block">videocam_off</span>
-                        <p className="text-sm text-slate-500">Generation may have failed. Edit your prompt and try again.</p>
-                    </div>
-                )}
-                <div className="flex gap-3">
-                    <button onClick={() => { setPhase('compose'); setGeneration(null); setProjectId(null) }}
-                        className="flex-1 py-3 rounded-xl bg-violet-500/20 text-violet-300 font-medium border border-violet-500/30 hover:bg-violet-500/30 transition-all cursor-pointer flex items-center justify-center gap-2">
-                        <span className="material-symbols-outlined text-sm">edit</span> Edit & Regenerate
-                    </button>
-                    {generation?.videoUrl && (
-                        <a href={generation.videoUrl} download target="_blank" rel="noopener noreferrer"
-                            className="px-6 py-3 rounded-xl bg-emerald-500/20 text-emerald-300 font-medium border border-emerald-500/30 hover:bg-emerald-500/30 transition-all flex items-center gap-2">
-                            <span className="material-symbols-outlined text-sm">download</span> Download
-                        </a>
-                    )}
-                </div>
-            </div>
-        )
-    }
-
-    // ── COMPOSE PHASE (main form) ──
+    // ════════════════════════════════════════════
     return (
-        <div className="space-y-6">
-            {error && (
-                <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm flex items-center gap-2">
-                    <span className="material-symbols-outlined text-lg">error</span>{error}
-                    <button onClick={() => setError('')} className="ml-auto text-rose-300 hover:text-white cursor-pointer">
-                        <span className="material-symbols-outlined text-sm">close</span>
-                    </button>
-                </div>
-            )}
+        <>
+            <style>{css}</style>
 
-            {/* ── Prompt ── */}
-            <div className="glass-panel rounded-2xl p-5 border border-white/[0.08]">
-                <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-base font-bold text-white flex items-center gap-2">
-                        <span className="material-symbols-outlined text-cyan-400">edit_note</span> Your Prompt
-                    </h3>
-                    <button onClick={handleEnhance} disabled={enhancing || !prompt.trim()}
-                        className="px-3 py-1.5 rounded-lg bg-cyan-500/15 text-cyan-300 text-xs font-medium border border-cyan-500/25 hover:bg-cyan-500/25 transition-all cursor-pointer disabled:opacity-40 flex items-center gap-1.5">
-                        {enhancing ? <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> : <span className="material-symbols-outlined text-sm">auto_awesome</span>}
-                        {enhancing ? 'Enhancing...' : '✨ Enhance with AI'}
-                    </button>
-                </div>
-                <textarea value={prompt} onChange={e => setPrompt(e.target.value)}
-                    placeholder="Describe your video in detail... e.g. 'A golden retriever running through a sunlit meadow, slow motion, cinematic depth of field, lens flare, warm golden tones'"
-                    className="w-full h-32 px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white text-sm placeholder-slate-600 outline-none focus:border-cyan-500/30 resize-none" />
-            </div>
-
-            {/* ── Model Selector ── */}
-            <div>
-                <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-violet-400">smart_toy</span> Select Model
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {Object.values(caps).map(m => (
-                        <button key={m.id} onClick={() => setModel(m.id)}
-                            className={`text-left p-4 rounded-xl transition-all cursor-pointer relative ${model === m.id
-                                ? 'bg-violet-500/10 border-2 border-violet-500/40 shadow-lg shadow-violet-500/10'
-                                : 'bg-white/[0.02] border border-white/[0.08] hover:border-white/[0.15]'}`}>
-                            {m.recommended && <span className="absolute -top-2 right-2 text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">⭐ Best</span>}
-                            <div className="flex items-center gap-2 mb-1">
-                                <span className="text-xl">{m.icon}</span>
-                                <span className="text-sm font-bold text-white">{m.name}</span>
+            {/* ── GENERATING ── */}
+            {phase === 'generating' && (
+                <div style={{ padding: '60px 20px' }}>
+                    <div className="adv-gen-card">
+                        <div className="adv-gen-preview">
+                            {firstFrame?.url && <img src={firstFrame.url} alt="" />}
+                            <div className="badges">
+                                <span className="adv-gen-badge" style={{ background: 'rgba(139,92,246,0.85)', color: '#fff' }}>{generation?.progress || 5}%</span>
+                                <span className="adv-gen-badge" style={{ background: 'rgba(0,0,0,0.5)', color: '#ccc' }}>{m.name}</span>
                             </div>
-                            <p className="text-xs text-slate-500 mb-2">{m.description}</p>
-                            <div className="flex flex-wrap gap-1">
-                                <span className="text-xs px-1.5 py-0.5 rounded bg-white/[0.05] text-slate-400">{m.duration.min}-{m.duration.native}s</span>
-                                {m.features?.nativeAudio && <span className="text-xs px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400">🔊</span>}
-                                {m.features?.extendVideo && <span className="text-xs px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400">↗️ extend</span>}
-                                {m.features?.cameraControl && <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">🎥</span>}
-                            </div>
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {/* ── Controls Grid ── */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Duration */}
-                <div className="glass-panel rounded-xl p-4 border border-white/[0.08]">
-                    <label className="text-sm font-bold text-white flex items-center gap-2 mb-3">
-                        <span className="material-symbols-outlined text-amber-400 text-base">timer</span> Duration: {duration}s
-                        {exceedsNative && <span className="text-xs text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full ml-auto">⚡ Will chain segments</span>}
-                    </label>
-                    <input type="range" min={cap.duration.min} max={cap.features?.extendVideo ? Math.min(60, (cap.duration.maxExtended || 60)) : cap.duration.native}
-                        value={duration} onChange={e => setDuration(Number(e.target.value))}
-                        className="w-full accent-violet-500" />
-                    <div className="flex justify-between text-xs text-slate-600 mt-1">
-                        <span>{cap.duration.min}s</span>
-                        <span className="text-violet-400">native: {cap.duration.native}s</span>
-                        <span>{cap.features?.extendVideo ? `${Math.min(60, (cap.duration.maxExtended || 60))}s` : `${cap.duration.native}s`}</span>
-                    </div>
-                </div>
-
-                {/* Resolution */}
-                <div className="glass-panel rounded-xl p-4 border border-white/[0.08]">
-                    <label className="text-sm font-bold text-white flex items-center gap-2 mb-3">
-                        <span className="material-symbols-outlined text-emerald-400 text-base">high_quality</span> Resolution
-                    </label>
-                    <div className="flex gap-2">
-                        {cap.resolutions.map(r => (
-                            <button key={r} onClick={() => setResolution(r)}
-                                className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-all ${resolution === r
-                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                                    : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'}`}>{r}</button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Aspect Ratio */}
-                <div className="glass-panel rounded-xl p-4 border border-white/[0.08]">
-                    <label className="text-sm font-bold text-white flex items-center gap-2 mb-3">
-                        <span className="material-symbols-outlined text-cyan-400 text-base">aspect_ratio</span> Aspect Ratio
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                        {cap.aspectRatios.map(r => (
-                            <button key={r} onClick={() => setAspectRatio(r)}
-                                className={`px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-all ${aspectRatio === r
-                                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                                    : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'}`}>{r}</button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Quality Mode */}
-                <div className="glass-panel rounded-xl p-4 border border-white/[0.08]">
-                    <label className="text-sm font-bold text-white flex items-center gap-2 mb-3">
-                        <span className="material-symbols-outlined text-violet-400 text-base">tune</span> Quality
-                    </label>
-                    <div className="flex gap-2">
-                        {['fast', 'quality'].map(m => (
-                            <button key={m} onClick={() => setQualityMode(m)}
-                                className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-all capitalize ${qualityMode === m
-                                    ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
-                                    : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'}`}>{m === 'fast' ? '⚡ Fast' : '✨ Quality'}</button>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {/* ── Image Inputs (model-aware) ── */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* First Frame */}
-                {cap.features?.firstFrame && (
-                    <div className="glass-panel rounded-xl p-4 border border-white/[0.08]">
-                        <label className="text-sm font-bold text-white flex items-center gap-2 mb-3">
-                            <span className="material-symbols-outlined text-amber-400 text-base">first_page</span> First Frame
-                            <span className="text-xs text-slate-600 font-normal ml-auto">optional</span>
-                        </label>
-                        {firstImageUrl ? (
-                            <div className="relative group">
-                                <img src={firstImageUrl} alt="First frame" className="w-full h-32 rounded-lg object-cover border border-white/[0.08]" />
-                                <button onClick={() => setFirstImageUrl('')}
-                                    className="absolute top-1 right-1 w-6 h-6 rounded-full bg-rose-500 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">×</button>
-                            </div>
-                        ) : (
-                            <div className="flex gap-2">
-                                <button onClick={() => fileRef.current?.click()}
-                                    className="flex-1 p-3 rounded-lg border-2 border-dashed border-white/[0.08] hover:border-violet-500/30 flex flex-col items-center gap-1 cursor-pointer text-slate-500 hover:text-violet-300 transition-all">
-                                    <span className="material-symbols-outlined text-lg">cloud_upload</span>
-                                    <span className="text-xs">Upload</span>
-                                </button>
-                                <button onClick={() => openImagePanel('first')}
-                                    className={`flex-1 p-3 rounded-lg border-2 border-dashed flex flex-col items-center gap-1 cursor-pointer transition-all ${imgMode === 'first' && imgTab === 'generate' ? 'border-cyan-500/40 bg-cyan-500/5 text-cyan-300' : 'border-white/[0.08] hover:border-cyan-500/30 text-slate-500 hover:text-cyan-300'}`}>
-                                    <span className="material-symbols-outlined text-lg">auto_awesome</span>
-                                    <span className="text-xs">AI Generate</span>
-                                </button>
-                                <button onClick={() => { openImagePanel('first'); setImgTab('library') }}
-                                    className={`flex-1 p-3 rounded-lg border-2 border-dashed flex flex-col items-center gap-1 cursor-pointer transition-all ${imgMode === 'first' && imgTab === 'library' ? 'border-amber-500/40 bg-amber-500/5 text-amber-300' : 'border-white/[0.08] hover:border-amber-500/30 text-slate-500 hover:text-amber-300'}`}>
-                                    <span className="material-symbols-outlined text-lg">photo_library</span>
-                                    <span className="text-xs">Library</span>
-                                </button>
-                            </div>
-                        )}
-                        <input ref={fileRef} type="file" accept="image/*" onChange={handleImageUpload(setFirstImageUrl, fileRef)} className="hidden" />
-
-                        {/* AI Generate / Library Panel for First Frame */}
-                        {imgMode === 'first' && !firstImageUrl && (
-                            <div className="mt-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                                <div className="flex gap-2 mb-3">
-                                    <button onClick={() => setImgTab('generate')} className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${imgTab === 'generate' ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-500 hover:text-white'}`}>✨ Generate</button>
-                                    <button onClick={() => setImgTab('library')} className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${imgTab === 'library' ? 'bg-amber-500/20 text-amber-300' : 'text-slate-500 hover:text-white'}`}>📚 Library</button>
-                                </div>
-                                {imgTab === 'generate' && (
-                                    <div className="flex gap-2">
-                                        <input value={aiImgPrompt} onChange={e => setAiImgPrompt(e.target.value)} placeholder="Describe the image..." className="flex-1 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-xs placeholder-slate-600 outline-none" />
-                                        <button onClick={() => handleAiGenerateImage(setFirstImageUrl)} disabled={aiImgLoading} className="px-3 py-2 rounded-lg bg-cyan-500/20 text-cyan-300 text-xs font-medium cursor-pointer disabled:opacity-50">{aiImgLoading ? '...' : 'Create'}</button>
-                                    </div>
-                                )}
-                                {imgTab === 'library' && (
-                                    libraryLoading ? <p className="text-xs text-slate-500 text-center py-4">Loading library...</p> :
-                                        libraryImages.length === 0 ? <p className="text-xs text-slate-500 text-center py-4">No images in library</p> :
-                                            <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto">
-                                                {libraryImages.map((img, i) => (
-                                                    <img key={i} src={img.url || img.imageUrl} alt="" onClick={() => { setFirstImageUrl(img.url || img.imageUrl); setImgMode(null) }}
-                                                        className="w-full h-16 rounded-lg object-cover cursor-pointer border border-white/[0.08] hover:border-violet-500/40 transition-all" />
-                                                ))}
-                                            </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Last Frame */}
-                {cap.features?.lastFrame && (
-                    <div className="glass-panel rounded-xl p-4 border border-white/[0.08]">
-                        <label className="text-sm font-bold text-white flex items-center gap-2 mb-3">
-                            <span className="material-symbols-outlined text-rose-400 text-base">last_page</span> Last Frame
-                            <span className="text-xs text-slate-600 font-normal ml-auto">optional</span>
-                        </label>
-                        {lastImageUrl ? (
-                            <div className="relative group">
-                                <img src={lastImageUrl} alt="Last frame" className="w-full h-32 rounded-lg object-cover border border-white/[0.08]" />
-                                <button onClick={() => setLastImageUrl('')}
-                                    className="absolute top-1 right-1 w-6 h-6 rounded-full bg-rose-500 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">×</button>
-                            </div>
-                        ) : (
-                            <div className="flex gap-2">
-                                <button onClick={() => lastFileRef.current?.click()}
-                                    className="flex-1 p-3 rounded-lg border-2 border-dashed border-white/[0.08] hover:border-rose-500/30 flex flex-col items-center gap-1 cursor-pointer text-slate-500 hover:text-rose-300 transition-all">
-                                    <span className="material-symbols-outlined text-lg">cloud_upload</span>
-                                    <span className="text-xs">Upload</span>
-                                </button>
-                                <button onClick={() => openImagePanel('last')}
-                                    className={`flex-1 p-3 rounded-lg border-2 border-dashed flex flex-col items-center gap-1 cursor-pointer transition-all ${imgMode === 'last' && imgTab === 'generate' ? 'border-cyan-500/40 bg-cyan-500/5 text-cyan-300' : 'border-white/[0.08] hover:border-cyan-500/30 text-slate-500 hover:text-cyan-300'}`}>
-                                    <span className="material-symbols-outlined text-lg">auto_awesome</span>
-                                    <span className="text-xs">AI Generate</span>
-                                </button>
-                                <button onClick={() => { openImagePanel('last'); setImgTab('library') }}
-                                    className={`flex-1 p-3 rounded-lg border-2 border-dashed flex flex-col items-center gap-1 cursor-pointer transition-all ${imgMode === 'last' && imgTab === 'library' ? 'border-amber-500/40 bg-amber-500/5 text-amber-300' : 'border-white/[0.08] hover:border-amber-500/30 text-slate-500 hover:text-amber-300'}`}>
-                                    <span className="material-symbols-outlined text-lg">photo_library</span>
-                                    <span className="text-xs">Library</span>
-                                </button>
-                            </div>
-                        )}
-                        <input ref={lastFileRef} type="file" accept="image/*" onChange={handleImageUpload(setLastImageUrl, lastFileRef)} className="hidden" />
-
-                        {/* AI Generate / Library Panel for Last Frame */}
-                        {imgMode === 'last' && !lastImageUrl && (
-                            <div className="mt-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                                <div className="flex gap-2 mb-3">
-                                    <button onClick={() => setImgTab('generate')} className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${imgTab === 'generate' ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-500 hover:text-white'}`}>✨ Generate</button>
-                                    <button onClick={() => setImgTab('library')} className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${imgTab === 'library' ? 'bg-amber-500/20 text-amber-300' : 'text-slate-500 hover:text-white'}`}>📚 Library</button>
-                                </div>
-                                {imgTab === 'generate' && (
-                                    <div className="flex gap-2">
-                                        <input value={aiImgPrompt} onChange={e => setAiImgPrompt(e.target.value)} placeholder="Describe the image..." className="flex-1 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-xs placeholder-slate-600 outline-none" />
-                                        <button onClick={() => handleAiGenerateImage(setLastImageUrl)} disabled={aiImgLoading} className="px-3 py-2 rounded-lg bg-cyan-500/20 text-cyan-300 text-xs font-medium cursor-pointer disabled:opacity-50">{aiImgLoading ? '...' : 'Create'}</button>
-                                    </div>
-                                )}
-                                {imgTab === 'library' && (
-                                    libraryLoading ? <p className="text-xs text-slate-500 text-center py-4">Loading library...</p> :
-                                        libraryImages.length === 0 ? <p className="text-xs text-slate-500 text-center py-4">No images in library</p> :
-                                            <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto">
-                                                {libraryImages.map((img, i) => (
-                                                    <img key={i} src={img.url || img.imageUrl} alt="" onClick={() => { setLastImageUrl(img.url || img.imageUrl); setImgMode(null) }}
-                                                        className="w-full h-16 rounded-lg object-cover cursor-pointer border border-white/[0.08] hover:border-violet-500/40 transition-all" />
-                                                ))}
-                                            </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-
-            {/* ── Audio toggle ── */}
-            {cap.features?.nativeAudio && (
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                    <button onClick={() => setGenerateAudio(!generateAudio)}
-                        className={`w-10 h-5 rounded-full transition-all cursor-pointer relative ${generateAudio ? 'bg-cyan-500' : 'bg-white/[0.1]'}`}>
-                        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${generateAudio ? 'left-5' : 'left-0.5'}`} />
-                    </button>
-                    <span className="text-sm text-slate-300">🔊 Generate native audio</span>
-                </div>
-            )}
-
-            {/* ── Cost Preview ── */}
-            {costPreview && (
-                <div className="glass-panel rounded-xl p-4 border border-emerald-500/20">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-6">
-                            <div className="text-center">
-                                <p className="text-lg font-bold text-violet-400">{cap.name}</p>
-                                <p className="text-xs text-slate-500">Model</p>
-                            </div>
-                            <div className="text-center">
-                                <p className="text-lg font-bold text-cyan-400">{duration}s</p>
-                                <p className="text-xs text-slate-500">Duration</p>
-                            </div>
-                            <div className="text-center">
-                                <p className="text-lg font-bold text-amber-400">{costPreview.credits}</p>
-                                <p className="text-xs text-slate-500">Credits</p>
-                            </div>
-                            <div className="text-center">
-                                <p className="text-lg font-bold text-emerald-400">₹{costPreview.inr}</p>
-                                <p className="text-xs text-slate-500">Est. Cost</p>
-                            </div>
+                        </div>
+                        <div className="adv-gen-info">
+                            <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '12px' }}>🎬 Creating your ad film — usually 1-3 minutes</p>
+                            <div className="adv-progress-bar"><div className="adv-progress-fill" style={{ width: `${generation?.progress || 5}%` }} /></div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* ── Generate Button ── */}
-            <button onClick={handleGenerate} disabled={loading || !prompt.trim()}
-                className="w-full py-4 rounded-2xl bg-gradient-to-r from-violet-600 to-cyan-600 text-white font-bold text-base hover:shadow-xl hover:shadow-violet-500/20 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-3">
-                {loading ? (
-                    <><span className="material-symbols-outlined animate-spin">progress_activity</span>Submitting to {cap.name}...</>
-                ) : (
-                    <><span className="material-symbols-outlined">movie</span>Generate Video — {costPreview?.credits || 15} Credits</>
-                )}
-            </button>
-        </div>
+            {/* ── DONE ── */}
+            {phase === 'done' && (
+                <div style={{ padding: '20px' }}>
+                    {generation?.videoUrl ? (
+                        <>
+                            <div className="adv-done-card"><video controls src={generation.videoUrl} /></div>
+                            <div className="adv-done-btns">
+                                <button className="adv-btn-secondary" onClick={() => { setPhase('compose'); setGeneration(null) }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>edit</span> Edit & Retry
+                                </button>
+                                <a className="adv-btn-primary" href={generation.videoUrl} download target="_blank" rel="noopener noreferrer">
+                                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>download</span> Download
+                                </a>
+                            </div>
+                        </>
+                    ) : (
+                        <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: '48px', color: '#475569' }}>videocam_off</span>
+                            <p style={{ color: '#64748b', fontSize: '14px', margin: '12px 0 16px' }}>{error || 'Generation failed'}</p>
+                            <button className="adv-btn-secondary" onClick={() => { setPhase('compose'); setError('') }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>arrow_back</span> Try Again
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ── COMPOSE ── */}
+            {phase === 'compose' && (
+                <div className="adv-wrap">
+                    {error && (
+                        <div className="adv-err">
+                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>error</span>
+                            <span style={{ flex: 1 }}>{error}</span>
+                            <button onClick={() => setError('')}><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>close</span></button>
+                        </div>
+                    )}
+
+                    {/* §1 — PROMPT */}
+                    <div className="adv-prompt-card" style={{ position: 'relative' }}>
+                        <textarea
+                            ref={promptRef}
+                            className="adv-textarea"
+                            value={prompt}
+                            onChange={handlePromptChange}
+                            placeholder={activeBrand?.name
+                                ? `What's your ${activeBrand.name} ad about? Type @ to tag ref images...`
+                                : `What's your ad about? Type @ to tag ref images...`}
+                        />
+                        {/* @ Autocomplete popup */}
+                        {showAutocomplete && refImages.length > 0 && (
+                            <div className="adv-autocomplete">
+                                {refImages.map((img, i) => (
+                                    <button key={img.id} className="adv-ac-item" onClick={() => insertTag(i)}>
+                                        <img src={img.url} alt="" />
+                                        <span>@image{i + 1}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        {/* Ref image tags */}
+                        {refImages.length > 0 && (
+                            <div className="adv-tags">
+                                {refImages.map((img, i) => {
+                                    const isLinked = prompt.includes(`@image${i + 1}`)
+                                    return (
+                                        <div key={img.id} className="adv-tag" style={isLinked ? { borderColor: 'rgba(34,197,94,0.4)', background: 'rgba(34,197,94,0.08)' } : {}}>
+                                            <img src={img.url} alt="" />
+                                            <span style={isLinked ? { color: '#4ade80' } : {}}>@image{i + 1}</span>
+                                            {isLinked && <span style={{ fontSize: 10 }}>🔗</span>}
+                                            {!isLinked && !img.uploading && <span style={{ fontSize: 9, color: '#64748b' }}>type @ to link</span>}
+                                            {img.uploading && <span className="uploading">uploading...</span>}
+                                            <button onClick={() => setRefImages(prev => prev.filter(r => r.id !== img.id))}>×</button>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
+                        <div className="adv-prompt-footer">
+                            <button className="adv-enhance" onClick={handleEnhance} disabled={enhancing || !prompt.trim()}>
+                                {enhancing ? <><span className="material-symbols-outlined adv-spin" style={{ fontSize: '14px' }}>progress_activity</span> Enhancing...</> : <>✨ Enhance as Ad Film</>}
+                            </button>
+                            <span className="adv-chars">{prompt.length} chars</span>
+                        </div>
+                    </div>
+
+                    {/* §2 — CONFIG ROW */}
+                    <div className="adv-config">
+                        <div className="adv-config-item">
+                            <span className="adv-config-label">Model</span>
+                            <select className="adv-select" value={model} onChange={e => setModel(e.target.value)}>
+                                {Object.values(MODELS).map(mod => <option key={mod.id} value={mod.id}>{mod.icon} {mod.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="adv-config-item">
+                            <span className="adv-config-label">Ratio</span>
+                            <select className="adv-select" value={aspectRatio} onChange={e => setAspectRatio(e.target.value)}>
+                                {m.ratios.map(r => <option key={r} value={r}>{r}</option>)}
+                            </select>
+                        </div>
+                        <div className="adv-config-item">
+                            <span className="adv-config-label">Duration</span>
+                            <select className="adv-select" value={duration} onChange={e => setDuration(Number(e.target.value))}>
+                                {Array.from({ length: m.dur[1] - m.dur[0] + 1 }, (_, i) => m.dur[0] + i).map(d => <option key={d} value={d}>{d}s</option>)}
+                            </select>
+                        </div>
+                        <div className="adv-config-item">
+                            <span className="adv-config-label">Quality</span>
+                            <div className="adv-quality-row">
+                                <button className={`adv-pill ${quality === 'fast' ? 'active' : ''}`} onClick={() => setQuality('fast')}>⚡ Fast</button>
+                                <button className={`adv-pill ${quality === 'quality' ? 'active' : ''}`} onClick={() => setQuality('quality')}>✨ Quality</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* §3 — DYNAMIC FEATURE CARDS */}
+                    <div className="adv-features">
+                        {/* First Frame */}
+                        {m.has.firstFrame && (
+                            <div className={`adv-fcard ${firstFrame ? 'has-content' : ''}`}>
+                                <div className="adv-fcard-head">
+                                    <span className="icon">📸</span>
+                                    <span className="title">First Frame</span>
+                                    {firstFrame && <button className="remove" onClick={() => setFirstFrame(null)}>×</button>}
+                                </div>
+                                {firstFrame ? (
+                                    <img className="adv-fcard-preview" src={firstFrame.url} alt="First frame" />
+                                ) : (
+                                    <div className="adv-fcard-btns">
+                                        <button className="adv-fcard-btn" onClick={() => firstFrameRef.current?.click()}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>upload</span> Upload
+                                        </button>
+                                        <button className="adv-fcard-btn ai" onClick={generateFirstFrame} disabled={generatingFrame}>
+                                            {generatingFrame ? <span className="material-symbols-outlined adv-spin" style={{ fontSize: '16px' }}>progress_activity</span> : '✨'} AI
+                                        </button>
+                                        <button className="adv-fcard-btn" onClick={() => loadLibrary('first')}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>photo_library</span>
+                                        </button>
+                                    </div>
+                                )}
+                                <input ref={firstFrameRef} type="file" accept="image/*" onChange={e => onFile(e, setFirstFrame)} style={{ display: 'none' }} />
+                            </div>
+                        )}
+
+                        {/* Last Frame */}
+                        {m.has.lastFrame && (
+                            <div className={`adv-fcard ${lastFrame ? 'has-content' : ''}`}>
+                                <div className="adv-fcard-head">
+                                    <span className="icon">🎬</span>
+                                    <span className="title">Last Frame</span>
+                                    {lastFrame && <button className="remove" onClick={() => setLastFrame(null)}>×</button>}
+                                </div>
+                                {lastFrame ? (
+                                    <img className="adv-fcard-preview" src={lastFrame.url} alt="Last frame" />
+                                ) : (
+                                    <div className="adv-fcard-btns">
+                                        <button className="adv-fcard-btn" onClick={() => lastFrameRef.current?.click()}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>upload</span> Upload
+                                        </button>
+                                        <button className="adv-fcard-btn" onClick={() => loadLibrary('last')}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>photo_library</span>
+                                        </button>
+                                    </div>
+                                )}
+                                <input ref={lastFrameRef} type="file" accept="image/*" onChange={e => onFile(e, setLastFrame)} style={{ display: 'none' }} />
+                            </div>
+                        )}
+
+                        {/* Ref Images */}
+                        {m.has.refImages && (
+                            <div className={`adv-fcard ${refImages.length > 0 ? 'has-content' : ''}`}>
+                                <div className="adv-fcard-head">
+                                    <span className="icon">🎞️</span>
+                                    <span className="title">Ref Images</span>
+                                    <span className="hint">Use @image1 in prompt</span>
+                                </div>
+                                <div className="adv-ref-grid">
+                                    {refImages.map((img, i) => (
+                                        <div key={img.id} className="adv-ref-thumb">
+                                            <img src={img.url} alt="" />
+                                            <span className="label">@img{i + 1}</span>
+                                            <button className="del" onClick={() => setRefImages(prev => prev.filter(r => r.id !== img.id))}>×</button>
+                                        </div>
+                                    ))}
+                                    <button className="adv-ref-add" onClick={() => refImgRef.current?.click()}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>add</span>
+                                    </button>
+                                </div>
+                                <input ref={refImgRef} type="file" accept="image/*" onChange={onRefFile} style={{ display: 'none' }} />
+                            </div>
+                        )}
+
+                        {/* Ref Video */}
+                        {m.has.refVideo && (
+                            <div className={`adv-fcard ${refVideo ? 'has-content' : ''}`}>
+                                <div className="adv-fcard-head">
+                                    <span className="icon">🎥</span>
+                                    <span className="title">Ref Video</span>
+                                    {refVideo && <button className="remove" onClick={() => setRefVideo(null)}>×</button>}
+                                </div>
+                                {refVideo ? (
+                                    <p className="adv-fcard-attached">📎 {refVideo.name || 'Video attached'}</p>
+                                ) : (
+                                    <div className="adv-fcard-btns">
+                                        <button className="adv-fcard-btn" onClick={() => refVideoRef.current?.click()}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>upload</span> Upload Video
+                                        </button>
+                                    </div>
+                                )}
+                                <input ref={refVideoRef} type="file" accept="video/*" onChange={e => onMediaFile(e, setRefVideo)} style={{ display: 'none' }} />
+                            </div>
+                        )}
+
+                        {/* Ref Audio */}
+                        {m.has.refAudio && (
+                            <div className={`adv-fcard ${refAudio ? 'has-content' : ''}`}>
+                                <div className="adv-fcard-head">
+                                    <span className="icon">🔊</span>
+                                    <span className="title">Ref Audio</span>
+                                    {refAudio && <button className="remove" onClick={() => setRefAudio(null)}>×</button>}
+                                </div>
+                                {refAudio ? (
+                                    <p className="adv-fcard-attached">🎵 {refAudio.name || 'Audio attached'}</p>
+                                ) : (
+                                    <div className="adv-fcard-btns">
+                                        <button className="adv-fcard-btn" onClick={() => refAudioRef.current?.click()}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>upload</span> Upload Audio
+                                        </button>
+                                    </div>
+                                )}
+                                <input ref={refAudioRef} type="file" accept="audio/*" onChange={e => onMediaFile(e, setRefAudio)} style={{ display: 'none' }} />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Library Modal */}
+                    {showLibrary && (
+                        <div className="adv-library">
+                            <div className="adv-library-head">
+                                <span>📚 Image Library</span>
+                                <button onClick={() => setShowLibrary(false)}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
+                                </button>
+                            </div>
+                            {libraryLoading ? <p style={{ fontSize: '12px', color: '#64748b', textAlign: 'center', padding: '16px 0' }}>Loading...</p>
+                                : libraryImages.length === 0 ? <p style={{ fontSize: '12px', color: '#64748b', textAlign: 'center', padding: '16px 0' }}>No images yet</p>
+                                    : <div className="adv-library-grid">{libraryImages.map((img, i) => <img key={i} src={img.url || img.imageUrl} alt="" onClick={() => pickFromLibrary(img)} />)}</div>
+                            }
+                        </div>
+                    )}
+
+                    {/* §4 — GENERATE BUTTON */}
+                    <button className="adv-generate" onClick={handleGenerate} disabled={loading || !prompt.trim()}>
+                        {loading ? <><span className="material-symbols-outlined adv-spin" style={{ fontSize: '18px' }}>progress_activity</span> Submitting to {m.name}...</> : <>🎬 Generate Ad Film · {credits} credits · ~2 min</>}
+                    </button>
+                </div>
+            )}
+        </>
     )
 }
