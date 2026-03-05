@@ -21,15 +21,6 @@ const SUPER_ADMINS = [
         credits: { total: 999999, used: 0, bonus: 0 },
     },
     {
-        name: 'User Admin',
-        email: 'user@mantram.ai',
-        password: 'Mantram@2024',
-        role: 'superadmin',
-        plan: 'enterprise',
-        company: 'Mantram AI',
-        credits: { total: 999999, used: 0, bonus: 0 },
-    },
-    {
         name: 'Principal Admin',
         email: 'superadmin@mantram.ai',
         password: 'MantramSuper@2024',
