@@ -97,6 +97,10 @@ jobs:
             
             # 4. Atomic Symlink Switch
             echo "🔗 Switching symlink..."
+            if [ ! -L "$CURRENT_LINK" ] && [ -d "$CURRENT_LINK" ]; then
+              echo "⚠️  Moving existing Mantram folder to Mantram_old_folder"
+              mv "$CURRENT_LINK" "${CURRENT_LINK}_old_folder"
+            fi
             ln -sfn $RELEASE_DIR $CURRENT_LINK
             
             # 5. Restart with PM2
