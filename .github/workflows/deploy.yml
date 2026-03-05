@@ -76,6 +76,7 @@ jobs:
             
             echo "📦 Creating release: $TIMESTAMP"
             mkdir -p $BASE_DIR
+            mkdir -p $RELEASE_DIR/backend/logs
             
             # 1. Clone/Copy release
             git clone --depth=1 -b main https://github.com/Abhishekjohri1998/Mantram.git $RELEASE_DIR
@@ -125,11 +126,14 @@ jobs:
             done
             
             if [ "$success" = false ]; then
-              echo "❌ Backend health check failed! Showing logs from $CURRENT_LINK/backend/logs/:"
-              echo "--- ERROR LOG ---"
-              cat $CURRENT_LINK/backend/logs/error.log || echo "No error log found"
-              echo "--- OUT LOG ---"
-              cat $CURRENT_LINK/backend/logs/out.log || echo "No out log found"
+              echo "❌ Backend health check failed! Showing PM2 Logs:"
+              pm2 logs mantram-server --lines 100 --no-daemon & sleep 10 && kill $!
+              
+              echo "🔍 Checking port 3001 usage..."
+              sudo lsof -i :3001 || echo "Port 3001 is free"
+              
+              echo "💀 Force killing any existing mantram process for fresh start..."
+              pm2 delete mantram-server || true
               exit 1
             fi
             

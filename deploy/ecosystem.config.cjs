@@ -31,8 +31,8 @@ module.exports = {
         wait_ready: false,
 
         // Logging
-        error_file: 'logs/error.log',
-        out_file: 'logs/out.log',
+        error_file: '/home/ec2-user/Mantram/backend/logs/error.log',
+        out_file: '/home/ec2-user/Mantram/backend/logs/out.log',
         merge_logs: true,
         log_date_format: 'YYYY-MM-DD HH:mm:ss',
     }]
