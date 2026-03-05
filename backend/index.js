@@ -36,6 +36,7 @@ import pmConnectionRoutes from './routes/pm-connections.js';
 import dashboardSummaryRoutes from './routes/dashboard-summary.js';
 import teamRoutes from './routes/team.js';
 import fidatoRoutes from './routes/fidato.js';
+import paymentRoutes from './routes/payments.js';
 
 const app = express();
 
