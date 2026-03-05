@@ -110,9 +110,15 @@ jobs:
             fi
             ln -sfn $RELEASE_DIR $CURRENT_LINK
             
-            # 5. Restart with PM2
+            # 5. Restart with PM2 (Force restart to pick up latest symlink)
+            echo "🔄 Restarting backend..."
             cd $CURRENT_LINK
-            pm2 startOrReload deploy/ecosystem.config.cjs --update-env
+            
+            echo "📄 Verifying index.js version (checking for 'cors' in health check):"
+            grep "cors:" backend/index.js || echo "⚠️  WARNING: Latest code with 'cors' debug key not found in index.js!"
+            
+            pm2 delete mantram-server || true
+            pm2 start deploy/ecosystem.config.cjs --update-env
             pm2 save
             
             # 6. Health Check (with Retry Loop)
