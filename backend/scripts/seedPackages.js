@@ -148,7 +148,7 @@ const PACKAGES = [
         badge: 'TESTING',
         color: '#10b981',
         icon: 'bug_report',
-        displayOrder: 0,
+        displayOrder: -1, // Ensure it is the VERY first one
         features: [
             { name: 'Live Integration Test', included: true },
             { name: '1 Rupee Only', included: true },
@@ -161,13 +161,13 @@ async function seed() {
         await mongoose.connect(process.env.MONGODB_URI);
         console.log('✅ Connected to MongoDB');
 
+        // Force a clean state to resolve duplicates
+        console.log('🧹 Clearing existing packages...');
+        await SubscriptionPackage.deleteMany({});
+
         for (const pkg of PACKAGES) {
-            await SubscriptionPackage.findOneAndUpdate(
-                { slug: pkg.slug },
-                pkg,
-                { upsert: true, new: true }
-            );
-            console.log(`📦 Seeded/Updated package: ${pkg.name}`);
+            await SubscriptionPackage.create(pkg);
+            console.log(`📦 Seeded package: ${pkg.name} (slug: ${pkg.slug})`);
         }
 
         console.log('\n✅ Subscription packages seeding complete.');

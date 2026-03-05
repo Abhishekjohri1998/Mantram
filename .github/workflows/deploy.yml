@@ -128,8 +128,8 @@ jobs:
             
             # 3.5 Seed Superadmin accounts and subscription packages
             echo "🔑 Seeding data..."
-            node scripts/seedSuperAdmin.js || echo "⚠️ Superadmin seeding failed or skipped"
-            node scripts/seedPackages.js || echo "⚠️ Package seeding failed or skipped"
+            node scripts/seedSuperAdmin.js
+            node scripts/seedPackages.js
             
             # 4. Atomic Symlink Switch
             echo "🔗 Switching symlink..."
