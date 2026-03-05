@@ -116,6 +116,10 @@ jobs:
             cd $RELEASE_DIR/backend
             npm ci --omit=dev
             
+            # 3.5 Seed Superadmin accounts
+            echo "🔑 Seeding superadmins..."
+            node scripts/seedSuperAdmin.js || echo "⚠️ Seeding failed or skipped"
+            
             # 4. Atomic Symlink Switch
             echo "🔗 Switching symlink..."
             if [ ! -L "$CURRENT_LINK" ] && [ -d "$CURRENT_LINK" ]; then
