@@ -110,15 +110,23 @@ jobs:
             pm2 startOrReload deploy/ecosystem.config.cjs --update-env
             pm2 save
             
-            # 6. Health Check
+            # 6. Health Check (with Retry Loop)
             echo "🏥 Health check..."
-            sleep 5
-            if curl -sf http://localhost:3001/api/health > /dev/null; then
-              echo "✅ Backend is UP"
-            else
-              echo "❌ Backend health check failed! Rolling back..."
-              # Simple rollback: point symlink back to previous (if exists)
-              # Ideally, Job 3 handles this more robustly, but this is a local safety
+            success=false
+            for i in {1..6}; do
+              echo "Attempt $i: Checking http://localhost:3001/api/health"
+              if curl -sf http://localhost:3001/api/health; then
+                echo "✅ Backend is UP"
+                success=true
+                break
+              fi
+              echo "⏳ Waiting for server to start... (5s)"
+              sleep 5
+            done
+            
+            if [ "$success" = false ]; then
+              echo "❌ Backend health check failed! Showing logs:"
+              pm2 logs mantram-server --lines 50 --no-daemon & sleep 5 && kill $!
               exit 1
             fi
             
