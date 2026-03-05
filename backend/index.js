@@ -48,10 +48,14 @@ app.use(cors({
         // Allow requests with no origin (like mobile apps or curl)
         if (!origin) return callback(null, true);
 
-        if (config.frontendUrl.includes(origin)) {
+        // Standardize origin for matching (lowercase, no trailing slash)
+        const cleanOrigin = origin.toLowerCase().replace(/\/$/, '');
+        const allowedOrigins = config.frontendUrl.map(url => url.toLowerCase().replace(/\/$/, ''));
+
+        if (allowedOrigins.includes(cleanOrigin)) {
             callback(null, true);
         } else {
-            console.warn(`⚠️ CORS Blocked: Origin "${origin}" not in allowed list:`, config.frontendUrl);
+            console.warn(`⚠️ CORS Blocked: Origin "${origin}" (cleaned: "${cleanOrigin}") not in allowed list:`, allowedOrigins);
             callback(null, false);
         }
     },
