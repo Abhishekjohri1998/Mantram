@@ -306,7 +306,7 @@ export default function CreditsPage() {
                                                     {pkg.features.map((f, j) => (
                                                         <li key={j} className="flex items-center gap-2 text-sm text-slate-300">
                                                             <span className="material-symbols-outlined text-primary text-lg">check_circle</span>
-                                                            {f.name || f}
+                                                            {typeof f === 'object' ? (f.name || 'Feature') : f}
                                                         </li>
                                                     ))}
                                                 </ul>
