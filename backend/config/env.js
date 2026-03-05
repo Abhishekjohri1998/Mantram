@@ -38,9 +38,14 @@ export default {
         apiKey: process.env.FAL_API_KEY,
     },
 
-    // kie.ai — Video Generation (Veo 3.1 Fast, Seedance 2.0)
+    // kie.ai — Video Generation (Veo 3.1 Fast)
     kie: {
         apiKey: process.env.KIE_API_KEY,
+    },
+
+    // PiAPI — Video Generation (Seedance 2.0)
+    piapi: {
+        apiKey: process.env.PIAPI_API_KEY,
     },
 
     // Google OAuth

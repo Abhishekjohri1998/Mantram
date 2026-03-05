@@ -15,6 +15,7 @@
  */
 
 import { Router } from 'express';
+import mongoose from 'mongoose';
 import VideoProject from '../models/VideoProject.js';
 import Brand from '../models/Brand.js';
 import { protect } from '../middleware/auth.js';
@@ -29,12 +30,23 @@ import {
     pollGenerationStatus,
     criticNode,
     editorNode,
+    enhancePromptNode,
+    durationPlannerNode,
+    advancedGenerateNode,
 } from '../agents/videoStudio/nodes.js';
-import { estimateCost, getModelsInfo } from '../agents/videoStudio/falClient.js';
+import { estimateCost, getModelsInfo, MODEL_CAPABILITIES } from '../agents/videoStudio/falClient.js';
 import { saveLearnings, getStylePreferences } from '../agents/videoStudio/selfLearning.js';
+import { getRouter as getAIRouter } from '../ai/router.js';
 
 const router = Router();
 
+// Validate :id parameter — skip non-ObjectId values so named routes like /advanced/generate work
+router.param('id', (req, res, next, id) => {
+    if (!mongoose.isValidObjectId(id)) {
+        return res.status(400).json({ success: false, error: `Invalid project ID: ${id}` });
+    }
+    next();
+});
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/video-studio/start — Create project + brainstorm concepts
 // ══════════════════════════════════════════════════════════════════════════════
@@ -181,8 +193,61 @@ router.post('/:id/approve', protect, async (req, res) => {
             title: project.title,
         };
 
+        // Run reference curator + auto-generate first frame image in parallel
+        const script = editedScript || project.script;
+        const firstShot = script?.shots?.[0];
+        // Check if user provided a real, externally-accessible image
+        // Exclude: base64 data URIs, localhost proxy URLs
+        const hasRealImage = fullState.inputImages?.some(img => {
+            if (!img.url) return false;
+            if (img.url.startsWith('data:')) return false;
+            if (img.url.includes('localhost') || img.url.includes('127.0.0.1')) return false;
+            return img.url.startsWith('http');
+        });
+
+        console.log(`🖼️ First frame check: firstShot=${!!firstShot}, hasRealImage=${hasRealImage}, inputImages=${fullState.inputImages?.length || 0}`);
+
+        // Generate first-frame image if no real image is already provided
+        let firstFramePromise = Promise.resolve(null);
+        if (firstShot && !hasRealImage) {
+            console.log('🖼️ Auto-generating first frame image from first shot description...');
+            firstFramePromise = (async () => {
+                try {
+                    const { geminiImageGenerate } = await import('../agents/videoStudio/firstFrame.js');
+                    const brand = project.brand ? await Brand.findById(project.brand).lean() : null;
+                    const shotDesc = firstShot.description || firstShot.visual || firstShot.prompt || 'cinematic opening shot';
+                    const shotPrompt = `Generate a cinematic, photorealistic still frame for a video scene: ${shotDesc}.
+Style: ${firstShot.style || script?.narrative || 'cinematic, professional'}.
+${brand?.name ? `Brand: ${brand.name}` : ''}
+This image will be used as the FIRST FRAME of a video — make it visually striking, well-composed, and suitable as an opening shot.
+Output ONLY the image, no text or labels.`;
+                    console.log('🖼️ First frame prompt:', shotPrompt.substring(0, 200) + '...');
+                    const result = await geminiImageGenerate(shotPrompt, [], 0.5);
+                    if (result.imageUrl) {
+                        console.log('✅ First frame image generated successfully:', result.imageUrl.substring(0, 80));
+                        return result.imageUrl;
+                    }
+                } catch (e) {
+                    console.warn('⚠️ First frame generation failed (non-blocking):', e.message);
+                }
+                return null;
+            })();
+        } else {
+            console.log(`🖼️ Skipping first frame generation: ${!firstShot ? 'no first shot in script' : 'user already has a real image'}`);
+        }
+
         // Run reference curator
         const refState = await runStep(project._id, 'references', referenceCuratorNode, fullState);
+
+        // Wait for first frame and store it
+        const firstFrameUrl = await firstFramePromise;
+        if (firstFrameUrl) {
+            const images = [...(project.input?.images || [])];
+            images.unshift({ url: firstFrameUrl, source: 'ai-first-frame', label: `First shot: ${(firstShot.description || '').substring(0, 60)}` });
+            await VideoProject.findByIdAndUpdate(project._id, { 'input.images': images });
+            // Also inject into state for videoGeneratorNode
+            refState.inputImages = images;
+        }
 
         // Auto-advance to model router
         const routingState = await runStep(project._id, 'routing', modelRouterNode, {
@@ -197,6 +262,8 @@ router.post('/:id/approve', protect, async (req, res) => {
                 references: routingState.references,
                 routing: routingState.routing,
                 pipeline: getPipelineInfo('routing'),
+                firstFrameUrl: firstFrameUrl || null,
+                images: firstFrameUrl ? routingState.inputImages : (project.input?.images || []),
             },
         });
     } catch (error) {
@@ -210,17 +277,18 @@ router.post('/:id/approve', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/:id/generate', protect, requireCredits('videoGenerate'), async (req, res) => {
     try {
-        const { resolution, model, mode } = req.body; // Optional overrides
+        const { resolution, model, mode, aspectRatio } = req.body; // Optional overrides
         const project = await VideoProject.findOne({ _id: req.params.id, user: req.user._id });
         if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
         if (project.status !== 'routing') return res.status(400).json({ success: false, error: 'Not in routing stage' });
 
         // Apply any user overrides
-        if (resolution || model || mode) {
+        if (resolution || model || mode || aspectRatio) {
             const routing = { ...project.routing.toObject() };
             if (resolution) routing.resolution = resolution;
             if (model) routing.selectedModel = model;
             if (mode) routing.mode = mode;
+            if (aspectRatio) routing.aspectRatio = aspectRatio;
             routing.costPreview = estimateCost(
                 routing.selectedModel,
                 project.script?.totalDuration || 5,
@@ -267,7 +335,7 @@ router.get('/:id/status', protect, async (req, res) => {
         const project = await VideoProject.findOne({ _id: req.params.id, user: req.user._id }).lean();
         if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
 
-        if (project.status === 'generating' && project.generation?.falRequestId) {
+        if ((project.status === 'generating' || project.status === 'advanced-generating') && project.generation?.falRequestId) {
             // Poll fal.ai for progress
             const state = {
                 generation: project.generation,
@@ -443,7 +511,7 @@ router.post('/:id/finalize', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 router.get('/', protect, async (req, res) => {
     try {
-        const { brandId, status, limit = 20, page = 1 } = req.query;
+        const { brandId, status, limit = 50, page = 1 } = req.query;
         const filter = { user: req.user._id };
         if (brandId) filter.brand = brandId;
         if (status) filter.status = status;
@@ -454,11 +522,59 @@ router.get('/', protect, async (req, res) => {
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(Number(limit))
-                .select('title status input.videoType routing.selectedModel routing.costPreview generation.videoUrl generation.thumbnailUrl createdAt updatedAt')
+                .select('title status mode input.videoType routing.selectedModel routing.costPreview generation createdAt updatedAt')
                 .populate('brand', 'name dna.logo.url')
                 .lean(),
             VideoProject.countDocuments(filter),
         ]);
+
+        // ── Auto-sync stuck generating projects ──
+        // If any projects are still "generating"/"advanced-generating", re-check their status
+        // This catches cases where the user closed the tab before polling completed
+        const stuckProjects = projects.filter(p =>
+            (p.status === 'generating' || p.status === 'advanced-generating') && p.generation?.falRequestId
+        );
+
+        if (stuckProjects.length > 0) {
+            console.log(`🔄 Auto-syncing ${stuckProjects.length} stuck generating project(s)...`);
+            await Promise.allSettled(stuckProjects.map(async (p) => {
+                try {
+                    // Infer provider from model if not stored (older projects)
+                    const model = p.routing?.selectedModel || '';
+                    let provider = p.generation?.provider || '';
+                    if (!provider) {
+                        if (model === 'veo-3.1-fast') provider = 'kie';
+                        else if (model === 'seedance-2.0') provider = 'piapi';
+                        else if (model === 'grok-imagine') provider = 'grok';
+                        else provider = 'fal';
+                    }
+
+                    console.log(`🔍 Syncing ${p._id}: model=${model}, provider=${provider}, reqId=${p.generation?.falRequestId?.substring(0, 20)}...`);
+
+                    const state = {
+                        generation: { ...p.generation, provider },
+                        routing: { selectedModel: model },
+                    };
+                    const updated = await pollGenerationStatus(state);
+
+                    if (updated.generation?.status === 'COMPLETED' || updated.generation?.status === 'FAILED') {
+                        const newStatus = updated.generation.status === 'COMPLETED' ? 'critique' : 'failed';
+                        await VideoProject.findByIdAndUpdate(p._id, {
+                            status: newStatus,
+                            generation: { ...updated.generation, provider },
+                        });
+                        // Update the in-memory project for the response
+                        p.status = newStatus;
+                        p.generation = { ...updated.generation, provider };
+                        console.log(`✅ Synced project ${p._id}: ${newStatus} — videoUrl: ${updated.generation.videoUrl ? 'YES' : 'no'}`);
+                    } else {
+                        console.log(`⏳ Project ${p._id} still ${updated.generation?.status || 'unknown'}`);
+                    }
+                } catch (e) {
+                    console.warn(`⚠️ Failed to sync project ${p._id}:`, e.message);
+                }
+            }));
+        }
 
         res.json({ success: true, projects, total });
     } catch (error) {
@@ -493,6 +609,167 @@ router.get('/:id', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 router.get('/models/info', protect, (req, res) => {
     res.json({ success: true, models: getModelsInfo() });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GET /api/video-studio/models/capabilities — Full model capability matrix
+// ══════════════════════════════════════════════════════════════════════════════
+router.get('/models/capabilities', protect, (req, res) => {
+    res.json({ success: true, capabilities: MODEL_CAPABILITIES });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/video-studio/enhance-prompt — AI-enhance a raw video prompt
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/enhance-prompt', protect, async (req, res) => {
+    try {
+        const { prompt, model, duration, aspectRatio, brandId } = req.body;
+        if (!prompt || !prompt.trim()) {
+            return res.status(400).json({ success: false, error: 'Prompt is required' });
+        }
+
+        // Load brand context for on-brand prompt enhancement
+        let brandContext = '';
+        if (brandId) {
+            try {
+                const brand = await Brand.findById(brandId).lean();
+                if (brand) {
+                    const parts = [];
+                    if (brand.name) parts.push(`Brand: ${brand.name}`);
+                    if (brand.tagline) parts.push(`Tagline: "${brand.tagline}"`);
+                    if (brand.dna?.brandVoice) parts.push(`Brand Voice: ${brand.dna.brandVoice}`);
+                    if (brand.dna?.visualStyle) parts.push(`Visual Style: ${brand.dna.visualStyle}`);
+                    if (brand.dna?.targetAudience) parts.push(`Target Audience: ${brand.dna.targetAudience}`);
+                    if (brand.dna?.colorPalette?.length) parts.push(`Colors: ${brand.dna.colorPalette.join(', ')}`);
+                    if (brand.dna?.industry) parts.push(`Industry: ${brand.dna.industry}`);
+                    if (brand.dna?.uniqueSellingPoints?.length) parts.push(`USPs: ${brand.dna.uniqueSellingPoints.join(', ')}`);
+                    if (brand.dna?.emotionalTone) parts.push(`Emotional Tone: ${brand.dna.emotionalTone}`);
+                    if (parts.length > 0) {
+                        brandContext = `\n\nBRAND CONTEXT (IMPORTANT — the enhanced prompt MUST align with this brand):\n${parts.join('\n')}`;
+                    }
+                }
+            } catch (e) {
+                console.warn('Could not load brand context:', e.message);
+            }
+        }
+
+        // Use Claude with brand context for reliable prompt enhancement
+        const aiRouter = getAIRouter();
+
+        const systemPrompt = `You are a cinematic AI video prompt enhancer. Take the user's raw prompt and rewrite it into a detailed, production-ready video generation prompt.
+
+Rules:
+- Add specific visual details: lighting, camera angle, movement, color palette
+- Include cinematic language: depth of field, lens type, motion type
+- Keep the core intent but make it vivid and specific
+- Duration: ${duration || 5}s, Aspect ratio: ${aspectRatio || '16:9'}, Model: ${model || 'general'}
+${brandContext}
+${brandContext ? '- IMPORTANT: Align the visual style, colors, mood, and tone with the brand identity above' : ''}
+- Output ONLY valid JSON: {"enhancedPrompt": "...", "changes": ["change1", "change2"]}`;
+
+        const result = await aiRouter.generateText({
+            systemPrompt,
+            userPrompt: `Enhance this video prompt:\n\n"${prompt.trim()}"`,
+            temperature: 0.5,
+            maxTokens: 1024,
+        }, { provider: 'anthropic' });
+
+        let parsed;
+        try {
+            const jsonMatch = (result.text || '').match(/\{[\s\S]*\}/);
+            parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { enhancedPrompt: result.text };
+        } catch {
+            parsed = { enhancedPrompt: result.text || prompt };
+        }
+
+        res.json({
+            success: true,
+            enhancedPrompt: parsed.enhancedPrompt || prompt,
+            changes: parsed.changes || [],
+        });
+    } catch (error) {
+        console.error('Enhance prompt error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/video-studio/advanced/generate — Direct generation (Advanced Mode)
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/advanced/generate', protect, requireCredits('videoGenerate'), async (req, res) => {
+    try {
+        const {
+            prompt, model, duration, resolution, aspectRatio,
+            firstImageUrl, lastImageUrl, referenceImages,
+            generateAudio, qualityMode, brandId,
+        } = req.body;
+
+        if (!prompt || !prompt.trim()) {
+            return res.status(400).json({ success: false, error: 'Prompt is required' });
+        }
+
+        // Create project in advanced mode
+        const project = await VideoProject.create({
+            user: req.user._id,
+            brand: brandId || null,
+            title: prompt.trim().substring(0, 60) + '...',
+            status: 'advanced-generating',
+            mode: 'advanced',
+            advancedConfig: {
+                prompt: prompt.trim(),
+                firstImageUrl: firstImageUrl || '',
+                lastImageUrl: lastImageUrl || '',
+                referenceImages: referenceImages || [],
+                aspectRatio: aspectRatio || '16:9',
+                duration: duration || 5,
+                generateAudio: generateAudio !== false,
+            },
+            routing: {
+                selectedModel: model || 'kling-3.0',
+                resolution: resolution || '1080p',
+                mode: qualityMode || 'fast',
+            },
+        });
+
+        // Plan duration if needed
+        const durationPlan = await durationPlannerNode({
+            model: model || 'kling-3.0',
+            duration: duration || 5,
+        });
+
+        // Run generation
+        const state = await advancedGenerateNode({
+            prompt: prompt.trim(),
+            model: model || 'kling-3.0',
+            duration: duration || 5,
+            resolution: resolution || '1080p',
+            qualityMode: qualityMode || 'fast',
+            firstImageUrl: firstImageUrl || '',
+            generateAudio: generateAudio !== false,
+            aspectRatio: aspectRatio || '16:9',
+        });
+
+        // Update project with generation details
+        await VideoProject.findByIdAndUpdate(project._id, {
+            generation: state.generation,
+            backendPrompt: prompt.trim(),
+        });
+
+        res.json({
+            success: true,
+            project: {
+                _id: project._id,
+                status: 'advanced-generating',
+                mode: 'advanced',
+                generation: state.generation,
+                costPreview: state.costPreview,
+                durationPlan: durationPlan.durationPlan,
+            },
+        });
+    } catch (error) {
+        console.error('Advanced generate error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
