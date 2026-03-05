@@ -1,16 +1,51 @@
-# React + Vite
+# Mantram AI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Mantram AI is now separated into two standalone directories for better maintainability and independent deployments.
 
-Currently, two official plugins are available:
+## 📂 Project Structure
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **`/backend`**: Node.js & Express API
+  - Handles authentication, database (MongoDB), and AI integrations (Claude, Gemini, etc.).
+  - Runs on port `3001` by default.
+- **`/frontend`**: Vite & React Application
+  - The user interface for Mantram AI.
+  - Proxies `/api` requests to the backend on `localhost:3001`.
+  - Runs on port `5173` by default.
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🚀 Getting Started
 
-## Expanding the ESLint configuration
+### 1. Prerequisites
+- Node.js (v18+)
+- MongoDB Atlas (or local instance)
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### 2. Backend Setup
+```bash
+cd backend
+npm install
+npm run dev
+```
+*Note: Ensure you have your `.env` file inside the `backend/` directory.*
+
+### 3. Frontend Setup
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+---
+
+## 🛠️ Key Commands
+
+| Directory | Command | Description |
+|-----------|---------|-------------|
+| Backend | `npm run dev` | Starts the API server with logging |
+| Frontend | `npm run dev` | Starts the Vite dev server |
+| Frontend | `npm run build` | Builds the production bundle |
+
+## 📐 Architecture
+- **Backend**: Express, Mongoose, JWT, Multer
+- **Frontend**: React, Vite, Tailwind CSS (v4), React Router v6
+- **AI Integrations**: Anthropic Claude, Google Gemini, OpenAI
