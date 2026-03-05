@@ -31,11 +31,14 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install dependencies (Backend)
+        run: cd backend && npm ci
+
+      - name: Install dependencies (Frontend)
+        run: cd frontend && npm ci
 
       - name: Build frontend
-        run: npm run build
+        run: cd frontend && npm run build
 
       - name: Lint check
         run: npm run lint || true
@@ -91,13 +94,15 @@ jobs:
             echo "🔗 Linking shared .env..."
             ln -sf $APP_DIR/shared/.env "$RELEASE_DIR/.env"
 
-            # ── 3. Install production dependencies ──
-            echo "📦 Installing dependencies..."
-            cd "$RELEASE_DIR"
+            # ── 3. Install production dependencies (Backend) ──
+            echo "📦 Installing backend dependencies..."
+            cd "$RELEASE_DIR/backend"
             npm ci --omit=dev
 
             # ── 4. Build frontend ──
             echo "🏗️  Building frontend..."
+            cd "$RELEASE_DIR/frontend"
+            npm ci
             npm run build
 
             # ── 5. Save current as previous (for instant rollback) ──
