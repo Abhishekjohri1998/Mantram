@@ -87,4 +87,10 @@ export default {
     grok: {
         apiKey: process.env.GROK_API_KEY || process.env.XAI_API_KEY,
     },
+
+    // Razorpay
+    razorpay: {
+        keyId: process.env.RAZORPAY_KEY_ID,
+        keySecret: process.env.RAZORPAY_KEY_SECRET,
+    },
 };

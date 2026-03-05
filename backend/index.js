@@ -114,6 +114,7 @@ app.use('/api/pm-studio', pmConnectionRoutes);
 app.use('/api/dashboard-summary', dashboardSummaryRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/fidato', fidatoRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
