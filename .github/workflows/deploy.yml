@@ -69,8 +69,8 @@ jobs:
             set -e
             
             # Paths
-            BASE_DIR=/home/ec2-user/deployments
-            CURRENT_LINK=/home/ec2-user/Mantram
+            BASE_DIR=$HOME/deployments
+            CURRENT_LINK=$HOME/Mantram
             TIMESTAMP=$(date +%Y%m%d_%H%M%S)
             RELEASE_DIR=$BASE_DIR/$TIMESTAMP
             
@@ -131,13 +131,10 @@ jobs:
             
             if [ "$success" = false ]; then
               echo "❌ Backend health check failed! Showing PM2 Logs:"
-              pm2 logs mantram-server --lines 100 --no-daemon & sleep 10 && kill $!
+              pm2 logs mantram-server --lines 100 --no-daemon --raw & sleep 10 && kill $!
               
               echo "🔍 Checking port 3001 usage..."
               sudo lsof -i :3001 || echo "Port 3001 is free"
-              
-              echo "💀 Force killing any existing mantram process for fresh start..."
-              pm2 delete mantram-server || true
               exit 1
             fi
             
