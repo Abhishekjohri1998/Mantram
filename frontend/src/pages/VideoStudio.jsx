@@ -705,7 +705,14 @@ export default function VideoStudio() {
                             Choose Video Model & Review Cost
                         </h2>
                         <p className="text-sm text-slate-400 -mt-3">
-                            AI recommended <strong className="text-violet-300">{routing.selectedModel === 'veo-3.1' ? 'Google Veo 3.1' : routing.selectedModel === 'kling-3.0' ? 'Kling 3.0' : 'Seedance 2.0'}</strong> — {routing.reasoning || 'but you can pick any model below.'}
+                            AI recommended <strong className="text-violet-300">{
+                                routing.selectedModel === 'veo-3.1' ? 'Google Veo 3.1' :
+                                    routing.selectedModel === 'veo-3.1-fast' ? 'Google Veo 3.1 Fast' :
+                                        routing.selectedModel === 'kling-3.0' ? 'Kling 3.0' :
+                                            routing.selectedModel === 'seedance-2.0' ? 'Seedance 2.0 Pro' :
+                                                routing.selectedModel === 'seedance-1.0' ? 'Seedance 1.0' :
+                                                    routing.selectedModel
+                            }</strong> — {routing.reasoning || 'but you can pick any model below.'}
                         </p>
 
                         {/* Model Selector Cards */}
@@ -713,6 +720,8 @@ export default function VideoStudio() {
                             {[
                                 { id: 'kling-3.0', name: 'Kling 3.0', icon: '🎥', desc: 'Multi-shot storyboards, native audio + voice IDs, 3-15s', bestFor: 'Product demos, action shots, storyboard videos', features: ['multi-shot', 'native-audio', 'voice-ids', '3-15s'], available: true, recommended: true },
                                 { id: 'veo-3.1', name: 'Google Veo 3.1', icon: '🎬', desc: 'Cinematic quality with native audio + extend-video', bestFor: 'Premium brand films, cinematic ads', features: ['native-audio', 'cinematic', 'extend-video', '5-8s'], available: true, recommended: false },
+                                { id: 'veo-3.1-fast', name: 'Veo 3.1 Fast', icon: '⚡', desc: 'Faster & cheaper Veo 3.1 — great for prototyping', bestFor: 'Quick iterations, content series, social video', features: ['native-audio', 'fast', '5-8s', 'cost-efficient'], available: true, recommended: false },
+                                { id: 'seedance-2.0', name: 'Seedance 2.0 Pro', icon: '🎞️', desc: 'Cinematic video with native audio, camera control & physics', bestFor: 'Premium ads, product showcases, brand films', features: ['native-audio', 'camera-control', 'cinematic', '4-15s'], available: true, recommended: false },
                                 { id: 'seedance-1.0', name: 'Seedance 1.0 Lite', icon: '🌱', desc: 'Fast & affordable video generation', bestFor: 'Quick prototypes, social content, UGC', features: ['fast', 'affordable', '5-10s'], available: true, recommended: false },
                             ].map(m => (
                                 <button key={m.id}
@@ -804,7 +813,13 @@ export default function VideoStudio() {
                             {loading ? (
                                 <><span className="material-symbols-outlined animate-spin">progress_activity</span>Submitting to {routing.selectedModel}...</>
                             ) : (
-                                <><span className="material-symbols-outlined">movie</span>Generate Video with {routing.selectedModel === 'veo-3.1' ? 'Veo 3.1' : routing.selectedModel === 'kling-3.0' ? 'Kling 3.0' : routing.selectedModel} — {routing.costPreview?.credits || 15} Credits</>
+                                <><span className="material-symbols-outlined">movie</span>Generate Video with {
+                                    routing.selectedModel === 'veo-3.1' ? 'Veo 3.1' :
+                                        routing.selectedModel === 'veo-3.1-fast' ? 'Veo 3.1 Fast' :
+                                            routing.selectedModel === 'kling-3.0' ? 'Kling 3.0' :
+                                                routing.selectedModel === 'seedance-2.0' ? 'Seedance 2.0' :
+                                                    routing.selectedModel
+                                } — {routing.costPreview?.credits || 15} Credits</>
                             )}
                         </button>
                     </div>

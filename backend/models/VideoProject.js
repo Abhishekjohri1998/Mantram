@@ -68,7 +68,7 @@ const videoProjectSchema = new mongoose.Schema({
 
     // ── Step 5: Model Router Output ──
     routing: {
-        selectedModel: { type: String, enum: ['veo-3.1', 'kling-3.0', 'seedance-2.0', 'seedance-1.0', 'grok-imagine'], default: 'kling-3.0' },
+        selectedModel: { type: String, enum: ['veo-3.1', 'veo-3.1-fast', 'kling-3.0', 'seedance-2.0', 'seedance-1.0', 'grok-imagine'], default: 'kling-3.0' },
         resolution: { type: String, enum: ['720p', '1080p', '4k'], default: '1080p' },
         mode: { type: String, enum: ['fast', 'quality'], default: 'fast' },
         reasoning: { type: String, default: '' },
@@ -85,6 +85,7 @@ const videoProjectSchema = new mongoose.Schema({
         falEndpoint: { type: String, default: '' },
         falStatusUrl: { type: String, default: '' },
         falResultUrl: { type: String, default: '' },
+        provider: { type: String, enum: ['fal', 'grok', 'kie'], default: 'fal' },
         videoUrl: { type: String, default: '' },
         thumbnailUrl: { type: String, default: '' },
         audioUrl: { type: String, default: '' },

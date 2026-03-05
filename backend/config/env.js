@@ -25,9 +25,14 @@ export default {
         },
     },
 
-    // fal.ai — Video Generation (Veo, Kling, Seedance)
+    // fal.ai — Video Generation (Kling)
     fal: {
         apiKey: process.env.FAL_API_KEY,
+    },
+
+    // kie.ai — Video Generation (Veo 3.1 Fast, Seedance 2.0)
+    kie: {
+        apiKey: process.env.KIE_API_KEY,
     },
 
     // Google OAuth
