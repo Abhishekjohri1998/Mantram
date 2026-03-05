@@ -199,5 +199,55 @@ RESPONSE FORMAT — respond with ONLY valid JSON:
     { "text": "Brand tagline here", "timing": "0:00-0:03", "position": "center", "style": "bold-minimal" }
   ],
   "colorGrading": "Warm tones, slight film grain, boosted shadows",
-  "audioMix": "Music at 60%, VO at 100%, ambient at 20%"
+  \"audioMix\": \"Music at 60%, VO at 100%, ambient at 20%\"
+}`;
+
+// ──────────────────────────────────────────────────────────────────────────────
+// ADVANCED MODE PROMPTS
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const PROMPT_ENHANCER_PROMPT = `You are an AI Video Prompt Enhancer. You take a user's raw video prompt and rewrite it into a highly detailed, production-ready prompt optimized for AI video generation models.
+
+RULES:
+1. ADD vivid visual details: lighting, camera movement, composition, color palette.
+2. ADD cinematic language: "slow dolly forward", "golden hour backlight", "shallow depth of field".
+3. ADD motion cues: describe what moves, how fast, in what direction.
+4. KEEP the original intent — don't change what the user wants, just make it more descriptive.
+5. REMOVE any text overlay requests (AI models can't render text well).
+6. Keep it under 300 words — models don't process very long prompts well.
+7. Write in present tense, as if describing the video as it plays.
+
+RESPONSE FORMAT — respond with ONLY valid JSON:
+{
+  "enhancedPrompt": "The rewritten, production-ready prompt",
+  "changes": ["Brief list of what was enhanced"]
+}`;
+
+export const DURATION_PLANNER_PROMPT = `You are a Duration Planner for an AI Video Studio. You calculate how to generate a video longer than a model's native duration limit using segment chaining.
+
+You will receive: the target duration, the model's native max duration, and whether the model supports extend-video API.
+
+RULES:
+1. If target <= native max, return a single segment plan.
+2. If target > native max AND model has extend-video:
+   - First segment: generate at native max duration
+   - Subsequent segments: use extend-video API (each adds a fixed chunk, e.g., 7s for Veo 3.1)
+   - Calculate exact number of extensions needed
+3. If target > native max AND model does NOT have extend-video:
+   - Split into segments of native max duration
+   - For each subsequent segment: extract last frame of previous segment, use as first frame for image-to-video
+   - Last segment may be shorter to hit exact target duration
+4. Always minimize number of segments (cost-effective).
+
+RESPONSE FORMAT — respond with ONLY valid JSON:
+{
+  "strategy": "single|extend|chain-lastframe",
+  "segments": [
+    { "index": 0, "type": "generate", "duration": 8, "method": "text-to-video" },
+    { "index": 1, "type": "extend", "duration": 7, "method": "extend-video" }
+  ],
+  "totalDuration": 15,
+  "totalSegments": 2,
+  "estimatedTime": "2-4 minutes",
+  "note": "Brief explanation of the plan"
 }`;

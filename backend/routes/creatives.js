@@ -364,7 +364,7 @@ router.post('/save-to-bank', protect, async (req, res) => {
 // GET /api/creatives/image-bank — List all saved images for image bank view
 router.get('/image-bank', protect, async (req, res) => {
     try {
-        const { brandId, limit = 50, page = 1, category } = req.query;
+        const { brandId, limit = 30, page = 1, category } = req.query;
         console.log('📸 image-bank request:', { userId: req.user._id, brandId, category, page, limit });
 
         const match = { user: req.user._id, imageUrl: { $exists: true, $ne: '' } };
@@ -377,8 +377,8 @@ router.get('/image-bank', protect, async (req, res) => {
             match.type = { $in: ['ai-photoshoot', 'instagram-post', 'instagram-story', 'facebook-ad', 'linkedin-post', 'youtube-thumb', 'banner', 'twitter-post', 'pinterest', 'photoshoot', 'other'] };
         }
 
-        // Use aggregation with allowDiskUse to avoid 32MB sort memory limit
-        // (each document has 3-4MB base64 imageUrl/thumbnailUrl fields)
+        // IMPORTANT: Do NOT project full imageUrl — it's 3-4MB base64 per image!
+        // Only fetch metadata + first 100 chars of imageUrl to detect if it's HTTP or base64
         const pipeline = [
             { $match: match },
             { $sort: { createdAt: -1 } },
@@ -387,8 +387,10 @@ router.get('/image-bank', protect, async (req, res) => {
             {
                 $project: {
                     type: 1, title: 1, prompt: 1, createdAt: 1, brand: 1,
-                    tags: 1, status: 1, aiMeta: 1, designData: 1,
-                    imageUrl: 1, thumbnailUrl: 1,
+                    tags: 1, status: 1,
+                    // Only get first 500 chars — enough for full HTTP URLs, tiny vs 3-4MB base64
+                    imageUrlPrefix: { $substrBytes: [{ $ifNull: ['$imageUrl', ''] }, 0, 500] },
+                    thumbnailUrl: { $substrBytes: [{ $ifNull: ['$thumbnailUrl', ''] }, 0, 500] },
                 }
             },
             { $lookup: { from: 'brands', localField: 'brand', foreignField: '_id', as: 'brandData' } },
@@ -397,6 +399,32 @@ router.get('/image-bank', protect, async (req, res) => {
         ];
 
         const images = await Creative.aggregate(pipeline).allowDiskUse(true);
+
+        // Post-process: replace base64 refs with proxy URLs
+        const API_BASE = `${req.protocol}://${req.get('host')}`;
+        for (const img of images) {
+            const prefix = img.imageUrlPrefix || '';
+            const thumbPrefix = img.thumbnailUrl || '';
+
+            if (prefix.startsWith('http')) {
+                // Real HTTP URL — the 500-char prefix is the full URL
+                img.imageUrl = prefix;
+            } else if (prefix.startsWith('data:image/')) {
+                // Base64 data URI — use proxy URL instead (avoids 3-4MB in response)
+                img.imageUrl = `${API_BASE}/api/creatives/${img._id}/image`;
+            } else {
+                img.imageUrl = '';
+            }
+
+            // Clean up thumbnailUrl
+            if (thumbPrefix.startsWith('http')) {
+                img.thumbnailUrl = thumbPrefix;
+            } else {
+                img.thumbnailUrl = img.imageUrl;
+            }
+
+            delete img.imageUrlPrefix;
+        }
 
         const total = await Creative.countDocuments(match);
 
@@ -407,6 +435,34 @@ router.get('/image-bank', protect, async (req, res) => {
 
         console.log('📸 image-bank result:', { total, returned: images.length, uploaded: uploadedCount, generated: generatedCount });
         res.json({ success: true, images, total, counts: { uploaded: uploadedCount, generated: generatedCount, all: uploadedCount + generatedCount } });
+    } catch (error) {
+        console.error('📸 image-bank error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// GET /api/creatives/:id/image — Serve creative image (proxy for base64 stored images)
+// NOTE: No `protect` middleware — <img src> tags can't send Authorization headers.
+// Security relies on unguessable MongoDB ObjectId.
+router.get('/:id/image', async (req, res) => {
+    try {
+        const creative = await Creative.findById(req.params.id).select('imageUrl').lean();
+        if (!creative?.imageUrl) return res.status(404).send('Not found');
+
+        if (creative.imageUrl.startsWith('data:image/')) {
+            // Parse base64 data URI and serve as image
+            const match = creative.imageUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+            if (match) {
+                const [, mimeType, base64Data] = match;
+                const buffer = Buffer.from(base64Data, 'base64');
+                res.set('Content-Type', mimeType);
+                res.set('Cache-Control', 'public, max-age=86400'); // Cache 1 day
+                return res.send(buffer);
+            }
+        }
+
+        // HTTP URL — redirect
+        res.redirect(creative.imageUrl);
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }

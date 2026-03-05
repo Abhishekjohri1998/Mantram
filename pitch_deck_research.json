@@ -1,0 +1,781 @@
+{
+    "platform": {
+        "name": "Mantram AI",
+        "tagline": "AI-Powered Digital Marketing Intelligence Platform",
+        "description": "All-in-one AI platform that transforms how brands create, manage, and optimize their digital presence. Combines Agentic AI workflows, multi-model intelligence, and real-time market data into a unified SaaS platform.",
+        "corePhilosophy": "Every studio is brand-aware — it ingests the brand's DNA (colors, voice, products, analytics) and generates content that is always on-brand.",
+        "website": "mantram.ai"
+    },
+    "technologyStack": {
+        "backend": {
+            "runtime": "Node.js (ES Modules)",
+            "framework": "Express.js",
+            "database": "MongoDB Atlas (cloud-hosted)",
+            "auth": "JWT (7-day expiry)",
+            "fileStorage": "AWS S3 (ap-south-1)",
+            "videoGeneration": "fal.ai queue-based + xAI Grok native",
+            "webScraping": "Cheerio (server-side DOM)"
+        },
+        "frontend": {
+            "framework": "React",
+            "bundler": "Vite",
+            "styling": "Tailwind CSS",
+            "routing": "React Router"
+        },
+        "aiRouting": {
+            "type": "Custom SmartLanguageRouter + ModelRouter",
+            "description": "Dynamically selects the optimal AI model based on task type, language, and context"
+        }
+    },
+    "aiProviders": [
+        {
+            "name": "Anthropic Claude",
+            "model": "claude-sonnet-4-20250514",
+            "usedFor": "Long-form content, blogs, SEO, structured writing (primary text generator)",
+            "costPer1MInput": "$3.00",
+            "costPer1MOutput": "$15.00",
+            "routingRule": "English long-form writing (blog, SEO, educate)"
+        },
+        {
+            "name": "Google Gemini",
+            "models": [
+                "gemini-3.1-flash",
+                "gemini-2.0-flash-exp-image-generation"
+            ],
+            "usedFor": "Image generation, vision, social media, CJK/MENA languages",
+            "costPer1MInput": "$0.15",
+            "costPer1MOutput": "$0.60",
+            "routingRule": "East Asian, Arabic, social/creative English"
+        },
+        {
+            "name": "OpenAI",
+            "model": "gpt-4o",
+            "usedFor": "European languages, embeddings, image generation, brainstorm",
+            "costPer1MInput": "$5.00",
+            "costPer1MOutput": "$15.00",
+            "routingRule": "European languages (French, German, Spanish, etc.)"
+        },
+        {
+            "name": "xAI Grok",
+            "models": [
+                "grok-3-mini-fast",
+                "grok-imagine-video"
+            ],
+            "usedFor": "Real-time knowledge (Fidato chatbot), video generation, trend intelligence",
+            "costPer1MInput": "$0.30",
+            "costPer1MOutput": "$0.50",
+            "routingRule": "Real-time data queries, video generation, live knowledge"
+        },
+        {
+            "name": "Sarvam AI",
+            "model": "sarvam-m",
+            "usedFor": "Indian regional languages (Hindi, Tamil, Bengali, Marathi, etc.)",
+            "costPer1MTokens": "$0.50",
+            "routingRule": "Any Indian language detected"
+        }
+    ],
+    "smartLanguageRoutingRules": [
+        {
+            "priority": 1,
+            "languages": "Indian (Hindi, Tamil, Bengali, etc.)",
+            "provider": "Sarvam AI",
+            "reason": "Best for Indian languages"
+        },
+        {
+            "priority": 2,
+            "languages": "East Asian (CJK)",
+            "provider": "Google Gemini",
+            "reason": "Strong polyglot, good CJK"
+        },
+        {
+            "priority": 3,
+            "languages": "Arabic/Middle-Eastern",
+            "provider": "Google Gemini",
+            "reason": "Strong multilingual (MENA)"
+        },
+        {
+            "priority": 4,
+            "languages": "European",
+            "provider": "OpenAI GPT-4o",
+            "reason": "Strong European languages"
+        },
+        {
+            "priority": 5,
+            "languages": "English (long-form)",
+            "provider": "Anthropic Claude",
+            "reason": "Best for long-form English"
+        },
+        {
+            "priority": 6,
+            "languages": "English (social/creative)",
+            "provider": "Google Gemini",
+            "reason": "Fast and creative for social"
+        },
+        {
+            "priority": 7,
+            "languages": "Fallback",
+            "provider": "Default configured",
+            "reason": "Default provider"
+        }
+    ],
+    "externalAPIIntegrations": [
+        {
+            "name": "Anthropic Claude API",
+            "purpose": "Primary text generation"
+        },
+        {
+            "name": "Google Gemini API",
+            "purpose": "Image generation, vision, multilingual text"
+        },
+        {
+            "name": "OpenAI API",
+            "purpose": "European languages, embeddings"
+        },
+        {
+            "name": "xAI Grok API",
+            "purpose": "Real-time knowledge, video generation"
+        },
+        {
+            "name": "Sarvam AI API",
+            "purpose": "Indian language NLP"
+        },
+        {
+            "name": "fal.ai API",
+            "purpose": "Video generation (Kling, Veo, Seedance)"
+        },
+        {
+            "name": "AWS S3",
+            "purpose": "Media file storage"
+        },
+        {
+            "name": "Meta Graph API",
+            "purpose": "Social publishing, Instagram DM automation"
+        },
+        {
+            "name": "Meta Marketing API",
+            "purpose": "Ad campaigns on Facebook/Instagram"
+        },
+        {
+            "name": "Google Ads API",
+            "purpose": "Ad campaigns on Google"
+        },
+        {
+            "name": "Google Analytics API",
+            "purpose": "Website performance data"
+        },
+        {
+            "name": "Google OAuth",
+            "purpose": "Social login"
+        },
+        {
+            "name": "Shopify Admin API",
+            "purpose": "D2C e-commerce data"
+        },
+        {
+            "name": "Unsplash + Pixabay APIs",
+            "purpose": "Stock photos and textures"
+        }
+    ],
+    "studios": [
+        {
+            "id": "brand-dna",
+            "name": "Brand DNA Engine",
+            "icon": "🧬",
+            "usp": "One-click website scan → complete brand identity extraction",
+            "description": "Scans any website and extracts logo, colors, typography, content voice, products, and images. All other studios consume this DNA for on-brand generation.",
+            "features": [
+                "8+ logo detection strategies with fallbacks",
+                "Color extraction from CSS, inline styles, meta, SVG, buttons, backgrounds",
+                "Typography detection (Google Fonts, @font-face, CSS font-family)",
+                "Content sample extraction for AI voice/tone analysis",
+                "Shopify product catalog sync",
+                "Banner/hero image extraction",
+                "OG data and meta info parsing"
+            ],
+            "agentUsed": "Brand Scanner Agent (948 LOC)"
+        },
+        {
+            "id": "content-studio",
+            "name": "Content Studio",
+            "icon": "✍️",
+            "usp": "Brand-aware multi-language content with RLHF self-improvement",
+            "description": "AI-generated posts, blogs, captions, threads, newsletters with smart language routing and self-learning.",
+            "features": [
+                "AI-generated posts, blogs, captions, threads, newsletters",
+                "Smart Language Router for 20+ languages",
+                "RLHF Prompt Optimizer (learns from user feedback)",
+                "Platform-specific formatting (Instagram, LinkedIn, Twitter)",
+                "Tone controls: professional, casual, GenZ, corporate",
+                "Brand context auto-injection",
+                "Brand alignment scoring"
+            ],
+            "creditCost": 2,
+            "aiPipeline": "Brand DNA → Prompt Optimization → Smart Model Selection → Generation → Brand Alignment Scoring"
+        },
+        {
+            "id": "creative-studio",
+            "name": "Creative Studio",
+            "icon": "🎨",
+            "usp": "AI Photoshoot with template learning from existing images",
+            "description": "AI image generation, product photoshoots, template learning, and canvas editor.",
+            "features": [
+                "AI image generation (Gemini image model)",
+                "AI Photoshoot: product photos with AI backgrounds",
+                "Template Learning: reverse-prompt images → reusable templates",
+                "Canvas Editor with layers, text, shapes",
+                "Unsplash photos and Pixabay textures library"
+            ],
+            "creditCost": {
+                "creative": 5,
+                "photoshoot": 10
+            }
+        },
+        {
+            "id": "video-studio",
+            "name": "Video Studio",
+            "icon": "🎬",
+            "usp": "6-node agentic pipeline with multi-model selection and shot-by-shot scripting",
+            "description": "Full video production pipeline from brief to final cut with AI brainstorming, scripting, and multi-model generation.",
+            "agenticPipeline": [
+                {
+                    "node": 1,
+                    "name": "Brainstorm Node",
+                    "action": "AI generates multiple video concepts from brief"
+                },
+                {
+                    "node": 2,
+                    "name": "Script Director Node",
+                    "action": "Detailed shot-by-shot screenplay"
+                },
+                {
+                    "node": 3,
+                    "name": "Reference Curator Node",
+                    "action": "Finds visual references for each shot"
+                },
+                {
+                    "node": 4,
+                    "name": "Model Router Node",
+                    "action": "Selects optimal video model based on requirements"
+                },
+                {
+                    "node": 5,
+                    "name": "Video Generator Node",
+                    "action": "Submits to fal.ai/Grok queue"
+                },
+                {
+                    "node": 6,
+                    "name": "Critic + Editor Node",
+                    "action": "Reviews and refines output"
+                }
+            ],
+            "videoModels": [
+                {
+                    "id": "kling-3.0",
+                    "name": "Kling 3.0",
+                    "provider": "fal.ai",
+                    "duration": "3-15s",
+                    "costPerSecFast": 0.07,
+                    "costPerSecQuality": 0.12,
+                    "bestFor": "Product demos, action shots, storyboard videos",
+                    "features": [
+                        "multi-shot",
+                        "native-audio",
+                        "voice-ids",
+                        "image-to-video"
+                    ]
+                },
+                {
+                    "id": "veo-3.1",
+                    "name": "Google Veo 3.1",
+                    "provider": "fal.ai",
+                    "duration": "5-8s",
+                    "costPerSecFast": 0.15,
+                    "costPerSecQuality": 0.40,
+                    "bestFor": "Premium brand films, cinematic ads",
+                    "features": [
+                        "native-audio",
+                        "cinematic",
+                        "extend-video"
+                    ]
+                },
+                {
+                    "id": "seedance-1.0",
+                    "name": "Seedance 1.0 Lite",
+                    "provider": "fal.ai",
+                    "duration": "5-10s",
+                    "costPerSecFast": 0.05,
+                    "costPerSecQuality": 0.08,
+                    "bestFor": "Quick prototypes, social content, UGC",
+                    "features": [
+                        "fast",
+                        "affordable",
+                        "image-to-video"
+                    ]
+                },
+                {
+                    "id": "grok-imagine",
+                    "name": "Grok Imagine",
+                    "provider": "xAI",
+                    "duration": "1-15s",
+                    "costPerSecFast": 0.08,
+                    "costPerSecQuality": 0.08,
+                    "bestFor": "Social reels, creative experiments, quick turnaround",
+                    "features": [
+                        "text-to-video",
+                        "image-to-video",
+                        "native-audio",
+                        "fast"
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "brainstorm-studio",
+            "name": "Brainstorm Studio",
+            "icon": "🧠",
+            "usp": "9 intent-based strategic frameworks with real-time trend hijacking",
+            "description": "AI-powered strategic brainstorming with brand-aware follow-up questions and Google Trends integration.",
+            "intentTypes": [
+                {
+                    "id": "campaign",
+                    "name": "Campaign",
+                    "description": "Full marketing campaign strategy"
+                },
+                {
+                    "id": "ad-film",
+                    "name": "Ad Film",
+                    "description": "Film concepts with loglines, synopses, visual styles, budgets"
+                },
+                {
+                    "id": "festival",
+                    "name": "Festival",
+                    "description": "Festival/seasonal campaign ideas"
+                },
+                {
+                    "id": "product-launch",
+                    "name": "Product Launch",
+                    "description": "Launch strategy and GTM"
+                },
+                {
+                    "id": "naming",
+                    "name": "Naming",
+                    "description": "Brand/product naming with domain availability"
+                },
+                {
+                    "id": "offer",
+                    "name": "Offer",
+                    "description": "Promotional strategy and pricing"
+                },
+                {
+                    "id": "positioning",
+                    "name": "Positioning",
+                    "description": "Brand positioning and USP definition"
+                },
+                {
+                    "id": "trend-hijack",
+                    "name": "Trend Hijack",
+                    "description": "Real-time trend riding with Google Trends data"
+                },
+                {
+                    "id": "custom",
+                    "name": "Custom",
+                    "description": "Free-form strategic brainstorming"
+                }
+            ],
+            "creditCost": 3
+        },
+        {
+            "id": "seo-studio",
+            "name": "SEO Studio",
+            "icon": "🔍",
+            "usp": "AI-powered SEO research with competitor analysis and domain intelligence",
+            "description": "Comprehensive SEO toolkit with domain research, competitor analysis, keyword strategy, and Google Analytics/Search Console integration.",
+            "features": [
+                "Domain research and web research",
+                "Competitor analysis",
+                "Keyword strategy generation",
+                "Content briefs for SEO-optimized articles",
+                "Google Analytics integration",
+                "Google Search Console data",
+                "Brand-aware SEO recommendations"
+            ],
+            "creditCost": 3
+        },
+        {
+            "id": "performance-marketing",
+            "name": "Performance Marketing Studio",
+            "icon": "📊",
+            "usp": "End-to-end ad campaign management with AI creative generation",
+            "description": "Full ad campaign lifecycle from competitor research to performance reporting across Meta and Google Ads.",
+            "pipeline": [
+                "Competitor Research → External web intelligence + Google Trends + historical learnings",
+                "Strategy Generation → Budget-aware marketing strategy with platform allocation",
+                "Budget Planning → Duration/objective-based budget split across platforms",
+                "Campaign Creation → Auto-generates ad creatives, CTAs, targeting",
+                "A/B Testing → AI suggests test variations",
+                "Performance Reporting → Cross-platform analytics"
+            ],
+            "supportedPlatforms": [
+                "Meta Ads (Facebook/Instagram)",
+                "Google Ads"
+            ],
+            "features": [
+                "Historical learning per brand",
+                "Web intelligence engine",
+                "Auto-creative generation"
+            ]
+        },
+        {
+            "id": "conversation-studio",
+            "name": "Conversation Studio",
+            "icon": "💬",
+            "usp": "AI-powered DM automation with compliance windows and human takeover",
+            "description": "Instagram DM inbox management with AI auto-reply, intent detection, compliance tracking, and seamless human takeover.",
+            "features": [
+                "Instagram DM inbox via Meta Graph API",
+                "AI auto-reply with brand-aware responses",
+                "Intent detection and classification",
+                "Compliance windows for timely responses",
+                "Seamless AI-to-human takeover",
+                "Real-time sentiment analysis",
+                "AI reply suggestions for human agents",
+                "Multi-channel support (Instagram, Facebook)"
+            ]
+        },
+        {
+            "id": "d2c-analytics",
+            "name": "D2C Analytics (Shopify Intelligence)",
+            "icon": "🛒",
+            "usp": "Deep e-commerce intelligence with red flag detection and product velocity",
+            "description": "Shopify-connected analytics with order, customer, product intelligence, AI-powered red flag detection, and Grok-powered business insights.",
+            "features": [
+                "Multi-store Shopify OAuth connection",
+                "Order Analytics: revenue trends, AOV, order frequency, time-series",
+                "Customer Analytics: repeat rate, LTV, cohort analysis",
+                "Product Health: velocity scoring, variant analysis",
+                "Red Flags: abandonment signals, inventory alerts, declining products",
+                "Advanced: geo radar, product velocity, variant popularity",
+                "AI Insights via Grok (real-time business intelligence)",
+                "15-min intelligent caching"
+            ]
+        },
+        {
+            "id": "fidato",
+            "name": "Fidato — AI Brand Manager",
+            "icon": "🤖",
+            "usp": "Always-on AI brand manager with real-time knowledge and proactive monitoring",
+            "description": "Grok-powered AI assistant that exclusively manages the selected brand with live knowledge, proactive notifications, and morning briefings.",
+            "features": [
+                "Powered by Grok for live, up-to-date knowledge (no cutoff)",
+                "Brand Loyalty Rule — exclusively manages selected brand",
+                "Morning Briefing Popup with brand health and daily inspiration",
+                "Proactive brand health notifications",
+                "Full brand DNA + product + analytics context injection",
+                "User preference controls (popup/widget toggles)",
+                "GenZ-inspired warm personality",
+                "Multi-language support"
+            ]
+        }
+    ],
+    "agenticArchitecture": {
+        "corePipeline": "User Input → Orchestrator → Smart Router → AI Provider → RLHF Optimizer → Output",
+        "keyComponents": [
+            "Brand DNA Context Injection (every request includes brand context)",
+            "State Machine Pipeline (multi-node processing)",
+            "Self-Learning via RLHF (feedback → improved future outputs)"
+        ],
+        "agents": [
+            {
+                "name": "Orchestrator",
+                "linesOfCode": 304,
+                "responsibility": "Decomposes requests, delegates to agents, coordinates pipelines"
+            },
+            {
+                "name": "Brand Scanner",
+                "linesOfCode": 948,
+                "responsibility": "Website scraping, logo/color/font/content extraction"
+            },
+            {
+                "name": "Smart Language Router",
+                "linesOfCode": 254,
+                "responsibility": "Language detection → optimal model routing"
+            },
+            {
+                "name": "RLHF Prompt Optimizer",
+                "linesOfCode": 200,
+                "responsibility": "Learns from user feedback, optimizes prompts"
+            },
+            {
+                "name": "Product Matcher",
+                "linesOfCode": 200,
+                "responsibility": "Matches products to recommendations"
+            },
+            {
+                "name": "Master Orchestrator",
+                "linesOfCode": 150,
+                "responsibility": "Higher-level coordination of multiple agents"
+            },
+            {
+                "name": "Video Studio Nodes",
+                "files": 5,
+                "responsibility": "6-node pipeline for video generation"
+            },
+            {
+                "name": "PM Intelligence",
+                "files": 6,
+                "responsibility": "Competitor research, strategy, web intelligence"
+            }
+        ],
+        "selfLearningLoop": "Generation → User Feedback (like/dislike) → RLHF Optimizer → Improved Prompts → Better Future Outputs"
+    },
+    "subscriptionModel": {
+        "creditCostsPerOperation": [
+            {
+                "operation": "Content generation",
+                "credits": 2,
+                "estimatedAPICostUSD": "0.01 - 0.05"
+            },
+            {
+                "operation": "Creative (image)",
+                "credits": 5,
+                "estimatedAPICostUSD": "0.02 - 0.08"
+            },
+            {
+                "operation": "SEO research",
+                "credits": 3,
+                "estimatedAPICostUSD": "0.02 - 0.10"
+            },
+            {
+                "operation": "Brainstorm session",
+                "credits": 3,
+                "estimatedAPICostUSD": "0.02 - 0.10"
+            },
+            {
+                "operation": "AI Photoshoot",
+                "credits": 10,
+                "estimatedAPICostUSD": "0.05 - 0.15"
+            },
+            {
+                "operation": "Video (5s Seedance)",
+                "credits": 8,
+                "estimatedAPICostUSD": "0.25"
+            },
+            {
+                "operation": "Video (5s Kling)",
+                "credits": 11,
+                "estimatedAPICostUSD": "0.35"
+            },
+            {
+                "operation": "Video (5s Veo quality)",
+                "credits": 60,
+                "estimatedAPICostUSD": "2.00"
+            }
+        ],
+        "monthlyAPICostPerUser": [
+            {
+                "tier": "Light",
+                "credits": 50,
+                "usage": "10 posts, 3 images, 0 videos",
+                "apiCostUSD": 1.50
+            },
+            {
+                "tier": "Medium",
+                "credits": 200,
+                "usage": "40 posts, 10 images, 2 videos",
+                "apiCostUSD": 6.00
+            },
+            {
+                "tier": "Heavy",
+                "credits": 500,
+                "usage": "80 posts, 25 images, 5 videos",
+                "apiCostUSD": 20.00
+            },
+            {
+                "tier": "Enterprise",
+                "credits": "Unlimited",
+                "usage": "200+ posts, 50+ images, 10+ videos",
+                "apiCostUSD": "50 - 100"
+            }
+        ],
+        "recommendedPlans": [
+            {
+                "name": "Starter",
+                "target": "Freelancers, solopreneurs",
+                "creditsPerMonth": 100,
+                "maxBrands": 1,
+                "maxTeamMembers": 0,
+                "studios": [
+                    "Content Studio",
+                    "Creative Studio",
+                    "Brainstorm Studio"
+                ],
+                "suggestedPriceINR": 999,
+                "suggestedPriceUSD": 12,
+                "billingOptions": {
+                    "monthly": 999,
+                    "quarterly": 899,
+                    "yearly": 799
+                }
+            },
+            {
+                "name": "Professional",
+                "target": "Growing brands, agencies",
+                "creditsPerMonth": 500,
+                "maxBrands": 3,
+                "maxTeamMembers": 3,
+                "studios": [
+                    "All studios",
+                    "Video Studio (2 videos/mo)"
+                ],
+                "suggestedPriceINR": 2999,
+                "suggestedPriceUSD": 35,
+                "billingOptions": {
+                    "monthly": 2999,
+                    "quarterly": 2699,
+                    "yearly": 2399
+                }
+            },
+            {
+                "name": "Enterprise",
+                "target": "Large brands, agencies",
+                "creditsPerMonth": "Unlimited",
+                "maxBrands": 10,
+                "maxTeamMembers": 10,
+                "studios": [
+                    "All studios",
+                    "Priority support",
+                    "API access"
+                ],
+                "suggestedPriceINR": 9999,
+                "suggestedPriceUSD": 120,
+                "billingOptions": {
+                    "monthly": 9999,
+                    "quarterly": 8999,
+                    "yearly": 7999
+                }
+            }
+        ],
+        "planFeatures": {
+            "toggleableStudios": [
+                "contentStudio",
+                "creativeStudio",
+                "seoStudio",
+                "brainstormStudio",
+                "videoStudio",
+                "d2cAnalytics",
+                "adStudio",
+                "smartCalendar",
+                "conversationStudio"
+            ],
+            "creditOptions": [
+                "monthly allocation",
+                "rollover",
+                "signup bonus"
+            ],
+            "limits": [
+                "maxBrands",
+                "maxTeamMembers",
+                "maxProducts",
+                "maxScheduledPosts",
+                "socialIntegrations"
+            ],
+            "pricingCycles": [
+                "monthly",
+                "quarterly (10% off)",
+                "yearly (20% off)"
+            ]
+        }
+    },
+    "competitiveAnalysis": {
+        "competitors": [
+            {
+                "name": "Canva",
+                "strengths": "Design templates, ease of use",
+                "mantramAdvantage": "Brand DNA auto-extraction, AI content generation, video gen, D2C analytics, ad management"
+            },
+            {
+                "name": "Jasper AI",
+                "strengths": "AI content generation",
+                "mantramAdvantage": "Multi-model routing (5 AI providers vs 1), Indian language support, video gen, ad management, SEO studio"
+            },
+            {
+                "name": "Hootsuite",
+                "strengths": "Social media management, scheduling",
+                "mantramAdvantage": "AI content generation, brand DNA engine, video gen, ad management, D2C analytics"
+            },
+            {
+                "name": "AdCreative.ai",
+                "strengths": "Ad creative generation",
+                "mantramAdvantage": "Full platform (not just ads), brand DNA, video gen, SEO, content, conversation studio"
+            }
+        ],
+        "uniqueFeatures": [
+            "Brand DNA auto-extraction from any website",
+            "Multi-model Smart Language Routing (5 AI providers)",
+            "Indian language support via Sarvam AI (no competitor has this)",
+            "4 video generation models in one platform",
+            "Self-learning AI via RLHF pipeline",
+            "D2C analytics with Shopify red flag detection",
+            "AI DM automation with compliance tracking",
+            "Proactive AI Brand Manager (Fidato)"
+        ]
+    },
+    "infrastructureCosts": {
+        "projectedFor": "1000 active users per month",
+        "breakdown": [
+            {
+                "service": "MongoDB Atlas (M10)",
+                "monthlyCostUSD": 60
+            },
+            {
+                "service": "AWS S3 (100GB)",
+                "monthlyCostUSD": 5
+            },
+            {
+                "service": "Anthropic Claude API",
+                "monthlyCostUSD": "500 - 2000"
+            },
+            {
+                "service": "Google Gemini API",
+                "monthlyCostUSD": "200 - 800"
+            },
+            {
+                "service": "OpenAI API",
+                "monthlyCostUSD": "100 - 500"
+            },
+            {
+                "service": "xAI Grok API",
+                "monthlyCostUSD": "100 - 400"
+            },
+            {
+                "service": "Sarvam AI",
+                "monthlyCostUSD": "50 - 200"
+            },
+            {
+                "service": "fal.ai (video gen)",
+                "monthlyCostUSD": "200 - 2000"
+            },
+            {
+                "service": "Meta / Google Ads API",
+                "monthlyCostUSD": 0
+            },
+            {
+                "service": "Shopify API",
+                "monthlyCostUSD": 0
+            }
+        ],
+        "totalEstimatedMonthlyUSD": "1200 - 6000"
+    },
+    "technicalMetrics": {
+        "backendRouteFiles": 32,
+        "databaseModels": 24,
+        "agentFiles": 15,
+        "totalBackendLOC": "50,000+",
+        "frontendPages": "25+",
+        "apiEndpoints": "150+",
+        "aiProvidersIntegrated": 5,
+        "videoModels": 4,
+        "supportedLanguages": "20+",
+        "externalAPIs": 14
+    }
+}

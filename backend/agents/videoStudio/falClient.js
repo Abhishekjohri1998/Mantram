@@ -10,12 +10,14 @@
  * 
  * Provider routing:
  *   - fal.ai: Kling 3.0, Veo 3.1, Seedance 1.0 (queue-based async)
- *   - kie.ai: Veo 3.1 Fast, Seedance 2.0 (taskId-based async)
+ *   - kie.ai: Veo 3.1 Fast (taskId-based async)
+ *   - PiAPI:  Seedance 2.0 (task-based async)
  *   - xAI:   Grok Imagine (native REST)
  */
 
 import config from '../../config/env.js';
 import { submitKieVideoGeneration } from './kieClient.js';
+import { submitPiApiVideoGeneration } from './piApiClient.js';
 
 const FAL_BASE_URL = 'https://queue.fal.run';
 const GROK_BASE_URL = 'https://api.x.ai/v1';
@@ -85,6 +87,106 @@ const DURATION_LIMITS = {
 const RESOLUTION_MAP = {
     '720p': { width: 1280, height: 720 },
     '1080p': { width: 1920, height: 1080 },
+};
+
+// ── Full Model Capabilities Matrix (exported for frontend) ──
+export const MODEL_CAPABILITIES = {
+    'kling-3.0': {
+        id: 'kling-3.0', name: 'Kling 3.0', icon: '🎥', provider: 'fal',
+        description: 'Best motion & physics — multi-shot, native audio, voice IDs',
+        bestFor: 'Product demos, action shots, storyboard videos',
+        duration: { min: 3, max: 15, native: 15, step: 1 },
+        resolutions: ['720p', '1080p', '4k'],
+        aspectRatios: ['16:9', '9:16', '1:1'],
+        features: {
+            firstFrame: true, lastFrame: true, referenceImages: false,
+            extendVideo: false, multiShot: true, nativeAudio: true,
+            voiceIds: true, cameraControl: false,
+        },
+        maxReferenceImages: 0,
+        costPerSecond: COST_PER_SECOND['kling-3.0'],
+        recommended: true,
+    },
+    'veo-3.1': {
+        id: 'veo-3.1', name: 'Google Veo 3.1', icon: '🎬', provider: 'fal',
+        description: 'Cinematic quality with native audio + extend-video',
+        bestFor: 'Premium brand films, cinematic ads',
+        duration: { min: 4, max: 8, native: 8, step: 2, extendChunk: 7, maxExtended: 148 },
+        resolutions: ['720p', '1080p', '4k'],
+        aspectRatios: ['16:9', '9:16'],
+        features: {
+            firstFrame: true, lastFrame: true, referenceImages: true,
+            extendVideo: true, multiShot: false, nativeAudio: true,
+            voiceIds: false, cameraControl: false,
+        },
+        maxReferenceImages: 3,
+        costPerSecond: COST_PER_SECOND['veo-3.1'],
+        recommended: false,
+    },
+    'veo-3.1-fast': {
+        id: 'veo-3.1-fast', name: 'Veo 3.1 Fast', icon: '⚡', provider: 'kie',
+        description: 'Faster & cheaper Veo 3.1 — great for prototyping',
+        bestFor: 'Quick iterations, content series, social video',
+        duration: { min: 4, max: 8, native: 8, step: 2, extendChunk: 7, maxExtended: 60 },
+        resolutions: ['720p', '1080p'],
+        aspectRatios: ['16:9', '9:16'],
+        features: {
+            firstFrame: true, lastFrame: false, referenceImages: true,
+            extendVideo: true, multiShot: false, nativeAudio: true,
+            voiceIds: false, cameraControl: false,
+        },
+        maxReferenceImages: 3,
+        costPerSecond: COST_PER_SECOND['veo-3.1-fast'],
+        recommended: false,
+    },
+    'seedance-1.0': {
+        id: 'seedance-1.0', name: 'Seedance 1.0 Lite', icon: '🌱', provider: 'fal',
+        description: 'Fast & affordable video generation',
+        bestFor: 'Quick prototypes, social content, UGC',
+        duration: { min: 5, max: 10, native: 10, step: 5 },
+        resolutions: ['480p', '720p', '1080p'],
+        aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
+        features: {
+            firstFrame: true, lastFrame: true, referenceImages: false,
+            extendVideo: true, multiShot: false, nativeAudio: false,
+            voiceIds: false, cameraControl: false,
+        },
+        maxReferenceImages: 0,
+        costPerSecond: COST_PER_SECOND['seedance-1.0'],
+        recommended: false,
+    },
+    'seedance-2.0': {
+        id: 'seedance-2.0', name: 'Seedance 2.0 Pro', icon: '🎞️', provider: 'kie',
+        description: 'Cinematic video with native audio, camera control & physics',
+        bestFor: 'Premium ads, product showcases, brand films',
+        duration: { min: 4, max: 15, native: 15, step: 1 },
+        resolutions: ['720p', '1080p'],
+        aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+        features: {
+            firstFrame: true, lastFrame: false, referenceImages: true,
+            extendVideo: true, multiShot: true, nativeAudio: true,
+            voiceIds: false, cameraControl: true,
+        },
+        maxReferenceImages: 3,
+        costPerSecond: COST_PER_SECOND['seedance-2.0'],
+        recommended: false,
+    },
+    'grok-imagine': {
+        id: 'grok-imagine', name: 'Grok Imagine', icon: '🤖', provider: 'grok',
+        description: 'xAI native video — fast, affordable, 1-15s',
+        bestFor: 'Social reels, creative experiments, quick turnaround',
+        duration: { min: 1, max: 15, native: 15, step: 1 },
+        resolutions: ['480p', '720p'],
+        aspectRatios: ['16:9', '9:16', '1:1'],
+        features: {
+            firstFrame: true, lastFrame: false, referenceImages: false,
+            extendVideo: false, multiShot: false, nativeAudio: false,
+            voiceIds: false, cameraControl: false,
+        },
+        maxReferenceImages: 0,
+        costPerSecond: COST_PER_SECOND['grok-imagine'],
+        recommended: false,
+    },
 };
 
 /**
@@ -286,7 +388,7 @@ export async function getGrokGenerationStatus(requestId) {
  * Submit video generation — routes to the correct provider
  * Returns { requestId, endpoint, statusUrl, resultUrl, provider }
  */
-export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio }) {
+export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio }) {
     if (!MODEL_AVAILABLE[model]) {
         throw new Error(`Model '${model}' is not available. Use kling-3.0, veo-3.1, veo-3.1-fast, seedance-1.0, seedance-2.0, or grok-imagine.`);
     }
@@ -303,8 +405,8 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         };
     }
 
-    // ── kie.ai models: Veo 3.1 Fast + Seedance 2.0 ──
-    if (model === 'veo-3.1-fast' || model === 'seedance-2.0') {
+    // ── kie.ai models: Veo 3.1 Fast ──
+    if (model === 'veo-3.1-fast') {
         const result = await submitKieVideoGeneration({ model, prompt, imageUrl, duration, aspectRatio: '16:9' });
         return {
             requestId: result.taskId,
@@ -312,6 +414,18 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             statusUrl: null,
             resultUrl: null,
             provider: 'kie',
+        };
+    }
+
+    // ── PiAPI: Seedance 2.0 ──
+    if (model === 'seedance-2.0') {
+        const result = await submitPiApiVideoGeneration({ prompt, imageUrl, duration, aspectRatio: aspectRatio || '16:9', generateAudio });
+        return {
+            requestId: result.taskId,
+            endpoint: `piapi-seedance-2.0`,
+            statusUrl: null,
+            resultUrl: null,
+            provider: 'piapi',
         };
     }
 
@@ -422,40 +536,29 @@ export async function getGenerationStatus(requestId, statusUrl, resultUrl) {
 
     if (!response.ok) {
         console.error(`❌ fal.ai status check failed: ${response.status}`);
-        return { status: 'FAILED', progress: 0, error: `Status check failed: ${response.status}` };
+        // Don't immediately fail — could be a transient error
+        return { status: 'IN_PROGRESS', progress: 30 };
     }
 
     const data = await response.json();
     console.log(`📊 fal.ai status for ${requestId}: ${data.status}`);
 
-    // Map fal.ai status to our format
+    // ── COMPLETED ──
     if (data.status === 'COMPLETED') {
-        // Fetch the actual result using fal.ai's response URL
-        const resultRes = await fetch(resultUrl, {
-            headers: { 'Authorization': `Key ${apiKey}` },
-        });
-        const result = await resultRes.json();
-
-        // Extract video URL from result (format varies by model)
-        const videoUrl = result.video?.url
-            || result.data?.video_url
-            || result.output?.url
-            || result.video?.file_url
-            || '';
-
-        console.log(`✅ Video generation complete: ${videoUrl ? 'URL received' : 'No URL found'}`);
-
-        return {
-            status: 'COMPLETED',
-            progress: 100,
-            videoUrl,
-            thumbnailUrl: result.thumbnail?.url || '',
-            audioUrl: result.audio?.url || '',
-        };
+        return await fetchFalResult(apiKey, resultUrl);
     }
 
+    // ── FAILED ──
     if (data.status === 'FAILED') {
-        // Try to get the error details
+        // Sometimes fal says FAILED but video is still accessible — try fetching
+        try {
+            const tryResult = await fetchFalResult(apiKey, resultUrl);
+            if (tryResult.videoUrl) {
+                console.log(`⚠️ fal.ai said FAILED but video URL exists — treating as COMPLETED`);
+                return tryResult;
+            }
+        } catch (e) { /* ignore */ }
+
         let errorMsg = 'Video generation failed on fal.ai';
         try {
             const resultRes = await fetch(resultUrl, {
@@ -468,16 +571,64 @@ export async function getGenerationStatus(requestId, statusUrl, resultUrl) {
             console.error(`❌ Could not fetch error details:`, e.message);
         }
 
-        return {
-            status: 'FAILED',
-            progress: 0,
-            error: errorMsg,
-        };
+        return { status: 'FAILED', progress: 0, error: errorMsg };
     }
 
     return {
         status: data.status || 'IN_PROGRESS',
         progress: data.status === 'IN_QUEUE' ? 10 : 50,
+    };
+}
+
+/**
+ * Fetch fal.ai result and extract video URL from various response formats
+ */
+async function fetchFalResult(apiKey, resultUrl) {
+    const resultRes = await fetch(resultUrl, {
+        headers: { 'Authorization': `Key ${apiKey}` },
+    });
+    const result = await resultRes.json();
+
+    console.log(`📦 fal.ai result keys:`, Object.keys(result));
+    console.log(`📦 fal.ai result snippet:`, JSON.stringify(result).substring(0, 800));
+
+    // Comprehensive video URL extraction — covers ALL known fal.ai response formats
+    const videoUrl =
+        // Standard: { video: { url: "..." } }
+        result.video?.url
+        // Kling/Veo: { video: { file_url: "..." } }
+        || result.video?.file_url
+        // Direct URL field
+        || result.video_url
+        // Nested data: { data: { video_url: "..." } }
+        || result.data?.video_url
+        || result.data?.video?.url
+        // Output pattern: { output: { url: "..." } }
+        || result.output?.url
+        || result.output?.video_url
+        || result.output?.video?.url
+        // Array of videos: { videos: [{ url: "..." }] }
+        || result.videos?.[0]?.url
+        || result.videos?.[0]?.file_url
+        // Result array: { result: [{ url: "..." }] }
+        || result.result?.[0]?.url
+        || result.result?.url
+        || result.result?.video_url
+        // URL directly on root
+        || result.url
+        || '';
+
+    const thumbnailUrl = result.thumbnail?.url || result.thumbnailUrl || result.thumbnail_url || '';
+    const audioUrl = result.audio?.url || result.audioUrl || result.audio_url || '';
+
+    console.log(`✅ Video URL extracted: ${videoUrl ? videoUrl.substring(0, 100) + '...' : 'NONE FOUND'}`);
+
+    return {
+        status: 'COMPLETED',
+        progress: 100,
+        videoUrl,
+        thumbnailUrl,
+        audioUrl,
     };
 }
 

@@ -13,10 +13,34 @@ const videoProjectSchema = new mongoose.Schema({
     // ── Current pipeline status ──
     status: {
         type: String,
-        enum: ['brainstorm', 'script', 'references', 'routing', 'generating', 'critique', 'editing', 'done', 'failed'],
+        enum: ['brainstorm', 'script', 'references', 'routing', 'generating', 'critique', 'editing', 'done', 'failed', 'advanced-generating'],
         default: 'brainstorm',
     },
     checkpoint: { type: Number, default: 0 }, // for resumability
+
+    // ── Studio mode ──
+    mode: { type: String, enum: ['advanced', 'storyboard'], default: 'storyboard' },
+
+    // ── Advanced Mode Config (power-user direct generation) ──
+    advancedConfig: {
+        prompt: { type: String, default: '' },
+        enhancedPrompt: { type: String, default: '' },
+        firstImageUrl: { type: String, default: '' },
+        lastImageUrl: { type: String, default: '' },
+        referenceImages: [{ url: String, label: String }],
+        aspectRatio: { type: String, default: '16:9' },
+        duration: { type: Number, default: 5 },
+        generateAudio: { type: Boolean, default: true },
+    },
+
+    // ── Duration Extension — segments for chaining ──
+    segments: [{
+        segmentIndex: { type: Number },
+        videoUrl: { type: String, default: '' },
+        duration: { type: Number },
+        status: { type: String, enum: ['pending', 'generating', 'completed', 'failed'], default: 'pending' },
+        requestId: { type: String, default: '' },
+    }],
 
     // ── Step 1: Input ──
     input: {
