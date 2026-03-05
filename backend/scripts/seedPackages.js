@@ -27,6 +27,13 @@ const PACKAGES = [
         icon: 'rocket_launch',
         isDefault: true,
         displayOrder: 1,
+        features: [
+            { name: '1 Brand Profile', included: true },
+            { name: '50 Credits / month', included: true },
+            { name: 'Content & Brainstorm Studio', included: true },
+            { name: 'Smart Calendar Access', included: true },
+            { name: 'Email Support', included: true },
+        ]
     },
     {
         name: 'Professional',
@@ -50,6 +57,14 @@ const PACKAGES = [
         color: '#6366f1',
         icon: 'trending_up',
         displayOrder: 2,
+        features: [
+            { name: '3 Brand Profiles', included: true },
+            { name: '200 Credits / month', included: true },
+            { name: 'All 7 AI Studios Included', included: true },
+            { name: 'Team Dashboard (2 seats)', included: true },
+            { name: 'Priority Email Support', included: true },
+            { name: 'Ad Studio Access', included: true },
+        ]
     },
     {
         name: 'Agency',
@@ -75,6 +90,14 @@ const PACKAGES = [
         color: '#ec4899',
         icon: 'business',
         displayOrder: 3,
+        features: [
+            { name: '15 Brand Profiles', included: true },
+            { name: '1,000 Credits / month', included: true },
+            { name: 'Full Studio Access (All 9)', included: true },
+            { name: 'Agency Dashboard & Team (10 seats)', included: true },
+            { name: 'Priority WhatsApp Support', included: true },
+            { name: 'D2C Analytics Access', included: true },
+        ]
     },
     {
         name: 'Enterprise',
@@ -100,6 +123,14 @@ const PACKAGES = [
         color: '#f59e0b',
         icon: 'diamond',
         displayOrder: 4,
+        features: [
+            { name: 'Unlimited Brand Profiles', included: true },
+            { name: 'Unlimited Credits', included: true },
+            { name: 'All 9 AI Studios Included', included: true },
+            { name: 'Dedicated Support Account', included: true },
+            { name: 'White Labeling (Custom Logo)', included: true },
+            { name: 'Custom Domain Access', included: true },
+        ]
     }
 ];
 
