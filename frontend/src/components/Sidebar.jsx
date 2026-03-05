@@ -70,7 +70,7 @@ export default function Sidebar({ mobileOpen, onClose }) {
         return () => { document.body.style.overflow = '' }
     }, [mobileOpen])
 
-    const isSuperAdmin = user?.role === 'superadmin'
+    const isSuperAdmin = user?.role?.trim() === 'superadmin'
 
     const sidebarContent = (
         <>

@@ -178,7 +178,7 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                         <div className="text-right hidden md:block">
                             <p className="text-base font-semibold text-white">{user?.name || 'User'}</p>
                             <p className="text-sm text-slate-500 uppercase tracking-wider font-medium">
-                                {user?.role === 'admin' ? 'Admin' : user?.plan || 'Starter'}
+                                {user?.role === 'superadmin' ? 'Super Admin' : user?.role === 'admin' ? 'Admin' : user?.plan || 'Starter'}
                             </p>
                         </div>
                         <div className="size-9 sm:size-10 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white font-bold text-sm border-2 border-primary/30 flex-shrink-0">
