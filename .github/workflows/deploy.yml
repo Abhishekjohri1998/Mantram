@@ -33,25 +33,22 @@ jobs:
           VITE_API_URL: https://api.mantram.ai/api
 
       - name: 📦 Sync to S3
-        uses: jakejarvis/s3-sync-action@master
-        with:
-          args: --delete
+        run: |
+          aws s3 sync frontend/dist s3://${{ secrets.S3_BUCKET_NAME }} --delete
         env:
-          AWS_S3_BUCKET: ${{ secrets.S3_BUCKET_NAME }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          SOURCE_DIR: 'frontend/dist'
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
 
       - name: ⚡ Invalidate CloudFront
-        uses: chetan/cloudfront-invalidation-action@master
-        with:
-          distribution: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
-          paths: '/*'
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
 
   # ═══════════════════════════════════════════
   # ⚙️ Job 2: Deploy Backend (EC2)
