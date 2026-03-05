@@ -6,7 +6,7 @@ module.exports = {
     apps: [{
         name: 'mantram-server',
         script: 'backend/index.js',
-        cwd: '/var/www/mantram/current',
+        cwd: '/home/ec2-user/Mantram',
 
         // Cluster mode for zero-downtime reloads
         instances: 2,
