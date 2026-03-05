@@ -2,8 +2,10 @@
  * Video Studio — Agent Nodes
  * 
  * Each node is a function: (state) → updatedState
- * They call Claude Sonnet via the existing AnthropicProvider for planning,
- * and fal.ai for actual video generation.
+ * 
+ * Provider strategy for speed:
+ *   - Claude Sonnet: writing-heavy nodes (brainstorm, script director) — quality matters
+ *   - Gemini Flash: utility nodes (reference curator, model router, critic, editor) — speed matters
  * 
  * Brand Bible is injected into every agent prompt automatically.
  */
@@ -24,7 +26,18 @@ import { estimateCost, submitVideoGeneration, getGenerationStatus, getGrokGenera
 import { getKieGenerationStatus } from './kieClient.js';
 import { getPastProjects } from './selfLearning.js';
 
-// ── Helper: Call Claude Sonnet and parse JSON response ──
+// ── Helper: Parse JSON from any AI response ──
+function parseAgentJSON(text) {
+    try {
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) return JSON.parse(jsonMatch[0]);
+    } catch (e) {
+        console.warn('Agent JSON parse failed, raw response:', text.substring(0, 200));
+    }
+    return { error: 'Failed to parse agent response', raw: text.substring(0, 500) };
+}
+
+// ── Call Claude Sonnet — for writing-heavy nodes (brainstorm, script) ──
 async function callAgent(systemPrompt, userPrompt, temperature = 0.7) {
     const router = getRouter();
     const result = await router.generateText({
@@ -32,18 +45,33 @@ async function callAgent(systemPrompt, userPrompt, temperature = 0.7) {
         userPrompt,
         temperature,
         maxTokens: 4096,
-    }, { provider: 'anthropic' }); // Force Claude for all agents
+    }, { provider: 'anthropic' }); // Claude Sonnet for quality writing
+    return parseAgentJSON(result.text || '');
+}
 
-    // Parse JSON from response
-    const text = result.text || '';
+// ── Call Gemini Flash — for utility nodes (router, curator, critic, editor) ──
+// ~10x faster than Claude, great for structured JSON tasks
+async function callFastAgent(systemPrompt, userPrompt, temperature = 0.3, maxTokens = 1024) {
+    const router = getRouter();
     try {
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) return JSON.parse(jsonMatch[0]);
+        const result = await router.generateText({
+            systemPrompt,
+            userPrompt,
+            temperature,
+            maxTokens,
+        }, { provider: 'gemini' }); // Gemini Flash for speed
+        return parseAgentJSON(result.text || '');
     } catch (e) {
-        console.warn('Agent JSON parse failed, raw response:', text.substring(0, 200));
+        // Fallback to Claude if Gemini fails
+        console.warn('⚡ Gemini Flash failed, falling back to Claude:', e.message);
+        const result = await router.generateText({
+            systemPrompt,
+            userPrompt,
+            temperature,
+            maxTokens,
+        }, { provider: 'anthropic' });
+        return parseAgentJSON(result.text || '');
     }
-
-    return { error: 'Failed to parse agent response', raw: text.substring(0, 500) };
 }
 
 // ── Helper: Load brand + past projects for context injection ──
@@ -153,10 +181,11 @@ export async function referenceCuratorNode(state) {
         `USER-UPLOADED REFERENCE IMAGES: ${state.inputImages?.length || 0}`,
     ].join('\n');
 
-    const result = await callAgent(
+    const result = await callFastAgent(
         REFERENCE_CURATOR_PROMPT(brandContext, styleMemory),
         userPrompt,
-        0.3 // Low creativity for curation
+        0.3, // Low creativity for curation
+        1024
     );
 
     // Map selected indices to actual images
@@ -196,10 +225,11 @@ export async function modelRouterNode(state) {
         `USER PREFERENCES: Default resolution 1080p, default mode fast`,
     ].join('\n');
 
-    const result = await callAgent(
+    const result = await callFastAgent(
         MODEL_ROUTER_PROMPT(brandContext),
         userPrompt,
-        0.2 // Very deterministic
+        0.2, // Very deterministic
+        512
     );
 
     const model = result.selectedModel || 'kling-3.0';
@@ -321,10 +351,11 @@ export async function criticNode(state) {
         `Analyze the video against the script and brand standards. Focus on actionable improvements.`,
     ].join('\n');
 
-    const result = await callAgent(
+    const result = await callFastAgent(
         CRITIC_PROMPT(brandContext),
         userPrompt,
-        0.4
+        0.4,
+        1024
     );
 
     return {
@@ -357,10 +388,11 @@ export async function editorNode(state) {
         `Critic Notes: ${state.critique?.technicalNotes || 'None'}`,
     ].join('\n');
 
-    const result = await callAgent(
+    const result = await callFastAgent(
         EDITOR_PROMPT(brandContext),
         userPrompt,
-        0.5
+        0.5,
+        1024
     );
 
     return {
