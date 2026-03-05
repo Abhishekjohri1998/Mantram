@@ -21,6 +21,7 @@ import {
     EDITOR_PROMPT,
 } from './prompts.js';
 import { estimateCost, submitVideoGeneration, getGenerationStatus, getGrokGenerationStatus } from './falClient.js';
+import { getKieGenerationStatus } from './kieClient.js';
 import { getPastProjects } from './selfLearning.js';
 
 // ── Helper: Call Claude Sonnet and parse JSON response ──
@@ -279,6 +280,9 @@ export async function pollGenerationStatus(state) {
     // Branch polling based on provider
     if (state.generation?.provider === 'grok' || state.routing?.selectedModel === 'grok-imagine') {
         statusResult = await getGrokGenerationStatus(state.generation.falRequestId);
+    } else if (state.generation?.provider === 'kie' || state.routing?.selectedModel === 'veo-3.1-fast' || state.routing?.selectedModel === 'seedance-2.0') {
+        // kie.ai polling — use taskId + model
+        statusResult = await getKieGenerationStatus(state.generation.falRequestId, state.routing?.selectedModel);
     } else {
         // fal.ai polling — use stored URLs
         const statusUrl = state.generation?.falStatusUrl || null;

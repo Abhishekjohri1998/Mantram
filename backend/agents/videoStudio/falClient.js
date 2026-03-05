@@ -1,15 +1,21 @@
 /**
- * fal.ai Client — Video generation SDK wrapper + cost calculator
+ * Video Generation Client — Multi-provider SDK wrapper + cost calculator
  * 
  * Supported models (verified endpoints as of March 2026):
- *   - Kling 3.0 (v3) — 3-15s, multi-prompt, native audio, voice IDs
- *   - Google Veo 3 / 3.1 — 5-8s, extend-video, native audio
- *   - Seedance 1.0 Lite — 5-10s, fast & affordable
+ *   - Kling 3.0 (v3) — 3-15s, multi-prompt, native audio, voice IDs       [fal.ai]
+ *   - Google Veo 3 / 3.1 — 5-8s, extend-video, native audio              [fal.ai]
+ *   - Google Veo 3.1 Fast — 5-8s, faster + cheaper variant                [kie.ai]
+ *   - Seedance 1.0 Lite — 5-10s, fast & affordable                        [fal.ai]
+ *   - Seedance 2.0 Pro — 5-15s, native audio, camera control, cinematic   [kie.ai]
  * 
- * Uses fal.ai REST API via fetch (queue-based async).
+ * Provider routing:
+ *   - fal.ai: Kling 3.0, Veo 3.1, Seedance 1.0 (queue-based async)
+ *   - kie.ai: Veo 3.1 Fast, Seedance 2.0 (taskId-based async)
+ *   - xAI:   Grok Imagine (native REST)
  */
 
 import config from '../../config/env.js';
+import { submitKieVideoGeneration } from './kieClient.js';
 
 const FAL_BASE_URL = 'https://queue.fal.run';
 const GROK_BASE_URL = 'https://api.x.ai/v1';
@@ -27,10 +33,21 @@ const MODEL_ENDPOINTS = {
         imageToVideo: 'fal-ai/veo3/image-to-video',
         extendVideo: 'fal-ai/veo3.1/extend-video',
     },
-    // Seedance 1.0 Lite (Seedance 2.0 endpoint not yet stable)
+    // Google Veo 3.1 Fast — cheaper, faster variant
+    'veo-3.1-fast': {
+        textToVideo: 'fal-ai/veo3/fast',
+        imageToVideo: 'fal-ai/veo3/fast/image-to-video',
+        extendVideo: 'fal-ai/veo3.1/fast/extend-video',
+    },
+    // Seedance 1.0 Lite
     'seedance-1.0': {
         textToVideo: 'fal-ai/bytedance/seedance/v1/lite/text-to-video',
         imageToVideo: 'fal-ai/bytedance/seedance/v1/lite/image-to-video',
+    },
+    // Seedance 2.0 Pro — native audio, camera control, cinematic
+    'seedance-2.0': {
+        textToVideo: 'fal-ai/bytedance/seedance/v2/pro/text-to-video',
+        imageToVideo: 'fal-ai/bytedance/seedance/v2/pro/image-to-video',
     },
 };
 
@@ -38,7 +55,9 @@ const MODEL_ENDPOINTS = {
 const MODEL_AVAILABLE = {
     'kling-3.0': true,
     'veo-3.1': true,
+    'veo-3.1-fast': true,
     'seedance-1.0': true,
+    'seedance-2.0': true,
     'grok-imagine': true,
 };
 
@@ -46,7 +65,9 @@ const MODEL_AVAILABLE = {
 const COST_PER_SECOND = {
     'kling-3.0': { fast: 0.07, quality: 0.12 },
     'veo-3.1': { fast: 0.15, quality: 0.40 },
+    'veo-3.1-fast': { fast: 0.08, quality: 0.15 },
     'seedance-1.0': { fast: 0.05, quality: 0.08 },
+    'seedance-2.0': { fast: 0.08, quality: 0.15 },
     'grok-imagine': { fast: 0.08, quality: 0.08 },
 };
 
@@ -54,7 +75,9 @@ const COST_PER_SECOND = {
 const DURATION_LIMITS = {
     'kling-3.0': { min: 3, max: 15, supported: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] },
     'veo-3.1': { min: 5, max: 8, supported: [5, 6, 7, 8] },
+    'veo-3.1-fast': { min: 5, max: 8, supported: [5, 6, 7, 8] },
     'seedance-1.0': { min: 5, max: 10, supported: [5, 10] },
+    'seedance-2.0': { min: 5, max: 15, supported: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] },
     'grok-imagine': { min: 1, max: 15, supported: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] },
 };
 
@@ -125,7 +148,7 @@ function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, sho
         return payload;
     }
 
-    if (model === 'veo-3.1') {
+    if (model === 'veo-3.1' || model === 'veo-3.1-fast') {
         return {
             prompt,
             aspect_ratio: '16:9',
@@ -136,12 +159,22 @@ function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, sho
     }
 
     if (model === 'seedance-1.0') {
-        // Seedance only supports 5 or 10
+        // Seedance 1.0 only supports 5 or 10
         const seedDur = dur >= 8 ? '10' : '5';
         return {
             prompt,
             duration: seedDur,
             aspect_ratio: '16:9',
+            seed: Math.floor(Math.random() * 999999),
+        };
+    }
+
+    if (model === 'seedance-2.0') {
+        return {
+            prompt,
+            duration: String(dur),
+            aspect_ratio: '16:9',
+            generate_audio: generateAudio !== false,
             seed: Math.floor(Math.random() * 999999),
         };
     }
@@ -250,14 +283,12 @@ export async function getGrokGenerationStatus(requestId) {
 }
 
 /**
- * Submit video generation to fal.ai queue
- * Returns { requestId, endpoint } for polling
+ * Submit video generation — routes to the correct provider
+ * Returns { requestId, endpoint, statusUrl, resultUrl, provider }
  */
 export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio }) {
-    const apiKey = getApiKey();
-
     if (!MODEL_AVAILABLE[model]) {
-        throw new Error(`Model '${model}' is not available. Use kling-3.0, veo-3.1, seedance-1.0, or grok-imagine.`);
+        throw new Error(`Model '${model}' is not available. Use kling-3.0, veo-3.1, veo-3.1-fast, seedance-1.0, seedance-2.0, or grok-imagine.`);
     }
 
     // ── Grok Imagine: use native xAI API instead of fal.ai ──
@@ -272,7 +303,20 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         };
     }
 
-    // ── fal.ai models ──
+    // ── kie.ai models: Veo 3.1 Fast + Seedance 2.0 ──
+    if (model === 'veo-3.1-fast' || model === 'seedance-2.0') {
+        const result = await submitKieVideoGeneration({ model, prompt, imageUrl, duration, aspectRatio: '16:9' });
+        return {
+            requestId: result.taskId,
+            endpoint: `kie-${model}`,
+            statusUrl: null,
+            resultUrl: null,
+            provider: 'kie',
+        };
+    }
+
+    // ── fal.ai models (Kling, Veo 3.1 standard, Seedance 1.0) ──
+    const apiKey = getApiKey();
 
     const endpoints = MODEL_ENDPOINTS[model];
     if (!endpoints) throw new Error(`Unknown video model: ${model}`);
@@ -476,6 +520,17 @@ export function getModelsInfo() {
             recommended: false,
         },
         {
+            id: 'veo-3.1-fast',
+            name: 'Google Veo 3.1 Fast',
+            description: 'Faster & cheaper Veo 3.1 — great for prototyping & high-volume',
+            bestFor: 'Quick iterations, content series, social video',
+            costPerSecond: COST_PER_SECOND['veo-3.1-fast'],
+            duration: DURATION_LIMITS['veo-3.1-fast'],
+            features: ['native-audio', 'fast', '5-8s', 'cost-efficient'],
+            available: !!(config.kie?.apiKey || process.env.KIE_API_KEY),
+            recommended: false,
+        },
+        {
             id: 'seedance-1.0',
             name: 'Seedance 1.0 Lite',
             description: 'Fast & affordable video generation',
@@ -484,6 +539,17 @@ export function getModelsInfo() {
             duration: DURATION_LIMITS['seedance-1.0'],
             features: ['fast', 'affordable', 'image-to-video', '5-10s'],
             available: true,
+            recommended: false,
+        },
+        {
+            id: 'seedance-2.0',
+            name: 'Seedance 2.0 Pro',
+            description: 'Cinematic video with native audio, camera control & real-world physics',
+            bestFor: 'Premium ads, product showcases, brand films',
+            costPerSecond: COST_PER_SECOND['seedance-2.0'],
+            duration: DURATION_LIMITS['seedance-2.0'],
+            features: ['native-audio', 'camera-control', 'cinematic', 'image-to-video', '4-15s'],
+            available: !!(config.kie?.apiKey || process.env.KIE_API_KEY),
             recommended: false,
         },
     ];
