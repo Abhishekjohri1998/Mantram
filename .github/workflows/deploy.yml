@@ -80,12 +80,17 @@ jobs:
             # 1. Clone/Copy release
             git clone --depth=1 -b main https://github.com/Abhishekjohri1998/Mantram.git $RELEASE_DIR
             
-            # 2. Restore .env (from current folder or shared backup)
-            if [ -L "$CURRENT_LINK" ]; then
-              cp $CURRENT_LINK/backend/.env $RELEASE_DIR/backend/.env
+            # 2. Restore .env (Crucial Step)
+            echo "🔐 Restoring .env file..."
+            if [ -f "$CURRENT_LINK/backend/.env" ]; then
+              cp "$CURRENT_LINK/backend/.env" "$RELEASE_DIR/backend/.env"
+            elif [ -d "${CURRENT_LINK}_old_folder" ] && [ -f "${CURRENT_LINK}_old_folder/backend/.env" ]; then
+              cp "${CURRENT_LINK}_old_folder/backend/.env" "$RELEASE_DIR/backend/.env"
+            elif [ -f ~/Mantram/backend/.env ]; then
+              cp ~/Mantram/backend/.env "$RELEASE_DIR/backend/.env"
             else
-              # Fallback to shared location if symlink doesn't exist yet
-              cp ~/Mantram_backup_*/.env $RELEASE_DIR/backend/.env || echo ".env restore failed"
+              echo "❌ CRITICAL: .env file not found anywhere! Deployment will fail."
+              exit 1
             fi
             
             # 3. Install & Build
