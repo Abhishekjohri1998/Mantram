@@ -88,7 +88,7 @@ server {
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript image/svg+xml;
 
     location / {
-        root /var/www/mantram/current/dist;
+        root /var/www/mantram/current/frontend/dist;
         try_files $uri $uri/ /index.html;
         location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff2|woff|ttf)$ {
             expires 1y;
@@ -128,7 +128,7 @@ cat > /var/www/mantram/shared/ecosystem.config.cjs << 'PM2_CONF'
 module.exports = {
   apps: [{
     name: 'mantram-server',
-    script: 'server/index.js',
+    script: 'backend/index.js',
     cwd: '/var/www/mantram/current',
     instances: 2,
     exec_mode: 'cluster',
