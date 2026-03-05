@@ -7,12 +7,18 @@ import { Router } from 'express';
 import { protect } from '../middleware/auth.js';
 import Integration from '../models/Integration.js';
 import Product from '../models/Product.js';
+import ShopifyOrder from '../models/ShopifyOrder.js';
+import ShopifyCustomer from '../models/ShopifyCustomer.js';
 import {
     getShopifyAuthUrl,
     exchangeShopifyToken,
     fetchShopifyProducts,
     transformShopifyProduct,
     getShopInfo,
+    syncStoreData,
+    registerShopifyWebhooks,
+    transformShopifyOrder,
+    transformShopifyCustomer
 } from '../services/shopifyService.js';
 import config from '../config/env.js';
 import { verifyShopifyWebhook } from '../middleware/shopifyWebhookAuth.js';
@@ -93,6 +99,17 @@ router.post('/connect-token', protect, async (req, res) => {
         );
 
         console.log(`✅ Shopify connected via token: ${shopInfo.name} (${cleanDomain})`);
+
+        // Trigger initial sync and webhook registration in background
+        const backendUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
+        syncStoreData(accessToken, cleanDomain, req.user._id, brandId || undefined, { Product, ShopifyOrder, ShopifyCustomer })
+            .then(res => console.log(`📦 Initial sync complete for ${cleanDomain}:`, res))
+            .catch(err => console.error(`❌ Initial sync failed for ${cleanDomain}:`, err));
+
+        registerShopifyWebhooks(accessToken, cleanDomain, backendUrl)
+            .then(res => console.log(`🔗 Webhooks registered for ${cleanDomain}:`, res.filter(r => r.success).map(r => r.topic)))
+            .catch(err => console.error(`❌ Webhook registration failed for ${cleanDomain}:`, err));
+
         res.json({ success: true, shopName: shopInfo.name, shopDomain: cleanDomain });
     } catch (error) {
         console.error('Shopify connect-token error:', error);
@@ -146,6 +163,17 @@ router.get('/callback', async (req, res) => {
                 integration.profileUrl = `https://${shop}`;
                 await integration.save();
                 console.log(`✅ Shopify connected: ${shopInfo.name} (${shop})`);
+
+                // Trigger initial sync and webhook registration in background
+                const backendUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
+                syncStoreData(tokenData.access_token, shop, userId, integration.brand, { Product, ShopifyOrder, ShopifyCustomer })
+                    .then(res => console.log(`📦 Initial sync complete for ${shop}:`, res))
+                    .catch(err => console.error(`❌ Initial sync failed for ${shop}:`, err));
+
+                registerShopifyWebhooks(tokenData.access_token, shop, backendUrl)
+                    .then(res => console.log(`🔗 Webhooks registered for ${shop}:`, res.filter(r => r.success).map(r => r.topic)))
+                    .catch(err => console.error(`❌ Webhook registration failed for ${shop}:`, err));
+
             } catch (e) { console.warn('Shop info fetch failed:', e.message); }
         } else {
             console.warn(`⚠️ No pending integration found for ${shop}`);
@@ -172,32 +200,23 @@ router.post('/sync', protect, async (req, res) => {
             return res.status(400).json({ success: false, error: 'Shopify is not connected. Please connect first.' });
         }
 
-        console.log(`📦 Syncing products from Shopify: ${integration.platformData.shopDomain}`);
+        console.log(`📦 Syncing all data from Shopify: ${integration.platformData.shopDomain}`);
 
-        const shopifyProducts = await fetchShopifyProducts(
+        const results = await syncStoreData(
             integration.accessToken,
-            integration.platformData.shopDomain
+            integration.platformData.shopDomain,
+            req.user._id,
+            brandId || integration.brand,
+            { Product, ShopifyOrder, ShopifyCustomer }
         );
-
-        // Transform and upsert products
-        let synced = 0;
-        for (const sp of shopifyProducts) {
-            const productData = transformShopifyProduct(sp, req.user._id, brandId || integration.brand);
-            await Product.findOneAndUpdate(
-                { shopifyId: productData.shopifyId, user: req.user._id },
-                productData,
-                { upsert: true, new: true }
-            );
-            synced++;
-        }
 
         // Update sync metadata
         integration.lastSyncAt = new Date();
         integration.syncCount++;
         await integration.save();
 
-        console.log(`✅ Synced ${synced} products`);
-        res.json({ success: true, synced, total: synced });
+        console.log(`✅ Synced products: ${results.products}, orders: ${results.orders}, customers: ${results.customers}`);
+        res.json({ success: true, ...results });
     } catch (error) {
         console.error('Shopify sync error:', error);
         res.status(500).json({ success: false, error: error.message });
@@ -348,6 +367,68 @@ router.post('/webhooks/shop-redact', verifyShopifyWebhook, async (req, res) => {
         res.status(200).json({ received: true });
     } catch (error) {
         console.error('GDPR shop/redact error:', error);
+        res.status(200).json({ received: true });
+    }
+});
+
+// ============================================================================
+// REAL-TIME DATA WEBHOOKS
+// ============================================================================
+
+/**
+ * Handle Order Created/Updated Webhooks
+ */
+router.post('/webhooks/orders-create', verifyShopifyWebhook, async (req, res) => {
+    try {
+        const order = req.body;
+        const shop = req.headers['x-shopify-shop-domain'];
+        console.log(`🔔 Webhook: Order created/updated in ${shop} — Order #${order.id}`);
+
+        // Find integration to get brand + userId
+        const integration = await Integration.findOne({ 'platformData.shopDomain': shop, platform: 'shopify' });
+        if (!integration) return res.status(200).json({ received: true });
+
+        const transformed = transformShopifyOrder(order, integration.user, integration.brand);
+        await ShopifyOrder.findOneAndUpdate(
+            { brand: integration.brand, shopifyOrderId: String(order.id) },
+            transformed,
+            { upsert: true }
+        );
+
+        res.status(200).json({ received: true });
+    } catch (error) {
+        console.error('Webhook order-create error:', error);
+        res.status(200).json({ received: true });
+    }
+});
+
+router.post('/webhooks/orders-updated', verifyShopifyWebhook, async (req, res) => {
+    // Shared logic with orders-create for simplicity
+    return router.handle(req, res);
+});
+
+/**
+ * Handle Product Updated Webhook
+ */
+router.post('/webhooks/products-update', verifyShopifyWebhook, async (req, res) => {
+    try {
+        const product = req.body;
+        const shop = req.headers['x-shopify-shop-domain'];
+        console.log(`🔔 Webhook: Product updated in ${shop} — ${product.title}`);
+
+        const integration = await Integration.findOne({ 'platformData.shopDomain': shop, platform: 'shopify' });
+        if (!integration) return res.status(200).json({ received: true });
+
+        const transformed = transformShopifyProduct(product, integration.user, integration.brand);
+        await Product.findOneAndUpdate(
+            { brand: integration.brand, shopifyId: String(product.id) },
+            transformed,
+            { upsert: true }
+        );
+
+        res.status(200).json({ received: true });
+    } catch (error) {
+        console.error('Webhook product-update error:', error);
         res.status(200).json({ received: true });
     }
 });

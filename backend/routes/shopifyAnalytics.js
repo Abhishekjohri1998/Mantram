@@ -10,12 +10,10 @@ import Integration from '../models/Integration.js';
 import Brand from '../models/Brand.js';
 import Content from '../models/Content.js';
 import AdCampaign from '../models/AdCampaign.js';
-import {
-    fetchShopifyOrders,
-    fetchShopifyProducts,
-    fetchShopifyCustomers,
-    getShopInfo,
-} from '../services/shopifyService.js';
+import Product from '../models/Product.js';
+import ShopifyOrder from '../models/ShopifyOrder.js';
+import ShopifyCustomer from '../models/ShopifyCustomer.js';
+import { getShopInfo } from '../services/shopifyService.js';
 
 const router = Router();
 
@@ -74,24 +72,24 @@ async function callGrok(systemPrompt, userPrompt, maxTokens = 1500) {
     }
 }
 
-// ── Compute analytics from raw orders ──
+// ── Compute analytics from raw orders (Now using ShopifyOrder model fields) ──
 function computeOrderAnalytics(orders) {
     const totalOrders = orders.length;
     const now = Date.now();
     const msDay = 24 * 60 * 60 * 1000;
 
     // Revenue
-    const totalRevenue = orders.reduce((s, o) => s + parseFloat(o.total_price || 0), 0);
+    const totalRevenue = orders.reduce((s, o) => s + (o.totalPrice || 0), 0);
     const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
     // Weekly comparison
-    const thisWeekOrders = orders.filter(o => (now - new Date(o.created_at).getTime()) < 7 * msDay);
+    const thisWeekOrders = orders.filter(o => (now - new Date(o.shopifyCreatedAt).getTime()) < 7 * msDay);
     const lastWeekOrders = orders.filter(o => {
-        const age = now - new Date(o.created_at).getTime();
+        const age = now - new Date(o.shopifyCreatedAt).getTime();
         return age >= 7 * msDay && age < 14 * msDay;
     });
-    const thisWeekRevenue = thisWeekOrders.reduce((s, o) => s + parseFloat(o.total_price || 0), 0);
-    const lastWeekRevenue = lastWeekOrders.reduce((s, o) => s + parseFloat(o.total_price || 0), 0);
+    const thisWeekRevenue = thisWeekOrders.reduce((s, o) => s + (o.totalPrice || 0), 0);
+    const lastWeekRevenue = lastWeekOrders.reduce((s, o) => s + (o.totalPrice || 0), 0);
     const revenueGrowth = lastWeekRevenue > 0 ? Math.round(((thisWeekRevenue - lastWeekRevenue) / lastWeekRevenue) * 100) : 0;
 
     // Daily revenue for chart (last 30 days)
@@ -101,12 +99,12 @@ function computeOrderAnalytics(orders) {
         dayStart.setHours(0, 0, 0, 0);
         const dayEnd = new Date(dayStart.getTime() + msDay);
         const dayOrders = orders.filter(o => {
-            const t = new Date(o.created_at).getTime();
+            const t = new Date(o.shopifyCreatedAt).getTime();
             return t >= dayStart.getTime() && t < dayEnd.getTime();
         });
         dailyRevenue.push({
             date: dayStart.toISOString().split('T')[0],
-            revenue: dayOrders.reduce((s, o) => s + parseFloat(o.total_price || 0), 0),
+            revenue: dayOrders.reduce((s, o) => s + (o.totalPrice || 0), 0),
             orders: dayOrders.length,
         });
     }
@@ -114,13 +112,13 @@ function computeOrderAnalytics(orders) {
     // Product performance from line items
     const productMap = {};
     orders.forEach(order => {
-        (order.line_items || []).forEach(item => {
-            const key = item.product_id || item.title;
+        (order.lineItems || []).forEach(item => {
+            const key = item.productId || item.title;
             if (!productMap[key]) {
                 productMap[key] = {
-                    productId: item.product_id,
+                    productId: item.productId,
                     title: item.title,
-                    variant: item.variant_title,
+                    variant: item.variantTitle,
                     unitsSold: 0,
                     revenue: 0,
                     orderCount: 0,
@@ -128,24 +126,24 @@ function computeOrderAnalytics(orders) {
                 };
             }
             productMap[key].unitsSold += item.quantity || 1;
-            productMap[key].revenue += parseFloat(item.price || 0) * (item.quantity || 1);
+            productMap[key].revenue += (item.price || 0) * (item.quantity || 1);
             productMap[key].orderCount++;
         });
     });
 
     const topProducts = Object.values(productMap)
         .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, 20);
+        .slice(0, 50); // increased limit for internal processing
 
     // Fulfillment stats
-    const fulfilled = orders.filter(o => o.fulfillment_status === 'fulfilled').length;
-    const unfulfilled = orders.filter(o => !o.fulfillment_status || o.fulfillment_status === null).length;
-    const refunded = orders.filter(o => o.financial_status === 'refunded' || o.financial_status === 'partially_refunded').length;
+    const fulfilled = orders.filter(o => o.fulfillmentStatus === 'fulfilled').length;
+    const unfulfilled = orders.filter(o => !o.fulfillmentStatus || o.fulfillmentStatus === null).length;
+    const refunded = orders.filter(o => o.financialStatus === 'refunded' || o.financialStatus === 'partially_refunded').length;
     const refundRate = totalOrders > 0 ? Math.round((refunded / totalOrders) * 100) : 0;
 
     // Discount usage
-    const discountedOrders = orders.filter(o => parseFloat(o.total_discounts || 0) > 0).length;
-    const totalDiscounts = orders.reduce((s, o) => s + parseFloat(o.total_discounts || 0), 0);
+    const discountedOrders = orders.filter(o => (o.totalDiscounts || 0) > 0).length;
+    const totalDiscounts = orders.reduce((s, o) => s + (o.totalDiscounts || 0), 0);
 
     return {
         totalRevenue: Math.round(totalRevenue * 100) / 100,
@@ -166,38 +164,38 @@ function computeOrderAnalytics(orders) {
     };
 }
 
-// ── Compute customer analytics ──
+// ── Compute customer analytics (Using ShopifyCustomer model) ──
 function computeCustomerAnalytics(customers, orders) {
     const totalCustomers = customers.length;
     const now = Date.now();
     const msDay = 24 * 60 * 60 * 1000;
 
-    const newCustomers = customers.filter(c => (now - new Date(c.created_at).getTime()) < 30 * msDay).length;
-    const returningCustomers = customers.filter(c => (c.orders_count || 0) > 1).length;
+    const newCustomers = customers.filter(c => (now - new Date(c.shopifyCreatedAt).getTime()) < 30 * msDay).length;
+    const returningCustomers = customers.filter(c => (c.ordersCount || 0) > 1).length;
 
     // Geographic split
     const cityMap = {};
     const countryMap = {};
     customers.forEach(c => {
-        const addr = c.default_address;
+        const addr = c.defaultAddress;
         if (addr?.city) cityMap[addr.city] = (cityMap[addr.city] || 0) + 1;
         if (addr?.country) countryMap[addr.country] = (countryMap[addr.country] || 0) + 1;
     });
-    const topCities = Object.entries(cityMap).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({ name, count, pct: Math.round((count / totalCustomers) * 100) }));
-    const topCountries = Object.entries(countryMap).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => ({ name, count, pct: Math.round((count / totalCustomers) * 100) }));
+    const topCities = Object.entries(cityMap).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({ name, count, pct: Math.round((count / (totalCustomers || 1)) * 100) }));
+    const topCountries = Object.entries(countryMap).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => ({ name, count, pct: Math.round((count / (totalCustomers || 1)) * 100) }));
 
     // LTV tiers
     const ltvTiers = { vip: 0, regular: 0, oneTime: 0 };
-    const avgOrderValue = orders.length > 0 ? orders.reduce((s, o) => s + parseFloat(o.total_price || 0), 0) / orders.length : 0;
+    const avgOrderValue = orders.length > 0 ? orders.reduce((s, o) => s + (o.totalPrice || 0), 0) / orders.length : 0;
     customers.forEach(c => {
-        const ltv = (c.orders_count || 0) * avgOrderValue;
+        const ltv = (c.ordersCount || 0) * avgOrderValue;
         if (ltv > avgOrderValue * 5) ltvTiers.vip++;
-        else if (c.orders_count > 1) ltvTiers.regular++;
+        else if (c.ordersCount > 1) ltvTiers.regular++;
         else ltvTiers.oneTime++;
     });
 
     // Email marketing opted in
-    const marketingConsent = customers.filter(c => c.email_marketing_consent?.state === 'subscribed').length;
+    const marketingConsent = customers.filter(c => c.acceptsMarketing).length;
 
     return {
         totalCustomers,
@@ -208,7 +206,7 @@ function computeCustomerAnalytics(customers, orders) {
         topCountries,
         ltvTiers,
         marketingConsent,
-        avgLTV: Math.round(avgOrderValue * (totalCustomers > 0 ? customers.reduce((s, c) => s + (c.orders_count || 0), 0) / totalCustomers : 1) * 100) / 100,
+        avgLTV: Math.round(avgOrderValue * (totalCustomers > 0 ? customers.reduce((s, c) => s + (c.ordersCount || 0), 0) / totalCustomers : 1) * 100) / 100,
     };
 }
 
@@ -219,8 +217,8 @@ function computeRedFlags(orderAnalytics, products, customerAnalytics) {
     // Dead stock: products with 0 sales but stock > 0
     const soldProductIds = new Set(orderAnalytics.topProducts.map(p => String(p.productId)));
     const deadStock = products.filter(p => {
-        const totalInventory = (p.variants || []).reduce((s, v) => s + (v.inventory_quantity || 0), 0);
-        return totalInventory > 0 && !soldProductIds.has(String(p.id));
+        const totalInventory = (p.variants || []).reduce((s, v) => s + (v.inventoryQuantity || 0), 0);
+        return totalInventory > 0 && !soldProductIds.has(String(p.shopifyId));
     });
     if (deadStock.length > 0) {
         flags.push({
@@ -305,16 +303,16 @@ function computeProductHealth(topProducts, allProducts) {
     return topProducts.map(p => {
         const salesScore = Math.min(100, (p.revenue / maxRevenue) * 100);
         const velocityScore = Math.min(100, p.unitsSold * 5); // arbitrary scaling
-        const shopifyProduct = allProducts.find(sp => String(sp.id) === String(p.productId));
-        const totalInventory = shopifyProduct ? (shopifyProduct.variants || []).reduce((s, v) => s + (v.inventory_quantity || 0), 0) : 0;
+        const product = allProducts.find(sp => String(sp.shopifyId) === String(p.productId));
+        const totalInventory = product ? (product.variants || []).reduce((s, v) => s + (v.inventoryQuantity || 0), 0) : 0;
         const inventoryHealth = totalInventory > 0 ? Math.min(100, (p.unitsSold / totalInventory) * 50) : 50;
         const overallScore = Math.round((salesScore * 0.5) + (velocityScore * 0.3) + (inventoryHealth * 0.2));
 
         return {
             ...p,
             inventory: totalInventory,
-            price: shopifyProduct ? parseFloat(shopifyProduct.variants?.[0]?.price || 0) : 0,
-            image: shopifyProduct?.images?.[0]?.src || null,
+            price: product ? (product.price?.amount || product.variants?.[0]?.price || 0) : 0,
+            image: product?.images?.[0]?.url || product?.images?.[0]?.src || null,
             healthScore: overallScore,
             healthBadge: overallScore >= 70 ? 'hot' : overallScore >= 40 ? 'warm' : 'cold',
             needsBoost: overallScore >= 30 && overallScore < 60 && totalInventory > 5,
@@ -362,8 +360,8 @@ function computeAdvancedAnalytics(orders, products) {
 
     // 3. Popular Variants — colors, sizes, options
     const variantMap = {};
-    orders.forEach(o => (o.line_items || []).forEach(li => {
-        const name = li.variant_title || 'Default';
+    orders.forEach(o => (o.lineItems || []).forEach(li => {
+        const name = li.variantTitle || 'Default';
         if (name === 'Default Title' || name === 'Default') return;
         variantMap[name] = (variantMap[name] || { name, units: 0, products: new Set() });
         variantMap[name].units += li.quantity || 1;
@@ -376,16 +374,16 @@ function computeAdvancedAnalytics(orders, products) {
 
     // 4. Abandonment Signals — stocked products with zero orders
     const soldIds = new Set();
-    orders.forEach(o => (o.line_items || []).forEach(li => { if (li.product_id) soldIds.add(String(li.product_id)); }));
+    orders.forEach(o => (o.lineItems || []).forEach(li => { if (li.productId) soldIds.add(String(li.productId)); }));
     const abandonmentSignals = products
         .filter(p => {
-            const inv = (p.variants || []).reduce((s, v) => s + (v.inventory_quantity || 0), 0);
-            return inv > 0 && !soldIds.has(String(p.id));
+            const inv = (p.variants || []).reduce((s, v) => s + (v.inventoryQuantity || 0), 0);
+            return inv > 0 && !soldIds.has(String(p.shopifyId));
         })
         .map(p => {
-            const inv = (p.variants || []).reduce((s, v) => s + (v.inventory_quantity || 0), 0);
-            const price = parseFloat(p.variants?.[0]?.price || 0);
-            return { productId: p.id, title: p.title, inventory: inv, price, image: p.images?.[0]?.src || null, stuckValue: Math.round(inv * price), reason: inv > 20 ? 'High stock, zero sales' : 'In stock, no orders', suggestion: price > 1000 ? 'Consider targeted ads or influencer push' : 'Bundle with top sellers or run flash sale' };
+            const inv = (p.variants || []).reduce((s, v) => s + (v.inventoryQuantity || 0), 0);
+            const price = p.price?.amount || p.variants?.[0]?.price || 0;
+            return { productId: p.shopifyId, title: p.title, inventory: inv, price, image: p.images?.[0]?.url || null, stuckValue: Math.round(inv * price), reason: inv > 20 ? 'High stock, zero sales' : 'In stock, no orders', suggestion: price > 1000 ? 'Consider targeted ads or influencer push' : 'Bundle with top sellers or run flash sale' };
         })
         .sort((a, b) => b.stuckValue - a.stuckValue)
         .slice(0, 10);
@@ -407,20 +405,17 @@ router.get('/overview', protect, async (req, res) => {
 
         const integration = await getShopifyIntegration(userId);
         if (!integration) {
-            return res.json({
-                connected: false,
-                message: 'Shopify not connected. Connect your store to see D2C analytics.',
-            });
+            return res.json({ connected: false, message: 'Shopify not connected.' });
         }
 
-        const shopDomain = integration.platformData.shopDomain;
-        const accessToken = integration.accessToken;
+        const brandFilter = brandId ? { brand: brandId } : { user: userId };
+        const dateLimit = new Date(Date.now() - parseInt(days) * 24 * 60 * 60 * 1000);
 
-        // Fetch all data in parallel
+        // Fetch from OUR Database instead of live API
         const [orders, products, customers] = await Promise.all([
-            fetchShopifyOrders(accessToken, shopDomain, { days: parseInt(days) }).catch(() => []),
-            fetchShopifyProducts(accessToken, shopDomain).catch(() => []),
-            fetchShopifyCustomers(accessToken, shopDomain).catch(() => []),
+            ShopifyOrder.find({ ...brandFilter, shopifyCreatedAt: { $gte: dateLimit } }).lean(),
+            Product.find({ ...brandFilter, source: 'shopify' }).lean(),
+            ShopifyCustomer.find(brandFilter).lean(),
         ]);
 
         const orderAnalytics = computeOrderAnalytics(orders);
@@ -484,20 +479,21 @@ router.get('/snapshot', protect, async (req, res) => {
         const integration = await getShopifyIntegration(userId);
         if (!integration) return res.json({ connected: false });
 
-        const shopDomain = integration.platformData.shopDomain;
-        const accessToken = integration.accessToken;
-        const orders = await fetchShopifyOrders(accessToken, shopDomain, { days: 7 }).catch(() => []);
+        const brandFilter = { user: userId };
+        const dateLimit = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-        const revenue = orders.reduce((s, o) => s + parseFloat(o.total_price || 0), 0);
+        const orders = await ShopifyOrder.find({ ...brandFilter, shopifyCreatedAt: { $gte: dateLimit } }).lean();
+
+        const revenue = orders.reduce((s, o) => s + (o.totalPrice || 0), 0);
         const aov = orders.length > 0 ? revenue / orders.length : 0;
 
         // Top 3 products
         const productMap = {};
-        orders.forEach(o => (o.line_items || []).forEach(li => {
-            const k = li.product_id || li.title;
+        orders.forEach(o => (o.lineItems || []).forEach(li => {
+            const k = li.productId || li.title;
             if (!productMap[k]) productMap[k] = { title: li.title, units: 0, revenue: 0 };
             productMap[k].units += li.quantity || 1;
-            productMap[k].revenue += parseFloat(li.price || 0) * (li.quantity || 1);
+            productMap[k].revenue += (li.price || 0) * (li.quantity || 1);
         }));
         const topProducts = Object.values(productMap).sort((a, b) => b.revenue - a.revenue).slice(0, 3);
 

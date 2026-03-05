@@ -93,4 +93,12 @@ export default {
         keyId: process.env.RAZORPAY_KEY_ID,
         keySecret: process.env.RAZORPAY_KEY_SECRET,
     },
+
+    // Shopify
+    shopify: {
+        apiKey: process.env.SHOPIFY_API_KEY,
+        apiSecret: process.env.SHOPIFY_API_SECRET,
+        scope: process.env.SHOPIFY_SCOPES || 'read_products,read_orders,read_customers',
+        callbackUrl: process.env.SHOPIFY_CALLBACK_URL,
+    },
 };
