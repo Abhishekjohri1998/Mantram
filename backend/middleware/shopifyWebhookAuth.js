@@ -7,6 +7,7 @@
  */
 
 import crypto from 'crypto';
+import config from '../config/env.js';
 
 /**
  * Verify Shopify webhook HMAC signature.
@@ -19,9 +20,9 @@ export function verifyShopifyWebhook(req, res, next) {
         return res.status(401).json({ error: 'Missing HMAC signature' });
     }
 
-    const secret = process.env.SHOPIFY_CLIENT_SECRET;
+    const secret = config.shopify.apiSecret;
     if (!secret) {
-        console.error('❌ SHOPIFY_CLIENT_SECRET not configured');
+        console.error('❌ SHOPIFY_API_SECRET not configured');
         return res.status(500).json({ error: 'Server misconfigured' });
     }
 

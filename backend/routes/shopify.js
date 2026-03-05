@@ -31,8 +31,8 @@ router.post('/connect', protect, async (req, res) => {
         const { shopDomain, brandId } = req.body;
         if (!shopDomain) return res.status(400).json({ success: false, error: 'Shop domain is required (e.g. my-store.myshopify.com)' });
 
-        const clientId = process.env.SHOPIFY_CLIENT_ID;
-        if (!clientId) return res.status(500).json({ success: false, error: 'Shopify app not configured. Add SHOPIFY_CLIENT_ID to .env' });
+        const clientId = config.shopify.apiKey;
+        if (!clientId) return res.status(500).json({ success: false, error: 'Shopify app not configured. Add SHOPIFY_API_KEY to .env' });
 
         // Use server URL for callback (must match Shopify app config exactly)
         const backendUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
@@ -124,8 +124,8 @@ router.get('/callback', async (req, res) => {
         const { code, shop, state } = req.query;
         if (!code || !shop) return res.redirect(`${frontendUrl}/integrations?error=missing_params`);
 
-        const clientId = process.env.SHOPIFY_CLIENT_ID;
-        const clientSecret = process.env.SHOPIFY_CLIENT_SECRET;
+        const clientId = config.shopify.apiKey;
+        const clientSecret = config.shopify.apiSecret;
 
         console.log(`🔄 Shopify callback: shop=${shop}, code=${code ? 'present' : 'missing'}`);
 
