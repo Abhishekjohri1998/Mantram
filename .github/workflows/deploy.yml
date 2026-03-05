@@ -95,6 +95,20 @@ jobs:
               exit 1
             fi
 
+            # 2.5 Ensure CloudFront origin is in FRONTEND_URL
+            echo "🌐 Ensuring CloudFront origin is in CORS allowlist..."
+            CLOUDFRONT_ORIGIN="https://djty1w4l0681b.cloudfront.net"
+            if grep -q "FRONTEND_URL" "$RELEASE_DIR/backend/.env"; then
+              # If missing, append it
+              if ! grep -q "$CLOUDFRONT_ORIGIN" "$RELEASE_DIR/backend/.env"; then
+                sed -i "s|FRONTEND_URL=|FRONTEND_URL=$CLOUDFRONT_ORIGIN,|" "$RELEASE_DIR/backend/.env"
+                echo "✅ Added $CLOUDFRONT_ORIGIN to FRONTEND_URL"
+              fi
+            else
+              echo "FRONTEND_URL=$CLOUDFRONT_ORIGIN,https://mantram.ai" >> "$RELEASE_DIR/backend/.env"
+              echo "✅ Created FRONTEND_URL in .env"
+            fi
+
             echo "🌐 Verifying Allowed Origins (CORS):"
             grep "FRONTEND_URL" "$RELEASE_DIR/backend/.env" || echo "FRONTEND_URL not set in .env"
             
