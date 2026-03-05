@@ -126,9 +126,10 @@ jobs:
             cd $RELEASE_DIR/backend
             npm ci --omit=dev
             
-            # 3.5 Seed Superadmin accounts
-            echo "🔑 Seeding superadmins..."
-            node scripts/seedSuperAdmin.js || echo "⚠️ Seeding failed or skipped"
+            # 3.5 Seed Superadmin accounts and subscription packages
+            echo "🔑 Seeding data..."
+            node scripts/seedSuperAdmin.js || echo "⚠️ Superadmin seeding failed or skipped"
+            node scripts/seedPackages.js || echo "⚠️ Package seeding failed or skipped"
             
             # 4. Atomic Symlink Switch
             echo "🔗 Switching symlink..."
