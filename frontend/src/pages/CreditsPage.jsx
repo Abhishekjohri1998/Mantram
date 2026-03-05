@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import DashboardLayout from '../components/DashboardLayout'
-import { credits as creditsAPI } from '../services/api'
+import { credits as creditsAPI, payments as paymentsAPI } from '../services/api'
 
 const ACTION_ICONS = {
     content: 'edit_note', contentRefine: 'auto_fix',
@@ -49,6 +49,61 @@ export default function CreditsPage() {
             setUsageTotal(data.total || 0)
             setPages(data.pages || 1)
         } catch (e) { console.error(e) }
+    }
+
+    const [packages, setPackages] = useState([])
+    const [packagesLoading, setPackagesLoading] = useState(false)
+
+    useEffect(() => {
+        if (tab === 'plans' && packages.length === 0) {
+            loadPackages()
+        }
+    }, [tab])
+
+    const loadPackages = async () => {
+        setPackagesLoading(true)
+        try {
+            const { packages: pkgs } = await paymentsAPI.getPackages()
+            setPackages(pkgs)
+        } catch (e) { console.error(e) } finally { setPackagesLoading(false) }
+    }
+
+    const handleUpgrade = async (pkg) => {
+        try {
+            const { orderId, amount, currency } = await paymentsAPI.createOrder(pkg._id)
+
+            const options = {
+                key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_live_SNWgwltU4JKol6',
+                amount,
+                currency,
+                name: 'Mantram AI',
+                description: `Upgrade to ${pkg.name} Plan`,
+                order_id: orderId,
+                handler: async (response) => {
+                    try {
+                        await paymentsAPI.verify({
+                            ...response,
+                            packageId: pkg._id,
+                            billingCycle: 'monthly'
+                        })
+                        alert(`Successfully upgraded to ${pkg.name}!`)
+                        window.location.reload()
+                    } catch (e) {
+                        alert('Payment verification failed: ' + e.message)
+                    }
+                },
+                prefill: {
+                    name: summary?.userName,
+                    email: summary?.userEmail,
+                },
+                theme: { color: '#2b4bee' }
+            }
+
+            const rzp = new window.Razorpay(options)
+            rzp.open()
+        } catch (e) {
+            alert('Failed to initialize payment: ' + e.message)
+        }
     }
 
     const balance = summary?.balance
@@ -125,7 +180,7 @@ export default function CreditsPage() {
 
                     {/* Tabs */}
                     <div className="flex gap-2">
-                        {['overview', 'history'].map(t => (
+                        {['overview', 'plans', 'history'].map(t => (
                             <button
                                 key={t}
                                 onClick={() => setTab(t)}
@@ -134,7 +189,7 @@ export default function CreditsPage() {
                                     : 'text-slate-400 hover:bg-white/[0.04] border border-transparent'
                                     }`}
                             >
-                                {t === 'overview' ? '📊 Usage Breakdown' : '📋 Transaction History'}
+                                {t === 'overview' ? '📊 Usage Breakdown' : t === 'plans' ? '💎 Upgrade Plans' : '📋 Transaction History'}
                             </button>
                         ))}
                     </div>
@@ -218,6 +273,58 @@ export default function CreditsPage() {
                                     </div>
                                 )}
                             </div>
+                        </div>
+                    ) : tab === 'plans' ? (
+                        <div className="space-y-6">
+                            {packagesLoading ? (
+                                <div className="flex items-center justify-center h-64">
+                                    <div className="size-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                    {packages.map((pkg) => (
+                                        <div key={pkg._id} className={`glass-panel p-6 rounded-2xl border transition-all hover:scale-[1.02] flex flex-col ${pkg.slug === balance?.plan ? 'border-primary ring-1 ring-primary/20 bg-primary/5' : 'border-white/[0.08]'}`}>
+                                            <div className="flex-1">
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <h3 className="text-xl font-bold text-white">{pkg.name}</h3>
+                                                    {pkg.slug === balance?.plan && <span className="badge badge-primary scale-75 origin-right">Current</span>}
+                                                </div>
+                                                <p className="text-sm text-slate-500 mb-6">{pkg.description}</p>
+                                                <div className="mb-6">
+                                                    <span className="text-3xl font-black text-white">{pkg.pricing.currency === 'INR' ? '₹' : '$'}{pkg.pricing.monthly}</span>
+                                                    <span className="text-slate-500 text-sm">/mo</span>
+                                                </div>
+                                                <ul className="space-y-3 mb-8">
+                                                    <li className="flex items-center gap-2 text-sm text-slate-300">
+                                                        <span className="material-symbols-outlined text-primary text-lg">check_circle</span>
+                                                        {pkg.credits.monthly} Credits / mo
+                                                    </li>
+                                                    <li className="flex items-center gap-2 text-sm text-slate-300">
+                                                        <span className="material-symbols-outlined text-primary text-lg">check_circle</span>
+                                                        {pkg.limits.brands} Brand Profiles
+                                                    </li>
+                                                    {pkg.features.map((f, j) => (
+                                                        <li key={j} className="flex items-center gap-2 text-sm text-slate-300">
+                                                            <span className="material-symbols-outlined text-primary text-lg">check_circle</span>
+                                                            {f}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                            <button
+                                                disabled={pkg.slug === balance?.plan}
+                                                onClick={() => handleUpgrade(pkg)}
+                                                className={`w-full py-3 rounded-xl font-bold text-sm text-center block transition-all cursor-pointer ${pkg.slug === balance?.plan
+                                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default'
+                                                    : 'bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary-light'
+                                                    }`}
+                                            >
+                                                {pkg.slug === balance?.plan ? 'Current Plan' : 'Upgrade Now'}
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     ) : (
                         /* Transaction History */

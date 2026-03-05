@@ -14,6 +14,19 @@ const razorpay = new Razorpay({
     key_secret: config.razorpay.keySecret,
 });
 
+// @desc    Get Available Subscription Packages
+// @route   GET /api/payments/packages
+// @access  Public
+router.get('/packages', async (req, res) => {
+    try {
+        const packages = await SubscriptionPackage.find().sort({ displayOrder: 1 });
+        res.json({ success: true, packages });
+    } catch (error) {
+        console.error('❌ Get Packages Error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch packages' });
+    }
+});
+
 // @desc    Create Razorpay Order
 // @route   POST /api/payments/create-order
 // @access  Private

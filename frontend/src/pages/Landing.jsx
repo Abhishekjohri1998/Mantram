@@ -181,11 +181,12 @@ export default function Landing() {
                     <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Choose your <span className="text-gradient">plan</span></h2>
                     <p className="text-slate-400 max-w-xl mx-auto">Start free, scale as you grow. Every plan includes AI-powered brand intelligence.</p>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 max-w-7xl mx-auto">
                     {[
-                        { name: 'Starter', price: 'Free', desc: 'Perfect for getting started', features: ['1 Brand Profile', 'Basic Content Studio', '5 AI Generations/day', 'Email Support'], popular: false },
-                        { name: 'Professional', price: '$49', desc: 'For growing brands', features: ['5 Brand Profiles', 'Full Content & Creative Studio', 'Unlimited AI Generations', 'Team Dashboard (3 users)', 'Analytics Dashboard', 'Priority Support'], popular: true },
-                        { name: 'Enterprise', price: '$199', desc: 'For agencies & teams', features: ['Unlimited Brands', 'Full Platform Access', 'Unlimited Everything', 'Admin Dashboard', 'API Access', 'Dedicated Account Manager'], popular: false },
+                        { name: 'Starter', price: '₹499', desc: 'Perfect for getting started', features: ['1 Brand Profile', '50 Credits/month', 'Basic Content Studio', 'Email Support'], popular: false },
+                        { name: 'Professional', price: '₹1,999', desc: 'For growing brands', features: ['3 Brand Profiles', '200 Credits/month', 'Full Studio Access', 'Team Dashboard', 'Priority Support'], popular: true },
+                        { name: 'Agency', price: '₹4,999', desc: 'For marketing teams', features: ['15 Brand Profiles', '1,000 Credits/month', 'Full Studio Access', 'Team Dashboard (10 users)', 'D2C Analytics'], popular: false },
+                        { name: 'Enterprise', price: '₹9,999', desc: 'Unlimited AI power', features: ['Unlimited Brand Profiles', 'Unlimited Credits', 'Full Studio Access', 'Dedicated Support', 'White Labeling'], popular: false },
                     ].map((plan, i) => (
                         <div key={i} className={`glass-panel p-8 rounded-3xl relative transition-all hover:scale-[1.02] ${plan.popular ? 'border-primary/40 ring-2 ring-primary/20' : ''}`}>
                             {plan.popular && (

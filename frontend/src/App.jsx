@@ -57,7 +57,7 @@ function App() {
               <Route path="/brands" element={<ProtectedRoute><BrandManagement /></ProtectedRoute>} />
               <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute><UserDashboard /></ProtectedRoute>} />
-              <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+              <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin', 'superadmin']}><AdminDashboard /></ProtectedRoute>} />
               <Route path="/team" element={<ProtectedRoute><TeamDashboard /></ProtectedRoute>} />
               <Route path="/content-studio" element={<ProtectedRoute><ContentStudio /></ProtectedRoute>} />
               <Route path="/creative-studio" element={<ProtectedRoute><CreativeStudio /></ProtectedRoute>} />
@@ -75,7 +75,7 @@ function App() {
               <Route path="/conversations/ai-settings" element={<ProtectedRoute><AISettings /></ProtectedRoute>} />
               <Route path="/conversations/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
               <Route path="/credits" element={<ProtectedRoute><CreditsPage /></ProtectedRoute>} />
-              <Route path="/superadmin" element={<ProtectedRoute><SuperAdminDashboard /></ProtectedRoute>} />
+              <Route path="/superadmin" element={<ProtectedRoute allowedRoles={['superadmin']}><SuperAdminDashboard /></ProtectedRoute>} />
             </Routes>
           </CreditProvider>
         </BrandProvider>

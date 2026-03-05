@@ -446,3 +446,18 @@ export const routingRules = {
     test: (data) => apiFetch('/routing-rules/test', { method: 'POST', body: JSON.stringify(data) }),
 };
 
+// ============ Payments & Subscriptions API ============
+export const payments = {
+    getPackages: () => apiFetch('/payments/packages'),
+    createOrder: (packageId, billingCycle = 'monthly') =>
+        apiFetch('/payments/create-order', {
+            method: 'POST',
+            body: JSON.stringify({ packageId, billingCycle })
+        }),
+    verify: (paymentData) =>
+        apiFetch('/payments/verify', {
+            method: 'POST',
+            body: JSON.stringify(paymentData)
+        }),
+};
+
