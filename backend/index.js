@@ -120,6 +120,9 @@ app.get('/api/health', (req, res) => {
     res.json({
         status: 'ok',
         timestamp: new Date().toISOString(),
+        cors: {
+            allowedOrigins: config.frontendUrl
+        },
         ai: {
             textProvider: config.ai.defaultTextProvider,
             imageProvider: config.ai.defaultImageProvider,
