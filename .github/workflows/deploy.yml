@@ -1,164 +1,144 @@
-name: 🚀 Deploy Mantram AI
+name: 🚀 Production Deployment
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-concurrency:
-  group: deploy-production
-  cancel-in-progress: false
-
-env:
-  APP_DIR: /var/www/mantram
-  KEEP_RELEASES: 5
-  NODE_VERSION: 22
-
 jobs:
   # ═══════════════════════════════════════════
-  # Job 1: Build & Test
+  # 🎨 Job 1: Build & Deploy Frontend (S3)
   # ═══════════════════════════════════════════
-  build-test:
-    name: 🧪 Build & Test
+  deploy-frontend:
+    name: 🎨 Frontend (S3 + CloudFront)
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: cd frontend && npm ci
 
       - name: Build frontend
-        run: npm run build
-
-      - name: Lint check
-        run: npm run lint || true
-
-      - name: Verify build output
         run: |
-          if [ ! -d "dist" ]; then
-            echo "❌ Build failed — dist/ directory not found"
-            exit 1
-          fi
-          echo "✅ Build successful — $(find dist -type f | wc -l) files"
+          cd frontend
+          npm run build
+        env:
+          VITE_API_URL: https://api.mantram.ai/api
+
+      - name: 📦 Sync to S3
+        run: |
+          aws s3 sync frontend/dist s3://${{ secrets.S3_BUCKET_NAME }} --delete
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+
+      - name: ⚡ Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
 
   # ═══════════════════════════════════════════
-  # Job 2: Deploy to EC2
+  # ⚙️ Job 2: Deploy Backend (EC2)
   # ═══════════════════════════════════════════
-  deploy:
-    name: 🚀 Deploy to EC2
+  deploy-backend:
+    name: ⚙️ Backend (EC2 + PM2)
     runs-on: ubuntu-latest
-    needs: build-test
     steps:
-      - name: Deploy via SSH
+      - uses: actions/checkout@v4
+
+      - name: 🚀 Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          command_timeout: 10m
           script: |
             set -e
-
-            APP_DIR=/var/www/mantram
+            
+            # Paths
+            BASE_DIR=/home/ec2-user/deployments
+            CURRENT_LINK=/home/ec2-user/Mantram
             TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-            SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-            RELEASE_DIR=$APP_DIR/releases/${TIMESTAMP}_${SHORT_SHA}
-            CURRENT_LINK=$APP_DIR/current
-            PREVIOUS_LINK=$APP_DIR/previous
-
-            echo "═══════════════════════════════════════════"
-            echo "🚀 Deploying Mantram AI"
-            echo "📦 Commit:  ${{ github.sha }}"
-            echo "📁 Release: $RELEASE_DIR"
-            echo "⏰ Time:    $(date)"
-            echo "═══════════════════════════════════════════"
-
-            # ── 1. Clone the new release ──
-            echo "📥 Cloning repository..."
-            git clone --depth=1 --branch=main \
-              git@github.com:Abhishekjohri1998/Mantram.git \
-              "$RELEASE_DIR"
-            rm -rf "$RELEASE_DIR/.git"
-
-            # ── 2. Link shared files (.env) ──
-            echo "🔗 Linking shared .env..."
-            ln -sf $APP_DIR/shared/.env "$RELEASE_DIR/.env"
-
-            # ── 3. Install production dependencies ──
-            echo "📦 Installing dependencies..."
-            cd "$RELEASE_DIR"
-            npm ci --omit=dev
-
-            # ── 4. Build frontend ──
-            echo "🏗️  Building frontend..."
-            npm run build
-
-            # ── 5. Save current as previous (for instant rollback) ──
-            if [ -L "$CURRENT_LINK" ]; then
-              PREV_TARGET=$(readlink -f "$CURRENT_LINK")
-              ln -sfn "$PREV_TARGET" "$PREVIOUS_LINK"
-              echo "📌 Previous release saved: $(basename $PREV_TARGET)"
-            fi
-
-            # ── 6. Atomic symlink switch ──
-            ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
-            echo "✅ Symlink switched: current → $(basename $RELEASE_DIR)"
-
-            # ── 7. Restart with PM2 (zero-downtime reload) ──
-            echo "🔄 Reloading PM2..."
-            pm2 startOrReload $APP_DIR/shared/ecosystem.config.cjs --update-env
-            pm2 save
-
-            # ── 8. Reload Nginx ──
-            sudo systemctl reload nginx
-
-            # ── 9. Health check (30s timeout) ──
-            echo "🏥 Running health check..."
-            HEALTH_OK=false
-            for i in $(seq 1 10); do
-              if curl -sf http://localhost:3001/api/health > /dev/null 2>&1; then
-                HEALTH_OK=true
-                echo "✅ Health check passed (attempt $i/10)"
-                break
-              fi
-              echo "   Waiting for server... (attempt $i/10)"
-              sleep 3
-            done
-
-            if [ "$HEALTH_OK" = false ]; then
-              echo ""
-              echo "❌ ═══════════════════════════════════════════"
-              echo "❌ HEALTH CHECK FAILED — AUTO-ROLLING BACK"
-              echo "❌ ═══════════════════════════════════════════"
-
-              if [ -L "$PREVIOUS_LINK" ]; then
-                PREV_TARGET=$(readlink -f "$PREVIOUS_LINK")
-                ln -sfn "$PREV_TARGET" "$CURRENT_LINK"
-                pm2 startOrReload $APP_DIR/shared/ecosystem.config.cjs --update-env
-                sudo systemctl reload nginx
-                echo "🔄 Rolled back to: $(basename $PREV_TARGET)"
-              fi
+            RELEASE_DIR=$BASE_DIR/$TIMESTAMP
+            
+            echo "📦 Creating release: $TIMESTAMP"
+            mkdir -p $BASE_DIR
+            rm -rf $RELEASE_DIR  # Ensure clean state
+            # 1. Clone/Copy release
+            git clone --depth=1 -b main https://github.com/Abhishekjohri1998/Mantram.git $RELEASE_DIR
+            
+            mkdir -p $RELEASE_DIR/backend/logs
+            
+            # 2. Restore .env (Crucial Step)
+            echo "🔐 Restoring .env file..."
+            if [ -f "$CURRENT_LINK/backend/.env" ]; then
+              cp "$CURRENT_LINK/backend/.env" "$RELEASE_DIR/backend/.env"
+            elif [ -d "${CURRENT_LINK}_old_folder" ] && [ -f "${CURRENT_LINK}_old_folder/backend/.env" ]; then
+              cp "${CURRENT_LINK}_old_folder/backend/.env" "$RELEASE_DIR/backend/.env"
+            elif [ -f ~/Mantram/backend/.env ]; then
+              cp ~/Mantram/backend/.env "$RELEASE_DIR/backend/.env"
+            else
+              echo "❌ CRITICAL: .env file not found anywhere! Deployment will fail."
               exit 1
             fi
-
-            # ── 10. Cleanup old releases (keep last N) ──
-            cd $APP_DIR/releases
-            RELEASE_COUNT=$(ls -dt */ 2>/dev/null | wc -l)
-            if [ "$RELEASE_COUNT" -gt 5 ]; then
-              ls -dt */ | tail -n +6 | xargs rm -rf 2>/dev/null || true
-              echo "🧹 Cleaned up old releases (kept last 5)"
+            
+            # 3. Install & Build
+            cd $RELEASE_DIR/backend
+            npm ci --omit=dev
+            
+            # 4. Atomic Symlink Switch
+            echo "🔗 Switching symlink..."
+            if [ ! -L "$CURRENT_LINK" ] && [ -d "$CURRENT_LINK" ]; then
+              echo "⚠️  Moving existing Mantram folder to Mantram_old_folder"
+              mv "$CURRENT_LINK" "${CURRENT_LINK}_old_folder"
             fi
-
-            echo ""
-            echo "═══════════════════════════════════════════"
-            echo "✅ DEPLOYMENT SUCCESSFUL"
-            echo "📁 Release: $(basename $RELEASE_DIR)"
-            echo "⏰ $(date)"
-            echo "═══════════════════════════════════════════"
+            ln -sfn $RELEASE_DIR $CURRENT_LINK
+            
+            # 5. Restart with PM2
+            cd $CURRENT_LINK
+            pm2 startOrReload deploy/ecosystem.config.cjs --update-env
+            pm2 save
+            
+            # 6. Health Check (with Retry Loop)
+            echo "🏥 Health check..."
+            success=false
+            for i in {1..6}; do
+              echo "Attempt $i: Checking http://localhost:3001/api/health"
+              if curl -sf http://localhost:3001/api/health; then
+                echo "✅ Backend is UP"
+                success=true
+                break
+              fi
+              echo "⏳ Waiting for server to start... (5s)"
+              sleep 5
+            done
+            
+            if [ "$success" = false ]; then
+              echo "❌ Backend health check failed! Showing PM2 Logs:"
+              pm2 logs mantram-server --lines 100 --no-daemon & sleep 10 && kill $!
+              
+              echo "🔍 Checking port 3001 usage..."
+              sudo lsof -i :3001 || echo "Port 3001 is free"
+              
+              echo "💀 Force killing any existing mantram process for fresh start..."
+              pm2 delete mantram-server || true
+              exit 1
+            fi
+            
+            # 7. Cleanup old releases (keep last 5)
+            cd $BASE_DIR
+            ls -1t | tail -n +6 | xargs rm -rf || true
+            echo "🧹 Old releases cleaned up"

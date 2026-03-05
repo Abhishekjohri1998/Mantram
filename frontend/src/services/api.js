@@ -4,7 +4,7 @@
  * Handles auth tokens, error handling, and response parsing.
  */
 
-const API_BASE = `${window.location.origin}/api`;
+const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`;
 
 // Token management
 let authToken = localStorage.getItem('mantram_token') || '';
