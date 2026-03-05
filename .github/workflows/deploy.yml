@@ -109,6 +109,14 @@ jobs:
               echo "✅ Created FRONTEND_URL in .env"
             fi
 
+            # 2.5 Inject Razorpay Secrets
+            if ! grep -q "RAZORPAY_KEY_ID" "$RELEASE_DIR/backend/.env"; then
+              echo "RAZORPAY_KEY_ID=rzp_live_SNWgwltU4JKol6" >> "$RELEASE_DIR/backend/.env"
+            fi
+            if ! grep -q "RAZORPAY_KEY_SECRET" "$RELEASE_DIR/backend/.env"; then
+              echo "RAZORPAY_KEY_SECRET=NBZfyya8Elg7b16ak9ADXr2O" >> "$RELEASE_DIR/backend/.env"
+            fi
+
             echo "🌐 Verifying Allowed Origins (CORS):"
             grep "FRONTEND_URL" "$RELEASE_DIR/backend/.env" || echo "FRONTEND_URL not set in .env"
             
