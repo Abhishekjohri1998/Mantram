@@ -43,7 +43,20 @@ const app = express();
 connectDB();
 
 // Middleware
-app.use(cors({ origin: config.frontendUrl, credentials: true }));
+app.use(cors({
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl)
+        if (!origin) return callback(null, true);
+
+        if (config.frontendUrl.includes(origin)) {
+            callback(null, true);
+        } else {
+            console.warn(`⚠️ CORS Blocked: Origin "${origin}" not in allowed list:`, config.frontendUrl);
+            callback(null, false);
+        }
+    },
+    credentials: true
+}));
 app.use(express.json({
     limit: '50mb',
     // Capture raw body for Shopify webhook HMAC verification
