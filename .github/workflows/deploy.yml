@@ -94,6 +94,9 @@ jobs:
               echo "❌ CRITICAL: .env file not found anywhere! Deployment will fail."
               exit 1
             fi
+
+            echo "🌐 Verifying Allowed Origins (CORS):"
+            grep "FRONTEND_URL" "$RELEASE_DIR/backend/.env" || echo "FRONTEND_URL not set in .env"
             
             # 3. Install & Build
             cd $RELEASE_DIR/backend
