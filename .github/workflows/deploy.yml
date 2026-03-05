@@ -76,6 +76,7 @@ jobs:
             
             echo "📦 Creating release: $TIMESTAMP"
             mkdir -p $BASE_DIR
+            rm -rf $RELEASE_DIR  # Ensure clean state
             mkdir -p $RELEASE_DIR/backend/logs
             
             # 1. Clone/Copy release
