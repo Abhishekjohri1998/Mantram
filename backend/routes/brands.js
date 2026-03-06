@@ -37,12 +37,28 @@ async function findBrandWithAccess(brandId, userId) {
 
 // ═══════════════════════════════════════════════════════════════
 // GET /api/brands — list user's brands
+// By default, excludes archived brands.
+// ?include=archived → only archived brands (for archive page)
+// ?include=all      → everything (admin use)
 // ═══════════════════════════════════════════════════════════════
 router.get('/', protect, async (req, res) => {
     try {
-        const brands = await Brand.find({
+        const query = {
             $or: [{ user: req.user._id }, { sharedWith: req.user._id }]
-        }).sort('-updatedAt');
+        };
+
+        // Status filtering — exclude archived by default
+        const include = req.query.include;
+        if (include === 'archived') {
+            query.status = 'archived';
+        } else if (include === 'all') {
+            // No status filter — return everything
+        } else {
+            // Default: exclude archived
+            query.status = { $ne: 'archived' };
+        }
+
+        const brands = await Brand.find(query).sort('-updatedAt');
         res.json({ success: true, brands });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });

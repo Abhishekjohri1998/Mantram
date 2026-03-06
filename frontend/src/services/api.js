@@ -64,7 +64,7 @@ export const auth = {
 
 // ============ Brands API ============
 export const brands = {
-    list: () => apiFetch('/brands'),
+    list: (params = {}) => apiFetch(`/brands?${new URLSearchParams(params)}`),
     get: (id) => apiFetch(`/brands/${id}`),
     create: (data) => apiFetch('/brands', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => apiFetch(`/brands/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
@@ -357,6 +357,60 @@ export const agentCommand = {
 };
 
 // ============ SEO Studio API ============
+// ============ Performance Marketing Studio API ============
+export const pmStudio = {
+    // ── Core Pipeline ──
+    research: (data) => apiFetch('/pm-studio/research', { method: 'POST', body: JSON.stringify(data) }),
+    strategy: (data) => apiFetch('/pm-studio/strategy', { method: 'POST', body: JSON.stringify(data) }),
+    budget: (data) => apiFetch('/pm-studio/budget', { method: 'POST', body: JSON.stringify(data) }),
+    generateCreatives: (data) => apiFetch('/pm-studio/generate-creatives', { method: 'POST', body: JSON.stringify(data) }),
+    generateAdImage: (data) => apiFetch('/pm-studio/generate-ad-image', { method: 'POST', body: JSON.stringify(data) }),
+    analyze: (data) => apiFetch('/pm-studio/analyze', { method: 'POST', body: JSON.stringify(data) }),
+    report: (data) => apiFetch('/pm-studio/report', { method: 'POST', body: JSON.stringify(data) }),
+
+    // ── Campaigns ──
+    createCampaign: (data) => apiFetch('/pm-studio/campaigns', { method: 'POST', body: JSON.stringify(data) }),
+    getCampaigns: (params = {}) => apiFetch(`/pm-studio/campaigns?${new URLSearchParams(params)}`),
+    getCampaign: (id) => apiFetch(`/pm-studio/campaigns/${id}`),
+    updateCampaign: (id, data) => apiFetch(`/pm-studio/campaigns/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    createABTest: (id, data) => apiFetch(`/pm-studio/campaigns/${id}/ab-test`, { method: 'POST', body: JSON.stringify(data) }),
+
+    // ── Reports & Learnings ──
+    getReports: (params = {}) => apiFetch(`/pm-studio/reports?${new URLSearchParams(params)}`),
+    getReport: (id) => apiFetch(`/pm-studio/reports/${id}`),
+    getLearnings: (params = {}) => apiFetch(`/pm-studio/learnings?${new URLSearchParams(params)}`),
+    updateLearning: (id, data) => apiFetch(`/pm-studio/learnings/${id}/status`, { method: 'PUT', body: JSON.stringify(data) }),
+
+    // ── Dashboard & Connections ──
+    dashboard: (params = {}) => apiFetch(`/pm-studio/dashboard?${new URLSearchParams(params)}`),
+    connections: () => apiFetch('/pm-studio/connections'),
+    trends: (params = {}) => apiFetch(`/pm-studio/trends?${new URLSearchParams(params)}`),
+
+    // ── Phase 1: Live Data Pipeline ──
+    syncCampaigns: (data = {}) => apiFetch('/pm-studio/sync-campaigns', { method: 'POST', body: JSON.stringify(data) }),
+    anomalies: (params = {}) => apiFetch(`/pm-studio/anomalies?${new URLSearchParams(params)}`),
+    autoFixAnomalies: (data) => apiFetch('/pm-studio/anomalies/auto-fix', { method: 'POST', body: JSON.stringify(data) }),
+    blendedRoas: (params = {}) => apiFetch(`/pm-studio/blended-roas?${new URLSearchParams(params)}`),
+
+    // ── Phase 2: Autonomous Optimization ──
+    roasForecast: (data) => apiFetch('/pm-studio/roas-forecast', { method: 'POST', body: JSON.stringify(data) }),
+    optimize: (data = {}) => apiFetch('/pm-studio/optimize', { method: 'POST', body: JSON.stringify(data) }),
+    optimizationLog: (params = {}) => apiFetch(`/pm-studio/optimization-log?${new URLSearchParams(params)}`),
+    setAutopilot: (id, data) => apiFetch(`/pm-studio/campaigns/${id}/autopilot`, { method: 'PUT', body: JSON.stringify(data) }),
+
+    // ── Phase 3: Cross-Studio Intelligence ──
+    crossStudioOpportunities: (params = {}) => apiFetch(`/pm-studio/cross-studio/opportunities?${new URLSearchParams(params)}`),
+    createFromSEO: (data) => apiFetch('/pm-studio/cross-studio/create-from-seo', { method: 'POST', body: JSON.stringify(data) }),
+
+    // ── Phase 4: Attribution, Pixel, Alerts, Benchmarks ──
+    attribution: (params = {}) => apiFetch(`/pm-studio/attribution?${new URLSearchParams(params)}`),
+    pixelSetup: (params = {}) => apiFetch(`/pm-studio/pixel/setup?${new URLSearchParams(params)}`),
+    sendAlertManual: (data) => apiFetch('/pm-studio/alerts/send', { method: 'POST', body: JSON.stringify(data) }),
+    testAlert: (data = {}) => apiFetch('/pm-studio/alerts/test', { method: 'POST', body: JSON.stringify(data) }),
+    benchmarks: (params = {}) => apiFetch(`/pm-studio/benchmarks?${new URLSearchParams(params)}`),
+    benchmarksAI: (params = {}) => apiFetch(`/pm-studio/benchmarks/ai?${new URLSearchParams(params)}`),
+};
+
 export const seoStudio = {
     healthCheck: (data) => apiFetch('/seo-studio/health-check', { method: 'POST', body: JSON.stringify(data) }),
     traffic: (data) => apiFetch('/seo-studio/traffic', { method: 'POST', body: JSON.stringify(data) }),
@@ -366,6 +420,11 @@ export const seoStudio = {
     ask: (data) => apiFetch('/seo-studio/ask', { method: 'POST', body: JSON.stringify(data) }),
     manageCompetitors: (data) => apiFetch('/seo-studio/competitors/manage', { method: 'POST', body: JSON.stringify(data) }),
     discoverCompetitors: (data) => apiFetch('/seo-studio/competitors/discover', { method: 'POST', body: JSON.stringify(data) }),
+    // New agentic workflows
+    competitorWarRoom: (data) => apiFetch('/seo-studio/competitor-warroom', { method: 'POST', body: JSON.stringify(data) }),
+    llmProbe: (data) => apiFetch('/seo-studio/llm-probe', { method: 'POST', body: JSON.stringify(data) }),
+    autoFix: (data) => apiFetch('/seo-studio/auto-fix', { method: 'POST', body: JSON.stringify(data) }),
+    promptMining: (data) => apiFetch('/seo-studio/prompt-mining', { method: 'POST', body: JSON.stringify(data) }),
     history: (params = {}) => {
         const query = new URLSearchParams(params).toString();
         return apiFetch(`/seo-studio/history?${query}`);

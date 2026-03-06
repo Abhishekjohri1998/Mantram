@@ -108,7 +108,30 @@ const adCampaignSchema = new mongoose.Schema({
         roas: { type: Number, default: 0 },
         spend: { type: Number, default: 0 },
         leads: { type: Number, default: 0 },
+        revenue: { type: Number, default: 0 },           // Shopify-attributed revenue
+        blendedRoas: { type: Number, default: 0 },       // Revenue / Spend (from Shopify)
+        mer: { type: Number, default: 0 },                // Marketing Efficiency Ratio
         lastSyncAt: { type: Date },
+    },
+
+    // ── Anomaly Tracking ──
+    anomalies: [{
+        type: { type: String },                           // 'roas-drop', 'cpc-spike', 'ctr-drop', 'budget-exceeded'
+        severity: { type: String, enum: ['low', 'medium', 'high', 'critical'], default: 'medium' },
+        detected: { type: Date },
+        metric: { type: String },
+        expected: { type: Number },
+        actual: { type: Number },
+        action: { type: String },                         // What was done (paused, budget-shifted, alert-sent)
+        resolved: { type: Boolean, default: false },
+    }],
+
+    // ── Autopilot Settings ──
+    autopilot: {
+        enabled: { type: Boolean, default: false },
+        pauseOnRoasDrop: { type: Number, default: 0 },   // Auto-pause if ROAS drops below this
+        maxDailySpend: { type: Number, default: 0 },      // Hard cap
+        autoSwapCreatives: { type: Boolean, default: false },
     },
 
     // ── AI Insights ──

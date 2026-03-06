@@ -573,13 +573,15 @@ export async function advancedGenerateNode(state) {
         cap?.duration.native || 15
     );
 
-    console.log(`🎬 Advanced Generate: ${model}, ${duration}s, prompt: ${prompt.substring(0, 100)}...`);
+    console.log(`🎬 Advanced Generate: ${model}, ${duration}s, refImages: ${(state.referenceImages || []).length}, prompt: ${prompt.substring(0, 100)}...`);
 
-    // Skip base64 data URIs AND localhost URLs — external video APIs can't access them
+    // For PiAPI (seedance), base64 is supported in image_urls — only skip for fal/other providers
     let imageUrl = state.firstImageUrl || undefined;
-    if (imageUrl && (imageUrl.startsWith('data:') || imageUrl.includes('localhost') || imageUrl.includes('127.0.0.1'))) {
-        console.warn('⚠️ firstImageUrl is base64/localhost — external video APIs can\'t access it. Skipping.');
-        imageUrl = undefined;
+    if (imageUrl && model !== 'seedance-2.0') {
+        if (imageUrl.startsWith('data:') || imageUrl.includes('localhost') || imageUrl.includes('127.0.0.1')) {
+            console.warn('⚠️ firstImageUrl is base64/localhost — external video APIs can\'t access it. Skipping.');
+            imageUrl = undefined;
+        }
     }
 
     const result = await submitVideoGeneration({
@@ -591,6 +593,7 @@ export async function advancedGenerateNode(state) {
         mode: state.qualityMode || 'fast',
         generateAudio: state.generateAudio !== false,
         aspectRatio: state.aspectRatio || '16:9',
+        referenceImages: state.referenceImages || [],
     });
 
     return {

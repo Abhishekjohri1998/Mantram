@@ -26,6 +26,16 @@ import {
 import { runCompetitorResearch } from '../agents/performanceMarketing/competitorResearch.js';
 import { getHistoricalContext, extractLearningsFromReport } from '../agents/performanceMarketing/historicalLearning.js';
 import { getKeywordTrends, getRelatedQueries, getBrandTrends } from '../agents/performanceMarketing/webIntelligence.js';
+import { syncAllCampaigns } from '../agents/performanceMarketing/liveSync.js';
+import { detectAnomalies, generateAnomalyActions, autoRespond } from '../agents/performanceMarketing/anomalyDetector.js';
+import { calculateBlendedMER, getAttributionByUTM } from '../agents/performanceMarketing/shopifyBridge.js';
+import { forecastROAS } from '../agents/performanceMarketing/roasForecaster.js';
+import { runOptimizationCycle } from '../agents/performanceMarketing/autoOptimizer.js';
+import { getSEOKeywordsForTargeting, getCrossStudioOpportunities } from '../agents/performanceMarketing/crossStudioBridge.js';
+import { runAttribution, runAIAttribution } from '../agents/performanceMarketing/attributionEngine.js';
+import { generatePixelScript, getPixelClientScript, processPixelEvent } from '../agents/performanceMarketing/pixelTracking.js';
+import { sendAlert, sendAnomalyAlert } from '../agents/performanceMarketing/alertEngine.js';
+import { getBenchmarkComparison, getAIBenchmarkInsights } from '../agents/performanceMarketing/benchmarkEngine.js';
 
 const router = Router();
 
@@ -767,6 +777,380 @@ router.post('/generate-ad-image', protect, async (req, res) => {
         res.json({ success: true, imageUrl, model: usedModel, platform: platform || 'meta-feed' });
     } catch (error) {
         console.error('PM Ad image generation error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LIVE CAMPAIGN SYNC (Phase 1)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/pm-studio/sync-campaigns
+ * Trigger live campaign data sync from Meta/Google APIs
+ */
+router.post('/sync-campaigns', protect, async (req, res) => {
+    try {
+        const brandId = req.body.brandId || req.user.activeBrand;
+        const result = await syncAllCampaigns(req.user._id, brandId);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('PM Campaign sync error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ANOMALY DETECTION (Phase 1)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/pm-studio/anomalies
+ * Get detected anomalies for active campaigns
+ */
+router.get('/anomalies', protect, async (req, res) => {
+    try {
+        const brandId = req.query.brandId || req.user.activeBrand;
+        const result = await detectAnomalies(req.user._id, brandId);
+
+        // Generate actions if anomalies found
+        let actions = [];
+        if (result.anomalies?.length > 0) {
+            const actionResult = await generateAnomalyActions(result.anomalies, brandId);
+            actions = actionResult.actions || [];
+        }
+
+        res.json({ success: true, ...result, recommendedActions: actions });
+    } catch (error) {
+        console.error('PM Anomaly detection error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * POST /api/pm-studio/anomalies/auto-fix
+ * Execute AI-recommended fixes for anomalies
+ */
+router.post('/anomalies/auto-fix', protect, async (req, res) => {
+    try {
+        const { actions } = req.body;
+        if (!actions?.length) return res.status(400).json({ success: false, error: 'No actions provided' });
+
+        const result = await autoRespond(actions, req.user._id);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('PM Auto-fix error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// BLENDED ROAS / MER (Phase 1)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/pm-studio/blended-roas
+ * Get blended ROAS (MER) from Shopify revenue / ad spend
+ */
+router.get('/blended-roas', protect, async (req, res) => {
+    try {
+        const brandId = req.query.brandId || req.user.activeBrand;
+        const result = await calculateBlendedMER(req.user._id, brandId);
+
+        // Also get UTM attribution breakdown
+        let attribution = { attributions: [] };
+        try {
+            attribution = await getAttributionByUTM(req.user._id, brandId);
+        } catch (e) { /* Shopify may not be connected */ }
+
+        res.json({ success: true, ...result, utmAttribution: attribution });
+    } catch (error) {
+        console.error('PM Blended ROAS error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ROAS FORECASTING (Phase 2)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/pm-studio/roas-forecast
+ * Predict ROAS for a campaign configuration before launch
+ */
+router.post('/roas-forecast', protect, async (req, res) => {
+    try {
+        const brandId = req.body.brandId || req.user.activeBrand;
+        const { platform, objective, budget, targeting } = req.body;
+
+        const forecast = await forecastROAS({ platform, objective, budget, targeting }, brandId);
+        res.json({ success: true, forecast });
+    } catch (error) {
+        console.error('PM ROAS Forecast error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AUTO-OPTIMIZATION (Phase 2)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/pm-studio/optimize
+ * Run one optimization cycle on-demand
+ */
+router.post('/optimize', protect, async (req, res) => {
+    try {
+        const brandId = req.body.brandId || req.user.activeBrand;
+        const result = await runOptimizationCycle(req.user._id, brandId);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('PM Optimization error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * GET /api/pm-studio/optimization-log
+ * Get historical optimization actions/decisions
+ */
+router.get('/optimization-log', protect, async (req, res) => {
+    try {
+        const brandId = req.query.brandId || req.user.activeBrand;
+        const learnings = await AdLearning.find({
+            user: req.user._id,
+            brand: brandId,
+            title: { $regex: /Optimization Cycle|Auto-action/i },
+        }).sort({ createdAt: -1 }).limit(20).lean();
+
+        res.json({ success: true, log: learnings });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * PUT /api/pm-studio/campaigns/:id/autopilot
+ * Enable/configure autopilot settings for a campaign
+ */
+router.put('/campaigns/:id/autopilot', protect, async (req, res) => {
+    try {
+        const { enabled, pauseOnRoasDrop, maxDailySpend, autoSwapCreatives } = req.body;
+        const campaign = await AdCampaign.findOneAndUpdate(
+            { _id: req.params.id, user: req.user._id },
+            { autopilot: { enabled, pauseOnRoasDrop, maxDailySpend, autoSwapCreatives } },
+            { new: true }
+        );
+
+        if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
+        res.json({ success: true, campaign });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CROSS-STUDIO INTELLIGENCE (Phase 3)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/pm-studio/cross-studio/opportunities
+ * Get aggregated cross-studio data and AI-identified opportunities
+ */
+router.get('/cross-studio/opportunities', protect, async (req, res) => {
+    try {
+        const brandId = req.query.brandId || req.user.activeBrand;
+        const result = await getCrossStudioOpportunities(req.user._id, brandId);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('PM Cross-studio error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * POST /api/pm-studio/cross-studio/create-from-seo
+ * Create a campaign draft pre-populated with SEO keyword data
+ */
+router.post('/cross-studio/create-from-seo', protect, async (req, res) => {
+    try {
+        const brandId = req.body.brandId || req.user.activeBrand;
+        const seoData = await getSEOKeywordsForTargeting(brandId);
+
+        if (!seoData.suggestedForPaid?.length) {
+            return res.status(400).json({ success: false, error: 'No SEO keywords available for targeting' });
+        }
+
+        // Create a draft campaign with SEO-sourced keywords
+        const campaign = await AdCampaign.create({
+            user: req.user._id,
+            brand: brandId,
+            title: `SEO-Powered Campaign — ${new Date().toLocaleDateString('en-IN')}`,
+            platform: req.body.platform || 'google',
+            status: 'draft',
+            objective: 'traffic',
+            targeting: {
+                interests: seoData.suggestedForPaid.slice(0, 15),
+                locations: ['IN'],
+            },
+        });
+
+        res.json({
+            success: true,
+            campaign,
+            seoKeywords: seoData.suggestedForPaid,
+            cannibalizationWarning: seoData.cannibalizationWarning,
+        });
+    } catch (error) {
+        console.error('PM Create from SEO error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MULTI-TOUCH ATTRIBUTION (Phase 4)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/pm-studio/attribution
+ * Run multi-touch attribution analysis
+ */
+router.get('/attribution', protect, async (req, res) => {
+    try {
+        const brandId = req.query.brandId || req.user.activeBrand;
+        const model = req.query.model || 'position-based';
+        const dateRange = { start: req.query.start, end: req.query.end };
+
+        const result = model === 'ai-driven'
+            ? await runAIAttribution(req.user._id, brandId, dateRange)
+            : await runAttribution(req.user._id, brandId, model, dateRange);
+
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('PM Attribution error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FIRST-PARTY PIXEL & TRACKING (Phase 4)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/pm-studio/pixel/setup
+ * Generate pixel script for a brand
+ */
+router.get('/pixel/setup', protect, async (req, res) => {
+    try {
+        const brandId = req.query.brandId || req.user.activeBrand;
+        const serverUrl = `${req.protocol}://${req.get('host')}`;
+        const pixelData = generatePixelScript(brandId, serverUrl);
+        res.json({ success: true, ...pixelData });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * GET /pixel.js
+ * Serve the pixel client-side JavaScript
+ * NOTE: This route is WITHOUT /api/pm-studio prefix — served at root
+ */
+router.get('/pixel.js', (req, res) => {
+    const serverUrl = `${req.protocol}://${req.get('host')}`;
+    res.set('Content-Type', 'application/javascript');
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(getPixelClientScript(serverUrl));
+});
+
+/**
+ * POST /api/pm-studio/pixel/event
+ * Receive pixel events from client websites
+ */
+router.post('/pixel/event', async (req, res) => {
+    try {
+        // No auth required — pixel events come from external websites
+        const result = await processPixelEvent(req.body);
+        res.status(200).json({ received: true });
+    } catch (error) {
+        console.error('Pixel event error:', error);
+        res.status(200).json({ received: true }); // Always 200 for pixels
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// NOTIFICATION ALERTS (Phase 4)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/pm-studio/alerts/send
+ * Manually trigger an alert
+ */
+router.post('/alerts/send', protect, async (req, res) => {
+    try {
+        const brandId = req.body.brandId || req.user.activeBrand;
+        const { alertType, alertData } = req.body;
+
+        if (!alertType || !alertData) {
+            return res.status(400).json({ success: false, error: 'alertType and alertData required' });
+        }
+
+        const result = await sendAlert(req.user._id, brandId, alertType, alertData);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('PM Alert error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * POST /api/pm-studio/alerts/test
+ * Send a test alert to verify channel configuration
+ */
+router.post('/alerts/test', protect, async (req, res) => {
+    try {
+        const brandId = req.body.brandId || req.user.activeBrand;
+        const result = await sendAlert(req.user._id, brandId, 'daily-digest', {
+            title: 'Test Alert',
+            summary: 'This is a test alert from Mantram AI to verify your notification setup.',
+            metrics: { 'Status': 'Connected ✅' },
+        });
+        res.json({ success: true, ...result });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// INDUSTRY BENCHMARKING (Phase 4)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/pm-studio/benchmarks
+ * Compare performance against industry benchmarks
+ */
+router.get('/benchmarks', protect, async (req, res) => {
+    try {
+        const brandId = req.query.brandId || req.user.activeBrand;
+        const result = await getBenchmarkComparison(req.user._id, brandId);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('PM Benchmark error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * GET /api/pm-studio/benchmarks/ai
+ * AI-enhanced benchmark analysis with SWOT + quarterly goals
+ */
+router.get('/benchmarks/ai', protect, async (req, res) => {
+    try {
+        const brandId = req.query.brandId || req.user.activeBrand;
+        const result = await getAIBenchmarkInsights(req.user._id, brandId);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('PM AI Benchmark error:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

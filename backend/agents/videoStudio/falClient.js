@@ -388,7 +388,7 @@ export async function getGrokGenerationStatus(requestId) {
  * Submit video generation — routes to the correct provider
  * Returns { requestId, endpoint, statusUrl, resultUrl, provider }
  */
-export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio }) {
+export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio, referenceImages }) {
     if (!MODEL_AVAILABLE[model]) {
         throw new Error(`Model '${model}' is not available. Use kling-3.0, veo-3.1, veo-3.1-fast, seedance-1.0, seedance-2.0, or grok-imagine.`);
     }
@@ -419,7 +419,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
 
     // ── PiAPI: Seedance 2.0 ──
     if (model === 'seedance-2.0') {
-        const result = await submitPiApiVideoGeneration({ prompt, imageUrl, duration, aspectRatio: aspectRatio || '16:9', generateAudio });
+        const result = await submitPiApiVideoGeneration({ prompt, imageUrl, duration, aspectRatio: aspectRatio || '16:9', generateAudio, referenceImages: referenceImages || [], qualityMode: mode || 'fast' });
         return {
             requestId: result.taskId,
             endpoint: `piapi-seedance-2.0`,
