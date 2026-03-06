@@ -18,7 +18,10 @@ const SOCIAL_PLATFORMS = [
 ]
 
 export default function Integrations() {
+    const { user } = useAuth()
+    const { activeBrand } = useBrand()
     const { isEmbedded, shop: shopifyShop } = useShopify()
+    const [platformStatus, setPlatformStatus] = useState({})
     const [shopifyDomain, setShopifyDomain] = useState(shopifyShop || '')
     const [shopifyToken, setShopifyToken] = useState('')
     const [shopifyMode, setShopifyMode] = useState(isEmbedded ? 'oauth' : 'token') // 'oauth' or 'token'

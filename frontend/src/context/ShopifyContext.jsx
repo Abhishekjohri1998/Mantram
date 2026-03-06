@@ -9,6 +9,23 @@ export const ShopifyProvider = ({ children }) => {
     const [isEmbedded, setIsEmbedded] = useState(false);
     const [shop, setShop] = useState(null);
 
+    const getSessionToken = async () => {
+        // We use window.shopify directly to avoid stale closure issues with isEmbedded
+        const urlParams = new URLSearchParams(window.location.search);
+        const shopParam = urlParams.get('shop');
+        const hostParam = urlParams.get('host');
+
+        if (!(shopParam && hostParam) || !window.shopify) return null;
+
+        try {
+            // App Bridge v4 (CDN version) uses shopify.idToken()
+            return await window.shopify.idToken();
+        } catch (error) {
+            console.error('❌ Failed to get Shopify Session Token:', error);
+            return null;
+        }
+    };
+
     useEffect(() => {
         // Detect if we are running inside Shopify iframe
         const urlParams = new URLSearchParams(window.location.search);
@@ -30,17 +47,6 @@ export const ShopifyProvider = ({ children }) => {
             }
         }
     }, []);
-
-    const getSessionToken = async () => {
-        if (!isEmbedded || !window.shopify) return null;
-        try {
-            // App Bridge v4 (CDN version) uses shopify.idToken()
-            return await window.shopify.idToken();
-        } catch (error) {
-            console.error('❌ Failed to get Shopify Session Token:', error);
-            return null;
-        }
-    };
 
     return (
         <ShopifyContext.Provider value={{ isEmbedded, shop, getSessionToken }}>
