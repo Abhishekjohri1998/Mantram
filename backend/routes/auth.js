@@ -183,27 +183,44 @@ router.get('/google/callback', async (req, res) => {
         }
 
         // 4. Generate JWT
-        // Robust ID check: handle mongoose doc or POJO
-        const userId = user._id || user.id;
+        // Ultra-robust ID check: handle mongoose doc, POJO, or Array
+        let userId = user?._id || user?.id;
 
-        if (!userId) {
-            console.error('❌ [GOOGLE AUTH] User object missing ID:', {
-                has_id: !!user._id,
-                hasId: !!user.id,
-                email: user.email,
-                keys: Object.keys(user)
-            });
-            throw new Error('User identification failed after login');
+        if (!userId && Array.isArray(user) && user[0]) {
+            userId = user[0]._id || user[0].id;
+            user = user[0];
         }
 
-        console.log(`✅ [GOOGLE AUTH] Proceeding with User ID: ${userId} (${user.email})`);
-        const token = generateToken(userId.toString());
+        // If still no ID, try a fallback findOne
+        if (!userId && profileData.email) {
+            console.warn(`⚠️ [GOOGLE AUTH] ID missing, attempting fallback search for ${profileData.email}`);
+            const fallbackUser = await User.findOne({ email: profileData.email });
+            if (fallbackUser) {
+                user = fallbackUser;
+                userId = user._id || user.id;
+            }
+        }
+
+        if (!userId) {
+            console.error('❌ [GOOGLE AUTH] User identification failed:', {
+                user_exists: !!user,
+                is_array: Array.isArray(user),
+                keys: user ? Object.keys(user) : [],
+                email: profileData.email
+            });
+            throw new Error(`User identification failed after login (Email: ${profileData.email})`);
+        }
+
+        const stringId = userId.toString();
+        console.log(`✅ [GOOGLE AUTH] Success! User ID: ${stringId} (${user.email})`);
+
+        const token = generateToken(stringId);
         const userData = {
-            id: user._id,
+            id: stringId,
             name: user.name,
             email: user.email,
-            role: user.role,
-            plan: user.plan,
+            role: user.role || 'user',
+            plan: user.plan || 'starter',
             company: user.company || '',
         };
 
