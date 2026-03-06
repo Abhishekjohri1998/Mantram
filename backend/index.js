@@ -69,7 +69,7 @@ app.use('/api/shopify/webhooks', express.raw({ type: '*/*' }), (req, res, next) 
         try {
             // Attempt to parse JSON so subsequent handlers can use req.body
             const bodyString = req.body.toString('utf8');
-            if (bodyString) {
+            if (bodyString && (bodyString.startsWith('{') || bodyString.startsWith('['))) {
                 req.body = JSON.parse(bodyString);
             }
         } catch (e) {
@@ -79,10 +79,20 @@ app.use('/api/shopify/webhooks', express.raw({ type: '*/*' }), (req, res, next) 
     next();
 });
 
-app.use(express.json({
-    limit: '50mb'
-}));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// Regular body parsers - Skip for webhooks to avoid interference
+app.use((req, res, next) => {
+    if (req.originalUrl && req.originalUrl.includes('/api/shopify/webhooks')) {
+        return next();
+    }
+    express.json({ limit: '50mb' })(req, res, next);
+});
+
+app.use((req, res, next) => {
+    if (req.originalUrl && req.originalUrl.includes('/api/shopify/webhooks')) {
+        return next();
+    }
+    express.urlencoded({ extended: true, limit: '50mb' })(req, res, next);
+});
 
 // Request logging in dev
 if (config.nodeEnv === 'development') {
