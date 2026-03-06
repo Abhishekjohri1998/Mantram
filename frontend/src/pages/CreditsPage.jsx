@@ -73,7 +73,7 @@ export default function CreditsPage() {
             const { orderId, amount, currency } = await paymentsAPI.createOrder(pkg._id)
 
             const options = {
-                key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_live_SNWgwltU4JKol6',
+                key: import.meta.env.VITE_RAZORPAY_KEY_ID,
                 amount,
                 currency,
                 name: 'Mantram AI',
