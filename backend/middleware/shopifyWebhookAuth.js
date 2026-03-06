@@ -20,8 +20,8 @@ export function verifyShopifyWebhook(req, res, next) {
         return res.status(401).json({ error: 'Missing HMAC signature' });
     }
 
-    // Strip suspicious prefixes and trim any accidental whitespace
-    const secret = config.shopify.apiSecret?.trim()?.replace(/^(shpss_|shpat_|shpua_|shppa_|shpur_|shpca_)/, '');
+    // Use the secret exactly as provided and trimmed
+    const secret = config.shopify.apiSecret?.trim();
 
     if (!secret) {
         console.error('❌ SHOPIFY_API_SECRET not configured correctly');
