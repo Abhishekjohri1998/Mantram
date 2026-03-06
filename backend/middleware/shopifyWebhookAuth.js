@@ -20,7 +20,9 @@ export function verifyShopifyWebhook(req, res, next) {
         return res.status(401).json({ error: 'Missing HMAC signature' });
     }
 
-    const secret = config.shopify.apiSecret;
+    // Strip suspicious shpss_ or shpat_ prefixes from secret if user copied wrong token
+    const secret = config.shopify.apiSecret?.replace(/^(shpss_|shpat_|shpat_|shpua_)/, '');
+
     if (!secret) {
         console.error('❌ SHOPIFY_API_SECRET not configured');
         return res.status(500).json({ error: 'Server misconfigured' });
@@ -30,13 +32,12 @@ export function verifyShopifyWebhook(req, res, next) {
     const rawBody = req.rawBody;
     if (!rawBody) {
         console.warn('⚠️ Shopify webhook: No raw body available for HMAC verification');
-        // If we don't have rawBody, we can't verify. Usually means express.json verify didn't run.
         return res.status(400).json({ error: 'Cannot verify — raw body missing' });
     }
 
     const computedHmac = crypto
         .createHmac('sha256', secret)
-        .update(rawBody, 'utf8')
+        .update(rawBody) // update handles Buffer directly
         .digest('base64');
 
     // Use timing-safe comparison to prevent timing attacks
