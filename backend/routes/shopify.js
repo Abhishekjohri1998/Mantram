@@ -303,7 +303,8 @@ router.delete('/disconnect', protect, async (req, res) => {
  * Since we primarily store product/order aggregates and don't hold
  * raw customer PII beyond what Shopify provides, we acknowledge the request.
  */
-router.post('/webhooks/customers-data-request', verifyShopifyWebhook, async (req, res) => {
+// Topic: customers/data_request
+router.post('/webhooks/customers-data_request', verifyShopifyWebhook, async (req, res) => {
     try {
         const { shop_domain, customer, orders_requested } = req.body;
         console.log(`📋 GDPR: Customer data request from ${shop_domain} for customer ${customer?.id}`);
@@ -415,8 +416,27 @@ router.post('/webhooks/orders-create', verifyShopifyWebhook, async (req, res) =>
 });
 
 router.post('/webhooks/orders-updated', verifyShopifyWebhook, async (req, res) => {
-    // Shared logic with orders-create for simplicity
-    return router.handle(req, res);
+    // Shared logic with orders-create
+    try {
+        const order = req.body;
+        const shop = req.headers['x-shopify-shop-domain'];
+        console.log(`🔔 Webhook: Order updated in ${shop} — Order #${order.id}`);
+
+        const integration = await Integration.findOne({ 'platformData.shopDomain': shop, platform: 'shopify' });
+        if (!integration) return res.status(200).json({ received: true });
+
+        const transformed = transformShopifyOrder(order, integration.user, integration.brand);
+        await ShopifyOrder.findOneAndUpdate(
+            { brand: integration.brand, shopifyOrderId: String(order.id) },
+            transformed,
+            { upsert: true }
+        );
+
+        res.status(200).json({ received: true });
+    } catch (error) {
+        console.error('Webhook order-update error:', error);
+        res.status(200).json({ received: true });
+    }
 });
 
 /**
@@ -443,6 +463,39 @@ router.post('/webhooks/products-update', verifyShopifyWebhook, async (req, res) 
         console.error('Webhook product-update error:', error);
         res.status(200).json({ received: true });
     }
+});
+
+/**
+ * Handle App Uninstalled Webhook
+ */
+router.post('/webhooks/app-uninstalled', verifyShopifyWebhook, async (req, res) => {
+    try {
+        const shop = req.headers['x-shopify-shop-domain'];
+        console.log(`🗑️ Webhook: App uninstalled from ${shop}`);
+
+        // Mark integration as disconnected
+        await Integration.updateMany(
+            { 'platformData.shopDomain': shop, platform: 'shopify' },
+            { status: 'disconnected', accessToken: null }
+        );
+
+        res.status(200).json({ received: true });
+    } catch (error) {
+        console.error('Webhook app-uninstalled error:', error);
+        res.status(200).json({ received: true });
+    }
+});
+
+/**
+ * Connectivity Check (No HMAC verification)
+ * Used to verify TLS and reachability from Shopify/Internet
+ */
+router.get('/webhooks/check', (req, res) => {
+    res.status(200).json({
+        status: 'ok',
+        message: 'Mantram AI Webhook Endpoint is Reachable',
+        timestamp: new Date().toISOString()
+    });
 });
 
 export default router;

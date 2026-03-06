@@ -30,6 +30,7 @@ export function verifyShopifyWebhook(req, res, next) {
     const rawBody = req.rawBody;
     if (!rawBody) {
         console.warn('⚠️ Shopify webhook: No raw body available for HMAC verification');
+        // If we don't have rawBody, we can't verify. Usually means express.json verify didn't run.
         return res.status(400).json({ error: 'Cannot verify — raw body missing' });
     }
 
@@ -44,7 +45,7 @@ export function verifyShopifyWebhook(req, res, next) {
         const computedBuffer = Buffer.from(computedHmac, 'base64');
 
         if (sigBuffer.length !== computedBuffer.length || !crypto.timingSafeEqual(sigBuffer, computedBuffer)) {
-            console.warn('⚠️ Shopify webhook: HMAC mismatch');
+            console.warn(`⚠️ Shopify webhook: HMAC mismatch. Computed: ${computedHmac.substring(0, 8)}... vs Header: ${hmacHeader.substring(0, 8)}...`);
             return res.status(401).json({ error: 'HMAC verification failed' });
         }
     } catch (err) {
@@ -52,6 +53,6 @@ export function verifyShopifyWebhook(req, res, next) {
         return res.status(401).json({ error: 'HMAC verification failed' });
     }
 
-    console.log('✅ Shopify webhook: HMAC verified');
+    console.log('✅ Shopify webhook: HMAC verified successfully');
     next();
 }
