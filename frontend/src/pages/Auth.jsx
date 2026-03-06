@@ -1,7 +1,7 @@
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { auth as authAPI } from '../services/api.js'
-import { useRef } from 'react'
 
 const PLAN_LABELS = {
     starter: 'Starter — Free',
