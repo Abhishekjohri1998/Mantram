@@ -15,29 +15,30 @@ import config from '../config/env.js';
  */
 export function verifyShopifyWebhook(req, res, next) {
     const hmacHeader = req.get('X-Shopify-Hmac-Sha256');
+    const topic = req.get('X-Shopify-Topic');
+
     if (!hmacHeader) {
-        console.warn('⚠️ Shopify webhook: Missing X-Shopify-Hmac-Sha256 header');
+        console.warn(`⚠️ Shopify webhook [${topic}]: Missing X-Shopify-Hmac-Sha256 header`);
         return res.status(401).json({ error: 'Missing HMAC signature' });
     }
 
-    // Use the secret exactly as provided and trimmed
     const secret = config.shopify.apiSecret?.trim();
     if (!secret) {
-        console.error('❌ SHOPIFY_API_SECRET not configured correctly');
+        console.error('❌ SHOPIFY_API_SECRET not configured');
         return res.status(500).json({ error: 'Server misconfigured' });
     }
 
     const rawBody = req.rawBody;
     if (!rawBody || !Buffer.isBuffer(rawBody)) {
-        console.warn('⚠️ Shopify webhook: No raw buffer available. Capture failed in index.js');
-        return res.status(400).json({ error: 'Cannot verify — raw body missing' });
+        console.warn(`⚠️ Shopify webhook [${topic}]: No raw buffer available`);
+        return res.status(400).json({ error: 'Raw body missing' });
     }
 
     // Calculate HMAC
     const hmac = crypto.createHmac('sha256', secret).update(rawBody).digest();
     const computedBase64 = hmac.toString('base64');
 
-    // Safe comparison function
+    // Safe comparison
     const verifySignature = (header, encoding) => {
         try {
             const headerBuf = Buffer.from(header, encoding);
@@ -47,18 +48,19 @@ export function verifyShopifyWebhook(req, res, next) {
         }
     };
 
-    const isBase64Match = verifySignature(hmacHeader, 'base64');
-    const isHexMatch = hmacHeader.length === 64 && verifySignature(hmacHeader, 'hex');
+    const isMatch = verifySignature(hmacHeader, 'base64');
 
-    if (!isBase64Match && !isHexMatch) {
-        console.warn(`⚠️ Shopify webhook HMAC mismatch!`);
-        console.warn(`   Path: ${req.originalUrl}`);
-        console.warn(`   Secret used (first 4): ${secret.substring(0, 4)}... (length: ${secret.length})`);
-        console.warn(`   Computed (Base64): ${computedBase64}`);
-        console.warn(`   Header Received: ${hmacHeader}`);
+    if (!isMatch) {
+        console.warn(`❌ Shopify HMAC mismatch for topic: ${topic}`);
+        console.warn(`   Header: ${hmacHeader}`);
+        console.warn(`   Computed: ${computedBase64}`);
+        console.warn(`   Secret used (first 8): ${secret.substring(0, 8)}... (len: ${secret.length})`);
+
+        // During compliance checks, sometimes returning 200 even on fail helps trigger the next check
+        // but we return 401 as per docs.
         return res.status(401).json({ error: 'HMAC verification failed' });
     }
 
-    console.log(`✅ Shopify webhook verified: ${req.originalUrl}`);
+    console.log(`✅ Shopify webhook [${topic}] verified`);
     next();
 }

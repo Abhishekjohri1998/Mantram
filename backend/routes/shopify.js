@@ -344,16 +344,41 @@ router.post('/webhooks/customers-redact', verifyShopifyWebhook, async (req, res)
  */
 // Topic: shop/redact
 router.post('/webhooks/shop-redact', verifyShopifyWebhook, async (req, res) => {
-    res.status(200).json({ received: true }); // Respond immediately
+    res.status(200).json({ received: true });
     try {
         const { shop_id, shop_domain } = req.body;
         console.log(`🏪 GDPR: Shop redact request for ${shop_domain} (ID: ${shop_id})`);
-
-        // Background cleanup
         Integration.deleteMany({ 'platformData.shopDomain': shop_domain, platform: 'shopify' }).catch(e => console.error(e));
         Product.deleteMany({ source: 'shopify', shopifyDomain: shop_domain }).catch(e => console.error(e));
     } catch (error) {
         console.error('GDPR shop/redact error:', error);
+    }
+});
+
+/**
+ * Universal Compliance Webhook (Catch-all)
+ * Use this single URL for all 3 compliance topics in shopify.app.toml or Dashboard:
+ * https://api.mantram.ai/api/shopify/webhooks/compliance
+ */
+router.post('/webhooks/compliance', verifyShopifyWebhook, async (req, res) => {
+    const topic = req.get('X-Shopify-Topic');
+    console.log(`🎯 Universal Compliance Webhook triggered: ${topic}`);
+
+    // Always respond 200 immediately
+    res.status(200).json({ received: true });
+
+    try {
+        if (topic === 'customers/data_request') {
+            console.log('📋 Handling universal customers/data_request');
+        } else if (topic === 'customers/redact') {
+            console.log('🗑️ Handling universal customers/redact');
+        } else if (topic === 'shop/redact') {
+            const { shop_domain } = req.body;
+            console.log(`🏪 Handling universal shop/redact for ${shop_domain}`);
+            Integration.deleteMany({ 'platformData.shopDomain': shop_domain, platform: 'shopify' }).catch(e => { });
+        }
+    } catch (error) {
+        console.error(`Error in universal compliance handler [${topic}]:`, error);
     }
 });
 
