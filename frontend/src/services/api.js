@@ -8,10 +8,15 @@ const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
 // Token management
 let authToken = localStorage.getItem('mantram_token') || '';
+let dynamicTokenProvider = null;
 
 export const setToken = (token) => {
     authToken = token;
     localStorage.setItem('mantram_token', token);
+};
+
+export const setDynamicTokenProvider = (provider) => {
+    dynamicTokenProvider = provider;
 };
 
 export const clearToken = () => {
@@ -23,9 +28,17 @@ export const getToken = () => authToken;
 
 // Base fetch wrapper
 async function apiFetch(endpoint, options = {}) {
+    let token = authToken;
+
+    // Use dynamic token (like Shopify Session Token) if provider is registered
+    if (dynamicTokenProvider) {
+        const dToken = await dynamicTokenProvider();
+        if (dToken) token = dToken;
+    }
+
     const headers = {
         'Content-Type': 'application/json',
-        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.headers,
     };
 

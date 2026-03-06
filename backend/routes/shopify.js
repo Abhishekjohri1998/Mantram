@@ -22,6 +22,7 @@ import {
 } from '../services/shopifyService.js';
 import config from '../config/env.js';
 import { verifyShopifyWebhook } from '../middleware/shopifyWebhookAuth.js';
+import { verifyShopifySessionToken } from '../middleware/shopifySessionAuth.js';
 
 const router = Router();
 
@@ -179,7 +180,18 @@ router.get('/callback', async (req, res) => {
             console.warn(`⚠️ No pending integration found for ${shop}`);
         }
 
-        res.redirect(`${frontendUrl}/integrations?shopify=connected`);
+        // Determine final redirect URL
+        // If it's an embedded app, we should redirect to the Shopify Admin URL
+        const isEmbedded = req.query.embedded === '1' || !!state; // State presence often indicates embedded start
+        const apiKey = config.shopify.apiKey;
+
+        if (isEmbedded && apiKey) {
+            console.log(`🚀 Redirecting to Shopify Admin (Embedded): ${shop}`);
+            const host = req.query.host || Buffer.from(`${shop}/admin`).toString('base64');
+            res.redirect(`https://${shop}/admin/apps/${apiKey}/integrations?shopify=connected&shop=${shop}&host=${host}`);
+        } else {
+            res.redirect(`${frontendUrl}/integrations?shopify=connected`);
+        }
     } catch (error) {
         console.error('Shopify callback error:', error);
         res.redirect(`${frontendUrl}/integrations?error=shopify_auth_failed&detail=${encodeURIComponent(error.message)}`);

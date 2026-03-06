@@ -1,8 +1,9 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import Integration from '../models/Integration.js';
 import config from '../config/env.js';
 
-// Protect routes — verify JWT
+// Protect routes — verify JWT (supports Shopify Session Tokens as fallback)
 export const protect = async (req, res, next) => {
     let token;
     if (req.headers.authorization?.startsWith('Bearer')) {
@@ -11,20 +12,52 @@ export const protect = async (req, res, next) => {
     if (!token) {
         return res.status(401).json({ success: false, error: 'Not authorized' });
     }
+
+    // 1. Try standard JWT verification
     try {
         const decoded = jwt.verify(token, config.jwtSecret);
         const user = await User.findById(decoded.id);
 
-        if (!user) {
-            console.error(`❌ [AUTH] User not found in DB for ID: ${decoded.id} (Token valid)`);
-            return res.status(401).json({ success: false, error: 'User not found' });
+        if (user) {
+            req.user = user;
+            return next();
         }
+    } catch (jwtErr) {
+        // Continue to Shopify verification
+    }
 
-        req.user = user;
-        next();
-    } catch (error) {
-        console.error(`❌ [AUTH] Token verification failed: ${error.message}`);
-        return res.status(401).json({ success: false, error: 'Token invalid' });
+    // 2. Try Shopify Session Token verification (as fallback)
+    try {
+        const secret = config.shopify.apiSecret;
+        if (!secret) throw new Error('Shopify secret not configured');
+
+        const decoded = jwt.verify(token, secret, {
+            audience: config.shopify.apiKey,
+            algorithms: ['HS256']
+        });
+
+        const shopDomain = decoded.dest.replace(/^https?:\/\//, '');
+        const integration = await Integration.findOne({
+            'platformData.shopDomain': shopDomain,
+            platform: 'shopify',
+            status: 'connected'
+        });
+
+        if (integration) {
+            req.user = await User.findById(integration.user);
+            req.activeBrand = integration.brand;
+            req.shopifyShop = shopDomain;
+            req.shopifyAuth = true;
+            return next();
+        } else {
+            // Valid Shopify token but no integration found yet
+            req.shopifyShop = shopDomain;
+            req.shopifyAuth = true;
+            return next();
+        }
+    } catch (shopifyErr) {
+        console.error(`❌ [AUTH] Token verification failed (Standard & Shopify): ${shopifyErr.message}`);
+        return res.status(401).json({ success: false, error: 'Token invalid or expired' });
     }
 };
 

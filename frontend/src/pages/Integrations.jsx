@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react'
 import DashboardLayout from '../components/DashboardLayout'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
+import { useShopify } from '../context/ShopifyContext'
 import { social, shopify as shopifyAPI } from '../services/api'
 
 const SOCIAL_PLATFORMS = [
@@ -17,12 +18,10 @@ const SOCIAL_PLATFORMS = [
 ]
 
 export default function Integrations() {
-    const { user } = useAuth()
-    const { activeBrand } = useBrand()
-    const [platformStatus, setPlatformStatus] = useState({})
-    const [shopifyDomain, setShopifyDomain] = useState('')
+    const { isEmbedded, shop: shopifyShop } = useShopify()
+    const [shopifyDomain, setShopifyDomain] = useState(shopifyShop || '')
     const [shopifyToken, setShopifyToken] = useState('')
-    const [shopifyMode, setShopifyMode] = useState('token') // 'oauth' or 'token'
+    const [shopifyMode, setShopifyMode] = useState(isEmbedded ? 'oauth' : 'token') // 'oauth' or 'token'
     const [products, setProducts] = useState([])
     const [productSearch, setProductSearch] = useState('')
     const [loading, setLoading] = useState({})
@@ -211,17 +210,19 @@ export default function Integrations() {
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
-                                        {/* Mode toggle */}
-                                        <div className="flex gap-2 mb-2">
-                                            <button onClick={() => setShopifyMode('token')}
-                                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${shopifyMode === 'token' ? 'bg-[#96BF48]/20 text-[#96BF48] border border-[#96BF48]/30' : 'bg-white/[0.04] text-slate-400 border border-white/[0.06]'}`}>
-                                                🔑 Access Token
-                                            </button>
-                                            <button onClick={() => setShopifyMode('oauth')}
-                                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${shopifyMode === 'oauth' ? 'bg-[#96BF48]/20 text-[#96BF48] border border-[#96BF48]/30' : 'bg-white/[0.04] text-slate-400 border border-white/[0.06]'}`}>
-                                                🔗 OAuth
-                                            </button>
-                                        </div>
+                                        {/* Mode toggle - Hide if embedded (Manual token not allowed for public apps) */}
+                                        {!isEmbedded && (
+                                            <div className="flex gap-2 mb-2">
+                                                <button onClick={() => setShopifyMode('token')}
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${shopifyMode === 'token' ? 'bg-[#96BF48]/20 text-[#96BF48] border border-[#96BF48]/30' : 'bg-white/[0.04] text-slate-400 border border-white/[0.06]'}`}>
+                                                    🔑 Access Token
+                                                </button>
+                                                <button onClick={() => setShopifyMode('oauth')}
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${shopifyMode === 'oauth' ? 'bg-[#96BF48]/20 text-[#96BF48] border border-[#96BF48]/30' : 'bg-white/[0.04] text-slate-400 border border-white/[0.06]'}`}>
+                                                    🔗 OAuth
+                                                </button>
+                                            </div>
+                                        )}
 
                                         <input
                                             type="text" value={shopifyDomain} onChange={e => setShopifyDomain(e.target.value)}
