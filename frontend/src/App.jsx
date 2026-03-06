@@ -34,11 +34,10 @@ import BrandManagement from './pages/BrandManagement'
 import UnderConstruction from './pages/UnderConstruction'
 
 function App() {
-  const isProduction = window.location.hostname.includes('mantram.ai');
-
-  if (isProduction) {
-    return <UnderConstruction />
-  }
+  // const isProduction = window.location.hostname.includes('mantram.ai');
+  // if (isProduction) {
+  //   return <UnderConstruction />
+  // }
 
   return (
     <BrowserRouter>
