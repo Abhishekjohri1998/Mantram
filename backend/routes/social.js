@@ -178,16 +178,24 @@ router.post('/publish', protect, async (req, res) => {
 });
 
 /**
- * @route   POST /api/social/delete-data
+ * @route   ANY /api/social/delete-data
  * @desc    Meta Data Deletion Callback Webhook
  * @access  Public
  */
-router.post('/delete-data', (req, res) => {
+router.all('/delete-data', (req, res) => {
     // A robust implementation requires decoding the 'signed_request' from Meta
-    // and deleting the user's data. Currently stubbed to return standard success.
-    // Since we opted for Option A (email link), this endpoint is just a fallback.
+    // and deleting the user's data.
+
+    if (req.method === 'GET') {
+        // If meta or user visits via GET, redirect to the informational page
+        return res.redirect(`${config.frontendUrl}/data-deletion`);
+    }
+
     const confirmationCode = `deleted-${Date.now()}`;
-    res.json({ url: `${config.frontendUrl}/data-deletion-status?code=${confirmationCode}`, confirmation_code: confirmationCode });
+    res.json({
+        url: `${config.frontendUrl}/data-deletion-status?code=${confirmationCode}`,
+        confirmation_code: confirmationCode
+    });
 });
 
 export default router;

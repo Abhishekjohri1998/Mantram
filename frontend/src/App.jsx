@@ -31,6 +31,9 @@ import PerformanceMarketing from './pages/PerformanceMarketing'
 import D2CAnalytics from './pages/D2CAnalytics'
 import BrandManagement from './pages/BrandManagement'
 
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import TermsOfService from './pages/TermsOfService'
+import DataDeletion from './pages/DataDeletion'
 import UnderConstruction from './pages/UnderConstruction'
 
 function App() {
@@ -49,6 +52,10 @@ function App() {
               <Route path="/" element={<Landing />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/onboarding" element={<BrandOnboarding />} />
+              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+              <Route path="/terms" element={<TermsOfService />} />
+              <Route path="/data-deletion" element={<DataDeletion />} />
+              <Route path="/data-deletion-status" element={<DataDeletion />} />
 
               {/* Protected routes — require authentication */}
               <Route path="/nexus" element={<ProtectedRoute><Nexus /></ProtectedRoute>} />
