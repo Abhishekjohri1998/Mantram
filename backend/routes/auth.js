@@ -179,13 +179,25 @@ router.get('/google/callback', async (req, res) => {
             });
             console.log(`✨ New user signed up via Google: ${user.email}`);
         } else {
-            console.log(`👋 [GOOGLE AUTH] User logged in: ${user.email}`);
+            console.log(`👋 [GOOGLE AUTH] User found: ${user.email}`);
         }
 
-        console.log(`✅ [GOOGLE AUTH] Proceeding with User ID: ${user._id} (${user.email})`);
-
         // 4. Generate JWT
-        const token = generateToken(user._id.toString());
+        // Robust ID check: handle mongoose doc or POJO
+        const userId = user._id || user.id;
+
+        if (!userId) {
+            console.error('❌ [GOOGLE AUTH] User object missing ID:', {
+                has_id: !!user._id,
+                hasId: !!user.id,
+                email: user.email,
+                keys: Object.keys(user)
+            });
+            throw new Error('User identification failed after login');
+        }
+
+        console.log(`✅ [GOOGLE AUTH] Proceeding with User ID: ${userId} (${user.email})`);
+        const token = generateToken(userId.toString());
         const userData = {
             id: user._id,
             name: user.name,

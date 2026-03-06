@@ -115,10 +115,16 @@ export default function Auth() {
 
             // 4. Poll for popup closure
             pollingRef.current = setInterval(() => {
+                if (!popup) {
+                    clearInterval(pollingRef.current);
+                    return;
+                }
                 try {
+                    // Accessing .closed can trigger a console error if the popup is on a strict origin
+                    // even inside a try-catch. We'll just ignore it if it fails.
                     if (popup.closed) {
                         clearInterval(pollingRef.current);
-                        setTimeout(() => setIsSocialLoading(false), 1000);
+                        setTimeout(() => setIsSocialLoading(false), 500);
                     }
                 } catch (e) {
                     // cross-origin access to .closed is sometimes blocked by COOP
