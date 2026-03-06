@@ -13,6 +13,9 @@ import {
     SEO_PROMPT,
     TONE_MATCHER_PROMPT,
     QUALITY_CRITIC_PROMPT,
+    YOUTUBE_RESEARCH_PROMPT,
+    YOUTUBE_WRITER_PROMPT,
+    YOUTUBE_SEO_PROMPT,
 } from './prompts.js';
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -148,5 +151,103 @@ export async function qualityCriticNode(state) {
         finalContent: state.toneMatched?.matchedContent || state.seoOptimized?.optimizedContent || state.draft?.content || '',
         finalTitle: state.seoOptimized?.optimizedTitle || state.draft?.title || '',
         status: 'critique',
+    };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// NODE 6: YOUTUBE RESEARCH — Analyze topic, keywords, structure for YouTube
+// ══════════════════════════════════════════════════════════════════════════════
+export async function youtubeResearchNode(state) {
+    console.log('🎬 YouTube Agent: Research — analyzing topic for YouTube...');
+
+    const { brandContext } = await loadBrandContext(state.brandId);
+
+    const userPrompt = [
+        `VIDEO BRIEF: ${state.brief}`,
+        `FORMAT: ${state.format || 'video'} (${state.format === 'shorts' ? 'YouTube Shorts — under 60 seconds' : 'Long-form YouTube video'})`,
+        state.videoLength ? `TARGET LENGTH: ${state.videoLength}` : '',
+        state.targetAudience ? `TARGET AUDIENCE: ${state.targetAudience}` : '',
+        state.style ? `VIDEO STYLE: ${state.style}` : '',
+        state.language ? `LANGUAGE: ${state.language}` : '',
+        state.subType ? `VIDEO TYPE: ${state.subType}` : '',
+    ].filter(Boolean).join('\n');
+
+    const result = await callAgent(YOUTUBE_RESEARCH_PROMPT(brandContext), userPrompt, 0.6);
+
+    return {
+        ...state,
+        youtubeResearch: result,
+        status: 'youtube_research',
+    };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// NODE 7: YOUTUBE WRITER — Script, title, description, tags, keywords
+// ══════════════════════════════════════════════════════════════════════════════
+export async function youtubeWriterNode(state) {
+    console.log('✍️ YouTube Agent: Writer — creating YouTube content...');
+
+    const { brandContext } = await loadBrandContext(state.brandId);
+    const research = state.youtubeResearch || {};
+
+    const userPrompt = [
+        `WRITE YOUTUBE CONTENT FOR: ${state.brief}`,
+        `FORMAT: ${state.format || 'video'} (${state.format === 'shorts' ? 'YouTube Shorts — MAX 60 seconds, punchy, no intro' : 'Long-form YouTube video'})`,
+        state.videoLength ? `TARGET VIDEO LENGTH: ${state.videoLength}` : '',
+        state.language ? `LANGUAGE: Write in ${state.language}` : '',
+        state.style ? `VIDEO STYLE: ${state.style}` : '',
+        '',
+        `YOUTUBE RESEARCH INSIGHTS:`,
+        `Primary Keyword: ${research.primaryKeyword || ''}`,
+        `Secondary Keywords: ${(research.secondaryKeywords || []).join(', ')}`,
+        `Long-Tail Keywords: ${(research.longTailKeywords || []).join(', ')}`,
+        `Key Angles: ${(research.keyAngles || []).join('; ')}`,
+        `Competitor Gaps: ${research.competitorGaps || ''}`,
+        `Suggested Structure: ${JSON.stringify(research.suggestedStructure || {})}`,
+        `Thumbnail Ideas: ${(research.thumbnailIdeas || []).join('; ')}`,
+        `Trending Angle: ${research.trendingAngle || ''}`,
+        `Brand Notes: ${research.brandNotes || ''}`,
+    ].filter(Boolean).join('\n');
+
+    const result = await callAgent(YOUTUBE_WRITER_PROMPT(brandContext), userPrompt, 0.7, 8192);
+
+    return {
+        ...state,
+        youtubeContent: result,
+        status: 'youtube_writing',
+    };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// NODE 8: YOUTUBE SEO — Publish Optimizer (metadata only, no script)
+// ══════════════════════════════════════════════════════════════════════════════
+export async function youtubeSeoNode(state) {
+    console.log('🚀 YouTube Agent: SEO Optimizer — generating publish metadata...');
+
+    const { brandContext } = await loadBrandContext(state.brandId);
+    const research = state.youtubeResearch || {};
+
+    const userPrompt = [
+        `GENERATE YOUTUBE PUBLISHING METADATA FOR: ${state.brief}`,
+        `FORMAT: ${state.format || 'video'} (${state.format === 'shorts' ? 'YouTube Shorts — under 60 seconds' : 'Long-form YouTube video'})`,
+        state.targetAudience ? `TARGET AUDIENCE: ${state.targetAudience}` : '',
+        state.language ? `LANGUAGE: ${state.language}` : '',
+        '',
+        `YOUTUBE RESEARCH INSIGHTS:`,
+        `Primary Keyword: ${research.primaryKeyword || ''}`,
+        `Secondary Keywords: ${(research.secondaryKeywords || []).join(', ')}`,
+        `Long-Tail Keywords: ${(research.longTailKeywords || []).join(', ')}`,
+        `Key Angles: ${(research.keyAngles || []).join('; ')}`,
+        `Competitor Gaps: ${research.competitorGaps || ''}`,
+        `Trending Angle: ${research.trendingAngle || ''}`,
+        `Brand Notes: ${research.brandNotes || ''}`,
+    ].filter(Boolean).join('\n');
+
+    const result = await callAgent(YOUTUBE_SEO_PROMPT(brandContext), userPrompt, 0.5, 4096);
+
+    return {
+        ...state,
+        youtubeSeo: result,
+        status: 'youtube_seo',
     };
 }

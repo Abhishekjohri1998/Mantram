@@ -18,7 +18,22 @@ function buildBrandDescription(brand) {
     if (brand.dna?.industry) parts.push(`${brand.dna.industry}`);
     parts.push(`brand called ${brand.name}`);
     if (brand.dna?.voice?.personality) parts.push(`with a ${brand.dna.voice.personality} feel`);
+    if (brand.dna?.targetAudience) parts.push(`targeting ${brand.dna.targetAudience}`);
     return parts.join(' ');
+}
+
+// ── Build rich visual context from brand DNA for image prompts ──
+function buildVisualContext(brand) {
+    const parts = [];
+    const dna = brand.dna || {};
+    if (dna.voice?.personality) parts.push(`Brand personality: ${dna.voice.personality}`);
+    if (dna.contentStyle?.dos?.length) {
+        parts.push(`Design principles: ${dna.contentStyle.dos.slice(0, 3).join(', ')}`);
+    }
+    if (dna.contentStyle?.donts?.length) {
+        parts.push(`Avoid in design: ${dna.contentStyle.donts.slice(0, 3).join(', ')}`);
+    }
+    return parts.join('. ');
 }
 
 // Convert brand colors to a short natural phrase (NO labels like "Teal:", NO lists)
@@ -46,20 +61,21 @@ function extractBase64(dataUri) {
 }
 
 // ── Gemini image generation with model fallback ─────────────────────────
-async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.4) {
+async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1') {
     const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
     if (!imageKey) throw new Error('Gemini API key not configured');
 
+    // Match AI Photoshoot model order — gemini-3.1-flash-image-preview (Nano Banana 2) first
     const models = [
-        'gemini-3.1-flash-image-preview',
-        'gemini-3-pro-image-preview',
-        'gemini-2.5-flash-image',
-        'gemini-2.0-flash-exp-image-generation',
+        'gemini-3.1-flash-image-preview',        // Nano Banana 2 — best, latest
+        'gemini-3-pro-image-preview',             // Pro fallback
+        'gemini-2.5-flash-image',                 // Stable fallback
+        'gemini-2.0-flash-exp-image-generation',  // Legacy fallback
     ];
 
-    // Build content parts: images first, then text
+    // imageParts now come pre-formatted: mix of { text: '...' } labels and { inlineData: { mimeType, data } }
     const parts = [
-        ...imageParts.map(img => ({ inlineData: { mimeType: img.mimeType, data: img.data } })),
+        ...imageParts,
         { text: promptText },
     ];
 
@@ -67,19 +83,32 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
     let usedModel = '';
     let textResponse = '';
 
+    const imageCount = imageParts.filter(p => p.inlineData).length;
+    console.log(`\n══════ CREATIVE STUDIO IMAGE GENERATION ══════`);
+    console.log(`🎨 Models to try: ${models.length}`);
+    console.log(`🖼️  Reference images: ${imageCount}`);
+    console.log(`📐 Aspect ratio: ${aspectRatio}`);
+    console.log(`📝 Prompt (first 200 chars): ${promptText.substring(0, 200)}...`);
+
     for (const modelId of models) {
         try {
+            console.log(`\n🔄 Trying model: ${modelId}...`);
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${imageKey}`;
             const resp = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     contents: [{ parts }],
-                    generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature },
+                    generationConfig: {
+                        responseModalities: ['TEXT', 'IMAGE'],
+                        temperature,
+                        // aspectRatio goes inside imageConfig, NOT directly in generationConfig
+                        ...(aspectRatio ? { imageConfig: { aspectRatio } } : {}),
+                    },
                 }),
             });
             const data = await resp.json();
-            if (data.error) { console.error(`Model ${modelId}:`, data.error.message); continue; }
+            if (data.error) { console.error(`❌ Model ${modelId} error:`, data.error.message); continue; }
             const resParts = data.candidates?.[0]?.content?.parts || [];
             for (const part of resParts) {
                 if (part.inlineData?.mimeType?.startsWith('image/')) {
@@ -87,12 +116,81 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
                 }
                 if (part.text) textResponse += part.text;
             }
-            if (imageUrl) { usedModel = modelId; break; }
-        } catch (e) { console.error(`Model ${modelId} error:`, e.message); continue; }
+            if (imageUrl) {
+                usedModel = modelId;
+                console.log(`✅ Image generated successfully with model: ${modelId}`);
+                break;
+            } else {
+                console.warn(`⚠️ Model ${modelId} responded but returned no image`);
+            }
+        } catch (e) { console.error(`❌ Model ${modelId} exception:`, e.message); continue; }
     }
+    if (!imageUrl) console.error('❌ All Gemini models failed to generate an image');
+    console.log(`══════ END IMAGE GENERATION ══════\n`);
 
     return { imageUrl, model: usedModel, textResponse };
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/creatives/enhance-prompt — AI-powered prompt enhancement
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/enhance-prompt', protect, async (req, res) => {
+    try {
+        const { brandId, prompt, style, format, referenceDescriptions, aspectRatio } = req.body;
+        if (!prompt) return res.status(400).json({ success: false, error: 'Prompt is required' });
+
+        const brand = brandId ? await Brand.findById(brandId) : null;
+        const brandDesc = brand ? buildBrandDescription(brand) : 'a professional brand';
+        const colorPhrase = brand ? getColorPhrase(brand) : '';
+        const visualCtx = brand ? buildVisualContext(brand) : '';
+
+        const systemPrompt = `You are an expert prompt engineer for AI image generation (Gemini / NanoBanana 2). 
+Your job is to take a rough user description and transform it into a detailed, vivid, specific image generation prompt.
+
+RULES:
+1. Keep the user's core intent but make it 10x more detailed and specific
+2. Add specific details about: composition, lighting, textures, materials, atmosphere, color palette, depth of field
+3. NEVER include labels, hex codes, font names, or metadata text — these render as visible text in images
+4. Describe colors by appearance, not codes (e.g. "warm amber tones" not "#f59e0b")
+5. Make it professional-quality, polished, ready for a design agency
+6. Keep it under 150 words — concise but vivid
+7. If reference images are mentioned, incorporate their visual elements into the enhanced prompt
+8. Match the brand's personality and style
+9. NEVER wrap in quotes or add prefixes like "Generate:" — just return the raw enhanced prompt text
+
+RESPOND WITH ONLY THE ENHANCED PROMPT TEXT. Nothing else.`;
+
+        const userPrompt = [
+            `ROUGH PROMPT: ${prompt}`,
+            brand ? `BRAND: ${brandDesc}` : '',
+            colorPhrase ? `BRAND COLORS: ${colorPhrase}` : '',
+            visualCtx ? `BRAND GUIDELINES: ${visualCtx}` : '',
+            style ? `STYLE: ${style}` : '',
+            format ? `FORMAT: ${format}` : '',
+            aspectRatio ? `ASPECT RATIO: ${aspectRatio}` : '',
+            referenceDescriptions ? `REFERENCE IMAGES: ${referenceDescriptions}` : '',
+        ].filter(Boolean).join('\n');
+
+        const { getRouter } = await import('../ai/router.js');
+        const router = getRouter();
+        const result = await router.generateText({
+            systemPrompt,
+            userPrompt,
+            temperature: 0.7,
+            maxTokens: 300,
+        }, { provider: 'anthropic' });
+
+        // Clean up the response — remove quotes, "Generate:" prefixes, etc.
+        let enhanced = (result.text || '').trim();
+        enhanced = enhanced.replace(/^["']|["']$/g, '').trim();
+        enhanced = enhanced.replace(/^(Generate|Create|Design|Prompt|Enhanced):?\s*/i, '').trim();
+
+        res.json({ success: true, enhancedPrompt: enhanced });
+    } catch (error) {
+        console.error('Prompt enhance error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 
 // POST /api/creatives/generate
 router.post('/generate', protect, requireCredits('creative'), async (req, res) => {
@@ -143,24 +241,90 @@ router.post('/generate', protect, requireCredits('creative'), async (req, res) =
         const imageParts = [];
         const referenceInstructions = [];
 
-        // Reference images: style, character, upload
+        // Reference images: style, character, upload — support both base64 data URIs and HTTP URLs
         const refs = options?.referenceImages || {};
-        if (refs.style && refs.style.startsWith('data:image/')) {
-            imageParts.push(extractBase64(refs.style));
-            referenceInstructions.push('STYLE REFERENCE: Match the visual style, color palette, mood, composition, and aesthetic of the FIRST attached image. Replicate its design language but adapt for the described content.');
+
+        // Helper: resolve a reference image (base64 or HTTP URL) to an image part
+        async function resolveRefImage(src, label) {
+            if (!src) return null;
+            if (src.startsWith('data:image/')) {
+                console.log(`🖼️  Ref image (${label}): base64 data URI, ${Math.round(src.length / 1024)}KB`);
+                return { part: extractBase64(src), label };
+            }
+            if (src.startsWith('http')) {
+                try {
+                    console.log(`📎 Fetching reference image (${label}): ${src.substring(0, 80)}...`);
+                    const imgResp = await fetch(src, {
+                        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'image/*' },
+                        redirect: 'follow',
+                    });
+                    if (imgResp.ok) {
+                        const buf = await imgResp.arrayBuffer();
+                        const ct = (imgResp.headers.get('content-type') || 'image/jpeg').split(';')[0];
+                        console.log(`✅ Ref image (${label}) fetched: ${Math.round(buf.byteLength / 1024)}KB, ${ct}`);
+                        return { part: { mimeType: ct, data: Buffer.from(buf).toString('base64') }, label };
+                    } else {
+                        console.warn(`⚠️ Ref image (${label}) fetch returned ${imgResp.status}`);
+                    }
+                } catch (e) { console.warn(`⚠️ Could not fetch ref image (${label}):`, e.message); }
+            }
+            console.warn(`⚠️ Ref image (${label}): unrecognized format — not base64 and not HTTP URL`);
+            return null;
         }
-        if (refs.character && refs.character.startsWith('data:image/')) {
-            imageParts.push(extractBase64(refs.character));
-            referenceInstructions.push(`CHARACTER REFERENCE: Include the character/person/mascot from the ${refs.style ? 'SECOND' : 'FIRST'} attached image in the generated creative. Preserve their appearance, style, and features accurately.`);
+
+        const [styleRef, uploadRef] = await Promise.all([
+            resolveRefImage(refs.style, 'style'),
+            resolveRefImage(refs.upload, 'upload'),
+        ]);
+
+        // Multi-character references from options.characters array
+        const characterRefs = [];
+        if (options?.characters?.length > 0) {
+            console.log(`👥 Processing ${options.characters.length} character reference(s)...`);
+            for (let i = 0; i < Math.min(options.characters.length, 5); i++) {
+                const char = options.characters[i];
+                if (char?.image) {
+                    const resolved = await resolveRefImage(char.image, `character-${char.name || i + 1}`);
+                    if (resolved) {
+                        characterRefs.push({ ...resolved, name: char.name || `Character ${i + 1}` });
+                    }
+                }
+            }
         }
-        if (refs.upload && refs.upload.startsWith('data:image/')) {
-            imageParts.push(extractBase64(refs.upload));
-            referenceInstructions.push('REFERENCE IMAGE: Use this image as a contextual reference for the creative.');
+
+        console.log(`🖼️  Reference image results: style=${!!styleRef}, characters=${characterRefs.length}, upload=${!!uploadRef}`);
+
+        // Build image parts — MINIMAL labels, images first, like AI Photoshoot pattern
+        // Key insight: the Photoshoot uses [image, prompt] simply. Too many verbose text parts
+        // between images confuse the model. Keep labels SHORT.
+        if (styleRef) {
+            imageParts.push({ text: 'Style reference:' });
+            imageParts.push({ inlineData: { mimeType: styleRef.part.mimeType, data: styleRef.part.data } });
+            referenceInstructions.push('Match the visual style, colors, and mood of the attached style reference image.');
+        }
+
+        // Character references — simple labels, let the prompt do the heavy lifting
+        for (let i = 0; i < characterRefs.length; i++) {
+            const charRef = characterRefs[i];
+            const tagName = charRef.name.replace(/\s/g, '');
+            imageParts.push({ text: `Character "${charRef.name}" (@${tagName}):` });
+            imageParts.push({ inlineData: { mimeType: charRef.part.mimeType, data: charRef.part.data } });
+        }
+        if (characterRefs.length > 0) {
+            const charList = characterRefs.map(c => `"${c.name}" (@${c.name.replace(/\s/g, '')})`).join(', ');
+            referenceInstructions.push(`CHARACTERS: The image must prominently feature these people from the attached photos: ${charList}. Replicate their exact face, skin tone, and hair from the reference images.`);
+        }
+
+        if (uploadRef) {
+            imageParts.push({ text: 'Reference context:' });
+            imageParts.push({ inlineData: { mimeType: uploadRef.part.mimeType, data: uploadRef.part.data } });
+            referenceInstructions.push('Use the attached general reference image as contextual inspiration.');
         }
 
         // Base image from AI Photoshoot
         if (options?.baseImage && options.baseImage.startsWith('data:image/')) {
-            imageParts.push(extractBase64(options.baseImage));
+            imageParts.push({ text: 'PRODUCT BASE IMAGE (keep this product exactly as-is, only change background and styling):' });
+            imageParts.push({ inlineData: extractBase64(options.baseImage) });
             referenceInstructions.push('PRODUCT IMAGE: Keep this product exactly as-is — same colors, labels, text, shape. Only change background and styling.');
         }
 
@@ -178,7 +342,8 @@ router.post('/generate', protect, requireCredits('creative'), async (req, res) =
                     const base64 = Buffer.from(imgBuffer).toString('base64');
                     // Must match extractBase64 format: { mimeType, data } — NOT wrapped in inlineData
                     const mimeType = (contentType || 'image/jpeg').split(';')[0];
-                    imageParts.push({ mimeType, data: base64 });
+                    imageParts.push({ text: 'PRODUCT CATALOG IMAGE (this is the ACTUAL product being promoted — feature it prominently):' });
+                    imageParts.push({ inlineData: { mimeType, data: base64 } });
                     referenceInstructions.push('PRODUCT IMAGE: This is the ACTUAL product being promoted. Feature this exact product prominently in the creative — preserve its real appearance, colors, shape, and branding. Place it as the hero element of the design.');
                     console.log(`✅ Product image loaded (${Math.round(imgBuffer.byteLength / 1024)}KB)`);
                 }
@@ -187,8 +352,12 @@ router.post('/generate', protect, requireCredits('creative'), async (req, res) =
             }
         }
 
+        // Determine the aspect ratio to pass to Gemini API
+        const geminiAspectRatio = options?.aspectRatio || '1:1';
+        console.log(`📐 Final aspect ratio for Gemini: ${geminiAspectRatio} (from type: ${type})`);
+
         // ── Build the full prompt ───────────────────────────────────────
-        const hasImages = imageParts.length > 0;
+        const hasImages = imageParts.filter(p => p.inlineData).length > 0;
 
         // Logo overlay instructions — tell AI NOT to draw a logo; client-side compositing adds the real one
         let logoInstructions = '';
@@ -196,20 +365,38 @@ router.post('/generate', protect, requireCredits('creative'), async (req, res) =
             logoInstructions = `Do NOT draw or generate any logo, watermark, or brand icon in the image.`;
         }
 
-        // Compose a fully natural-language prompt — NO structured metadata, NO labels
+        // Compose a concise, focused prompt — keep it SHORT like the AI Photoshoot pattern
+        // Nano Banana 2 produces better quality with simpler, more focused prompts
         const styleWord = options?.style || 'modern';
-        const textOverlayPart = options?.textOverlay ? ` with the text "${options.textOverlay}" prominently displayed` : '';
-        const colorPart = colorPhrase ? ` using ${colorPhrase}` : '';
+        const textOverlayPart = options?.textOverlay ? ` Include the text "${options.textOverlay}" in a clean, readable font.` : '';
+        const colorPart = colorPhrase ? ` Colors: ${colorPhrase}.` : '';
         const refPart = referenceInstructions.length > 0 ? '\n' + referenceInstructions.join('\n') : '';
 
-        const fullPrompt = `Generate a ${styleWord}, polished graphic for a ${brandDesc}. ${prompt}${textOverlayPart}. The design should have ${colorPart ? colorPart : 'a professional color scheme'}. Make it visually striking and ready to post.${refPart}${logoInstructions ? '\n' + logoInstructions : ''}
+        // Auto-inject character placement if characters are present
+        let characterPlacement = '';
+        if (characterRefs.length > 0) {
+            const charNames = characterRefs.map(c => c.name);
+            const charTags = characterRefs.map(c => `@${c.name.replace(/\s/g, '')}`);
+            const userUsedTags = charTags.some(tag => prompt.includes(tag));
+            if (!userUsedTags) {
+                characterPlacement = ` Feature ${charNames.join(' and ')} from the reference photos as the main subjects.`;
+            } else {
+                characterPlacement = ` Draw each @tagged character using their reference photo.`;
+            }
+        }
 
-The output must be ONLY the finished design filling the entire image from edge to edge. Do not add any labels, titles, font names, color names, color swatches, palette bars, hex codes, dimension text, watermarks, borders, frames, or any metadata anywhere in or around the image.`;
+        // Keep the prompt SHORT and focused — like the Photoshoot's ~50-word prompts
+        const fullPrompt = `${prompt}${textOverlayPart}${characterPlacement}
+
+${platformSize} ${styleWord} design for ${brand.name}.${colorPart}${refPart}
+Output only the finished design, edge-to-edge. No labels, text overlays, hex codes, or metadata.`;
+
+        console.log('📸 Full prompt (first 300 chars):', fullPrompt.substring(0, 300) + '...');
 
         if (hasImages) {
-            // Multi-image Gemini call (reference images + prompt)
-            console.log(`🎨 Creative Studio: generating with ${imageParts.length} reference image(s)...`);
-            const genResult = await geminiImageGenerate(fullPrompt, imageParts, 0.4);
+            // Multi-image Gemini call — lower temperature (0.2) for higher quality
+            console.log(`🎨 Creative Studio: generating with ${imageParts.filter(p => p.inlineData).length} reference image(s) + ${imageParts.filter(p => p.text).length} labels, aspect: ${geminiAspectRatio}`);
+            const genResult = await geminiImageGenerate(fullPrompt, imageParts, 0.2, geminiAspectRatio);
             result = {
                 title: `${type.replace('-', ' ')} — ${brand.name}`,
                 imageUrl: genResult.imageUrl || '',
@@ -223,8 +410,8 @@ The output must be ONLY the finished design filling the entire image from edge t
             };
         } else {
             // Text-only generation — use Gemini directly for brand-aware output
-            console.log(`🎨 Creative Studio: generating from text prompt...`);
-            const genResult = await geminiImageGenerate(fullPrompt, [], 0.5);
+            console.log(`🎨 Creative Studio: generating from text prompt, aspect: ${geminiAspectRatio}`);
+            const genResult = await geminiImageGenerate(fullPrompt, [], 0.3, geminiAspectRatio);
             if (genResult.imageUrl) {
                 result = {
                     title: `${type.replace('-', ' ')} — ${brand.name}`,
@@ -377,13 +564,11 @@ router.get('/image-bank', protect, async (req, res) => {
             match.type = { $in: ['ai-photoshoot', 'instagram-post', 'instagram-story', 'facebook-ad', 'linkedin-post', 'youtube-thumb', 'banner', 'twitter-post', 'pinterest', 'photoshoot', 'other'] };
         }
 
-        // IMPORTANT: Do NOT project full imageUrl — it's 3-4MB base64 per image!
-        // Only fetch metadata + first 100 chars of imageUrl to detect if it's HTTP or base64
+        // CRITICAL: Project FIRST to strip 3-4MB base64 imageUrl, THEN sort.
+        // MongoDB Atlas Free Tier has a 32MB sort memory limit — sorting full documents
+        // with base64 images exceeds this. By projecting first, sort operates on ~500 byte docs.
         const pipeline = [
             { $match: match },
-            { $sort: { createdAt: -1 } },
-            { $skip: (parseInt(page) - 1) * parseInt(limit) },
-            { $limit: parseInt(limit) },
             {
                 $project: {
                     type: 1, title: 1, prompt: 1, createdAt: 1, brand: 1,
@@ -393,6 +578,9 @@ router.get('/image-bank', protect, async (req, res) => {
                     thumbnailUrl: { $substrBytes: [{ $ifNull: ['$thumbnailUrl', ''] }, 0, 500] },
                 }
             },
+            { $sort: { createdAt: -1 } },
+            { $skip: (parseInt(page) - 1) * parseInt(limit) },
+            { $limit: parseInt(limit) },
             { $lookup: { from: 'brands', localField: 'brand', foreignField: '_id', as: 'brandData' } },
             { $addFields: { brand: { $arrayElemAt: ['$brandData', 0] } } },
             { $project: { brandData: 0, 'brand.dna': 0, 'brand.user': 0, 'brand.__v': 0 } },

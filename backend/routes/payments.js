@@ -9,10 +9,19 @@ import User from '../models/User.js';
 
 const router = Router();
 
-const razorpay = new Razorpay({
-    key_id: config.razorpay.keyId,
-    key_secret: config.razorpay.keySecret,
-});
+let razorpay;
+function getRazorpay() {
+    if (!razorpay) {
+        if (!config.razorpay?.keyId || !config.razorpay?.keySecret) {
+            throw new Error('Razorpay keys not configured — set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in .env');
+        }
+        razorpay = new Razorpay({
+            key_id: config.razorpay.keyId,
+            key_secret: config.razorpay.keySecret,
+        });
+    }
+    return razorpay;
+}
 
 // @desc    Get Available Subscription Packages
 // @route   GET /api/payments/packages
@@ -55,7 +64,7 @@ router.post('/create-order', protect, async (req, res) => {
             },
         };
 
-        const order = await razorpay.orders.create(options);
+        const order = await getRazorpay().orders.create(options);
 
         res.json({
             success: true,

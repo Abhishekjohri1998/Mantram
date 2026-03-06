@@ -112,11 +112,14 @@ export const content = {
     delete: (id) => apiFetch(`/content/${id}`, { method: 'DELETE' }),
     refine: (id, data) => apiFetch(`/content/${id}/refine`, { method: 'POST', body: JSON.stringify(data) }),
     refineText: (data) => apiFetch('/content/refine-text', { method: 'POST', body: JSON.stringify(data) }),
+    youtube: (data) => apiFetch('/content/agentic/youtube', { method: 'POST', body: JSON.stringify(data) }),
+    youtubeSeo: (data) => apiFetch('/content/agentic/youtube-seo', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ============ Creatives API ============
 export const creatives = {
     generate: (data) => apiFetch('/creatives/generate', { method: 'POST', body: JSON.stringify(data) }),
+    enhancePrompt: (data) => apiFetch('/creatives/enhance-prompt', { method: 'POST', body: JSON.stringify(data) }),
     list: (params = {}) => {
         const query = new URLSearchParams(params).toString();
         return apiFetch(`/creatives?${query}`);

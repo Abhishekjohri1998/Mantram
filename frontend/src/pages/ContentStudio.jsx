@@ -105,6 +105,22 @@ const GOALS = [
             { id: 'website', icon: 'web', label: 'Website Product Page' },
         ],
     },
+    {
+        id: 'youtube_content', icon: 'smart_display', label: 'YouTube Content',
+        desc: 'Scripts, titles, descriptions, tags for Videos & Shorts',
+        color: 'from-red-500/20 to-rose-500/10', accent: '#FF0000',
+        subTypes: [
+            { id: 'youtube_seo', icon: 'rocket_launch', label: '🚀 Publish Optimizer', desc: 'Title, description, tags & keywords — SEO only, no script' },
+            { id: 'video_script', icon: 'movie', label: '📝 Video Script', desc: 'Full script + all metadata' },
+            { id: 'shorts_script', icon: 'slow_motion_video', label: '📝 Shorts Script', desc: 'Short-form script + metadata' },
+            { id: 'tutorial', icon: 'school', label: '📝 Tutorial / How-To' },
+            { id: 'review', icon: 'rate_review', label: '📝 Review / Unboxing' },
+            { id: 'vlog', icon: 'videocam', label: '📝 Vlog' },
+            { id: 'podcast', icon: 'podcasts', label: '📝 Podcast Highlights' },
+            { id: 'commentary', icon: 'chat', label: '📝 Commentary / Reaction' },
+            { id: 'explainer', icon: 'lightbulb', label: '📝 Explainer Video' },
+        ],
+    },
 ]
 
 const CHANNELS = [
@@ -112,6 +128,7 @@ const CHANNELS = [
     { id: 'facebook', icon: '/icons/facebook.svg', label: 'Facebook', fallbackIcon: 'thumb_up' },
     { id: 'linkedin', icon: '/icons/linkedin.svg', label: 'LinkedIn', fallbackIcon: 'work' },
     { id: 'twitter', icon: '/icons/twitter.svg', label: 'X (Twitter)', fallbackIcon: 'tag' },
+    { id: 'youtube', icon: '/icons/youtube.svg', label: 'YouTube', fallbackIcon: 'play_circle' },
     { id: 'website', icon: '/icons/web.svg', label: 'Website / Blog', fallbackIcon: 'language' },
     { id: 'ecommerce', icon: '/icons/shop.svg', label: 'Amazon / Ecommerce', fallbackIcon: 'shopping_cart' },
     { id: 'email', icon: '/icons/email.svg', label: 'Email / Newsletter', fallbackIcon: 'mail' },
@@ -171,6 +188,7 @@ function SmartInput({ onParse, onSkip }) {
         else if (/amazon|ecommerce|shopify/i.test(lower)) channel = 'ecommerce'
         else if (/website|blog|web/i.test(lower)) channel = 'website'
         else if (/whatsapp/i.test(lower)) channel = 'whatsapp'
+        else if (/youtube|yt |video script|shorts/i.test(lower)) channel = 'youtube'
 
         setTimeout(() => {
             setParsing(false)
@@ -1264,6 +1282,892 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
 }
 
 // ============================================================================
+// YOUTUBE CONTENT WIZARD
+// ============================================================================
+
+const YT_FORMATS = [
+    { id: 'video', icon: 'movie', label: 'YouTube Video', desc: 'Long-form (5-60 min)', color: 'from-red-500/20 to-rose-500/10' },
+    { id: 'shorts', icon: 'slow_motion_video', label: 'YouTube Shorts', desc: 'Under 60 seconds', color: 'from-pink-500/20 to-rose-500/10' },
+]
+
+const YT_LENGTHS = [
+    { id: 'short', label: 'Short', desc: '5-8 min', icon: 'timer' },
+    { id: 'medium', label: 'Medium', desc: '10-15 min', icon: 'schedule' },
+    { id: 'long', label: 'Long', desc: '20+ min', icon: 'hourglass_top' },
+]
+
+const YT_STYLES = [
+    { id: 'educational', label: 'Educational', icon: 'school' },
+    { id: 'entertainment', label: 'Entertainment', icon: 'theater_comedy' },
+    { id: 'storytelling', label: 'Storytelling', icon: 'auto_stories' },
+    { id: 'tutorial', label: 'Tutorial', icon: 'construction' },
+    { id: 'commentary', label: 'Commentary', icon: 'forum' },
+    { id: 'review', label: 'Review', icon: 'star_rate' },
+]
+
+function StepYouTubeWizard({ onComplete, onBack, activeBrand, availableProviders, modelOverride, setModelOverride }) {
+    const [brief, setBrief] = useState('')
+    const [format, setFormat] = useState('video')
+    const [videoLength, setVideoLength] = useState('medium')
+    const [targetAudience, setTargetAudience] = useState('')
+    const [style, setStyle] = useState('educational')
+    const defaultLang = activeBrand?.dna?.defaultLanguage || 'english'
+    const [language, setLanguage] = useState(defaultLang)
+
+    const LANGUAGES = [
+        { id: 'english', label: 'English', flag: '🇬🇧' },
+        { id: 'hindi', label: 'Hindi', flag: '🇮🇳' },
+        { id: 'tamil', label: 'Tamil', flag: '🇮🇳' },
+        { id: 'telugu', label: 'Telugu', flag: '🇮🇳' },
+        { id: 'bengali', label: 'Bengali', flag: '🇮🇳' },
+        { id: 'marathi', label: 'Marathi', flag: '🇮🇳' },
+    ]
+
+    const handleSubmit = () => {
+        if (!brief.trim()) return
+        onComplete({ brief, format, videoLength: format === 'shorts' ? 'short' : videoLength, targetAudience, style, language })
+    }
+
+    return (
+        <div className="animate-fade-in max-w-2xl mx-auto">
+            <button onClick={onBack} className="text-slate-500 text-sm flex items-center gap-1 mb-6 hover:text-white transition-colors cursor-pointer">
+                <span className="material-symbols-outlined text-sm">arrow_back</span> Back
+            </button>
+
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-500/20 to-rose-500/10 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-2xl text-red-400">smart_display</span>
+                </div>
+                <div>
+                    <h3 className="text-xl font-extrabold text-white">YouTube <span className="text-red-400">Content Creator</span></h3>
+                    <p className="text-sm text-slate-400">Script, title, description, tags & keywords — YouTube algorithm optimized</p>
+                </div>
+            </div>
+
+            {/* Brief Input */}
+            <div className="mb-5">
+                <label className="text-sm font-bold text-slate-300 mb-2 block">Video Brief *</label>
+                <div className="relative">
+                    <textarea
+                        value={brief} onChange={e => setBrief(e.target.value)}
+                        placeholder="Describe your video idea... e.g. '5 productivity hacks for 2026 that actually work — backed by science'"
+                        className="input-glass w-full py-4 pr-14 resize-none text-white" rows={4} autoFocus
+                    />
+                    <div className="absolute right-3 top-3">
+                        <VoiceInput onResult={(text) => setBrief(prev => prev ? prev + ' ' + text : text)} size="small" />
+                    </div>
+                </div>
+                <p className="text-xs text-slate-600 mt-1.5">💡 Be specific — include the hook, key points, or angle you want</p>
+            </div>
+
+            {/* Format Selection */}
+            <div className="mb-5">
+                <label className="text-sm font-bold text-slate-300 mb-2 block">Format</label>
+                <div className="grid grid-cols-2 gap-3">
+                    {YT_FORMATS.map(f => (
+                        <button key={f.id} onClick={() => setFormat(f.id)}
+                            className={`glass-panel rounded-xl p-4 text-left transition-all cursor-pointer ${format === f.id ? 'bg-red-500/15 border-red-500/40 ring-1 ring-red-500/30' : 'hover:bg-white/[0.05]'}`}>
+                            <span className="material-symbols-outlined text-xl mb-2 block" style={{ color: format === f.id ? '#EF4444' : '#64748b' }}>{f.icon}</span>
+                            <p className="text-sm font-bold text-white">{f.label}</p>
+                            <p className="text-xs text-slate-500">{f.desc}</p>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Video Length (only for long-form) */}
+            {format === 'video' && (
+                <div className="mb-5 animate-fade-in">
+                    <label className="text-sm font-bold text-slate-300 mb-2 block">Target Length</label>
+                    <div className="flex gap-2">
+                        {YT_LENGTHS.map(l => (
+                            <button key={l.id} onClick={() => setVideoLength(l.id)}
+                                className={`flex-1 glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${videoLength === l.id ? 'bg-red-500/15 border-red-500/40' : 'hover:bg-white/[0.05]'}`}>
+                                <span className="material-symbols-outlined text-sm mb-1 block" style={{ color: videoLength === l.id ? '#EF4444' : '#64748b' }}>{l.icon}</span>
+                                <p className="text-xs font-bold text-white">{l.label}</p>
+                                <p className="text-[10px] text-slate-500">{l.desc}</p>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Style */}
+            <div className="mb-5">
+                <label className="text-sm font-bold text-slate-300 mb-2 block">Content Style</label>
+                <div className="flex flex-wrap gap-2">
+                    {YT_STYLES.map(s => (
+                        <button key={s.id} onClick={() => setStyle(s.id)}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${style === s.id ? 'bg-red-500/15 text-red-400 border border-red-500/30' : 'glass-panel text-slate-400 hover:text-white'}`}>
+                            <span className="material-symbols-outlined text-sm">{s.icon}</span> {s.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Target Audience */}
+            <div className="mb-5">
+                <label className="text-sm font-bold text-slate-300 mb-2 block">Target Audience <span className="text-slate-600 font-normal">(optional)</span></label>
+                <input value={targetAudience} onChange={e => setTargetAudience(e.target.value)}
+                    placeholder="e.g. Entrepreneurs aged 25-40, tech enthusiasts, students"
+                    className="input-glass w-full py-3 text-white"
+                />
+            </div>
+
+            {/* Language */}
+            <div className="mb-6">
+                <label className="text-sm font-bold text-slate-300 mb-2 block">Language</label>
+                <div className="flex flex-wrap gap-2">
+                    {LANGUAGES.map(l => (
+                        <button key={l.id} onClick={() => setLanguage(l.id)}
+                            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${language === l.id ? 'bg-primary/20 text-primary border border-primary/30' : 'glass-panel text-slate-400 hover:text-white'}`}>
+                            {l.flag} {l.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Model Override */}
+            {availableProviders.length > 1 && (
+                <div className="mb-6 glass-panel rounded-xl p-4">
+                    <label className="text-xs font-bold text-slate-400 mb-2 block flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs">tune</span> AI Model
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                        {availableProviders.map(p => (
+                            <button key={p.id} onClick={() => setModelOverride(p.id)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${modelOverride === p.id ? 'bg-primary/20 text-primary' : 'text-slate-500 hover:text-white'}`}>
+                                {p.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Generate Button */}
+            <CreditTooltipWrapper action="content">
+                <button onClick={handleSubmit} disabled={!brief.trim()}
+                    className="btn-primary w-full py-4 rounded-xl text-sm font-bold disabled:opacity-30 flex items-center justify-center gap-2 cursor-pointer">
+                    <span className="material-symbols-outlined text-lg">smart_display</span>
+                    Generate YouTube Content
+                    <CreditBadge action="content" />
+                </button>
+            </CreditTooltipWrapper>
+        </div>
+    )
+}
+
+// ============================================================================
+// YOUTUBE RESULT VIEW
+// ============================================================================
+
+function YouTubeResultView({ result, youtubeData, onNewContent, generating, activeBrand }) {
+    const [copiedSection, setCopiedSection] = useState(null)
+    const [expandedSections, setExpandedSections] = useState({ script: true, title: true, description: true, tags: true, keywords: true })
+
+    const yt = youtubeData || result?.youtubeData || {}
+    const meta = result?.youtubeMeta || {}
+
+    const videoTitle = yt.videoTitle || meta.videoTitle || result?.title || ''
+    const script = yt.script || result?.content || ''
+    const description = yt.description || meta.description || ''
+    const tags = yt.tags || meta.tags || []
+    const keywords = yt.keywords || meta.keywords || {}
+    const timestamps = yt.timestamps || meta.timestamps || []
+    const thumbnailIdeas = yt.thumbnailTextSuggestions || meta.thumbnailIdeas || []
+    const hookScript = yt.hookScript || meta.hookScript || ''
+    const ctaText = yt.ctaText || meta.ctaText || ''
+    const hashtags = yt.hashtags || meta.hashtags || []
+    const estimatedDuration = yt.estimatedDuration || meta.estimatedDuration || ''
+
+    const copySection = (text, section) => {
+        navigator.clipboard.writeText(text)
+        setCopiedSection(section)
+        setTimeout(() => setCopiedSection(null), 2000)
+    }
+
+    const copyAll = () => {
+        const allText = [
+            `📌 TITLE:\n${videoTitle}`,
+            `\n📝 SCRIPT:\n${script}`,
+            `\n📋 DESCRIPTION:\n${description}`,
+            `\n🏷️ TAGS:\n${tags.join(', ')}`,
+            `\n🔑 KEYWORDS:\nPrimary: ${(keywords.primary || []).join(', ')}\nSecondary: ${(keywords.secondary || []).join(', ')}`,
+            timestamps.length ? `\n⏱️ TIMESTAMPS:\n${timestamps.map(t => `${t.time} ${t.label}`).join('\n')}` : '',
+            hashtags.length ? `\n# HASHTAGS:\n${hashtags.join(' ')}` : '',
+        ].filter(Boolean).join('\n')
+        copySection(allText, 'all')
+    }
+
+    const toggleSection = (key) => {
+        setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }))
+    }
+
+    const SectionHeader = ({ icon, title, count, sectionKey, copyText, color = 'text-red-400' }) => (
+        <div className="flex items-center justify-between mb-3">
+            <button onClick={() => toggleSection(sectionKey)} className="flex items-center gap-2 cursor-pointer group">
+                <span className={`material-symbols-outlined text-lg ${color}`}>{icon}</span>
+                <h4 className="text-base font-bold text-white">{title}</h4>
+                {count && <span className="text-xs bg-white/10 text-slate-400 px-2 py-0.5 rounded-full">{count}</span>}
+                <span className="material-symbols-outlined text-sm text-slate-600 group-hover:text-white transition-colors">
+                    {expandedSections[sectionKey] ? 'expand_less' : 'expand_more'}
+                </span>
+            </button>
+            {copyText && (
+                <button onClick={() => copySection(copyText, sectionKey)}
+                    className="flex items-center gap-1 text-xs text-slate-500 hover:text-white transition-colors cursor-pointer">
+                    <span className="material-symbols-outlined text-sm">{copiedSection === sectionKey ? 'check' : 'content_copy'}</span>
+                    {copiedSection === sectionKey ? 'Copied!' : 'Copy'}
+                </button>
+            )}
+        </div>
+    )
+
+    return (
+        <div className="max-w-3xl mx-auto animate-fade-in">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-500/20 to-rose-500/10 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-2xl text-red-400">smart_display</span>
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-extrabold text-white">YouTube Content <span className="text-red-400">Ready</span></h3>
+                        <div className="flex items-center gap-2 mt-0.5">
+                            {estimatedDuration && <span className="text-xs bg-red-500/10 text-red-400 px-2 py-0.5 rounded-full font-bold">{estimatedDuration}</span>}
+                            <span className="text-xs text-slate-500">{script.split(/\s+/).length} words</span>
+                        </div>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button onClick={copyAll} className="glass-panel px-3 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-all">
+                        <span className="material-symbols-outlined text-sm">{copiedSection === 'all' ? 'check' : 'content_copy'}</span>
+                        {copiedSection === 'all' ? 'Copied All!' : 'Copy All'}
+                    </button>
+                    <button onClick={onNewContent} className="glass-panel px-3 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-all">
+                        <span className="material-symbols-outlined text-sm">add</span> New
+                    </button>
+                </div>
+            </div>
+
+            {/* Hook callout */}
+            {hookScript && (
+                <div className="glass-panel rounded-2xl p-4 mb-4 border border-amber-500/20 bg-amber-500/5 animate-fade-in">
+                    <div className="flex items-center gap-2 mb-2">
+                        <span className="material-symbols-outlined text-amber-400">bolt</span>
+                        <h4 className="text-sm font-bold text-amber-400">Opening Hook — First 5 Seconds</h4>
+                        <button onClick={() => copySection(hookScript, 'hook')}
+                            className="ml-auto text-xs text-slate-500 hover:text-white cursor-pointer">
+                            <span className="material-symbols-outlined text-sm">{copiedSection === 'hook' ? 'check' : 'content_copy'}</span>
+                        </button>
+                    </div>
+                    <p className="text-sm text-amber-200/80 italic leading-relaxed">"{hookScript}"</p>
+                </div>
+            )}
+
+            {/* Title Section */}
+            <div className="glass-panel rounded-2xl p-5 mb-4">
+                <SectionHeader icon="title" title="Video Title" sectionKey="title" copyText={videoTitle} color="text-blue-400" />
+                {expandedSections.title && (
+                    <div className="animate-fade-in">
+                        <p className="text-lg font-bold text-white leading-relaxed">{videoTitle}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${videoTitle.length <= 70 ? 'bg-emerald-500/10 text-emerald-400' : videoTitle.length <= 100 ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                {videoTitle.length} chars {videoTitle.length <= 70 ? '✓ Optimal' : videoTitle.length <= 100 ? '⚠ Long' : '❌ Too long'}
+                            </span>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Script Section */}
+            <div className="glass-panel rounded-2xl p-5 mb-4">
+                <SectionHeader icon="movie" title="Video Script" count={`${script.split(/\s+/).length} words`} sectionKey="script" copyText={script} />
+                {expandedSections.script && (
+                    <div className="animate-fade-in text-sm text-slate-300 leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+                        {script}
+                    </div>
+                )}
+            </div>
+
+            {/* Description Section */}
+            <div className="glass-panel rounded-2xl p-5 mb-4">
+                <SectionHeader icon="description" title="YouTube Description" sectionKey="description" copyText={description} color="text-emerald-400" />
+                {expandedSections.description && (
+                    <div className="animate-fade-in text-sm text-slate-300 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                        {description}
+                    </div>
+                )}
+            </div>
+
+            {/* Tags Section */}
+            {tags.length > 0 && (
+                <div className="glass-panel rounded-2xl p-5 mb-4">
+                    <SectionHeader icon="sell" title="Tags" count={`${tags.length} tags`} sectionKey="tags" copyText={tags.join(', ')} color="text-violet-400" />
+                    {expandedSections.tags && (
+                        <div className="animate-fade-in flex flex-wrap gap-2">
+                            {tags.map((tag, i) => (
+                                <button key={i} onClick={() => copySection(tag, `tag-${i}`)}
+                                    className="px-3 py-1.5 rounded-lg bg-violet-500/10 text-violet-300 text-xs font-medium hover:bg-violet-500/20 transition-colors cursor-pointer border border-violet-500/20">
+                                    {copiedSection === `tag-${i}` ? '✓' : ''} {tag}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Keywords Section */}
+            {(keywords.primary?.length > 0 || keywords.secondary?.length > 0) && (
+                <div className="glass-panel rounded-2xl p-5 mb-4">
+                    <SectionHeader icon="key" title="Keywords" sectionKey="keywords"
+                        copyText={`Primary: ${(keywords.primary || []).join(', ')}\nSecondary: ${(keywords.secondary || []).join(', ')}`} color="text-cyan-400" />
+                    {expandedSections.keywords && (
+                        <div className="animate-fade-in space-y-3">
+                            {keywords.primary?.length > 0 && (
+                                <div>
+                                    <p className="text-xs font-bold text-cyan-400 mb-1.5">🎯 Primary Keywords</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {keywords.primary.map((kw, i) => (
+                                            <span key={i} className="px-3 py-1.5 rounded-lg bg-cyan-500/10 text-cyan-300 text-xs font-bold border border-cyan-500/20">{kw}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {keywords.secondary?.length > 0 && (
+                                <div>
+                                    <p className="text-xs font-bold text-slate-500 mb-1.5">📌 Secondary Keywords</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {keywords.secondary.map((kw, i) => (
+                                            <span key={i} className="px-3 py-1.5 rounded-lg bg-white/5 text-slate-400 text-xs font-medium border border-white/10">{kw}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Timestamps + Thumbnail Ideas row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                {/* Timestamps */}
+                {timestamps.length > 0 && (
+                    <div className="glass-panel rounded-2xl p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className="material-symbols-outlined text-lg text-orange-400">schedule</span>
+                            <h4 className="text-sm font-bold text-white">Timestamps</h4>
+                            <button onClick={() => copySection(timestamps.map(t => `${t.time} ${t.label}`).join('\n'), 'timestamps')}
+                                className="ml-auto text-xs text-slate-500 hover:text-white cursor-pointer">
+                                <span className="material-symbols-outlined text-sm">{copiedSection === 'timestamps' ? 'check' : 'content_copy'}</span>
+                            </button>
+                        </div>
+                        <div className="space-y-1.5">
+                            {timestamps.map((ts, i) => (
+                                <div key={i} className="flex items-center gap-2 text-xs">
+                                    <span className="text-orange-400 font-mono font-bold min-w-[40px]">{ts.time}</span>
+                                    <span className="text-slate-300">{ts.label}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Thumbnail Ideas */}
+                {thumbnailIdeas.length > 0 && (
+                    <div className="glass-panel rounded-2xl p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className="material-symbols-outlined text-lg text-pink-400">image</span>
+                            <h4 className="text-sm font-bold text-white">Thumbnail Ideas</h4>
+                        </div>
+                        <div className="space-y-2">
+                            {thumbnailIdeas.map((idea, i) => (
+                                <div key={i} className="flex items-start gap-2 text-xs">
+                                    <span className="text-pink-400 font-bold mt-0.5">{i + 1}.</span>
+                                    <span className="text-slate-300 leading-relaxed">{idea}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Hashtags + CTA */}
+            {(hashtags.length > 0 || ctaText) && (
+                <div className="glass-panel rounded-2xl p-5 mb-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                        {hashtags.length > 0 && (
+                            <div className="flex-1">
+                                <p className="text-xs font-bold text-slate-500 mb-1.5">Hashtags</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {hashtags.map((h, i) => (
+                                        <span key={i} className="text-xs text-blue-400 bg-blue-500/10 px-2 py-1 rounded-lg font-medium">{h}</span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {ctaText && (
+                            <div className="flex-1 min-w-[200px]">
+                                <p className="text-xs font-bold text-slate-500 mb-1.5">CTA</p>
+                                <p className="text-sm text-emerald-300 bg-emerald-500/10 px-3 py-2 rounded-xl font-medium leading-relaxed">{ctaText}</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-4 mt-6">
+                <button onClick={copyAll}
+                    className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-emerald-500/30 transition-all cursor-pointer text-center group border border-white/[0.06]">
+                    <span className="material-symbols-outlined text-2xl text-emerald-400 mb-2 block group-hover:scale-110 transition-transform">
+                        {copiedSection === 'all' ? 'check_circle' : 'content_copy'}
+                    </span>
+                    <p className="text-sm font-bold text-white">{copiedSection === 'all' ? 'Copied!' : 'Copy Everything'}</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Title + Script + Description + Tags</p>
+                </button>
+                <button onClick={onNewContent}
+                    className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-red-500/30 transition-all cursor-pointer text-center group border border-white/[0.06]">
+                    <span className="material-symbols-outlined text-2xl text-red-400 mb-2 block group-hover:scale-110 transition-transform">smart_display</span>
+                    <p className="text-sm font-bold text-white">Create Another</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Start a new YouTube content</p>
+                </button>
+            </div>
+        </div>
+    )
+}
+
+// ============================================================================
+// YOUTUBE SEO / PUBLISH OPTIMIZER WIZARD (metadata only — no script)
+// ============================================================================
+
+function StepYouTubeSeoWizard({ onComplete, onBack, activeBrand, availableProviders, modelOverride, setModelOverride }) {
+    const [brief, setBrief] = useState('')
+    const [format, setFormat] = useState('video')
+    const [videoCategory, setVideoCategory] = useState('')
+    const [targetAudience, setTargetAudience] = useState('')
+    const defaultLang = activeBrand?.dna?.defaultLanguage || 'english'
+    const [language, setLanguage] = useState(defaultLang)
+
+    const VIDEO_CATEGORIES = [
+        { id: 'music_video', icon: 'music_note', label: '🎵 Music Video / Song', desc: 'Music video, lyric video, song release' },
+        { id: 'film_trailer', icon: 'movie', label: '🎬 Film / Trailer / Short Film', desc: 'Movie, web series, short film' },
+        { id: 'review_unboxing', icon: 'rate_review', label: '📱 Review / Unboxing', desc: 'Product review, tech review, comparison' },
+        { id: 'tutorial', icon: 'school', label: '📚 Tutorial / How-To', desc: 'Educational, how-to, guide' },
+        { id: 'podcast_interview', icon: 'podcasts', label: '🎙️ Podcast / Interview', desc: 'Podcast episode, guest interview' },
+        { id: 'vlog_travel', icon: 'videocam', label: '📷 Vlog / Travel / Lifestyle', desc: 'Daily vlog, travel, experience' },
+        { id: 'gaming', icon: 'sports_esports', label: '🎮 Gaming / Entertainment', desc: 'Gameplay, walkthrough, reaction' },
+        { id: 'business', icon: 'trending_up', label: '💼 Business / Motivational', desc: 'Marketing, business, motivation' },
+    ]
+
+    const LANGUAGES = [
+        { id: 'english', label: 'English', flag: '🇬🇧' },
+        { id: 'hindi', label: 'Hindi', flag: '🇮🇳' },
+        { id: 'tamil', label: 'Tamil', flag: '🇮🇳' },
+        { id: 'telugu', label: 'Telugu', flag: '🇮🇳' },
+        { id: 'bengali', label: 'Bengali', flag: '🇮🇳' },
+        { id: 'marathi', label: 'Marathi', flag: '🇮🇳' },
+    ]
+
+    const handleSubmit = () => {
+        if (!brief.trim()) return
+        onComplete({ brief, format, videoCategory, targetAudience, language })
+    }
+
+    return (
+        <div className="animate-fade-in max-w-2xl mx-auto">
+            <button onClick={onBack} className="text-slate-500 text-sm flex items-center gap-1 mb-6 hover:text-white transition-colors cursor-pointer">
+                <span className="material-symbols-outlined text-sm">arrow_back</span> Back
+            </button>
+
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-2xl text-emerald-400">rocket_launch</span>
+                </div>
+                <div>
+                    <h3 className="text-xl font-extrabold text-white">YouTube <span className="text-emerald-400">Publish Optimizer</span></h3>
+                    <p className="text-sm text-slate-400">Algorithm-optimized title, description, tags & keywords — no script needed</p>
+                </div>
+            </div>
+
+            {/* Info callout */}
+            <div className="glass-panel rounded-xl p-4 mb-5 border border-emerald-500/20 bg-emerald-500/5">
+                <div className="flex items-start gap-2">
+                    <span className="material-symbols-outlined text-emerald-400 text-lg mt-0.5">info</span>
+                    <div>
+                        <p className="text-xs text-emerald-300 font-bold mb-1">Already have your video? Just need the SEO metadata.</p>
+                        <p className="text-xs text-slate-400">We'll analyze YouTube search trends and generate 3 title options, a perfectly structured description, 20-30 tags, and keyword strategy — all optimized for the latest YouTube algorithm.</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Topic/Brief */}
+            <div className="mb-5">
+                <label className="text-sm font-bold text-slate-300 mb-2 block">What's your video about? *</label>
+                <div className="relative">
+                    <textarea
+                        value={brief} onChange={e => setBrief(e.target.value)}
+                        placeholder="e.g. 'Rambha Ho music video by Usha Uthup' or 'iPhone 17 Pro full review and comparison'"
+                        className="input-glass w-full py-4 pr-14 resize-none text-white" rows={3} autoFocus
+                    />
+                    <div className="absolute right-3 top-3">
+                        <VoiceInput onResult={(text) => setBrief(prev => prev ? prev + ' ' + text : text)} size="small" />
+                    </div>
+                </div>
+                <p className="text-xs text-slate-600 mt-1.5">💡 Include specific names — artists, products, brands, topics. We'll research them for accurate metadata</p>
+            </div>
+
+            {/* Video Category — CRITICAL for context-aware output */}
+            <div className="mb-5">
+                <label className="text-sm font-bold text-slate-300 mb-2 block">Video Category *</label>
+                <p className="text-xs text-slate-500 mb-3">This determines the metadata format — music videos get different SEO than tutorials</p>
+                <div className="grid grid-cols-2 gap-2">
+                    {VIDEO_CATEGORIES.map(cat => (
+                        <button key={cat.id} onClick={() => setVideoCategory(cat.id)}
+                            className={`glass-panel rounded-xl p-3 text-left transition-all cursor-pointer ${videoCategory === cat.id
+                                ? 'bg-emerald-500/15 border-emerald-500/40 ring-1 ring-emerald-500/30'
+                                : 'hover:bg-white/[0.05]'}`}>
+                            <p className="text-sm font-bold text-white">{cat.label}</p>
+                            <p className="text-[10px] text-slate-500 mt-0.5">{cat.desc}</p>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Format */}
+            <div className="mb-5">
+                <label className="text-sm font-bold text-slate-300 mb-2 block">Format</label>
+                <div className="grid grid-cols-2 gap-3">
+                    {YT_FORMATS.map(f => (
+                        <button key={f.id} onClick={() => setFormat(f.id)}
+                            className={`glass-panel rounded-xl p-4 text-left transition-all cursor-pointer ${format === f.id ? 'bg-emerald-500/15 border-emerald-500/40 ring-1 ring-emerald-500/30' : 'hover:bg-white/[0.05]'}`}>
+                            <span className="material-symbols-outlined text-xl mb-2 block" style={{ color: format === f.id ? '#10B981' : '#64748b' }}>{f.icon}</span>
+                            <p className="text-sm font-bold text-white">{f.label}</p>
+                            <p className="text-xs text-slate-500">{f.desc}</p>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Target Audience */}
+            <div className="mb-5">
+                <label className="text-sm font-bold text-slate-300 mb-2 block">Target Audience <span className="text-slate-600 font-normal">(optional)</span></label>
+                <input value={targetAudience} onChange={e => setTargetAudience(e.target.value)}
+                    placeholder="e.g. Entrepreneurs, tech enthusiasts, beginners, students"
+                    className="input-glass w-full py-3 text-white"
+                />
+            </div>
+
+            {/* Language */}
+            <div className="mb-6">
+                <label className="text-sm font-bold text-slate-300 mb-2 block">Language</label>
+                <div className="flex flex-wrap gap-2">
+                    {LANGUAGES.map(l => (
+                        <button key={l.id} onClick={() => setLanguage(l.id)}
+                            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${language === l.id ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'glass-panel text-slate-400 hover:text-white'}`}>
+                            {l.flag} {l.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Generate Button */}
+            <CreditTooltipWrapper action="content">
+                <button onClick={handleSubmit} disabled={!brief.trim() || !videoCategory}
+                    className="w-full py-4 rounded-xl text-sm font-bold disabled:opacity-30 flex items-center justify-center gap-2 cursor-pointer bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white transition-all shadow-lg shadow-emerald-500/20">
+                    <span className="material-symbols-outlined text-lg">rocket_launch</span>
+                    Optimize for YouTube
+                    <CreditBadge action="content" />
+                </button>
+            </CreditTooltipWrapper>
+        </div>
+    )
+}
+
+// ============================================================================
+// YOUTUBE SEO RESULT VIEW (metadata only — no script)
+// ============================================================================
+
+function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
+    const [copiedSection, setCopiedSection] = useState(null)
+    const [selectedTitle, setSelectedTitle] = useState(0)
+
+    const seo = youtubeSeoData || result?.youtubeSeoData || {}
+    const meta = result?.youtubeMeta || {}
+
+    const titles = seo.titles || meta.titleOptions || []
+    const description = seo.description || meta.description || ''
+    const tags = seo.tags || meta.tags || []
+    const keywords = seo.keywords || meta.keywords || {}
+    const hashtags = seo.hashtags || meta.hashtags || []
+    const seoScore = seo.seoScore || meta.seoScore || {}
+    const competitorInsight = seo.competitorInsight || meta.competitorInsight || ''
+
+    const copySection = (text, section) => {
+        navigator.clipboard.writeText(text)
+        setCopiedSection(section)
+        setTimeout(() => setCopiedSection(null), 2000)
+    }
+
+    const copyAll = () => {
+        const selectedTitleText = titles[selectedTitle]?.text || titles[0]?.text || ''
+        const allText = [
+            `📌 TITLE:\n${selectedTitleText}`,
+            `\n📋 DESCRIPTION:\n${description}`,
+            `\n🏷️ TAGS:\n${tags.join(', ')}`,
+            `\n🔑 KEYWORDS:\nPrimary: ${(keywords.primary || []).join(', ')}\nSecondary: ${(keywords.secondary || []).join(', ')}`,
+            hashtags.length ? `\n# HASHTAGS:\n${hashtags.join(' ')}` : '',
+        ].filter(Boolean).join('\n')
+        copySection(allText, 'all')
+    }
+
+    const getTitleColor = (charCount) => {
+        if (charCount <= 55) return { bg: 'bg-emerald-500/10', text: 'text-emerald-400', label: '✓ Optimal', border: 'border-emerald-500/30' }
+        if (charCount <= 70) return { bg: 'bg-amber-500/10', text: 'text-amber-400', label: '⚠ Slightly long', border: 'border-amber-500/30' }
+        return { bg: 'bg-rose-500/10', text: 'text-rose-400', label: '❌ Too long', border: 'border-rose-500/30' }
+    }
+
+    return (
+        <div className="max-w-3xl mx-auto animate-fade-in">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-2xl text-emerald-400">rocket_launch</span>
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-extrabold text-white">YouTube SEO <span className="text-emerald-400">Ready</span></h3>
+                        <p className="text-xs text-slate-500 mt-0.5">Copy-paste directly into YouTube Studio</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button onClick={copyAll} className="glass-panel px-3 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-all">
+                        <span className="material-symbols-outlined text-sm">{copiedSection === 'all' ? 'check' : 'content_copy'}</span>
+                        {copiedSection === 'all' ? 'Copied All!' : 'Copy All'}
+                    </button>
+                    <button onClick={onNewContent} className="glass-panel px-3 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-all">
+                        <span className="material-symbols-outlined text-sm">add</span> New
+                    </button>
+                </div>
+            </div>
+
+            {/* Title Options — the star of the show */}
+            <div className="glass-panel rounded-2xl p-5 mb-4">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-lg text-blue-400">title</span>
+                        <h4 className="text-base font-bold text-white">Title Options</h4>
+                        <span className="text-xs bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full font-bold">{titles.length} options</span>
+                    </div>
+                    {titles[selectedTitle]?.text && (
+                        <button onClick={() => copySection(titles[selectedTitle].text, 'title')}
+                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-white transition-colors cursor-pointer">
+                            <span className="material-symbols-outlined text-sm">{copiedSection === 'title' ? 'check' : 'content_copy'}</span>
+                            {copiedSection === 'title' ? 'Copied!' : 'Copy Selected'}
+                        </button>
+                    )}
+                </div>
+                <div className="space-y-3">
+                    {titles.map((t, i) => {
+                        const charCount = t.charCount || t.text?.length || 0
+                        const color = getTitleColor(charCount)
+                        return (
+                            <button key={i} onClick={() => setSelectedTitle(i)}
+                                className={`w-full text-left p-4 rounded-xl border-2 transition-all cursor-pointer ${selectedTitle === i
+                                    ? `${color.bg} ${color.border} ring-1 ring-white/10`
+                                    : 'border-transparent bg-white/[0.02] hover:bg-white/[0.04]'}`}>
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1">
+                                        <p className="text-base font-bold text-white leading-relaxed">{t.text}</p>
+                                        {t.strategy && <p className="text-xs text-slate-500 mt-1.5 italic">💡 {t.strategy}</p>}
+                                    </div>
+                                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                        <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${color.bg} ${color.text}`}>
+                                            {charCount} chars {color.label}
+                                        </span>
+                                        {selectedTitle === i && (
+                                            <span className="text-[10px] text-emerald-400 font-bold">✓ Selected</span>
+                                        )}
+                                    </div>
+                                </div>
+                            </button>
+                        )
+                    })}
+                </div>
+            </div>
+
+            {/* Description */}
+            <div className="glass-panel rounded-2xl p-5 mb-4">
+                <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-lg text-emerald-400">description</span>
+                        <h4 className="text-base font-bold text-white">YouTube Description</h4>
+                    </div>
+                    <button onClick={() => copySection(description, 'description')}
+                        className="flex items-center gap-1 text-xs text-slate-500 hover:text-white transition-colors cursor-pointer">
+                        <span className="material-symbols-outlined text-sm">{copiedSection === 'description' ? 'check' : 'content_copy'}</span>
+                        {copiedSection === 'description' ? 'Copied!' : 'Copy'}
+                    </button>
+                </div>
+                <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto pr-2 custom-scrollbar bg-white/[0.02] rounded-xl p-4">
+                    {description}
+                </div>
+                <div className="flex items-center gap-3 mt-2">
+                    <span className="text-xs text-slate-600">{description.length} chars • {description.split(/\s+/).length} words</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${description.length >= 300 && description.length <= 500 ? 'bg-emerald-500/10 text-emerald-400' : description.length > 500 ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                        {description.length >= 300 && description.length <= 500 ? '✓ Optimal length' : description.length > 500 ? '✓ Good length' : '⚠ Short — aim for 300-500 words'}
+                    </span>
+                </div>
+            </div>
+
+            {/* Tags */}
+            {tags.length > 0 && (
+                <div className="glass-panel rounded-2xl p-5 mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-lg text-violet-400">sell</span>
+                            <h4 className="text-base font-bold text-white">Tags</h4>
+                            <span className="text-xs bg-violet-500/10 text-violet-400 px-2 py-0.5 rounded-full font-bold">{tags.length} tags</span>
+                        </div>
+                        <button onClick={() => copySection(tags.join(', '), 'tags')}
+                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-white transition-colors cursor-pointer">
+                            <span className="material-symbols-outlined text-sm">{copiedSection === 'tags' ? 'check' : 'content_copy'}</span>
+                            {copiedSection === 'tags' ? 'Copied!' : 'Copy All Tags'}
+                        </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {tags.map((tag, i) => (
+                            <button key={i} onClick={() => copySection(tag, `tag-${i}`)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer border ${i === 0
+                                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 font-bold'
+                                    : 'bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 border-violet-500/20'}`}>
+                                {copiedSection === `tag-${i}` ? '✓' : ''} {tag}
+                                {i === 0 && <span className="ml-1 text-[8px] text-emerald-400">PRIMARY</span>}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Keywords */}
+            {(keywords.primary?.length > 0 || keywords.secondary?.length > 0) && (
+                <div className="glass-panel rounded-2xl p-5 mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-lg text-cyan-400">key</span>
+                            <h4 className="text-base font-bold text-white">Keywords Strategy</h4>
+                        </div>
+                        <button onClick={() => copySection(`Primary: ${(keywords.primary || []).join(', ')}\nSecondary: ${(keywords.secondary || []).join(', ')}`, 'keywords')}
+                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-white transition-colors cursor-pointer">
+                            <span className="material-symbols-outlined text-sm">{copiedSection === 'keywords' ? 'check' : 'content_copy'}</span>
+                            {copiedSection === 'keywords' ? 'Copied!' : 'Copy'}
+                        </button>
+                    </div>
+                    <div className="space-y-3">
+                        {keywords.primary?.length > 0 && (
+                            <div>
+                                <p className="text-xs font-bold text-cyan-400 mb-1.5">🎯 Primary — High Volume Search Terms</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {keywords.primary.map((kw, i) => (
+                                        <span key={i} className="px-3 py-1.5 rounded-lg bg-cyan-500/10 text-cyan-300 text-xs font-bold border border-cyan-500/20">{kw}</span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {keywords.secondary?.length > 0 && (
+                            <div>
+                                <p className="text-xs font-bold text-slate-500 mb-1.5">📌 Secondary — Long-Tail & LSI</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {keywords.secondary.map((kw, i) => (
+                                        <span key={i} className="px-3 py-1.5 rounded-lg bg-white/5 text-slate-400 text-xs font-medium border border-white/10">{kw}</span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* SEO Score + Competitor Insight */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                {/* SEO Score */}
+                {seoScore.overallScore && (
+                    <div className="glass-panel rounded-2xl p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className="material-symbols-outlined text-lg text-amber-400">analytics</span>
+                            <h4 className="text-sm font-bold text-white">SEO Score</h4>
+                        </div>
+                        <div className="flex items-center justify-center mb-4">
+                            <div className={`w-20 h-20 rounded-full flex items-center justify-center text-2xl font-black border-4 ${seoScore.overallScore >= 8 ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10' : seoScore.overallScore >= 6 ? 'border-amber-500 text-amber-400 bg-amber-500/10' : 'border-rose-500 text-rose-400 bg-rose-500/10'}`}>
+                                {seoScore.overallScore}/10
+                            </div>
+                        </div>
+                        <div className="space-y-1.5 text-xs">
+                            {seoScore.titleOptimization && <p className="text-slate-400">📌 Title: <span className="text-white">{seoScore.titleOptimization}</span></p>}
+                            {seoScore.descriptionOptimization && <p className="text-slate-400">📋 Desc: <span className="text-white">{seoScore.descriptionOptimization}</span></p>}
+                            {seoScore.tagCoverage && <p className="text-slate-400">🏷️ Tags: <span className="text-white">{seoScore.tagCoverage}</span></p>}
+                        </div>
+                    </div>
+                )}
+
+                {/* Competitor Insight */}
+                {competitorInsight && (
+                    <div className="glass-panel rounded-2xl p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className="material-symbols-outlined text-lg text-pink-400">psychology</span>
+                            <h4 className="text-sm font-bold text-white">Competitor Insight</h4>
+                        </div>
+                        <p className="text-sm text-slate-300 leading-relaxed">{competitorInsight}</p>
+                    </div>
+                )}
+            </div>
+
+            {/* Hashtags */}
+            {hashtags.length > 0 && (
+                <div className="glass-panel rounded-2xl p-5 mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-lg text-blue-400">tag</span>
+                            <h4 className="text-sm font-bold text-white">Hashtags</h4>
+                        </div>
+                        <button onClick={() => copySection(hashtags.join(' '), 'hashtags')}
+                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-white transition-colors cursor-pointer">
+                            <span className="material-symbols-outlined text-sm">{copiedSection === 'hashtags' ? 'check' : 'content_copy'}</span>
+                            {copiedSection === 'hashtags' ? 'Copied!' : 'Copy'}
+                        </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {hashtags.map((h, i) => (
+                            <span key={i} className="text-xs text-blue-400 bg-blue-500/10 px-2 py-1 rounded-lg font-medium border border-blue-500/20">{h}</span>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Actions */}
+            <div className="grid grid-cols-2 gap-4 mt-6">
+                <button onClick={copyAll}
+                    className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-emerald-500/30 transition-all cursor-pointer text-center group border border-white/[0.06]">
+                    <span className="material-symbols-outlined text-2xl text-emerald-400 mb-2 block group-hover:scale-110 transition-transform">
+                        {copiedSection === 'all' ? 'check_circle' : 'content_copy'}
+                    </span>
+                    <p className="text-sm font-bold text-white">{copiedSection === 'all' ? 'Copied!' : 'Copy Everything'}</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Title + Description + Tags + Keywords</p>
+                </button>
+                <button onClick={onNewContent}
+                    className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-emerald-500/30 transition-all cursor-pointer text-center group border border-white/[0.06]">
+                    <span className="material-symbols-outlined text-2xl text-emerald-400 mb-2 block group-hover:scale-110 transition-transform">rocket_launch</span>
+                    <p className="text-sm font-bold text-white">Optimize Another</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Generate SEO for a new video</p>
+                </button>
+            </div>
+        </div>
+    )
+}
+
+// ============================================================================
 // RESULT VIEW (with Edit & AI Refine)
 // ============================================================================
 
@@ -1696,7 +2600,7 @@ export default function ContentStudio() {
     const { activeBrand } = useBrand()
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
-    const [step, setStep] = useState(0)   // 0=goal, 1=subtype, 2=channel, 3=context, 4=tone, 5=result
+    const [step, setStep] = useState(0)   // 0=goal, 1=subtype, 2=channel, 3=context, 4=tone, 5=result, 6=PR, 7=product, 8=youtube wizard, 9=youtube result, 10=youtube SEO wizard, 11=youtube SEO result
     const [goal, setGoal] = useState(null)
     const [subType, setSubType] = useState(null)
     const [channel, setChannel] = useState(null)
@@ -1711,6 +2615,8 @@ export default function ContentStudio() {
     const [photoshootImage, setPhotoshootImage] = useState(null)
     const [modelOverride, setModelOverride] = useState('auto')
     const [selectedProduct, setSelectedProduct] = useState(null)
+    const [youtubeData, setYoutubeData] = useState(null)
+    const [youtubeSeoData, setYoutubeSeoData] = useState(null)
     const [availableProviders, setAvailableProviders] = useState([
         { id: 'auto', label: 'Auto (Recommended)', icon: 'auto_awesome', desc: 'AI picks the best model' },
     ])
@@ -1767,6 +2673,7 @@ export default function ContentStudio() {
             else if (/launch|new|announce|pr |press|collab/.test(lower)) detectedGoal = 'launch'
             else if (/blog|seo|article|guide|how.to|educat|tip/.test(lower)) detectedGoal = 'educate'
             else if (/brand|story|about|tagline|website|vision/.test(lower)) detectedGoal = 'brand'
+            else if (/youtube|yt |video script|shorts script/.test(lower)) detectedGoal = 'youtube_content'
 
             let detectedChannel = null
             if (/instagram|insta/i.test(lower)) detectedChannel = 'instagram'
@@ -1778,7 +2685,10 @@ export default function ContentStudio() {
             else if (/website|blog|web/i.test(lower)) detectedChannel = 'website'
 
             setContext({ details: prompt })
-            if (detectedGoal) {
+            if (detectedGoal === 'youtube_content') {
+                setGoal('youtube_content')
+                setStep(1)  // Show YouTube sub-types (Script vs SEO)
+            } else if (detectedGoal) {
                 setGoal(detectedGoal)
                 if (detectedChannel) {
                     setChannel(detectedChannel)
@@ -2068,6 +2978,59 @@ SPOKESPERSON QUOTES:`
         setStep(0); setGoal(null); setSubType(null); setChannel(null)
         setContext(null); setToneSettings(null); setResult(null); setError('')
         setAccepted(false); setPrefilledOccasion(null); setSelectedProduct(null)
+        setYoutubeData(null); setYoutubeSeoData(null)
+    }
+
+    // YouTube content generation handler (Script & Ideation)
+    const handleGenerateYouTube = async (ytSettings) => {
+        if (!activeBrand) { setError('Please select a brand first.'); return }
+        setGenerating(true)
+        setError('')
+
+        try {
+            const data = await contentAPI.youtube({
+                brandId: activeBrand._id,
+                brief: ytSettings.brief,
+                format: ytSettings.format,
+                videoLength: ytSettings.videoLength,
+                targetAudience: ytSettings.targetAudience,
+                style: ytSettings.style,
+                language: ytSettings.language,
+                subType: subType || '',
+            })
+            setResult(data.content)
+            setYoutubeData(data.content?.youtubeData || {})
+            setStep(9)  // YouTube result view
+        } catch (err) {
+            setError(err.message || 'YouTube content generation failed.')
+        } finally {
+            setGenerating(false)
+        }
+    }
+
+    // YouTube SEO / Publish Optimizer handler (metadata only)
+    const handleGenerateYouTubeSeo = async (seoSettings) => {
+        if (!activeBrand) { setError('Please select a brand first.'); return }
+        setGenerating(true)
+        setError('')
+
+        try {
+            const data = await contentAPI.youtubeSeo({
+                brandId: activeBrand._id,
+                brief: seoSettings.brief,
+                format: seoSettings.format,
+                videoCategory: seoSettings.videoCategory,
+                targetAudience: seoSettings.targetAudience,
+                language: seoSettings.language,
+            })
+            setResult(data.content)
+            setYoutubeSeoData(data.content?.youtubeSeoData || {})
+            setStep(11)  // YouTube SEO result view
+        } catch (err) {
+            setError(err.message || 'YouTube SEO generation failed.')
+        } finally {
+            setGenerating(false)
+        }
     }
 
     // Step progress
@@ -2145,6 +3108,8 @@ SPOKESPERSON QUOTES:`
                             setGoal(g); setStep(6)  // Jump to PR wizard
                         } else if (g === 'product_content') {
                             setGoal(g); setStep(7)  // Jump to product picker
+                        } else if (g === 'youtube_content') {
+                            setGoal(g); setStep(1)  // Show YouTube sub-types (Script vs Publish Optimizer)
                         } else {
                             setGoal(g); setStep(1)
                         }
@@ -2153,7 +3118,14 @@ SPOKESPERSON QUOTES:`
             )}
             {step === 1 && <StepSubType goal={goal} onSelect={(s) => {
                 setSubType(s);
-                if (goal === 'product_content') {
+                if (goal === 'youtube_content') {
+                    // YouTube flow: SEO-only vs Script
+                    if (s === 'youtube_seo') {
+                        setStep(10)  // YouTube SEO / Publish Optimizer wizard
+                    } else {
+                        setStep(8)  // YouTube Script & Ideation wizard
+                    }
+                } else if (goal === 'product_content') {
                     // Platform IS the channel — auto-set and skip channel step
                     setChannel('ecommerce');
                     setStep(context ? 4 : 3);
@@ -2242,6 +3214,80 @@ SPOKESPERSON QUOTES:`
                     onCreateVisual={handleCreateVisual}
                     onRefine={handleRefine}
                     contentFeedback={contentFeedback}
+                />
+            )}
+
+            {/* YouTube Wizard */}
+            {step === 8 && (
+                <>
+                    <StepYouTubeWizard
+                        activeBrand={activeBrand}
+                        onBack={() => { setGoal(null); setStep(0) }}
+                        onComplete={handleGenerateYouTube}
+                        availableProviders={availableProviders}
+                        modelOverride={modelOverride}
+                        setModelOverride={setModelOverride}
+                    />
+                    {generating && (
+                        <div className="max-w-2xl mx-auto mt-6 glass-panel rounded-2xl p-6 text-center animate-fade-in">
+                            <span className="material-symbols-outlined text-3xl text-red-400 animate-spin block mb-3">progress_activity</span>
+                            <p className="text-white font-bold">Generating YouTube content...</p>
+                            <p className="text-sm text-slate-400 mt-1">Running YouTube Research Agent → YouTube Writer Agent pipeline</p>
+                            <p className="text-xs text-slate-600 mt-2">Script • Title • Description • Tags • Keywords • Timestamps</p>
+                        </div>
+                    )}
+                    {error && (
+                        <div className="max-w-2xl mx-auto mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm text-center">
+                            <span className="material-symbols-outlined align-middle mr-1">error</span> {error}
+                        </div>
+                    )}
+                </>
+            )}
+
+            {/* YouTube Result View */}
+            {step === 9 && result && (
+                <YouTubeResultView
+                    result={result}
+                    youtubeData={youtubeData}
+                    onNewContent={resetAll}
+                    generating={generating}
+                    activeBrand={activeBrand}
+                />
+            )}
+
+            {/* YouTube SEO / Publish Optimizer Wizard */}
+            {step === 10 && (
+                <>
+                    <StepYouTubeSeoWizard
+                        activeBrand={activeBrand}
+                        onBack={() => { setSubType(null); setStep(1) }}
+                        onComplete={handleGenerateYouTubeSeo}
+                        availableProviders={availableProviders}
+                        modelOverride={modelOverride}
+                        setModelOverride={setModelOverride}
+                    />
+                    {generating && (
+                        <div className="max-w-2xl mx-auto mt-6 glass-panel rounded-2xl p-6 text-center animate-fade-in">
+                            <span className="material-symbols-outlined text-3xl text-emerald-400 animate-spin block mb-3">progress_activity</span>
+                            <p className="text-white font-bold">Optimizing for YouTube algorithm...</p>
+                            <p className="text-sm text-slate-400 mt-1">Running YouTube Research Agent → SEO Optimizer Agent pipeline</p>
+                            <p className="text-xs text-slate-600 mt-2">3 Title Options • Description • 20-30 Tags • Keywords • SEO Score</p>
+                        </div>
+                    )}
+                    {error && (
+                        <div className="max-w-2xl mx-auto mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm text-center">
+                            <span className="material-symbols-outlined align-middle mr-1">error</span> {error}
+                        </div>
+                    )}
+                </>
+            )}
+
+            {/* YouTube SEO Result View */}
+            {step === 11 && result && (
+                <YouTubeSeoResultView
+                    result={result}
+                    youtubeSeoData={youtubeSeoData}
+                    onNewContent={resetAll}
                 />
             )}
 

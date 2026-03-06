@@ -20,6 +20,9 @@ import {
     seoNode,
     toneMatcherNode,
     qualityCriticNode,
+    youtubeResearchNode,
+    youtubeWriterNode,
+    youtubeSeoNode,
 } from '../agents/contentStudio/nodes.js';
 
 const router = Router();
@@ -191,6 +194,166 @@ router.post('/:id/edit', protect, async (req, res) => {
             },
         });
     } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/content/agentic/youtube — YouTube Content Generation Pipeline
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/youtube', protect, requireCredits('content'), async (req, res) => {
+    try {
+        const { brandId, brief, format, videoLength, targetAudience, style, language, subType } = req.body;
+        if (!brief) return res.status(400).json({ success: false, error: 'Video brief is required' });
+
+        const contentType = format === 'shorts' ? 'youtube_shorts' : 'youtube_video';
+
+        // Build pipeline state
+        let state = {
+            userId: req.user._id.toString(),
+            brandId: brandId || null,
+            brief,
+            format: format || 'video',
+            videoLength: videoLength || 'medium',
+            targetAudience: targetAudience || '',
+            style: style || '',
+            language: language || 'english',
+            subType: subType || '',
+        };
+
+        // Step 1: YouTube Research
+        state = await youtubeResearchNode(state);
+
+        // Step 2: YouTube Writer
+        state = await youtubeWriterNode(state);
+
+        const yt = state.youtubeContent || {};
+
+        // Save content with structured YouTube metadata
+        const content = await Content.create({
+            user: req.user._id,
+            brand: brandId || undefined,
+            type: contentType,
+            title: yt.videoTitle || '',
+            content: yt.script || '',
+            prompt: brief,
+            platform: 'youtube',
+            originalContent: yt.script || '',
+            aiMeta: {
+                provider: 'anthropic',
+                model: 'claude-sonnet',
+                agenticPipeline: true,
+                pipelineStep: 'youtube_complete',
+            },
+            youtubeMeta: {
+                videoTitle: yt.videoTitle || '',
+                description: yt.description || '',
+                tags: yt.tags || [],
+                keywords: {
+                    primary: yt.keywords?.primary || [],
+                    secondary: yt.keywords?.secondary || [],
+                },
+                timestamps: yt.timestamps || [],
+                thumbnailIdeas: yt.thumbnailTextSuggestions || [],
+                hookScript: yt.hookScript || '',
+                ctaText: yt.ctaText || '',
+                format: format || 'video',
+                estimatedDuration: yt.estimatedDuration || '',
+                hashtags: yt.hashtags || [],
+            },
+        });
+
+        await req.user.updateOne({ $inc: { 'usage.contentGenerated': 1 } });
+
+        res.json({
+            success: true,
+            content: {
+                ...content.toObject(),
+                youtubeData: {
+                    research: state.youtubeResearch,
+                    ...yt,
+                },
+            },
+        });
+    } catch (error) {
+        console.error('YouTube content generation error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/content/agentic/youtube-seo — YouTube Publish Optimizer (metadata only)
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/youtube-seo', protect, requireCredits('content'), async (req, res) => {
+    try {
+        const { brandId, brief, format, videoCategory, targetAudience, language } = req.body;
+        if (!brief) return res.status(400).json({ success: false, error: 'Video topic/brief is required' });
+
+        // Build pipeline state
+        let state = {
+            userId: req.user._id.toString(),
+            brandId: brandId || null,
+            brief: `[VIDEO CATEGORY: ${videoCategory || 'general'}] ${brief}`,
+            format: format || 'video',
+            videoCategory: videoCategory || 'general',
+            targetAudience: targetAudience || '',
+            language: language || 'english',
+        };
+
+        // Step 1: YouTube Research (keywords, competitive analysis)
+        state = await youtubeResearchNode(state);
+
+        // Step 2: YouTube SEO Optimizer (metadata only — no script)
+        state = await youtubeSeoNode(state);
+
+        const seo = state.youtubeSeo || {};
+
+        // Save content with structured YouTube SEO metadata
+        const content = await Content.create({
+            user: req.user._id,
+            brand: brandId || undefined,
+            type: 'youtube_seo',
+            title: seo.titles?.[0]?.text || '',
+            content: seo.description || '',
+            prompt: brief,
+            platform: 'youtube',
+            originalContent: seo.description || '',
+            aiMeta: {
+                provider: 'anthropic',
+                model: 'claude-sonnet',
+                agenticPipeline: true,
+                pipelineStep: 'youtube_seo',
+            },
+            youtubeMeta: {
+                videoTitle: seo.titles?.[0]?.text || '',
+                titleOptions: seo.titles || [],
+                description: seo.description || '',
+                tags: seo.tags || [],
+                keywords: {
+                    primary: seo.keywords?.primary || [],
+                    secondary: seo.keywords?.secondary || [],
+                },
+                hashtags: seo.hashtags || [],
+                seoScore: seo.seoScore || {},
+                competitorInsight: seo.competitorInsight || '',
+                format: format || 'video',
+            },
+        });
+
+        await req.user.updateOne({ $inc: { 'usage.contentGenerated': 1 } });
+
+        res.json({
+            success: true,
+            content: {
+                ...content.toObject(),
+                youtubeSeoData: {
+                    research: state.youtubeResearch,
+                    ...seo,
+                },
+            },
+        });
+    } catch (error) {
+        console.error('YouTube SEO generation error:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

@@ -5,11 +5,11 @@ const contentSchema = new mongoose.Schema({
     brand: { type: mongoose.Schema.Types.ObjectId, ref: 'Brand', required: true },
 
     // Content details
-    type: { type: String, enum: ['social', 'blog', 'ad', 'email', 'seo', 'caption', 'promote', 'celebrate', 'launch', 'educate', 'engage', 'brand', 'hijack', 'press_release', 'product_content', 'other'], required: true },
+    type: { type: String, enum: ['social', 'blog', 'ad', 'email', 'seo', 'caption', 'promote', 'celebrate', 'launch', 'educate', 'engage', 'brand', 'hijack', 'press_release', 'product_content', 'youtube_video', 'youtube_shorts', 'youtube_content', 'youtube_seo', 'other'], required: true },
     title: { type: String, default: '' },
     content: { type: String, required: true },
     prompt: { type: String, default: '' }, // original user prompt
-    platform: { type: String, default: '' }, // Instagram, LinkedIn, etc.
+    platform: { type: String, default: '' }, // Instagram, LinkedIn, YouTube, etc.
 
     // AI Generation metadata
     aiMeta: {
@@ -20,6 +20,24 @@ const contentSchema = new mongoose.Schema({
         brandAlignmentScore: { type: Number, default: 0, min: 0, max: 100 },
         systemPromptUsed: { type: String, default: '' },
         temperature: { type: Number, default: 0.7 },
+    },
+
+    // YouTube-specific structured metadata
+    youtubeMeta: {
+        videoTitle: { type: String, default: '' },
+        description: { type: String, default: '' },
+        tags: [String],
+        keywords: {
+            primary: [String],
+            secondary: [String],
+        },
+        timestamps: [{ time: String, label: String }],
+        thumbnailIdeas: [String],
+        hookScript: { type: String, default: '' },
+        ctaText: { type: String, default: '' },
+        format: { type: String, enum: ['video', 'shorts', ''], default: '' },
+        estimatedDuration: { type: String, default: '' },
+        hashtags: [String],
     },
 
     // User modifications (for RLHF)
