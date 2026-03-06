@@ -63,7 +63,7 @@ app.use(cors({
     credentials: true
 }));
 // Special middleware for Shopify Webhooks to ensure raw body capture for HMAC verification
-app.use('/api/shopify/webhooks', express.raw({ type: '*/*' }), (req, res, next) => {
+app.use('/api/shopify/webhooks', express.raw({ type: '*/*', limit: '50mb' }), (req, res, next) => {
     if (Buffer.isBuffer(req.body)) {
         req.rawBody = req.body;
         try {

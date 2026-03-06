@@ -16,46 +16,49 @@ import config from '../config/env.js';
 export function verifyShopifyWebhook(req, res, next) {
     const hmacHeader = req.get('X-Shopify-Hmac-Sha256');
     if (!hmacHeader) {
-        console.warn('⚠️ Shopify webhook: Missing HMAC header');
+        console.warn('⚠️ Shopify webhook: Missing X-Shopify-Hmac-Sha256 header');
         return res.status(401).json({ error: 'Missing HMAC signature' });
     }
 
     // Use the secret exactly as provided and trimmed
     const secret = config.shopify.apiSecret?.trim();
-
     if (!secret) {
         console.error('❌ SHOPIFY_API_SECRET not configured correctly');
         return res.status(500).json({ error: 'Server misconfigured' });
     }
 
-    // rawBody should be a Buffer (captured in index.js)
     const rawBody = req.rawBody;
-    if (!rawBody) {
-        console.warn('⚠️ Shopify webhook: No raw body available. Capture failed in index.js');
+    if (!rawBody || !Buffer.isBuffer(rawBody)) {
+        console.warn('⚠️ Shopify webhook: No raw buffer available. Capture failed in index.js');
         return res.status(400).json({ error: 'Cannot verify — raw body missing' });
     }
 
-    console.log(`🔍 Shopify webhook debug: Path=${req.originalUrl} BodySize=${rawBody.length} bytes Header=${hmacHeader.substring(0, 8)}...`);
+    // Calculate HMAC
+    const hmac = crypto.createHmac('sha256', secret).update(rawBody).digest();
+    const computedBase64 = hmac.toString('base64');
 
-    const computedHmac = crypto
-        .createHmac('sha256', secret)
-        .update(rawBody)
-        .digest('base64');
-
-    // Use timing-safe comparison to prevent timing attacks
-    try {
-        const sigBuffer = Buffer.from(hmacHeader, 'base64');
-        const computedBuffer = Buffer.from(computedHmac, 'base64');
-
-        if (sigBuffer.length !== computedBuffer.length || !crypto.timingSafeEqual(sigBuffer, computedBuffer)) {
-            console.warn(`⚠️ Shopify webhook: HMAC mismatch. Computed: ${computedHmac.substring(0, 8)}... vs Header: ${hmacHeader.substring(0, 8)}...`);
-            return res.status(401).json({ error: 'HMAC verification failed' });
+    // Safe comparison function
+    const verifySignature = (header, encoding) => {
+        try {
+            const headerBuf = Buffer.from(header, encoding);
+            return headerBuf.length === hmac.length && crypto.timingSafeEqual(headerBuf, hmac);
+        } catch (e) {
+            return false;
         }
-    } catch (err) {
-        console.warn('⚠️ Shopify webhook: HMAC comparison error:', err.message);
+    };
+
+    const isBase64Match = verifySignature(hmacHeader, 'base64');
+    const isHexMatch = hmacHeader.length === 64 && verifySignature(hmacHeader, 'hex');
+
+    if (!isBase64Match && !isHexMatch) {
+        console.warn(`⚠️ Shopify webhook HMAC mismatch!`);
+        console.warn(`   Path: ${req.originalUrl}`);
+        console.warn(`   Secret used (first 4): ${secret.substring(0, 4)}... (length: ${secret.length})`);
+        console.warn(`   Computed (Base64): ${computedBase64}`);
+        console.warn(`   Header Received: ${hmacHeader}`);
         return res.status(401).json({ error: 'HMAC verification failed' });
     }
 
-    console.log('✅ Shopify webhook: HMAC verified successfully');
+    console.log(`✅ Shopify webhook verified: ${req.originalUrl}`);
     next();
 }

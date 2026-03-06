@@ -479,6 +479,7 @@ router.get('/debug-config', (req, res) => {
     res.status(200).json({
         hasSecret: secret.length > 0,
         secretLength: secret.length,
+        maskedSecret: `${secret.substring(0, 4)}***${secret.substring(secret.length - 4)}`,
         hasShpssPrefix: secret.startsWith('shpss_'),
         hasShpatPrefix: secret.startsWith('shpat_'),
         nodeEnv: config.nodeEnv,
