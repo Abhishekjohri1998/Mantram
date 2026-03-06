@@ -1,0 +1,26 @@
+/* ... keeping existing imports and routes ... */
+import { Router } from 'express';
+import { protect } from '../middleware/auth.js';
+import Integration from '../models/Integration.js';
+import Product from '../models/Product.js';
+import ShopifyOrder from '../models/ShopifyOrder.js';
+import ShopifyCustomer from '../models/ShopifyCustomer.js';
+import {
+    getShopifyAuthUrl,
+    exchangeShopifyToken,
+    fetchShopifyProducts,
+    transformShopifyProduct,
+    getShopInfo,
+    syncStoreData,
+    registerShopifyWebhooks,
+    transformShopifyOrder,
+    transformShopifyCustomer
+} from '../services/shopifyService.js';
+import config from '../config/env.js';
+import { verifyShopifyWebhook } from '../middleware/shopifyWebhookAuth.js';
+import { verifyShopifySessionToken } from '../middleware/shopifySessionAuth.js';
+
+const router = Router();
+
+/* (Existing routes: /connect, /callback, /status, /sync, /products, /orders, /customers, /disconnect) */
+/* ... I will only replace the problematic section at the end ... */

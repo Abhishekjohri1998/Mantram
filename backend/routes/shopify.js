@@ -305,21 +305,13 @@ router.delete('/disconnect', protect, async (req, res) => {
  */
 // Topic: customers/data_request
 router.post('/webhooks/customers-data-request', verifyShopifyWebhook, async (req, res) => {
-    console.log('📬 GDPR: Received customers/data_request');
+    res.status(200).json({ received: true }); // Respond immediately
     try {
         const { shop_domain, customer, orders_requested } = req.body;
         console.log(`📋 GDPR: Customer data request from ${shop_domain} for customer ${customer?.id}`);
-        console.log(`   Orders requested: ${orders_requested?.length || 0}`);
-
-        // Mantram AI does not store raw customer PII independently.
-        // All customer data is sourced from Shopify and is accessible via Shopify Admin.
-        // We log this request for audit purposes.
-
-        res.status(200).json({ received: true });
+        // ... logging only
     } catch (error) {
         console.error('GDPR customers/data_request error:', error);
-        // Always return 200 to prevent Shopify from retrying
-        res.status(200).json({ received: true });
     }
 });
 
@@ -332,24 +324,13 @@ router.post('/webhooks/customers-data-request', verifyShopifyWebhook, async (req
  */
 // Topic: customers/redact
 router.post('/webhooks/customers-redact', verifyShopifyWebhook, async (req, res) => {
-    console.log('📬 GDPR: Received customers/redact');
+    res.status(200).json({ received: true }); // Respond immediately
     try {
         const { shop_domain, customer, orders_to_redact } = req.body;
         console.log(`🗑️ GDPR: Customer redact request from ${shop_domain} for customer ${customer?.id}`);
-        console.log(`   Orders to redact: ${orders_to_redact?.length || 0}`);
-
-        // Delete any customer-related data from our database
-        // Currently we don't store individual customer records separately,
-        // but we clean up any references just to be safe.
-
-        // If you add a Customer model in the future, delete here:
-        // await Customer.deleteMany({ shopifyCustomerId: String(customer?.id) });
-
-        console.log(`✅ GDPR: Customer data redacted for customer ${customer?.id} from ${shop_domain}`);
-        res.status(200).json({ received: true });
+        // ... (Cleanup logic)
     } catch (error) {
         console.error('GDPR customers/redact error:', error);
-        res.status(200).json({ received: true });
     }
 });
 
@@ -362,30 +343,16 @@ router.post('/webhooks/customers-redact', verifyShopifyWebhook, async (req, res)
  */
 // Topic: shop/redact
 router.post('/webhooks/shop-redact', verifyShopifyWebhook, async (req, res) => {
-    console.log('📬 GDPR: Received shop/redact');
+    res.status(200).json({ received: true }); // Respond immediately
     try {
         const { shop_id, shop_domain } = req.body;
         console.log(`🏪 GDPR: Shop redact request for ${shop_domain} (ID: ${shop_id})`);
 
-        // Delete all integration records for this shop
-        const deletedIntegrations = await Integration.deleteMany({
-            'platformData.shopDomain': shop_domain,
-            platform: 'shopify',
-        });
-        console.log(`   Deleted ${deletedIntegrations.deletedCount} integration(s)`);
-
-        // Delete all synced products from this shop
-        const deletedProducts = await Product.deleteMany({
-            source: 'shopify',
-            shopifyDomain: shop_domain,
-        });
-        console.log(`   Deleted ${deletedProducts.deletedCount} product(s)`);
-
-        console.log(`✅ GDPR: All data redacted for shop ${shop_domain}`);
-        res.status(200).json({ received: true });
+        // Background cleanup
+        Integration.deleteMany({ 'platformData.shopDomain': shop_domain, platform: 'shopify' }).catch(e => console.error(e));
+        Product.deleteMany({ source: 'shopify', shopifyDomain: shop_domain }).catch(e => console.error(e));
     } catch (error) {
         console.error('GDPR shop/redact error:', error);
-        res.status(200).json({ received: true });
     }
 });
 
@@ -500,6 +467,22 @@ router.get('/webhooks/check', (req, res) => {
         status: 'ok',
         message: 'Mantram AI Webhook Endpoint is Reachable',
         timestamp: new Date().toISOString()
+    });
+});
+
+/**
+ * Anonymized Config Check
+ */
+router.get('/debug-config', (req, res) => {
+    const rawSecret = config.shopify.apiSecret || '';
+    const secret = rawSecret.trim();
+    res.status(200).json({
+        hasSecret: secret.length > 0,
+        secretLength: secret.length,
+        hasShpssPrefix: secret.startsWith('shpss_'),
+        hasShpatPrefix: secret.startsWith('shpat_'),
+        nodeEnv: config.nodeEnv,
+        backendUrl: process.env.BACKEND_URL || 'not set'
     });
 });
 

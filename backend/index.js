@@ -62,14 +62,25 @@ app.use(cors({
     },
     credentials: true
 }));
-app.use(express.json({
-    limit: '50mb',
-    // Capture raw body for Shopify webhook HMAC verification
-    verify: (req, _res, buf) => {
-        if (req.originalUrl && req.originalUrl.includes('/webhooks')) {
-            req.rawBody = buf; // Store as raw Buffer
+// Special middleware for Shopify Webhooks to ensure raw body capture for HMAC verification
+app.use('/api/shopify/webhooks', express.raw({ type: '*/*' }), (req, res, next) => {
+    if (Buffer.isBuffer(req.body)) {
+        req.rawBody = req.body;
+        try {
+            // Attempt to parse JSON so subsequent handlers can use req.body
+            const bodyString = req.body.toString('utf8');
+            if (bodyString) {
+                req.body = JSON.parse(bodyString);
+            }
+        } catch (e) {
+            console.warn('⚠️ Webhook body is not valid JSON, but rawBody captured');
         }
-    },
+    }
+    next();
+});
+
+app.use(express.json({
+    limit: '50mb'
 }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
