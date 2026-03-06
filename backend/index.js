@@ -66,7 +66,7 @@ app.use(express.json({
     limit: '50mb',
     // Capture raw body for Shopify webhook HMAC verification
     verify: (req, _res, buf) => {
-        if (req.originalUrl && req.originalUrl.includes('/api/shopify/webhooks')) {
+        if (req.originalUrl && req.originalUrl.includes('/webhooks')) {
             req.rawBody = buf; // Store as raw Buffer
         }
     },

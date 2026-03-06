@@ -304,7 +304,8 @@ router.delete('/disconnect', protect, async (req, res) => {
  * raw customer PII beyond what Shopify provides, we acknowledge the request.
  */
 // Topic: customers/data_request
-router.post('/webhooks/customers-data_request', verifyShopifyWebhook, async (req, res) => {
+router.post('/webhooks/customers-data-request', verifyShopifyWebhook, async (req, res) => {
+    console.log('📬 GDPR: Received customers/data_request');
     try {
         const { shop_domain, customer, orders_requested } = req.body;
         console.log(`📋 GDPR: Customer data request from ${shop_domain} for customer ${customer?.id}`);
@@ -329,7 +330,9 @@ router.post('/webhooks/customers-data_request', verifyShopifyWebhook, async (req
  * Triggered when a store owner requests deletion of a customer's data.
  * We must delete any customer data we've stored.
  */
+// Topic: customers/redact
 router.post('/webhooks/customers-redact', verifyShopifyWebhook, async (req, res) => {
+    console.log('📬 GDPR: Received customers/redact');
     try {
         const { shop_domain, customer, orders_to_redact } = req.body;
         console.log(`🗑️ GDPR: Customer redact request from ${shop_domain} for customer ${customer?.id}`);
@@ -357,7 +360,9 @@ router.post('/webhooks/customers-redact', verifyShopifyWebhook, async (req, res)
  * Triggered 48 hours after a store owner uninstalls the app.
  * We must delete ALL data related to this shop from our systems.
  */
+// Topic: shop/redact
 router.post('/webhooks/shop-redact', verifyShopifyWebhook, async (req, res) => {
+    console.log('📬 GDPR: Received shop/redact');
     try {
         const { shop_id, shop_domain } = req.body;
         console.log(`🏪 GDPR: Shop redact request for ${shop_domain} (ID: ${shop_id})`);
