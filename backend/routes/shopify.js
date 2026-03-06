@@ -484,31 +484,33 @@ router.get('/debug-config', (req, res) => {
         nodeEnv: config.nodeEnv,
         backendUrl: process.env.BACKEND_URL || 'not set'
     });
-    /**
-     * HMAC Simulation/Verification Tool (for debugging)
-     * Use this to verify that the server's HMAC logic is working with a known secret.
-     */
-    router.post('/debug/hmac-simulator', async (req, res) => {
-        const providedHmac = req.get('X-Shopify-Hmac-Sha256');
-        const secret = req.query.secret || '';
-        const rawBody = req.rawBody;
+});
 
-        if (!rawBody) {
-            return res.status(400).json({ error: 'No raw body captured' });
-        }
+/**
+ * HMAC Simulation/Verification Tool (for debugging)
+ * Use this to verify that the server's HMAC logic is working with a known secret.
+ */
+router.post('/debug/hmac-simulator', async (req, res) => {
+    const providedHmac = req.get('X-Shopify-Hmac-Sha256');
+    const secret = req.query.secret || '';
+    const rawBody = req.rawBody;
 
-        const computedHmac = crypto
-            .createHmac('sha256', secret)
-            .update(rawBody)
-            .digest('base64');
+    if (!rawBody) {
+        return res.status(400).json({ error: 'No raw body captured' });
+    }
 
-        res.status(200).json({
-            receivedHmac: providedHmac,
-            computedHmac: computedHmac,
-            matches: providedHmac === computedHmac,
-            bodySize: rawBody.length,
-            usedSecretLength: secret.length
-        });
+    const computedHmac = crypto
+        .createHmac('sha256', secret)
+        .update(rawBody)
+        .digest('base64');
+
+    res.status(200).json({
+        receivedHmac: providedHmac,
+        computedHmac: computedHmac,
+        matches: providedHmac === computedHmac,
+        bodySize: rawBody.length,
+        usedSecretLength: secret.length
     });
+});
 
-    export default router;
+export default router;
