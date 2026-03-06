@@ -39,6 +39,11 @@ export function AuthProvider({ children }) {
         setUser(null);
     };
 
+    const loginWithToken = (token, userData) => {
+        setToken(token);
+        setUser(userData);
+    };
+
     const updateProfile = async (updates) => {
         const data = await authAPI.updateProfile(updates);
         setUser(data.user);
@@ -46,7 +51,10 @@ export function AuthProvider({ children }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, register, logout, updateProfile, isAuthenticated: !!user }}>
+        <AuthContext.Provider value={{
+            user, loading, login, register, logout, loginWithToken,
+            updateProfile, isAuthenticated: !!user
+        }}>
             {children}
         </AuthContext.Provider>
     );

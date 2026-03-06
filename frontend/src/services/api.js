@@ -60,6 +60,7 @@ export const auth = {
     login: (data) => apiFetch('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
     getProfile: () => apiFetch('/auth/me'),
     updateProfile: (data) => apiFetch('/auth/profile', { method: 'PUT', body: JSON.stringify(data) }),
+    google: () => apiFetch('/auth/google'),
 };
 
 // ============ Brands API ============
