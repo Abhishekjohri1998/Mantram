@@ -108,6 +108,8 @@ router.get('/google', (req, res) => {
         `&scope=${encodeURIComponent(scopes)}` +
         `&prompt=select_account`;
 
+    // Ensure popup can communicate back
+    res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
     res.json({ success: true, authUrl });
 });
 
@@ -116,6 +118,8 @@ router.get('/google', (req, res) => {
  * Handles Google OAuth callback
  */
 router.get('/google/callback', async (req, res) => {
+    // Ensure popup can communicate back
+    res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
     try {
         const { code, error: authError } = req.query;
 

@@ -85,7 +85,12 @@ export default function Auth() {
 
             // 3. Listen for message from popup
             const handleMessage = (event) => {
-                if (event.origin !== window.location.origin) return;
+                // Allow messages from same site (including api subdomain)
+                const isSameSite = event.origin === window.location.origin ||
+                    event.origin.includes('mantram.ai') ||
+                    event.origin.includes('localhost');
+
+                if (!isSameSite) return;
 
                 if (event.data.type === 'GOOGLE_AUTH_SUCCESS') {
                     const { token, user, error: authError } = event.data;
@@ -105,9 +110,13 @@ export default function Auth() {
 
             // 4. Poll for popup closure
             const pollPopup = setInterval(() => {
-                if (popup.closed) {
-                    clearInterval(pollPopup);
-                    setTimeout(() => setIsSocialLoading(false), 1000);
+                try {
+                    if (popup.closed) {
+                        clearInterval(pollPopup);
+                        setTimeout(() => setIsSocialLoading(false), 1000);
+                    }
+                } catch (e) {
+                    // Ignore cross-origin errors during polling
                 }
             }, 500);
 
