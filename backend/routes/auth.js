@@ -179,11 +179,13 @@ router.get('/google/callback', async (req, res) => {
             });
             console.log(`✨ New user signed up via Google: ${user.email}`);
         } else {
-            console.log(`👋 User logged in via Google: ${user.email}`);
+            console.log(`👋 [GOOGLE AUTH] User logged in: ${user.email}`);
         }
 
+        console.log(`✅ [GOOGLE AUTH] Proceeding with User ID: ${user._id} (${user.email})`);
+
         // 4. Generate JWT
-        const token = generateToken(user._id);
+        const token = generateToken(user._id.toString());
         const userData = {
             id: user._id,
             name: user.name,

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { auth as authAPI } from '../services/api.js'
+import { useRef } from 'react'
 
 const PLAN_LABELS = {
     starter: 'Starter — Free',
@@ -18,6 +18,7 @@ export default function Auth() {
     const [isSocialLoading, setIsSocialLoading] = useState(false)
     const [error, setError] = useState('')
     const [form, setForm] = useState({ name: '', email: '', password: '', company: '' })
+    const pollingRef = useRef(null)
 
     const redirect = searchParams.get('redirect') || '/dashboard'
     const plan = searchParams.get('plan')
@@ -26,11 +27,15 @@ export default function Auth() {
     // If already authenticated, redirect immediately
     useEffect(() => {
         if (!authLoading && isAuthenticated) {
+            if (pollingRef.current) clearInterval(pollingRef.current)
             let dest = redirect
             if (scanUrl) {
                 dest = `/onboarding?scanUrl=${encodeURIComponent(scanUrl)}`
             }
             navigate(dest, { replace: true })
+        }
+        return () => {
+            if (pollingRef.current) clearInterval(pollingRef.current)
         }
     }, [isAuthenticated, authLoading, navigate, redirect, scanUrl])
 
@@ -99,8 +104,8 @@ export default function Auth() {
                         setError(authError);
                         setIsSocialLoading(false);
                     } else if (token && user) {
+                        if (pollingRef.current) clearInterval(pollingRef.current);
                         loginWithToken(token, user);
-                        // Navigation is handled by useEffect on isAuthenticated
                     }
                     window.removeEventListener('message', handleMessage);
                 }
@@ -109,14 +114,14 @@ export default function Auth() {
             window.addEventListener('message', handleMessage);
 
             // 4. Poll for popup closure
-            const pollPopup = setInterval(() => {
+            pollingRef.current = setInterval(() => {
                 try {
                     if (popup.closed) {
-                        clearInterval(pollPopup);
+                        clearInterval(pollingRef.current);
                         setTimeout(() => setIsSocialLoading(false), 1000);
                     }
                 } catch (e) {
-                    // Ignore cross-origin errors during polling
+                    // cross-origin access to .closed is sometimes blocked by COOP
                 }
             }, 500);
 

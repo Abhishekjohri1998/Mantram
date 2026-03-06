@@ -13,12 +13,17 @@ export const protect = async (req, res, next) => {
     }
     try {
         const decoded = jwt.verify(token, config.jwtSecret);
-        req.user = await User.findById(decoded.id);
-        if (!req.user) {
+        const user = await User.findById(decoded.id);
+
+        if (!user) {
+            console.error(`❌ [AUTH] User not found in DB for ID: ${decoded.id} (Token valid)`);
             return res.status(401).json({ success: false, error: 'User not found' });
         }
+
+        req.user = user;
         next();
     } catch (error) {
+        console.error(`❌ [AUTH] Token verification failed: ${error.message}`);
         return res.status(401).json({ success: false, error: 'Token invalid' });
     }
 };
