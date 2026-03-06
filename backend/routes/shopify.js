@@ -4,6 +4,7 @@
  */
 
 import { Router } from 'express';
+import crypto from 'crypto';
 import { protect } from '../middleware/auth.js';
 import Integration from '../models/Integration.js';
 import Product from '../models/Product.js';
