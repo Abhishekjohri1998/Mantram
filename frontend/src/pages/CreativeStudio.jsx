@@ -5,6 +5,7 @@ import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
 import { creatives as creativesAPI, agents as agentsAPI, products as productsAPI, brands as brandsAPI } from '../services/api'
 import { useBrand } from '../context/BrandContext'
 import VoiceInput from '../components/VoiceInput'
+import PublishModal from '../components/PublishModal'
 
 export default function CreativeStudio() {
     const navigate = useNavigate()
@@ -24,6 +25,7 @@ export default function CreativeStudio() {
     const [textOverlay, setTextOverlay] = useState('')
     const [fromContent, setFromContent] = useState(false)
     const [aspectRatio, setAspectRatio] = useState('1:1')
+    const [showPublish, setShowPublish] = useState(false)
 
     // Studio mode: 'design', 'photoshoot', 'templates', or 'imagebank'
     const [studioMode, setStudioMode] = useState('design')
@@ -1349,7 +1351,18 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             className="btn-glass py-2.5 px-6 rounded-xl text-sm border border-white/[0.1] text-white cursor-pointer hover:bg-white/[0.06]">
                                             <span className="material-symbols-outlined text-sm">download</span> Export
                                         </button>
+                                        <button onClick={() => setShowPublish(true)}
+                                            className="btn-glass py-2.5 px-6 rounded-xl text-sm font-bold bg-[#1877F2]/10 text-[#1877F2] hover:bg-[#1877F2]/20 border border-[#1877F2]/30 cursor-pointer transition-all">
+                                            <span className="material-symbols-outlined text-sm">share</span> Publish
+                                        </button>
                                     </div>
+
+                                    <PublishModal
+                                        isOpen={showPublish}
+                                        onClose={() => setShowPublish(false)}
+                                        defaultText={prompt}
+                                        defaultImage={result?.imageUrl}
+                                    />
 
                                     {/* ── Open Canvas Editor Button ── */}
                                     {result?.imageUrl && (

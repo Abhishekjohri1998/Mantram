@@ -249,10 +249,11 @@ export const fidato = {
 
 // ============ Social Media API ============
 export const social = {
-    connect: (platform, brandId) => apiFetch(`/social/connect/${platform}`, { method: 'POST', body: JSON.stringify({ brandId }) }),
-    status: () => apiFetch('/social/status'),
+    accounts: () => apiFetch('/social/accounts'),
+    connect: (platform) => apiFetch(`/social/auth/${platform}`),
+    disconnect: (accountId) => apiFetch(`/social/accounts/${accountId}`, { method: 'DELETE' }),
     publish: (data) => apiFetch('/social/publish', { method: 'POST', body: JSON.stringify(data) }),
-    disconnect: (platform) => apiFetch(`/social/disconnect/${platform}`, { method: 'DELETE' }),
+    status: () => apiFetch('/social/status'), // Keep this if used somewhere else natively
 };
 
 // ============ Admin API ============

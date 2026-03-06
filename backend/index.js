@@ -116,6 +116,7 @@ app.use('/api/dashboard-summary', dashboardSummaryRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/fidato', fidatoRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/social', socialRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

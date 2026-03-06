@@ -35,9 +35,28 @@ export default function Integrations() {
 
     const loadStatus = async () => {
         try {
-            const data = await social.status()
-            setPlatformStatus(data.integrations || {})
-        } catch { /* ignore if not logged in */ }
+            // Load custom status map for Shopify
+            const shopifyData = await shopifyAPI.status();
+
+            // Load actual connected social accounts from database
+            const socialData = await social.accounts();
+            const accounts = socialData.data || [];
+
+            // Map the accounts array to the platformStatus object format
+            const mappedStatus = {
+                shopify: shopifyData.status || { connected: false }
+            };
+
+            accounts.forEach(acc => {
+                // If a platform has multiple accounts (e.g. 2 FB pages), we store it as an array to display
+                if (!mappedStatus[acc.platform]) {
+                    mappedStatus[acc.platform] = { connected: true, accounts: [] };
+                }
+                mappedStatus[acc.platform].accounts.push(acc);
+            });
+
+            setPlatformStatus(mappedStatus);
+        } catch (e) { console.error('Error loading integration status:', e); }
     }
 
     const loadProducts = async () => {
@@ -65,11 +84,11 @@ export default function Integrations() {
     }
 
     // ── Disconnect Platform ──
-    const disconnectPlatform = async (platform) => {
-        if (!confirm(`Disconnect ${platform}?`)) return
+    const disconnectPlatform = async (accountId) => {
+        if (!confirm(`Disconnect this account?`)) return
         try {
-            await social.disconnect(platform)
-            setPlatformStatus(s => ({ ...s, [platform]: { ...s[platform], connected: false, status: 'disconnected' } }))
+            await social.disconnect(accountId)
+            loadStatus()
         } catch (err) {
             alert(err.message)
         }
@@ -256,17 +275,31 @@ export default function Integrations() {
                                                 <StatusBadge status={status.status || 'disconnected'} />
                                             </div>
 
-                                            {status.connected ? (
-                                                <div className="flex items-center justify-between">
-                                                    <div className="text-sm text-slate-400">
-                                                        <span className="text-white font-medium">{status.displayName}</span>
-                                                        {status.publishCount > 0 && (
-                                                            <span className="ml-2">• {status.publishCount} posts</span>
-                                                        )}
-                                                    </div>
-                                                    <button onClick={() => disconnectPlatform(platform.id)}
-                                                        className="text-sm text-red-400 hover:text-red-300 px-2 py-1 rounded-lg hover:bg-red-500/10">
-                                                        Disconnect
+                                            {status.connected && status.accounts ? (
+                                                <div className="space-y-2">
+                                                    {status.accounts.map(acc => (
+                                                        <div key={acc._id} className="flex items-center justify-between p-2 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                                                            <div className="flex items-center gap-3 overflow-hidden">
+                                                                {acc.avatar ? (
+                                                                    <img src={acc.avatar} alt="avatar" className="w-8 h-8 rounded-full flex-shrink-0" />
+                                                                ) : (
+                                                                    <div className="w-8 h-8 rounded-full bg-white/[0.1] flexitems-center justify-center flex-shrink-0">
+                                                                        <span className="material-symbols-outlined text-sm text-slate-400">person</span>
+                                                                    </div>
+                                                                )}
+                                                                <div className="text-sm truncate pr-2">
+                                                                    <span className="text-white font-medium truncate block">{acc.accountName}</span>
+                                                                </div>
+                                                            </div>
+                                                            <button onClick={() => disconnectPlatform(acc._id)}
+                                                                className="text-xs font-medium text-red-400 hover:text-red-300 px-2 py-1 rounded-lg hover:bg-red-500/10 transition-colors flex-shrink-0">
+                                                                Disconnect
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                    <button onClick={() => connectPlatform(platform.id)}
+                                                        className="w-full mt-2 py-2 rounded-xl text-xs font-medium text-slate-300 bg-white/[0.05] hover:bg-white/[0.1] transition-all">
+                                                        + Connect another
                                                     </button>
                                                 </div>
                                             ) : (

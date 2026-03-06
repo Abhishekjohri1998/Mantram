@@ -6,6 +6,7 @@ import { useBrand } from '../context/BrandContext'
 import { stripMarkdown } from '../utils/stripMarkdown'
 import VoiceInput from '../components/VoiceInput'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
+import PublishModal from '../components/PublishModal'
 
 // ============================================================================
 // DATA: Goals, sub-types, channels, tones
@@ -1273,6 +1274,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
     const [editContent, setEditContent] = useState(result?.content || '')
     const [refineInput, setRefineInput] = useState('')
     const [refining, setRefining] = useState(false)
+    const [showPublish, setShowPublish] = useState(false)
     const refineRef = useRef(null)
 
     // Keep editContent in sync when result changes
@@ -1480,7 +1482,17 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold glass-panel text-primary hover:bg-primary/10 transition-all cursor-pointer border border-primary/20">
                     <span className="material-symbols-outlined text-lg">image</span> Create Visual
                 </button>
+                <button onClick={() => setShowPublish(true)}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-[#1877F2]/10 text-[#1877F2] hover:bg-[#1877F2]/20 transition-all cursor-pointer border border-[#1877F2]/30">
+                    <span className="material-symbols-outlined text-lg">share</span> Publish
+                </button>
             </div>
+
+            <PublishModal
+                isOpen={showPublish}
+                onClose={() => setShowPublish(false)}
+                defaultText={result?.content || ''}
+            />
 
             <div className="flex gap-2">
                 <button onClick={() => onFeedback('thumbs', { thumbs: 'up' })}
