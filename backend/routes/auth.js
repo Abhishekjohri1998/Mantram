@@ -202,13 +202,15 @@ router.get('/google/callback', async (req, res) => {
         }
 
         if (!userId) {
-            console.error('❌ [GOOGLE AUTH] User identification failed:', {
-                user_exists: !!user,
-                is_array: Array.isArray(user),
-                keys: user ? Object.keys(user) : [],
-                email: profileData.email
-            });
-            throw new Error(`User identification failed after login (Email: ${profileData.email})`);
+            let safeUserDump = "null";
+            try {
+                let obj = user && user._doc ? user._doc : (user || {});
+                safeUserDump = typeof user + " | keys:" + Object.keys(obj).join(",") + " | json:" + JSON.stringify(obj).substring(0, 200);
+            } catch (e) {
+                safeUserDump = String(user);
+            }
+            console.error('❌ [GOOGLE AUTH] User identification failed:', safeUserDump);
+            throw new Error(`NO_ID_FOUND | Email: ${profileData.email} | Dump: ${safeUserDump}`);
         }
 
         const stringId = userId.toString();
