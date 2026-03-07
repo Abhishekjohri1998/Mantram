@@ -267,11 +267,15 @@ export default function Landing() {
                         </div>
                         <span className="text-white font-bold">Mantram AI</span>
                     </div>
-                    <div className="flex gap-8 text-slate-500 text-sm">
-                        <Link to="/privacy-policy" className="hover:text-primary transition-colors cursor-pointer">Privacy</Link>
-                        <Link to="/terms" className="hover:text-primary transition-colors cursor-pointer">Terms</Link>
-                        <a className="hover:text-primary transition-colors cursor-pointer">Security</a>
-                        <a className="hover:text-primary transition-colors cursor-pointer">API</a>
+                    <div className="flex flex-col md:flex-row gap-8 items-center">
+                        <div className="text-slate-500 text-xs max-w-xs text-center md:text-left">
+                            We value your privacy. We only request data necessary to power your brand intelligence and content creation.
+                        </div>
+                        <div className="flex gap-8 text-slate-500 text-sm">
+                            <Link to="/privacy-policy" className="hover:text-primary transition-colors cursor-pointer">Privacy Policy</Link>
+                            <Link to="/terms" className="hover:text-primary transition-colors cursor-pointer">Terms of Service</Link>
+                            <a className="hover:text-primary transition-colors cursor-pointer">Security</a>
+                        </div>
                     </div>
                     <div className="flex gap-4">
                         <a className="size-10 rounded-full glass-panel flex items-center justify-center text-slate-400 hover:text-white transition-all cursor-pointer">
