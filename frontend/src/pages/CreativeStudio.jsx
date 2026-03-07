@@ -17,6 +17,7 @@ export default function CreativeStudio() {
     const [showProductPicker, setShowProductPicker] = useState(false)
     const [productsList, setProductsList] = useState([])
     const [generating, setGenerating] = useState(false)
+    const [enhancing, setEnhancing] = useState(false)
     const [result, setResult] = useState(null)
     const [error, setError] = useState('')
     const [feedbackState, setFeedbackState] = useState(null)  // 'liked' | 'disliked' | 'accepted'
@@ -27,8 +28,8 @@ export default function CreativeStudio() {
     const [aspectRatio, setAspectRatio] = useState('1:1')
     const [showPublish, setShowPublish] = useState(false)
 
-    // Studio mode: 'design', 'photoshoot', 'templates', or 'imagebank'
-    const [studioMode, setStudioMode] = useState('design')
+    // Studio mode: 'create' (unified), 'photoshoot', 'templates', or 'imagebank'
+    const [studioMode, setStudioMode] = useState('create')
 
     // AI Photoshoot state
     const [productImage, setProductImage] = useState(null)
@@ -65,17 +66,48 @@ export default function CreativeStudio() {
     // Photoshoot image passed to design mode
     const [designBaseImage, setDesignBaseImage] = useState(null)
 
-    // ── NEW: Reference Images (style / character / upload) ──
-    const [referenceImages, setReferenceImages] = useState({ style: null, character: null, upload: null })
+    // ── NEW: Reference Images (style / upload) + multi-character ──
+    const [referenceImages, setReferenceImages] = useState({ style: null, upload: null })
+    const [characters, setCharacters] = useState([]) // [{ name: 'Character 1', image: 'data:...' }]
 
     // ── NEW: Logo Overlay ──
     const [addLogo, setAddLogo] = useState(false)
     const [logoPosition, setLogoPosition] = useState('bottom-right')
     const [logoSize, setLogoSize] = useState('medium')
 
-    // ── NEW: Quick-start / guided mode ──
+    // ── Unified landing state ──
+    const [showAdvanced, setShowAdvanced] = useState(false)
+    const [activeQuickTemplate, setActiveQuickTemplate] = useState(null) // inline template
     const [showQuickStart, setShowQuickStart] = useState(true)
     const [guidedForm, setGuidedForm] = useState(null) // which template is open
+    const [refPickerSlot, setRefPickerSlot] = useState(null) // which ref slot is being picked: 'style'|'character-N'|'upload'|null
+    const [refPickerTab, setRefPickerTab] = useState('upload') // 'upload'|'bank'|'brand'
+    const [brandImages, setBrandImages] = useState([]) // brand images from onboarding
+    const [showCharTags, setShowCharTags] = useState(false) // @character tag autocomplete
+    const [charTagFilter, setCharTagFilter] = useState('') // filter for @character autocomplete
+    const promptTextareaRef = useRef(null) // ref for prompt textarea
+    const [zoomImage, setZoomImage] = useState(null) // fullscreen zoom lightbox
+
+    // Load brand images from DNA (with fallback fetch by ID)
+    useEffect(() => {
+        if (!activeBrand?._id) { setBrandImages([]); return }
+        // Try from context first
+        if (activeBrand.dna?.brandImages?.length > 0) {
+            setBrandImages(activeBrand.dna.brandImages)
+            return
+        }
+        // Fallback: fetch full brand by ID (context may strip heavy fields)
+        ; (async () => {
+            try {
+                const data = await brandsAPI.get(activeBrand._id)
+                if (data?.brand?.dna?.brandImages?.length > 0) {
+                    setBrandImages(data.brand.dna.brandImages)
+                } else {
+                    console.log('🖼️ No brand images for', activeBrand.name)
+                }
+            } catch (e) { console.warn('🖼️ Could not fetch brand images:', e.message) }
+        })()
+    }, [activeBrand?._id])
 
     // ── Brand Templates (interactive formula-based) ──
     const [activeTemplate, setActiveTemplate] = useState(null)
@@ -407,12 +439,12 @@ export default function CreativeStudio() {
         }
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Load image bank when switching to that tab
+    // Load image bank on mount + when brand changes (needed for reference picker's Library tab)
     useEffect(() => {
-        if (studioMode === 'imagebank') {
+        if (activeBrand?._id) {
             loadImageBank()
         }
-    }, [studioMode, activeBrand?._id])
+    }, [activeBrand?._id])
 
     const loadImageBank = async () => {
         console.log('📸 loadImageBank called, activeBrand:', activeBrand?._id, activeBrand?.name)
@@ -461,12 +493,12 @@ export default function CreativeStudio() {
     }
 
     const creativeTypes = [
-        { id: 'instagram-post', icon: 'photo_camera', label: 'Instagram Post', size: '1080×1080' },
-        { id: 'instagram-story', icon: 'smartphone', label: 'Story', size: '1080×1920' },
-        { id: 'facebook-ad', icon: 'ads_click', label: 'Facebook Ad', size: '1200×628' },
-        { id: 'linkedin-post', icon: 'work', label: 'LinkedIn Post', size: '1200×627' },
-        { id: 'youtube-thumb', icon: 'smart_display', label: 'YouTube Thumb', size: '1280×720' },
-        { id: 'banner', icon: 'web', label: 'Banner', size: '1920×600' },
+        { id: 'instagram-post', icon: 'photo_camera', label: 'Instagram Post', size: '1080×1080', aspectRatio: '1:1' },
+        { id: 'instagram-story', icon: 'smartphone', label: 'Story', size: '1080×1920', aspectRatio: '9:16' },
+        { id: 'facebook-ad', icon: 'ads_click', label: 'Facebook Ad', size: '1200×628', aspectRatio: '16:9' },
+        { id: 'linkedin-post', icon: 'work', label: 'LinkedIn Post', size: '1200×627', aspectRatio: '16:9' },
+        { id: 'youtube-thumb', icon: 'smart_display', label: 'YouTube Thumb', size: '1280×720', aspectRatio: '16:9' },
+        { id: 'banner', icon: 'web', label: 'Banner', size: '1920×600', aspectRatio: '16:9' },
     ]
 
     const styles = [
@@ -526,6 +558,34 @@ export default function CreativeStudio() {
         })
     }
 
+    const handleEnhancePrompt = async () => {
+        if (!prompt.trim() || !activeBrand || enhancing) return
+        setEnhancing(true)
+        try {
+            // Build description of reference images for the enhancer
+            const refDescs = []
+            if (referenceImages.style) refDescs.push('A style reference image is attached — match its visual aesthetic, color palette, and mood')
+            if (characters.length > 0) refDescs.push(`${characters.length} character reference image(s) are attached: ${characters.map(c => c.name).join(', ')} — include these characters in the design`)
+            if (referenceImages.upload) refDescs.push('A general reference image is attached — use it as contextual inspiration')
+
+            const data = await creativesAPI.enhancePrompt({
+                brandId: activeBrand._id,
+                prompt: prompt.trim(),
+                style,
+                format: selectedType,
+                aspectRatio,
+                referenceDescriptions: refDescs.length > 0 ? refDescs.join('. ') : '',
+            })
+            if (data.enhancedPrompt) {
+                setPrompt(data.enhancedPrompt)
+            }
+        } catch (err) {
+            console.error('Enhance prompt failed:', err)
+        } finally {
+            setEnhancing(false)
+        }
+    }
+
     const handleGenerate = async () => {
         if (!prompt.trim() || !activeBrand) return
         setGenerating(true)
@@ -541,6 +601,7 @@ export default function CreativeStudio() {
                 style,
                 textOverlay,
                 referenceImages,
+                characters, // multi-character array
                 addLogo,
                 logoPosition,
                 logoSize,
@@ -563,6 +624,20 @@ export default function CreativeStudio() {
                     options.productImageUrl = selectedProduct.images[0].url
                 }
             }
+
+            console.log('🎨 Creative Studio — generating with:', {
+                type: selectedType,
+                aspectRatio,
+                style,
+                hasStyleRef: !!referenceImages.style,
+                charactersCount: characters.length,
+                characterNames: characters.map(c => c.name),
+                hasUploadRef: !!referenceImages.upload,
+                hasBaseImage: !!designBaseImage,
+                hasProductImage: !!options.productImageUrl,
+                textOverlay: textOverlay || '(none)',
+                addLogo,
+            })
 
             const data = await creativesAPI.generate({
                 brandId: activeBrand._id,
@@ -1047,497 +1122,753 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
     const selectedTypeInfo = creativeTypes.find(t => t.id === selectedType)
 
+    // ── Smart format detection from prompt ──
+    const detectFormatFromPrompt = useCallback((text) => {
+        const lower = text.toLowerCase()
+        if (/instagram\s*(post|feed|grid)/i.test(lower)) return 'instagram-post'
+        if (/story|stories|reel/i.test(lower)) return 'instagram-story'
+        if (/facebook|fb\s*ad/i.test(lower)) return 'facebook-ad'
+        if (/linkedin/i.test(lower)) return 'linkedin-post'
+        if (/youtube|thumbnail|thumb/i.test(lower)) return 'youtube-thumb'
+        if (/banner|hero|header|website/i.test(lower)) return 'banner'
+        return null // keep current selection
+    }, [])
+
+    // Auto-detect format when prompt changes
+    useEffect(() => {
+        if (prompt.trim()) {
+            const detected = detectFormatFromPrompt(prompt)
+            if (detected) setSelectedType(detected)
+        }
+    }, [prompt, detectFormatFromPrompt])
+
+    // Auto-lock aspect ratio when format changes
+    useEffect(() => {
+        const typeInfo = creativeTypes.find(t => t.id === selectedType)
+        if (typeInfo?.aspectRatio) {
+            setAspectRatio(typeInfo.aspectRatio)
+        }
+    }, [selectedType])
+
     return (
         <DashboardLayout>
             <div className="flex items-end justify-between mb-6">
                 <div>
                     <h2 className="text-3xl font-extrabold tracking-tight mb-1">Creative <span className="text-primary">Studio</span></h2>
-                    <p className="text-slate-400 text-sm">AI visual content generation, aligned with your brand identity.</p>
+                    <p className="text-slate-400 text-sm">Describe what you want — AI creates on-brand visuals instantly.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    {/* Image Bank badge */}
+                    <button onClick={() => { setStudioMode('imagebank'); loadImageBank() }}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${studioMode === 'imagebank' ? 'bg-primary/15 text-primary border border-primary/30' : 'glass-panel text-slate-400 hover:text-white'}`}>
+                        <span className="material-symbols-outlined text-sm">photo_library</span>
+                        Image Bank
+                        {bankTotal > 0 && <span className="bg-primary/20 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full">{bankTotal}</span>}
+                    </button>
+                    {/* AI Canvas */}
+                    <button onClick={() => navigate('/creative-studio/editor')}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold glass-panel text-slate-400 hover:text-white transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-sm">edit</span>
+                        AI Canvas
+                    </button>
                 </div>
             </div>
 
-            {/* Studio Mode Toggle */}
-            <div className="flex gap-2 mb-6">
-                {[
-                    { id: 'design', icon: 'palette', label: 'Design Studio', desc: 'Generate creatives from text' },
-                    { id: 'templates', icon: 'dashboard_customize', label: 'Brand Templates', desc: 'Quick on-brand designs' },
-                    { id: 'photoshoot', icon: 'photo_camera', label: 'AI Photoshoot', desc: 'Style product photos with AI' },
-                    { id: 'aicanvas', icon: 'edit', label: 'AI Canvas', desc: 'Edit images with AI tools' },
-                    { id: 'imagebank', icon: 'photo_library', label: 'Image Bank', desc: 'Browse saved images' },
-                ].map(m => (
-                    <button key={m.id} onClick={() => {
-                        if (m.id === 'aicanvas') {
-                            navigate('/creative-studio/editor')
-                        } else {
-                            setStudioMode(m.id)
-                        }
-                    }}
-                        className={`flex-1 flex items-center gap-3 p-4 rounded-2xl transition-all cursor-pointer ${studioMode === m.id
-                            ? 'bg-primary/15 border-2 border-primary/40 text-white'
-                            : 'glass-panel text-slate-400 hover:text-white hover:bg-white/[0.04]'
-                            }`}>
-                        <span className={`material-symbols-outlined text-2xl ${studioMode === m.id ? 'text-primary' : 'text-slate-500'}`}>{m.icon}</span>
-                        <div>
-                            <p className="text-sm font-bold">{m.label}</p>
-                            <p className="text-sm text-slate-500">{m.desc}</p>
-                        </div>
-                        {m.id === 'imagebank' && bankTotal > 0 && (
-                            <span className="ml-auto bg-primary/20 text-primary text-xs font-bold px-2 py-0.5 rounded-full">{bankTotal}</span>
-                        )}
-                    </button>
-                ))}
-            </div>
+            {/* ====================== UNIFIED CREATE MODE ====================== */}
+            {studioMode === 'create' && (
+                <div className="max-w-4xl mx-auto">
 
-            {studioMode === 'design' && (
-                <div className="grid grid-cols-12 gap-6">
-                    {/* Left — Controls */}
-                    <div className="col-span-12 lg:col-span-4 space-y-4">
-                        {/* Creative Type */}
-                        <div className="glass-panel rounded-2xl p-5">
-                            <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
-                                <span className="material-symbols-outlined text-primary text-lg">category</span>
-                                Creative Type
-                            </h3>
-                            <div className="grid grid-cols-2 sm:grid-cols-2 gap-2">
-                                {creativeTypes.map(ct => (
-                                    <button key={ct.id} onClick={() => setSelectedType(ct.id)}
-                                        className={`p-3 rounded-xl text-left transition-all cursor-pointer ${selectedType === ct.id
-                                            ? 'bg-primary/20 border border-primary/30 text-white'
-                                            : 'bg-white/[0.03] border border-white/[0.06] text-slate-400 hover:bg-white/[0.05]'
-                                            }`}>
-                                        <span className="material-symbols-outlined text-lg block mb-1">{ct.icon}</span>
-                                        <p className="text-xs font-bold">{ct.label}</p>
-                                        <p className="text-sm text-slate-500">{ct.size}</p>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* ── Reference Images (Style / Character / Upload) ── */}
-                        <div className="glass-panel rounded-2xl p-5">
-                            <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
-                                <span className="material-symbols-outlined text-primary text-lg">image_search</span>
-                                Reference Images
-                                <span className="text-xs text-slate-600 bg-white/[0.04] px-1.5 py-0.5 rounded ml-auto">Optional</span>
-                            </h3>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                {[
-                                    { key: 'style', icon: 'brush', label: 'Style', hint: 'Match this look' },
-                                    { key: 'character', icon: 'face', label: 'Character', hint: 'Include this person' },
-                                    { key: 'upload', icon: 'add_photo_alternate', label: 'Reference', hint: 'Use as context' },
-                                ].map(ref => (
-                                    <div key={ref.key}>
-                                        {referenceImages[ref.key] ? (
-                                            <div className="relative rounded-xl overflow-hidden aspect-square border border-primary/30">
-                                                <img src={referenceImages[ref.key]} alt={ref.label} className="w-full h-full object-cover" />
-                                                <button onClick={() => setReferenceImages(prev => ({ ...prev, [ref.key]: null }))}
-                                                    className="absolute top-1 right-1 p-0.5 rounded-full bg-black/70 text-white hover:bg-rose-500 cursor-pointer">
-                                                    <span className="material-symbols-outlined text-xs">close</span>
-                                                </button>
-                                                <span className="absolute bottom-0 inset-x-0 text-center text-[8px] font-bold bg-black/70 text-white py-0.5">{ref.label}</span>
-                                            </div>
-                                        ) : (
-                                            <label className="flex flex-col items-center justify-center aspect-square rounded-xl border-2 border-dashed border-white/[0.08] hover:border-primary/40 cursor-pointer transition-colors bg-white/[0.02] group">
-                                                <span className="material-symbols-outlined text-lg text-slate-600 group-hover:text-primary mb-0.5">{ref.icon}</span>
-                                                <span className="text-sm text-slate-500 font-medium">{ref.label}</span>
-                                                <span className="text-[8px] text-slate-600">{ref.hint}</span>
-                                                <input type="file" className="hidden" accept="image/*" onChange={e => {
-                                                    const file = e.target.files?.[0]
-                                                    if (file) {
-                                                        const reader = new FileReader()
-                                                        reader.onload = ev => setReferenceImages(prev => ({ ...prev, [ref.key]: ev.target.result }))
-                                                        reader.readAsDataURL(file)
-                                                    }
-                                                }} />
-                                            </label>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* ── Style & Brand Colors (combined) ── */}
-                        <div className="glass-panel rounded-2xl p-5">
-                            <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
-                                <span className="material-symbols-outlined text-primary text-lg">style</span>
-                                Style
-                            </h3>
-                            <div className="flex flex-wrap gap-2">
-                                {styles.map(s => (
-                                    <button key={s.id} onClick={() => setStyle(s.id)}
-                                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs transition-all cursor-pointer ${style === s.id
-                                            ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                                            : 'bg-white/[0.04] text-slate-400 hover:text-white hover:bg-white/[0.06]'
-                                            }`}>
-                                        <span className="material-symbols-outlined text-sm">{s.icon}</span>
-                                        {s.label}
-                                    </button>
-                                ))}
-                            </div>
-                            {activeBrand?.dna?.colors?.length > 0 && (
-                                <div className="mt-3 pt-3 border-t border-white/[0.05]">
-                                    <p className="text-sm text-slate-500 mb-2">Brand Colors (auto-applied)</p>
-                                    <div className="flex gap-1.5">
-                                        {activeBrand.dna.colors.map((c, i) => (
-                                            <div key={i} className="w-7 h-7 rounded-lg border border-white/[0.1]" style={{ background: c.hex }} title={c.hex} />
-                                        ))}
-                                    </div>
+                    {/* ── Hero Prompt Bar ── */}
+                    <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'linear-gradient(135deg, rgba(43,75,238,0.08), rgba(139,92,246,0.05))' }}>
+                        {/* Content-linked banner */}
+                        {fromContent && (
+                            <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/20 mb-4">
+                                <span className="material-symbols-outlined text-primary">link</span>
+                                <div className="flex-1">
+                                    <p className="text-sm font-bold text-white">Linked to Content Studio</p>
+                                    <p className="text-sm text-slate-400">Image will match your content in {activeBrand?.name}'s brand style</p>
                                 </div>
+                                <button onClick={() => setFromContent(false)} className="text-slate-500 hover:text-white cursor-pointer">
+                                    <span className="material-symbols-outlined text-sm">close</span>
+                                </button>
+                            </div>
+                        )}
+                        {designBaseImage && (
+                            <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-4">
+                                <img src={designBaseImage} alt="Base" className="w-10 h-10 rounded-lg object-cover" />
+                                <div className="flex-1">
+                                    <p className="text-sm font-bold text-white">📸 Using photoshoot image as base</p>
+                                    <p className="text-sm text-slate-400">Describe how to adapt this for your platform</p>
+                                </div>
+                                <button onClick={() => setDesignBaseImage(null)} className="text-slate-500 hover:text-white cursor-pointer">
+                                    <span className="material-symbols-outlined text-sm">close</span>
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Product Selection Banner */}
+                        {selectedProduct && (
+                            <div className="flex items-center gap-3 mb-4 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
+                                {selectedProduct.images?.[0]?.url && (
+                                    <img src={selectedProduct.images[0].url} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-bold text-white truncate">{selectedProduct.title}</p>
+                                    <p className="text-sm text-cyan-400">Product selected — will be featured in creative</p>
+                                </div>
+                                <button onClick={() => setSelectedProduct(null)} className="text-slate-500 hover:text-white cursor-pointer">
+                                    <span className="material-symbols-outlined text-sm">close</span>
+                                </button>
+                            </div>
+                        )}
+
+                        {/* ── Guided References Bar (ABOVE prompt for guided flow) ── */}
+                        <div className="mb-4 p-3 rounded-2xl bg-gradient-to-r from-violet-500/[0.04] to-cyan-500/[0.04] border border-white/[0.06]">
+                            <div className="flex items-center justify-between mb-2.5">
+                                <p className="text-xs font-extrabold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-sm text-violet-400">collections</span>
+                                    References
+                                </p>
+                                <span className="text-[9px] text-slate-600">Add images before writing your prompt</span>
+                            </div>
+                            <div className="flex gap-2 items-start">
+                                {/* Style Ref */}
+                                {referenceImages.style ? (
+                                    <div className="relative flex-shrink-0">
+                                        <div className="w-14 h-14 rounded-xl overflow-hidden border-2 border-amber-500/40">
+                                            <img src={referenceImages.style} alt="Style" className="w-full h-full object-cover" />
+                                        </div>
+                                        <button onClick={() => setReferenceImages(prev => ({ ...prev, style: null }))}
+                                            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center cursor-pointer">×</button>
+                                        <span className="block text-[8px] text-amber-400 text-center mt-0.5 font-bold">Style</span>
+                                    </div>
+                                ) : (
+                                    <button onClick={() => { setRefPickerSlot('style'); setRefPickerTab('upload') }}
+                                        className="flex-shrink-0 w-14 h-14 rounded-xl border-2 border-dashed border-amber-500/20 hover:border-amber-500/40 flex flex-col items-center justify-center cursor-pointer transition-colors bg-amber-500/[0.03] group">
+                                        <span className="material-symbols-outlined text-base text-slate-600 group-hover:text-amber-400">brush</span>
+                                        <span className="text-[8px] text-slate-600 group-hover:text-amber-400 font-bold">Style</span>
+                                    </button>
+                                )}
+
+                                {/* Characters — dynamic */}
+                                <div className="flex gap-1.5 items-start flex-wrap flex-1 min-w-0">
+                                    {characters.map((char, idx) => (
+                                        <div key={idx} className="relative flex-shrink-0 group">
+                                            <div className="w-14 h-14 rounded-xl overflow-hidden border-2 border-violet-500/40">
+                                                <img src={char.image} alt={char.name} className="w-full h-full object-cover" />
+                                            </div>
+                                            <button onClick={() => setCharacters(prev => prev.filter((_, i) => i !== idx))}
+                                                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">×</button>
+                                            <input
+                                                value={char.name}
+                                                onChange={e => setCharacters(prev => prev.map((c, i) => i === idx ? { ...c, name: e.target.value } : c))}
+                                                className="w-14 mt-0.5 text-[8px] text-center bg-transparent text-violet-300 outline-none font-bold truncate"
+                                                placeholder="Name"
+                                            />
+                                        </div>
+                                    ))}
+                                    {characters.length < 5 && (
+                                        <button onClick={() => { setRefPickerSlot(`character-${characters.length}`); setRefPickerTab('upload') }}
+                                            className="flex-shrink-0 w-14 h-14 rounded-xl border-2 border-dashed border-violet-500/20 hover:border-violet-500/40 flex flex-col items-center justify-center cursor-pointer transition-colors bg-violet-500/[0.03] group">
+                                            <span className="material-symbols-outlined text-base text-slate-600 group-hover:text-violet-400">person_add</span>
+                                            <span className="text-[8px] text-slate-600 group-hover:text-violet-400 font-bold">Character</span>
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Upload Ref */}
+                                {referenceImages.upload ? (
+                                    <div className="relative flex-shrink-0">
+                                        <div className="w-14 h-14 rounded-xl overflow-hidden border-2 border-cyan-500/40">
+                                            <img src={referenceImages.upload} alt="Ref" className="w-full h-full object-cover" />
+                                        </div>
+                                        <button onClick={() => setReferenceImages(prev => ({ ...prev, upload: null }))}
+                                            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center cursor-pointer">×</button>
+                                        <span className="block text-[8px] text-cyan-400 text-center mt-0.5 font-bold">Upload</span>
+                                    </div>
+                                ) : (
+                                    <button onClick={() => { setRefPickerSlot('upload'); setRefPickerTab('upload') }}
+                                        className="flex-shrink-0 w-14 h-14 rounded-xl border-2 border-dashed border-cyan-500/20 hover:border-cyan-500/40 flex flex-col items-center justify-center cursor-pointer transition-colors bg-cyan-500/[0.03] group">
+                                        <span className="material-symbols-outlined text-base text-slate-600 group-hover:text-cyan-400">add_photo_alternate</span>
+                                        <span className="text-[8px] text-slate-600 group-hover:text-cyan-400 font-bold">Upload</span>
+                                    </button>
+                                )}
+                            </div>
+                            {characters.length > 0 && (
+                                <p className="text-[9px] text-violet-400/60 mt-1.5 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[10px]">info</span>
+                                    Type <span className="font-bold text-violet-400">@name</span> in prompt to tag characters
+                                </p>
                             )}
                         </div>
 
-                        {/* ── Aspect Ratio ── */}
-                        <div className="glass-panel rounded-2xl p-5">
-                            <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
-                                <span className="material-symbols-outlined text-primary text-lg">aspect_ratio</span>
-                                Aspect Ratio
-                            </h3>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                {ASPECT_RATIOS.map(ar => (
-                                    <button key={ar.ratio} onClick={() => setAspectRatio(ar.ratio)}
-                                        className={`flex flex-col items-center gap-1 p-2 rounded-xl text-xs transition-all cursor-pointer ${aspectRatio === ar.ratio
-                                            ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                                            : 'bg-white/[0.04] text-slate-500 hover:text-white hover:bg-white/[0.06]'}`}>
-                                        <span className="text-sm">{ar.icon}</span>
-                                        <span className="font-bold">{ar.ratio}</span>
-                                        <span className="text-[8px] opacity-70">{ar.label}</span>
-                                    </button>
-                                ))}
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className="material-symbols-outlined text-2xl text-primary">auto_awesome</span>
+                            <h3 className="text-lg font-extrabold text-white">Describe your image</h3>
+                        </div>
+
+                        <div className="relative mb-3">
+                            <textarea
+                                value={prompt}
+                                onChange={e => {
+                                    const val = e.target.value
+                                    setPrompt(val)
+                                    // Detect if user just typed @
+                                    const cursor = e.target.selectionStart
+                                    const textBefore = val.substring(0, cursor)
+                                    const atMatch = textBefore.match(/@(\w*)$/)
+                                    if (atMatch && characters.length > 0) {
+                                        setShowCharTags(true)
+                                        setCharTagFilter(atMatch[1].toLowerCase())
+                                    } else {
+                                        setShowCharTags(false)
+                                    }
+                                }}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter' && !e.shiftKey && !showCharTags) { e.preventDefault(); handleGenerate() }
+                                    if (e.key === 'Escape') setShowCharTags(false)
+                                }}
+                                placeholder={activeBrand
+                                    ? `Describe your visual... e.g. "Instagram post with @Character1 in a summer scene" 🎤`
+                                    : "Create a brand first to start generating visuals"}
+                                disabled={!activeBrand || generating}
+                                className="input-glass w-full resize-none py-4 pr-14 disabled:opacity-30 text-white text-base"
+                                rows={3}
+                                autoFocus
+                                ref={promptTextareaRef}
+                            />
+
+                            {/* @character tag autocomplete dropdown */}
+                            {showCharTags && characters.length > 0 && (
+                                <div className="absolute left-4 bottom-full mb-1 bg-[#1a1a2e] border border-violet-500/30 rounded-xl shadow-2xl shadow-violet-500/10 p-2 z-50 min-w-[200px] animate-fade-in">
+                                    <p className="text-[10px] text-slate-500 mb-1.5 px-2">Tag a character</p>
+                                    {characters
+                                        .filter(c => !charTagFilter || c.name.toLowerCase().includes(charTagFilter))
+                                        .map((char, idx) => (
+                                            <button key={idx} onClick={() => {
+                                                // Replace the @partial with @CharacterName
+                                                const textarea = promptTextareaRef.current
+                                                if (!textarea) return
+                                                const cursor = textarea.selectionStart
+                                                const textBefore = prompt.substring(0, cursor)
+                                                const textAfter = prompt.substring(cursor)
+                                                const tagName = char.name.replace(/\s/g, '')
+                                                const newBefore = textBefore.replace(/@\w*$/, `@${tagName} `)
+                                                setPrompt(newBefore + textAfter)
+                                                setShowCharTags(false)
+                                                setTimeout(() => {
+                                                    textarea.focus()
+                                                    textarea.selectionStart = textarea.selectionEnd = newBefore.length
+                                                }, 50)
+                                            }}
+                                                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-violet-500/15 cursor-pointer transition-colors text-left">
+                                                <img src={char.image} alt={char.name} className="w-6 h-6 rounded-full object-cover border border-violet-500/30" />
+                                                <div>
+                                                    <span className="text-xs font-bold text-white">{char.name}</span>
+                                                    <span className="text-[10px] text-violet-400 ml-1.5">@{char.name.replace(/\s/g, '')}</span>
+                                                </div>
+                                            </button>
+                                        ))}
+                                </div>
+                            )}
+                            <div className="absolute right-3 top-3">
+                                <VoiceInput
+                                    onResult={(text) => setPrompt(prev => prev ? prev + ' ' + text : text)}
+                                    size="small"
+                                />
                             </div>
                         </div>
 
-                        {/* ── Text Overlay & Logo (combined) ── */}
-                        <div className="glass-panel rounded-2xl p-5 space-y-4">
-                            <div>
-                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-2">
-                                    <span className="material-symbols-outlined text-primary text-lg">text_fields</span>
-                                    Text Overlay
-                                </h3>
-                                <input value={textOverlay} onChange={e => setTextOverlay(e.target.value)}
-                                    placeholder="Text to appear on the creative..."
-                                    className="input-glass w-full py-2.5" />
-                            </div>
-                            <div className="border-t border-white/[0.05] pt-3">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-base font-bold text-white flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-primary text-lg">add_photo_alternate</span>
-                                        Add Logo
+                        {/* Enhance Prompt Button */}
+                        {prompt.trim() && (
+                            <div className="flex items-center gap-2 mb-3 -mt-1">
+                                <button onClick={handleEnhancePrompt} disabled={enhancing || !activeBrand}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${enhancing
+                                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                        : 'bg-gradient-to-r from-amber-500/10 to-orange-500/10 text-amber-400 hover:from-amber-500/25 hover:to-orange-500/25 border border-amber-500/20 hover:border-amber-500/40 hover:shadow-lg hover:shadow-amber-500/10'}`}>
+                                    <span className={`material-symbols-outlined text-sm ${enhancing ? 'animate-spin' : ''}`}>
+                                        {enhancing ? 'progress_activity' : 'auto_awesome'}
                                     </span>
-                                    <button onClick={() => setAddLogo(!addLogo)}
-                                        className={`w-10 h-5 rounded-full transition-all cursor-pointer ${addLogo ? 'bg-primary' : 'bg-white/[0.1]'}`}>
-                                        <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${addLogo ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                                    </button>
+                                    {enhancing ? 'Enhancing...' : '✨ Enhance with AI'}
+                                </button>
+                                <span className="text-[10px] text-slate-600">Makes your prompt detailed & brand-aware</span>
+                            </div>
+                        )}
+
+                        {/* Quick-insert character tags */}
+                        {characters.length > 0 && (
+                            <div className="flex items-center gap-1.5 mb-3 -mt-1 flex-wrap">
+                                <span className="text-[10px] text-slate-600 mr-0.5">Tag:</span>
+                                {characters.map((char, idx) => {
+                                    const tagName = char.name.replace(/\s/g, '')
+                                    return (
+                                        <button key={idx} onClick={() => {
+                                            const textarea = promptTextareaRef.current
+                                            const cursor = textarea?.selectionStart ?? prompt.length
+                                            const before = prompt.substring(0, cursor)
+                                            const after = prompt.substring(cursor)
+                                            setPrompt(before + `@${tagName} ` + after)
+                                            setTimeout(() => textarea?.focus(), 50)
+                                        }}
+                                            className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 text-[10px] font-bold hover:bg-violet-500/20 border border-violet-500/15 cursor-pointer transition-all">
+                                            <img src={char.image} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
+                                            @{tagName}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        )}
+
+                        {/* Auto-detected format badge */}
+                        {prompt.trim() && selectedTypeInfo && (
+                            <div className="flex items-center gap-2 mb-3 animate-fade-in">
+                                <span className="text-xs text-slate-500">Format:</span>
+                                <span className="text-xs font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                    <span className="material-symbols-outlined text-xs align-middle mr-0.5">{selectedTypeInfo.icon}</span>
+                                    {selectedTypeInfo.label} ({selectedTypeInfo.size})
+                                </span>
+                                <button onClick={() => setShowAdvanced(true)} className="text-xs text-slate-600 hover:text-white cursor-pointer underline underline-offset-2">change</button>
+                            </div>
+                        )}
+
+                        <div className="flex gap-2">
+                            <CreditTooltipWrapper action="creative">
+                                <button onClick={handleGenerate} disabled={!prompt.trim() || !activeBrand || generating}
+                                    className="btn-primary flex-1 py-3.5 px-6 rounded-xl disabled:opacity-30 justify-center text-base font-bold cursor-pointer">
+                                    {generating ? (
+                                        <><span className="material-symbols-outlined animate-spin">progress_activity</span> Generating...</>
+                                    ) : (
+                                        <><span className="material-symbols-outlined">auto_awesome</span> Generate <CreditBadge action="creative" /></>
+                                    )}
+                                </button>
+                            </CreditTooltipWrapper>
+                            <button onClick={() => setShowAdvanced(!showAdvanced)}
+                                className={`px-4 py-3.5 rounded-xl text-sm font-bold transition-all cursor-pointer flex items-center gap-1.5 ${showAdvanced ? 'bg-white/10 text-white border border-white/20' : 'glass-panel text-slate-400 hover:text-white'}`}>
+                                <span className="material-symbols-outlined text-sm">tune</span>
+                                {showAdvanced ? 'Hide' : 'Options'}
+                            </button>
+                            <button onClick={() => {
+                                if (activeBrand?._id) {
+                                    productsAPI.list({ brandId: activeBrand._id, limit: 50 })
+                                        .then(res => setProductsList(res.products || []))
+                                        .catch(() => { })
+                                }
+                                setShowProductPicker(true)
+                            }}
+                                className="px-4 py-3.5 rounded-xl text-sm font-bold glass-panel text-slate-400 hover:text-cyan-400 transition-all cursor-pointer flex items-center gap-1.5">
+                                <span className="material-symbols-outlined text-sm">inventory_2</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* ── Collapsible Advanced Options Drawer ── */}
+                    {showAdvanced && (
+                        <div className="glass-panel rounded-2xl p-5 mb-6 animate-fade-in space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary text-sm">tune</span>
+                                    Advanced Options
+                                </h4>
+                                <button onClick={() => setShowAdvanced(false)} className="text-slate-500 hover:text-white cursor-pointer">
+                                    <span className="material-symbols-outlined text-sm">close</span>
+                                </button>
+                            </div>
+
+                            {/* Format */}
+                            <div>
+                                <p className="text-xs font-bold text-slate-400 mb-2">Format</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {creativeTypes.map(ct => (
+                                        <button key={ct.id} onClick={() => setSelectedType(ct.id)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${selectedType === ct.id
+                                                ? 'bg-primary/20 text-primary border border-primary/30'
+                                                : 'bg-white/[0.04] text-slate-400 hover:text-white border border-transparent'}`}>
+                                            <span className="material-symbols-outlined text-xs">{ct.icon}</span>
+                                            {ct.label}
+                                            <span className="text-[9px] opacity-60">{ct.size}</span>
+                                        </button>
+                                    ))}
                                 </div>
-                                {addLogo && (
-                                    <div className="mt-3 flex items-center gap-4">
-                                        <div>
-                                            <p className="text-sm text-slate-500 mb-1">Position</p>
-                                            <div className="grid grid-cols-3 gap-0.5 w-16">
+                            </div>
+
+                            {/* Style + Ratio Row */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <p className="text-xs font-bold text-slate-400 mb-2">Style</p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {styles.map(s => (
+                                            <button key={s.id} onClick={() => setStyle(s.id)}
+                                                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${style === s.id
+                                                    ? 'bg-primary text-white'
+                                                    : 'bg-white/[0.04] text-slate-400 hover:text-white'}`}>
+                                                <span className="material-symbols-outlined text-xs">{s.icon}</span>
+                                                {s.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <p className="text-xs font-bold text-slate-400 mb-2">Aspect Ratio</p>
+                                    {selectedTypeInfo?.aspectRatio ? (
+                                        <div className="flex items-center gap-2">
+                                            <span className="px-3 py-1.5 rounded-lg text-xs font-bold bg-primary/20 text-primary border border-primary/30 flex items-center gap-1.5">
+                                                <span className="material-symbols-outlined text-xs">lock</span>
+                                                {selectedTypeInfo.aspectRatio}
+                                            </span>
+                                            <span className="text-[10px] text-slate-500">
+                                                Locked by {selectedTypeInfo.label} ({selectedTypeInfo.size})
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {ASPECT_RATIOS.map(ar => (
+                                                <button key={ar.ratio} onClick={() => setAspectRatio(ar.ratio)}
+                                                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${aspectRatio === ar.ratio
+                                                        ? 'bg-primary text-white'
+                                                        : 'bg-white/[0.04] text-slate-400 hover:text-white'}`}>
+                                                    {ar.icon} {ar.ratio}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Text Overlay + Logo Row */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <p className="text-xs font-bold text-slate-400 mb-2">Text Overlay</p>
+                                    <input value={textOverlay} onChange={e => setTextOverlay(e.target.value)}
+                                        placeholder="Text to appear on the creative..."
+                                        className="input-glass w-full py-2 text-sm" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <p className="text-xs font-bold text-slate-400">Brand Logo</p>
+                                        <button onClick={() => setAddLogo(!addLogo)}
+                                            className={`w-9 h-5 rounded-full transition-all cursor-pointer ${addLogo ? 'bg-primary' : 'bg-white/[0.1]'}`}>
+                                            <div className={`w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${addLogo ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                                        </button>
+                                    </div>
+                                    {addLogo && (
+                                        <div className="flex items-center gap-3">
+                                            <div className="grid grid-cols-3 gap-0.5 w-14">
                                                 {['top-left', 'top-center', 'top-right', 'center-left', 'center', 'center-right', 'bottom-left', 'bottom-center', 'bottom-right'].map(pos => (
                                                     <button key={pos} onClick={() => setLogoPosition(pos)}
-                                                        className={`w-5 h-5 rounded transition-all cursor-pointer ${logoPosition === pos ? 'bg-primary' : 'bg-white/[0.06] hover:bg-white/[0.1]'}`} />
+                                                        className={`w-4 h-4 rounded transition-all cursor-pointer ${logoPosition === pos ? 'bg-primary' : 'bg-white/[0.06] hover:bg-white/[0.1]'}`} />
                                                 ))}
                                             </div>
-                                        </div>
-                                        <div>
-                                            <p className="text-sm text-slate-500 mb-1">Size</p>
                                             <div className="flex gap-1">
                                                 {['small', 'medium', 'large'].map(s => (
                                                     <button key={s} onClick={() => setLogoSize(s)}
-                                                        className={`px-2 py-1 rounded text-xs font-bold capitalize cursor-pointer ${logoSize === s ? 'bg-primary text-white' : 'bg-white/[0.04] text-slate-500'}`}>
+                                                        className={`px-2 py-1 rounded text-[10px] font-bold capitalize cursor-pointer ${logoSize === s ? 'bg-primary text-white' : 'bg-white/[0.04] text-slate-500'}`}>
                                                         {s[0].toUpperCase()}
                                                     </button>
                                                 ))}
                                             </div>
                                         </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Reference images are now in the top References Bar */}
+                            <div className="flex items-center gap-2 py-2 px-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                                <span className="material-symbols-outlined text-sm text-violet-400">collections</span>
+                                <p className="text-[11px] text-slate-500">
+                                    References (Style, Characters, Upload) are at the <strong className="text-white">top of the panel</strong>
+                                </p>
+                            </div>
+
+                            {/* Brand Colors */}
+                            {activeBrand?.dna?.colors?.length > 0 && (
+                                <div className="pt-2 border-t border-white/[0.05]">
+                                    <p className="text-xs text-slate-500 mb-1.5">Brand Colors (auto-applied)</p>
+                                    <div className="flex gap-1.5">
+                                        {activeBrand.dna.colors.map((c, i) => (
+                                            <div key={i} className="w-6 h-6 rounded-lg border border-white/[0.1]" style={{ background: c.hex }} title={c.hex} />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ── Inline Template Form (when a quickstart card with fields is active) ── */}
+                    {activeQuickTemplate && (
+                        <div className="glass-panel rounded-2xl p-5 mb-6 animate-fade-in border border-primary/10">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">{activeQuickTemplate.icon}</span>
+                                    <h4 className="text-sm font-bold text-white">{activeQuickTemplate.label}</h4>
+                                    <span className="text-xs text-slate-500">— fill in the details below</span>
+                                </div>
+                                <button onClick={() => { setActiveQuickTemplate(null); setTemplateFields({}) }}
+                                    className="text-slate-500 hover:text-white cursor-pointer">
+                                    <span className="material-symbols-outlined text-sm">close</span>
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {activeQuickTemplate.fields?.filter(f => f.type !== 'image').map(field => (
+                                    <div key={field.key}>
+                                        <label className="text-xs font-bold text-slate-400 mb-1 block">{field.label}</label>
+                                        {field.type === 'select' ? (
+                                            <select value={templateFields[field.key] || ''} onChange={e => setTemplateFields(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                                className="input-glass w-full py-2 text-sm">
+                                                <option value="">Choose...</option>
+                                                {field.options?.map(o => <option key={o} value={o}>{o}</option>)}
+                                            </select>
+                                        ) : field.type === 'textarea' ? (
+                                            <textarea value={templateFields[field.key] || ''} onChange={e => setTemplateFields(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                                placeholder={field.placeholder} className="input-glass w-full py-2 text-sm resize-none" rows={2} />
+                                        ) : (
+                                            <input value={templateFields[field.key] || ''} onChange={e => setTemplateFields(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                                placeholder={field.placeholder} className="input-glass w-full py-2 text-sm" />
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                            <button onClick={() => {
+                                const built = activeQuickTemplate.buildPrompt(activeBrand, templateFields)
+                                setPrompt(built)
+                                setActiveQuickTemplate(null)
+                            }}
+                                className="mt-4 btn-primary py-2.5 px-5 rounded-xl text-sm font-bold cursor-pointer w-full justify-center">
+                                <span className="material-symbols-outlined text-sm">auto_awesome</span>
+                                Apply to Prompt
+                            </button>
+                        </div>
+                    )}
+
+                    {/* ── Error ── */}
+                    {error && (
+                        <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
+                            <span className="material-symbols-outlined text-sm align-middle mr-1">error</span> {error}
+                        </div>
+                    )}
+
+                    {/* ── Result Area ── */}
+                    {result && !generating && (
+                        <div className="glass-panel rounded-2xl p-6 mb-6 animate-fade-in">
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                    <h3 className="text-lg font-bold text-white">{result.title || 'Generated Creative'}</h3>
+                                    <p className="text-sm text-slate-400">{selectedTypeInfo?.label} • {selectedTypeInfo?.size} • {style}</p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => handleFeedback('thumbs', { thumbs: 'up' })}
+                                        className={`btn-glass p-2 rounded-xl cursor-pointer transition-all ${feedbackState === 'liked' ? 'text-emerald-400 bg-emerald-400/15 border border-emerald-400/30 scale-110' : 'text-slate-400 hover:text-emerald-400'}`}>
+                                        <span className="material-symbols-outlined">thumb_up</span>
+                                    </button>
+                                    <button onClick={() => handleFeedback('thumbs', { thumbs: 'down' })}
+                                        className={`btn-glass p-2 rounded-xl cursor-pointer transition-all ${feedbackState === 'disliked' ? 'text-rose-400 bg-rose-400/15 border border-rose-400/30 scale-110' : 'text-slate-400 hover:text-rose-400'}`}>
+                                        <span className="material-symbols-outlined">thumb_down</span>
+                                    </button>
+                                    <button onClick={handleGenerate} className="btn-glass p-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
+                                        <span className="material-symbols-outlined">refresh</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Display area — respects actual aspect ratio */}
+                            <div className="relative rounded-xl overflow-hidden border border-white/[0.08] bg-black/20 cursor-pointer group"
+                                style={{ maxHeight: '600px' }}
+                                onClick={() => result.imageUrl && setZoomImage(result.imageUrl)}>
+                                {result.imageUrl ? (
+                                    <>
+                                        <img src={result.imageUrl} alt={result.title || 'Generated creative'}
+                                            className="w-full h-auto object-contain"
+                                            style={{ maxHeight: '600px' }}
+                                            onError={(e) => { e.target.style.display = 'none'; }} />
+                                        {/* Zoom overlay */}
+                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                            <span className="material-symbols-outlined text-3xl text-white bg-black/50 rounded-full p-2">zoom_in</span>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center p-8 text-center"
+                                        style={{ aspectRatio: aspectRatio?.replace(':', '/') || '1/1', background: `linear-gradient(135deg, ${activeBrand?.dna?.colors?.[0]?.hex || '#2B4BEE'}40, ${activeBrand?.dna?.colors?.[1]?.hex || '#8B5CF6'}40)` }}>
+                                        <span className="material-symbols-outlined text-6xl text-white/20 mb-4 block">image</span>
+                                        <p className="text-white font-bold text-lg mb-2">{textOverlay || result.title || prompt.substring(0, 40)}</p>
+                                        <p className="text-sm text-white/50">{activeBrand?.name}</p>
                                     </div>
                                 )}
                             </div>
-                        </div>
-                    </div>
 
-                    {/* Right — Canvas & Prompt */}
-                    <div className="col-span-12 lg:col-span-8 space-y-5">
-                        {/* Canvas */}
-                        <div className="glass-panel rounded-2xl p-6" style={{ minHeight: '400px' }}>
-                            {generating ? (
-                                <div className="flex flex-col items-center justify-center h-80 gap-4">
-                                    <div className="size-16 rounded-2xl bg-primary/20 flex items-center justify-center">
-                                        <span className="material-symbols-outlined text-4xl text-primary animate-spin">progress_activity</span>
-                                    </div>
-                                    <p className="text-white font-bold">Generating {selectedTypeInfo?.label}...</p>
-                                    <p className="text-sm text-slate-400">Using brand DNA: {activeBrand?.name} • Style: {style}</p>
-                                </div>
-                            ) : result ? (
-                                <div className="animate-fade-in">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div>
-                                            <h3 className="text-lg font-bold text-white">{result.title || 'Generated Creative'}</h3>
-                                            <p className="text-sm text-slate-400">{selectedTypeInfo?.label} • {selectedTypeInfo?.size} • {style}</p>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => handleFeedback('thumbs', { thumbs: 'up' })}
-                                                className={`btn-glass p-2 rounded-xl cursor-pointer transition-all duration-200 ${feedbackState === 'liked'
-                                                    ? 'text-emerald-400 bg-emerald-400/15 border border-emerald-400/30 scale-110'
-                                                    : 'text-slate-400 hover:text-emerald-400'}`}>
-                                                <span className="material-symbols-outlined">{feedbackState === 'liked' ? 'thumb_up' : 'thumb_up'}</span>
-                                            </button>
-                                            <button onClick={() => handleFeedback('thumbs', { thumbs: 'down' })}
-                                                className={`btn-glass p-2 rounded-xl cursor-pointer transition-all duration-200 ${feedbackState === 'disliked'
-                                                    ? 'text-rose-400 bg-rose-400/15 border border-rose-400/30 scale-110'
-                                                    : 'text-slate-400 hover:text-rose-400'}`}>
-                                                <span className="material-symbols-outlined">thumb_down</span>
-                                            </button>
-                                            <button onClick={handleGenerate}
-                                                className="btn-glass p-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
-                                                <span className="material-symbols-outlined">refresh</span>
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Display area */}
-                                    <div className="relative rounded-xl overflow-hidden border border-white/[0.08]"
-                                        style={{ aspectRatio: selectedType === 'instagram-story' ? '9/16' : selectedType === 'banner' ? '16/5' : '1/1', maxHeight: '500px' }}>
-                                        {result.imageUrl ? (
-                                            <img
-                                                src={result.imageUrl}
-                                                alt={result.title || 'Generated creative'}
-                                                className="w-full h-full object-cover"
-                                                onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
-                                            />
-                                        ) : null}
-                                        <div className={`absolute inset-0 flex flex-col items-center justify-center p-8 text-center ${result.imageUrl ? 'hidden' : ''}`}
-                                            style={{ background: `linear-gradient(135deg, ${activeBrand?.dna?.colors?.[0]?.hex || '#2B4BEE'}40, ${activeBrand?.dna?.colors?.[1]?.hex || '#8B5CF6'}40)` }}>
-                                            <span className="material-symbols-outlined text-6xl text-white/20 mb-4 block">image</span>
-                                            <p className="text-white font-bold text-lg mb-2">{textOverlay || result.title || prompt.substring(0, 40)}</p>
-                                            <p className="text-sm text-white/50">{activeBrand?.name}</p>
-                                        </div>
-                                    </div>
-
-                                    {result.aiMeta && (
-                                        <div className="flex items-center gap-4 mt-4 text-sm text-slate-500">
-                                            <span>Provider: {result.aiMeta.provider}</span>
-                                            <span>Model: {result.aiMeta.model}</span>
-                                            {result.aiMeta.brandAlignmentScore && (
-                                                <span className="text-emerald-400 font-bold">{result.aiMeta.brandAlignmentScore}% Brand Match</span>
-                                            )}
-                                        </div>
+                            {result.aiMeta && (
+                                <div className="flex items-center gap-4 mt-4 text-sm text-slate-500">
+                                    <span>Provider: {result.aiMeta.provider}</span>
+                                    <span>Model: {result.aiMeta.model}</span>
+                                    {result.aiMeta.brandAlignmentScore && (
+                                        <span className="text-emerald-400 font-bold">{result.aiMeta.brandAlignmentScore}% Brand Match</span>
                                     )}
-
-                                    {/* Toast feedback */}
-                                    {feedbackToast && (
-                                        <div className="mb-3 py-2 px-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-medium text-center animate-fade-in">
-                                            {feedbackToast}
-                                        </div>
-                                    )}
-
-                                    <div className="flex gap-3 mt-4">
-                                        <button onClick={() => handleFeedback('accept')}
-                                            className={`py-2.5 px-6 rounded-xl text-sm flex-1 transition-all duration-200 ${feedbackState === 'accepted'
-                                                ? 'bg-emerald-500 text-white font-bold'
-                                                : 'btn-primary'}`}>
-                                            <span className="material-symbols-outlined text-sm">{feedbackState === 'accepted' ? 'check_circle' : 'check'}</span>
-                                            {feedbackState === 'accepted' ? ' Accepted ✓' : ' Accept'}
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                if (result?.imageUrl) {
-                                                    const a = document.createElement('a')
-                                                    a.href = result.imageUrl
-                                                    a.download = `${result.title || 'creative'}.png`
-                                                    a.click()
-                                                }
-                                            }}
-                                            className="btn-glass py-2.5 px-6 rounded-xl text-sm border border-white/[0.1] text-white cursor-pointer hover:bg-white/[0.06]">
-                                            <span className="material-symbols-outlined text-sm">download</span> Export
-                                        </button>
-                                        <button onClick={() => setShowPublish(true)}
-                                            className="btn-glass py-2.5 px-6 rounded-xl text-sm font-bold bg-[#1877F2]/10 text-[#1877F2] hover:bg-[#1877F2]/20 border border-[#1877F2]/30 cursor-pointer transition-all">
-                                            <span className="material-symbols-outlined text-sm">share</span> Publish
-                                        </button>
-                                    </div>
-
-                                    <PublishModal
-                                        isOpen={showPublish}
-                                        onClose={() => setShowPublish(false)}
-                                        defaultText={prompt}
-                                        defaultImage={result?.imageUrl}
-                                    />
-
-                                    {/* ── Open Canvas Editor Button ── */}
-                                    {result?.imageUrl && (
-                                        <button
-                                            onClick={() => {
-                                                const typeInfo = creativeTypes.find(t => t.id === selectedType)
-                                                const [w, h] = (typeInfo?.size || '1080×1080').split('×').map(Number)
-                                                sessionStorage.setItem('canvasEditorImage', result.imageUrl)
-                                                navigate(`/creative-studio/editor?w=${w}&h=${h}`)
-                                            }}
-                                            className="w-full mt-3 py-3 px-6 rounded-xl text-base font-bold text-white cursor-pointer transition-all duration-200 hover:scale-[1.02] flex items-center justify-center gap-2"
-                                            style={{ background: 'linear-gradient(135deg, #2563eb, #6366f1)', boxShadow: '0 4px 20px rgba(99,102,241,0.4)' }}>
-                                            <span className="material-symbols-outlined">edit</span>
-                                            Open Canvas Editor
-                                        </button>
-                                    )}
-                                </div>
-                            ) : designBaseImage ? (
-                                <div className="flex flex-col items-center justify-center h-80 gap-4 relative">
-                                    <img src={designBaseImage} alt="Photoshoot base" className="w-full h-full object-contain rounded-xl opacity-60" />
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 rounded-xl">
-                                        <span className="material-symbols-outlined text-5xl text-primary mb-3">auto_awesome</span>
-                                        <h3 className="text-lg font-bold text-white mb-1">Photoshoot Image Ready</h3>
-                                        <p className="text-sm text-slate-300 mb-4 text-center max-w-sm">
-                                            Describe how you want to adapt this image for {selectedTypeInfo?.label || 'your platform'}, then click Generate.
-                                        </p>
-                                        <button onClick={handleGenerate} disabled={!prompt.trim() || generating}
-                                            className="btn-primary py-2.5 px-6 rounded-xl text-sm font-bold disabled:opacity-30">
-                                            <span className="material-symbols-outlined text-sm">auto_awesome</span> Generate from this image
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : showQuickStart && !prompt.trim() ? (
-                                <div className="p-4">
-                                    <h3 className="text-lg font-bold text-white mb-1 text-center">What do you want to create?</h3>
-                                    <p className="text-sm text-slate-400 text-center mb-5">Choose a category and we'll help you build the perfect prompt</p>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                        {quickStartCards.map(card => (
-                                            <button key={card.id} onClick={() => {
-                                                const brandName = activeBrand?.name || 'the brand'
-                                                const templates = {
-                                                    social: `Create a visually stunning social media post for ${brandName}. Make it eye-catching, on-brand, and shareable. Include a catchy headline and professional layout.`,
-                                                    product: `Create a premium product showcase for ${brandName}. Feature the product prominently with brand colors, modern layout, and a subtle call-to-action.`,
-                                                    promo: `Create an exciting promotional offer creative for ${brandName}. Make the offer text large and prominent, add urgency, brand colors, and a bold CTA button.`,
-                                                    quote: `Create an elegant customer testimonial card for ${brandName}. Use beautiful typography, quotation marks, brand colors as accents, and a clean professional layout.`,
-                                                    announce: `Create a bold announcement post for ${brandName}. Make the headline attention-grabbing, use excited energy and brand colors, and include a celebration feel.`,
-                                                    story: `Create a compelling brand story visual for ${brandName}. Tell the brand narrative through imagery, use brand colors, and convey authenticity with a warm, premium feel.`,
-                                                }
-                                                setPrompt(templates[card.id] || '')
-                                                setShowQuickStart(false)
-                                            }}
-                                                className="flex flex-col items-center gap-2 p-5 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] hover:border-primary/30 transition-all cursor-pointer group">
-                                                <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: `${card.color}20` }}>
-                                                    <span className="material-symbols-outlined text-2xl" style={{ color: card.color }}>{card.icon}</span>
-                                                </div>
-                                                <p className="text-base font-bold text-white group-hover:text-primary transition-colors">{card.label}</p>
-                                                <p className="text-sm text-slate-500">{card.desc}</p>
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <p className="text-xs text-slate-600 text-center mt-4">Or just type your own description in the prompt box below ↓</p>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-center justify-center h-80 gap-4 opacity-60">
-                                    <span className="material-symbols-outlined text-6xl text-primary">brush</span>
-                                    <h3 className="text-xl font-bold text-white">Create a Visual</h3>
-                                    <p className="text-sm text-slate-400 max-w-md text-center">
-                                        {activeBrand
-                                            ? `Describe what you want and AI will generate visuals matching ${activeBrand.name}'s brand identity.`
-                                            : 'Create a brand first to start generating visuals.'}
-                                    </p>
                                 </div>
                             )}
-                        </div>
 
-                        {/* Prompt Input */}
-                        <div className="glass-panel rounded-2xl p-5">
-                            {/* Content-linked banner */}
-                            {fromContent && (
-                                <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/20 mb-4">
-                                    <span className="material-symbols-outlined text-primary">link</span>
-                                    <div className="flex-1">
-                                        <p className="text-sm font-bold text-white">Linked to Content Studio</p>
-                                        <p className="text-sm text-slate-400">Image will be generated to match your content in {activeBrand?.name}'s brand style</p>
-                                    </div>
-                                    <button onClick={() => setFromContent(false)} className="text-slate-500 hover:text-white cursor-pointer">
-                                        <span className="material-symbols-outlined text-sm">close</span>
-                                    </button>
+                            {feedbackToast && (
+                                <div className="mt-3 py-2 px-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-medium text-center animate-fade-in">
+                                    {feedbackToast}
                                 </div>
                             )}
-                            {designBaseImage && (
-                                <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-4">
-                                    <img src={designBaseImage} alt="Base" className="w-10 h-10 rounded-lg object-cover" />
-                                    <div className="flex-1">
-                                        <p className="text-sm font-bold text-white">📸 Linked from AI Photoshoot</p>
-                                        <p className="text-sm text-slate-400">Describe how to adapt this image for your platform</p>
-                                    </div>
-                                    <button onClick={() => setDesignBaseImage(null)} className="text-slate-500 hover:text-white cursor-pointer">
-                                        <span className="material-symbols-outlined text-sm">close</span>
-                                    </button>
-                                </div>
-                            )}
-                            <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
-                                <span className="material-symbols-outlined text-primary text-lg">auto_awesome</span>
-                                Describe Your Creative
-                            </h3>
 
-                            {/* Product Picker */}
-                            {selectedProduct ? (
-                                <div className="flex items-center gap-3 mb-3 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
-                                    {selectedProduct.images?.[0]?.url && (
-                                        <img src={selectedProduct.images[0].url} alt="" className="w-10 h-10 rounded-lg object-cover" />
-                                    )}
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-bold text-white truncate">{selectedProduct.title}</p>
-                                        <p className="text-sm text-cyan-400">Product selected — will be used in creative</p>
-                                    </div>
-                                    <button onClick={() => setSelectedProduct(null)} className="text-slate-500 hover:text-white cursor-pointer">
-                                        <span className="material-symbols-outlined text-sm">close</span>
-                                    </button>
-                                </div>
-                            ) : (
+                            <div className="flex gap-3 mt-4">
+                                <button onClick={() => handleFeedback('accept')}
+                                    className={`py-2.5 px-6 rounded-xl text-sm flex-1 transition-all duration-200 cursor-pointer ${feedbackState === 'accepted' ? 'bg-emerald-500 text-white font-bold' : 'btn-primary'}`}>
+                                    <span className="material-symbols-outlined text-sm">{feedbackState === 'accepted' ? 'check_circle' : 'check'}</span>
+                                    {feedbackState === 'accepted' ? ' Accepted ✓' : ' Accept'}
+                                </button>
                                 <button onClick={() => {
-                                    if (activeBrand?._id) {
-                                        productsAPI.list({ brandId: activeBrand._id, limit: 50 })
-                                            .then(res => setProductsList(res.products || []))
-                                            .catch(() => { })
+                                    if (result?.imageUrl) {
+                                        const a = document.createElement('a')
+                                        a.href = result.imageUrl
+                                        a.download = `${result.title || 'creative'}.png`
+                                        a.click()
                                     }
-                                    setShowProductPicker(true)
                                 }}
-                                    className="w-full mb-3 py-2 px-3 rounded-xl glass-panel text-sm text-slate-400 hover:text-cyan-400 hover:bg-cyan-400/5 transition-all cursor-pointer font-bold flex items-center gap-2 justify-center border border-dashed border-white/10 hover:border-cyan-400/30">
-                                    <span className="material-symbols-outlined text-sm">inventory_2</span>
-                                    Select a Product (optional)
+                                    className="btn-glass py-2.5 px-6 rounded-xl text-sm border border-white/[0.1] text-white cursor-pointer hover:bg-white/[0.06]">
+                                    <span className="material-symbols-outlined text-sm">download</span> Export
+                                </button>
+                                <button onClick={() => setShowPublish(true)}
+                                    className="btn-glass py-2.5 px-6 rounded-xl text-sm font-bold bg-[#1877F2]/10 text-[#1877F2] hover:bg-[#1877F2]/20 border border-[#1877F2]/30 cursor-pointer transition-all">
+                                    <span className="material-symbols-outlined text-sm">share</span> Publish
+                                </button>
+                            </div>
+
+                            <PublishModal
+                                isOpen={showPublish}
+                                onClose={() => setShowPublish(false)}
+                                defaultText={prompt}
+                                defaultImage={result?.imageUrl}
+                            />
+
+                            {/* Open Canvas Editor */}
+                            {result?.imageUrl && (
+                                <button onClick={() => {
+                                    const typeInfo = creativeTypes.find(t => t.id === selectedType)
+                                    const [w, h] = (typeInfo?.size || '1080×1080').split('×').map(Number)
+                                    sessionStorage.setItem('canvasEditorImage', result.imageUrl)
+                                    navigate(`/creative-studio/editor?w=${w}&h=${h}`)
+                                }}
+                                    className="w-full mt-3 py-3 px-6 rounded-xl text-base font-bold text-white cursor-pointer transition-all duration-200 hover:scale-[1.02] flex items-center justify-center gap-2"
+                                    style={{ background: 'linear-gradient(135deg, #2563eb, #6366f1)', boxShadow: '0 4px 20px rgba(99,102,241,0.4)' }}>
+                                    <span className="material-symbols-outlined">edit</span>
+                                    Open Canvas Editor
                                 </button>
                             )}
-                            <div className="space-y-3">
-                                <div className="relative">
-                                    <textarea
-                                        value={prompt}
-                                        onChange={e => setPrompt(e.target.value)}
-                                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerate() } }}
-                                        placeholder={activeBrand ? "Describe the visual you want... Type or speak in any language 🎤" : "Create a brand first"}
-                                        disabled={!activeBrand || generating}
-                                        className="input-glass w-full resize-none py-3 pr-12 disabled:opacity-30"
-                                        rows={3}
-                                        style={{ minHeight: '100px' }}
-                                    />
-                                    <div className="absolute right-3 top-3">
-                                        <VoiceInput
-                                            onResult={(text) => setPrompt(prev => prev ? prev + ' ' + text : text)}
-                                            size="small"
-                                        />
-                                    </div>
-                                </div>
-                                <CreditTooltipWrapper action="creative">
-                                    <button onClick={handleGenerate} disabled={!prompt.trim() || !activeBrand || generating}
-                                        className="btn-primary w-full py-3 px-6 rounded-xl disabled:opacity-30 justify-center">
-                                        <span className="material-symbols-outlined">auto_awesome</span>
-                                        Generate <CreditBadge action="creative" />
-                                    </button>
-                                </CreditTooltipWrapper>
-                            </div>
-                            {error && (
-                                <div className="mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
-                                    <span className="material-symbols-outlined text-sm align-middle mr-1">error</span> {error}
-                                </div>
-                            )}
                         </div>
-                    </div>
+                    )}
+
+                    {/* ── Action Cards — Only shown when no result and prompt is empty ── */}
+                    {!result && !generating && !prompt.trim() && (
+                        <div className="animate-fade-in">
+                            <p className="text-sm text-slate-500 text-center mb-4">— or choose a starting point —</p>
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                {/* Quick-create cards that pre-fill prompts */}
+                                {[
+                                    {
+                                        id: 'social', icon: 'share', label: 'Social Media Post', desc: 'Instagram, Facebook, LinkedIn', color: '#6366f1',
+                                        prompt: `Create a visually stunning social media post for ${activeBrand?.name || 'the brand'}. Make it eye-catching, on-brand, and shareable. Include a catchy headline and professional layout.`
+                                    },
+                                    {
+                                        id: 'product', icon: 'inventory_2', label: 'Product Showcase', desc: 'Feature your product beautifully', color: '#f59e0b',
+                                        prompt: `Create a premium product showcase for ${activeBrand?.name || 'the brand'}. Feature the product prominently with brand colors, modern layout, and a subtle call-to-action.`
+                                    },
+                                    {
+                                        id: 'promo', icon: 'local_offer', label: 'Sale / Offer', desc: 'Discounts, deals, promotions', color: '#ef4444',
+                                        template: templateCategories.find(c => c.id === 'sales')?.subTemplates?.[0]
+                                    },
+                                    {
+                                        id: 'quote', icon: 'format_quote', label: 'Quote / Testimonial', desc: 'Reviews and brand quotes', color: '#10b981',
+                                        template: templateCategories.find(c => c.id === 'quotes')?.subTemplates?.[0]
+                                    },
+                                    {
+                                        id: 'announce', icon: 'campaign', label: 'Announcement', desc: 'Launches, updates, news', color: '#8b5cf6',
+                                        template: templateCategories.find(c => c.id === 'announcement')?.subTemplates?.[0]
+                                    },
+                                    {
+                                        id: 'event', icon: 'event', label: 'Event Promo', desc: 'Events, birthdays, milestones', color: '#ec4899',
+                                        template: templateCategories.find(c => c.id === 'events')?.subTemplates?.[0]
+                                    },
+                                    {
+                                        id: 'info', icon: 'analytics', label: 'Infographic', desc: 'Data, tips, educational', color: '#0ea5e9',
+                                        template: templateCategories.find(c => c.id === 'content')?.subTemplates?.[0]
+                                    },
+                                    {
+                                        id: 'story', icon: 'auto_stories', label: 'Brand Story', desc: 'Tell your brand narrative', color: '#f97316',
+                                        prompt: `Create a compelling brand story visual for ${activeBrand?.name || 'the brand'}. Tell the brand narrative through imagery, use brand colors, and convey authenticity with a warm, premium feel.`
+                                    },
+                                ].map(card => (
+                                    <button key={card.id} onClick={() => {
+                                        if (card.template && card.template.fields?.length > 0) {
+                                            // Open inline template form
+                                            setActiveQuickTemplate(card.template)
+                                            setTemplateFields({})
+                                        } else if (card.prompt) {
+                                            setPrompt(card.prompt)
+                                        }
+                                    }}
+                                        className="flex flex-col items-center gap-2 p-5 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] hover:border-primary/20 transition-all cursor-pointer group text-center">
+                                        <div className="w-11 h-11 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform" style={{ background: `${card.color}15` }}>
+                                            <span className="material-symbols-outlined text-xl" style={{ color: card.color }}>{card.icon}</span>
+                                        </div>
+                                        <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{card.label}</p>
+                                        <p className="text-[11px] text-slate-500 leading-tight">{card.desc}</p>
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Secondary access — Photoshoot + Templates + Image Bank */}
+                            <div className="grid grid-cols-3 gap-3 mt-4">
+                                <button onClick={() => setStudioMode('photoshoot')}
+                                    className="flex items-center gap-3 p-4 rounded-2xl glass-panel hover:bg-amber-500/[0.05] hover:border-amber-500/20 border border-transparent transition-all cursor-pointer group">
+                                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                        <span className="material-symbols-outlined text-lg text-amber-400">photo_camera</span>
+                                    </div>
+                                    <div className="text-left">
+                                        <p className="text-sm font-bold text-white">AI Photoshoot</p>
+                                        <p className="text-[11px] text-slate-500">Style product photos with AI</p>
+                                    </div>
+                                </button>
+                                <button onClick={() => setStudioMode('templates')}
+                                    className="flex items-center gap-3 p-4 rounded-2xl glass-panel hover:bg-violet-500/[0.05] hover:border-violet-500/20 border border-transparent transition-all cursor-pointer group">
+                                    <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                        <span className="material-symbols-outlined text-lg text-violet-400">dashboard_customize</span>
+                                    </div>
+                                    <div className="text-left">
+                                        <p className="text-sm font-bold text-white">Brand Templates</p>
+                                        <p className="text-[11px] text-slate-500">Quick on-brand designs</p>
+                                    </div>
+                                </button>
+                                <button onClick={() => { setStudioMode('imagebank'); loadImageBank() }}
+                                    className="flex items-center gap-3 p-4 rounded-2xl glass-panel hover:bg-emerald-500/[0.05] hover:border-emerald-500/20 border border-transparent transition-all cursor-pointer group">
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                        <span className="material-symbols-outlined text-lg text-emerald-400">photo_library</span>
+                                    </div>
+                                    <div className="text-left flex items-center gap-2">
+                                        <div>
+                                            <p className="text-sm font-bold text-white">Image Bank</p>
+                                            <p className="text-[11px] text-slate-500">Browse saved images</p>
+                                        </div>
+                                        {bankTotal > 0 && <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{bankTotal}</span>}
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
+
 
             {/* =================== AI PHOTOSHOOT MODE =================== */}
             {studioMode === 'photoshoot' && (
                 <div className="grid grid-cols-12 gap-6">
+                    {/* Back to Studio button */}
+                    <div className="col-span-12">
+                        <button onClick={() => setStudioMode('create')}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs glass-panel text-slate-400 hover:text-white cursor-pointer mb-2">
+                            <span className="material-symbols-outlined text-sm">arrow_back</span>
+                            Back to Studio
+                        </button>
+                    </div>
                     {/* Left — Photoshoot Controls */}
                     <div className="col-span-12 lg:col-span-5 space-y-5">
                         {/* Product Image Upload */}
@@ -1614,24 +1945,22 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 <span className="absolute bottom-0 inset-x-0 text-center text-[8px] font-bold bg-black/70 text-white py-0.5">{ref.label}</span>
                                             </div>
                                         ) : (
-                                            <label className="flex flex-col items-center justify-center aspect-video rounded-xl border-2 border-dashed border-white/[0.08] hover:border-primary/40 cursor-pointer transition-colors bg-white/[0.02] group">
+                                            <button onClick={() => { setRefPickerSlot(ref.key); setRefPickerTab('upload') }}
+                                                className="w-full flex flex-col items-center justify-center aspect-video rounded-xl border-2 border-dashed border-white/[0.08] hover:border-primary/40 cursor-pointer transition-colors bg-white/[0.02] group">
                                                 <span className="material-symbols-outlined text-lg text-slate-600 group-hover:text-primary mb-0.5">{ref.icon}</span>
                                                 <span className="text-sm text-slate-500 font-medium">{ref.label}</span>
                                                 <span className="text-[8px] text-slate-600">{ref.hint}</span>
-                                                <input type="file" className="hidden" accept="image/*" onChange={e => {
-                                                    const file = e.target.files?.[0]
-                                                    if (file) {
-                                                        const reader = new FileReader()
-                                                        reader.onload = ev => setReferenceImages(prev => ({ ...prev, [ref.key]: ev.target.result }))
-                                                        reader.readAsDataURL(file)
-                                                    }
-                                                }} />
-                                            </label>
+                                                <span className="text-[8px] text-slate-600 mt-1 flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-[8px]">upload</span> Upload
+                                                    <span className="material-symbols-outlined text-[8px] ml-1">photo_library</span> Library
+                                                    <span className="material-symbols-outlined text-[8px] ml-1">domain</span> Brand
+                                                </span>
+                                            </button>
                                         )}
                                     </div>
                                 ))}
                             </div>
-                            <p className="text-xs text-slate-600 mt-2">Add a style image or character to guide the photoshoot look</p>
+                            <p className="text-xs text-slate-600 mt-2">Upload, pick from library, or use brand images to guide the photoshoot look</p>
                         </div>
 
                         {/* Scene Keywords */}
@@ -1860,7 +2189,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         </button>
                                         <button onClick={() => {
                                             setDesignBaseImage(photoshootResult.imageUrl)
-                                            setStudioMode('design')
+                                            setStudioMode('create')
                                             setPrompt(`Create a ${selectedType} design using this product photoshoot image. Brand: ${activeBrand?.name}. Make it platform-ready.`)
                                         }}
                                             className="py-2.5 px-5 rounded-xl text-xs font-bold bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer">
@@ -2024,6 +2353,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
             {/* =================== BRAND TEMPLATES MODE =================== */}
             {studioMode === 'templates' && (
                 <div>
+                    <button onClick={() => setStudioMode('create')}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs glass-panel text-slate-400 hover:text-white cursor-pointer mb-4">
+                        <span className="material-symbols-outlined text-sm">arrow_back</span>
+                        Back to Studio
+                    </button>
                     <div className="flex items-center justify-between mb-5">
                         <div>
                             <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -2974,7 +3308,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 setPrompt(templatePromptPreview || activeTemplate.buildPrompt(activeBrand, templateFields))
                                                 setSelectedType(activeTemplate.type)
                                                 setStyle(activeTemplate.style)
-                                                setStudioMode('design')
+                                                setStudioMode('create')
                                             }}
                                                 className="py-2.5 px-5 rounded-xl text-xs font-bold bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer">
                                                 <span className="material-symbols-outlined text-sm">palette</span>
@@ -3000,6 +3334,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
             {/* =================== IMAGE BANK MODE =================== */}
             {studioMode === 'imagebank' && (
                 <div>
+                    <button onClick={() => setStudioMode('create')}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs glass-panel text-slate-400 hover:text-white cursor-pointer mb-4">
+                        <span className="material-symbols-outlined text-sm">arrow_back</span>
+                        Back to Studio
+                    </button>
                     <div className="flex items-center justify-between mb-5">
                         <div>
                             <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -3041,7 +3380,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             window.open(img.url, '_blank')
                                         }}>
                                         <img src={img.url} alt={img.alt || `Brand ${idx + 1}`} loading="lazy"
-                                            className="w-full aspect-square object-cover transition-transform duration-300 group-hover:scale-105"
+                                            className="w-full object-cover transition-transform duration-300 group-hover:scale-105" style={{ minHeight: '80px', maxHeight: '200px' }}
                                             onError={e => e.target.parentElement.style.display = 'none'} />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                                         <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -3065,7 +3404,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 Generate images in Design Studio or AI Photoshoot — they'll automatically appear here.
                             </p>
                             <div className="flex gap-2 justify-center">
-                                <button onClick={() => setStudioMode('design')}
+                                <button onClick={() => setStudioMode('create')}
                                     className="btn-primary py-2.5 px-5 rounded-xl text-xs font-bold cursor-pointer">
                                     <span className="material-symbols-outlined text-sm">palette</span>
                                     Design Studio
@@ -3085,7 +3424,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 <div key={img._id} className="glass-panel rounded-2xl overflow-hidden group relative cursor-pointer"
                                     onClick={() => setLightboxIdx(idx)}>
                                     <img src={img.imageUrl || img.thumbnailUrl} alt={img.title || 'Generated'} loading="lazy"
-                                        className="w-full aspect-square object-cover transition-transform duration-300 group-hover:scale-105" />
+                                        className="w-full object-cover transition-transform duration-300 group-hover:scale-105" style={{ minHeight: '120px', maxHeight: '300px' }} />
 
                                     {/* Hover overlay */}
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-3">
@@ -3111,7 +3450,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 e.stopPropagation()
                                                 setDesignBaseImage(img.imageUrl)
                                                 setPrompt(`Adapt this image for ${selectedType}. Brand: ${activeBrand?.name}.`)
-                                                setStudioMode('design')
+                                                setStudioMode('create')
                                             }}
                                                 className="flex-1 py-1.5 rounded-lg bg-primary/20 text-primary text-xs font-bold text-center hover:bg-primary/30 cursor-pointer flex items-center justify-center gap-1">
                                                 <span className="material-symbols-outlined text-xs">palette</span>
@@ -3147,6 +3486,27 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    )}
+
+                    {/* ═══ ZOOM LIGHTBOX (for generated result) ═══ */}
+                    {zoomImage && (
+                        <div className="fixed inset-0 z-[110] flex items-center justify-center animate-fade-in"
+                            onClick={() => setZoomImage(null)}>
+                            <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" />
+                            <div className="relative max-w-[90vw] max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                                <img src={zoomImage} alt="Zoomed" className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain" />
+                                <div className="absolute top-3 right-3 flex gap-2">
+                                    <a href={zoomImage} download="creative.png"
+                                        className="p-2 rounded-full bg-black/60 text-white hover:bg-white/20 backdrop-blur-sm transition-colors">
+                                        <span className="material-symbols-outlined text-lg">download</span>
+                                    </a>
+                                    <button onClick={() => setZoomImage(null)}
+                                        className="p-2 rounded-full bg-black/60 text-white hover:bg-white/20 backdrop-blur-sm cursor-pointer transition-colors">
+                                        <span className="material-symbols-outlined text-lg">close</span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     )}
 
@@ -3233,7 +3593,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 setDesignBaseImage(img.imageUrl)
                                                 setPrompt(`Adapt this image for ${selectedType}. Brand: ${activeBrand?.name}.`)
                                                 setLightboxIdx(null)
-                                                setStudioMode('design')
+                                                setStudioMode('create')
                                             }}
                                                 className="py-2.5 px-4 rounded-xl text-xs font-bold bg-primary/15 text-primary hover:bg-primary/25 flex items-center gap-2 cursor-pointer transition-colors">
                                                 <span className="material-symbols-outlined text-sm">palette</span>
@@ -3267,6 +3627,207 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )
                     })()}
+                </div>
+            )}
+
+            {/* ── Media Picker Modal ── */}
+            {refPickerSlot && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in"
+                    onClick={() => setRefPickerSlot(null)}>
+                    <div className="bg-[#1a1a2e] rounded-2xl shadow-2xl overflow-hidden animate-scale-in flex"
+                        style={{ width: '720px', maxWidth: '92vw', height: '520px', maxHeight: '85vh' }}
+                        onClick={e => e.stopPropagation()}>
+
+                        {/* ── Left Sidebar ── */}
+                        <div className="w-[200px] flex-shrink-0 bg-[#12121f] border-r border-white/[0.06] flex flex-col">
+                            {/* Header */}
+                            <div className="p-4 pb-3">
+                                <h3 className="text-sm font-extrabold text-white capitalize flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary text-lg">image_search</span>
+                                    {refPickerSlot?.startsWith('character-') ? 'Add Character' : refPickerSlot === 'style' ? 'Style Reference' : 'Reference Image'}
+                                </h3>
+                                <p className="text-[10px] text-slate-500 mt-1">
+                                    {refPickerSlot?.startsWith('character-') ? 'Pick a person, mascot, or character to include in your design' : refPickerSlot === 'style' ? 'Pick an image to match its visual style' : 'Pick an image for context'}
+                                </p>
+                            </div>
+
+                            {/* Source tabs — vertical */}
+                            <div className="flex flex-col gap-1 px-3">
+                                {[
+                                    { id: 'upload', icon: 'cloud_upload', label: 'Upload', subtitle: 'From device' },
+                                    { id: 'bank', icon: 'photo_library', label: 'Library', subtitle: `${bankImages.length} images` },
+                                    { id: 'brand', icon: 'domain', label: 'Brand Assets', subtitle: `${brandImages.length} images` },
+                                ].map(t => (
+                                    <button key={t.id} onClick={() => setRefPickerTab(t.id)}
+                                        className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer
+                                            ${refPickerTab === t.id
+                                                ? 'bg-primary/15 text-white border border-primary/30'
+                                                : 'text-slate-400 hover:text-white hover:bg-white/[0.04] border border-transparent'}`}>
+                                        <span className={`material-symbols-outlined text-base ${refPickerTab === t.id ? 'text-primary' : ''}`}>{t.icon}</span>
+                                        <div>
+                                            <p className="text-xs font-bold">{t.label}</p>
+                                            <p className="text-[9px] text-slate-500">{t.subtitle}</p>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Upload panel always visible at bottom */}
+                            <div className="mt-auto p-3">
+                                <label className="flex flex-col items-center justify-center p-4 rounded-xl border-2 border-dashed border-white/[0.08] hover:border-primary/40 cursor-pointer bg-white/[0.02] transition-all hover:bg-white/[0.04] group">
+                                    <span className="material-symbols-outlined text-2xl text-slate-500 group-hover:text-primary mb-1">add_photo_alternate</span>
+                                    <span className="text-[10px] text-slate-400 group-hover:text-white font-medium">Upload image</span>
+                                    <input type="file" className="hidden" accept="image/*" onChange={e => {
+                                        const file = e.target.files?.[0]
+                                        if (file) {
+                                            const reader = new FileReader()
+                                            reader.onload = ev => {
+                                                if (refPickerSlot?.startsWith('character-')) {
+                                                    setCharacters(prev => [...prev, { name: `Character ${prev.length + 1}`, image: ev.target.result }])
+                                                } else {
+                                                    setReferenceImages(prev => ({ ...prev, [refPickerSlot]: ev.target.result }))
+                                                }
+                                                setRefPickerSlot(null)
+                                            }
+                                            reader.readAsDataURL(file)
+                                        }
+                                    }} />
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* ── Right Content ── */}
+                        <div className="flex-1 flex flex-col min-w-0">
+                            {/* Top bar with search + close */}
+                            <div className="flex items-center gap-3 px-5 py-3 border-b border-white/[0.06]">
+                                <div className="flex-1 flex items-center gap-2 bg-white/[0.04] rounded-lg px-3 py-2">
+                                    <span className="material-symbols-outlined text-sm text-slate-500">search</span>
+                                    <span className="text-xs text-slate-500">
+                                        {refPickerTab === 'bank' ? 'Your generated images' : refPickerTab === 'brand' ? 'Brand website images' : 'Upload from device'}
+                                    </span>
+                                </div>
+                                <button onClick={() => setRefPickerSlot(null)}
+                                    className="p-1.5 rounded-lg hover:bg-white/[0.06] text-slate-500 hover:text-white cursor-pointer transition-colors">
+                                    <span className="material-symbols-outlined text-lg">close</span>
+                                </button>
+                            </div>
+
+                            {/* Content area */}
+                            <div className="flex-1 overflow-y-auto p-5">
+
+                                {/* Upload tab content */}
+                                {refPickerTab === 'upload' && (
+                                    <label className="flex flex-col items-center justify-center h-full rounded-2xl border-2 border-dashed border-white/[0.1] hover:border-primary/40 cursor-pointer bg-white/[0.02] transition-all group">
+                                        <span className="material-symbols-outlined text-5xl text-slate-600 group-hover:text-primary mb-3">cloud_upload</span>
+                                        <p className="text-base text-slate-400 group-hover:text-white font-medium mb-1">Drop an image or click to upload</p>
+                                        <p className="text-xs text-slate-600">PNG, JPG, or WebP up to 10MB</p>
+                                        <input type="file" className="hidden" accept="image/*" onChange={e => {
+                                            const file = e.target.files?.[0]
+                                            if (file) {
+                                                const reader = new FileReader()
+                                                reader.onload = ev => {
+                                                    if (refPickerSlot?.startsWith('character-')) {
+                                                        setCharacters(prev => [...prev, { name: `Character ${prev.length + 1}`, image: ev.target.result }])
+                                                    } else {
+                                                        setReferenceImages(prev => ({ ...prev, [refPickerSlot]: ev.target.result }))
+                                                    }
+                                                    setRefPickerSlot(null)
+                                                }
+                                                reader.readAsDataURL(file)
+                                            }
+                                        }} />
+                                    </label>
+                                )}
+
+                                {/* Library tab content */}
+                                {refPickerTab === 'bank' && (
+                                    <div>
+                                        {bankImages.length > 0 ? (
+                                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
+                                                {bankImages.map((img, i) => (
+                                                    <button key={img._id || i}
+                                                        onClick={() => {
+                                                            if (refPickerSlot?.startsWith('character-')) {
+                                                                setCharacters(prev => [...prev, { name: `Character ${prev.length + 1}`, image: img.imageUrl }])
+                                                            } else {
+                                                                setReferenceImages(prev => ({ ...prev, [refPickerSlot]: img.imageUrl }))
+                                                            }
+                                                            setRefPickerSlot(null)
+                                                        }}
+                                                        className="aspect-square rounded-xl overflow-hidden border-2 border-transparent hover:border-primary/60 cursor-pointer transition-all hover:scale-[1.03] hover:shadow-lg hover:shadow-primary/10 group relative">
+                                                        <img src={img.imageUrl || img.thumbnailUrl} alt={img.title || ''} className="w-full h-full object-cover" />
+                                                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
+                                                            <span className="text-[9px] text-white font-medium truncate">{img.title || img.type}</span>
+                                                        </div>
+                                                        <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <span className="bg-primary text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md">Select</span>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center h-60 text-center">
+                                                <span className="material-symbols-outlined text-4xl text-slate-700 mb-2">photo_library</span>
+                                                <p className="text-sm text-slate-500 font-medium">No images in your library</p>
+                                                <p className="text-xs text-slate-600 mt-1">Generate some creatives first — they'll appear here.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Brand tab content */}
+                                {refPickerTab === 'brand' && (
+                                    <div>
+                                        {brandImages.length > 0 ? (
+                                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
+                                                {brandImages.map((img, i) => (
+                                                    <button key={`brand-${i}`}
+                                                        onClick={() => {
+                                                            if (refPickerSlot?.startsWith('character-')) {
+                                                                setCharacters(prev => [...prev, { name: `Character ${prev.length + 1}`, image: img.url }])
+                                                            } else {
+                                                                setReferenceImages(prev => ({ ...prev, [refPickerSlot]: img.url }))
+                                                            }
+                                                            setRefPickerSlot(null)
+                                                        }}
+                                                        className="aspect-square rounded-xl overflow-hidden border-2 border-transparent hover:border-emerald-400/60 cursor-pointer transition-all hover:scale-[1.03] hover:shadow-lg hover:shadow-emerald-500/10 group relative">
+                                                        <img src={img.url} alt={img.alt || ''} className="w-full h-full object-cover"
+                                                            onError={e => e.target.parentElement.style.display = 'none'} />
+                                                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
+                                                            <span className="text-[9px] text-white font-medium truncate">{img.alt || img.source || 'Brand image'}</span>
+                                                        </div>
+                                                        {img.source && (
+                                                            <span className="absolute top-1.5 left-1.5 bg-emerald-500/80 text-white text-[7px] font-bold px-1.5 py-0.5 rounded-md capitalize backdrop-blur-sm">{img.source}</span>
+                                                        )}
+                                                        <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <span className="bg-emerald-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md">Select</span>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center h-60 text-center">
+                                                <span className="material-symbols-outlined text-4xl text-slate-700 mb-2">domain</span>
+                                                <p className="text-sm text-slate-500 font-medium">No brand images found</p>
+                                                <p className="text-xs text-slate-600 mt-1">Add a website URL in Brand DNA to auto-scan images.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Footer */}
+                            <div className="flex items-center justify-between px-5 py-3 border-t border-white/[0.06]">
+                                <p className="text-[10px] text-slate-600">
+                                    {refPickerTab === 'bank' ? `${bankImages.length} images` : refPickerTab === 'brand' ? `${brandImages.length} images` : 'Drag & drop or browse'}
+                                </p>
+                                <button onClick={() => setRefPickerSlot(null)}
+                                    className="px-4 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white hover:bg-white/[0.06] cursor-pointer transition-colors">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 
