@@ -164,7 +164,7 @@ app.use((err, req, res, next) => {
     });
 });
 
-app.listen(config.port, () => {
+const server = app.listen(config.port, () => {
     console.log(`\n🚀 Mantram AI Server running on port ${config.port}`);
     console.log(`📡 AI Provider: ${config.ai.defaultTextProvider} (${config.ai.defaultTextModel})`);
     console.log(`🌐 Frontend: ${config.frontendUrl}\n`);
@@ -177,5 +177,10 @@ app.listen(config.port, () => {
         console.log('🤖 Autonomous Agent active — Follow-up scheduler running every 30 min');
     }).catch(() => { });
 });
+
+// Configure Keep-Alive timeout to be larger than AWS ALB / CloudFront idle timeout (60s)
+// This prevents random 502 Bad Gateway errors caused by TCP connection race conditions
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000;
 
 export default app;

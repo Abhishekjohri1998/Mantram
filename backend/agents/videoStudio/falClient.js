@@ -449,14 +449,23 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     console.log(`🎬 Submitting to fal.ai: ${endpoint} (model: ${model})`);
     console.log(`   Payload:`, JSON.stringify(payload, null, 2).substring(0, 500));
 
-    const response = await fetch(`${FAL_BASE_URL}/${endpoint}`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Key ${apiKey}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-    });
+    let response;
+    try {
+        response = await fetch(`${FAL_BASE_URL}/${endpoint}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Key ${apiKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(35000)
+        });
+    } catch (fetchError) {
+        if (fetchError.name === 'TimeoutError' || fetchError.name === 'AbortError') {
+            throw new Error(`fal.ai (${model}) generation timed out after 35 seconds. The provider may be experiencing high traffic.`);
+        }
+        throw fetchError;
+    }
 
     if (!response.ok) {
         const errText = await response.text();

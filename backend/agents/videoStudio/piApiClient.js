@@ -247,14 +247,23 @@ export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, a
         }
     }, null, 2));
 
-    const response = await fetch(`${PIAPI_BASE_URL}/api/v1/task`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,                // Per docs: x-api-key header
-        },
-        body: JSON.stringify(payload),
-    });
+    let response;
+    try {
+        response = await fetch(`${PIAPI_BASE_URL}/api/v1/task`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,                // Per docs: x-api-key header
+            },
+            body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(35000) // 35 second timeout to prevent CloudFront 502
+        });
+    } catch (fetchError) {
+        if (fetchError.name === 'TimeoutError' || fetchError.name === 'AbortError') {
+            throw new Error('PiAPI video generation timed out after 35 seconds. The provider may be experiencing high traffic.');
+        }
+        throw fetchError;
+    }
 
     const rawText = await response.text();
     console.log(`📥 PiAPI raw response (${response.status}):`, rawText.substring(0, 1000));
