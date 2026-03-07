@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import DashboardLayout from '../components/DashboardLayout'
 
-const API_BASE = `${window.location.origin}/api`
+const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
 // ── API helper ──
 async function api(path, opts = {}) {

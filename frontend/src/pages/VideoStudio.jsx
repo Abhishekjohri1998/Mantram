@@ -5,7 +5,7 @@ import DashboardLayout from '../components/DashboardLayout'
 import { creatives as creativesAPI } from '../services/api'
 import AdvancedMode from '../components/VideoStudio/AdvancedMode'
 
-const API_BASE = `${window.location.origin}/api`
+const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
 // ── API helper (uses correct auth token) ──
 async function api(path, opts = {}) {

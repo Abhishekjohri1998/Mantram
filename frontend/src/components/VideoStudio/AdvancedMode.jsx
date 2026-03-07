@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { creatives as creativesAPI } from '../../services/api'
 
-const API_BASE = `${window.location.origin}/api`
+const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
 async function api(path, opts = {}) {
     const token = localStorage.getItem('mantram_token')
