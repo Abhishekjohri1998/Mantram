@@ -40,7 +40,95 @@ import { getRouter as getAIRouter } from '../ai/router.js';
 
 const router = Router();
 
-// Validate :id parameter — skip non-ObjectId values so named routes like /advanced/generate work
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/video-studio/advanced/generate — Direct generation (Advanced Mode)
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/advanced/generate', protect, requireCredits('videoGenerate'), async (req, res) => {
+    try {
+        const {
+            prompt, model, duration, resolution, aspectRatio,
+            firstImageUrl, lastImageUrl, referenceImages,
+            generateAudio, qualityMode, brandId,
+        } = req.body;
+
+        if (!prompt || !prompt.trim()) {
+            return res.status(400).json({ success: false, error: 'Prompt is required' });
+        }
+
+        console.log(`📸 Advanced generate: ${(referenceImages || []).length} ref images, firstImage: ${firstImageUrl ? 'yes' : 'no'}, model: ${model}, quality: ${qualityMode}`);
+
+        // Create project in advanced mode
+        // Format referenceImages for schema: [{url, label}]
+        // Skip base64 data URIs for storage (too large for MongoDB) — they're already embedded in the prompt via <img> tags
+        const formattedRefImages = (referenceImages || [])
+            .filter(r => typeof r === 'string' ? !r.startsWith('data:') : !r?.url?.startsWith('data:'))
+            .map((r, i) => typeof r === 'string' ? { url: r, label: `@image${i + 1}` } : r);
+
+        const project = await VideoProject.create({
+            user: req.user._id,
+            brand: brandId || null,
+            title: prompt.trim().substring(0, 60) + '...',
+            status: 'advanced-generating',
+            mode: 'advanced',
+            advancedConfig: {
+                prompt: prompt.trim(),
+                firstImageUrl: (firstImageUrl && !firstImageUrl.startsWith('data:')) ? firstImageUrl : '',
+                lastImageUrl: (lastImageUrl && !lastImageUrl.startsWith('data:')) ? lastImageUrl : '',
+                referenceImages: formattedRefImages,
+                aspectRatio: aspectRatio || '16:9',
+                duration: duration || 5,
+                generateAudio: generateAudio !== false,
+            },
+            routing: {
+                selectedModel: model || 'kling-3.0',
+                resolution: resolution || '1080p',
+                mode: qualityMode || 'fast',
+            },
+        });
+
+        // Plan duration if needed
+        const durationPlan = await durationPlannerNode({
+            model: model || 'kling-3.0',
+            duration: duration || 5,
+        });
+
+        // Run generation
+        const state = await advancedGenerateNode({
+            prompt: prompt.trim(),
+            model: model || 'kling-3.0',
+            duration: duration || 5,
+            resolution: resolution || '1080p',
+            qualityMode: qualityMode || 'fast',
+            firstImageUrl: firstImageUrl || '',
+            generateAudio: generateAudio !== false,
+            aspectRatio: aspectRatio || '16:9',
+            referenceImages: referenceImages || [],
+        });
+
+        // Update project with generation details
+        await VideoProject.findByIdAndUpdate(project._id, {
+            generation: state.generation,
+            backendPrompt: prompt.trim(),
+        });
+
+        res.json({
+            success: true,
+            project: {
+                _id: project._id,
+                status: 'advanced-generating',
+                mode: 'advanced',
+                generation: state.generation,
+                costPreview: state.costPreview,
+                durationPlan: durationPlan.durationPlan,
+            },
+        });
+    } catch (error) {
+        console.error('Advanced generate error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Validate :id parameter — skip non-ObjectId values so named routes like /models work
 router.param('id', (req, res, next, id) => {
     if (!mongoose.isValidObjectId(id)) {
         return next('route'); // Skip to next matching route instead of erroring
@@ -826,94 +914,6 @@ ${brandContext ? '- IMPORTANT: Align the visual style, colors, mood, and tone wi
         });
     } catch (error) {
         console.error('Enhance prompt error:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// ══════════════════════════════════════════════════════════════════════════════
-// POST /api/video-studio/advanced/generate — Direct generation (Advanced Mode)
-// ══════════════════════════════════════════════════════════════════════════════
-router.post('/advanced/generate', protect, requireCredits('videoGenerate'), async (req, res) => {
-    try {
-        const {
-            prompt, model, duration, resolution, aspectRatio,
-            firstImageUrl, lastImageUrl, referenceImages,
-            generateAudio, qualityMode, brandId,
-        } = req.body;
-
-        if (!prompt || !prompt.trim()) {
-            return res.status(400).json({ success: false, error: 'Prompt is required' });
-        }
-
-        console.log(`📸 Advanced generate: ${(referenceImages || []).length} ref images, firstImage: ${firstImageUrl ? 'yes' : 'no'}, model: ${model}, quality: ${qualityMode}`);
-
-        // Create project in advanced mode
-        // Format referenceImages for schema: [{url, label}]
-        // Skip base64 data URIs for storage (too large for MongoDB) — they're already embedded in the prompt via <img> tags
-        const formattedRefImages = (referenceImages || [])
-            .filter(r => typeof r === 'string' ? !r.startsWith('data:') : !r?.url?.startsWith('data:'))
-            .map((r, i) => typeof r === 'string' ? { url: r, label: `@image${i + 1}` } : r);
-
-        const project = await VideoProject.create({
-            user: req.user._id,
-            brand: brandId || null,
-            title: prompt.trim().substring(0, 60) + '...',
-            status: 'advanced-generating',
-            mode: 'advanced',
-            advancedConfig: {
-                prompt: prompt.trim(),
-                firstImageUrl: (firstImageUrl && !firstImageUrl.startsWith('data:')) ? firstImageUrl : '',
-                lastImageUrl: (lastImageUrl && !lastImageUrl.startsWith('data:')) ? lastImageUrl : '',
-                referenceImages: formattedRefImages,
-                aspectRatio: aspectRatio || '16:9',
-                duration: duration || 5,
-                generateAudio: generateAudio !== false,
-            },
-            routing: {
-                selectedModel: model || 'kling-3.0',
-                resolution: resolution || '1080p',
-                mode: qualityMode || 'fast',
-            },
-        });
-
-        // Plan duration if needed
-        const durationPlan = await durationPlannerNode({
-            model: model || 'kling-3.0',
-            duration: duration || 5,
-        });
-
-        // Run generation
-        const state = await advancedGenerateNode({
-            prompt: prompt.trim(),
-            model: model || 'kling-3.0',
-            duration: duration || 5,
-            resolution: resolution || '1080p',
-            qualityMode: qualityMode || 'fast',
-            firstImageUrl: firstImageUrl || '',
-            generateAudio: generateAudio !== false,
-            aspectRatio: aspectRatio || '16:9',
-            referenceImages: referenceImages || [],
-        });
-
-        // Update project with generation details
-        await VideoProject.findByIdAndUpdate(project._id, {
-            generation: state.generation,
-            backendPrompt: prompt.trim(),
-        });
-
-        res.json({
-            success: true,
-            project: {
-                _id: project._id,
-                status: 'advanced-generating',
-                mode: 'advanced',
-                generation: state.generation,
-                costPreview: state.costPreview,
-                durationPlan: durationPlan.durationPlan,
-            },
-        });
-    } catch (error) {
-        console.error('Advanced generate error:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
