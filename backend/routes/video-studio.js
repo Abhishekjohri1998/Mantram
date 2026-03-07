@@ -610,7 +610,7 @@ router.get('/', protect, async (req, res) => {
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(Number(limit))
-                .select('title status mode input.videoType routing.selectedModel routing.costPreview generation createdAt updatedAt')
+                .select('title status mode input.videoType input.brief input.images advancedConfig routing.selectedModel routing.costPreview generation createdAt updatedAt')
                 .populate('brand', 'name dna.logo.url')
                 .lean(),
             VideoProject.countDocuments(filter),

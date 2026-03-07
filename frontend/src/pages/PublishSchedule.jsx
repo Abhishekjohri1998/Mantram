@@ -92,16 +92,12 @@ export default function PublishSchedule() {
     }
 
     return (
-        <DashboardLayout>
+        <DashboardLayout title="Publish & Schedule" subtitle="Multi-platform content publishing">
             <div className="p-8 max-w-5xl mx-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <h1 className="text-3xl font-extrabold text-white tracking-tight">
-                            <span className="material-symbols-outlined text-primary text-3xl align-middle mr-2">send</span>
-                            Publish & Schedule
-                        </h1>
-                        <p className="text-slate-500 text-sm mt-1">
+                        <p className="text-slate-500 text-sm">
                             {allContent.length} total content pieces • {counts.approved} ready to publish
                         </p>
                     </div>

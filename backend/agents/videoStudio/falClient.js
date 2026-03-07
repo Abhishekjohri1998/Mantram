@@ -426,6 +426,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             statusUrl: null,
             resultUrl: null,
             provider: 'piapi',
+            _piApiPayload: result._payload, // Store for auto-retry on intermittent failures
         };
     }
 

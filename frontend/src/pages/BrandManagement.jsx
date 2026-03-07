@@ -145,11 +145,10 @@ export default function BrandManagement() {
     }
 
     return (
-        <DashboardLayout>
+        <DashboardLayout title="Brand Management" subtitle="Manage your brand profiles & DNA">
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
                 <div>
-                    <h2 className="text-3xl font-extrabold tracking-tight mb-1">Brand <span className="text-primary">Manager</span></h2>
                     <p className="text-slate-400 text-sm">
                         {planLimits ? `${allBrands.length}/${planLimits.maxBrands} brands · ${planLimits.plan} plan` : `${allBrands.length} brand${allBrands.length !== 1 ? 's' : ''} · Manage your brand portfolio`}
                     </p>

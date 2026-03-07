@@ -62,6 +62,10 @@ export default function CreativeStudio() {
     const [bankLoading, setBankLoading] = useState(false)
     const [bankTotal, setBankTotal] = useState(0)
     const [lightboxIdx, setLightboxIdx] = useState(null) // index into bankImages for zoom view
+    const [bankView, setBankView] = useState('list') // 'list' | 'grid'
+    const [bankCopiedId, setBankCopiedId] = useState(null)
+    const [bankTab, setBankTab] = useState('generated') // 'generated' | 'uploaded' | 'brand'
+    const [bankCounts, setBankCounts] = useState({ uploaded: 0, generated: 0 })
 
     // Photoshoot image passed to design mode
     const [designBaseImage, setDesignBaseImage] = useState(null)
@@ -446,18 +450,18 @@ export default function CreativeStudio() {
         }
     }, [activeBrand?._id])
 
-    const loadImageBank = async () => {
-        console.log('📸 loadImageBank called, activeBrand:', activeBrand?._id, activeBrand?.name)
+    const loadImageBank = async (cat) => {
+        const category = cat || bankTab
         setBankLoading(true)
         try {
-            // Load all user images — brandId filter is optional
-            const params = {}
+            const params = { limit: 50 }
             if (activeBrand?._id) params.brandId = activeBrand._id
-            console.log('📸 Calling imageBank API with params:', params)
+            // 'brand' tab uses client-side data, no API call needed
+            if (category !== 'brand') params.category = category
             const data = await creativesAPI.imageBank(params)
-            console.log('📸 imageBank response:', { success: data.success, total: data.total, imageCount: data.images?.length, counts: data.counts, error: data.error })
             setBankImages(data.images || [])
             setBankTotal(data.total || 0)
+            if (data.counts) setBankCounts(data.counts)
         } catch (err) {
             console.error('📸 Failed to load image bank:', err)
         } finally {
@@ -1151,12 +1155,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
     }, [selectedType])
 
     return (
-        <DashboardLayout>
-            <div className="flex items-end justify-between mb-6">
-                <div>
-                    <h2 className="text-3xl font-extrabold tracking-tight mb-1">Creative <span className="text-primary">Studio</span></h2>
-                    <p className="text-slate-400 text-sm">Describe what you want — AI creates on-brand visuals instantly.</p>
-                </div>
+        <DashboardLayout title="Creative Studio" subtitle="AI-powered image generation & design">
+            <div className="flex items-center justify-end mb-6">
                 <div className="flex items-center gap-2">
                     {/* Image Bank badge */}
                     <button onClick={() => { setStudioMode('imagebank'); loadImageBank() }}
@@ -1869,6 +1869,57 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             Back to Studio
                         </button>
                     </div>
+
+                    {/* Recent Photoshoots */}
+                    {(() => {
+                        const recentPhotoshoots = bankImages.filter(i => i.type === 'ai-photoshoot' || i.type === 'photoshoot').slice(0, 8);
+                        if (recentPhotoshoots.length === 0) return null;
+                        const getTimeAgo = (d) => {
+                            if (!d) return '';
+                            const diff = Date.now() - new Date(d).getTime();
+                            const m = Math.floor(diff / 60000);
+                            if (m < 1) return 'just now';
+                            if (m < 60) return `${m}m ago`;
+                            const h = Math.floor(m / 60);
+                            if (h < 24) return `${h}h ago`;
+                            const dy = Math.floor(h / 24);
+                            if (dy < 7) return `${dy}d ago`;
+                            return new Date(d).toLocaleDateString();
+                        };
+                        return (
+                            <div className="col-span-12 glass-panel rounded-2xl p-4 mb-1">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-amber-500 text-sm">history</span>
+                                        Recent Photoshoots
+                                        <span className="text-slate-500 font-normal">({recentPhotoshoots.length})</span>
+                                    </h4>
+                                </div>
+                                <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.06) transparent' }}>
+                                    {recentPhotoshoots.map(img => (
+                                        <div key={img._id} className="flex-shrink-0 w-48 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.12] overflow-hidden group transition-all cursor-pointer"
+                                            onClick={() => {
+                                                if (img.prompt) { setPhotoshootBrief(img.prompt); setSceneKeywords(img.tags || []) }
+                                            }}>
+                                            <div className="relative h-24 overflow-hidden">
+                                                <img src={img.imageUrl || img.thumbnailUrl} alt={img.title || 'Photoshoot'} loading="lazy"
+                                                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                                                <div className="absolute bottom-1.5 left-2 right-2">
+                                                    <p className="text-white text-[10px] font-medium truncate">{img.prompt ? (img.prompt.length > 40 ? img.prompt.slice(0, 40) + '…' : img.prompt) : 'Photoshoot'}</p>
+                                                    <p className="text-slate-400 text-[9px]">{getTimeAgo(img.createdAt)}</p>
+                                                </div>
+                                            </div>
+                                            <div className="px-2 py-1.5 flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <span className="material-symbols-outlined text-amber-400 text-xs">replay</span>
+                                                <span className="text-[10px] text-slate-400 font-medium">Refill</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )
+                    })()}
                     {/* Left — Photoshoot Controls */}
                     <div className="col-span-12 lg:col-span-5 space-y-5">
                         {/* Product Image Upload */}
@@ -3339,69 +3390,116 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         <span className="material-symbols-outlined text-sm">arrow_back</span>
                         Back to Studio
                     </button>
+
+                    {/* ── Tab Bar ── */}
                     <div className="flex items-center justify-between mb-5">
-                        <div>
-                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                <span className="material-symbols-outlined text-primary">photo_library</span>
-                                Image Bank
-                                {bankTotal > 0 && <span className="text-sm text-slate-400 font-normal ml-1">({bankTotal} images)</span>}
-                            </h3>
-                            <p className="text-sm text-slate-500 mt-1">All your AI-generated images — click to zoom, arrow keys to navigate</p>
+                        <div className="flex items-center gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                            {[
+                                { id: 'generated', icon: 'auto_awesome', label: 'AI Generated', count: bankCounts.generated },
+                                { id: 'uploaded', icon: 'upload_file', label: 'Uploaded', count: bankCounts.uploaded },
+                                { id: 'brand', icon: 'language', label: 'Brand Images', count: activeBrand?.dna?.brandImages?.length || 0 },
+                            ].map(tab => (
+                                <button key={tab.id} onClick={() => { setBankTab(tab.id); if (tab.id !== 'brand') loadImageBank(tab.id) }}
+                                    className={`flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${bankTab === tab.id
+                                        ? 'bg-gradient-to-r from-violet-600 to-cyan-600 text-white shadow-lg shadow-violet-500/20'
+                                        : 'text-slate-500 hover:text-white hover:bg-white/[0.05]'}`}>
+                                    <span className="material-symbols-outlined text-sm">{tab.icon}</span>
+                                    {tab.label}
+                                    {tab.count > 0 && (
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${bankTab === tab.id ? 'bg-white/20 text-white' : 'bg-white/[0.06] text-slate-400'}`}>
+                                            {tab.count}
+                                        </span>
+                                    )}
+                                </button>
+                            ))}
                         </div>
-                        <button onClick={loadImageBank}
-                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs glass-panel text-slate-400 hover:text-white cursor-pointer">
-                            <span className="material-symbols-outlined text-sm">refresh</span>
-                            Refresh
-                        </button>
+                        <div className="flex items-center gap-2">
+                            {bankTab !== 'brand' && (
+                                <>
+                                    <div className="flex rounded-lg border border-white/[0.08] overflow-hidden">
+                                        <button onClick={() => setBankView('list')}
+                                            className={`p-1.5 transition-all cursor-pointer ${bankView === 'list' ? 'bg-white/[0.08] text-white' : 'text-slate-600 hover:text-slate-400'}`}
+                                            title="List view">
+                                            <span className="material-symbols-outlined text-sm">view_list</span>
+                                        </button>
+                                        <button onClick={() => setBankView('grid')}
+                                            className={`p-1.5 transition-all cursor-pointer ${bankView === 'grid' ? 'bg-white/[0.08] text-white' : 'text-slate-600 hover:text-slate-400'}`}
+                                            title="Grid view">
+                                            <span className="material-symbols-outlined text-sm">grid_view</span>
+                                        </button>
+                                    </div>
+                                    <button onClick={() => loadImageBank()}
+                                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs glass-panel text-slate-400 hover:text-white cursor-pointer">
+                                        <span className="material-symbols-outlined text-sm">refresh</span>
+                                        Refresh
+                                    </button>
+                                </>
+                            )}
+                        </div>
                     </div>
 
-                    {bankLoading && (
+                    {bankLoading && bankTab !== 'brand' && (
                         <div className="flex items-center justify-center py-20">
                             <span className="material-symbols-outlined text-3xl text-primary animate-spin">progress_activity</span>
                         </div>
                     )}
 
-                    {/* Brand Website Images Section — always visible if available */}
-                    {(activeBrand?.dna?.brandImages?.length > 0 || activeBrand?.dna?.bannerImages?.length > 0) && (
-                        <div className="mb-6">
-                            <div className="flex items-center gap-2 mb-3">
-                                <span className="material-symbols-outlined text-emerald-500 text-sm">language</span>
-                                <h4 className="text-sm font-bold text-white">From Brand Website</h4>
-                                <span className="text-sm text-slate-500 bg-white/[0.04] px-2 py-0.5 rounded">
-                                    {(activeBrand.dna.brandImages || activeBrand.dna.bannerImages || []).length} images
-                                </span>
-                            </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                                {(activeBrand.dna.brandImages || activeBrand.dna.bannerImages || []).map((img, idx) => (
-                                    <div key={`brand-${idx}`}
-                                        className="glass-panel rounded-xl overflow-hidden group relative cursor-pointer"
-                                        onClick={() => {
-                                            // Open in a simple preview
-                                            window.open(img.url, '_blank')
-                                        }}>
-                                        <img src={img.url} alt={img.alt || `Brand ${idx + 1}`} loading="lazy"
-                                            className="w-full object-cover transition-transform duration-300 group-hover:scale-105" style={{ minHeight: '80px', maxHeight: '200px' }}
-                                            onError={e => e.target.parentElement.style.display = 'none'} />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                        <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <p className="text-sm text-white/80 truncate">{img.alt || img.source || 'Website'}</p>
+                    {/* ═══ BRAND IMAGES TAB ═══ */}
+                    {bankTab === 'brand' && (() => {
+                        const allBrandImgs = activeBrand?.dna?.brandImages || activeBrand?.dna?.bannerImages || []
+                        return allBrandImgs.length > 0 ? (
+                            <div>
+                                <p className="text-xs text-slate-500 mb-4">Images scraped from your brand website during onboarding. Use them as references for AI generation.</p>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                    {allBrandImgs.map((img, idx) => (
+                                        <div key={`brand-${idx}`}
+                                            className="glass-panel rounded-2xl overflow-hidden group relative cursor-pointer">
+                                            <img src={img.url} alt={img.alt || `Brand ${idx + 1}`} loading="lazy"
+                                                className="w-full object-cover transition-transform duration-300 group-hover:scale-105" style={{ minHeight: '100px', maxHeight: '240px' }}
+                                                onError={e => e.target.parentElement.style.display = 'none'} />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-3">
+                                                <p className="text-white text-xs font-bold truncate mb-2">{img.alt || img.source || 'Website Image'}</p>
+                                                <div className="flex gap-1">
+                                                    <button onClick={(e) => { e.stopPropagation(); window.open(img.url, '_blank') }}
+                                                        className="p-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-all cursor-pointer" title="View Full Size">
+                                                        <span className="material-symbols-outlined text-xs">open_in_new</span>
+                                                    </button>
+                                                    <button onClick={(e) => { e.stopPropagation(); setDesignBaseImage(img.url); setPrompt(`Create a ${selectedType} using this brand image as reference. Brand: ${activeBrand?.name}.`); setStudioMode('create') }}
+                                                        className="p-1.5 rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-all cursor-pointer" title="Use in Design">
+                                                        <span className="material-symbols-outlined text-xs">palette</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            {img.source && (
+                                                <span className="absolute top-2 right-2 text-[8px] text-white/70 bg-emerald-500/40 px-1.5 py-0.5 rounded-full backdrop-blur-sm capitalize">{img.source}</span>
+                                            )}
                                         </div>
-                                        {img.source && (
-                                            <span className="absolute top-1.5 right-1.5 text-[8px] text-white/70 bg-emerald-500/40 px-1.5 py-0.5 rounded-full backdrop-blur-sm capitalize">{img.source}</span>
-                                        )}
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
+                                <p className="text-xs text-slate-600 mt-3 italic">💡 These images can be used as reference for templates, AI photoshoots, and creative generation.</p>
                             </div>
-                            <p className="text-xs text-slate-600 mt-2 italic">💡 These images can be used as reference for templates, AI photoshoots, and creative generation.</p>
-                        </div>
-                    )}
+                        ) : (
+                            <div className="glass-panel rounded-2xl p-12 text-center">
+                                <span className="material-symbols-outlined text-6xl text-slate-700 mb-4 block">language</span>
+                                <h3 className="text-lg font-bold text-slate-500 mb-2">No Brand Images</h3>
+                                <p className="text-xs text-slate-600 mb-4 max-w-md mx-auto">Run brand onboarding to scan your website and auto-import brand images.</p>
+                                <button onClick={() => navigate('/onboarding')}
+                                    className="btn-primary py-2.5 px-5 rounded-xl text-xs font-bold cursor-pointer">
+                                    <span className="material-symbols-outlined text-sm">language</span> Scan Website
+                                </button>
+                            </div>
+                        )
+                    })()}
 
-                    {!bankLoading && bankImages.length === 0 && !(activeBrand?.dna?.brandImages?.length > 0 || activeBrand?.dna?.bannerImages?.length > 0) && (
+                    {/* ═══ GENERATED / UPLOADED TABS ═══ */}
+                    {bankTab !== 'brand' && !bankLoading && bankImages.length === 0 && (
                         <div className="glass-panel rounded-2xl p-12 text-center">
-                            <span className="material-symbols-outlined text-6xl text-slate-700 mb-4 block">photo_library</span>
-                            <h3 className="text-lg font-bold text-slate-500 mb-2">No Images Yet</h3>
+                            <span className="material-symbols-outlined text-6xl text-slate-700 mb-4 block">{bankTab === 'uploaded' ? 'upload_file' : 'auto_awesome'}</span>
+                            <h3 className="text-lg font-bold text-slate-500 mb-2">{bankTab === 'uploaded' ? 'No Uploaded Images' : 'No Generated Images Yet'}</h3>
                             <p className="text-xs text-slate-600 mb-4 max-w-md mx-auto">
-                                Generate images in Design Studio or AI Photoshoot — they'll automatically appear here.
+                                {bankTab === 'uploaded'
+                                    ? 'Upload images to use as references or base images for your designs.'
+                                    : 'Generate images in Design Studio or AI Photoshoot — they\'ll automatically appear here.'}
                             </p>
                             <div className="flex gap-2 justify-center">
                                 <button onClick={() => setStudioMode('create')}
@@ -3418,76 +3516,215 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         </div>
                     )}
 
-                    {!bankLoading && bankImages.length > 0 && (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {bankImages.map((img, idx) => (
-                                <div key={img._id} className="glass-panel rounded-2xl overflow-hidden group relative cursor-pointer"
-                                    onClick={() => setLightboxIdx(idx)}>
-                                    <img src={img.imageUrl || img.thumbnailUrl} alt={img.title || 'Generated'} loading="lazy"
-                                        className="w-full object-cover transition-transform duration-300 group-hover:scale-105" style={{ minHeight: '120px', maxHeight: '300px' }} />
+                    {bankTab !== 'brand' && !bankLoading && bankImages.length > 0 && (() => {
+                        const getTimeAgo = (dateStr) => {
+                            if (!dateStr) return '';
+                            const diff = Date.now() - new Date(dateStr).getTime();
+                            const mins = Math.floor(diff / 60000);
+                            if (mins < 1) return 'just now';
+                            if (mins < 60) return `${mins}m ago`;
+                            const hrs = Math.floor(mins / 60);
+                            if (hrs < 24) return `${hrs}h ago`;
+                            const days = Math.floor(hrs / 24);
+                            if (days < 7) return `${days}d ago`;
+                            return new Date(dateStr).toLocaleDateString();
+                        };
+                        const handleRefillCreative = (img) => {
+                            const isPhotoshootType = img.type === 'ai-photoshoot' || img.type === 'photoshoot';
+                            if (isPhotoshootType) {
+                                setPhotoshootBrief(img.prompt || '');
+                                setSceneKeywords(img.tags || []);
+                                setStudioMode('photoshoot');
+                            } else {
+                                setPrompt(img.prompt || '');
+                                if (img.designData?.style) setStyle(img.designData.style);
+                                if (img.type && !['uploaded', 'other'].includes(img.type)) setSelectedType(img.type);
+                                if (img.designData?.textOverlay) setTextOverlay(img.designData.textOverlay);
+                                setStudioMode('create');
+                                setShowQuickStart(false);
+                            }
+                        };
+                        const handleDownloadImage = async (url, title) => {
+                            if (!url) return;
+                            try {
+                                const resp = await fetch(url);
+                                const blob = await resp.blob();
+                                const blobUrl = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = blobUrl;
+                                a.download = `${(title || 'image').replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
+                                document.body.appendChild(a);
+                                a.click();
+                                setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(blobUrl) }, 100);
+                            } catch { window.open(url, '_blank') }
+                        };
+                        const handleCopyImagePrompt = (text, id) => {
+                            if (!text) return;
+                            navigator.clipboard.writeText(text).then(() => {
+                                setBankCopiedId(id);
+                                setTimeout(() => setBankCopiedId(null), 2000);
+                            });
+                        };
+                        return bankView === 'list' ? (
+                            <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+                                {bankImages.map((img, idx) => {
+                                    const isPhotoshoot = img.type === 'ai-photoshoot' || img.type === 'photoshoot';
+                                    const isUploaded = img.type === 'uploaded';
+                                    const timeAgo = getTimeAgo(img.createdAt);
+                                    const promptPreview = img.prompt ? (img.prompt.length > 80 ? img.prompt.slice(0, 80) + '…' : img.prompt) : '';
+                                    return (
+                                        <div key={img._id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.12] transition-all group">
+                                            {/* Thumbnail */}
+                                            <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-black/40 cursor-pointer"
+                                                onClick={() => setLightboxIdx(idx)}>
+                                                <img src={img.imageUrl || img.thumbnailUrl} alt={img.title || 'Image'} loading="lazy"
+                                                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                                                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                    <span className="material-symbols-outlined text-white/80 text-lg">zoom_in</span>
+                                                </div>
+                                            </div>
 
-                                    {/* Hover overlay */}
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-3">
-                                        <p className="text-white text-xs font-bold truncate mb-0.5">{img.title || 'AI Image'}</p>
-                                        <p className="text-slate-400 text-xs truncate mb-2">
-                                            {img.type === 'ai-photoshoot' ? '📸 Photoshoot' : '🎨 Design'} • {new Date(img.createdAt).toLocaleDateString()}
-                                        </p>
-                                        <div className="flex gap-1.5">
-                                            <a href={img.imageUrl} download={`${img.title || 'image'}.png`}
-                                                onClick={e => e.stopPropagation()}
-                                                className="flex-1 py-1.5 rounded-lg bg-white/10 text-white text-xs font-bold text-center hover:bg-white/20 flex items-center justify-center gap-1">
-                                                <span className="material-symbols-outlined text-xs">download</span>
-                                            </a>
-                                            <button onClick={(e) => {
-                                                e.stopPropagation()
-                                                sessionStorage.setItem('canvasEditorImage', img.imageUrl)
-                                                navigate('/creative-studio/editor')
-                                            }}
-                                                className="flex-1 py-1.5 rounded-lg bg-violet-500/20 text-violet-400 text-xs font-bold text-center hover:bg-violet-500/30 cursor-pointer flex items-center justify-center gap-1">
-                                                <span className="material-symbols-outlined text-xs">edit</span>
-                                            </button>
-                                            <button onClick={(e) => {
-                                                e.stopPropagation()
-                                                setDesignBaseImage(img.imageUrl)
-                                                setPrompt(`Adapt this image for ${selectedType}. Brand: ${activeBrand?.name}.`)
-                                                setStudioMode('create')
-                                            }}
-                                                className="flex-1 py-1.5 rounded-lg bg-primary/20 text-primary text-xs font-bold text-center hover:bg-primary/30 cursor-pointer flex items-center justify-center gap-1">
-                                                <span className="material-symbols-outlined text-xs">palette</span>
-                                            </button>
-                                            <button onClick={async (e) => {
-                                                e.stopPropagation()
-                                                if (confirm('Delete this image?')) {
-                                                    try {
-                                                        await creativesAPI.delete(img._id)
-                                                        loadImageBank()
-                                                    } catch (err) { console.error(err) }
-                                                }
-                                            }}
-                                                className="py-1.5 px-2 rounded-lg bg-rose-500/10 text-rose-400 text-xs hover:bg-rose-500/20 cursor-pointer flex items-center justify-center">
-                                                <span className="material-symbols-outlined text-xs">delete</span>
-                                            </button>
+                                            {/* Info */}
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-white truncate mb-1">{img.title || 'AI Image'}</p>
+                                                {promptPreview && (
+                                                    <p className="text-xs text-slate-500 truncate mb-1.5" title={img.prompt}>{promptPreview}</p>
+                                                )}
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${isPhotoshoot ? 'bg-amber-500/15 text-amber-400' :
+                                                        isUploaded ? 'bg-slate-500/15 text-slate-400' :
+                                                            'bg-primary/15 text-primary'}`}>
+                                                        {isPhotoshoot ? '📸 Photoshoot' : isUploaded ? '📁 Uploaded' : '🎨 Design'}
+                                                    </span>
+                                                    {img.designData?.style && (
+                                                        <span className="text-[10px] text-slate-600">{img.designData.style}</span>
+                                                    )}
+                                                    <span className="text-[10px] text-slate-700">{timeAgo}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Actions */}
+                                            <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                {img.prompt && (
+                                                    <button onClick={(e) => { e.stopPropagation(); handleRefillCreative(img) }}
+                                                        className="p-1.5 rounded-lg text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 transition-all cursor-pointer"
+                                                        title="Refill inputs & regenerate">
+                                                        <span className="material-symbols-outlined text-base">replay</span>
+                                                    </button>
+                                                )}
+                                                {img.prompt && (
+                                                    <button onClick={(e) => { e.stopPropagation(); handleCopyImagePrompt(img.prompt, img._id) }}
+                                                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${bankCopiedId === img._id ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-500 hover:text-blue-400 hover:bg-blue-500/10'}`}
+                                                        title={bankCopiedId === img._id ? 'Copied!' : 'Copy prompt'}>
+                                                        <span className="material-symbols-outlined text-base">{bankCopiedId === img._id ? 'check' : 'content_copy'}</span>
+                                                    </button>
+                                                )}
+                                                <button onClick={(e) => { e.stopPropagation(); handleDownloadImage(img.imageUrl, img.title || 'image') }}
+                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all cursor-pointer"
+                                                    title="Download">
+                                                    <span className="material-symbols-outlined text-base">download</span>
+                                                </button>
+                                                <button onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    sessionStorage.setItem('canvasEditorImage', img.imageUrl);
+                                                    navigate('/creative-studio/editor')
+                                                }}
+                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-violet-400 hover:bg-violet-500/10 transition-all cursor-pointer"
+                                                    title="Edit in Canvas">
+                                                    <span className="material-symbols-outlined text-base">edit</span>
+                                                </button>
+                                                <button onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setDesignBaseImage(img.imageUrl);
+                                                    setPrompt(`Adapt this image for ${selectedType}. Brand: ${activeBrand?.name}.`);
+                                                    setStudioMode('create')
+                                                }}
+                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer"
+                                                    title="Use as base">
+                                                    <span className="material-symbols-outlined text-base">palette</span>
+                                                </button>
+                                                <button onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    if (confirm('Delete this image?')) {
+                                                        try { await creativesAPI.delete(img._id); loadImageBank() } catch (err) { console.error(err) }
+                                                    }
+                                                }}
+                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
+                                                    title="Delete">
+                                                    <span className="material-symbols-outlined text-base">delete</span>
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
+                                    )
+                                })}
+                            </div>
+                        ) : (
+                            /* ── GRID VIEW ── */
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[70vh] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+                                {bankImages.map((img, idx) => {
+                                    const isPhotoshoot = img.type === 'ai-photoshoot' || img.type === 'photoshoot';
+                                    const isUploaded = img.type === 'uploaded';
+                                    const timeAgo = getTimeAgo(img.createdAt);
+                                    return (
+                                        <div key={img._id} className="glass-panel rounded-2xl overflow-hidden group relative cursor-pointer"
+                                            onClick={() => setLightboxIdx(idx)}>
+                                            <img src={img.imageUrl || img.thumbnailUrl} alt={img.title || 'Generated'} loading="lazy"
+                                                className="w-full object-cover transition-transform duration-300 group-hover:scale-105" style={{ minHeight: '120px', maxHeight: '300px' }} />
 
-                                    {/* Zoom hint */}
-                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <span className="material-symbols-outlined text-white/70 text-sm bg-black/40 rounded-lg p-1">zoom_in</span>
-                                    </div>
+                                            {/* Hover overlay */}
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-3">
+                                                <p className="text-white text-xs font-bold truncate mb-0.5">{img.title || 'AI Image'}</p>
+                                                {img.prompt && <p className="text-slate-400 text-[10px] truncate mb-2" title={img.prompt}>{img.prompt.length > 50 ? img.prompt.slice(0, 50) + '…' : img.prompt}</p>}
+                                                <div className="flex gap-1">
+                                                    {img.prompt && (
+                                                        <>
+                                                            <button onClick={(e) => { e.stopPropagation(); handleRefillCreative(img) }}
+                                                                className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-all cursor-pointer" title="Refill">
+                                                                <span className="material-symbols-outlined text-xs">replay</span>
+                                                            </button>
+                                                            <button onClick={(e) => { e.stopPropagation(); handleCopyImagePrompt(img.prompt, img._id) }}
+                                                                className={`p-1.5 rounded-lg transition-all cursor-pointer ${bankCopiedId === img._id ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'}`}
+                                                                title={bankCopiedId === img._id ? 'Copied!' : 'Copy prompt'}>
+                                                                <span className="material-symbols-outlined text-xs">{bankCopiedId === img._id ? 'check' : 'content_copy'}</span>
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    <button onClick={(e) => { e.stopPropagation(); handleDownloadImage(img.imageUrl, img.title || 'image') }}
+                                                        className="p-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-all cursor-pointer" title="Download">
+                                                        <span className="material-symbols-outlined text-xs">download</span>
+                                                    </button>
+                                                    <button onClick={(e) => { e.stopPropagation(); sessionStorage.setItem('canvasEditorImage', img.imageUrl); navigate('/creative-studio/editor') }}
+                                                        className="p-1.5 rounded-lg bg-violet-500/20 text-violet-400 hover:bg-violet-500/30 transition-all cursor-pointer" title="Edit">
+                                                        <span className="material-symbols-outlined text-xs">edit</span>
+                                                    </button>
+                                                    <button onClick={async (e) => {
+                                                        e.stopPropagation();
+                                                        if (confirm('Delete this image?')) {
+                                                            try { await creativesAPI.delete(img._id); loadImageBank() } catch (err) { console.error(err) }
+                                                        }
+                                                    }}
+                                                        className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition-all cursor-pointer" title="Delete">
+                                                        <span className="material-symbols-outlined text-xs">delete</span>
+                                                    </button>
+                                                </div>
+                                            </div>
 
-                                    {/* Source badge */}
-                                    <div className="absolute top-2 left-2">
-                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${img.type === 'ai-photoshoot'
-                                            ? 'bg-amber-500/20 text-amber-400'
-                                            : 'bg-primary/20 text-primary'
-                                            }`}>
-                                            {img.type === 'ai-photoshoot' ? '📸' : '🎨'}
-                                        </span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                                            {/* Source badge */}
+                                            <div className="absolute top-2 left-2">
+                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full backdrop-blur-sm ${isPhotoshoot ? 'bg-amber-500/30 text-amber-300' : isUploaded ? 'bg-slate-500/30 text-slate-300' : 'bg-primary/30 text-primary-light'}`}>
+                                                    {isPhotoshoot ? '📸' : isUploaded ? '📁' : '🎨'}
+                                                </span>
+                                            </div>
+                                            {/* Time badge */}
+                                            <div className="absolute top-2 right-2">
+                                                <span className="text-[8px] text-white/60 bg-black/40 px-1.5 py-0.5 rounded-full backdrop-blur-sm">{timeAgo}</span>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )
+                    })()}
 
                     {/* ═══ ZOOM LIGHTBOX (for generated result) ═══ */}
                     {zoomImage && (

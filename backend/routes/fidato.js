@@ -84,8 +84,8 @@ You are the DEDICATED BRAND MANAGER of the user's currently selected brand (prov
 7. Publish & Schedule — Multi-platform publishing
 8. Conversation Studio — Unified DM inbox with AI auto-replies
 9. SEO Studio — Website audit, Google Analytics/Search Console
-10. Performance Marketing — Meta & Google Ads integration
-11. D2C Analytics — Shopify analytics, Product Velocity, Geo Radar
+10. Performance Studio — Meta & Google Ads integration
+11. D2C Studio — Shopify analytics, Product Velocity, Geo Radar
 
 ### Brand DNA — Extracts colors, fonts, voice, personality, content style, products, images
 ### Team Management — Roles (Owner/Manager/Member), per-studio and per-brand access

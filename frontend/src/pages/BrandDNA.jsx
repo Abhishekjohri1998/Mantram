@@ -1202,7 +1202,7 @@ export default function BrandDNA() {
 
     if (!brand) {
         return (
-            <DashboardLayout>
+            <DashboardLayout title="Brand DNA" subtitle="Your brand's intelligence profile">
                 <div className="flex flex-col items-center justify-center py-20 gap-4">
                     <span className="material-symbols-outlined text-6xl text-slate-600">fingerprint</span>
                     <h2 className="text-2xl font-extrabold text-white">No Brand Selected</h2>
@@ -1216,13 +1216,10 @@ export default function BrandDNA() {
     }
 
     return (
-        <DashboardLayout key={brand._id}>
+        <DashboardLayout key={brand._id} title="Brand DNA" subtitle="Your brand's intelligence profile">
             {/* Header */}
             <div className="flex items-end justify-between mb-6">
-                <div>
-                    <h2 className="text-3xl font-extrabold tracking-tight mb-1">Brand <span className="text-primary">DNA</span></h2>
-                    <p className="text-slate-400 text-sm">Your brand knowledge bank — this drives all AI-generated content.</p>
-                </div>
+                <div></div>
                 <div className="flex items-center gap-2">
                     <button onClick={() => navigate('/onboarding')}
                         className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer">

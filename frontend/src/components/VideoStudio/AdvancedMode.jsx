@@ -128,7 +128,7 @@ const css = `
 .adv-spin { animation: adv-spin 1s linear infinite; }
 `
 
-export default function AdvancedMode({ activeBrand }) {
+export default function AdvancedMode({ activeBrand, initialData }) {
     const [model, setModel] = useState('seedance-2.0')
     const [prompt, setPrompt] = useState('')
     const [duration, setDuration] = useState(6)
@@ -164,6 +164,26 @@ export default function AdvancedMode({ activeBrand }) {
 
     const m = MODELS[model] || MODELS['seedance-2.0']
     const credits = Math.ceil(m.cost * duration * 30)
+
+    // ── Refill from initialData (history re-use) ──
+    useEffect(() => {
+        if (!initialData) return
+        if (initialData.prompt) setPrompt(initialData.prompt)
+        if (initialData.model && MODELS[initialData.model]) setModel(initialData.model)
+        if (initialData.duration) setDuration(initialData.duration)
+        if (initialData.aspectRatio) setAspectRatio(initialData.aspectRatio)
+        if (initialData.quality) setQuality(initialData.quality)
+        if (initialData.firstImageUrl) setFirstFrame({ url: initialData.firstImageUrl, source: 'refill' })
+        if (initialData.lastImageUrl) setLastFrame({ url: initialData.lastImageUrl, source: 'refill' })
+        if (initialData.referenceImages?.length > 0) {
+            setRefImages(initialData.referenceImages.map((r, i) => ({
+                id: `refill-${i}-${Date.now()}`, url: r.url || r, label: r.label || `@image${i + 1}`, uploading: false
+            })))
+        }
+        setPhase('compose')
+        setGeneration(null)
+        setError('')
+    }, [initialData])
 
     useEffect(() => {
         if (duration < m.dur[0]) setDuration(m.dur[0])
@@ -376,9 +396,21 @@ export default function AdvancedMode({ activeBrand }) {
                                 <button className="adv-btn-secondary" onClick={() => { setPhase('compose'); setGeneration(null) }}>
                                     <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>edit</span> Edit & Retry
                                 </button>
-                                <a className="adv-btn-primary" href={generation.videoUrl} download target="_blank" rel="noopener noreferrer">
+                                <button className="adv-btn-primary" onClick={async () => {
+                                    try {
+                                        const resp = await fetch(generation.videoUrl)
+                                        const blob = await resp.blob()
+                                        const blobUrl = URL.createObjectURL(blob)
+                                        const a = document.createElement('a')
+                                        a.href = blobUrl
+                                        a.download = 'video.mp4'
+                                        document.body.appendChild(a)
+                                        a.click()
+                                        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(blobUrl) }, 100)
+                                    } catch { window.open(generation.videoUrl, '_blank') }
+                                }}>
                                     <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>download</span> Download
-                                </a>
+                                </button>
                             </div>
                         </>
                     ) : (

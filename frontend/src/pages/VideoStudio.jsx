@@ -70,6 +70,10 @@ export default function VideoStudio() {
     // History
     const [projects, setProjects] = useState([])
     const [showHistory, setShowHistory] = useState(false)
+    const [playingVideo, setPlayingVideo] = useState(null)
+    const [advancedRefillData, setAdvancedRefillData] = useState(null)
+    const [historyView, setHistoryView] = useState('list') // 'list' | 'grid'
+    const [copiedId, setCopiedId] = useState(null)
 
     // Image input UI state
     const [showUrlInput, setShowUrlInput] = useState(false)
@@ -83,6 +87,93 @@ export default function VideoStudio() {
     // File input ref
     const fileInputRef = useRef(null)
     const pollRef = useRef(null)
+
+    // ── Download helper: fetches video as blob for proper file download ──
+    async function handleDownloadVideo(url, title) {
+        if (!url) return
+        try {
+            const resp = await fetch(url)
+            const blob = await resp.blob()
+            const blobUrl = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = blobUrl
+            a.download = `${(title || 'video').replace(/[^a-zA-Z0-9_-]/g, '_')}.mp4`
+            document.body.appendChild(a)
+            a.click()
+            setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(blobUrl) }, 100)
+        } catch {
+            // Fallback: open in new tab if fetch fails (CORS)
+            window.open(url, '_blank')
+        }
+    }
+
+    // ── Relative time helper ──
+    function getTimeAgo(dateStr) {
+        if (!dateStr) return ''
+        const diff = Date.now() - new Date(dateStr).getTime()
+        const mins = Math.floor(diff / 60000)
+        if (mins < 1) return 'just now'
+        if (mins < 60) return `${mins}m ago`
+        const hrs = Math.floor(mins / 60)
+        if (hrs < 24) return `${hrs}h ago`
+        const days = Math.floor(hrs / 24)
+        if (days < 7) return `${days}d ago`
+        return new Date(dateStr).toLocaleDateString()
+    }
+
+    // ── Copy prompt to clipboard ──
+    function handleCopyPrompt(text, id) {
+        if (!text) return
+        navigator.clipboard.writeText(text).then(() => {
+            setCopiedId(id)
+            setTimeout(() => setCopiedId(null), 2000)
+        })
+    }
+
+    // ── Get project prompt text ──
+    function getProjectPrompt(p) {
+        // Try advanced config first (covers all advanced projects regardless of mode/status)
+        if (p.advancedConfig?.enhancedPrompt || p.advancedConfig?.prompt) {
+            return p.advancedConfig.enhancedPrompt || p.advancedConfig.prompt
+        }
+        // Storyboard brief
+        if (p.input?.brief) return p.input.brief
+        // Fallback to title
+        return p.title || ''
+    }
+
+    // ── Refill handler: load a project's inputs back into the form ──
+    function handleRefillProject(project) {
+        // Detect advanced projects: check mode field, status, OR presence of advancedConfig
+        const isAdvanced = project.mode === 'advanced' || project.status === 'advanced-generating' || !!project.advancedConfig
+        if (isAdvanced && project.advancedConfig) {
+            const ac = project.advancedConfig
+            setStudioMode('advanced')
+            setAdvancedRefillData({
+                prompt: ac.enhancedPrompt || ac.prompt || '',
+                model: project.routing?.selectedModel || 'seedance-2.0',
+                duration: ac.duration || 6,
+                aspectRatio: ac.aspectRatio || '16:9',
+                firstImageUrl: ac.firstImageUrl || '',
+                lastImageUrl: ac.lastImageUrl || '',
+                referenceImages: ac.referenceImages || [],
+                _ts: Date.now(), // force re-trigger
+            })
+        } else {
+            // Storyboard mode refill
+            setStudioMode('storyboard')
+            setBrief(project.input?.brief || project.title || '')
+            setImages(project.input?.images || [])
+            setVideoType(project.input?.videoType || 'ad-film')
+            setStep(0)
+            setProjectId(null)
+            setConcepts([])
+            setSelectedConcept(null)
+            setScript(null)
+            setGeneration(null)
+        }
+        setShowHistory(false)
+    }
 
     // Load history on mount
     useEffect(() => {
@@ -275,16 +366,10 @@ export default function VideoStudio() {
     // RENDER
     // ══════════════════════════════════════════════════════════════════════════
     return (
-        <DashboardLayout>
+        <DashboardLayout title="Video Studio" subtitle="AI-powered video generation & editing">
             <div className="max-w-6xl mx-auto">
-                {/* ── Header ── */}
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
-                            Video <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-400 via-violet-400 to-cyan-400">Studio</span>
-                        </h1>
-                        <p className="text-sm text-slate-500 mt-1">AI-powered video creation — from brief to final cut</p>
-                    </div>
+                {/* ── Header Actions ── */}
+                <div className="flex items-center justify-end mb-6">
                     <button onClick={() => {
                         const opening = !showHistory
                         setShowHistory(opening)
@@ -310,74 +395,246 @@ export default function VideoStudio() {
                     </button>
                 </div>
 
+                {/* ── History Panel (shown in both modes) ── */}
+                {showHistory && (
+                    <div className="glass-panel rounded-2xl p-5 mb-6 border border-white/[0.08]">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-base font-bold text-white flex items-center gap-2">
+                                <span className="material-symbols-outlined text-violet-400">folder_open</span>
+                                Video History
+                                <span className="text-xs font-normal text-slate-500 ml-1">({projects.length})</span>
+                            </h3>
+                            <div className="flex items-center gap-2">
+                                {/* Grid/List toggle */}
+                                <div className="flex rounded-lg border border-white/[0.08] overflow-hidden">
+                                    <button onClick={() => setHistoryView('list')}
+                                        className={`p-1.5 transition-all cursor-pointer ${historyView === 'list' ? 'bg-white/[0.08] text-white' : 'text-slate-600 hover:text-slate-400'}`}
+                                        title="List view">
+                                        <span className="material-symbols-outlined text-sm">view_list</span>
+                                    </button>
+                                    <button onClick={() => setHistoryView('grid')}
+                                        className={`p-1.5 transition-all cursor-pointer ${historyView === 'grid' ? 'bg-white/[0.08] text-white' : 'text-slate-600 hover:text-slate-400'}`}
+                                        title="Grid view">
+                                        <span className="material-symbols-outlined text-sm">grid_view</span>
+                                    </button>
+                                </div>
+                                <button onClick={() => {
+                                    api('/video-studio?limit=50').then(d => setProjects(d.projects || [])).catch(() => { })
+                                }} className="text-xs text-slate-500 hover:text-white flex items-center gap-1 cursor-pointer px-2 py-1 rounded-lg hover:bg-white/[0.04] transition-all">
+                                    <span className="material-symbols-outlined text-sm">refresh</span> Refresh
+                                </button>
+                                <button onClick={() => setShowHistory(false)} className="text-slate-500 hover:text-white cursor-pointer p-1 rounded-lg hover:bg-white/[0.04] transition-all">
+                                    <span className="material-symbols-outlined text-sm">close</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {projects.length === 0 ? (
+                            <div className="text-center py-12">
+                                <span className="material-symbols-outlined text-4xl text-slate-700 mb-3 block">videocam_off</span>
+                                <p className="text-sm text-slate-500">No videos yet. Create your first one!</p>
+                            </div>
+                        ) : historyView === 'list' ? (
+                            <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+                                {projects.map(p => {
+                                    const videoUrl = p.generation?.videoUrl || '';
+                                    const isDone = p.status === 'done' || p.status === 'critique' || videoUrl;
+                                    const isFailed = p.status === 'failed' || p.generation?.status === 'FAILED';
+                                    const isGenerating = p.status === 'generating' || p.status === 'advanced-generating';
+                                    const modelName = p.routing?.selectedModel || '';
+                                    const timeAgo = getTimeAgo(p.createdAt);
+                                    const promptText = getProjectPrompt(p);
+                                    const promptPreview = promptText ? (promptText.length > 80 ? promptText.slice(0, 80) + '…' : promptText) : '';
+
+                                    return (
+                                        <div key={p._id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.12] transition-all group">
+                                            {/* Thumbnail / Play area */}
+                                            <div className="relative w-28 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-black/40 cursor-pointer"
+                                                onClick={() => { if (videoUrl) setPlayingVideo(videoUrl); else loadProject(p._id) }}>
+                                                {videoUrl ? (
+                                                    <video src={`${videoUrl}#t=1`} className="w-full h-full object-cover" muted preload="metadata" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
+                                                        <span className="material-symbols-outlined text-slate-600 text-xl">
+                                                            {isFailed ? 'error' : isGenerating ? 'pending' : 'movie'}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {videoUrl && (
+                                                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                        <span className="material-symbols-outlined text-white text-2xl drop-shadow-lg">play_circle</span>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Info */}
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-white truncate mb-0.5">{p.title || 'Untitled Video'}</p>
+                                                {promptPreview && (
+                                                    <p className="text-xs text-slate-500 truncate mb-1" title={promptText}>{promptPreview}</p>
+                                                )}
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${isDone ? 'bg-emerald-500/15 text-emerald-400' :
+                                                        isFailed ? 'bg-rose-500/15 text-rose-400' :
+                                                            isGenerating ? 'bg-amber-500/15 text-amber-400' :
+                                                                'bg-slate-500/15 text-slate-400'}`}>
+                                                        {isDone ? 'Done' : isFailed ? 'Failed' : isGenerating ? 'Generating' : p.status}
+                                                    </span>
+                                                    {modelName && (
+                                                        <span className="text-[10px] text-slate-600">{modelName}</span>
+                                                    )}
+                                                    <span className="text-[10px] text-slate-700">{timeAgo}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Actions */}
+                                            <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                {videoUrl && (
+                                                    <>
+                                                        <button onClick={(e) => { e.stopPropagation(); setPlayingVideo(videoUrl) }}
+                                                            className="p-1.5 rounded-lg text-slate-500 hover:text-violet-400 hover:bg-violet-500/10 transition-all cursor-pointer"
+                                                            title="Play">
+                                                            <span className="material-symbols-outlined text-base">play_arrow</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); handleDownloadVideo(videoUrl, p.title || 'video') }}
+                                                            className="p-1.5 rounded-lg text-slate-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all cursor-pointer"
+                                                            title="Download">
+                                                            <span className="material-symbols-outlined text-base">download</span>
+                                                        </button>
+                                                    </>
+                                                )}
+                                                {promptText && (
+                                                    <button onClick={(e) => { e.stopPropagation(); handleCopyPrompt(promptText, p._id) }}
+                                                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${copiedId === p._id ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-500 hover:text-blue-400 hover:bg-blue-500/10'}`}
+                                                        title={copiedId === p._id ? 'Copied!' : 'Copy prompt'}>
+                                                        <span className="material-symbols-outlined text-base">{copiedId === p._id ? 'check' : 'content_copy'}</span>
+                                                    </button>
+                                                )}
+                                                <button onClick={(e) => { e.stopPropagation(); handleRefillProject(p) }}
+                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 transition-all cursor-pointer"
+                                                    title="Refill inputs & regenerate">
+                                                    <span className="material-symbols-outlined text-base">replay</span>
+                                                </button>
+                                                <button onClick={(e) => { e.stopPropagation(); loadProject(p._id); setShowHistory(false) }}
+                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer"
+                                                    title="Open project">
+                                                    <span className="material-symbols-outlined text-base">open_in_new</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        ) : (
+                            /* ── GRID VIEW ── */
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[70vh] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+                                {projects.map(p => {
+                                    const videoUrl = p.generation?.videoUrl || '';
+                                    const isDone = p.status === 'done' || p.status === 'critique' || videoUrl;
+                                    const isFailed = p.status === 'failed' || p.generation?.status === 'FAILED';
+                                    const isGenerating = p.status === 'generating' || p.status === 'advanced-generating';
+                                    const modelName = p.routing?.selectedModel || '';
+                                    const timeAgo = getTimeAgo(p.createdAt);
+                                    const promptText = getProjectPrompt(p);
+
+                                    return (
+                                        <div key={p._id} className="rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.12] transition-all group overflow-hidden">
+                                            {/* Video thumbnail */}
+                                            <div className="relative aspect-video bg-black/40 cursor-pointer"
+                                                onClick={() => { if (videoUrl) setPlayingVideo(videoUrl); else loadProject(p._id) }}>
+                                                {videoUrl ? (
+                                                    <video src={`${videoUrl}#t=1`} className="w-full h-full object-cover" muted preload="metadata" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
+                                                        <span className="material-symbols-outlined text-slate-600 text-2xl">
+                                                            {isFailed ? 'error' : isGenerating ? 'pending' : 'movie'}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {videoUrl && (
+                                                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                        <span className="material-symbols-outlined text-white text-3xl drop-shadow-lg">play_circle</span>
+                                                    </div>
+                                                )}
+                                                {/* Status badge */}
+                                                <span className={`absolute top-1.5 left-1.5 text-[9px] px-1.5 py-0.5 rounded font-bold backdrop-blur-sm ${isDone ? 'bg-emerald-500/30 text-emerald-300' :
+                                                    isFailed ? 'bg-rose-500/30 text-rose-300' :
+                                                        isGenerating ? 'bg-amber-500/30 text-amber-300' :
+                                                            'bg-slate-500/30 text-slate-300'}`}>
+                                                    {isDone ? '✓' : isFailed ? '✕' : isGenerating ? '⏳' : p.status}
+                                                </span>
+                                            </div>
+                                            {/* Info + actions */}
+                                            <div className="p-2.5">
+                                                <p className="text-xs font-medium text-white truncate mb-1">{p.title || 'Untitled Video'}</p>
+                                                <div className="flex items-center gap-1.5 mb-2">
+                                                    {modelName && <span className="text-[9px] text-slate-600">{modelName}</span>}
+                                                    <span className="text-[9px] text-slate-700">{timeAgo}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    {videoUrl && (
+                                                        <>
+                                                            <button onClick={() => setPlayingVideo(videoUrl)}
+                                                                className="p-1 rounded text-slate-500 hover:text-violet-400 hover:bg-violet-500/10 transition-all cursor-pointer" title="Play">
+                                                                <span className="material-symbols-outlined text-sm">play_arrow</span>
+                                                            </button>
+                                                            <button onClick={() => handleDownloadVideo(videoUrl, p.title || 'video')}
+                                                                className="p-1 rounded text-slate-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all cursor-pointer" title="Download">
+                                                                <span className="material-symbols-outlined text-sm">download</span>
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    {promptText && (
+                                                        <button onClick={() => handleCopyPrompt(promptText, p._id)}
+                                                            className={`p-1 rounded transition-all cursor-pointer ${copiedId === p._id ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-500 hover:text-blue-400 hover:bg-blue-500/10'}`}
+                                                            title={copiedId === p._id ? 'Copied!' : 'Copy prompt'}>
+                                                            <span className="material-symbols-outlined text-sm">{copiedId === p._id ? 'check' : 'content_copy'}</span>
+                                                        </button>
+                                                    )}
+                                                    <button onClick={() => handleRefillProject(p)}
+                                                        className="p-1 rounded text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 transition-all cursor-pointer" title="Refill">
+                                                        <span className="material-symbols-outlined text-sm">replay</span>
+                                                    </button>
+                                                    <button onClick={() => { loadProject(p._id); setShowHistory(false) }}
+                                                        className="p-1 rounded text-slate-500 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer" title="Open">
+                                                        <span className="material-symbols-outlined text-sm">open_in_new</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* ── Video Player Modal ── */}
+                {playingVideo && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setPlayingVideo(null)}>
+                        <div className="relative max-w-4xl w-full mx-4" onClick={e => e.stopPropagation()}>
+                            <video src={playingVideo} controls autoPlay className="w-full rounded-2xl shadow-2xl shadow-black/50" />
+                            <div className="absolute -top-12 right-0 flex items-center gap-2">
+                                <button onClick={() => handleDownloadVideo(playingVideo, 'video')}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white text-sm hover:bg-white/20 transition-all cursor-pointer backdrop-blur">
+                                    <span className="material-symbols-outlined text-base">download</span> Download
+                                </button>
+                                <button onClick={() => setPlayingVideo(null)}
+                                    className="p-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-all cursor-pointer backdrop-blur">
+                                    <span className="material-symbols-outlined text-lg">close</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* ── ADVANCED MODE ── */}
                 {studioMode === 'advanced' && (
-                    <AdvancedMode activeBrand={activeBrand} />
+                    <AdvancedMode activeBrand={activeBrand} initialData={advancedRefillData} />
                 )}
 
                 {/* ── STORYBOARD MODE ── */}
                 {studioMode === 'storyboard' && (<>
-
-                    {/* ── History Panel ── */}
-                    {showHistory && (
-                        <div className="glass-panel rounded-2xl p-5 mb-6 border border-white/[0.08]">
-                            <div className="flex items-center justify-between mb-3">
-                                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-violet-400">folder_open</span>
-                                    Recent Projects
-                                </h3>
-                                <button onClick={() => {
-                                    api('/video-studio?limit=20').then(d => setProjects(d.projects || [])).catch(() => { })
-                                }} className="text-xs text-slate-500 hover:text-white flex items-center gap-1 cursor-pointer">
-                                    <span className="material-symbols-outlined text-sm">refresh</span> Refresh
-                                </button>
-                            </div>
-                            {projects.length === 0 ? (
-                                <p className="text-sm text-slate-500">No projects yet. Create your first video!</p>
-                            ) : (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                    {projects.map(p => {
-                                        const videoUrl = p.generation?.videoUrl || '';
-                                        const thumbUrl = p.generation?.thumbnailUrl || '';
-                                        const isDone = p.status === 'done' || p.status === 'critique' || videoUrl;
-                                        const isFailed = p.status === 'failed' || p.generation?.status === 'FAILED';
-                                        const isGenerating = p.status === 'generating' || p.status === 'advanced-generating';
-                                        return (
-                                            <button key={p._id} onClick={() => loadProject(p._id)}
-                                                className="text-left p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-violet-500/30 transition-all cursor-pointer group">
-                                                {/* Video thumbnail */}
-                                                {(videoUrl || thumbUrl) && (
-                                                    <div className="relative mb-3 rounded-lg overflow-hidden aspect-video bg-black/40">
-                                                        {videoUrl ? (
-                                                            <video src={videoUrl} className="w-full h-full object-cover" muted preload="metadata" />
-                                                        ) : (
-                                                            <img src={thumbUrl} className="w-full h-full object-cover" alt="" />
-                                                        )}
-                                                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-all flex items-center justify-center">
-                                                            <span className="material-symbols-outlined text-white/60 text-3xl">play_circle</span>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${isDone ? 'bg-emerald-500/20 text-emerald-400' :
-                                                        isFailed ? 'bg-rose-500/20 text-rose-400' :
-                                                            isGenerating ? 'bg-amber-500/20 text-amber-400 animate-pulse' :
-                                                                'bg-violet-500/20 text-violet-400'}`}>
-                                                        {isDone ? '✅ Done' : isFailed ? '❌ Failed' : isGenerating ? '⏳ Generating' : p.status}
-                                                    </span>
-                                                    {p.routing?.selectedModel && (
-                                                        <span className="text-xs text-slate-600">{p.routing.selectedModel}</span>
-                                                    )}
-                                                </div>
-                                                <p className="text-sm font-medium text-white truncate">{p.title}</p>
-                                                <p className="text-sm text-slate-500 mt-1">{new Date(p.createdAt).toLocaleDateString()}</p>
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    )}
 
                     {/* ── Progress Steps ── */}
                     <div className="flex items-center gap-1 mb-8 overflow-x-auto pb-2">
@@ -1062,11 +1319,11 @@ export default function VideoStudio() {
                                     Accept & Save
                                 </button>
                                 {generation?.videoUrl && (
-                                    <a href={generation.videoUrl} download target="_blank" rel="noopener noreferrer"
-                                        className="px-6 py-4 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-slate-300 font-medium hover:text-white hover:bg-white/[0.08] transition-all flex items-center gap-2">
+                                    <button onClick={() => handleDownloadVideo(generation.videoUrl, 'video')}
+                                        className="px-6 py-4 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-slate-300 font-medium hover:text-white hover:bg-white/[0.08] transition-all flex items-center gap-2 cursor-pointer">
                                         <span className="material-symbols-outlined">download</span>
                                         Download
-                                    </a>
+                                    </button>
                                 )}
                             </div>
                         </div>

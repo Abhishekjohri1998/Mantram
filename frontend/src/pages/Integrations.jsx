@@ -163,15 +163,10 @@ export default function Integrations() {
     const shopifyStatus = platformStatus.shopify || {}
 
     return (
-        <DashboardLayout>
+        <DashboardLayout title="Integrations" subtitle="Connect your platforms & tools">
             {/* Page Header */}
             <div className="flex items-end justify-between mb-6">
-                <div>
-                    <h2 className="text-3xl font-extrabold tracking-tight mb-1">
-                        <span className="text-primary">⚡</span> Integrations
-                    </h2>
-                    <p className="text-slate-400 text-sm">Connect platforms, sync products, publish everywhere</p>
-                </div>
+                <div></div>
                 <div className="flex gap-2">
                     <button onClick={() => setActiveTab('platforms')}
                         className={`px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer ${activeTab === 'platforms' ? 'bg-primary text-black' : 'bg-white/[0.05] text-slate-300 hover:bg-white/[0.1]'}`}>

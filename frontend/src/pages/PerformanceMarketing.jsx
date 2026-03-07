@@ -285,7 +285,7 @@ export default function PerformanceMarketing() {
     }
 
     return (
-        <DashboardLayout title="Performance Marketing" subtitle="AI-powered ad research, strategy & management">
+        <DashboardLayout title="Performance Studio" subtitle="AI-powered ad research, strategy & management">
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* ── Error display ── */}
                 {error && (

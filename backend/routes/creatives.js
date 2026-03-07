@@ -572,7 +572,7 @@ router.get('/image-bank', protect, async (req, res) => {
             {
                 $project: {
                     type: 1, title: 1, prompt: 1, createdAt: 1, brand: 1,
-                    tags: 1, status: 1,
+                    tags: 1, status: 1, designData: 1,
                     // Only get first 500 chars — enough for full HTTP URLs, tiny vs 3-4MB base64
                     imageUrlPrefix: { $substrBytes: [{ $ifNull: ['$imageUrl', ''] }, 0, 500] },
                     thumbnailUrl: { $substrBytes: [{ $ifNull: ['$thumbnailUrl', ''] }, 0, 500] },

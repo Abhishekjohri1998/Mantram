@@ -26,7 +26,7 @@ class ModelRouter {
         // Register all providers — they self-check if API key exists
         this.providers.gemini = new GeminiProvider({
             apiKey: providerConfigs.gemini?.apiKey,
-            defaultModel: config.ai.defaultTextModel,
+            defaultModel: 'gemini-2.0-flash',
         });
         this.providers.openai = new OpenAIProvider({
             apiKey: providerConfigs.openai?.apiKey,

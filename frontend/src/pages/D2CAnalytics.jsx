@@ -126,7 +126,7 @@ export default function D2CAnalytics() {
     const healthColors = { hot: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', label: '🟢 Hot' }, warm: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', label: '🟡 Warm' }, cold: { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/20', label: '🔴 Cold' } }
 
     return (
-        <DashboardLayout>
+        <DashboardLayout title="D2C Studio" subtitle="Shopify Intelligence Hub">
             <style>{`
                 @keyframes radar-sweep { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
                 @keyframes blip-ping { 0%,100% { opacity:0.4; transform: scale(0.8) } 50% { opacity:1; transform: scale(1.3) } }
@@ -136,19 +136,7 @@ export default function D2CAnalytics() {
 
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-6 gap-3">
-                <div>
-                    <div className="flex items-center gap-3 mb-1">
-                        <div className="size-10 rounded-xl bg-gradient-to-br from-violet-500/20 to-cyan-500/20 flex items-center justify-center border border-violet-500/20">
-                            <span className="material-symbols-outlined text-violet-400">storefront</span>
-                        </div>
-                        <div>
-                            <h2 className="text-2xl font-extrabold text-white">
-                                <span className="bg-gradient-to-r from-violet-400 via-primary to-cyan-400 bg-clip-text text-transparent">D2C Analytics</span>
-                            </h2>
-                            <p className="text-xs text-slate-500">Shopify Intelligence Hub · {data?.shop?.name || 'Not Connected'}</p>
-                        </div>
-                    </div>
-                </div>
+                <div></div>
                 <div className="flex items-center gap-2">
                     <select value={days} onChange={e => setDays(parseInt(e.target.value))}
                         className="input-glass py-2 px-3 rounded-xl text-xs bg-white/[0.04] cursor-pointer">
@@ -171,7 +159,7 @@ export default function D2CAnalytics() {
             {loading ? (
                 <div className="flex items-center justify-center py-24 text-slate-400">
                     <span className="material-symbols-outlined animate-spin mr-3 text-3xl">progress_activity</span>
-                    <span className="text-lg">Loading D2C analytics...</span>
+                    <span className="text-lg">Loading D2C Studio...</span>
                 </div>
             ) : !data?.connected ? (
                 /* Not Connected State */
@@ -181,7 +169,7 @@ export default function D2CAnalytics() {
                     </div>
                     <h3 className="text-2xl font-bold text-white mb-2">Connect Your Shopify Store</h3>
                     <p className="text-slate-400 max-w-md mx-auto mb-6">
-                        Link your Shopify store to unlock powerful D2C analytics — revenue tracking, product health scores, customer insights, red flag alerts, and AI-powered growth strategies.
+                        Link your Shopify store to unlock powerful D2C intelligence — revenue tracking, product health scores, customer insights, red flag alerts, and AI-powered growth strategies.
                     </p>
                     <button onClick={() => navigate('/integrations')}
                         className="px-6 py-3 rounded-xl bg-gradient-to-r from-primary to-violet-500 text-white font-bold hover:shadow-lg hover:shadow-primary/20 transition-all cursor-pointer">
@@ -650,7 +638,7 @@ export default function D2CAnalytics() {
 
                                         <button onClick={() => navigate('/performance-marketing')}
                                             className="mt-4 w-full py-2.5 rounded-xl bg-gradient-to-r from-primary to-violet-500 text-white text-sm font-bold hover:shadow-lg transition-all cursor-pointer">
-                                            Launch Campaign in Ad Studio →
+                                            Launch Campaign in Performance Studio →
                                         </button>
                                     </div>
                                 )}

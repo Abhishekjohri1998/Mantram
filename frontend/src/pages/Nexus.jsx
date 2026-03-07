@@ -22,16 +22,8 @@ export default function Nexus() {
     const voice = dna.voice || {}
 
     return (
-        <DashboardLayout>
+        <DashboardLayout title="Nexus" subtitle="Cross-studio intelligence hub">
             {/* Brand Header */}
-            <div className="flex items-end justify-between mb-6">
-                <div>
-                    <h2 className="text-3xl font-extrabold tracking-tight mb-1">
-                        Brand <span className="text-primary">Nexus</span>
-                    </h2>
-                    <p className="text-slate-400 text-sm">Your brand command center — everything in one place.</p>
-                </div>
-            </div>
 
             {!brand ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-4">

@@ -13,8 +13,8 @@ const navItems = [
     { icon: 'send', label: 'Publish & Schedule', to: '/publish' },
     { icon: 'forum', label: 'Conversation Studio', to: '/conversations', studioKey: 'conversationStudio' },
     { icon: 'travel_explore', label: 'SEO Studio', to: '/seo-studio', studioKey: 'seoStudio' },
-    { icon: 'monitoring', label: 'Ad Studio', to: '/performance-marketing', studioKey: 'adStudio' },
-    { icon: 'storefront', label: 'D2C Analytics', to: '/d2c-analytics', studioKey: 'd2cAnalytics' },
+    { icon: 'monitoring', label: 'Performance Studio', to: '/performance-marketing', studioKey: 'adStudio' },
+    { icon: 'storefront', label: 'D2C Studio', to: '/d2c-analytics', studioKey: 'd2cAnalytics' },
 ]
 
 const bottomItems = [

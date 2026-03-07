@@ -62,7 +62,7 @@ export default function Header({ title, subtitle, onMenuToggle }) {
 
                 {title && (
                     <div className="min-w-0">
-                        <h2 className="text-base sm:text-lg lg:text-xl font-bold text-white truncate">{title}</h2>
+                        <h2 className="text-base sm:text-lg lg:text-xl font-bold truncate bg-gradient-to-r from-violet-400 via-primary to-cyan-400 bg-clip-text text-transparent">{title}</h2>
                         {subtitle && <p className="text-xs sm:text-sm text-slate-500 truncate">{subtitle}</p>}
                     </div>
                 )}

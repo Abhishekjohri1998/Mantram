@@ -26,7 +26,7 @@ import {
 } from './prompts.js';
 import { estimateCost, submitVideoGeneration, getGenerationStatus, getGrokGenerationStatus, MODEL_CAPABILITIES } from './falClient.js';
 import { getKieGenerationStatus } from './kieClient.js';
-import { getPiApiGenerationStatus } from './piApiClient.js';
+import { getPiApiGenerationStatus, resubmitPiApiTask } from './piApiClient.js';
 import { getPastProjects } from './selfLearning.js';
 
 // ── Helper: Parse JSON from any AI response ──
@@ -319,7 +319,7 @@ export async function videoGeneratorNode(state) {
     // Pass shots for Kling multi-prompt support
     const shots = state.script?.shots || [];
 
-    const { requestId, endpoint, statusUrl, resultUrl, provider } = await submitVideoGeneration({
+    const { requestId, endpoint, statusUrl, resultUrl, provider, _piApiPayload } = await submitVideoGeneration({
         model,
         prompt,
         imageUrl,
@@ -339,6 +339,7 @@ export async function videoGeneratorNode(state) {
             falStatusUrl: statusUrl,   // null for Grok
             falResultUrl: resultUrl,   // null for Grok
             provider: provider || 'fal', // 'grok' or 'fal'
+            _piApiPayload: _piApiPayload || null, // For PiAPI auto-retry
             videoUrl: '',
             thumbnailUrl: '',
             progress: 5,
@@ -363,6 +364,36 @@ export async function pollGenerationStatus(state) {
     } else if (state.generation?.provider === 'piapi' || state.routing?.selectedModel === 'seedance-2.0') {
         // PiAPI polling — Seedance 2.0
         statusResult = await getPiApiGenerationStatus(state.generation.falRequestId);
+
+        // AUTO-RETRY: PiAPI intermittently fails with "failed to process task" (code 10000)
+        // Automatically resubmit up to 2 times using the stored payload
+        if (statusResult.status === 'FAILED' && statusResult.retryable && state.generation._piApiPayload) {
+            const retryCount = state.generation._piApiRetryCount || 0;
+            const MAX_RETRIES = 2;
+            if (retryCount < MAX_RETRIES) {
+                console.log(`🔄 PiAPI auto-retry ${retryCount + 1}/${MAX_RETRIES}: resubmitting task...`);
+                try {
+                    const retryResult = await resubmitPiApiTask(state.generation._piApiPayload);
+                    return {
+                        ...state,
+                        generation: {
+                            ...state.generation,
+                            falRequestId: retryResult.taskId,
+                            progress: 5,
+                            startedAt: new Date(),
+                            error: '',
+                            _piApiRetryCount: retryCount + 1,
+                        },
+                        status: state.status, // Keep current status (generating/advanced-generating)
+                    };
+                } catch (retryErr) {
+                    console.error(`❌ PiAPI auto-retry failed: ${retryErr.message}`);
+                    // Fall through to normal failure handling
+                }
+            } else {
+                console.warn(`⚠️ PiAPI exhausted ${MAX_RETRIES} auto-retries, reporting failure`);
+            }
+        }
     } else if (state.generation?.provider === 'kie' || state.routing?.selectedModel === 'veo-3.1-fast') {
         // kie.ai polling — Veo 3.1 Fast only
         statusResult = await getKieGenerationStatus(state.generation.falRequestId, state.routing?.selectedModel);
@@ -604,6 +635,7 @@ export async function advancedGenerateNode(state) {
             falStatusUrl: result.statusUrl,
             falResultUrl: result.resultUrl,
             provider: result.provider || 'fal',
+            _piApiPayload: result._piApiPayload || null, // For PiAPI auto-retry
             videoUrl: '',
             progress: 5,
             startedAt: new Date(),

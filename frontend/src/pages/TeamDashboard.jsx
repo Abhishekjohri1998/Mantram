@@ -11,8 +11,8 @@ const STUDIO_LABELS = {
     seoStudio: { label: 'SEO Studio', icon: 'travel_explore', color: '#f59e0b' },
     brainstormStudio: { label: 'Brainstorm', icon: 'psychology', color: '#8b5cf6' },
     videoStudio: { label: 'Video Studio', icon: 'movie', color: '#06b6d4' },
-    d2cAnalytics: { label: 'D2C Analytics', icon: 'storefront', color: '#14b8a6' },
-    adStudio: { label: 'Ad Studio', icon: 'monitoring', color: '#f43f5e' },
+    d2cAnalytics: { label: 'D2C Studio', icon: 'storefront', color: '#14b8a6' },
+    adStudio: { label: 'Performance Studio', icon: 'monitoring', color: '#f43f5e' },
     smartCalendar: { label: 'Calendar', icon: 'calendar_month', color: '#a855f7' },
     conversationStudio: { label: 'Conversations', icon: 'forum', color: '#3b82f6' },
 }
@@ -197,10 +197,9 @@ export default function TeamDashboard() {
     }
 
     return (
-        <DashboardLayout>
+        <DashboardLayout title="Team Dashboard" subtitle="Team activity & collaboration hub">
             <div className="flex items-end justify-between mb-6">
                 <div>
-                    <h2 className="text-3xl font-extrabold tracking-tight mb-1">Team <span className="text-primary">Hub</span></h2>
                     <p className="text-slate-400 text-sm">
                         {planLimits ? `${planLimits.currentMembers}/${planLimits.maxMembers} members · ${planLimits.currentBrands}/${planLimits.maxBrands} brands · ${planLimits.plan} plan` : 'Manage your team, chat, and approvals.'}
                     </p>

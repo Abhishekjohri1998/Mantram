@@ -171,7 +171,7 @@ export default function UserDashboard() {
     ]
 
     return (
-        <DashboardLayout>
+        <DashboardLayout title="Dashboard" subtitle="Your AI command center">
             {/* ═══════ CSS Animations ═══════ */}
             <style>{`
                 @keyframes gradient-shift { 0%,100% { background-position: 0% 50% } 50% { background-position: 100% 50% } }
@@ -202,10 +202,6 @@ export default function UserDashboard() {
             {/* ═══════════════════════════════════════════════════════════════ */}
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-5 gap-3 anim-slide-up">
                 <div>
-                    <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white">
-                        {typedGreeting}
-                        {!greetingDone && <span className="inline-block w-0.5 h-7 bg-violet-400 ml-1 align-middle" style={{ animation: 'cursor-blink 0.8s step-end infinite' }} />}
-                    </h2>
                     <div className="flex items-center gap-3 mt-2">
                         <p className="text-slate-500 text-base">{getDateString()}</p>
                         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
@@ -795,7 +791,7 @@ export default function UserDashboard() {
                                         ))}
                                     </div>
                                 )}
-                                <button onClick={() => navigate('/d2c-analytics')} className="w-full py-2.5 rounded-xl bg-emerald-500/5 text-emerald-400 text-sm font-bold hover:bg-emerald-500/10 transition-all cursor-pointer border border-emerald-500/10">Open D2C Analytics →</button>
+                                <button onClick={() => navigate('/d2c-analytics')} className="w-full py-2.5 rounded-xl bg-emerald-500/5 text-emerald-400 text-sm font-bold hover:bg-emerald-500/10 transition-all cursor-pointer border border-emerald-500/10">Open D2C Studio →</button>
                             </>
                         ) : (
                             <>
@@ -812,7 +808,7 @@ export default function UserDashboard() {
                                         </div>
                                     ))}
                                 </div>
-                                <p className="text-sm text-slate-400 mb-3 text-center">Connect your Shopify store to unlock real-time D2C analytics, product velocity, geo insights & more.</p>
+                                <p className="text-sm text-slate-400 mb-3 text-center">Connect your Shopify store to unlock real-time D2C intelligence, product velocity, geo insights & more.</p>
                                 <button onClick={() => navigate('/d2c-analytics')} className="w-full py-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 text-sm font-bold hover:bg-emerald-500/20 transition-all cursor-pointer border border-emerald-500/20 flex items-center justify-center gap-2">
                                     <span className="material-symbols-outlined text-sm">link</span>Connect & Explore D2C →
                                 </button>

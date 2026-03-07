@@ -100,7 +100,7 @@ export default function Analytics() {
     const priorityColors = { high: 'text-rose-400 bg-rose-500/10 border-rose-500/20', medium: 'text-amber-400 bg-amber-500/10 border-amber-500/20', low: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' }
 
     return (
-        <DashboardLayout>
+        <DashboardLayout title="Analytics" subtitle="Platform-wide performance insights">
             <style>{`
                 @keyframes radar-sweep { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
                 @keyframes blip-ping { 0%,100% { opacity:0.4; transform: scale(0.8) } 50% { opacity:1; transform: scale(1.3) } }
@@ -114,12 +114,8 @@ export default function Analytics() {
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-6 gap-3">
                 <div>
                     <div className="flex items-center gap-3">
-                        <h2 className="text-3xl font-extrabold tracking-tight text-white">
-                            <span className="bg-gradient-to-r from-primary via-violet-400 to-cyan-400 bg-clip-text text-transparent">Analytics Command Center</span>
-                        </h2>
                         <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Live</span>
                     </div>
-                    <p className="text-slate-500 text-sm mt-1">Traffic intelligence, audience insights, and AI-powered strategy.</p>
                 </div>
                 <div className="flex items-center gap-3">
                     <select value={timeRange} onChange={e => setTimeRange(e.target.value)}

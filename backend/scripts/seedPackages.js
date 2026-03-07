@@ -63,7 +63,7 @@ const PACKAGES = [
             { name: 'All 7 AI Studios Included', included: true },
             { name: 'Team Dashboard (2 seats)', included: true },
             { name: 'Priority Email Support', included: true },
-            { name: 'Ad Studio Access', included: true },
+            { name: 'Performance Studio Access', included: true },
         ]
     },
     {
@@ -96,7 +96,7 @@ const PACKAGES = [
             { name: 'Full Studio Access (All 9)', included: true },
             { name: 'Agency Dashboard & Team (10 seats)', included: true },
             { name: 'Priority WhatsApp Support', included: true },
-            { name: 'D2C Analytics Access', included: true },
+            { name: 'D2C Studio Access', included: true },
         ]
     },
     {

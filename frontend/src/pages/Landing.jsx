@@ -1,293 +1,536 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+
+/* ────────────────────────────────────────────── */
+/*  MANTRAM AI — PREMIUM LANDING PAGE            */
+/* ────────────────────────────────────────────── */
 
 export default function Landing() {
     const navigate = useNavigate()
     const { isAuthenticated } = useAuth()
-    const [scanUrl, setScanUrl] = useState('')
 
-    const handleScan = (e) => {
+    /* ── Early-access form state ── */
+    const [showWaitlist, setShowWaitlist] = useState(false)
+    const [waitlistType, setWaitlistType] = useState('individual') // 'individual' | 'enterprise'
+    const [waitlistForm, setWaitlistForm] = useState({ name: '', email: '', company: '', role: '', phone: '', teamSize: '', message: '' })
+    const [waitlistSubmitted, setWaitlistSubmitted] = useState(false)
+    const [waitlistLoading, setWaitlistLoading] = useState(false)
+
+    /* ── Hero carousel ── */
+    const [heroSlide, setHeroSlide] = useState(0)
+    const heroInterval = useRef(null)
+    const heroSlides = [
+        { type: 'gradient', gradient: 'from-violet-600/30 via-primary/20 to-cyan-600/30', icon: 'hub', label: 'Agentic AI Platform' },
+        { type: 'gradient', gradient: 'from-rose-600/30 via-amber-500/20 to-emerald-600/30', icon: 'auto_awesome', label: 'AI-Powered Content' },
+        { type: 'gradient', gradient: 'from-cyan-600/30 via-blue-500/20 to-violet-600/30', icon: 'smart_display', label: 'Multi-Model Video' },
+    ]
+    useEffect(() => {
+        heroInterval.current = setInterval(() => setHeroSlide(p => (p + 1) % heroSlides.length), 5000)
+        return () => clearInterval(heroInterval.current)
+    }, [])
+
+    /* ── Nav scroll effect ── */
+    const [scrolled, setScrolled] = useState(false)
+    useEffect(() => {
+        const onScroll = () => setScrolled(window.scrollY > 30)
+        window.addEventListener('scroll', onScroll)
+        return () => window.removeEventListener('scroll', onScroll)
+    }, [])
+
+    /* ── Waitlist submit ── */
+    const handleWaitlistSubmit = async (e) => {
         e.preventDefault()
-        const url = scanUrl.trim()
-        if (!url) return
-
-        if (isAuthenticated) {
-            // Already logged in — go straight to onboarding with URL
-            navigate(`/onboarding?scanUrl=${encodeURIComponent(url)}`)
-        } else {
-            // Need to login first, then redirect to onboarding with URL
-            navigate(`/auth?redirect=${encodeURIComponent('/onboarding')}&scanUrl=${encodeURIComponent(url)}`)
-        }
+        setWaitlistLoading(true)
+        // simulate API call (replace with real endpoint later)
+        await new Promise(r => setTimeout(r, 1500))
+        setWaitlistSubmitted(true)
+        setWaitlistLoading(false)
     }
 
-    const handlePricing = (planName) => {
-        if (isAuthenticated) {
-            navigate('/dashboard')
-        } else {
-            navigate(`/auth?plan=${planName.toLowerCase()}`)
-        }
-    }
+    const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+
+    /* ── Studios data ── */
+    const studios = [
+        { icon: 'draw', name: 'Content Studio', desc: 'AI-generated blog posts, social captions, ad copy & emails — perfectly aligned to your brand voice.', color: 'from-violet-500 to-purple-600', tag: 'Writing' },
+        { icon: 'auto_fix_high', name: 'Creative Studio', desc: 'Design social posts, stories, ads, banners & AI photoshoots with one-click brand consistency.', color: 'from-pink-500 to-rose-600', tag: 'Design' },
+        { icon: 'smart_display', name: 'Video Studio', desc: 'Multi-model video generation — Seedance, Kling, Veo 2 — from brief to cinematic final cut.', color: 'from-amber-500 to-orange-600', tag: 'Video' },
+        { icon: 'campaign', name: 'Performance Studio', desc: 'AI ad strategist that researches competitors, plans budgets & generates Meta/Google ad campaigns.', color: 'from-emerald-500 to-teal-600', tag: 'Ads' },
+        { icon: 'query_stats', name: 'SEO Studio', desc: 'AI-powered keyword research, site audits, content gap analysis & competitive intelligence.', color: 'from-blue-500 to-indigo-600', tag: 'SEO' },
+        { icon: 'storefront', name: 'D2C Studio', desc: 'Shopify Intelligence Hub — product velocity, abandonment signals & AI-powered e-commerce insights.', color: 'from-cyan-500 to-sky-600', tag: 'Commerce' },
+        { icon: 'forum', name: 'Conversation Studio', desc: 'AI auto-responder for Instagram & Facebook DMs — route leads, answer FAQs, never miss a message.', color: 'from-fuchsia-500 to-pink-600', tag: 'DMs' },
+        { icon: 'lightbulb', name: 'Brainstorm Studio', desc: 'AI creative director — generate campaign ideas, ad films, mood boards & content calendars.', color: 'from-yellow-500 to-amber-600', tag: 'Ideas' },
+        { icon: 'calendar_month', name: 'Smart Calendar', desc: 'Marketing intelligence calendar — trending moments, festivals & AI-suggested content dates.', color: 'from-teal-500 to-emerald-600', tag: 'Planning' },
+        { icon: 'analytics', name: 'Analytics', desc: 'Traffic intelligence, audience insights, Google Analytics integration & AI-powered growth strategies.', color: 'from-indigo-500 to-violet-600', tag: 'Insights' },
+    ]
+
+    const usps = [
+        { icon: 'hub', title: 'Agentic AI Architecture', desc: 'Not prompts — entire AI agent teams. Each studio runs a chain of specialized agents (Researcher, Strategist, Creator) that collaborate like a real marketing team.', gradient: 'from-violet-500/20 to-purple-500/20', iconColor: 'text-violet-400' },
+        { icon: 'genetics', title: 'Brand DNA Engine', desc: 'Scan any website in 60 seconds. AI extracts logo, colors, fonts, voice, tone & visual identity — then uses it across every piece of content you create.', gradient: 'from-primary/20 to-blue-500/20', iconColor: 'text-primary' },
+        { icon: 'auto_awesome', title: 'Multi-Model Intelligence', desc: 'Access Gemini, Claude, GPT-4o, Grok & Imagen in one platform. Each task routes to the best model — no lock-in, maximum quality.', gradient: 'from-amber-500/20 to-orange-500/20', iconColor: 'text-amber-400' },
+        { icon: 'trending_up', title: 'Real-Time Trending', desc: 'Google Trends + Grok-powered intelligence feeds every studio with what\'s trending NOW — so your content is always relevant.', gradient: 'from-emerald-500/20 to-teal-500/20', iconColor: 'text-emerald-400' },
+        { icon: 'groups', title: 'Team Collaboration', desc: 'Multi-user workspaces, approval workflows, brand-level permissions & team chat — built for marketing teams, not solo users.', gradient: 'from-cyan-500/20 to-sky-500/20', iconColor: 'text-cyan-400' },
+        { icon: 'lock', title: 'Enterprise-Ready', desc: 'SOC 2 compliance, SSO, dedicated support, white-labeling & custom integrations. Scale from startup to enterprise.', gradient: 'from-rose-500/20 to-pink-500/20', iconColor: 'text-rose-400' },
+    ]
 
     return (
-        <div className="relative min-h-screen w-full flex flex-col overflow-x-hidden liquid-gradient">
-            {/* Navbar */}
-            <nav className="sticky top-0 z-50 w-full px-6 py-4 flex justify-center">
-                <header className="max-w-7xl w-full flex items-center justify-between glass-panel px-8 py-3 rounded-full">
+        <div className="relative min-h-screen w-full flex flex-col overflow-x-hidden" style={{ background: '#07070f' }}>
+            {/* Ambient background */}
+            <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+                <div className="absolute -top-[30%] -left-[15%] w-[70%] h-[70%] bg-violet-600/[0.07] rounded-full blur-[150px]" />
+                <div className="absolute top-[30%] -right-[15%] w-[60%] h-[60%] bg-primary/[0.06] rounded-full blur-[150px]" />
+                <div className="absolute bottom-[10%] left-[20%] w-[40%] h-[40%] bg-cyan-600/[0.04] rounded-full blur-[120px]" />
+            </div>
+
+            {/* ═══════════════════════════════════════════════════════ */}
+            {/*  NAVBAR                                                */}
+            {/* ═══════════════════════════════════════════════════════ */}
+            <nav className={`sticky top-0 z-50 w-full px-4 py-3 transition-all duration-500 ${scrolled ? 'backdrop-blur-2xl bg-[#07070f]/80' : ''}`}>
+                <header className="max-w-7xl mx-auto flex items-center justify-between px-6 py-2.5 rounded-2xl" style={scrolled ? { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' } : {}}>
                     <div className="flex items-center gap-3">
-                        <div className="size-8 rounded-lg overflow-hidden shadow-lg shadow-primary/20">
-                            <img src="/mantram-logo.png" alt="Mantram AI" className="size-8" />
+                        <div className="size-9 rounded-xl overflow-hidden shadow-lg shadow-primary/20">
+                            <img src="/mantram-logo.png" alt="Mantram AI" className="size-9" />
                         </div>
-                        <h2 className="text-white text-xl font-bold tracking-tight">Mantram AI</h2>
+                        <h2 className="text-white text-xl font-bold tracking-tight">Mantram <span className="text-primary">AI</span></h2>
                     </div>
-                    <div className="hidden md:flex items-center gap-10">
-                        <a className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">Product</a>
-                        <a href="#pricing" className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">Pricing</a>
-                        <Link to="/privacy-policy" className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">Privacy Policy</Link>
-                        <Link to="/terms" className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">Terms of Service</Link>
+                    <div className="hidden md:flex items-center gap-8">
+                        <button onClick={() => scrollTo('studios')} className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">Studios</button>
+                        <button onClick={() => scrollTo('usps')} className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">Why Mantram</button>
+                        <button onClick={() => scrollTo('how-it-works')} className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">How It Works</button>
+                        <button onClick={() => scrollTo('early-access')} className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">Early Access</button>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                         {isAuthenticated ? (
                             <Link to="/dashboard" className="hidden sm:block text-slate-300 text-sm font-medium px-4 hover:text-white transition-colors">Dashboard</Link>
                         ) : (
                             <Link to="/auth" className="hidden sm:block text-slate-300 text-sm font-medium px-4 hover:text-white transition-colors">Login</Link>
                         )}
-                        <Link to={isAuthenticated ? '/onboarding' : '/auth?redirect=%2Fonboarding'}
-                            className="bg-primary hover:bg-primary-light text-white text-sm font-bold py-2.5 px-6 rounded-full transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-primary/20">
-                            Get Started Free
-                        </Link>
+                        <button onClick={() => { setShowWaitlist(true); setTimeout(() => scrollTo('early-access'), 100) }}
+                            className="bg-gradient-to-r from-violet-600 to-primary hover:from-violet-500 hover:to-primary-light text-white text-sm font-bold py-2.5 px-6 rounded-full transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-violet-500/20 cursor-pointer">
+                            Get Early Access
+                        </button>
                     </div>
                 </header>
             </nav>
 
-            {/* Hero */}
-            <main className="flex-grow flex flex-col items-center justify-center px-4 py-20 relative">
-                {/* Background blobs */}
-                <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                    <div className="absolute -top-[20%] -left-[10%] w-[60%] h-[60%] bg-primary/10 rounded-full blur-[120px]" />
-                    <div className="absolute top-[40%] -right-[10%] w-[50%] h-[50%] bg-purple-600/10 rounded-full blur-[120px]" />
-                </div>
-
-                <div className="relative z-10 max-w-4xl w-full text-center space-y-12 animate-fade-in">
-                    {/* Badge */}
-                    <div className="space-y-6">
-                        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-panel text-primary text-xs font-bold uppercase tracking-widest" style={{ borderColor: 'rgba(43,75,238,0.2)' }}>
-                            <span className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" style={{ animation: 'ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite' }}></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-                            </span>
-                            Introducing The Source
-                        </div>
-
-                        <h1 className="text-5xl md:text-7xl lg:text-8xl font-black text-white leading-[1.1] tracking-tight">
-                            Plant your <span className="text-gradient">digital seed.</span>
-                        </h1>
-                        <p className="text-slate-400 text-lg md:text-xl max-w-2xl mx-auto font-light leading-relaxed">
-                            The next evolution of brand intelligence. Enter your website URL to extract your brand DNA and begin your marketing journey with AI-powered insights.
-                        </p>
-                    </div>
-
-                    {/* URL Input */}
-                    <div className="max-w-2xl mx-auto w-full group">
-                        <div className="glass-panel p-2 rounded-2xl md:rounded-3xl shadow-2xl transition-all duration-500 hover:border-primary/40 focus-within:border-primary/50 focus-within:ring-4 focus-within:ring-primary/10">
-                            <form className="flex flex-col md:flex-row gap-2" onSubmit={handleScan}>
-                                <div className="flex-grow flex items-center px-4 gap-3">
-                                    <span className="material-symbols-outlined text-slate-500">language</span>
-                                    <input
-                                        className="w-full bg-transparent border-none text-white focus:ring-0 focus:outline-none placeholder:text-slate-600 text-lg py-4"
-                                        placeholder="https://your-website.com"
-                                        type="url"
-                                        value={scanUrl}
-                                        onChange={(e) => setScanUrl(e.target.value)}
-                                        required
-                                    />
-                                </div>
-                                <button type="submit" className="bg-primary hover:bg-primary-light text-white px-10 py-4 rounded-xl md:rounded-2xl font-bold text-lg flex items-center justify-center gap-2 transition-all shadow-xl shadow-primary/20 cursor-pointer">
-                                    Scan
-                                    <span className="material-symbols-outlined">auto_awesome</span>
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-
-                    {/* Trust badges */}
-                    <div className="flex flex-wrap justify-center gap-8 md:gap-16 pt-6 opacity-40 hover:opacity-100 transition-all duration-700">
-                        <div className="flex items-center gap-2 font-bold text-slate-300 text-sm">
-                            <span className="material-symbols-outlined text-lg">verified_user</span> ENTERPRISE SECURE
-                        </div>
-                        <div className="flex items-center gap-2 font-bold text-slate-300 text-sm">
-                            <span className="material-symbols-outlined text-lg">memory</span> AI-POWERED
-                        </div>
-                        <div className="flex items-center gap-2 font-bold text-slate-300 text-sm">
-                            <span className="material-symbols-outlined text-lg">speed</span> REAL-TIME
-                        </div>
-                    </div>
-                </div>
-            </main>
-
-            {/* Features Section */}
-            <section className="max-w-7xl mx-auto w-full px-6 py-24">
-                <div className="text-center mb-16 animate-slide-up" style={{ animationDelay: '0.2s', animationFillMode: 'both' }}>
-                    <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Everything you need, <span className="text-gradient">one platform.</span></h2>
-                    <p className="text-slate-400 max-w-xl mx-auto">From brand intelligence to content creation, from social media to e-commerce — all powered by neural AI.</p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {[
-                        { icon: 'genetics', color: 'primary', title: 'Brand DNA', desc: 'Extract your brand identity — logo, colors, fonts, voice, and tone — from your website in seconds.' },
-                        { icon: 'draw', color: 'purple-400', title: 'Content Studio', desc: 'Generate blog posts, social captions, ad copy, emails, and SEO content aligned to your brand voice.' },
-                        { icon: 'auto_fix_high', color: 'emerald-400', title: 'Creative Studio', desc: 'Design social media posts, stories, ads, banners, and marketing videos with AI-powered generation.' },
-                        { icon: 'monitoring', color: 'primary', title: 'Search & Social Intel', desc: 'Connect Google Analytics, Search Console, and Meta Ads to monitor performance and get AI-driven marketing insights.' },
-                    ].map((f, i) => (
-                        <div key={i} className="glass-panel p-8 rounded-3xl group hover:bg-white/[0.05] transition-all duration-300" style={{ animationDelay: `${0.3 + i * 0.1}s`, animationFillMode: 'both' }}>
-                            <div className={`size-12 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform ${f.color === 'primary' ? 'bg-primary/20 text-primary' :
-                                f.color === 'purple-400' ? 'bg-purple-500/20 text-purple-400' :
-                                    'bg-emerald-500/20 text-emerald-400'
-                                }`}>
-                                <span className="material-symbols-outlined text-3xl">{f.icon}</span>
-                            </div>
-                            <h3 className="text-xl font-bold text-white mb-3">{f.title}</h3>
-                            <p className="text-slate-400 leading-relaxed">{f.desc}</p>
-                        </div>
-                    ))}
-                </div>
-            </section>
-
-            {/* How It Works */}
-            <section className="max-w-7xl mx-auto w-full px-6 py-16">
-                <div className="text-center mb-16">
-                    <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">How it <span className="text-gradient">works</span></h2>
-                    <p className="text-slate-400 max-w-xl mx-auto">Three simple steps from zero to published content.</p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {[
-                        { step: '01', icon: 'language', title: 'Enter Your Website', desc: 'Paste your URL and our AI scans your entire website to extract brand assets, style, and voice.' },
-                        { step: '02', icon: 'palette', title: 'Build Brand DNA', desc: 'Review and refine your extracted brand knowledge bank — colors, fonts, logos, and content style.' },
-                        { step: '03', icon: 'rocket_launch', title: 'Create & Publish', desc: 'Use Content Studio and Creative Studio to generate on-brand marketing content and post directly.' },
-                    ].map((s, i) => (
-                        <div key={i} className="relative glass-panel p-8 rounded-3xl group hover:bg-white/[0.05] transition-all">
-                            <div className="text-6xl font-black text-white/[0.04] absolute top-4 right-6">{s.step}</div>
-                            <div className="size-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-6 group-hover:bg-primary/20 transition-colors">
-                                <span className="material-symbols-outlined text-3xl">{s.icon}</span>
-                            </div>
-                            <h3 className="text-xl font-bold text-white mb-3">{s.title}</h3>
-                            <p className="text-slate-400 leading-relaxed">{s.desc}</p>
-                        </div>
-                    ))}
-                </div>
-            </section>
-
-            {/* Pricing Section */}
-            <section id="pricing" className="max-w-7xl mx-auto w-full px-6 py-24">
-                <div className="text-center mb-16">
-                    <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Choose your <span className="text-gradient">plan</span></h2>
-                    <p className="text-slate-400 max-w-xl mx-auto">Start free, scale as you grow. Every plan includes AI-powered brand intelligence.</p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 max-w-7xl mx-auto">
-                    {[
-                        { name: 'Starter', price: '₹499', desc: 'Perfect for getting started', features: ['1 Brand Profile', '50 Credits/month', 'Basic Content Studio', 'Email Support'], popular: false },
-                        { name: 'Professional', price: '₹1,999', desc: 'For growing brands', features: ['3 Brand Profiles', '200 Credits/month', 'Full Studio Access', 'Team Dashboard', 'Priority Support'], popular: true },
-                        { name: 'Agency', price: '₹4,999', desc: 'For marketing teams', features: ['15 Brand Profiles', '1,000 Credits/month', 'Full Studio Access', 'Team Dashboard (10 users)', 'D2C Analytics'], popular: false },
-                        { name: 'Enterprise', price: '₹9,999', desc: 'Unlimited AI power', features: ['Unlimited Brand Profiles', 'Unlimited Credits', 'Full Studio Access', 'Dedicated Support', 'White Labeling'], popular: false },
-                    ].map((plan, i) => (
-                        <div key={i} className={`glass-panel p-8 rounded-3xl relative transition-all hover:scale-[1.02] ${plan.popular ? 'border-primary/40 ring-2 ring-primary/20' : ''}`}>
-                            {plan.popular && (
-                                <div className="absolute -top-3 left-1/2 -translate-x-1/2 badge badge-primary">Most Popular</div>
-                            )}
-                            <h3 className="text-xl font-bold text-white mb-1">{plan.name}</h3>
-                            <p className="text-slate-500 text-sm mb-6">{plan.desc}</p>
-                            <div className="mb-6">
-                                <span className="text-4xl font-black text-white">{plan.price}</span>
-                                {plan.price !== 'Free' && <span className="text-slate-500 text-sm">/month</span>}
-                            </div>
-                            <ul className="space-y-3 mb-8">
-                                {plan.features.map((f, j) => (
-                                    <li key={j} className="flex items-center gap-2 text-sm text-slate-300">
-                                        <span className="material-symbols-outlined text-primary text-lg">check_circle</span>
-                                        {f}
-                                    </li>
-                                ))}
-                            </ul>
-                            <button
-                                onClick={() => handlePricing(plan.name)}
-                                className={`w-full py-3 rounded-xl font-bold text-sm text-center block transition-all cursor-pointer ${plan.popular
-                                    ? 'bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary-light'
-                                    : 'bg-white/[0.06] text-white hover:bg-white/[0.1]'
-                                    }`}
-                            >
-                                Get Started
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            </section>
-
-            {/* CTA Section */}
-            <section className="max-w-7xl mx-auto w-full px-6 py-12">
-                <div className="glass-panel rounded-[2.5rem] p-8 md:p-16 overflow-hidden relative">
-                    <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-primary/10 to-transparent pointer-events-none" />
-                    <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+            {/* ═══════════════════════════════════════════════════════ */}
+            {/*  HERO SECTION                                          */}
+            {/* ═══════════════════════════════════════════════════════ */}
+            <main className="relative z-10 flex-shrink-0">
+                <section className="max-w-7xl mx-auto px-6 pt-16 pb-24">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                        {/* Left: Copy */}
                         <div className="space-y-8">
-                            <h2 className="text-4xl font-bold text-white leading-tight">Join the future of <br />brand intelligence.</h2>
-                            <div className="flex flex-col gap-6">
+                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest"
+                                style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#a78bfa' }}>
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-400" />
+                                </span>
+                                Now Accepting Early Access
+                            </div>
+
+                            <h1 className="text-5xl md:text-6xl lg:text-7xl font-black text-white leading-[1.05] tracking-tight">
+                                Your entire<br />
+                                marketing team,<br />
+                                <span className="bg-gradient-to-r from-violet-400 via-primary to-cyan-400 bg-clip-text text-transparent">powered by AI.</span>
+                            </h1>
+
+                            <p className="text-slate-400 text-lg md:text-xl max-w-lg leading-relaxed">
+                                10 AI studios. One platform. From brand DNA extraction to content creation, video production, ad optimization & e-commerce intelligence — Mantram AI is your full-stack marketing operating system.
+                            </p>
+
+                            <div className="flex flex-col sm:flex-row gap-4">
+                                <button onClick={() => { setShowWaitlist(true); setTimeout(() => scrollTo('early-access'), 100) }}
+                                    className="bg-gradient-to-r from-violet-600 to-primary hover:from-violet-500 hover:to-primary-light text-white font-bold py-4 px-8 rounded-2xl transition-all transform hover:scale-105 active:scale-95 shadow-xl shadow-violet-500/20 text-lg flex items-center justify-center gap-2 cursor-pointer">
+                                    <span className="material-symbols-outlined">rocket_launch</span>
+                                    Join the Waitlist
+                                </button>
+                                <button onClick={() => scrollTo('studios')}
+                                    className="py-4 px-8 rounded-2xl text-lg font-bold text-white flex items-center justify-center gap-2 cursor-pointer transition-all hover:bg-white/[0.05]"
+                                    style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
+                                    <span className="material-symbols-outlined">play_circle</span>
+                                    Explore Studios
+                                </button>
+                            </div>
+
+                            {/* Trust strip */}
+                            <div className="flex items-center gap-6 pt-4">
                                 {[
-                                    { title: '2.4M+ Analyses Run', desc: 'Join a global network of digital pioneers.' },
-                                    { title: '45ms Processing Speed', desc: 'Real-time extraction without the wait.' },
-                                    { title: '99.9% Accuracy', desc: 'Enterprise-grade brand intelligence.' },
-                                ].map((s, i) => (
-                                    <div key={i} className="flex items-start gap-4">
-                                        <div className="mt-1 text-primary"><span className="material-symbols-outlined">check_circle</span></div>
-                                        <div>
-                                            <h4 className="text-white font-bold">{s.title}</h4>
-                                            <p className="text-slate-400 text-sm">{s.desc}</p>
+                                    { icon: 'verified_user', text: 'Enterprise Secure' },
+                                    { icon: 'memory', text: '10 AI Studios' },
+                                    { icon: 'speed', text: 'Real-Time Intelligence' },
+                                ].map((b, i) => (
+                                    <div key={i} className="flex items-center gap-1.5 text-slate-500 text-xs font-semibold uppercase tracking-wider">
+                                        <span className="material-symbols-outlined text-sm">{b.icon}</span>{b.text}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Right: Hero Media Carousel */}
+                        <div className="relative">
+                            <div className="relative aspect-[4/3] rounded-3xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                {/* Carousel slides */}
+                                {heroSlides.map((slide, idx) => (
+                                    <div key={idx} className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-700 ${heroSlide === idx ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+                                        <div className={`absolute inset-0 bg-gradient-to-br ${slide.gradient}`} />
+                                        <div className="relative z-10 text-center">
+                                            <span className="material-symbols-outlined text-white/20" style={{ fontSize: '120px' }}>{slide.icon}</span>
+                                            <p className="text-white/40 text-sm font-bold uppercase tracking-widest mt-4">{slide.label}</p>
+                                            <p className="text-white/20 text-xs mt-2">Replace with your hero image, video, or carousel media</p>
                                         </div>
                                     </div>
                                 ))}
+
+                                {/* Slide indicators */}
+                                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+                                    {heroSlides.map((_, idx) => (
+                                        <button key={idx} onClick={() => { setHeroSlide(idx); clearInterval(heroInterval.current); heroInterval.current = setInterval(() => setHeroSlide(p => (p + 1) % heroSlides.length), 5000) }}
+                                            className={`h-1.5 rounded-full transition-all duration-500 cursor-pointer ${heroSlide === idx ? 'w-8 bg-violet-400' : 'w-3 bg-white/20 hover:bg-white/30'}`} />
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                        <div className="flex justify-center md:justify-end">
-                            <div className="relative w-full max-w-sm aspect-square">
-                                <div className="absolute inset-0 bg-primary/20 rounded-full blur-3xl animate-pulse-slow" />
-                                <div className="relative w-full h-full glass-panel rounded-full flex items-center justify-center" style={{ borderColor: 'rgba(255,255,255,0.15)' }}>
-                                    <div className="text-center">
-                                        <span className="material-symbols-outlined text-primary text-8xl">hub</span>
-                                        <div className="mt-4 text-white font-black text-2xl tracking-widest">ACTIVE NODE</div>
+
+                            {/* Floating feature cards */}
+                            <div className="absolute -bottom-6 -left-6 px-4 py-3 rounded-2xl backdrop-blur-xl shadow-2xl animate-float" style={{ background: 'rgba(15,15,30,0.85)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                <div className="flex items-center gap-3">
+                                    <div className="size-10 rounded-xl bg-violet-500/20 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-violet-400">genetics</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-white text-sm font-bold">Brand DNA</p>
+                                        <p className="text-slate-500 text-[10px]">60-second website scan</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="absolute -top-4 -right-4 px-4 py-3 rounded-2xl backdrop-blur-xl shadow-2xl" style={{ background: 'rgba(15,15,30,0.85)', border: '1px solid rgba(255,255,255,0.08)', animation: 'float 3s ease-in-out 1s infinite' }}>
+                                <div className="flex items-center gap-3">
+                                    <div className="size-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-emerald-400">trending_up</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-white text-sm font-bold">Live Trends</p>
+                                        <p className="text-slate-500 text-[10px]">Grok-powered intelligence</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </section>
+                </section>
 
-            {/* Footer */}
-            <footer className="w-full border-t border-white/[0.05] py-12 px-6 mt-20">
-                <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
-                    <div className="flex items-center gap-3">
-                        <div className="size-6 rounded overflow-hidden">
-                            <img src="/mantram-logo.png" alt="Mantram AI" className="size-6" />
-                        </div>
-                        <span className="text-white font-bold">Mantram AI</span>
+                {/* ═══════════════════════════════════════════════════════ */}
+                {/*  STATS STRIP                                           */}
+                {/* ═══════════════════════════════════════════════════════ */}
+                <section className="border-y border-white/[0.04] py-10" style={{ background: 'rgba(255,255,255,0.01)' }}>
+                    <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8">
+                        {[
+                            { value: '10+', label: 'AI Studios', icon: 'dashboard' },
+                            { value: '6+', label: 'AI Models', icon: 'psychology' },
+                            { value: '50+', label: 'Content Types', icon: 'article' },
+                            { value: '∞', label: 'Possibilities', icon: 'all_inclusive' },
+                        ].map((s, i) => (
+                            <div key={i} className="text-center group">
+                                <span className="material-symbols-outlined text-white/10 text-3xl mb-2 block group-hover:text-primary/30 transition-colors">{s.icon}</span>
+                                <p className="text-4xl font-black text-white mb-1">{s.value}</p>
+                                <p className="text-slate-500 text-sm font-medium uppercase tracking-wider">{s.label}</p>
+                            </div>
+                        ))}
                     </div>
-                    <div className="flex flex-col md:flex-row gap-8 items-center">
-                        <div className="text-slate-500 text-xs max-w-sm text-center md:text-left">
-                            <strong>Transparency Notice:</strong> We request read-only access to Google Analytics and Search Console solely to generate your marketing reports and AI insights. We never sell your data or use it for any purpose outside of your brand dashboard.
+                </section>
+
+                {/* ═══════════════════════════════════════════════════════ */}
+                {/*  STUDIOS SHOWCASE                                      */}
+                {/* ═══════════════════════════════════════════════════════ */}
+                <section id="studios" className="max-w-7xl mx-auto px-6 py-24">
+                    <div className="text-center mb-16">
+                        <p className="text-primary text-sm font-bold uppercase tracking-widest mb-3">The Studio Ecosystem</p>
+                        <h2 className="text-4xl md:text-5xl font-black text-white mb-5">
+                            10 Studios. <span className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">One Platform.</span>
+                        </h2>
+                        <p className="text-slate-400 text-lg max-w-2xl mx-auto">Every marketing function — content, design, video, ads, SEO, e-commerce, conversations — powered by specialized AI agent teams.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {studios.map((s, i) => (
+                            <div key={i} className="group relative rounded-2xl p-6 transition-all duration-300 hover:translate-y-[-4px] cursor-default"
+                                style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
+                                onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(139,92,246,0.2)'}
+                                onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'}>
+                                <div className="flex items-start gap-4">
+                                    <div className={`size-12 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center flex-shrink-0 shadow-lg group-hover:scale-110 transition-transform`}>
+                                        <span className="material-symbols-outlined text-white text-2xl">{s.icon}</span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1.5">
+                                            <h3 className="text-white font-bold text-lg">{s.name}</h3>
+                                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/[0.06] text-slate-500">{s.tag}</span>
+                                        </div>
+                                        <p className="text-slate-400 text-sm leading-relaxed">{s.desc}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+
+                {/* ═══════════════════════════════════════════════════════ */}
+                {/*  PLATFORM USPs                                         */}
+                {/* ═══════════════════════════════════════════════════════ */}
+                <section id="usps" className="py-24" style={{ background: 'rgba(255,255,255,0.01)' }}>
+                    <div className="max-w-7xl mx-auto px-6">
+                        <div className="text-center mb-16">
+                            <p className="text-emerald-400 text-sm font-bold uppercase tracking-widest mb-3">Why Mantram AI</p>
+                            <h2 className="text-4xl md:text-5xl font-black text-white mb-5">
+                                Not another AI tool.<br /><span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">A marketing operating system.</span>
+                            </h2>
                         </div>
-                        <div className="flex gap-8 text-slate-500 text-sm">
-                            <Link to="/privacy-policy" className="hover:text-primary transition-colors cursor-pointer whitespace-nowrap">Privacy Policy</Link>
-                            <Link to="/terms" className="hover:text-primary transition-colors cursor-pointer whitespace-nowrap">Terms of Service</Link>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {usps.map((u, i) => (
+                                <div key={i} className="rounded-2xl p-7 transition-all duration-300 hover:translate-y-[-2px]"
+                                    style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <div className={`size-14 rounded-2xl bg-gradient-to-br ${u.gradient} flex items-center justify-center mb-5`}
+                                        style={{ border: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <span className={`material-symbols-outlined text-3xl ${u.iconColor}`}>{u.icon}</span>
+                                    </div>
+                                    <h3 className="text-white font-bold text-xl mb-3">{u.title}</h3>
+                                    <p className="text-slate-400 text-sm leading-relaxed">{u.desc}</p>
+                                </div>
+                            ))}
                         </div>
                     </div>
-                    <div className="flex gap-4">
-                        <a className="size-10 rounded-full glass-panel flex items-center justify-center text-slate-400 hover:text-white transition-all cursor-pointer">
-                            <span className="material-symbols-outlined text-lg">share</span>
-                        </a>
-                        <a className="size-10 rounded-full glass-panel flex items-center justify-center text-slate-400 hover:text-white transition-all cursor-pointer">
-                            <span className="material-symbols-outlined text-lg">mail</span>
-                        </a>
+                </section>
+
+                {/* ═══════════════════════════════════════════════════════ */}
+                {/*  HOW IT WORKS                                          */}
+                {/* ═══════════════════════════════════════════════════════ */}
+                <section id="how-it-works" className="max-w-7xl mx-auto px-6 py-24">
+                    <div className="text-center mb-16">
+                        <p className="text-amber-400 text-sm font-bold uppercase tracking-widest mb-3">Getting Started</p>
+                        <h2 className="text-4xl md:text-5xl font-black text-white mb-5">
+                            Three steps to <span className="bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">marketing magic.</span>
+                        </h2>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        {[
+                            { step: '01', icon: 'language', title: 'Scan Your Brand', desc: 'Paste your website URL. Our AI scans every page to extract your brand DNA — logo, colors, fonts, voice, tone & visual identity. Takes 60 seconds.', gradient: 'from-violet-500 to-purple-600' },
+                            { step: '02', icon: 'hub', title: 'Explore Studios', desc: 'Access 10 AI studios — each with specialized agent teams. Generate content, design creatives, produce videos, plan ads, optimize SEO & more.', gradient: 'from-primary to-blue-600' },
+                            { step: '03', icon: 'rocket_launch', title: 'Publish & Scale', desc: 'Connect your social accounts, Shopify store & ad platforms. Publish directly, schedule content & let AI optimize your campaigns in real-time.', gradient: 'from-cyan-500 to-teal-600' },
+                        ].map((s, i) => (
+                            <div key={i} className="relative rounded-2xl p-8 transition-all duration-300 group"
+                                style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <div className="text-7xl font-black text-white/[0.04] absolute top-4 right-6">{s.step}</div>
+                                <div className={`size-14 rounded-2xl bg-gradient-to-br ${s.gradient} flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform`}>
+                                    <span className="material-symbols-outlined text-white text-3xl">{s.icon}</span>
+                                </div>
+                                <h3 className="text-xl font-bold text-white mb-3">{s.title}</h3>
+                                <p className="text-slate-400 leading-relaxed">{s.desc}</p>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+
+                {/* ═══════════════════════════════════════════════════════ */}
+                {/*  EARLY ACCESS WAITLIST                                 */}
+                {/* ═══════════════════════════════════════════════════════ */}
+                <section id="early-access" className="py-24" style={{ background: 'linear-gradient(180deg, rgba(139,92,246,0.03) 0%, rgba(43,75,238,0.05) 50%, rgba(6,182,212,0.03) 100%)' }}>
+                    <div className="max-w-4xl mx-auto px-6">
+                        <div className="text-center mb-12">
+                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest mb-6"
+                                style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#a78bfa' }}>
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-60" />
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-400" />
+                                </span>
+                                Limited Spots Available
+                            </div>
+                            <h2 className="text-4xl md:text-5xl font-black text-white mb-5">
+                                Get <span className="bg-gradient-to-r from-violet-400 via-primary to-cyan-400 bg-clip-text text-transparent">early access.</span>
+                            </h2>
+                            <p className="text-slate-400 text-lg max-w-xl mx-auto">
+                                Join the waitlist for exclusive early access. Be among the first to experience the future of AI-powered marketing.
+                            </p>
+                        </div>
+
+                        {!waitlistSubmitted ? (
+                            <div className="rounded-3xl p-8 md:p-10" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                {/* Individual / Enterprise toggle */}
+                                <div className="flex justify-center mb-8">
+                                    <div className="flex rounded-xl p-1" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                        {[
+                                            { id: 'individual', icon: 'person', label: 'Individual / Freelancer' },
+                                            { id: 'enterprise', icon: 'business', label: 'Enterprise / Agency' },
+                                        ].map(t => (
+                                            <button key={t.id} onClick={() => setWaitlistType(t.id)}
+                                                className={`flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${waitlistType === t.id
+                                                    ? 'bg-gradient-to-r from-violet-600 to-primary text-white shadow-lg shadow-violet-500/20'
+                                                    : 'text-slate-500 hover:text-white'}`}>
+                                                <span className="material-symbols-outlined text-base">{t.icon}</span>
+                                                {t.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <form onSubmit={handleWaitlistSubmit} className="space-y-5">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                        <div>
+                                            <label className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1.5 block">Full Name *</label>
+                                            <input type="text" required value={waitlistForm.name} onChange={e => setWaitlistForm(p => ({ ...p, name: e.target.value }))}
+                                                className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3.5 text-white placeholder:text-slate-600 focus:outline-none focus:border-violet-500/40 focus:ring-2 focus:ring-violet-500/10 transition-all"
+                                                placeholder="John Doe" />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1.5 block">Email *</label>
+                                            <input type="email" required value={waitlistForm.email} onChange={e => setWaitlistForm(p => ({ ...p, email: e.target.value }))}
+                                                className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3.5 text-white placeholder:text-slate-600 focus:outline-none focus:border-violet-500/40 focus:ring-2 focus:ring-violet-500/10 transition-all"
+                                                placeholder="john@company.com" />
+                                        </div>
+                                    </div>
+
+                                    {waitlistType === 'enterprise' && (
+                                        <>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                <div>
+                                                    <label className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1.5 block">Company Name *</label>
+                                                    <input type="text" required value={waitlistForm.company} onChange={e => setWaitlistForm(p => ({ ...p, company: e.target.value }))}
+                                                        className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3.5 text-white placeholder:text-slate-600 focus:outline-none focus:border-violet-500/40 focus:ring-2 focus:ring-violet-500/10 transition-all"
+                                                        placeholder="Acme Inc." />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1.5 block">Your Role</label>
+                                                    <select value={waitlistForm.role} onChange={e => setWaitlistForm(p => ({ ...p, role: e.target.value }))}
+                                                        className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3.5 text-white focus:outline-none focus:border-violet-500/40 focus:ring-2 focus:ring-violet-500/10 transition-all cursor-pointer appearance-none">
+                                                        <option value="" className="bg-[#12122a]">Select role</option>
+                                                        <option value="founder" className="bg-[#12122a]">Founder / CEO</option>
+                                                        <option value="cmo" className="bg-[#12122a]">CMO / Marketing Head</option>
+                                                        <option value="manager" className="bg-[#12122a]">Marketing Manager</option>
+                                                        <option value="agency" className="bg-[#12122a]">Agency Owner</option>
+                                                        <option value="other" className="bg-[#12122a]">Other</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                <div>
+                                                    <label className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1.5 block">Phone</label>
+                                                    <input type="tel" value={waitlistForm.phone} onChange={e => setWaitlistForm(p => ({ ...p, phone: e.target.value }))}
+                                                        className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3.5 text-white placeholder:text-slate-600 focus:outline-none focus:border-violet-500/40 focus:ring-2 focus:ring-violet-500/10 transition-all"
+                                                        placeholder="+91 98765 43210" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1.5 block">Team Size</label>
+                                                    <select value={waitlistForm.teamSize} onChange={e => setWaitlistForm(p => ({ ...p, teamSize: e.target.value }))}
+                                                        className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3.5 text-white focus:outline-none focus:border-violet-500/40 focus:ring-2 focus:ring-violet-500/10 transition-all cursor-pointer appearance-none">
+                                                        <option value="" className="bg-[#12122a]">Select size</option>
+                                                        <option value="1-5" className="bg-[#12122a]">1 – 5 people</option>
+                                                        <option value="6-20" className="bg-[#12122a]">6 – 20 people</option>
+                                                        <option value="21-50" className="bg-[#12122a]">21 – 50 people</option>
+                                                        <option value="50+" className="bg-[#12122a]">50+ people</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    <div>
+                                        <label className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1.5 block">
+                                            {waitlistType === 'enterprise' ? 'What are you looking for?' : 'Tell us about your brand (optional)'}
+                                        </label>
+                                        <textarea value={waitlistForm.message} onChange={e => setWaitlistForm(p => ({ ...p, message: e.target.value }))}
+                                            className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3.5 text-white placeholder:text-slate-600 focus:outline-none focus:border-violet-500/40 focus:ring-2 focus:ring-violet-500/10 transition-all resize-none"
+                                            rows={3}
+                                            placeholder={waitlistType === 'enterprise' ? 'Custom integrations, white-labeling, team requirements...' : 'Your website URL, industry, or what you would like to achieve...'} />
+                                    </div>
+
+                                    <button type="submit" disabled={waitlistLoading}
+                                        className="w-full bg-gradient-to-r from-violet-600 to-primary hover:from-violet-500 hover:to-primary-light text-white font-bold py-4 rounded-xl text-lg transition-all transform hover:scale-[1.01] active:scale-[0.99] shadow-xl shadow-violet-500/20 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                                        {waitlistLoading ? (
+                                            <><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span> Submitting...</>
+                                        ) : (
+                                            <><span className="material-symbols-outlined text-lg">rocket_launch</span> Request Early Access</>
+                                        )}
+                                    </button>
+
+                                    <p className="text-center text-slate-600 text-xs">No credit card required. We'll reach out when your spot opens up.</p>
+                                </form>
+                            </div>
+                        ) : (
+                            /* ── Success state ── */
+                            <div className="rounded-3xl p-12 text-center" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                <div className="size-20 rounded-full bg-emerald-500/15 flex items-center justify-center mx-auto mb-6">
+                                    <span className="material-symbols-outlined text-emerald-400 text-5xl">check_circle</span>
+                                </div>
+                                <h3 className="text-3xl font-black text-white mb-3">You're on the list! 🚀</h3>
+                                <p className="text-slate-400 text-lg max-w-md mx-auto mb-6">
+                                    We've received your request. You'll be among the first to get access when we launch. Keep an eye on your inbox.
+                                </p>
+                                <div className="flex justify-center gap-4">
+                                    <button onClick={() => { setWaitlistSubmitted(false); setWaitlistForm({ name: '', email: '', company: '', role: '', phone: '', teamSize: '', message: '' }) }}
+                                        className="px-6 py-3 rounded-xl text-sm font-bold text-slate-400 hover:text-white transition-colors cursor-pointer" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+                                        Submit Another
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </section>
+            </main>
+
+            {/* ═══════════════════════════════════════════════════════ */}
+            {/*  FOOTER                                                */}
+            {/* ═══════════════════════════════════════════════════════ */}
+            <footer className="relative z-10 w-full border-t border-white/[0.04] py-16 px-6 mt-auto">
+                <div className="max-w-7xl mx-auto">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+                        <div className="md:col-span-2">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="size-8 rounded-lg overflow-hidden">
+                                    <img src="/mantram-logo.png" alt="Mantram AI" className="size-8" />
+                                </div>
+                                <span className="text-white text-xl font-bold">Mantram <span className="text-primary">AI</span></span>
+                            </div>
+                            <p className="text-slate-500 text-sm max-w-sm leading-relaxed mb-6">
+                                The AI-powered marketing operating system. 10 studios, infinite possibilities. From brand DNA to published content in minutes.
+                            </p>
+                            <div className="flex gap-3">
+                                {['share', 'mail', 'code'].map((icon, i) => (
+                                    <a key={i} className="size-10 rounded-xl flex items-center justify-center text-slate-500 hover:text-white transition-all cursor-pointer" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                        <span className="material-symbols-outlined text-lg">{icon}</span>
+                                    </a>
+                                ))}
+                            </div>
+                        </div>
+                        <div>
+                            <h4 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Platform</h4>
+                            <ul className="space-y-3">
+                                {['Studios', 'Brand DNA', 'Team Dashboard', 'Integrations', 'Analytics'].map(item => (
+                                    <li key={item}><a className="text-slate-500 hover:text-primary text-sm transition-colors cursor-pointer">{item}</a></li>
+                                ))}
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Company</h4>
+                            <ul className="space-y-3">
+                                {['Privacy Policy', 'Terms of Service', 'Security', 'API Docs', 'Contact'].map(item => (
+                                    <li key={item}><a className="text-slate-500 hover:text-primary text-sm transition-colors cursor-pointer">{item}</a></li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                    <div className="border-t border-white/[0.04] pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+                        <p className="text-slate-600 text-xs">© {new Date().getFullYear()} Mantram AI. All rights reserved.</p>
+                        <p className="text-slate-700 text-xs">Built with ❤️ for marketers, by marketers.</p>
                     </div>
                 </div>
-                <p className="text-center text-slate-600 text-xs mt-8">© 2025 Mantram AI. All rights reserved.</p>
             </footer>
+
+            {/* Inline CSS for animations */}
+            <style>{`
+                @keyframes float { 0%, 100% { transform: translateY(0px) } 50% { transform: translateY(-10px) } }
+                .animate-float { animation: float 3s ease-in-out infinite }
+            `}</style>
         </div>
     )
 }

@@ -95,8 +95,26 @@ async function resizeToAspectRatio(base64DataUri, targetRatio) {
 }
 
 /**
+ * Verify that a hosted URL is actually fetchable (returns image content).
+ * PiAPI needs to be able to GET the image — this catches redirect pages, 403s, etc.
+ */
+async function verifyHostedUrl(url) {
+    try {
+        const resp = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(8000) });
+        const ct = resp.headers.get('content-type') || '';
+        if (resp.ok && ct.startsWith('image/')) return true;
+        console.warn(`⚠️ URL verification failed: ${resp.status}, content-type: ${ct}`);
+        return false;
+    } catch (e) {
+        console.warn(`⚠️ URL verification error: ${e.message}`);
+        return false;
+    }
+}
+
+/**
  * Upload a base64 image to a free file hosting service to get a public URL.
- * Uses 0x0.st (primary) and catbox.moe (fallback) — both free, no auth needed.
+ * Uses catbox.moe (primary, proven reliable with PiAPI) and tmpfiles.org (fallback).
+ * Includes retry logic and URL verification to ensure PiAPI can actually fetch the image.
  * Returns hosted URL or null.
  */
 async function uploadImageToHostedUrl(base64DataUri) {
@@ -113,67 +131,192 @@ async function uploadImageToHostedUrl(base64DataUri) {
     const fileName = `ref-${Date.now()}.${ext}`;
     const buffer = Buffer.from(base64Data, 'base64');
 
-    console.log(`📤 Uploading ref image to catbox.moe (${fileName}, ${Math.round(buffer.length / 1024)}KB)...`);
+    console.log(`📤 Uploading ref image (${fileName}, ${Math.round(buffer.length / 1024)}KB)...`);
 
-    // catbox.moe — free, no auth, tested and working
+    // Method 1: catbox.moe — PRIMARY (proven reliable with PiAPI, direct file URLs)
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+            const { Blob } = await import('buffer');
+            const formData = new FormData();
+            formData.append('reqtype', 'fileupload');
+            const blob = new Blob([buffer], { type: mimeType });
+            formData.append('fileToUpload', blob, fileName);
+
+            const resp = await fetch('https://catbox.moe/user/api.php', {
+                method: 'POST',
+                body: formData,
+                signal: AbortSignal.timeout(15000),
+            });
+            const text = await resp.text();
+            console.log(`📥 catbox response attempt ${attempt} (${resp.status}): ${text.trim().substring(0, 200)}`);
+            if (resp.ok && text.trim().startsWith('http')) {
+                const url = text.trim();
+                // Verify the URL is actually fetchable
+                const ok = await verifyHostedUrl(url);
+                if (ok) {
+                    console.log(`✅ Image hosted at: ${url} (verified)`);
+                    return url;
+                }
+                console.warn(`⚠️ catbox URL not fetchable, trying next method`);
+                break; // URL exists but isn't fetchable, skip retries
+            }
+            console.warn(`⚠️ catbox upload failed attempt ${attempt} (${resp.status}): ${text.trim().substring(0, 200)}`);
+        } catch (e) {
+            console.warn(`⚠️ catbox upload error attempt ${attempt}: ${e.message}`);
+        }
+        if (attempt < 2) {
+            console.log(`🔄 Retrying catbox in 1s...`);
+            await new Promise(r => setTimeout(r, 1000));
+        }
+    }
+
+    // Method 2: tmpfiles.org — fallback
     try {
         const { Blob } = await import('buffer');
         const formData = new FormData();
-        formData.append('reqtype', 'fileupload');
         const blob = new Blob([buffer], { type: mimeType });
-        formData.append('fileToUpload', blob, fileName);
+        formData.append('file', blob, fileName);
 
-        const resp = await fetch('https://catbox.moe/user/api.php', {
+        const resp = await fetch('https://tmpfiles.org/api/v1/upload', {
             method: 'POST',
             body: formData,
+            signal: AbortSignal.timeout(15000),
         });
-        const text = await resp.text();
-        console.log(`📥 catbox response (${resp.status}): ${text.trim().substring(0, 200)}`);
-        if (resp.ok && text.trim().startsWith('http')) {
-            console.log(`✅ Image hosted at: ${text.trim()}`);
-            return text.trim();
+        const json = await resp.json();
+        console.log(`📥 tmpfiles.org response (${resp.status}):`, JSON.stringify(json).substring(0, 200));
+        if (json.status === 'success' && json.data?.url) {
+            // tmpfiles.org URLs need /dl/ inserted for direct download
+            const directUrl = json.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/').replace('http://', 'https://');
+            const ok = await verifyHostedUrl(directUrl);
+            if (ok) {
+                console.log(`✅ Image hosted at: ${directUrl} (verified)`);
+                return directUrl;
+            }
+            console.warn(`⚠️ tmpfiles.org URL not fetchable: ${directUrl}`);
         }
-        console.warn(`⚠️ catbox upload failed (${resp.status}): ${text.trim().substring(0, 200)}`);
+        console.warn(`⚠️ tmpfiles.org upload failed:`, JSON.stringify(json).substring(0, 200));
     } catch (e) {
-        console.warn(`⚠️ catbox upload error: ${e.message}`);
+        console.warn(`⚠️ tmpfiles.org upload error: ${e.message}`);
     }
 
-    console.warn('⚠️ Image upload failed');
+    // Method 3: 0x0.st — last resort fallback
+    try {
+        const { Blob } = await import('buffer');
+        const formData = new FormData();
+        const blob = new Blob([buffer], { type: mimeType });
+        formData.append('file', blob, fileName);
+
+        const resp = await fetch('https://0x0.st', {
+            method: 'POST',
+            body: formData,
+            signal: AbortSignal.timeout(15000),
+        });
+        const text = await resp.text();
+        console.log(`📥 0x0.st response (${resp.status}): ${text.trim().substring(0, 200)}`);
+        if (resp.ok && text.trim().startsWith('http')) {
+            const url = text.trim();
+            const ok = await verifyHostedUrl(url);
+            if (ok) {
+                console.log(`✅ Image hosted at: ${url} (verified)`);
+                return url;
+            }
+        }
+        console.warn(`⚠️ 0x0.st upload failed (${resp.status})`);
+    } catch (e) {
+        console.warn(`⚠️ 0x0.st upload error: ${e.message}`);
+    }
+
+    console.warn('❌ All image upload services failed');
     return null;
 }
 
 /**
+ * Submit a raw PiAPI payload and return the taskId.
+ * Includes retry logic: up to 3 attempts with 3s delay for transient failures.
+ */
+async function submitPiApiPayload(payload) {
+    const apiKey = getPiApiKey();
+    const MAX_ATTEMPTS = 3;
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        console.log(`🎬 PiAPI submit attempt ${attempt}/${MAX_ATTEMPTS}:`, JSON.stringify({
+            ...payload,
+            input: {
+                ...payload.input,
+                prompt: payload.input.prompt.substring(0, 200) + '...',
+                image_urls: payload.input.image_urls?.map(u => u.substring(0, 60) + '...'),
+            }
+        }, null, 2));
+
+        try {
+            const response = await fetch(`${PIAPI_BASE_URL}/api/v1/task`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey,
+                },
+                body: JSON.stringify(payload),
+                signal: AbortSignal.timeout(20000),
+            });
+
+            const rawText = await response.text();
+            console.log(`📥 PiAPI raw response attempt ${attempt} (${response.status}):`, rawText.substring(0, 1000));
+
+            let data;
+            try {
+                data = JSON.parse(rawText);
+            } catch (e) {
+                throw new Error(`PiAPI returned non-JSON (${response.status}): ${rawText.substring(0, 200)}`);
+            }
+
+            if (data.code && data.code !== 200) {
+                throw new Error(`PiAPI submission failed (code ${data.code}): ${data.message || JSON.stringify(data).substring(0, 300)}`);
+            }
+
+            if (!response.ok && !data.data) {
+                throw new Error(`PiAPI submission failed (${response.status}): ${data.message || data.error || rawText.substring(0, 200)}`);
+            }
+
+            const taskId = data.data?.task_id || data.task_id;
+            if (!taskId) {
+                throw new Error(`PiAPI did not return a taskId. Response: ${JSON.stringify(data).substring(0, 300)}`);
+            }
+
+            console.log(`✅ PiAPI queued: taskId=${taskId}`);
+            return taskId;
+        } catch (e) {
+            console.warn(`⚠️ PiAPI submit attempt ${attempt} failed: ${e.message}`);
+            if (attempt < MAX_ATTEMPTS) {
+                console.log(`🔄 Retrying PiAPI submit in 3s...`);
+                await new Promise(r => setTimeout(r, 3000));
+            } else {
+                throw e;
+            }
+        }
+    }
+}
+
+/**
  * Submit video generation to PiAPI (Seedance 2.0)
- * Returns { taskId, provider: 'piapi' }
+ * Returns { taskId, provider: 'piapi', _payload }
  * 
- * Per PiAPI docs (piapi.ai/docs/seedance-api/seedance-2-preview):
- *   - model: "seedance"
- *   - task_type: "seedance-2-preview" or "seedance-2-fast-preview"
- *   - input: { prompt, duration (int), aspect_ratio }
- *   - Images are embedded IN the prompt as <img>URL</img> tags
- *   - NO separate image_urls field
- *   - Base64 images must be uploaded to PiAPI ephemeral storage first
+ * The _payload is stored so that auto-retry can resubmit on
+ * PiAPI's intermittent "failed to process task" errors.
  */
 export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, aspectRatio, generateAudio = true, referenceImages = [], qualityMode = 'fast' }) {
-    const apiKey = getPiApiKey();
-
     const dur = Math.min(Math.max(duration || 5, 4), 15);
 
     console.log(`🎞️ PiAPI received: ${referenceImages.length} ref images, imageUrl: ${imageUrl ? 'yes' : 'no'}, quality: ${qualityMode}`);
 
     let finalPrompt = prompt;
-    const imageUrls = []; // Only for first-frame images
+    const imageUrls = [];
 
     // Upload reference images to catbox and embed URLs in prompt
-    // IMPORTANT: ref images go ONLY in the prompt (not in image_urls)
-    // Putting them in image_urls makes Seedance treat them as first frames,
-    // which overrides the user's selected aspect ratio (confirmed PiAPI bug)
     if (referenceImages && referenceImages.length > 0) {
         for (let i = 0; i < referenceImages.length; i++) {
             let url = referenceImages[i];
             if (!url) continue;
 
-            // If base64, upload to get hosted URL
             if (url.startsWith('data:')) {
                 const hostedUrl = await uploadImageToHostedUrl(url);
                 if (hostedUrl) {
@@ -185,11 +328,8 @@ export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, a
             }
 
             console.log(`📸 Ref image ${i + 1} hosted: ${url.substring(0, 60)}...`);
-
-            // Add to image_urls for PiAPI's @imageN referencing
             imageUrls.push(url);
 
-            // Ensure @imageN tag exists in prompt
             const tag = `@image${i + 1}`;
             if (!finalPrompt.includes(tag)) {
                 finalPrompt += ` Use ${tag} as visual reference.`;
@@ -198,7 +338,7 @@ export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, a
         }
     }
 
-    // Handle first frame image — this one IS supposed to control aspect ratio
+    // Handle first frame image
     if (imageUrl) {
         let url = imageUrl;
         if (url.startsWith('data:')) {
@@ -207,7 +347,7 @@ export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, a
             else url = null;
         }
         if (url) {
-            imageUrls.unshift(url); // First frame goes first in image_urls
+            imageUrls.unshift(url);
             console.log(`📸 First frame ready: ${url.substring(0, 60)}...`);
         }
     }
@@ -222,83 +362,38 @@ export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, a
         duration: dur,
     };
 
-    // Add image_urls (contains first frame + ref images for @imageN referencing)
     if (imageUrls.length > 0) {
         taskInput.image_urls = imageUrls;
         console.log(`📸 Sending ${imageUrls.length} image(s) via input.image_urls:`, imageUrls.map(u => u.substring(0, 60)));
     }
 
-    // Use fast or quality task_type based on user selection
     const taskType = qualityMode === 'quality' ? 'seedance-2-preview' : 'seedance-2-fast-preview';
     console.log(`🎯 PiAPI task_type: ${taskType} (quality mode: ${qualityMode})`);
 
     const payload = {
-        model: 'seedance',                  // Per docs: "seedance"
+        model: 'seedance',
         task_type: taskType,
         input: taskInput,
     };
 
-    console.log(`🎬 Submitting to PiAPI (Seedance 2.0):`, JSON.stringify({
-        ...payload,
-        input: {
-            ...payload.input,
-            prompt: payload.input.prompt.substring(0, 200) + '...',
-            image_urls: payload.input.image_urls?.map(u => u.substring(0, 60) + '...'),
-        }
-    }, null, 2));
-
-    let response;
-    try {
-        response = await fetch(`${PIAPI_BASE_URL}/api/v1/task`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': apiKey,                // Per docs: x-api-key header
-            },
-            body: JSON.stringify(payload),
-            signal: AbortSignal.timeout(35000) // 35 second timeout to prevent CloudFront 502
-        });
-    } catch (fetchError) {
-        if (fetchError.name === 'TimeoutError' || fetchError.name === 'AbortError') {
-            throw new Error('PiAPI video generation timed out after 35 seconds. The provider may be experiencing high traffic.');
-        }
-        throw fetchError;
-    }
-
-    const rawText = await response.text();
-    console.log(`📥 PiAPI raw response (${response.status}):`, rawText.substring(0, 1000));
-
-    let data;
-    try {
-        data = JSON.parse(rawText);
-    } catch (e) {
-        throw new Error(`PiAPI returned non-JSON (${response.status}): ${rawText.substring(0, 200)}`);
-    }
-
-    // Check for errors
-    if (data.code && data.code !== 200) {
-        throw new Error(`PiAPI submission failed (code ${data.code}): ${data.message || JSON.stringify(data).substring(0, 300)}`);
-    }
-
-    if (!response.ok && !data.data) {
-        throw new Error(`PiAPI submission failed (${response.status}): ${data.message || data.error || rawText.substring(0, 200)}`);
-    }
-
-    // Extract taskId — per docs: data.task_id
-    const taskId = data.data?.task_id || data.task_id;
-
-    if (!taskId) {
-        console.error('❌ PiAPI response missing taskId. Full response:', JSON.stringify(data).substring(0, 1000));
-        throw new Error(`PiAPI did not return a taskId. Response: ${JSON.stringify(data).substring(0, 300)}`);
-    }
-
-    console.log(`✅ PiAPI queued: taskId=${taskId}`);
+    const taskId = await submitPiApiPayload(payload);
 
     return {
         taskId,
         provider: 'piapi',
         model: 'seedance-2.0',
+        _payload: payload, // Store for auto-retry on "failed to process task"
     };
+}
+
+/**
+ * Resubmit a PiAPI task using the stored payload.
+ * Called automatically when the status poller detects "failed to process task".
+ */
+export async function resubmitPiApiTask(storedPayload) {
+    console.log(`🔄 AUTO-RETRY: Resubmitting PiAPI task after 'failed to process task'...`);
+    const taskId = await submitPiApiPayload(storedPayload);
+    return { taskId, provider: 'piapi', model: 'seedance-2.0' };
 }
 
 /**
@@ -360,13 +455,24 @@ export async function getPiApiGenerationStatus(taskId) {
         };
     }
 
-    // Failed
+    // Failed — check if retryable
     if (status === 'failed' || status === 'error') {
         const errorInfo = task.error || {};
+        const errorMsg = errorInfo.message || errorInfo.raw_message || task.message || 'PiAPI video generation failed';
+        const errorCode = errorInfo.code || 0;
+
+        // PiAPI error code 10000 "failed to process task" is intermittent
+        // and usually succeeds on retry — signal auto-retry
+        const isRetryable = errorCode === 10000 || errorMsg.includes('failed to process task');
+        if (isRetryable) {
+            console.warn(`⚠️ PiAPI task ${taskId} failed with retryable error (code ${errorCode}): ${errorMsg}`);
+        }
+
         return {
             status: 'FAILED',
             progress: 0,
-            error: errorInfo.message || errorInfo.raw_message || task.message || 'PiAPI video generation failed',
+            error: errorMsg,
+            retryable: isRetryable,
         };
     }
 

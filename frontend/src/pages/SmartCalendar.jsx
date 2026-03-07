@@ -111,16 +111,12 @@ export default function SmartCalendar() {
     }
 
     return (
-        <DashboardLayout>
+        <DashboardLayout title="Smart Calendar" subtitle="AI-powered content scheduling & planning">
             <div className="p-8 max-w-[1400px] mx-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h1 className="text-3xl font-extrabold text-white tracking-tight">
-                            <span className="material-symbols-outlined text-primary text-3xl align-middle mr-2">calendar_month</span>
-                            Smart Calendar
-                        </h1>
-                        <p className="text-slate-500 text-sm mt-1">Marketing intelligence calendar for <span className="text-primary font-semibold">{country}</span></p>
+                        <p className="text-slate-500 text-sm">Marketing intelligence calendar for <span className="text-primary font-semibold">{country}</span></p>
                     </div>
                     <div className="flex items-center gap-3">
                         {/* Country Switcher */}
