@@ -44,7 +44,7 @@ export default function Landing() {
                         <a className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">Product</a>
                         <a href="#pricing" className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">Pricing</a>
                         <Link to="/privacy-policy" className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">Privacy Policy</Link>
-                        <Link to="/terms" className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">Terms</Link>
+                        <Link to="/terms" className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">Terms of Service</Link>
                     </div>
                     <div className="flex items-center gap-4">
                         {isAuthenticated ? (
