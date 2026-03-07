@@ -37,7 +37,14 @@ export default function TermsOfService() {
                     </section>
 
                     <section>
-                        <h2 className="text-xl font-bold text-white mb-3">5. Termination</h2>
+                        <h2 className="text-xl font-bold text-white mb-3">5. Third-Party Services</h2>
+                        <p className="leading-relaxed">
+                            Our service integrates with third-party platforms, including but not limited to Meta and Google. By using these integrations, you also agree to be bound by the respective Third-Party Terms of Service. For features using Google APIs, you specifically agree to the <a href="https://www.google.com/intl/en/policies/terms/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Google Terms of Service</a>.
+                        </p>
+                    </section>
+
+                    <section>
+                        <h2 className="text-xl font-bold text-white mb-3">6. Termination</h2>
                         <p className="leading-relaxed">
                             We may terminate or suspend access to our service immediately, without prior notice or liability, for any reason whatsoever, including without limitation if you breach the Terms.
                         </p>

@@ -32,9 +32,19 @@ export default function PrivacyPolicy() {
                     </section>
 
                     <section>
-                        <h2 className="text-xl font-bold text-white mb-3">4. Data Deletion</h2>
+                        <h2 className="text-xl font-bold text-white mb-3">4. Google Analytics and Search Console Data</h2>
+                        <p className="leading-relaxed mb-4">
+                            Mantram AI requests read-only access to your Google Analytics properties and Search Console sites. This data is used solely to provide SEO performance reports, keyword insights, and AI-driven marketing recommendations within our platform.
+                        </p>
                         <p className="leading-relaxed">
-                            You have the right to request the deletion of your data. You can disconnect your social accounts at any time via the Integrations tab. To request full account deletion and removal of all associated data, please contact us at <a href="mailto:support@mantram.ai" className="text-primary hover:underline">support@mantram.ai</a> or use our automated data deletion tool.
+                            <strong>Limited Use Disclosure:</strong> Our use and transfer of information received from Google APIs to any other app will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Google API Service User Data Policy</a>, including the Limited Use requirements. We do not sell or share this data with third-party advertisers or external platforms.
+                        </p>
+                    </section>
+
+                    <section>
+                        <h2 className="text-xl font-bold text-white mb-3">5. Data Deletion</h2>
+                        <p className="leading-relaxed">
+                            You have the right to request the deletion of your data. You can disconnect your social and Google accounts at any time via the Integrations tab. To request full account deletion, please contact us at <a href="mailto:support@mantram.ai" className="text-primary hover:underline">support@mantram.ai</a> or use our automated data deletion tool.
                         </p>
                     </section>
 

@@ -136,6 +136,7 @@ export default function Landing() {
                         { icon: 'genetics', color: 'primary', title: 'Brand DNA', desc: 'Extract your brand identity — logo, colors, fonts, voice, and tone — from your website in seconds.' },
                         { icon: 'draw', color: 'purple-400', title: 'Content Studio', desc: 'Generate blog posts, social captions, ad copy, emails, and SEO content aligned to your brand voice.' },
                         { icon: 'auto_fix_high', color: 'emerald-400', title: 'Creative Studio', desc: 'Design social media posts, stories, ads, banners, and marketing videos with AI-powered generation.' },
+                        { icon: 'monitoring', color: 'primary', title: 'Search & Social Intel', desc: 'Connect Google Analytics, Search Console, and Meta Ads to monitor performance and get AI-driven marketing insights.' },
                     ].map((f, i) => (
                         <div key={i} className="glass-panel p-8 rounded-3xl group hover:bg-white/[0.05] transition-all duration-300" style={{ animationDelay: `${0.3 + i * 0.1}s`, animationFillMode: 'both' }}>
                             <div className={`size-12 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform ${f.color === 'primary' ? 'bg-primary/20 text-primary' :
@@ -268,13 +269,12 @@ export default function Landing() {
                         <span className="text-white font-bold">Mantram AI</span>
                     </div>
                     <div className="flex flex-col md:flex-row gap-8 items-center">
-                        <div className="text-slate-500 text-xs max-w-xs text-center md:text-left">
-                            We value your privacy. We only request data necessary to power your brand intelligence and content creation.
+                        <div className="text-slate-500 text-xs max-w-sm text-center md:text-left">
+                            <strong>Transparency Notice:</strong> We request read-only access to Google Analytics and Search Console solely to generate your marketing reports and AI insights. We never sell your data or use it for any purpose outside of your brand dashboard.
                         </div>
                         <div className="flex gap-8 text-slate-500 text-sm">
-                            <Link to="/privacy-policy" className="hover:text-primary transition-colors cursor-pointer">Privacy Policy</Link>
-                            <Link to="/terms" className="hover:text-primary transition-colors cursor-pointer">Terms of Service</Link>
-                            <a className="hover:text-primary transition-colors cursor-pointer">Security</a>
+                            <Link to="/privacy-policy" className="hover:text-primary transition-colors cursor-pointer whitespace-nowrap">Privacy Policy</Link>
+                            <Link to="/terms" className="hover:text-primary transition-colors cursor-pointer whitespace-nowrap">Terms of Service</Link>
                         </div>
                     </div>
                     <div className="flex gap-4">
