@@ -170,6 +170,7 @@ export const shopify = {
     },
     getProduct: (id) => apiFetch(`/shopify/products/${id}`),
     disconnect: () => apiFetch('/shopify/disconnect', { method: 'DELETE' }),
+    status: () => apiFetch('/shopify/status'),
 };
 
 // ============ Products API ============

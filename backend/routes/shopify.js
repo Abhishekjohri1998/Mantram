@@ -27,6 +27,27 @@ import { verifyShopifySessionToken } from '../middleware/shopifySessionAuth.js';
 
 const router = Router();
 
+// GET /api/shopify/status — Check connection status
+router.get('/status', protect, async (req, res) => {
+    try {
+        const integration = await Integration.findOne({ user: req.user._id, platform: 'shopify' });
+        if (integration) {
+            res.json({
+                success: true,
+                status: {
+                    connected: integration.status === 'connected',
+                    shopDomain: integration.platformData?.shopDomain || '',
+                    shopName: integration.platformData?.shopName || ''
+                }
+            });
+        } else {
+            res.json({ success: true, status: { connected: false } });
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, error: 'Failed to fetch Shopify status' });
+    }
+});
+
 // POST /api/shopify/connect — Start Shopify OAuth
 router.post('/connect', protect, async (req, res) => {
     try {
