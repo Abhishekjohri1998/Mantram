@@ -32,8 +32,14 @@ const UnderConstruction = () => {
                     </div>
                 </div>
 
-                <div className="mt-16 text-sm text-gray-600">
-                    &copy; {new Date().getFullYear()} Mantram AI. All rights reserved.
+                <div className="mt-16 flex flex-col items-center gap-4">
+                    <div className="flex items-center gap-6 text-sm text-gray-500">
+                        <a href="/privacy-policy" className="hover:text-blue-400 transition-colors">Privacy Policy</a>
+                        <a href="/terms" className="hover:text-blue-400 transition-colors">Terms of Service</a>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                        &copy; {new Date().getFullYear()} Mantram AI. All rights reserved.
+                    </div>
                 </div>
             </div>
         </div>

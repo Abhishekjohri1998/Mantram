@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { useBrand } from '../context/BrandContext'
 import { content as contentAPI } from '../services/api'
+import PublishModal from '../components/PublishModal'
 
 // ═══════════════════════════════════════════════════════════════
 // PUBLISH & SCHEDULE — Real content from Content Studio
@@ -15,6 +16,8 @@ export default function PublishSchedule() {
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState('approved')
     const [copiedId, setCopiedId] = useState(null)
+    const [isPublishModalOpen, setIsPublishModalOpen] = useState(false)
+    const [publishItem, setPublishItem] = useState(null)
 
     // Fetch all content for active brand
     useEffect(() => {
@@ -186,7 +189,10 @@ export default function PublishSchedule() {
                                                 </button>
                                             )}
                                             {item.status === 'approved' && (
-                                                <button onClick={() => handleStatusChange(item._id, 'published')}
+                                                <button onClick={() => {
+                                                    setPublishItem(item);
+                                                    setIsPublishModalOpen(true);
+                                                }}
                                                     className="px-4 py-2 rounded-lg bg-primary text-white text-xs font-bold hover:bg-primary-light transition-all cursor-pointer flex items-center gap-1.5">
                                                     <span className="material-symbols-outlined text-sm">send</span>
                                                     Publish
@@ -247,6 +253,17 @@ export default function PublishSchedule() {
                     </div>
                 </div>
             </div>
+
+            <PublishModal
+                isOpen={isPublishModalOpen}
+                onClose={() => {
+                    setIsPublishModalOpen(false);
+                    // Refresh content after closing to update statuses
+                    window.location.reload();
+                }}
+                defaultText={publishItem?.content || ''}
+                defaultImage={publishItem?.imageUrl || publishItem?.files?.[0]?.url || ''}
+            />
         </DashboardLayout>
     )
 }

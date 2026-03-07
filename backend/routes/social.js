@@ -6,24 +6,32 @@ import {
     exchangeCodeForToken,
     fetchUserPagesAndIgAccounts,
     publishToFacebook,
-    publishToInstagram
+    publishToInstagram,
+    fetchRecentPosts,
+    fetchPostAnalytics
 } from '../services/socialService.js';
 import config from '../config/env.js';
 
 const router = express.Router();
 
 /**
- * @route   GET /api/social/auth/facebook
- * @desc    Initiate Facebook OAuth flow
+ * @route   GET /api/social/auth/:platform
+ * @desc    Initiate Social OAuth flow (facebook or instagram)
  * @access  Private
  */
-router.get('/auth/facebook', protect, (req, res) => {
+router.get('/auth/:platform', protect, (req, res) => {
     try {
-        // Pass user ID as state to track who initiated
-        const authUrl = getMetaAuthUrl(req.user._id.toString());
+        const { platform } = req.params;
+        if (platform !== 'facebook' && platform !== 'instagram') {
+            return res.status(400).json({ success: false, error: 'Invalid platform' });
+        }
+
+        // Pass user ID and platform as state to track who initiated and which app to use
+        const state = `${req.user._id.toString()}:${platform}`;
+        const authUrl = getMetaAuthUrl(state, platform);
         res.json({ success: true, authUrl });
     } catch (error) {
-        console.error('FB Auth URL error:', error);
+        console.error('Social Auth URL error:', error);
         res.status(500).json({ success: false, error: 'Failed to generate auth URL' });
     }
 });
@@ -46,10 +54,12 @@ router.get('/auth/facebook/callback', async (req, res) => {
     }
 
     try {
-        const userId = state;
+        // State is "userId:platform"
+        const [userId, platform] = state.split(':');
+        const activePlatform = platform || 'facebook';
 
-        // 1. Get user access token
-        const userAccessToken = await exchangeCodeForToken(code);
+        // 1. Get user access token using the correct app credentials
+        const userAccessToken = await exchangeCodeForToken(code, activePlatform);
 
         // 2. Fetch pages and IG accounts
         const accounts = await fetchUserPagesAndIgAccounts(userAccessToken);
@@ -67,7 +77,7 @@ router.get('/auth/facebook/callback', async (req, res) => {
         }
 
         // Redirect back to frontend
-        return res.redirect(`${config.frontendUrl}/settings?social=success_facebook`);
+        return res.redirect(`${config.frontendUrl}/settings?social=success_${activePlatform}`);
 
     } catch (err) {
         console.error('Meta Callback Error:', err);
@@ -176,6 +186,47 @@ router.post('/publish', protect, async (req, res) => {
         res.status(500).json({ success: false, error: 'Server error during publishing' });
     }
 });
+
+/**
+ * @route   GET /api/social/accounts/:id/posts
+ * @desc    Get recent posts for a specific social account
+ * @access  Private
+ */
+router.get('/accounts/:id/posts', protect, async (req, res) => {
+    try {
+        const account = await SocialAccount.findOne({ _id: req.params.id, user: req.user._id });
+        if (!account) {
+            return res.status(404).json({ success: false, error: 'Account not found' });
+        }
+
+        const posts = await fetchRecentPosts(account.accountId, account.accessToken, account.platform);
+        res.json({ success: true, data: posts });
+    } catch (error) {
+        console.error('Fetch posts error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * @route   GET /api/social/accounts/:id/posts/:postId/insights
+ * @desc    Get insights for a specific post
+ * @access  Private
+ */
+router.get('/accounts/:id/posts/:postId/insights', protect, async (req, res) => {
+    try {
+        const account = await SocialAccount.findOne({ _id: req.params.id, user: req.user._id });
+        if (!account) {
+            return res.status(404).json({ success: false, error: 'Account not found' });
+        }
+
+        const insights = await fetchPostAnalytics(req.params.postId, account.accessToken, account.platform);
+        res.json({ success: true, data: insights });
+    } catch (error) {
+        console.error('Fetch insights error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 
 /**
  * @route   ANY /api/social/delete-data

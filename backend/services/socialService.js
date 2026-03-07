@@ -3,33 +3,63 @@ import config from '../config/env.js';
 
 const FB_API_URL = 'https://graph.facebook.com/v19.0';
 
-export const getMetaAuthUrl = (stateId) => {
-    // Generate URL for user to grant permissions
-    const scopes = [
+export const getMetaAuthUrl = (stateId, platform = 'facebook') => {
+    // Determine which app credentials to use
+    const appId = platform === 'instagram' ? config.instagram.appId : config.facebook.appId;
+
+    // Scopes for Facebook vs Instagram
+    const fbScopes = [
         'pages_show_list',
         'pages_read_engagement',
         'pages_manage_posts',
         'instagram_basic',
         'instagram_content_publish',
         'public_profile'
-    ].join(',');
+    ];
 
-    // stateId is typically the user's JWT or DB ID to verify who initiated the flow
-    return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${config.facebook.appId}&redirect_uri=${config.facebook.redirectUri}&state=${stateId}&scope=${scopes}`;
+    const igScopes = [
+        'instagram_business_basic',
+        'instagram_business_manage_messages',
+        'instagram_business_manage_comments',
+        'instagram_business_content_publish',
+        'instagram_business_manage_insights',
+        'pages_show_list',
+        'public_profile'
+    ];
+
+    const scopes = (platform === 'instagram' ? igScopes : fbScopes).join(',');
+
+    // Base URL is different for direct Instagram OAuth
+    const baseUrl = platform === 'instagram'
+        ? 'https://www.instagram.com/oauth/authorize'
+        : 'https://www.facebook.com/v19.0/dialog/oauth';
+
+    return `${baseUrl}?client_id=${appId}&redirect_uri=${config.facebook.redirectUri}&state=${stateId}&scope=${scopes}&response_type=code${platform === 'instagram' ? '&force_reauth=true' : ''}`;
 };
 
-export const exchangeCodeForToken = async (code) => {
-    // Exchanges auth code for user access token
-    const url = `${FB_API_URL}/oauth/access_token`;
-    const response = await axios.get(url, {
-        params: {
-            client_id: config.facebook.appId,
-            client_secret: config.facebook.appSecret,
-            redirect_uri: config.facebook.redirectUri,
-            code: code,
-        }
+export const exchangeCodeForToken = async (code, platform = 'facebook') => {
+    const appId = platform === 'instagram' ? config.instagram.appId : config.facebook.appId;
+    const appSecret = platform === 'instagram' ? config.instagram.appSecret : config.facebook.appSecret;
+
+    // Direct Instagram App uses a different token endpoint usually, 
+    // but often Meta apps share the same graph endpoint.
+    const url = platform === 'instagram'
+        ? 'https://api.instagram.com/oauth/access_token'
+        : `${FB_API_URL}/oauth/access_token`;
+
+    const params = {
+        client_id: appId,
+        client_secret: appSecret,
+        grant_type: 'authorization_code',
+        redirect_uri: config.facebook.redirectUri,
+        code: code,
+    };
+
+    const response = await axios.post(url, new URLSearchParams(params), {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     });
-    return response.data.access_token;
+
+    return response.data.access_token || response.data.access_token;
 };
 
 export const fetchUserPagesAndIgAccounts = async (userAccessToken) => {
@@ -132,5 +162,95 @@ export const publishToInstagram = async (igAccountId, accessToken, text, imageUr
         return publishResponse.data.id;
     } catch (error) {
         throw new Error(error.response?.data?.error?.message || 'Failed to publish to Instagram');
+    }
+};
+
+/**
+ * Fetch recent posts from a Facebook Page or Instagram Account
+ */
+export const fetchRecentPosts = async (accountId, accessToken, platform) => {
+    try {
+        if (platform === 'facebook') {
+            const url = `${FB_API_URL}/${accountId}/posts`;
+            const response = await axios.get(url, {
+                params: {
+                    fields: 'id,message,created_time,full_picture,permalink_url',
+                    access_token: accessToken,
+                    limit: 10
+                }
+            });
+            return response.data.data.map(post => ({
+                id: post.id,
+                content: post.message || '',
+                createdAt: post.created_time,
+                imageUrl: post.full_picture,
+                permalink: post.permalink_url,
+                platform: 'facebook'
+            }));
+        } else if (platform === 'instagram') {
+            const url = `${FB_API_URL}/${accountId}/media`;
+            const response = await axios.get(url, {
+                params: {
+                    fields: 'id,caption,timestamp,media_url,permalink,media_type',
+                    access_token: accessToken,
+                    limit: 10
+                }
+            });
+            return response.data.data.map(media => ({
+                id: media.id,
+                content: media.caption || '',
+                createdAt: media.timestamp,
+                imageUrl: media.media_url,
+                permalink: media.permalink,
+                platform: 'instagram'
+            }));
+        }
+        return [];
+    } catch (error) {
+        console.error(`Failed to fetch recent posts for ${platform}:`, error.response?.data || error.message);
+        throw new Error(error.response?.data?.error?.message || `Failed to fetch recent posts for ${platform}`);
+    }
+};
+
+/**
+ * Fetch insights/analytics for a specific post
+ */
+export const fetchPostAnalytics = async (postId, accessToken, platform) => {
+    try {
+        if (platform === 'facebook') {
+            const url = `${FB_API_URL}/${postId}/insights`;
+            const response = await axios.get(url, {
+                params: {
+                    metric: 'post_reactions_by_type_total,post_comments_by_type,post_impressions',
+                    access_token: accessToken
+                }
+            });
+
+            const insights = response.data.data;
+            const stats = {
+                likes: insights.find(i => i.name === 'post_reactions_by_type_total')?.values[0]?.value?.like || 0,
+                comments: insights.find(i => i.name === 'post_comments_by_type')?.values[0]?.value || 0,
+                impressions: insights.find(i => i.name === 'post_impressions')?.values[0]?.value || 0
+            };
+            return stats;
+        } else if (platform === 'instagram') {
+            const url = `${FB_API_URL}/${postId}/insights`;
+            const response = await axios.get(url, {
+                params: {
+                    metric: 'engagement,impressions,reach',
+                    access_token: accessToken
+                }
+            });
+            const insights = response.data.data;
+            return {
+                engagement: insights.find(i => i.name === 'engagement')?.values[0]?.value || 0,
+                impressions: insights.find(i => i.name === 'impressions')?.values[0]?.value || 0,
+                reach: insights.find(i => i.name === 'reach')?.values[0]?.value || 0
+            };
+        }
+    } catch (error) {
+        console.error(`Failed to fetch analytics for ${platform} post ${postId}:`, error.response?.data || error.message);
+        // Don't throw, just return null so the UI can handle it gracefully
+        return null;
     }
 };

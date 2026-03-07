@@ -70,6 +70,12 @@ export default {
         redirectUri: process.env.FACEBOOK_REDIRECT_URI,
     },
 
+    // Instagram Specific App
+    instagram: {
+        appId: process.env.INSTAGRAM_APP_ID,
+        appSecret: process.env.INSTAGRAM_APP_SECRET,
+    },
+
     // Meta Ads (Marketing API)
     metaAds: {
         appId: process.env.META_ADS_APP_ID || process.env.FACEBOOK_APP_ID,

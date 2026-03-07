@@ -269,7 +269,9 @@ export const social = {
     connect: (platform) => apiFetch(`/social/auth/${platform}`),
     disconnect: (accountId) => apiFetch(`/social/accounts/${accountId}`, { method: 'DELETE' }),
     publish: (data) => apiFetch('/social/publish', { method: 'POST', body: JSON.stringify(data) }),
-    status: () => apiFetch('/social/status'), // Keep this if used somewhere else natively
+    status: () => apiFetch('/social/status'),
+    getPosts: (accountId) => apiFetch(`/social/accounts/${accountId}/posts`),
+    getInsights: (accountId, postId) => apiFetch(`/social/accounts/${accountId}/posts/${postId}/insights`),
 };
 
 // ============ Admin API ============

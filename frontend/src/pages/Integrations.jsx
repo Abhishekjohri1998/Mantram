@@ -30,6 +30,9 @@ export default function Integrations() {
     const [loading, setLoading] = useState({})
     const [syncing, setSyncing] = useState(false)
     const [activeTab, setActiveTab] = useState('platforms') // platforms | products
+    const [selectedAccount, setSelectedAccount] = useState(null)
+    const [posts, setPosts] = useState([])
+    const [loadingPosts, setLoadingPosts] = useState(false)
 
     useEffect(() => {
         loadStatus()
@@ -93,6 +96,19 @@ export default function Integrations() {
             loadStatus()
         } catch (err) {
             alert(err.message)
+        }
+    }
+
+    const loadPosts = async (account) => {
+        setSelectedAccount(account)
+        setLoadingPosts(true)
+        try {
+            const res = await social.getPosts(account._id)
+            setPosts(res.data || [])
+        } catch (err) {
+            console.error('Failed to load posts:', err)
+        } finally {
+            setLoadingPosts(false)
         }
     }
 
@@ -295,10 +311,18 @@ export default function Integrations() {
                                                                     <span className="text-white font-medium truncate block">{acc.accountName}</span>
                                                                 </div>
                                                             </div>
-                                                            <button onClick={() => disconnectPlatform(acc._id)}
-                                                                className="text-xs font-medium text-red-400 hover:text-red-300 px-2 py-1 rounded-lg hover:bg-red-500/10 transition-colors flex-shrink-0">
-                                                                Disconnect
-                                                            </button>
+                                                            <div className="flex gap-2">
+                                                                {(acc.platform === 'facebook' || acc.platform === 'instagram') && (
+                                                                    <button onClick={() => loadPosts(acc)}
+                                                                        className="text-xs font-medium text-primary hover:text-white px-2 py-1 rounded-lg hover:bg-primary/10 transition-colors flex-shrink-0">
+                                                                        Manage
+                                                                    </button>
+                                                                )}
+                                                                <button onClick={() => disconnectPlatform(acc._id)}
+                                                                    className="text-xs font-medium text-red-400 hover:text-red-300 px-2 py-1 rounded-lg hover:bg-red-500/10 transition-colors flex-shrink-0">
+                                                                    Disconnect
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     ))}
                                                     <button onClick={() => connectPlatform(platform.id)}
@@ -399,6 +423,75 @@ export default function Integrations() {
                     </div>
                 )}
             </div>
+
+            {/* Manage Posts Modal */}
+            {selectedAccount && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setSelectedAccount(null)} />
+                    <div className="relative bg-[#0c0f1a] border border-white/10 rounded-3xl w-full max-w-4xl flex flex-col max-h-[85vh] shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-fade-in">
+                        <div className="flex items-center justify-between p-6 border-b border-white/10">
+                            <div className="flex items-center gap-4">
+                                {selectedAccount.avatar ? (
+                                    <img src={selectedAccount.avatar} className="w-10 h-10 rounded-full" alt="" />
+                                ) : (
+                                    <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center font-bold text-primary">
+                                        {selectedAccount.accountName[0]}
+                                    </div>
+                                )}
+                                <div>
+                                    <h3 className="text-xl font-bold text-white">Manage {selectedAccount.accountName}</h3>
+                                    <p className="text-xs text-slate-500 uppercase tracking-widest">{selectedAccount.platform} Integration</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setSelectedAccount(null)} className="text-slate-500 hover:text-white transition-colors">
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
+                            {loadingPosts ? (
+                                <div className="py-20 text-center">
+                                    <span className="material-symbols-outlined animate-spin text-primary text-4xl">progress_activity</span>
+                                    <p className="text-slate-500 mt-4 font-medium">Fetching recent posts...</p>
+                                </div>
+                            ) : posts.length === 0 ? (
+                                <div className="py-20 text-center bg-white/[0.02] rounded-2xl border border-dashed border-white/10">
+                                    <span className="material-symbols-outlined text-5xl text-slate-700 mb-4 text-slate-600">post_add</span>
+                                    <p className="text-slate-400 font-medium">No recent posts found on this account.</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {posts.map(post => (
+                                        <div key={post.id} className="glass-panel p-4 rounded-2xl border border-white/5 hover:border-primary/30 transition-all group flex gap-4">
+                                            {post.imageUrl && (
+                                                <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-black/40 border border-white/10">
+                                                    <img src={post.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="" />
+                                                </div>
+                                            )}
+                                            <div className="min-w-0 flex-1 flex flex-col justify-between">
+                                                <div>
+                                                    <p className="text-sm text-slate-300 line-clamp-2 leading-relaxed">
+                                                        {post.content || <span className="italic text-slate-500">No caption</span>}
+                                                    </p>
+                                                    <span className="text-[10px] text-slate-500 mt-2 block">
+                                                        {new Date(post.createdAt).toLocaleDateString()} at {new Date(post.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between mt-3">
+                                                    <a href={post.permalink} target="_blank" rel="noopener noreferrer"
+                                                        className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1">
+                                                        View Post <span className="material-symbols-outlined text-xs">open_in_new</span>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </DashboardLayout>
     )
 }
