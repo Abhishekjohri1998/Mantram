@@ -15,6 +15,7 @@ export const getMetaAuthUrl = (stateId, platform = 'facebook') => {
         'pages_show_list',
         'pages_read_engagement',
         'pages_manage_posts',
+        'pages_read_user_content',
         'instagram_basic',
         'instagram_content_publish',
         'instagram_manage_insights',
@@ -107,7 +108,7 @@ export const publishToFacebook = async (pageId, accessToken, text, imageUrl) => 
             // Post photo with caption
             const url = `${FB_API_URL}/${pageId}/photos`;
             const response = await axios.post(url, {
-                message: text,
+                caption: text,
                 url: imageUrl,
                 access_token: accessToken
             });
