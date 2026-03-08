@@ -1,7 +1,7 @@
 import axios from 'axios';
 import config from '../config/env.js';
 
-const FB_API_URL = 'https://graph.facebook.com/v19.0';
+const FB_API_URL = 'https://graph.facebook.com/v22.0';
 
 export const getMetaAuthUrl = (stateId, platform = 'facebook') => {
     // We always use the Facebook App ID even for Instagram, 
@@ -25,7 +25,7 @@ export const getMetaAuthUrl = (stateId, platform = 'facebook') => {
     const scopes = metaScopes.join(',');
 
     // Always use Facebook Dialog for Business Accounts
-    const baseUrl = 'https://www.facebook.com/v19.0/dialog/oauth';
+    const baseUrl = 'https://www.facebook.com/v22.0/dialog/oauth';
 
     return `${baseUrl}?client_id=${appId}&redirect_uri=${config.facebook.redirectUri}&state=${stateId}&scope=${scopes}&response_type=code`;
 };
