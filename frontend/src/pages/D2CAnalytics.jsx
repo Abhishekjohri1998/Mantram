@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { useBrand } from '../context/BrandContext'
+import AgentFidatoPanel from '../components/AgentFidatoPanel'
 import { shopifyAnalytics } from '../services/api'
 
 export default function D2CAnalytics() {
@@ -154,6 +155,9 @@ export default function D2CAnalytics() {
                     )}
                 </div>
             </div>
+
+            {/* Agent Fidato — Competitive Intelligence */}
+            <AgentFidatoPanel studio="d2c" />
 
             {/* Loading */}
             {loading ? (

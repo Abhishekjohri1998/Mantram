@@ -36,6 +36,8 @@ import pmConnectionRoutes from './routes/pm-connections.js';
 import dashboardSummaryRoutes from './routes/dashboard-summary.js';
 import teamRoutes from './routes/team.js';
 import fidatoRoutes from './routes/fidato.js';
+import nexusRoutes from './routes/nexus.js';
+import spyMissionRoutes from './routes/spyMissions.js';
 import paymentRoutes from './routes/payments.js';
 import waitlistRoutes from './routes/waitlist.js';
 
@@ -137,6 +139,8 @@ app.use('/api/pm-studio', pmConnectionRoutes);
 app.use('/api/dashboard-summary', dashboardSummaryRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/fidato', fidatoRoutes);
+app.use('/api/nexus', nexusRoutes);
+app.use('/api/spy', spyMissionRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/social', socialRoutes);
 app.use('/api/waitlist', waitlistRoutes);
@@ -177,6 +181,14 @@ const server = app.listen(config.port, () => {
             runFollowUpCheck().catch(err => console.warn('⚠️ Follow-up check failed:', err.message));
         }, 30 * 60 * 1000);
         console.log('🤖 Autonomous Agent active — Follow-up scheduler running every 30 min');
+    }).catch(() => { });
+
+    // Start spy agent scheduler (every 2 hours)
+    import('./services/spyAgent.js').then(({ runSpyMissions }) => {
+        setInterval(() => {
+            runSpyMissions().catch(err => console.warn('🕵️ Spy Agent check failed:', err.message));
+        }, 2 * 60 * 60 * 1000);
+        console.log('🕵️ Agent Fidato active — Spy missions scheduler running every 2 hours');
     }).catch(() => { });
 });
 

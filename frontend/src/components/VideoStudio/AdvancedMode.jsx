@@ -391,14 +391,15 @@ export default function AdvancedMode({ activeBrand, initialData }) {
                 <div style={{ padding: '20px' }}>
                     {generation?.videoUrl ? (
                         <>
-                            <div className="adv-done-card"><video controls src={generation.videoUrl} /></div>
+                            <div className="adv-done-card"><video controls src={projectId ? `${API_BASE}/video-studio/${projectId}/video` : generation.videoUrl} /></div>
                             <div className="adv-done-btns">
                                 <button className="adv-btn-secondary" onClick={() => { setPhase('compose'); setGeneration(null) }}>
                                     <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>edit</span> Edit & Retry
                                 </button>
                                 <button className="adv-btn-primary" onClick={async () => {
                                     try {
-                                        const resp = await fetch(generation.videoUrl)
+                                        const videoSrc = projectId ? `${API_BASE}/video-studio/${projectId}/video` : generation.videoUrl
+                                        const resp = await fetch(videoSrc)
                                         const blob = await resp.blob()
                                         const blobUrl = URL.createObjectURL(blob)
                                         const a = document.createElement('a')
@@ -407,7 +408,7 @@ export default function AdvancedMode({ activeBrand, initialData }) {
                                         document.body.appendChild(a)
                                         a.click()
                                         setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(blobUrl) }, 100)
-                                    } catch { window.open(generation.videoUrl, '_blank') }
+                                    } catch { const videoSrc = projectId ? `${API_BASE}/video-studio/${projectId}/video` : generation.videoUrl; window.open(videoSrc, '_blank') }
                                 }}>
                                     <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>download</span> Download
                                 </button>

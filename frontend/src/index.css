@@ -260,6 +260,10 @@
   .animate-glow {
     animation: glow 2s ease-in-out infinite alternate;
   }
+
+  .animate-bounce-slow {
+    animation: bounceSlow 3s ease-in-out infinite;
+  }
 }
 
 @keyframes fadeIn {
@@ -336,5 +340,17 @@
   100% {
     transform: scale(2);
     opacity: 0;
+  }
+}
+
+@keyframes bounceSlow {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
   }
 }

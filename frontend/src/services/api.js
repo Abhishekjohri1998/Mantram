@@ -264,6 +264,18 @@ export const fidato = {
     clear: () => apiFetch('/fidato/clear', { method: 'POST' }),
 };
 
+// ============ Nexus — Unified Agentic Interface ============
+export const nexus = {
+    chat: (message, brandId, options = {}) => apiFetch('/nexus/chat', {
+        method: 'POST',
+        body: JSON.stringify({ message, brandId, ...options }),
+    }),
+    briefing: (brandId) => apiFetch('/nexus/briefing', { method: 'POST', body: JSON.stringify({ brandId }) }),
+    notifications: (brandId) => apiFetch(`/nexus/notifications${brandId ? `?brandId=${brandId}` : ''}`),
+    updatePreferences: (prefs) => apiFetch('/nexus/preferences', { method: 'POST', body: JSON.stringify(prefs) }),
+    clear: () => apiFetch('/nexus/clear', { method: 'POST' }),
+};
+
 // ============ Social Media API ============
 export const social = {
     accounts: () => apiFetch('/social/accounts'),

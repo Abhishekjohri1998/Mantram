@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import DashboardLayout from '../components/DashboardLayout'
+import AgentFidatoPanel from '../components/AgentFidatoPanel'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -317,6 +318,9 @@ export default function PerformanceMarketing() {
                         </button>
                     ))}
                 </div>
+
+                {/* Agent Fidato — Competitive Intelligence */}
+                <AgentFidatoPanel studio="performance" />
 
                 {/* ════════════════════════════════════════════════════════════ */}
                 {/* TAB: DASHBOARD                                             */}

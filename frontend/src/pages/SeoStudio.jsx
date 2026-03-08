@@ -3,6 +3,7 @@ import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
 import { useBrand } from '../context/BrandContext'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
+import AgentFidatoPanel from '../components/AgentFidatoPanel'
 import { seoStudio as seoAPI, googleAnalytics as gaAPI } from '../services/api'
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -307,6 +308,9 @@ export default function SeoStudio() {
                                 </div>
 
                                 {error && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 mb-4"><p className="text-rose-400 text-xs">{error}</p></div>}
+
+                                {/* Agent Fidato — Competitive Intelligence (placed above competitor management for contextual flow) */}
+                                <AgentFidatoPanel studio="seo" />
 
                                 {/* Competitor Management */}
                                 <div className="glass-panel rounded-2xl p-5 mb-6">

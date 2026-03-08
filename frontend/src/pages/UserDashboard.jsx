@@ -6,6 +6,8 @@ import { useBrand } from '../context/BrandContext'
 import { content as contentAPI, creatives as creativesAPI, trends as trendsAPI, dashboardSummary, shopifyAnalytics } from '../services/api'
 import { getUpcomingEvents, EVENT_COLORS } from '../data/calendarData'
 import SmartCommandBox from '../components/SmartCommandBox'
+import SpyReportViewer from '../components/SpyReportViewer'
+import AgentFidatoPanel from '../components/AgentFidatoPanel'
 
 // ── Helpers ──
 function getGreeting() {
@@ -86,6 +88,11 @@ export default function UserDashboard() {
     const [radarHover, setRadarHover] = useState(null)
     const [d2cSnapshot, setD2cSnapshot] = useState(null)
 
+    // Spy mission state
+    const [spyMissions, setSpyMissions] = useState([])
+    const [spyReport, setSpyReport] = useState(null) // { mission, findings }
+    const [showSpyReport, setShowSpyReport] = useState(false)
+    const [showFidatoPanel, setShowFidatoPanel] = useState(false)
 
 
     const country = activeBrand?.dna?.country || activeBrand?.country || 'India'
@@ -140,6 +147,40 @@ export default function UserDashboard() {
         const interval = setInterval(() => { loadTrends(); loadSummary() }, 30 * 60 * 1000)
         return () => clearInterval(interval)
     }, [loadSummary, loadTrends])
+
+    // ── Load spy missions ──
+    useEffect(() => {
+        async function fetchSpyData() {
+            if (!activeBrand?._id) return
+            try {
+                const token = localStorage.getItem('mantram_token')
+                const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
+                const resp = await fetch(`${API_BASE}/spy/missions?brandId=${activeBrand._id}`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                })
+                if (resp.ok) {
+                    const data = await resp.json()
+                    setSpyMissions(data.missions || [])
+                }
+            } catch { /* silent */ }
+        }
+        fetchSpyData()
+    }, [activeBrand?._id])
+
+    const openSpyReport = async (mission) => {
+        try {
+            const token = localStorage.getItem('mantram_token')
+            const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
+            const resp = await fetch(`${API_BASE}/spy/missions/${mission._id}/findings`, {
+                headers: { Authorization: `Bearer ${token}` },
+            })
+            if (resp.ok) {
+                const data = await resp.json()
+                setSpyReport({ mission, findings: data })
+                setShowSpyReport(true)
+            }
+        } catch { /* silent */ }
+    }
 
     const insight = summary?.dailyInsight
     const health = summary?.healthScores || {}
@@ -739,6 +780,120 @@ export default function UserDashboard() {
                 {/* ═══════════════════════════════════════════════════════════ */}
                 <div className="col-span-12 lg:col-span-4 space-y-6">
 
+                    {/* ── SPY INTELLIGENCE CARD ── */}
+                    <div className="glass-panel rounded-2xl p-5 lg:p-6 border border-violet-500/20 anim-slide-up anim-border-glow overflow-hidden relative"
+                        style={{ animationDelay: '150ms' }}>
+                        {/* Background grid effect */}
+                        <div className="absolute inset-0 opacity-[0.03]" style={{
+                            backgroundImage: 'linear-gradient(rgba(139,92,246,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,0.3) 1px, transparent 1px)',
+                            backgroundSize: '20px 20px',
+                        }} />
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-violet-400">shield</span>
+                                    Agent Fidato
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-violet-500/15 text-violet-400 border border-violet-500/20">
+                                        Intel
+                                    </span>
+                                </h3>
+                                {spyMissions.some(m => m.status === 'active') && (
+                                    <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                                        <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Live</span>
+                                    </span>
+                                )}
+                            </div>
+
+                            {spyMissions.length === 0 ? (
+                                /* ── Empty / Onboarding State ── */
+                                <div className="text-center py-4">
+                                    {/* Animated radar */}
+                                    <div className="relative mx-auto mb-4" style={{ width: 100, height: 100 }}>
+                                        <svg width="100" height="100" viewBox="0 0 100 100">
+                                            <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
+                                            <circle cx="50" cy="50" r="28" fill="none" stroke="rgba(139,92,246,0.08)" strokeWidth="1" />
+                                            <circle cx="50" cy="50" r="14" fill="none" stroke="rgba(139,92,246,0.15)" strokeWidth="1" />
+                                            <line x1="50" y1="5" x2="50" y2="95" stroke="rgba(139,92,246,0.06)" strokeWidth="0.5" />
+                                            <line x1="5" y1="50" x2="95" y2="50" stroke="rgba(139,92,246,0.06)" strokeWidth="0.5" />
+                                            <circle cx="50" cy="50" r="3" fill="#8b5cf6" opacity="0.6" />
+                                        </svg>
+                                        <svg width="100" height="100" viewBox="0 0 100 100" className="absolute inset-0" style={{ animation: 'radar-sweep 3s linear infinite' }}>
+                                            <defs>
+                                                <linearGradient id="fidatoSweep" gradientTransform="rotate(90)">
+                                                    <stop offset="0%" stopColor="rgba(139,92,246,0.3)" />
+                                                    <stop offset="100%" stopColor="transparent" />
+                                                </linearGradient>
+                                            </defs>
+                                            <path d="M50,50 L50,8 A42,42 0 0,1 84,32 Z" fill="url(#fidatoSweep)" />
+                                            <line x1="50" y1="50" x2="50" y2="8" stroke="rgba(139,92,246,0.6)" strokeWidth="1" />
+                                        </svg>
+                                    </div>
+                                    <p className="text-sm font-bold text-white mb-1">Competitive Intelligence</p>
+                                    <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                                        Deploy spy missions to track competitor<br />
+                                        pricing, ads, launches & strategy changes
+                                    </p>
+                                    <button onClick={() => setShowFidatoPanel(true)}
+                                        className="px-5 py-2.5 rounded-xl text-sm font-bold cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center gap-2 mx-auto"
+                                        style={{
+                                            background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(16,185,129,0.2))',
+                                            border: '1px solid rgba(139,92,246,0.3)',
+                                            color: '#a78bfa',
+                                        }}>
+                                        <span className="material-symbols-outlined text-sm">rocket_launch</span>
+                                        Deploy First Mission
+                                    </button>
+                                </div>
+                            ) : (
+                                /* ── Active Missions State ── */
+                                <>
+                                    <div className="grid grid-cols-3 gap-2 mb-4">
+                                        <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04] text-center">
+                                            <p className="text-lg font-extrabold text-white">{spyMissions.length}</p>
+                                            <p className="text-[10px] text-slate-500 uppercase">Missions</p>
+                                        </div>
+                                        <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04] text-center">
+                                            <p className="text-lg font-extrabold text-white">{spyMissions.filter(m => m.status === 'active').length}</p>
+                                            <p className="text-[10px] text-slate-500 uppercase">Active</p>
+                                        </div>
+                                        <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04] text-center">
+                                            <p className="text-lg font-extrabold text-white">{spyMissions.reduce((a, m) => a + (m.totalFindings || 0), 0)}</p>
+                                            <p className="text-[10px] text-slate-500 uppercase">Findings</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Recent missions with findings */}
+                                    <div className="space-y-2 mb-4">
+                                        {spyMissions.filter(m => (m.totalFindings || 0) > 0).slice(0, 3).map((m, i) => (
+                                            <button key={m._id} onClick={() => openSpyReport(m)}
+                                                className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-violet-500/30 hover:bg-white/[0.04] transition-all cursor-pointer text-left group"
+                                                style={{ animation: `slide-up 0.4s ease-out ${i * 80}ms both` }}>
+                                                <div className="size-8 rounded-lg bg-gradient-to-br from-violet-500/15 to-emerald-500/10 flex items-center justify-center shrink-0">
+                                                    <span className="material-symbols-outlined text-violet-400 text-sm">visibility</span>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-bold text-white truncate">{m.title}</p>
+                                                    <p className="text-[11px] text-slate-500">{m.target?.name} · {m.totalFindings} findings</p>
+                                                </div>
+                                                <span className="text-[9px] font-bold font-mono text-violet-400 opacity-0 group-hover:opacity-100 transition-opacity tracking-wider">
+                                                    DECRYPT
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <button onClick={() => setShowFidatoPanel(!showFidatoPanel)}
+                                        className="w-full py-2.5 rounded-xl bg-violet-500/5 text-violet-400 text-sm font-bold hover:bg-violet-500/10 transition-all cursor-pointer border border-violet-500/10 flex items-center justify-center gap-2">
+                                        <span className="material-symbols-outlined text-sm">shield</span>
+                                        {showFidatoPanel ? 'Close Panel' : 'Open Agent Fidato'}
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+
                     {/* ── STUDIOS GRID ── */}
                     <div className="glass-panel rounded-2xl p-5 lg:p-6 anim-slide-up" style={{ animationDelay: '200ms' }}>
                         <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
@@ -914,6 +1069,18 @@ export default function UserDashboard() {
 
             {/* Bottom spacer for floating bar */}
             <div className="h-20" />
+            {/* Cinematic Spy Report Overlay */}
+            {showSpyReport && spyReport && (
+                <SpyReportViewer
+                    mission={spyReport.mission}
+                    findings={spyReport.findings}
+                    onClose={() => { setShowSpyReport(false); setSpyReport(null) }}
+                />
+            )}
+            {/* Agent Fidato Mission Panel — rendered at root to avoid stacking context issues */}
+            {showFidatoPanel && (
+                <AgentFidatoPanel studio="dashboard" panelOnly onClose={() => setShowFidatoPanel(false)} />
+            )}
         </DashboardLayout>
     )
 }

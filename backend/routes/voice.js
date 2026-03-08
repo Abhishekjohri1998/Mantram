@@ -71,7 +71,8 @@ router.post('/transcribe', optionalAuth, upload.single('audio'), async (req, res
         const language = (req.body.language || 'english').toLowerCase();
         const isIndianLanguage = language in INDIAN_LANGUAGES;
 
-        if (isIndianLanguage) {
+        if (isIndianLanguage || language === 'unknown') {
+            // For Indian languages or unknown — try Sarvam first (it auto-detects)
             return await transcribeWithSarvam(req, res, language);
         } else {
             return await transcribeWithWhisper(req, res, language);

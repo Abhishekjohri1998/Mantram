@@ -437,8 +437,10 @@ export default function VideoStudio() {
                         ) : historyView === 'list' ? (
                             <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
                                 {projects.map(p => {
-                                    const videoUrl = p.generation?.videoUrl || '';
-                                    const isDone = p.status === 'done' || p.status === 'critique' || videoUrl;
+                                    const rawVideoUrl = p.generation?.videoUrl || '';
+                                    // Use proxy URL to serve from local cache (PiAPI CDN URLs expire)
+                                    const videoUrl = rawVideoUrl ? `${API_BASE}/video-studio/${p._id}/video` : '';
+                                    const isDone = p.status === 'done' || p.status === 'critique' || rawVideoUrl;
                                     const isFailed = p.status === 'failed' || p.generation?.status === 'FAILED';
                                     const isGenerating = p.status === 'generating' || p.status === 'advanced-generating';
                                     const modelName = p.routing?.selectedModel || '';
@@ -452,7 +454,8 @@ export default function VideoStudio() {
                                             <div className="relative w-28 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-black/40 cursor-pointer"
                                                 onClick={() => { if (videoUrl) setPlayingVideo(videoUrl); else loadProject(p._id) }}>
                                                 {videoUrl ? (
-                                                    <video src={`${videoUrl}#t=1`} className="w-full h-full object-cover" muted preload="metadata" />
+                                                    <video src={`${videoUrl}#t=1`} className="w-full h-full object-cover" muted playsInline preload="auto"
+                                                        onLoadedData={e => { e.target.currentTime = 1 }} />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
                                                         <span className="material-symbols-outlined text-slate-600 text-xl">
@@ -529,8 +532,9 @@ export default function VideoStudio() {
                             /* ── GRID VIEW ── */
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[70vh] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
                                 {projects.map(p => {
-                                    const videoUrl = p.generation?.videoUrl || '';
-                                    const isDone = p.status === 'done' || p.status === 'critique' || videoUrl;
+                                    const rawVideoUrl = p.generation?.videoUrl || '';
+                                    const videoUrl = rawVideoUrl ? `${API_BASE}/video-studio/${p._id}/video` : '';
+                                    const isDone = p.status === 'done' || p.status === 'critique' || rawVideoUrl;
                                     const isFailed = p.status === 'failed' || p.generation?.status === 'FAILED';
                                     const isGenerating = p.status === 'generating' || p.status === 'advanced-generating';
                                     const modelName = p.routing?.selectedModel || '';
@@ -543,7 +547,8 @@ export default function VideoStudio() {
                                             <div className="relative aspect-video bg-black/40 cursor-pointer"
                                                 onClick={() => { if (videoUrl) setPlayingVideo(videoUrl); else loadProject(p._id) }}>
                                                 {videoUrl ? (
-                                                    <video src={`${videoUrl}#t=1`} className="w-full h-full object-cover" muted preload="metadata" />
+                                                    <video src={`${videoUrl}#t=1`} className="w-full h-full object-cover" muted playsInline crossOrigin="anonymous" preload="auto"
+                                                        onLoadedData={e => { e.target.currentTime = 1 }} />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
                                                         <span className="material-symbols-outlined text-slate-600 text-2xl">
@@ -1236,7 +1241,7 @@ export default function VideoStudio() {
                                     <video
                                         controls
                                         className="w-full aspect-video bg-black"
-                                        src={generation.videoUrl}
+                                        src={projectId ? `${API_BASE}/video-studio/${projectId}/video` : generation.videoUrl}
                                         poster={generation.thumbnailUrl || ''}
                                     >
                                         Your browser does not support video.
@@ -1319,7 +1324,7 @@ export default function VideoStudio() {
                                     Accept & Save
                                 </button>
                                 {generation?.videoUrl && (
-                                    <button onClick={() => handleDownloadVideo(generation.videoUrl, 'video')}
+                                    <button onClick={() => handleDownloadVideo(projectId ? `${API_BASE}/video-studio/${projectId}/video` : generation.videoUrl, 'video')}
                                         className="px-6 py-4 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-slate-300 font-medium hover:text-white hover:bg-white/[0.08] transition-all flex items-center gap-2 cursor-pointer">
                                         <span className="material-symbols-outlined">download</span>
                                         Download
