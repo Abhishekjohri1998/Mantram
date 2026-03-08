@@ -96,7 +96,7 @@ export default function Integrations() {
         loadAllStatuses()
     }, [loadAllStatuses])
 
-    // Listen for OAuth popup messages (GA + PM platforms)
+    // Listen for OAuth popup messages (Social + GA + PM platforms)
     useEffect(() => {
         const handler = (e) => {
             if (e.data?.type === 'GOOGLE_ANALYTICS_CONNECTED') {
@@ -105,10 +105,25 @@ export default function Integrations() {
             if (e.data?.type === 'PM_PLATFORM_CONNECTED') {
                 setConnectingPlatform(null); loadAllStatuses()
             }
+            if (e.data?.type === 'SOCIAL_PLATFORM_CONNECTED') {
+                loadAllStatuses()
+            }
         }
         window.addEventListener('message', handler)
         return () => window.removeEventListener('message', handler)
     }, [loadAllStatuses])
+
+    // Detect if this window is an OAuth popup and should close itself
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search)
+        if (params.get('social') === 'success' && window.opener) {
+            window.opener.postMessage({
+                type: 'SOCIAL_PLATFORM_CONNECTED',
+                platform: params.get('platform')
+            }, window.location.origin)
+            window.close()
+        }
+    }, [])
 
     // ── Google Analytics Actions ──
     const connectGA = async () => {
