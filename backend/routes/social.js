@@ -17,6 +17,7 @@ import {
     fetchPostAnalytics
 } from '../services/socialService.js';
 import config from '../config/env.js';
+import { uploadToS3 } from '../utils/s3.js';
 
 const router = express.Router();
 const FB_API_URL = 'https://graph.facebook.com/v22.0';
@@ -225,8 +226,17 @@ router.post('/publish', protect, async (req, res) => {
     let absoluteImageUrl = imageUrl;
     if (imageUrl && !imageUrl.startsWith('http')) {
         if (imageUrl.startsWith('data:')) {
-            console.log('[SOCIAL] Image is a data URI (base64)');
-            // Stay as is, though Meta won't support it directly
+            console.log('[SOCIAL] Image is a data URI (base64) - Uploading to S3 fallback');
+            try {
+                // Determine userId for the folder structure
+                const userId = req.user._id;
+                const s3Url = await uploadToS3(imageUrl, `social-fallback/${userId}/${Date.now()}.png`);
+                absoluteImageUrl = s3Url;
+                console.log(`[SOCIAL] Fallback S3 Upload Success: ${absoluteImageUrl}`);
+            } catch (s3Err) {
+                console.error('[SOCIAL] Fallback S3 Upload Failed:', s3Err.message);
+                // absoluteImageUrl remains base64, Meta will likely reject
+            }
         } else {
             const baseUrl = (config.backendUrl || '').replace(/\/$/, '');
             const path = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
