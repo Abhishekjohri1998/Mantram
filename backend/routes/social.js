@@ -26,8 +26,9 @@ router.get('/auth/:platform', protect, (req, res) => {
             return res.status(400).json({ success: false, error: 'Invalid platform' });
         }
 
-        // Pass user ID and platform as state to track who initiated and which app to use
-        const state = `${req.user._id.toString()}:${platform}`;
+        // Pass user ID, platform, and the requesting origin as state to track where to redirect back
+        const origin = req.headers.origin || config.frontendUrl[0];
+        const state = `${req.user._id.toString()}:${platform}:${Buffer.from(origin).toString('base64')}`;
         const authUrl = getMetaAuthUrl(state, platform);
         res.json({ success: true, authUrl });
     } catch (error) {
@@ -44,17 +45,30 @@ router.get('/auth/:platform', protect, (req, res) => {
 router.get('/auth/facebook/callback', async (req, res) => {
     const { code, state, error, error_description } = req.query;
 
+    let targetFrontend = config.frontendUrl[0];
+
+    try {
+        if (state) {
+            const parts = state.split(':');
+            if (parts.length >= 3) {
+                targetFrontend = Buffer.from(parts[2], 'base64').toString('ascii');
+            }
+        }
+    } catch (e) {
+        console.error('Failed to parse origin from state', e);
+    }
+
     if (error) {
         console.error('Meta OAuth Error:', error, error_description);
-        return res.redirect(`${config.frontendUrl[0]}/integrations?social=error`);
+        return res.redirect(`${targetFrontend}/integrations?social=error`);
     }
 
     if (!code || !state) {
-        return res.redirect(`${config.frontendUrl[0]}/integrations?social=invalid_request`);
+        return res.redirect(`${targetFrontend}/integrations?social=invalid_request`);
     }
 
     try {
-        // State is "userId:platform"
+        // State is "userId:platform:originBase64"
         const [userId, platform] = state.split(':');
         const activePlatform = platform || 'facebook';
 
@@ -64,7 +78,7 @@ router.get('/auth/facebook/callback', async (req, res) => {
         // Ensure user is valid
         const userExists = await mongoose.model('User').findById(userId);
         if (!userExists) {
-            return res.redirect(`${config.frontendUrl[0]}/integrations?social=user_not_found`);
+            return res.redirect(`${targetFrontend}/integrations?social=user_not_found`);
         }
 
         // Fetch User Pages and (if applicable) Instagram Accounts
@@ -77,7 +91,7 @@ router.get('/auth/facebook/callback', async (req, res) => {
 
         if (accountsToSave.length === 0) {
             console.warn(`No active ${activePlatform} accounts found for user ${userId}`);
-            return res.redirect(`${config.frontendUrl[0]}/integrations?social=no_accounts_found`);
+            return res.redirect(`${targetFrontend}/integrations?social=no_accounts_found`);
         }
 
         // Upsert accounts
@@ -89,10 +103,10 @@ router.get('/auth/facebook/callback', async (req, res) => {
             );
         }
 
-        res.redirect(`${config.frontendUrl[0]}/integrations?social=success&platform=${activePlatform}`);
+        res.redirect(`${targetFrontend}/integrations?social=success&platform=${activePlatform}`);
     } catch (error) {
         console.error('Meta Callback processing error:', error.response?.data || error.message);
-        res.redirect(`${config.frontendUrl[0]}/integrations?social=processing_failed`);
+        res.redirect(`${targetFrontend}/integrations?social=processing_failed`);
     }
 });
 
