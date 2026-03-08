@@ -106,7 +106,15 @@ router.get('/auth/facebook/callback', async (req, res) => {
         res.redirect(`${targetFrontend}/integrations?social=success&platform=${activePlatform}`);
     } catch (error) {
         console.error('Meta Callback processing error:', error.response?.data || error.message);
-        res.redirect(`${targetFrontend}/integrations?social=processing_failed`);
+
+        let errorDetails = error.message || 'Unknown Error';
+        if (error.response?.data?.error?.message) {
+            errorDetails = error.response.data.error.message;
+        } else if (error.response?.data) {
+            errorDetails = JSON.stringify(error.response.data);
+        }
+
+        res.redirect(`${targetFrontend}/integrations?social=processing_failed&details=${encodeURIComponent(errorDetails)}`);
     }
 });
 
