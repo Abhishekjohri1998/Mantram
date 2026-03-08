@@ -107,4 +107,10 @@ export default {
         scope: process.env.SHOPIFY_SCOPES || 'read_products,read_orders,read_customers',
         callbackUrl: process.env.SHOPIFY_CALLBACK_URL,
     },
+
+    // Email Config
+    email: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
 };

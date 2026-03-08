@@ -37,6 +37,7 @@ import dashboardSummaryRoutes from './routes/dashboard-summary.js';
 import teamRoutes from './routes/team.js';
 import fidatoRoutes from './routes/fidato.js';
 import paymentRoutes from './routes/payments.js';
+import waitlistRoutes from './routes/waitlist.js';
 
 const app = express();
 
@@ -138,6 +139,7 @@ app.use('/api/team', teamRoutes);
 app.use('/api/fidato', fidatoRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/social', socialRoutes);
+app.use('/api/waitlist', waitlistRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

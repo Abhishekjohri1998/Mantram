@@ -50,10 +50,29 @@ export default function Landing() {
     const handleWaitlistSubmit = async (e) => {
         e.preventDefault()
         setWaitlistLoading(true)
-        // simulate API call (replace with real endpoint later)
-        await new Promise(r => setTimeout(r, 1500))
-        setWaitlistSubmitted(true)
-        setWaitlistLoading(false)
+        try {
+            const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+            const response = await fetch(`${apiBaseUrl}/api/waitlist`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ ...waitlistForm, type: waitlistType })
+            })
+
+            const data = await response.json()
+
+            if (data.success) {
+                setWaitlistSubmitted(true)
+            } else {
+                alert(data.message || 'Something went wrong. Please try again.')
+            }
+        } catch (error) {
+            console.error('Submission error:', error)
+            alert('Failed to submit. Please check your connection and try again.')
+        } finally {
+            setWaitlistLoading(false)
+        }
     }
 
     const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })

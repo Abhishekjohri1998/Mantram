@@ -4,11 +4,15 @@ import Brand from '../models/Brand.js';
 import Content from '../models/Content.js';
 import Creative from '../models/Creative.js';
 import Feedback from '../models/Feedback.js';
+import ExcelJS from 'exceljs';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { protect, authorize } from '../middleware/auth.js';
 
 const router = Router();
-
-import { getSetting, setSetting } from '../models/SystemSettings.js';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // All admin routes require admin role
 router.use(protect, authorize('admin'));
@@ -108,6 +112,20 @@ router.get('/ai-health', async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// GET /api/admin/waitlist/export — download waitlist excel data
+router.get('/waitlist/export', async (req, res) => {
+    try {
+        const excelPath = path.join(__dirname, '../../waitlist.xlsx');
+        if (!fs.existsSync(excelPath)) {
+            return res.status(404).json({ success: false, message: 'No waitlist data found.' });
+        }
+        res.download(excelPath, 'Mantram-AI-Waitlist.xlsx');
+    } catch (error) {
+        console.error('Export error:', error);
+        res.status(500).json({ success: false, message: 'Error exporting data' });
     }
 });
 
