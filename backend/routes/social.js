@@ -46,11 +46,11 @@ router.get('/auth/facebook/callback', async (req, res) => {
 
     if (error) {
         console.error('Meta OAuth Error:', error, error_description);
-        return res.redirect(`${config.frontendUrl}/settings?social=error`);
+        return res.redirect(`${config.frontendUrl[0]}/integrations?social=error`);
     }
 
     if (!code || !state) {
-        return res.redirect(`${config.frontendUrl}/settings?social=invalid_request`);
+        return res.redirect(`${config.frontendUrl[0]}/integrations?social=invalid_request`);
     }
 
     try {
@@ -58,30 +58,76 @@ router.get('/auth/facebook/callback', async (req, res) => {
         const [userId, platform] = state.split(':');
         const activePlatform = platform || 'facebook';
 
-        // 1. Get user access token using the correct app credentials
-        const userAccessToken = await exchangeCodeForToken(code, activePlatform);
+        // Exchange code for access token
+        const tokenData = await exchangeCodeForToken(code, config.facebook.redirectUri, activePlatform);
 
-        // 2. Fetch pages and IG accounts
-        const accounts = await fetchUserPagesAndIgAccounts(userAccessToken);
-
-        // 3. Save to database
-        const savedAccounts = [];
-        for (const account of accounts) {
-            // Upsert the social account
-            const updatedAcc = await SocialAccount.findOneAndUpdate(
-                { user: userId, platform: account.platform, accountId: account.accountId },
-                { ...account, user: userId, isActive: true },
-                { new: true, upsert: true }
-            );
-            savedAccounts.push(updatedAcc);
+        // Ensure user is valid
+        const userExists = await mongoose.model('User').findById(userId);
+        if (!userExists) {
+            return res.redirect(`${config.frontendUrl[0]}/integrations?social=user_not_found`);
         }
 
-        // Redirect back to frontend
-        return res.redirect(`${config.frontendUrl}/settings?social=success_${activePlatform}`);
+        // Fetch User Pages and (if applicable) Instagram Accounts
+        const pagesData = await fetchUserPagesAndIgAccounts(tokenData.access_token);
 
-    } catch (err) {
-        console.error('Meta Callback Error:', err);
-        return res.redirect(`${config.frontendUrl}/settings?social=error_fetching_accounts`);
+        // Save accounts to database
+        const accountsToSave = [];
+
+        // Common profile picture if available
+        const profilePic = pagesData.picture?.data?.url || '';
+
+        // Handle Facebook Pages
+        if (activePlatform === 'facebook' || !platform) {
+            for (const page of pagesData.accounts?.data || []) {
+                accountsToSave.push({
+                    user: userId,
+                    platform: 'facebook',
+                    accountId: page.id,
+                    username: page.name,
+                    accessToken: page.access_token, // Page-specific token
+                    profileUrl: `https://facebook.com/${page.id}`,
+                    avatarUrl: profilePic,
+                    status: 'active'
+                });
+            }
+        }
+
+        // Handle Instagram Accounts
+        if (activePlatform === 'instagram' || !platform) {
+            for (const page of pagesData.accounts?.data || []) {
+                if (page.instagram_business_account) {
+                    accountsToSave.push({
+                        user: userId,
+                        platform: 'instagram',
+                        accountId: page.instagram_business_account.id,
+                        username: page.name, // Usually page name unless we fetch IG specific details
+                        accessToken: page.access_token, // Page token is used for IG Graph API
+                        profileUrl: `https://instagram.com/`,
+                        avatarUrl: profilePic,
+                        status: 'active'
+                    });
+                }
+            }
+        }
+
+        if (accountsToSave.length === 0) {
+            console.warn(`No active ${activePlatform} accounts found for user ${userId}`);
+            return res.redirect(`${config.frontendUrl[0]}/integrations?social=no_accounts_found`);
+        }
+
+        // Upsert accounts
+        for (const account of accountsToSave) {
+            await SocialAccount.findOneAndUpdate(
+                { user: userId, platform: account.platform, accountId: account.accountId },
+                account,
+                { upsert: true, new: true }
+            );
+        }
+
+        res.redirect(`${config.frontendUrl[0]}/integrations?social=success&platform=${activePlatform}`);
+    } catch (error) {
+        console.error('Meta Callback processing error:', error.response?.data || error.message);
+        res.redirect(`${config.frontendUrl[0]}/integrations?social=processing_failed`);
     }
 });
 
