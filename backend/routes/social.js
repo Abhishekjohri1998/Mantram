@@ -34,8 +34,17 @@ router.get('/auth/:platform', protect, (req, res) => {
             return res.status(400).json({ success: false, error: 'Invalid platform' });
         }
 
-        // Pass user ID, platform, and the requesting origin as state to track where to redirect back
-        const origin = req.headers.origin || config.frontendUrl[0];
+        // Pass user ID, platform, and the requesting origin as state to track where to redirect back.
+        // req.headers.origin might be missing on some devices/browsers, use referer as fallback.
+        let origin = req.headers.origin;
+        if (!origin && req.headers.referer) {
+            try {
+                const refUrl = new URL(req.headers.referer);
+                origin = `${refUrl.protocol}//${refUrl.host}`;
+            } catch (e) { /* ignore invalid referer */ }
+        }
+        if (!origin) origin = config.frontendUrl[0];
+
         const state = `${req.user._id.toString()}:${platform}:${Buffer.from(origin).toString('base64')}`;
 
         const authUrl = platform === 'linkedin' ? getLinkedInAuthUrl(state) : getMetaAuthUrl(state, platform);
@@ -73,6 +82,7 @@ router.get('/auth/facebook/callback', async (req, res) => {
     }
 
     if (!code || !state) {
+        console.warn('[SOCIAL] Meta Callback missing code or state:', { hasCode: !!code, hasState: !!state });
         return res.redirect(`${targetFrontend}/integrations?social=invalid_request`);
     }
 
