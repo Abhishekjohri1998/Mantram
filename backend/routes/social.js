@@ -59,7 +59,7 @@ router.get('/auth/facebook/callback', async (req, res) => {
         const activePlatform = platform || 'facebook';
 
         // Exchange code for access token
-        const tokenData = await exchangeCodeForToken(code, config.facebook.redirectUri, activePlatform);
+        const userAccessToken = await exchangeCodeForToken(code, activePlatform);
 
         // Ensure user is valid
         const userExists = await mongoose.model('User').findById(userId);
@@ -68,7 +68,7 @@ router.get('/auth/facebook/callback', async (req, res) => {
         }
 
         // Fetch User Pages and (if applicable) Instagram Accounts
-        const accounts = await fetchUserPagesAndIgAccounts(tokenData.access_token);
+        const accounts = await fetchUserPagesAndIgAccounts(userAccessToken);
 
         // Filter by platform if connecting specifically to one
         const accountsToSave = accounts.filter(acc =>
