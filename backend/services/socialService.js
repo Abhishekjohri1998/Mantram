@@ -9,18 +9,12 @@ export const getMetaAuthUrl = (stateId, platform = 'facebook') => {
     // The isolated Instagram OAuth is only for consumer accounts or specific Basic Display apps.
     const appId = config.facebook.appId;
 
-    // Scopes for Facebook vs Instagram
-    const fbScopes = [
+    // Since we authorize both Facebook Pages and linked Instagram accounts simultaneously,
+    // we must request the superset of all necessary permissions.
+    const metaScopes = [
         'pages_show_list',
         'pages_read_engagement',
         'pages_manage_posts',
-        'instagram_basic',
-        'instagram_content_publish',
-        'public_profile'
-    ];
-
-    const igScopes = [
-        'pages_show_list',
         'instagram_basic',
         'instagram_content_publish',
         'instagram_manage_comments',
@@ -28,7 +22,7 @@ export const getMetaAuthUrl = (stateId, platform = 'facebook') => {
         'public_profile'
     ];
 
-    const scopes = (platform === 'instagram' ? igScopes : fbScopes).join(',');
+    const scopes = metaScopes.join(',');
 
     // Always use Facebook Dialog for Business Accounts
     const baseUrl = 'https://www.facebook.com/v19.0/dialog/oauth';
