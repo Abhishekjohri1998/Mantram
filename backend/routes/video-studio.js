@@ -1,6 +1,3 @@
-import { createWriteStream, existsSync, mkdirSync, statSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
 /**
  * Video Studio API Routes
  * 
@@ -441,12 +438,12 @@ router.get('/:id/status', protect, async (req, res) => {
                     generation: updated.generation,
                 });
 
-                // If completed, auto-cache video before CDN URL expires, then run critic
+                // If completed, auto-upload video to S3 before CDN URL expires, then run critic
                 if (updated.status === 'critique') {
-                    // Fire-and-forget: download video to local cache
+                    // Fire-and-forget: upload video to S3
                     if (updated.generation?.videoUrl) {
-                        downloadVideoToCache(project._id.toString(), updated.generation.videoUrl)
-                            .catch(e => console.warn('⚠️ Video auto-cache failed:', e.message));
+                        downloadAndUploadVideoToS3(project._id.toString(), updated.generation.videoUrl)
+                            .catch(e => console.warn('⚠️ Video S3 upload failed:', e.message));
                     }
                     const criticState = await runStep(project._id, 'critique', criticNode, {
                         userId: project.user.toString(),
@@ -940,26 +937,19 @@ router.delete('/:id', protect, async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// VIDEO CACHING — Download ephemeral CDN videos to local disk
+// VIDEO CACHING — Download ephemeral CDN videos → Upload to S3
 // ══════════════════════════════════════════════════════════════════════════════
-const __filename_v = fileURLToPath(import.meta.url);
-const __dirname_v = dirname(__filename_v);
-const VIDEO_CACHE_DIR = join(__dirname_v, '..', 'uploads', 'videos');
-if (!existsSync(VIDEO_CACHE_DIR)) mkdirSync(VIDEO_CACHE_DIR, { recursive: true });
+import { uploadToS3 } from '../utils/s3.js';
 
 /**
- * Download a video from an ephemeral CDN URL to local cache.
- * Returns the local file path if successful, null otherwise.
+ * Download a video from an ephemeral CDN URL and upload to S3.
+ * Updates the project in DB with the permanent S3 URL.
+ * Returns the S3 URL if successful, null otherwise.
  */
-export async function downloadVideoToCache(projectId, videoUrl) {
+export async function downloadAndUploadVideoToS3(projectId, videoUrl) {
     if (!videoUrl || !videoUrl.startsWith('http')) return null;
-    const localPath = join(VIDEO_CACHE_DIR, `${projectId}.mp4`);
-    if (existsSync(localPath)) {
-        const stat = statSync(localPath);
-        if (stat.size > 1000) return localPath; // Already cached
-    }
     try {
-        console.log(`📥 Downloading video to cache: ${videoUrl.substring(0, 80)}...`);
+        console.log(`📥 Downloading video for S3 upload: ${videoUrl.substring(0, 80)}...`);
         const resp = await fetch(videoUrl, {
             headers: { 'User-Agent': 'Mozilla/5.0' },
             redirect: 'follow',
@@ -974,83 +964,56 @@ export async function downloadVideoToCache(projectId, videoUrl) {
             console.warn(`⚠️ Video download too small (${buffer.length} bytes), likely expired`);
             return null;
         }
-        const { writeFileSync } = await import('fs');
-        writeFileSync(localPath, buffer);
-        console.log(`✅ Video cached: ${localPath} (${Math.round(buffer.length / 1024)}KB)`);
-        return localPath;
+
+        // Upload to S3
+        const s3Key = `videos/${projectId}.mp4`;
+        console.log(`☁️ Uploading video to S3: ${s3Key} (${Math.round(buffer.length / 1024)}KB)...`);
+        const s3Url = await uploadToS3(buffer, s3Key, 'video/mp4');
+        console.log(`✅ Video uploaded to S3: ${s3Url}`);
+
+        // Update DB with permanent S3 URL
+        await VideoProject.findByIdAndUpdate(projectId, {
+            'generation.s3VideoUrl': s3Url,
+        });
+
+        return s3Url;
     } catch (e) {
-        console.warn(`⚠️ Video download error:`, e.message);
+        console.warn(`⚠️ Video S3 upload error:`, e.message);
         return null;
     }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// GET /api/video-studio/:id/video — Serve video with local caching
+// GET /api/video-studio/:id/video — Serve video (S3 → CDN fallback)
 // No auth required — <video> tags can't send Authorization headers
 // ══════════════════════════════════════════════════════════════════════════════
 router.get('/:id/video', async (req, res) => {
     try {
         const project = await VideoProject.findById(req.params.id)
-            .select('generation.videoUrl generation.localVideoPath')
+            .select('generation.videoUrl generation.s3VideoUrl')
             .lean();
-        if (!project?.generation?.videoUrl && !project?.generation?.localVideoPath) {
+        if (!project?.generation?.videoUrl && !project?.generation?.s3VideoUrl) {
             return res.status(404).send('Video not found');
         }
 
-        // Check local cache first
-        const cachedPath = join(VIDEO_CACHE_DIR, `${req.params.id}.mp4`);
-        if (existsSync(cachedPath)) {
-            const stat = statSync(cachedPath);
-            if (stat.size > 1000) {
-                res.set('Content-Type', 'video/mp4');
-                res.set('Content-Length', stat.size);
-                res.set('Cache-Control', 'public, max-age=604800'); // Cache 7 days
-                res.set('Accept-Ranges', 'bytes');
-
-                // Support range requests for seeking
-                const range = req.headers.range;
-                if (range) {
-                    const parts = range.replace(/bytes=/, '').split('-');
-                    const start = parseInt(parts[0], 10);
-                    const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
-                    const chunksize = (end - start) + 1;
-                    const { createReadStream } = await import('fs');
-                    const stream = createReadStream(cachedPath, { start, end });
-                    res.writeHead(206, {
-                        'Content-Range': `bytes ${start}-${end}/${stat.size}`,
-                        'Content-Length': chunksize,
-                        'Content-Type': 'video/mp4',
-                    });
-                    return stream.pipe(res);
-                }
-
-                const { createReadStream } = await import('fs');
-                return createReadStream(cachedPath).pipe(res);
-            }
+        // If already on S3, redirect to the permanent S3 URL
+        if (project.generation.s3VideoUrl) {
+            return res.redirect(302, project.generation.s3VideoUrl);
         }
 
-        // Not cached — try to download from CDN and cache
+        // Not on S3 yet — try to download from CDN and upload to S3
         const videoUrl = project.generation.videoUrl;
         if (!videoUrl) return res.status(404).send('Video URL not available');
 
-        const localPath = await downloadVideoToCache(req.params.id, videoUrl);
-        if (localPath && existsSync(localPath)) {
-            // Update DB with local path for future reference
-            await VideoProject.findByIdAndUpdate(req.params.id, {
-                'generation.localVideoPath': localPath,
-            });
-            const stat = statSync(localPath);
-            res.set('Content-Type', 'video/mp4');
-            res.set('Content-Length', stat.size);
-            res.set('Cache-Control', 'public, max-age=604800');
-            const { createReadStream } = await import('fs');
-            return createReadStream(localPath).pipe(res);
+        const s3Url = await downloadAndUploadVideoToS3(req.params.id, videoUrl);
+        if (s3Url) {
+            return res.redirect(302, s3Url);
         }
 
         // CDN URL expired and can't download — return 410 Gone
         res.status(410).json({
             success: false,
-            error: 'Video has expired from CDN and could not be cached. The original URL was ephemeral.'
+            error: 'Video has expired from CDN and could not be saved. The original URL was ephemeral.'
         });
     } catch (error) {
         console.error('Video serve error:', error);
