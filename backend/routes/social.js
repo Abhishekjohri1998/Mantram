@@ -68,47 +68,12 @@ router.get('/auth/facebook/callback', async (req, res) => {
         }
 
         // Fetch User Pages and (if applicable) Instagram Accounts
-        const pagesData = await fetchUserPagesAndIgAccounts(tokenData.access_token);
+        const accounts = await fetchUserPagesAndIgAccounts(tokenData.access_token);
 
-        // Save accounts to database
-        const accountsToSave = [];
-
-        // Common profile picture if available
-        const profilePic = pagesData.picture?.data?.url || '';
-
-        // Handle Facebook Pages
-        if (activePlatform === 'facebook' || !platform) {
-            for (const page of pagesData.accounts?.data || []) {
-                accountsToSave.push({
-                    user: userId,
-                    platform: 'facebook',
-                    accountId: page.id,
-                    username: page.name,
-                    accessToken: page.access_token, // Page-specific token
-                    profileUrl: `https://facebook.com/${page.id}`,
-                    avatarUrl: profilePic,
-                    status: 'active'
-                });
-            }
-        }
-
-        // Handle Instagram Accounts
-        if (activePlatform === 'instagram' || !platform) {
-            for (const page of pagesData.accounts?.data || []) {
-                if (page.instagram_business_account) {
-                    accountsToSave.push({
-                        user: userId,
-                        platform: 'instagram',
-                        accountId: page.instagram_business_account.id,
-                        username: page.name, // Usually page name unless we fetch IG specific details
-                        accessToken: page.access_token, // Page token is used for IG Graph API
-                        profileUrl: `https://instagram.com/`,
-                        avatarUrl: profilePic,
-                        status: 'active'
-                    });
-                }
-            }
-        }
+        // Filter by platform if connecting specifically to one
+        const accountsToSave = accounts.filter(acc =>
+            !platform || acc.platform === activePlatform
+        );
 
         if (accountsToSave.length === 0) {
             console.warn(`No active ${activePlatform} accounts found for user ${userId}`);
@@ -119,7 +84,7 @@ router.get('/auth/facebook/callback', async (req, res) => {
         for (const account of accountsToSave) {
             await SocialAccount.findOneAndUpdate(
                 { user: userId, platform: account.platform, accountId: account.accountId },
-                account,
+                { ...account, user: userId, isActive: true },
                 { upsert: true, new: true }
             );
         }
@@ -159,8 +124,7 @@ router.delete('/accounts/:id', protect, async (req, res) => {
         }
 
         account.isActive = false;
-        // Optionally nullify tokens
-        account.accessToken = '';
+        // Keep the old token but mark as inactive so validation doesn't fail
         await account.save();
 
         res.json({ success: true, message: 'Account disconnected successfully' });
