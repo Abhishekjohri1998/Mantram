@@ -69,7 +69,7 @@ const integrationSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
-integrationSchema.index({ user: 1, platform: 1 });
+integrationSchema.index({ user: 1, brand: 1, platform: 1 }, { unique: true, sparse: true });
 integrationSchema.index({ brand: 1, platform: 1 });
 
 export default mongoose.model('Integration', integrationSchema);

@@ -1,14 +1,16 @@
 /**
- * Integrations Page
- * Connect Shopify, social media platforms, and manage product catalog.
+ * Integrations Hub — Single Source of Truth for all platform connections.
+ * Handles Connect / Disconnect for: Google Analytics, Meta Ads, Google Ads, Shopify, and Social Media.
+ * All connections are scoped to the active brand.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import { useShopify } from '../context/ShopifyContext'
-import { social, shopify as shopifyAPI } from '../services/api'
+import { social, shopify as shopifyAPI, googleAnalytics as gaAPI, apiFetch } from '../services/api'
 
 const SOCIAL_PLATFORMS = [
     { id: 'instagram', name: 'Instagram', icon: '📷', color: '#E1306C', desc: 'Share photos, reels & stories' },
@@ -17,154 +19,197 @@ const SOCIAL_PLATFORMS = [
     { id: 'twitter', name: 'X (Twitter)', icon: '𝕏', color: '#000000', desc: 'Tweets & threads' },
 ]
 
+const AD_PLATFORMS = [
+    { key: 'meta', name: 'Meta Ads', icon: '📱', color: '#0081FB', desc: 'Facebook & Instagram ads' },
+    { key: 'google', name: 'Google Ads', icon: '📊', color: '#34A853', desc: 'Search, display & YouTube ads' },
+]
+
 export default function Integrations() {
+    const navigate = useNavigate()
     const { user } = useAuth()
     const { activeBrand } = useBrand()
     const { isEmbedded, shop: shopifyShop } = useShopify()
+
+    // ── Social & Shopify state ──
     const [platformStatus, setPlatformStatus] = useState({})
     const [shopifyDomain, setShopifyDomain] = useState(shopifyShop || '')
     const [shopifyToken, setShopifyToken] = useState('')
-    const [shopifyMode, setShopifyMode] = useState(isEmbedded ? 'oauth' : 'token') // 'oauth' or 'token'
+    const [shopifyMode, setShopifyMode] = useState(isEmbedded ? 'oauth' : 'token')
     const [products, setProducts] = useState([])
     const [productSearch, setProductSearch] = useState('')
     const [loading, setLoading] = useState({})
     const [syncing, setSyncing] = useState(false)
-    const [activeTab, setActiveTab] = useState('platforms') // platforms | products
+    const [activeTab, setActiveTab] = useState('platforms')
     const [selectedAccount, setSelectedAccount] = useState(null)
     const [posts, setPosts] = useState([])
     const [loadingPosts, setLoadingPosts] = useState(false)
 
-    useEffect(() => {
-        loadStatus()
-    }, [])
+    // ── Google Analytics state ──
+    const [gaConnected, setGaConnected] = useState(false)
+    const [gaEmail, setGaEmail] = useState('')
+    const [gaLoading, setGaLoading] = useState(false)
 
-    const loadStatus = async () => {
+    // ── Ad Platform state ──
+    const [adConnections, setAdConnections] = useState({ meta: { status: 'disconnected' }, google: { status: 'disconnected' } })
+    const [connectingPlatform, setConnectingPlatform] = useState(null)
+
+    const brandId = activeBrand?._id
+
+    // ── Load ALL platform statuses ──
+    const loadAllStatuses = useCallback(async () => {
         try {
-            // Load custom status map for Shopify
-            const shopifyData = await shopifyAPI.status();
-
-            // Load actual connected social accounts from database
-            const socialData = await social.accounts();
-            const accounts = socialData.data || [];
-
-            // Map the accounts array to the platformStatus object format
+            // Social + Shopify
+            const [shopifyData, socialData] = await Promise.allSettled([
+                shopifyAPI.status(),
+                social.accounts(),
+            ])
             const mappedStatus = {
-                shopify: shopifyData.status || { connected: false }
-            };
+                shopify: shopifyData.status === 'fulfilled' ? (shopifyData.value.status || { connected: false }) : { connected: false },
+            }
+            if (socialData.status === 'fulfilled') {
+                (socialData.value.data || []).forEach(acc => {
+                    if (!mappedStatus[acc.platform]) mappedStatus[acc.platform] = { connected: true, accounts: [] }
+                    mappedStatus[acc.platform].accounts.push(acc)
+                })
+            }
+            setPlatformStatus(mappedStatus)
 
-            accounts.forEach(acc => {
-                // If a platform has multiple accounts (e.g. 2 FB pages), we store it as an array to display
-                if (!mappedStatus[acc.platform]) {
-                    mappedStatus[acc.platform] = { connected: true, accounts: [] };
-                }
-                mappedStatus[acc.platform].accounts.push(acc);
-            });
+            // Google Analytics
+            try {
+                const gaData = await gaAPI.status(brandId)
+                setGaConnected(gaData.connected)
+                setGaEmail(gaData.email || '')
+            } catch { setGaConnected(false); setGaEmail('') }
 
-            setPlatformStatus(mappedStatus);
-        } catch (e) { console.error('Error loading integration status:', e); }
-    }
+            // Ad Platforms (Meta + Google)
+            try {
+                const adData = await apiFetch(`/pm-studio/connect/status${brandId ? `?brandId=${brandId}` : ''}`)
+                if (adData.connections) setAdConnections(adData.connections)
+            } catch { /* ignore */ }
+        } catch (e) { console.error('Error loading integration statuses:', e) }
+    }, [brandId])
 
-    const loadProducts = async () => {
+    // Re-load everything on brand switch
+    useEffect(() => {
+        setGaConnected(false); setGaEmail('');
+        setAdConnections({ meta: { status: 'disconnected' }, google: { status: 'disconnected' } })
+        loadAllStatuses()
+    }, [loadAllStatuses])
+
+    // Listen for OAuth popup messages (GA + PM platforms)
+    useEffect(() => {
+        const handler = (e) => {
+            if (e.data?.type === 'GOOGLE_ANALYTICS_CONNECTED') {
+                setGaConnected(true); setGaEmail(e.data.email || ''); loadAllStatuses()
+            }
+            if (e.data?.type === 'PM_PLATFORM_CONNECTED') {
+                setConnectingPlatform(null); loadAllStatuses()
+            }
+        }
+        window.addEventListener('message', handler)
+        return () => window.removeEventListener('message', handler)
+    }, [loadAllStatuses])
+
+    // ── Google Analytics Actions ──
+    const connectGA = async () => {
+        setGaLoading(true)
         try {
-            const data = await shopifyAPI.products({ search: productSearch })
-            setProducts(data.products || [])
-        } catch { /* ignore */ }
+            const d = await gaAPI.connect(brandId)
+            if (d.authUrl) window.open(d.authUrl, '_blank', 'width=600,height=700')
+        } catch (e) { alert(`Connection failed: ${e.message}`) }
+        finally { setGaLoading(false) }
+    }
+    const disconnectGA = async () => {
+        if (!confirm('Disconnect Google Analytics for this brand?')) return
+        try { await gaAPI.disconnect(brandId); setGaConnected(false); setGaEmail('') } catch { }
     }
 
-    useEffect(() => { if (activeTab === 'products') loadProducts() }, [activeTab, productSearch])
+    // ── Ad Platform Actions ──
+    const connectAdPlatform = async (platformKey) => {
+        setConnectingPlatform(platformKey)
+        try {
+            const data = await apiFetch(`/pm-studio/connect/${platformKey}/auth${brandId ? `?brandId=${brandId}` : ''}`)
+            if (data.authUrl) window.open(data.authUrl, `connect_${platformKey}`, 'width=600,height=700,scrollbars=yes')
+        } catch (e) {
+            alert(`Connection failed: ${e.message}`)
+            setConnectingPlatform(null)
+        }
+    }
+    const disconnectAdPlatform = async (platformKey) => {
+        if (!confirm(`Disconnect ${platformKey === 'meta' ? 'Meta Ads' : 'Google Ads'} for this brand?`)) return
+        try {
+            await apiFetch(`/pm-studio/connect/${platformKey}${brandId ? `?brandId=${brandId}` : ''}`, { method: 'DELETE' })
+            loadAllStatuses()
+        } catch (e) { alert(e.message) }
+    }
 
-    // ── Connect Social Platform ──
+    // ── Social Platform Actions ──
     const connectPlatform = async (platform) => {
         setLoading(l => ({ ...l, [platform]: true }))
         try {
-            const data = await social.connect(platform, activeBrand?._id)
-            if (data.authUrl) {
-                window.open(data.authUrl, '_blank', 'width=600,height=700')
-            }
-        } catch (err) {
-            alert(`Connection failed: ${err.message}`)
-        } finally {
-            setLoading(l => ({ ...l, [platform]: false }))
-        }
+            const data = await social.connect(platform, brandId)
+            if (data.authUrl) window.open(data.authUrl, '_blank', 'width=600,height=700')
+        } catch (err) { alert(`Connection failed: ${err.message}`) }
+        finally { setLoading(l => ({ ...l, [platform]: false })) }
     }
-
-    // ── Disconnect Platform ──
     const disconnectPlatform = async (accountId) => {
         if (!confirm(`Disconnect this account?`)) return
-        try {
-            await social.disconnect(accountId)
-            loadStatus()
-        } catch (err) {
-            alert(err.message)
-        }
+        try { await social.disconnect(accountId); loadAllStatuses() } catch (err) { alert(err.message) }
     }
-
     const loadPosts = async (account) => {
-        setSelectedAccount(account)
-        setLoadingPosts(true)
-        try {
-            const res = await social.getPosts(account._id)
-            setPosts(res.data || [])
-        } catch (err) {
-            console.error('Failed to load posts:', err)
-        } finally {
-            setLoadingPosts(false)
-        }
+        setSelectedAccount(account); setLoadingPosts(true)
+        try { const res = await social.getPosts(account._id); setPosts(res.data || []) }
+        catch { } finally { setLoadingPosts(false) }
     }
 
-    // ── Connect Shopify ──
+    // ── Shopify Actions ──
     const connectShopify = async () => {
         if (!shopifyDomain) return alert('Enter your Shopify store domain')
-
         if (shopifyMode === 'token') {
-            // Direct token connection
             if (!shopifyToken) return alert('Paste your Admin API Access Token')
             setLoading(l => ({ ...l, shopify: true }))
             try {
                 const data = await shopifyAPI.connectToken(shopifyDomain, shopifyToken)
-                alert(`✅ Connected to ${data.shopName}!`)
-                setShopifyToken('')
-                loadStatus()
-            } catch (err) {
-                alert(`Connection failed: ${err.message}`)
-            } finally {
-                setLoading(l => ({ ...l, shopify: false }))
-            }
+                alert(`✅ Connected to ${data.shopName}!`); setShopifyToken(''); loadAllStatuses()
+            } catch (err) { alert(`Connection failed: ${err.message}`) }
+            finally { setLoading(l => ({ ...l, shopify: false })) }
         } else {
-            // OAuth flow
             setLoading(l => ({ ...l, shopify: true }))
             try {
                 const data = await shopifyAPI.connect(shopifyDomain)
-                if (data.authUrl) {
-                    window.open(data.authUrl, '_blank', 'width=600,height=700')
-                }
-            } catch (err) {
-                alert(`Shopify connection failed: ${err.message}`)
-            } finally {
-                setLoading(l => ({ ...l, shopify: false }))
-            }
+                if (data.authUrl) window.open(data.authUrl, '_blank', 'width=600,height=700')
+            } catch (err) { alert(`Shopify connection failed: ${err.message}`) }
+            finally { setLoading(l => ({ ...l, shopify: false })) }
         }
     }
-
-    // ── Sync Products ──
     const syncProducts = async () => {
         setSyncing(true)
         try {
-            const data = await shopifyAPI.sync(activeBrand?._id)
-            alert(`✅ Synced ${data.synced} products from Shopify!`)
-            loadProducts()
-        } catch (err) {
-            alert(`Sync failed: ${err.message}`)
-        } finally {
-            setSyncing(false)
-        }
+            const data = await shopifyAPI.sync(brandId)
+            alert(`✅ Synced ${data.synced} products from Shopify!`); loadProducts()
+        } catch (err) { alert(`Sync failed: ${err.message}`) }
+        finally { setSyncing(false) }
     }
+    const loadProducts = async () => {
+        try { const data = await shopifyAPI.products({ search: productSearch }); setProducts(data.products || []) } catch { }
+    }
+    useEffect(() => { if (activeTab === 'products') loadProducts() }, [activeTab, productSearch])
 
     const shopifyStatus = platformStatus.shopify || {}
 
     return (
         <DashboardLayout title="Integrations" subtitle="Connect your platforms & tools">
-            {/* Page Header */}
+            {/* Brand Indicator */}
+            {activeBrand && (
+                <div className="flex items-center gap-2 mb-5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary/5 to-transparent border border-primary/10">
+                    <span className="material-symbols-outlined text-primary text-base">storefront</span>
+                    <span className="text-sm text-slate-400">Showing integrations for</span>
+                    <span className="text-sm font-bold text-white">{activeBrand.name}</span>
+                    <span className="text-xs text-slate-600 ml-auto">Switch brands in the header to manage other brands</span>
+                </div>
+            )}
+
+            {/* Tab Switcher */}
             <div className="flex items-end justify-between mb-6">
                 <div></div>
                 <div className="flex gap-2">
@@ -182,10 +227,131 @@ export default function Integrations() {
             <div>
                 {activeTab === 'platforms' ? (
                     <div className="space-y-8">
-                        {/* Shopify Section */}
+
+                        {/* ═══════════ ANALYTICS SECTION ═══════════ */}
+                        <section>
+                            <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+                                <span className="text-2xl">📊</span> Analytics & Search Console
+                                <span className="text-xs text-slate-600 font-normal ml-2">Used by SEO Studio</span>
+                            </h2>
+                            <div className="glass-panel rounded-2xl p-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-14 h-14 rounded-xl bg-[#F9AB00]/10 flex items-center justify-center">
+                                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M20 4h-4v16h4V4z" fill="#F9AB00" /><path d="M12 10h-4v10h4V10z" fill="#E37400" /><path d="M4 16h-0a2 2 0 100 4h0a2 2 0 100-4z" fill="#E37400" /></svg>
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-white">Google Analytics</h3>
+                                            <p className="text-sm text-slate-400">Website traffic, SERP & keyword rankings</p>
+                                        </div>
+                                    </div>
+                                    <StatusBadge status={gaConnected ? 'connected' : 'disconnected'} />
+                                </div>
+
+                                {gaConnected ? (
+                                    <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                                        <div className="flex items-center gap-3">
+                                            <span className="material-symbols-outlined text-emerald-400 text-lg">check_circle</span>
+                                            <div>
+                                                <p className="text-sm text-white font-medium">{gaEmail}</p>
+                                                <p className="text-xs text-slate-500">Connected for {activeBrand?.name}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => navigate('/seo-studio')}
+                                                className="px-3 py-1.5 rounded-lg text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-all cursor-pointer flex items-center gap-1">
+                                                <span className="material-symbols-outlined text-xs">analytics</span> View in SEO Studio
+                                            </button>
+                                            <button onClick={disconnectGA}
+                                                className="px-3 py-1.5 rounded-lg text-xs font-medium text-red-400 hover:bg-red-500/10 transition-all cursor-pointer">
+                                                Disconnect
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <button onClick={connectGA} disabled={gaLoading}
+                                        className="w-full py-3 rounded-xl text-sm font-medium transition-all hover:scale-[1.01] bg-[#F9AB00]/15 text-[#F9AB00] border border-[#F9AB00]/25 hover:bg-[#F9AB00]/25 cursor-pointer disabled:opacity-50">
+                                        {gaLoading ? '⏳ Connecting...' : '🔗 Connect Google Analytics'}
+                                    </button>
+                                )}
+                            </div>
+                        </section>
+
+                        {/* ═══════════ AD PLATFORMS SECTION ═══════════ */}
+                        <section>
+                            <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+                                <span className="text-2xl">📢</span> Ad Platforms
+                                <span className="text-xs text-slate-600 font-normal ml-2">Used by Performance Studio</span>
+                            </h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {AD_PLATFORMS.map(p => {
+                                    const conn = adConnections[p.key] || {}
+                                    const isConnected = conn.status === 'connected'
+                                    return (
+                                        <div key={p.key} className="glass-panel rounded-2xl p-5 hover:border-white/[0.15] transition-all">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl"
+                                                        style={{ background: `${p.color}20` }}>
+                                                        {p.icon}
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="font-bold text-white text-sm">{p.name}</h3>
+                                                        <p className="text-sm text-slate-500">{p.desc}</p>
+                                                    </div>
+                                                </div>
+                                                <StatusBadge status={isConnected ? 'connected' : 'disconnected'} />
+                                            </div>
+
+                                            {isConnected ? (
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                                                        <span className="material-symbols-outlined text-emerald-400 text-sm">check_circle</span>
+                                                        <span className="text-sm text-white font-medium">{conn.email || conn.displayName || 'Connected'}</span>
+                                                    </div>
+                                                    {conn.customerIds?.length > 0 && (
+                                                        <div className="px-2.5 py-1.5">
+                                                            <p className="text-xs text-slate-500 mb-1">Customer IDs:</p>
+                                                            {conn.customerIds.slice(0, 3).map(id => (
+                                                                <p key={id} className="text-xs text-slate-400">{id}</p>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => navigate('/performance-marketing')}
+                                                            className="flex-1 py-2 rounded-lg text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-all cursor-pointer flex items-center justify-center gap-1">
+                                                            <span className="material-symbols-outlined text-xs">analytics</span> View in PM Studio
+                                                        </button>
+                                                        <button onClick={() => disconnectAdPlatform(p.key)}
+                                                            className="py-2 px-3 rounded-lg text-xs font-medium text-red-400 hover:bg-red-500/10 transition-all cursor-pointer">
+                                                            Disconnect
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    disabled={connectingPlatform === p.key}
+                                                    onClick={() => connectAdPlatform(p.key)}
+                                                    className="w-full py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-[1.01] cursor-pointer disabled:opacity-50"
+                                                    style={{ background: `${p.color}15`, color: p.color, border: `1px solid ${p.color}30` }}>
+                                                    {connectingPlatform === p.key ? (
+                                                        <><span className="material-symbols-outlined animate-spin text-sm align-middle mr-1">progress_activity</span>Connecting...</>
+                                                    ) : (
+                                                        `🔗 Connect ${p.name}`
+                                                    )}
+                                                </button>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </section>
+
+                        {/* ═══════════ E-COMMERCE SECTION ═══════════ */}
                         <section>
                             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
                                 <span className="text-2xl">🛍️</span> E-Commerce
+                                <span className="text-xs text-slate-600 font-normal ml-2">Used by D2C Studio</span>
                             </h2>
                             <div className="glass-panel rounded-2xl p-6">
                                 <div className="flex items-center justify-between mb-4">
@@ -224,7 +390,6 @@ export default function Integrations() {
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
-                                        {/* Mode toggle - Hide if embedded (Manual token not allowed for public apps) */}
                                         {!isEmbedded && (
                                             <div className="flex gap-2 mb-2">
                                                 <button onClick={() => setShopifyMode('token')}
@@ -237,26 +402,19 @@ export default function Integrations() {
                                                 </button>
                                             </div>
                                         )}
-
-                                        <input
-                                            type="text" value={shopifyDomain} onChange={e => setShopifyDomain(e.target.value)}
+                                        <input type="text" value={shopifyDomain} onChange={e => setShopifyDomain(e.target.value)}
                                             placeholder="my-store.myshopify.com"
-                                            className="w-full px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white text-sm placeholder:text-slate-500 focus:border-primary focus:outline-none"
-                                        />
-
+                                            className="w-full px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white text-sm placeholder:text-slate-500 focus:border-primary focus:outline-none" />
                                         {shopifyMode === 'token' && (
                                             <>
-                                                <input
-                                                    type="password" value={shopifyToken} onChange={e => setShopifyToken(e.target.value)}
+                                                <input type="password" value={shopifyToken} onChange={e => setShopifyToken(e.target.value)}
                                                     placeholder="Admin API Access Token (shpat_...)"
-                                                    className="w-full px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white text-sm placeholder:text-slate-500 focus:border-primary focus:outline-none"
-                                                />
+                                                    className="w-full px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white text-sm placeholder:text-slate-500 focus:border-primary focus:outline-none" />
                                                 <p className="text-[11px] text-slate-500">
                                                     Go to your Shopify Admin → Settings → Apps and sales channels → Develop apps → Create an app → Configure Admin API scopes (read_products, read_orders, read_customers) → Install → Copy the Access Token
                                                 </p>
                                             </>
                                         )}
-
                                         <button onClick={connectShopify} disabled={loading.shopify}
                                             className="btn-primary w-full py-3 rounded-xl text-sm font-medium">
                                             {loading.shopify ? 'Connecting...' : shopifyMode === 'token' ? '🔗 Connect with Token' : '🔗 Connect via OAuth'}
@@ -266,10 +424,11 @@ export default function Integrations() {
                             </div>
                         </section>
 
-                        {/* Social Media Section */}
+                        {/* ═══════════ SOCIAL MEDIA SECTION ═══════════ */}
                         <section>
                             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
                                 <span className="text-2xl">📱</span> Social Media
+                                <span className="text-xs text-slate-600 font-normal ml-2">Used by Content & Publish Studios</span>
                             </h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {SOCIAL_PLATFORMS.map(platform => {
@@ -298,7 +457,7 @@ export default function Integrations() {
                                                                 {acc.avatar ? (
                                                                     <img src={acc.avatar} alt="avatar" className="w-8 h-8 rounded-full flex-shrink-0" />
                                                                 ) : (
-                                                                    <div className="w-8 h-8 rounded-full bg-white/[0.1] flexitems-center justify-center flex-shrink-0">
+                                                                    <div className="w-8 h-8 rounded-full bg-white/[0.1] flex items-center justify-center flex-shrink-0">
                                                                         <span className="material-symbols-outlined text-sm text-slate-400">person</span>
                                                                     </div>
                                                                 )}
@@ -339,7 +498,7 @@ export default function Integrations() {
                             </div>
                         </section>
 
-                        {/* Coming Soon */}
+                        {/* ═══════════ COMING SOON ═══════════ */}
                         <section>
                             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
                                 <span className="text-2xl">🔮</span> Coming Soon
@@ -360,12 +519,9 @@ export default function Integrations() {
                         <div className="flex items-center gap-4">
                             <div className="flex-1 relative">
                                 <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-lg">search</span>
-                                <input
-                                    type="text" value={productSearch}
-                                    onChange={e => setProductSearch(e.target.value)}
+                                <input type="text" value={productSearch} onChange={e => setProductSearch(e.target.value)}
                                     placeholder="Search products..."
-                                    className="w-full pl-11 pr-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white text-sm placeholder:text-slate-500 focus:border-primary focus:outline-none"
-                                />
+                                    className="w-full pl-11 pr-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white text-sm placeholder:text-slate-500 focus:border-primary focus:outline-none" />
                             </div>
                             {shopifyStatus.connected && (
                                 <button onClick={syncProducts} disabled={syncing}

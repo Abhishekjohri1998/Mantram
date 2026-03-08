@@ -123,7 +123,7 @@ export default function SuperAdminDashboard() {
     const handleToggleSetting = async (key, val) => { try { await API.updateSystemSettings({ [key]: val }); showToast('Updated'); loadSettings() } catch { showToast('Failed', 'error') } }
 
     const pc = { starter: { c: 'slate', cr: 50, p: 'Free' }, professional: { c: 'blue', cr: 500, p: '₹999/mo' }, enterprise: { c: 'amber', cr: '∞', p: '₹4,999/mo' } }
-    const platformIcons = { instagram: '📸', facebook: '📘', linkedin: '💼', twitter: '🐦', shopify: '🛍️', 'google-analytics': '📊' }
+    const platformIcons = { instagram: '📸', facebook: '📘', linkedin: '💼', twitter: '🐦', shopify: '🛍️', 'google-analytics': '📊', 'meta-ads': '📱', 'google-ads': '🔍', meta: '📱', google: '🔍' }
 
     const Card = ({ icon, color, value, label }) => (
         <div className="glass-panel rounded-2xl p-5">
@@ -795,30 +795,97 @@ export default function SuperAdminDashboard() {
                     <div>
                         {integrations && (
                             <>
-                                <div className="grid grid-cols-6 gap-3 mb-6">{Object.entries(integrations.summary?.byPlatform || {}).map(([p, count]) => (
+                                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">{Object.entries(integrations.summary?.byPlatform || {}).map(([p, count]) => (
                                     <div key={p} className="glass-panel rounded-2xl p-4 text-center">
                                         <p className="text-2xl mb-1">{platformIcons[p] || '🔌'}</p>
                                         <p className="text-lg font-extrabold text-white">{count}</p>
-                                        <p className="text-sm text-slate-500 capitalize">{p}</p>
+                                        <p className="text-sm text-slate-500 capitalize">{p.replace('-', ' ')}</p>
                                     </div>
                                 ))}</div>
-                                <div className="space-y-2">{(integrations.integrations || []).map(i => (
-                                    <div key={i._id} className="glass-panel rounded-2xl p-4 flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-xl">{platformIcons[i.platform] || '🔌'}</span>
-                                            <div>
-                                                <p className="text-base font-bold text-white capitalize">{i.platform} {i.displayName && `• ${i.displayName}`}</p>
-                                                <p className="text-[11px] text-slate-600">{i.user?.name} ({i.user?.email}) {i.brand?.name ? `• ${i.brand.name}` : ''}</p>
+
+                                {/* Search + Filter */}
+                                <div className="flex gap-3 mb-5">
+                                    <div className="flex-1 relative">
+                                        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-lg">search</span>
+                                        <input
+                                            type="text"
+                                            placeholder="Search by user, email, or brand..."
+                                            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none focus:border-primary/50"
+                                            id="integration-search"
+                                            onChange={e => {
+                                                const q = e.target.value.toLowerCase()
+                                                document.querySelectorAll('[data-integration-row]').forEach(row => {
+                                                    row.style.display = row.dataset.integrationRow.includes(q) ? '' : 'none'
+                                                })
+                                            }}
+                                        />
+                                    </div>
+                                    <select
+                                        className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none cursor-pointer"
+                                        onChange={e => {
+                                            const f = e.target.value
+                                            document.querySelectorAll('[data-integration-row]').forEach(row => {
+                                                row.style.display = (!f || row.dataset.platform === f) ? '' : 'none'
+                                            })
+                                        }}
+                                    >
+                                        <option value="">All Platforms</option>
+                                        {Object.keys(integrations.summary?.byPlatform || {}).map(p => (
+                                            <option key={p} value={p}>{p.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Table Header */}
+                                <div className="grid grid-cols-[2fr_1.5fr_1fr_0.8fr_1.5fr_1fr] gap-3 px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-white/[0.06] mb-2">
+                                    <span>User</span><span>Brand</span><span>Platform</span><span>Status</span><span>Account</span><span>Last Synced</span>
+                                </div>
+
+                                {/* Table Rows */}
+                                <div className="space-y-1.5">
+                                    {(integrations.integrations || []).map(i => (
+                                        <div
+                                            key={i._id}
+                                            data-integration-row={`${i.user?.name || ''} ${i.user?.email || ''} ${i.brand?.name || ''} ${i.platform || ''}`.toLowerCase()}
+                                            data-platform={i.platform}
+                                            className="grid grid-cols-[2fr_1.5fr_1fr_0.8fr_1.5fr_1fr] gap-3 items-center glass-panel rounded-xl px-4 py-3 hover:bg-white/[0.03] transition-all"
+                                        >
+                                            {/* User */}
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center text-primary text-xs font-bold flex-shrink-0">
+                                                    {i.user?.name?.[0]?.toUpperCase() || '?'}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-medium text-white truncate">{i.user?.name || 'Unknown'}</p>
+                                                    <p className="text-[10px] text-slate-600 truncate">{i.user?.email}</p>
+                                                </div>
                                             </div>
+                                            {/* Brand */}
+                                            <div className="min-w-0">
+                                                <p className="text-sm text-slate-300 truncate">{i.brand?.name || '—'}</p>
+                                            </div>
+                                            {/* Platform */}
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-lg">{platformIcons[i.platform] || '🔌'}</span>
+                                                <span className="text-xs text-slate-400 capitalize">{(i.platform || '').replace('-', ' ')}</span>
+                                            </div>
+                                            {/* Status */}
+                                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold w-fit ${i.status === 'connected' ? 'bg-emerald-500/15 text-emerald-400' : i.status === 'expired' ? 'bg-amber-500/15 text-amber-400' : 'bg-slate-500/15 text-slate-400'}`}>{i.status}</span>
+                                            {/* Account */}
+                                            <p className="text-xs text-slate-400 truncate">{i.displayName || i.email || '—'}</p>
+                                            {/* Last Synced */}
+                                            <span className="text-xs text-slate-600">{i.lastSyncAt ? new Date(i.lastSyncAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' }) : 'Never'}</span>
                                         </div>
-                                        <div className="flex items-center gap-4">
-                                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${i.status === 'connected' ? 'bg-emerald-500/15 text-emerald-400' : i.status === 'expired' ? 'bg-amber-500/15 text-amber-400' : 'bg-slate-500/15 text-slate-400'}`}>{i.status}</span>
-                                            {i.publishCount > 0 && <span className="text-sm text-slate-500">{i.publishCount} published</span>}
-                                            <span className="text-xs text-slate-700">{i.lastSyncAt ? new Date(i.lastSyncAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'Never synced'}</span>
-                                        </div>
+                                    ))}
+                                </div>
+
+                                {(integrations.integrations || []).length === 0 && (
+                                    <div className="text-center py-16 glass-panel rounded-2xl mt-4">
+                                        <span className="material-symbols-outlined text-5xl text-slate-700 mb-3">hub</span>
+                                        <h3 className="text-lg font-bold text-white mb-1">No Integrations</h3>
+                                        <p className="text-sm text-slate-500">Users haven't connected any platforms yet</p>
                                     </div>
-                                ))}</div>
-                                {(integrations.integrations || []).length === 0 && <div className="text-center py-16 glass-panel rounded-2xl"><span className="material-symbols-outlined text-5xl text-slate-700 mb-3">hub</span><h3 className="text-lg font-bold text-white mb-1">No Integrations</h3><p className="text-sm text-slate-500">Users haven't connected any platforms yet</p></div>}
+                                )}
                             </>
                         )}
                     </div>

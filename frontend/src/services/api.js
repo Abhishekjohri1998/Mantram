@@ -27,7 +27,7 @@ export const clearToken = () => {
 export const getToken = () => authToken;
 
 // Base fetch wrapper
-async function apiFetch(endpoint, options = {}) {
+export async function apiFetch(endpoint, options = {}) {
     let token = authToken;
 
     // Use dynamic token (like Shopify Session Token) if provider is registered
@@ -453,14 +453,14 @@ export const seoStudio = {
     getAudit: (id) => apiFetch(`/seo-studio/history/${id}`),
 };
 
-// ============ Google Analytics + Search Console API ============
+// ============ Google Analytics + Search Console API (brand-aware) ============
 export const googleAnalytics = {
-    connect: () => apiFetch('/google-analytics/connect'),
-    status: () => apiFetch('/google-analytics/status'),
-    disconnect: () => apiFetch('/google-analytics/disconnect', { method: 'POST' }),
-    properties: () => apiFetch('/google-analytics/properties'),
+    connect: (brandId) => apiFetch(`/google-analytics/connect${brandId ? `?brandId=${brandId}` : ''}`),
+    status: (brandId) => apiFetch(`/google-analytics/status${brandId ? `?brandId=${brandId}` : ''}`),
+    disconnect: (brandId) => apiFetch('/google-analytics/disconnect', { method: 'POST', body: JSON.stringify({ brandId: brandId || undefined }) }),
+    properties: (brandId) => apiFetch(`/google-analytics/properties${brandId ? `?brandId=${brandId}` : ''}`),
     report: (data) => apiFetch('/google-analytics/report', { method: 'POST', body: JSON.stringify(data) }),
-    searchConsoleSites: () => apiFetch('/google-analytics/search-console/sites'),
+    searchConsoleSites: (brandId) => apiFetch(`/google-analytics/search-console/sites${brandId ? `?brandId=${brandId}` : ''}`),
     searchConsoleReport: (data) => apiFetch('/google-analytics/search-console/report', { method: 'POST', body: JSON.stringify(data) }),
 };
 

@@ -27,10 +27,12 @@ import { verifyShopifySessionToken } from '../middleware/shopifySessionAuth.js';
 
 const router = Router();
 
-// GET /api/shopify/status — Check connection status
+// GET /api/shopify/status — Check connection status (brand-aware)
 router.get('/status', protect, async (req, res) => {
     try {
-        const integration = await Integration.findOne({ user: req.user._id, platform: 'shopify' });
+        const query = { user: req.user._id, platform: 'shopify' };
+        if (req.query.brandId) query.brand = req.query.brandId;
+        const integration = await Integration.findOne(query);
         if (integration) {
             res.json({
                 success: true,
@@ -297,11 +299,13 @@ router.get('/products/:id', protect, async (req, res) => {
     }
 });
 
-// DELETE /api/shopify/disconnect — Disconnect Shopify
+// DELETE /api/shopify/disconnect — Disconnect Shopify (brand-aware)
 router.delete('/disconnect', protect, async (req, res) => {
     try {
+        const query = { user: req.user._id, platform: 'shopify' };
+        if (req.query.brandId) query.brand = req.query.brandId;
         await Integration.findOneAndUpdate(
-            { user: req.user._id, platform: 'shopify' },
+            query,
             { status: 'disconnected', accessToken: '' }
         );
         res.json({ success: true, message: 'Shopify disconnected' });

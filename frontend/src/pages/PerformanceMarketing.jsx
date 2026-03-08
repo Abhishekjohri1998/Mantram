@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import DashboardLayout from '../components/DashboardLayout'
@@ -47,6 +48,7 @@ function MetricCard({ icon, label, value, sub, color = 'emerald' }) {
 export default function PerformanceMarketing() {
     const { user } = useAuth()
     const { activeBrand } = useBrand()
+    const navigate = useNavigate()
 
     const [tab, setTab] = useState('dashboard')
     const [loading, setLoading] = useState(false)
@@ -119,13 +121,13 @@ export default function PerformanceMarketing() {
         } catch (e) { console.warn('Learnings load error:', e.message) }
     }, [activeBrand])
 
-    // ── Load platform connections ──
+    // ── Load platform connections (brand-aware) ──
     const loadConnections = useCallback(async () => {
         try {
-            const data = await api('/pm-studio/connect/status')
+            const data = await api(`/pm-studio/connect/status${activeBrand ? `?brandId=${activeBrand._id}` : ''}`)
             if (data.connections) setConnections(data.connections)
         } catch (e) { console.warn('Connections load error:', e.message) }
-    }, [])
+    }, [activeBrand])
 
     // ── Load Grok trending data ──
     const loadGrokTrends = useCallback(async () => {
@@ -355,31 +357,36 @@ export default function PerformanceMarketing() {
                                 </div>
                             </div>
 
-                            {/* Connected Platforms */}
+                            {/* Connected Platforms — Read-Only Status */}
                             <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
-                                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-emerald-400">electrical_services</span>
-                                    Connect Platforms
-                                </h3>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-emerald-400">electrical_services</span>
+                                        Ad Platforms
+                                    </h3>
+                                    <button onClick={() => navigate('/integrations')} className="text-xs text-primary hover:text-white cursor-pointer flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-primary/10 transition-all">
+                                        <span className="material-symbols-outlined text-xs">settings</span> Manage in Integrations
+                                    </button>
+                                </div>
                                 <div className="space-y-3">
                                     {[
-                                        { name: 'Meta Ads', icon: '📘', key: 'meta', platform: 'meta-ads' },
-                                        { name: 'Google Ads', icon: '🔍', key: 'google', platform: 'google-ads' },
+                                        { name: 'Meta Ads', icon: '📘', key: 'meta' },
+                                        { name: 'Google Ads', icon: '🔍', key: 'google' },
                                     ].map(p => {
                                         const conn = connections[p.key] || {}
                                         const isConnected = conn.status === 'connected'
                                         return (
                                             <div key={p.key} className={`p-4 rounded-xl border transition-all ${isConnected
                                                 ? 'bg-emerald-500/5 border-emerald-500/20'
-                                                : 'bg-white/[0.02] border-white/[0.04] hover:border-white/[0.12]'
+                                                : 'bg-white/[0.02] border-white/[0.04]'
                                                 }`}>
-                                                <div className="flex items-center justify-between mb-2">
+                                                <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-2xl">{p.icon}</span>
                                                         <div>
                                                             <p className="text-sm font-medium text-white">{p.name}</p>
                                                             {isConnected ? (
-                                                                <p className="text-xs text-emerald-400">✓ {conn.displayName || 'Connected'}</p>
+                                                                <p className="text-xs text-emerald-400">✓ {conn.displayName || conn.email || 'Connected'}</p>
                                                             ) : (
                                                                 <p className="text-xs text-slate-500">Not connected</p>
                                                             )}
@@ -408,45 +415,15 @@ export default function PerformanceMarketing() {
                                                     </div>
                                                 )}
 
-                                                {/* Connect / Disconnect button */}
-                                                <div className="mt-3">
-                                                    {isConnected ? (
-                                                        <button
-                                                            onClick={async () => {
-                                                                try {
-                                                                    await api(`/pm-studio/connect/${p.key}`, { method: 'DELETE' })
-                                                                    loadConnections()
-                                                                } catch (e) { setError(e.message) }
-                                                            }}
-                                                            className="w-full py-2 rounded-lg bg-rose-500/10 text-rose-400 text-xs font-medium border border-rose-500/20 hover:bg-rose-500/20 transition-all cursor-pointer"
-                                                        >
-                                                            Disconnect
+                                                {/* Link to Integrations for non-connected */}
+                                                {!isConnected && (
+                                                    <div className="mt-3">
+                                                        <button onClick={() => navigate('/integrations')}
+                                                            className="w-full py-2.5 rounded-lg bg-gradient-to-r from-violet-600/20 to-cyan-600/20 text-white/80 text-sm font-medium hover:from-violet-600/30 hover:to-cyan-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 border border-violet-500/20">
+                                                            <span className="material-symbols-outlined text-sm">link</span>Connect in Integrations
                                                         </button>
-                                                    ) : (
-                                                        <button
-                                                            disabled={connectingPlatform === p.key}
-                                                            onClick={async () => {
-                                                                setConnectingPlatform(p.key)
-                                                                try {
-                                                                    const data = await api(`/pm-studio/connect/${p.key}/auth${activeBrand ? `?brandId=${activeBrand._id}` : ''}`)
-                                                                    if (data.authUrl) {
-                                                                        window.open(data.authUrl, `connect_${p.key}`, 'width=600,height=700,scrollbars=yes')
-                                                                    }
-                                                                } catch (e) {
-                                                                    setError(e.message)
-                                                                    setConnectingPlatform(null)
-                                                                }
-                                                            }}
-                                                            className="w-full py-2.5 rounded-lg bg-gradient-to-r from-violet-600 to-cyan-600 text-white text-sm font-bold hover:shadow-lg hover:shadow-violet-500/20 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-                                                        >
-                                                            {connectingPlatform === p.key ? (
-                                                                <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>Connecting...</>
-                                                            ) : (
-                                                                <><span className="material-symbols-outlined text-sm">link</span>Connect {p.name}</>
-                                                            )}
-                                                        </button>
-                                                    )}
-                                                </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         )
                                     })}

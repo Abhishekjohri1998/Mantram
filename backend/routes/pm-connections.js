@@ -144,9 +144,11 @@ router.get('/connect/meta/callback', async (req, res) => {
             console.warn('Failed to fetch ad accounts:', e.message);
         }
 
-        // Save integration
+        // Save integration — per-brand
+        const upsertQuery = { user: userId, platform: 'meta-ads' };
+        if (brandId) upsertQuery.brand = brandId;
         await Integration.findOneAndUpdate(
-            { user: userId, platform: 'meta-ads' },
+            upsertQuery,
             {
                 user: userId,
                 brand: brandId || undefined,
@@ -299,9 +301,11 @@ router.get('/connect/google/callback', async (req, res) => {
             }
         }
 
-        // Save integration
+        // Save integration — per-brand
+        const upsertQuery = { user: userId, platform: 'google-ads' };
+        if (brandId) upsertQuery.brand = brandId;
         await Integration.findOneAndUpdate(
-            { user: userId, platform: 'google-ads' },
+            upsertQuery,
             {
                 user: userId,
                 brand: brandId || undefined,
@@ -348,8 +352,10 @@ router.delete('/connect/:platform', protect, async (req, res) => {
     try {
         const platform = req.params.platform === 'meta' ? 'meta-ads' : req.params.platform === 'google' ? 'google-ads' : req.params.platform;
 
+        const query = { user: req.user._id, platform };
+        if (req.query.brandId) query.brand = req.query.brandId;
         const integration = await Integration.findOneAndUpdate(
-            { user: req.user._id, platform },
+            query,
             {
                 status: 'disconnected',
                 accessToken: '',
@@ -377,10 +383,12 @@ router.delete('/connect/:platform', protect, async (req, res) => {
  */
 router.get('/connect/status', protect, async (req, res) => {
     try {
-        const integrations = await Integration.find({
+        const query = {
             user: req.user._id,
             platform: { $in: ['meta-ads', 'google-ads'] },
-        }).lean();
+        };
+        if (req.query.brandId) query.brand = req.query.brandId;
+        const integrations = await Integration.find(query).lean();
 
         const meta = integrations.find(i => i.platform === 'meta-ads');
         const google = integrations.find(i => i.platform === 'google-ads');

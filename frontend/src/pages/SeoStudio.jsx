@@ -99,39 +99,37 @@ export default function SeoStudio() {
     useEffect(() => { if (activeBrand?.competitors) setCompetitors(activeBrand.competitors) }, [activeBrand])
     useEffect(() => { if (results) resultRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [results])
 
-    // Check GA connection on mount
+    // Check GA connection on mount AND on brand change
     useEffect(() => {
-        gaAPI.status().then(d => {
+        // Reset GA state on brand switch
+        setGaConnected(false); setGaEmail(''); setGaProperties([]); setGaSelectedProp(''); setGaReport(null); setGaSites([]); setGaSelectedSite(''); setGscReport(null);
+        const brandId = activeBrand?._id;
+        gaAPI.status(brandId).then(d => {
             setGaConnected(d.connected); setGaEmail(d.email || '')
             if (d.connected) { loadGAProperties(); loadGSCSites() }
         }).catch(() => { })
         const handler = (e) => { if (e.data?.type === 'GOOGLE_ANALYTICS_CONNECTED') { setGaConnected(true); setGaEmail(e.data.email || ''); loadGAProperties(); loadGSCSites() } }
         window.addEventListener('message', handler)
         return () => window.removeEventListener('message', handler)
-    }, [])
+    }, [activeBrand])
 
     const loadGAProperties = async () => {
-        try { const d = await gaAPI.properties(); setGaProperties(d.properties || []) } catch { }
+        try { const d = await gaAPI.properties(activeBrand?._id); setGaProperties(d.properties || []) } catch { }
     }
     const loadGSCSites = async () => {
-        try { const d = await gaAPI.searchConsoleSites(); setGaSites(d.sites || []) } catch { }
+        try { const d = await gaAPI.searchConsoleSites(activeBrand?._id); setGaSites(d.sites || []) } catch { }
     }
     const loadGAReport = async (propId) => {
         if (!propId) return; setGaLoading(true)
-        try { const d = await gaAPI.report({ propertyId: propId }); if (d.success) setGaReport(d) } catch { }
+        try { const d = await gaAPI.report({ propertyId: propId, brandId: activeBrand?._id }); if (d.success) setGaReport(d) } catch { }
         finally { setGaLoading(false) }
     }
     const loadGSCReport = async (siteUrl) => {
         if (!siteUrl) return; setGaLoading(true)
-        try { const d = await gaAPI.searchConsoleReport({ siteUrl }); if (d.success) setGscReport(d) } catch { }
+        try { const d = await gaAPI.searchConsoleReport({ siteUrl, brandId: activeBrand?._id }); if (d.success) setGscReport(d) } catch { }
         finally { setGaLoading(false) }
     }
-    const connectGA = async () => {
-        try { const d = await gaAPI.connect(); if (d.authUrl) window.open(d.authUrl, '_blank', 'width=600,height=700') } catch (e) { setError(e.message) }
-    }
-    const disconnectGA = async () => {
-        try { await gaAPI.disconnect(); setGaConnected(false); setGaReport(null); setGscReport(null) } catch { }
-    }
+    // Connect/disconnect now happens in the Integrations hub — SEO Studio only reads status
 
     const brandPayload = activeBrand ? { name: activeBrand.name, website: activeBrand.website, _id: activeBrand._id, dna: activeBrand.dna } : null
 
@@ -384,11 +382,13 @@ export default function SeoStudio() {
                                         {gaConnected ? (
                                             <div className="flex items-center gap-3">
                                                 <span className="text-sm text-emerald-400 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Connected — {gaEmail}</span>
-                                                <button onClick={disconnectGA} className="text-sm text-rose-400 hover:text-rose-300 cursor-pointer">Disconnect</button>
+                                                <button onClick={() => navigate('/integrations')} className="text-xs text-primary hover:text-white cursor-pointer flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-primary/10 transition-all">
+                                                    <span className="material-symbols-outlined text-xs">settings</span> Manage in Integrations
+                                                </button>
                                             </div>
                                         ) : (
-                                            <button onClick={connectGA} className="px-4 py-2 rounded-xl bg-blue-500/10 text-blue-400 text-xs font-bold hover:bg-blue-500/20 cursor-pointer transition-all flex items-center gap-2">
-                                                <span className="material-symbols-outlined text-sm">link</span> Connect Google Analytics
+                                            <button onClick={() => navigate('/integrations')} className="px-4 py-2 rounded-xl bg-blue-500/10 text-blue-400 text-xs font-bold hover:bg-blue-500/20 cursor-pointer transition-all flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-sm">link</span> Connect in Integrations
                                             </button>
                                         )}
                                     </div>
@@ -533,7 +533,10 @@ export default function SeoStudio() {
                                         <div className="text-center py-6">
                                             <span className="material-symbols-outlined text-slate-600 text-4xl block mb-2">monitoring</span>
                                             <p className="text-sm text-slate-500 mb-1">Connect Google Analytics & Search Console to see real data</p>
-                                            <p className="text-xs text-slate-600">Traffic trends, SERP positions, top pages, keyword rankings & more</p>
+                                            <p className="text-xs text-slate-600 mb-3">Traffic trends, SERP positions, top pages, keyword rankings & more</p>
+                                            <button onClick={() => navigate('/integrations')} className="px-4 py-2 rounded-xl bg-blue-500/10 text-blue-400 text-xs font-bold hover:bg-blue-500/20 cursor-pointer transition-all inline-flex items-center gap-1">
+                                                <span className="material-symbols-outlined text-sm">link</span> Connect in Integrations →
+                                            </button>
                                         </div>
                                     )}
                                 </div>

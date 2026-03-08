@@ -35,13 +35,15 @@ function setCache(key, data) {
     analyticsCache[key] = { data, ts: Date.now() };
 }
 
-// ── Helper: get connected Shopify integration ──
-async function getShopifyIntegration(userId) {
-    return Integration.findOne({
+// ── Helper: get connected Shopify integration (brand-aware) ──
+async function getShopifyIntegration(userId, brandId) {
+    const query = {
         user: userId,
         platform: 'shopify',
         status: 'connected',
-    }).select('+accessToken');
+    };
+    if (brandId) query.brand = brandId;
+    return Integration.findOne(query).select('+accessToken');
 }
 
 // ── Helper: Grok availability check ──
@@ -403,7 +405,7 @@ router.get('/overview', protect, async (req, res) => {
         const cached = getCached(cacheKey);
         if (cached) return res.json(cached);
 
-        const integration = await getShopifyIntegration(userId);
+        const integration = await getShopifyIntegration(userId, brandId);
         if (!integration) {
             return res.json({ connected: false, message: 'Shopify not connected.' });
         }
@@ -472,11 +474,12 @@ router.get('/overview', protect, async (req, res) => {
 router.get('/snapshot', protect, async (req, res) => {
     try {
         const userId = req.user._id;
-        const cacheKey = getCacheKey(userId, null, 'snapshot');
+        const { brandId } = req.query;
+        const cacheKey = getCacheKey(userId, brandId, 'snapshot');
         const cached = getCached(cacheKey);
         if (cached) return res.json(cached);
 
-        const integration = await getShopifyIntegration(userId);
+        const integration = await getShopifyIntegration(userId, brandId);
         if (!integration) return res.json({ connected: false });
 
         const brandFilter = { user: userId };
@@ -813,7 +816,7 @@ router.get('/cohort-ltv', protect, async (req, res) => {
         const cached = getCached(cacheKey);
         if (cached) return res.json(cached);
 
-        const integration = await getShopifyIntegration(userId);
+        const integration = await getShopifyIntegration(userId, brandId);
         if (!integration) return res.json({ connected: false });
 
         const [orders, customers] = await Promise.all([
@@ -941,7 +944,7 @@ router.get('/profitability', protect, async (req, res) => {
         const cached = getCached(cacheKey);
         if (cached) return res.json(cached);
 
-        const integration = await getShopifyIntegration(userId);
+        const integration = await getShopifyIntegration(userId, brandId);
         if (!integration) return res.json({ connected: false });
 
         const [orders, products] = await Promise.all([

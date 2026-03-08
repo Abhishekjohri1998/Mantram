@@ -47,9 +47,11 @@ async function refreshAccessToken(refreshToken) {
     return resp.json();
 }
 
-async function getValidToken(userId) {
+async function getValidToken(userId, brandId) {
     const Integration = (await import('../models/Integration.js')).default;
-    const integration = await Integration.findOne({ user: userId, platform: 'google-analytics', status: 'connected' });
+    const query = { user: userId, platform: 'google-analytics', status: 'connected' };
+    if (brandId) query.brand = brandId;
+    const integration = await Integration.findOne(query);
     if (!integration) return null;
 
     // Check if token is expired (with 5 min buffer)
@@ -91,7 +93,11 @@ async function googleAPIFetch(url, accessToken, options = {}) {
 
 // GET /api/google-analytics/connect — Start OAuth
 router.get('/connect', protect, (req, res) => {
-    const state = Buffer.from(JSON.stringify({ userId: req.user._id })).toString('base64');
+    const state = Buffer.from(JSON.stringify({
+        userId: req.user._id,
+        brandId: req.query.brandId || '',
+        ts: Date.now(),
+    })).toString('base64');
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` + new URLSearchParams({
         client_id: config.google.clientId,
         redirect_uri: REDIRECT_URI,
@@ -110,7 +116,7 @@ router.get('/callback', async (req, res) => {
         const { code, state } = req.query;
         if (!code) return res.status(400).send('Missing authorization code');
 
-        const { userId } = JSON.parse(Buffer.from(state, 'base64').toString());
+        const { userId, brandId } = JSON.parse(Buffer.from(state, 'base64').toString());
         const tokens = await getTokensFromCode(code);
 
         if (tokens.error) {
@@ -120,12 +126,15 @@ router.get('/callback', async (req, res) => {
         // Get user email from Google
         const userInfo = await googleAPIFetch('https://www.googleapis.com/oauth2/v2/userinfo', tokens.access_token);
 
-        // Save integration
+        // Save integration — per-brand so each brand can have its own GA connection
         const Integration = (await import('../models/Integration.js')).default;
+        const upsertQuery = { user: userId, platform: 'google-analytics' };
+        if (brandId) upsertQuery.brand = brandId;
         await Integration.findOneAndUpdate(
-            { user: userId, platform: 'google-analytics' },
+            upsertQuery,
             {
                 user: userId,
+                brand: brandId || undefined,
                 platform: 'google-analytics',
                 status: 'connected',
                 accessToken: tokens.access_token,
@@ -148,12 +157,14 @@ router.get('/callback', async (req, res) => {
     }
 });
 
-// GET /api/google-analytics/status — Check connection status
+// GET /api/google-analytics/status — Check connection status (brand-aware)
 router.get('/status', optionalAuth, async (req, res) => {
     if (!req.user) return res.json({ success: true, connected: false });
     try {
         const Integration = (await import('../models/Integration.js')).default;
-        const integration = await Integration.findOne({ user: req.user._id, platform: 'google-analytics' });
+        const query = { user: req.user._id, platform: 'google-analytics' };
+        if (req.query.brandId) query.brand = req.query.brandId;
+        const integration = await Integration.findOne(query);
         res.json({
             success: true,
             connected: integration?.status === 'connected',
@@ -165,12 +176,14 @@ router.get('/status', optionalAuth, async (req, res) => {
     }
 });
 
-// POST /api/google-analytics/disconnect
+// POST /api/google-analytics/disconnect (brand-aware)
 router.post('/disconnect', protect, async (req, res) => {
     try {
         const Integration = (await import('../models/Integration.js')).default;
+        const query = { user: req.user._id, platform: 'google-analytics' };
+        if (req.body.brandId) query.brand = req.body.brandId;
         await Integration.findOneAndUpdate(
-            { user: req.user._id, platform: 'google-analytics' },
+            query,
             { status: 'disconnected', accessToken: '', refreshToken: '' }
         );
         res.json({ success: true });
@@ -187,7 +200,7 @@ router.post('/disconnect', protect, async (req, res) => {
 // GET /api/google-analytics/properties — List GA4 properties
 router.get('/properties', protect, async (req, res) => {
     try {
-        const auth = await getValidToken(req.user._id);
+        const auth = await getValidToken(req.user._id, req.query.brandId);
         if (!auth) return res.status(401).json({ success: false, error: 'Not connected to Google Analytics' });
 
         const data = await googleAPIFetch(
@@ -214,7 +227,7 @@ router.get('/properties', protect, async (req, res) => {
 // POST /api/google-analytics/report — Get analytics data
 router.post('/report', protect, async (req, res) => {
     try {
-        const auth = await getValidToken(req.user._id);
+        const auth = await getValidToken(req.user._id, req.body.brandId);
         if (!auth) return res.status(401).json({ success: false, error: 'Not connected' });
 
         const { propertyId, startDate = '30daysAgo', endDate = 'today' } = req.body;
@@ -330,7 +343,7 @@ router.post('/report', protect, async (req, res) => {
 // GET /api/google-analytics/search-console/sites — List verified sites
 router.get('/search-console/sites', protect, async (req, res) => {
     try {
-        const auth = await getValidToken(req.user._id);
+        const auth = await getValidToken(req.user._id, req.query.brandId);
         if (!auth) return res.status(401).json({ success: false, error: 'Not connected' });
 
         const data = await googleAPIFetch('https://www.googleapis.com/webmasters/v3/sites', auth.token);
@@ -347,7 +360,7 @@ router.get('/search-console/sites', protect, async (req, res) => {
 // POST /api/google-analytics/search-console/report — SERP data
 router.post('/search-console/report', protect, async (req, res) => {
     try {
-        const auth = await getValidToken(req.user._id);
+        const auth = await getValidToken(req.user._id, req.body.brandId);
         if (!auth) return res.status(401).json({ success: false, error: 'Not connected' });
 
         const { siteUrl, startDate, endDate, dimensions = ['query'] } = req.body;
