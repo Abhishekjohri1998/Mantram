@@ -85,18 +85,14 @@ router.get('/auth/facebook/callback', async (req, res) => {
         // Fetch User Pages and (if applicable) Instagram Accounts
         const accounts = await fetchUserPagesAndIgAccounts(userAccessToken);
 
-        // Filter by platform if connecting specifically to one
-        const accountsToSave = accounts.filter(acc =>
-            !platform || acc.platform === activePlatform
-        );
-
-        if (accountsToSave.length === 0) {
-            console.warn(`No active ${activePlatform} accounts found for user ${userId}`);
+        if (accounts.length === 0) {
+            console.warn(`No Meta accounts found for user ${userId}`);
             return res.redirect(`${targetFrontend}/integrations?social=no_accounts_found`);
         }
 
-        // Upsert accounts
-        for (const account of accountsToSave) {
+        // Upsert ALL accounts (both Facebook Pages and linked Instagram accounts)
+        // Since the Meta dialog authorizes both simultaneously, missing out on one is confusing.
+        for (const account of accounts) {
             await SocialAccount.findOneAndUpdate(
                 { user: userId, platform: account.platform, accountId: account.accountId },
                 { ...account, user: userId, isActive: true },
