@@ -120,7 +120,8 @@ export const publishToFacebook = async (pageId, accessToken, text, imageUrl) => 
             const response = await axios.post(url, {
                 caption: text,
                 url: imageUrl,
-                access_token: accessToken
+                access_token: accessToken,
+                published: true
             });
             return response.data.id;
         } else {
@@ -133,6 +134,9 @@ export const publishToFacebook = async (pageId, accessToken, text, imageUrl) => 
             return response.data.id;
         }
     } catch (error) {
+        if (error.response?.data) {
+            console.error('[SOCIAL] Facebook API Error Details:', JSON.stringify(error.response.data));
+        }
         console.error('Facebook Publish Error:', error.response?.data || error.message);
         const fbError = error.response?.data?.error;
         const msg = fbError?.error_user_msg || fbError?.message || error.message;

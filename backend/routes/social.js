@@ -1,5 +1,6 @@
 import express from 'express';
 import mongoose from 'mongoose';
+import axios from 'axios';
 import { protect } from '../middleware/auth.js';
 import SocialAccount from '../models/SocialAccount.js';
 import {
@@ -18,6 +19,7 @@ import {
 import config from '../config/env.js';
 
 const router = express.Router();
+const FB_API_URL = 'https://graph.facebook.com/v22.0';
 
 /**
  * @route   GET /api/social/auth/:platform
@@ -241,11 +243,12 @@ router.post('/publish', protect, async (req, res) => {
         }
 
         const results = [];
-        const FB_API_URL = 'https://graph.facebook.com/v19.0';
-
         // Process sequentially or using Promise.allSettled
         for (const account of accounts) {
             try {
+                // Log what we are about to do
+                console.log(`[SOCIAL] Publishing to ${account.platform} (${account.accountName}) - Image: ${absoluteImageUrl || 'None'}`);
+
                 // Debug Meta tokens: check if the stored token actually has the requested permissions
                 if (account.platform === 'facebook' || account.platform === 'instagram') {
                     try {
