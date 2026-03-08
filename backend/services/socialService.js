@@ -11,18 +11,28 @@ export const getMetaAuthUrl = (stateId, platform = 'facebook') => {
 
     // Since we authorize both Facebook Pages and linked Instagram accounts simultaneously,
     // we must request the superset of all necessary permissions.
-    const metaScopes = [
+    // Base scopes needed for Facebook Pages
+    const fbScopes = [
         'pages_show_list',
         'pages_read_engagement',
         'pages_manage_posts',
         'pages_read_user_content',
-        'instagram_basic',
-        'instagram_content_publish',
-        'instagram_manage_insights',
         'public_profile'
     ];
 
-    const scopes = metaScopes.join(',');
+    // Additional scopes for Instagram (only if specifically requested or if Instagram is active)
+    const igScopes = [
+        'instagram_basic',
+        'instagram_content_publish',
+        'instagram_manage_insights'
+    ];
+
+    const requestedScopes = [...fbScopes];
+    if (platform === 'instagram') {
+        requestedScopes.push(...igScopes);
+    }
+
+    const scopes = requestedScopes.join(',');
 
     // Always use Facebook Dialog for Business Accounts
     const baseUrl = 'https://www.facebook.com/v22.0/dialog/oauth';
