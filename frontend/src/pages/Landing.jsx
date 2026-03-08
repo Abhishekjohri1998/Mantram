@@ -51,8 +51,8 @@ export default function Landing() {
         e.preventDefault()
         setWaitlistLoading(true)
         try {
-            const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
-            const response = await fetch(`${apiBaseUrl}/api/waitlist`, {
+            const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+            const response = await fetch(`${apiBaseUrl}/waitlist`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
