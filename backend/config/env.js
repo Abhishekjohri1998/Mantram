@@ -16,6 +16,7 @@ export default {
     frontendUrl: (process.env.FRONTEND_URL || 'http://localhost:5173')
         .split(',')
         .map(url => url.trim().replace(/^["']|["']$/g, '')),
+    backendUrl: process.env.BACKEND_URL || 'https://api.mantram.ai',
 
     // AI Provider Config — Claude primary, Gemini for images
     ai: {

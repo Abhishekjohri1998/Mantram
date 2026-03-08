@@ -219,6 +219,15 @@ router.post('/publish', protect, async (req, res) => {
         return res.status(400).json({ success: false, error: 'Please provide text and select at least one account' });
     }
 
+    // Ensure imageUrl is an absolute URL if it is provided and relative
+    let absoluteImageUrl = imageUrl;
+    if (imageUrl && imageUrl.startsWith('/')) {
+        absoluteImageUrl = `${config.backendUrl}${imageUrl}`;
+    } else if (imageUrl && !imageUrl.startsWith('http')) {
+        // Handle cases where it might be relative but doesn't start with /
+        absoluteImageUrl = `${config.backendUrl}/${imageUrl}`;
+    }
+
     try {
         // Find all selected active accounts for this user
         const accounts = await SocialAccount.find({
@@ -239,11 +248,11 @@ router.post('/publish', protect, async (req, res) => {
                 let postId = null;
 
                 if (account.platform === 'facebook') {
-                    postId = await publishToFacebook(account.accountId, account.accessToken, text, imageUrl);
+                    postId = await publishToFacebook(account.accountId, account.accessToken, text, absoluteImageUrl);
                 } else if (account.platform === 'instagram') {
-                    postId = await publishToInstagram(account.accountId, account.accessToken, text, imageUrl);
+                    postId = await publishToInstagram(account.accountId, account.accessToken, text, absoluteImageUrl);
                 } else if (account.platform === 'linkedin') {
-                    postId = await publishToLinkedIn(account.accountId, account.accessToken, text, imageUrl);
+                    postId = await publishToLinkedIn(account.accountId, account.accessToken, text, absoluteImageUrl);
                 }
 
                 results.push({
