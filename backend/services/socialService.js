@@ -4,8 +4,10 @@ import config from '../config/env.js';
 const FB_API_URL = 'https://graph.facebook.com/v19.0';
 
 export const getMetaAuthUrl = (stateId, platform = 'facebook') => {
-    // Determine which app credentials to use
-    const appId = platform === 'instagram' ? config.instagram.appId : config.facebook.appId;
+    // We always use the Facebook App ID even for Instagram, 
+    // because Instagram Business Accounts are linked to Facebook Pages.
+    // The isolated Instagram OAuth is only for consumer accounts or specific Basic Display apps.
+    const appId = config.facebook.appId;
 
     // Scopes for Facebook vs Instagram
     const fbScopes = [
@@ -18,34 +20,29 @@ export const getMetaAuthUrl = (stateId, platform = 'facebook') => {
     ];
 
     const igScopes = [
-        'instagram_business_basic',
-        'instagram_business_manage_messages',
-        'instagram_business_manage_comments',
-        'instagram_business_content_publish',
-        'instagram_business_manage_insights',
         'pages_show_list',
+        'instagram_basic',
+        'instagram_content_publish',
+        'instagram_manage_comments',
+        'instagram_manage_insights',
         'public_profile'
     ];
 
     const scopes = (platform === 'instagram' ? igScopes : fbScopes).join(',');
 
-    // Base URL is different for direct Instagram OAuth
-    const baseUrl = platform === 'instagram'
-        ? 'https://www.instagram.com/oauth/authorize'
-        : 'https://www.facebook.com/v19.0/dialog/oauth';
+    // Always use Facebook Dialog for Business Accounts
+    const baseUrl = 'https://www.facebook.com/v19.0/dialog/oauth';
 
-    return `${baseUrl}?client_id=${appId}&redirect_uri=${config.facebook.redirectUri}&state=${stateId}&scope=${scopes}&response_type=code${platform === 'instagram' ? '&force_reauth=true' : ''}`;
+    return `${baseUrl}?client_id=${appId}&redirect_uri=${config.facebook.redirectUri}&state=${stateId}&scope=${scopes}&response_type=code`;
 };
 
 export const exchangeCodeForToken = async (code, platform = 'facebook') => {
-    const appId = platform === 'instagram' ? config.instagram.appId : config.facebook.appId;
-    const appSecret = platform === 'instagram' ? config.instagram.appSecret : config.facebook.appSecret;
+    // Always use Facebook credentials for exchanging the code, as we used the FB dialog
+    const appId = config.facebook.appId;
+    const appSecret = config.facebook.appSecret;
 
-    // Direct Instagram App uses a different token endpoint usually, 
-    // but often Meta apps share the same graph endpoint.
-    const url = platform === 'instagram'
-        ? 'https://api.instagram.com/oauth/access_token'
-        : `${FB_API_URL}/oauth/access_token`;
+    // Always exchange the code at the Facebook Graph API endpoint
+    const url = `${FB_API_URL}/oauth/access_token`;
 
     const params = {
         client_id: appId,
