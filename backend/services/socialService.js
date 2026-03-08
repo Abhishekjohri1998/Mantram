@@ -124,7 +124,9 @@ export const publishToFacebook = async (pageId, accessToken, text, imageUrl) => 
         }
     } catch (error) {
         console.error('Facebook Publish Error:', error.response?.data || error.message);
-        throw new Error(error.response?.data?.error?.message || 'Failed to publish to Facebook');
+        const fbError = error.response?.data?.error;
+        const msg = fbError?.error_user_msg || fbError?.message || error.message;
+        throw new Error(msg);
     }
 };
 
@@ -154,7 +156,9 @@ export const publishToInstagram = async (igAccountId, accessToken, text, imageUr
         return publishResponse.data.id;
     } catch (error) {
         console.error('Instagram Publish Error:', error.response?.data || error.message);
-        throw new Error(error.response?.data?.error?.message || 'Failed to publish to Instagram');
+        const fbError = error.response?.data?.error;
+        const msg = fbError?.error_user_msg || fbError?.message || error.message;
+        throw new Error(msg);
     }
 };
 
