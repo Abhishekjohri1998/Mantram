@@ -223,11 +223,18 @@ router.post('/publish', protect, async (req, res) => {
 
     // Ensure imageUrl is an absolute URL if it is provided and relative
     let absoluteImageUrl = imageUrl;
-    if (imageUrl && imageUrl.startsWith('/')) {
-        absoluteImageUrl = `${config.backendUrl}${imageUrl}`;
-    } else if (imageUrl && !imageUrl.startsWith('http')) {
-        // Handle cases where it might be relative but doesn't start with /
-        absoluteImageUrl = `${config.backendUrl}/${imageUrl}`;
+    if (imageUrl && !imageUrl.startsWith('http')) {
+        if (imageUrl.startsWith('data:')) {
+            console.log('[SOCIAL] Image is a data URI (base64)');
+            // Stay as is, though Meta won't support it directly
+        } else {
+            const baseUrl = (config.backendUrl || '').replace(/\/$/, '');
+            const path = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+            absoluteImageUrl = `${baseUrl}${path}`;
+            console.log(`[SOCIAL] Transformed relative URL to absolute: ${absoluteImageUrl}`);
+        }
+    } else if (imageUrl) {
+        console.log(`[SOCIAL] Using provided absolute URL: ${imageUrl}`);
     }
 
     try {

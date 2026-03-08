@@ -8,6 +8,7 @@ import { requireCredits } from '../middleware/credits.js';
 import { getOrchestrator } from '../agents/orchestrator.js';
 import { addWatermark } from '../utils/watermark.js';
 import { getSetting } from '../models/SystemSettings.js';
+import { uploadToS3 } from '../utils/s3.js';
 
 const router = Router();
 
@@ -439,6 +440,18 @@ Output only the finished design, edge-to-edge. No labels, text overlays, hex cod
         // Watermark disabled for creative output — clean designs only
         let imageUrl = result.imageUrl || '';
 
+        // NEW: Upload to S3 for public access (required by Meta/IG)
+        if (imageUrl && imageUrl.startsWith('data:image/')) {
+            try {
+                const s3Url = await uploadToS3(imageUrl, `creatives/${brandId}/${Date.now()}.png`);
+                imageUrl = s3Url;
+                console.log(`[S3] Creative uploaded to S3: ${imageUrl}`);
+            } catch (s3Err) {
+                console.error('[S3] Failed to upload generated creative to S3:', s3Err.message);
+                // Fallback to base64 if S3 fails, but it might fail on Meta
+            }
+        }
+
         const creative = await Creative.create({
             user: req.user._id,
             brand: brandId,
@@ -525,14 +538,25 @@ router.post('/save-to-bank', protect, async (req, res) => {
             return res.status(400).json({ success: false, error: 'imageUrl and brandId are required' });
         }
 
+        let finalImageUrl = imageUrl;
+        if (imageUrl && imageUrl.startsWith('data:image/')) {
+            try {
+                const s3Url = await uploadToS3(imageUrl, `creatives/${brandId}/bank-${Date.now()}.png`);
+                finalImageUrl = s3Url;
+                console.log(`[S3] Bank image uploaded to S3: ${finalImageUrl}`);
+            } catch (s3Err) {
+                console.error('[S3] Failed to upload bank image to S3:', s3Err.message);
+            }
+        }
+
         const creative = await Creative.create({
             user: req.user._id,
             brand: brandId,
             type: source || 'other',
             title: prompt?.substring(0, 80) || 'AI Generated Image',
             prompt: prompt || '',
-            imageUrl,
-            thumbnailUrl: imageUrl,
+            imageUrl: finalImageUrl,
+            thumbnailUrl: finalImageUrl,
             designData: {
                 style: scene || '',
                 textOverlay: (keywords || []).join(', '),
@@ -634,8 +658,14 @@ router.get('/image-bank', protect, async (req, res) => {
 // Security relies on unguessable MongoDB ObjectId.
 router.get('/:id/image', async (req, res) => {
     try {
+        const userAgent = req.get('User-Agent') || 'Unknown';
+        console.log(`[PROXY] Serving image for creative ${req.params.id} to UA: ${userAgent}`);
+
         const creative = await Creative.findById(req.params.id).select('imageUrl').lean();
-        if (!creative?.imageUrl) return res.status(404).send('Not found');
+        if (!creative?.imageUrl) {
+            console.warn(`[PROXY] Creative ${req.params.id} or its image not found`);
+            return res.status(404).send('Not found');
+        }
 
         if (creative.imageUrl.startsWith('data:image/')) {
             // Parse base64 data URI and serve as image
@@ -664,14 +694,25 @@ router.post('/upload-to-bank', protect, async (req, res) => {
             return res.status(400).json({ success: false, error: 'imageUrl and brandId are required' });
         }
 
+        let uploadedImageUrl = imageUrl;
+        if (imageUrl && imageUrl.startsWith('data:image/')) {
+            try {
+                const s3Url = await uploadToS3(imageUrl, `uploads/${brandId}/${Date.now()}.png`);
+                uploadedImageUrl = s3Url;
+                console.log(`[S3] User upload stored on S3: ${uploadedImageUrl}`);
+            } catch (s3Err) {
+                console.error('[S3] Failed to upload user image to S3:', s3Err.message);
+            }
+        }
+
         const creative = await Creative.create({
             user: req.user._id,
             brand: brandId,
             type: 'uploaded',
             title: title || 'Uploaded Image',
             prompt: '',
-            imageUrl,
-            thumbnailUrl: imageUrl,
+            imageUrl: uploadedImageUrl,
+            thumbnailUrl: uploadedImageUrl,
             aiMeta: {},
             tags: ['uploaded'],
             status: 'draft',
