@@ -8,6 +8,10 @@ import {
     fetchUserPagesAndIgAccounts,
     publishToFacebook,
     publishToInstagram,
+    getLinkedInAuthUrl,
+    exchangeLinkedInCodeForToken,
+    fetchLinkedInProfile,
+    publishToLinkedIn,
     fetchRecentPosts,
     fetchPostAnalytics
 } from '../services/socialService.js';
@@ -23,14 +27,15 @@ const router = express.Router();
 router.get('/auth/:platform', protect, (req, res) => {
     try {
         const { platform } = req.params;
-        if (platform !== 'facebook' && platform !== 'instagram') {
+        if (platform !== 'facebook' && platform !== 'instagram' && platform !== 'linkedin') {
             return res.status(400).json({ success: false, error: 'Invalid platform' });
         }
 
         // Pass user ID, platform, and the requesting origin as state to track where to redirect back
         const origin = req.headers.origin || config.frontendUrl[0];
         const state = `${req.user._id.toString()}:${platform}:${Buffer.from(origin).toString('base64')}`;
-        const authUrl = getMetaAuthUrl(state, platform);
+
+        const authUrl = platform === 'linkedin' ? getLinkedInAuthUrl(state) : getMetaAuthUrl(state, platform);
         res.json({ success: true, authUrl });
     } catch (error) {
         console.error('Social Auth URL error:', error);
@@ -116,6 +121,56 @@ router.get('/auth/facebook/callback', async (req, res) => {
 });
 
 /**
+ * @route   GET /api/social/auth/linkedin/callback
+ * @desc    Handle LinkedIn OAuth callback
+ * @access  Public
+ */
+router.get('/auth/linkedin/callback', async (req, res) => {
+    const { code, state, error, error_description } = req.query;
+    let targetFrontend = config.frontendUrl[0];
+
+    try {
+        if (state) {
+            const parts = state.split(':');
+            if (parts.length >= 3) {
+                targetFrontend = Buffer.from(parts[2], 'base64').toString('ascii');
+            }
+        }
+    } catch (e) {
+        console.error('Failed to parse origin from state', e);
+    }
+
+    if (error) {
+        console.error('LinkedIn OAuth Error:', error, error_description);
+        return res.redirect(`${targetFrontend}/integrations?social=error&platform=linkedin`);
+    }
+
+    try {
+        const [userId] = state.split(':');
+        const tokenData = await exchangeLinkedInCodeForToken(code);
+        const profile = await fetchLinkedInProfile(tokenData.access_token);
+
+        await SocialAccount.findOneAndUpdate(
+            { user: userId, platform: 'linkedin', accountId: profile.id },
+            {
+                user: userId,
+                platform: 'linkedin',
+                accountId: profile.id,
+                accountName: `${profile.localizedFirstName} ${profile.localizedLastName}`,
+                accessToken: tokenData.access_token,
+                isActive: true
+            },
+            { upsert: true, new: true }
+        );
+
+        res.redirect(`${targetFrontend}/integrations?social=success&platform=linkedin`);
+    } catch (error) {
+        console.error('LinkedIn Callback Error:', error);
+        res.redirect(`${targetFrontend}/integrations?social=processing_failed&platform=linkedin`);
+    }
+});
+
+/**
  * @route   GET /api/social/accounts
  * @desc    Get all connected social accounts for the user
  * @access  Private
@@ -187,6 +242,8 @@ router.post('/publish', protect, async (req, res) => {
                     postId = await publishToFacebook(account.accountId, account.accessToken, text, imageUrl);
                 } else if (account.platform === 'instagram') {
                     postId = await publishToInstagram(account.accountId, account.accessToken, text, imageUrl);
+                } else if (account.platform === 'linkedin') {
+                    postId = await publishToLinkedIn(account.accountId, account.accessToken, text, imageUrl);
                 }
 
                 results.push({

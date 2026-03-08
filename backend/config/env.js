@@ -112,5 +112,12 @@ export default {
     email: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
+    },
+
+    // LinkedIn
+    linkedin: {
+        clientId: process.env.LINKEDIN_CLIENT_ID,
+        clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
+        callbackUrl: process.env.LINKEDIN_CALLBACK_URL || `${process.env.BACKEND_URL || 'https://api.mantram.ai'}/api/social/auth/linkedin/callback`,
     }
 };

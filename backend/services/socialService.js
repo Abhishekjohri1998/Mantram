@@ -17,7 +17,6 @@ export const getMetaAuthUrl = (stateId, platform = 'facebook') => {
         'pages_manage_posts',
         'instagram_basic',
         'instagram_content_publish',
-        'instagram_manage_comments',
         'instagram_manage_insights',
         'public_profile'
     ];
@@ -203,6 +202,80 @@ export const fetchRecentPosts = async (accountId, accessToken, platform) => {
     }
 };
 
+export const getLinkedInAuthUrl = (stateId) => {
+    const { clientId, callbackUrl } = config.linkedin;
+    const scopes = ['w_member_social', 'r_liteprofile', 'r_emailaddress'].join(' ');
+    const baseUrl = 'https://www.linkedin.com/oauth/v2/authorization';
+
+    return `${baseUrl}?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&state=${stateId}&scope=${encodeURIComponent(scopes)}`;
+};
+
+export const exchangeLinkedInCodeForToken = async (code) => {
+    const { clientId, clientSecret, callbackUrl } = config.linkedin;
+    const url = 'https://www.linkedin.com/oauth/v2/accessToken';
+
+    const params = {
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: callbackUrl,
+        client_id: clientId,
+        client_secret: clientSecret
+    };
+
+    const response = await axios.post(url, new URLSearchParams(params), {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+
+    return response.data;
+};
+
+export const fetchLinkedInProfile = async (accessToken) => {
+    const url = 'https://api.linkedin.com/v2/me';
+    const response = await axios.get(url, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+    return response.data;
+};
+
+export const publishToLinkedIn = async (personUrn, accessToken, text, imageUrl) => {
+    try {
+        const url = 'https://api.linkedin.com/v2/ugcPosts';
+        const body = {
+            author: `urn:li:person:${personUrn}`,
+            lifecycleState: 'PUBLISHED',
+            specificContent: {
+                'com.linkedin.ugc.ShareContent': {
+                    shareCommentary: { text },
+                    shareMediaCategory: imageUrl ? 'IMAGE' : 'NONE',
+                },
+            },
+            visibility: {
+                'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
+            },
+        };
+
+        if (imageUrl) {
+            body.specificContent['com.linkedin.ugc.ShareContent'].media = [{
+                status: 'READY',
+                originalUrl: imageUrl,
+                description: { text: text.substring(0, 200) },
+            }];
+        }
+
+        const response = await axios.post(url, body, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`,
+                'X-Restli-Protocol-Version': '2.0.0',
+            }
+        });
+
+        return response.data.id;
+    } catch (error) {
+        throw new Error(error.response?.data?.message || 'Failed to publish to LinkedIn');
+    }
+};
+
 /**
  * Fetch insights/analytics for a specific post
  */
@@ -238,6 +311,10 @@ export const fetchPostAnalytics = async (postId, accessToken, platform) => {
                 impressions: insights.find(i => i.name === 'impressions')?.values[0]?.value || 0,
                 reach: insights.find(i => i.name === 'reach')?.values[0]?.value || 0
             };
+        } else if (platform === 'linkedin') {
+            // LinkedIn analytics usually require a separate call to the organizationalInsights or similar
+            // For now, return a placeholder or implement if needed
+            return { likes: 0, comments: 0, impressions: 0 };
         }
     } catch (error) {
         console.error(`Failed to fetch analytics for ${platform} post ${postId}:`, error.response?.data || error.message);
