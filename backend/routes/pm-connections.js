@@ -15,6 +15,9 @@ import config from '../config/env.js';
 
 const router = Router();
 
+// Static base URL — must match what's registered in Google/Meta Cloud Console
+const BASE_URL = process.env.BACKEND_URL || 'http://localhost:3001';
+
 // ══════════════════════════════════════════════════════════════════════════════
 // META ADS OAUTH
 // ══════════════════════════════════════════════════════════════════════════════
@@ -43,7 +46,7 @@ router.get('/connect/meta/auth', protect, (req, res) => {
         ts: Date.now(),
     })).toString('base64');
 
-    const redirectUri = `${req.protocol}://${req.get('host')}/api/pm-studio/connect/meta/callback`;
+    const redirectUri = `${BASE_URL}/api/pm-studio/connect/meta/callback`;
 
     const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?` +
         `client_id=${appId}` +
@@ -81,7 +84,7 @@ router.get('/connect/meta/callback', async (req, res) => {
         const { userId, brandId } = stateData;
         const appId = config.metaAds.appId || config.facebook.appId;
         const appSecret = config.metaAds.appSecret || config.facebook.appSecret;
-        const redirectUri = `${req.protocol}://${req.get('host')}/api/pm-studio/connect/meta/callback`;
+        const redirectUri = `${BASE_URL}/api/pm-studio/connect/meta/callback`;
 
         // Exchange code for access token
         const tokenResp = await fetch(
@@ -207,7 +210,7 @@ router.get('/connect/google/auth', protect, (req, res) => {
         ts: Date.now(),
     })).toString('base64');
 
-    const redirectUri = `${req.protocol}://${req.get('host')}/api/pm-studio/connect/google/callback`;
+    const redirectUri = `${BASE_URL}/api/pm-studio/connect/google/callback`;
 
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
         `client_id=${clientId}` +
@@ -246,7 +249,7 @@ router.get('/connect/google/callback', async (req, res) => {
         const { userId, brandId } = stateData;
         const clientId = config.googleAds.clientId || config.google.clientId;
         const clientSecret = config.googleAds.clientSecret || config.google.clientSecret;
-        const redirectUri = `${req.protocol}://${req.get('host')}/api/pm-studio/connect/google/callback`;
+        const redirectUri = `${BASE_URL}/api/pm-studio/connect/google/callback`;
 
         // Exchange code for tokens
         const tokenResp = await fetch('https://oauth2.googleapis.com/token', {
