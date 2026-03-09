@@ -117,26 +117,50 @@ export const fetchUserPagesAndIgAccounts = async (userAccessToken) => {
             for (const biz of businesses) {
                 console.log(`[SOCIAL] Deep searching Business Portfolio: ${biz.name} (${biz.id})`);
 
-                // Try fetching pages owned by the business
-                const ownedPagesRes = await axios.get(`${FB_API_URL}/${biz.id}/owned_pages`, {
-                    params: { access_token: userAccessToken, fields: 'id,name,access_token,category' }
-                });
+                // 1. Try fetching pages via business_assets (Modern approach)
+                try {
+                    const assetsRes = await axios.get(`${FB_API_URL}/${biz.id}/business_assets`, {
+                        params: {
+                            access_token: userAccessToken,
+                            asset_endpoint_getter: 'PAGE',
+                            fields: 'id,name,access_token,category'
+                        }
+                    });
+                    const assetPages = assetsRes.data.data || [];
+                    if (assetPages.length > 0) {
+                        console.log(`[SOCIAL] Found ${assetPages.length} pages via business_assets in ${biz.name}`);
+                        pages.push(...assetPages);
+                    }
+                } catch (e) { /* silent fail for assets */ }
 
-                const bizPages = ownedPagesRes.data.data || [];
-                if (bizPages.length > 0) {
-                    console.log(`[SOCIAL] Found ${bizPages.length} pages owned by business ${biz.name}`);
-                    pages.push(...bizPages);
-                }
+                // 2. Try fetching IG accounts directly assigned to the Business
+                try {
+                    const bizIgRes = await axios.get(`${FB_API_URL}/${biz.id}/instagram_business_accounts`, {
+                        params: { access_token: userAccessToken, fields: 'id,username,profile_picture_url' }
+                    });
+                    const bizIgs = bizIgRes.data.data || [];
+                    for (const ig of bizIgs) {
+                        console.log(`[SOCIAL] Found IG Account via Business ID ${biz.name}: ${ig.username}`);
+                        accounts.push({
+                            platform: 'instagram',
+                            accountId: ig.id,
+                            accountName: ig.username,
+                            avatar: ig.profile_picture_url,
+                            accessToken: userAccessToken,
+                            metadata: { connectedBizId: biz.id }
+                        });
+                    }
+                } catch (e) { /* silent fail for biz ig */ }
 
-                // Try fetching pages where the business is a client
-                const clientPagesRes = await axios.get(`${FB_API_URL}/${biz.id}/client_pages`, {
-                    params: { access_token: userAccessToken, fields: 'id,name,access_token,category' }
-                });
-                const clientPages = clientPagesRes.data.data || [];
-                if (clientPages.length > 0) {
-                    console.log(`[SOCIAL] Found ${clientPages.length} client pages in business ${biz.name}`);
-                    pages.push(...clientPages);
-                }
+                // 3. Fallbacks: owned_pages and client_pages
+                try {
+                    const [ownedRes, clientRes] = await Promise.allSettled([
+                        axios.get(`${FB_API_URL}/${biz.id}/owned_pages`, { params: { access_token: userAccessToken, fields: 'id,name,access_token,category' } }),
+                        axios.get(`${FB_API_URL}/${biz.id}/client_pages`, { params: { access_token: userAccessToken, fields: 'id,name,access_token,category' } })
+                    ]);
+                    if (ownedRes.status === 'fulfilled') pages.push(...(ownedRes.value.data.data || []));
+                    if (clientRes.status === 'fulfilled') pages.push(...(clientRes.value.data.data || []));
+                } catch (e) { }
             }
         } catch (e) {
             console.warn('[SOCIAL] Business deep search failed:', e.response?.data || e.message);
