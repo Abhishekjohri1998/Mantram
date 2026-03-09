@@ -260,8 +260,45 @@ export const publishToInstagram = async (igAccountId, accessToken, text, imageUr
         });
 
         const creationId = containerResponse.data.id;
+        console.log(`[SOCIAL] Created Instagram media container: ${creationId}. Waiting for it to be ready...`);
 
-        // Step 2: Publish the media container
+        // Step 2: Poll for container readiness
+        // Meta can take several seconds to process images. Wait until status_code is 'FINISHED'.
+        let isReady = false;
+        let attempts = 0;
+        const maxAttempts = 10;
+
+        while (!isReady && attempts < maxAttempts) {
+            attempts++;
+            // Wait 3 seconds before each check
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            try {
+                const statusResponse = await axios.get(`${FB_API_URL}/${creationId}`, {
+                    params: {
+                        fields: 'status_code',
+                        access_token: accessToken
+                    }
+                });
+
+                const status = statusResponse.data.status_code;
+                console.log(`[SOCIAL] Container ${creationId} status: ${status} (Attempt ${attempts}/${maxAttempts})`);
+
+                if (status === 'FINISHED') {
+                    isReady = true;
+                } else if (status === 'ERROR') {
+                    throw new Error('Instagram media processing failed.');
+                }
+            } catch (err) {
+                console.warn(`[SOCIAL] Error checking container status: ${err.message}`);
+            }
+        }
+
+        if (!isReady) {
+            throw new Error("Instagram media processing timed out. Please try again in a few moments.");
+        }
+
+        // Step 3: Publish the media container
         const publishUrl = `${FB_API_URL}/${igAccountId}/media_publish`;
         const publishResponse = await axios.post(publishUrl, {
             creation_id: creationId,
