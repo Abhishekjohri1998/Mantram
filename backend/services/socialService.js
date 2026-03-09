@@ -78,42 +78,59 @@ export const fetchUserPagesAndIgAccounts = async (userAccessToken) => {
         console.error('[SOCIAL] Debug fetch failed:', debugErr.response?.data || debugErr.message);
     }
 
-    // 1. Fetch all Pages the user manages
-    const pagesUrl = `${FB_API_URL}/me/accounts`;
-    const pagesResponse = await axios.get(pagesUrl, {
-        params: { access_token: userAccessToken }
-    });
+    // 1. Fetch all Pages the user manages (Try multiple routes for robustness)
+    let pages = [];
+    try {
+        const pagesResponse = await axios.get(`${FB_API_URL}/me/accounts`, {
+            params: {
+                access_token: userAccessToken,
+                fields: 'id,name,access_token,category,tasks'
+            }
+        });
+        pages = pagesResponse.data.data || [];
+        console.log(`[SOCIAL] Found ${pages.length} pages via /me/accounts`);
+    } catch (e) {
+        console.error('[SOCIAL] /me/accounts failed:', e.message);
+    }
+
+    // Fallback: If no pages, try me?fields=accounts (Works better for some app types)
+    if (pages.length === 0) {
+        try {
+            const meAccResponse = await axios.get(`${FB_API_URL}/me?fields=accounts{id,name,access_token,category}`, {
+                params: { access_token: userAccessToken }
+            });
+            pages = meAccResponse.data.accounts?.data || [];
+            if (pages.length > 0) console.log(`[SOCIAL] Found ${pages.length} pages via me?fields=accounts fallback`);
+        } catch (e) {
+            console.warn('[SOCIAL] me?fields=accounts fallback failed:', e.message);
+        }
+    }
 
     const accounts = [];
-    const pages = pagesResponse.data.data;
-    console.log(`[SOCIAL] Found ${pages?.length || 0} pages from Meta:`, JSON.stringify(pagesResponse.data));
 
+    // Process Pages found
     for (const page of pages) {
         // Collect the Facebook Page
         accounts.push({
             platform: 'facebook',
             accountId: page.id,
             accountName: page.name,
-            accessToken: page.access_token, // Page-specific access token
+            accessToken: page.access_token,
             metadata: { category: page.category }
         });
 
         // 2. Fetch connected Instagram Business Account for this Page
         try {
-            const igUrl = `${FB_API_URL}/${page.id}`;
-            console.log(`[SOCIAL] Fetching IG account for page: ${page.name} (${page.id})`);
-            const igResponse = await axios.get(igUrl, {
+            const igResponse = await axios.get(`${FB_API_URL}/${page.id}`, {
                 params: {
                     fields: 'instagram_business_account{id,username,profile_picture_url}',
                     access_token: page.access_token
                 }
             });
 
-            console.log(`[SOCIAL] IG Response for ${page.name}:`, JSON.stringify(igResponse.data));
-
             if (igResponse.data.instagram_business_account) {
                 const igAccount = igResponse.data.instagram_business_account;
-                console.log(`[SOCIAL] Found IG Business Account: ${igAccount.username} (${igAccount.id})`);
+                console.log(`[SOCIAL] Found IG Business Account via Page ${page.name}: ${igAccount.username}`);
                 accounts.push({
                     platform: 'instagram',
                     accountId: igAccount.id,
@@ -122,12 +139,52 @@ export const fetchUserPagesAndIgAccounts = async (userAccessToken) => {
                     accessToken: page.access_token, // IG uses the connected Page's token
                     metadata: { connectedPageId: page.id }
                 });
-            } else {
-                console.warn(`[SOCIAL] Page ${page.name} has no linked instagram_business_account`);
             }
         } catch (error) {
-            console.error(`Failed to fetch IG account for page ${page.name}:`, error.response?.data || error.message);
+            console.error(`[SOCIAL] Failed to fetch IG account for page ${page.name}:`, error.response?.data || error.message);
         }
+    }
+
+    // Direct Check Fallback: If still no IG accounts, try direct Discovery
+    // This works if the User has a role on the IG account directly or if discovery is allowed
+    const igCount = accounts.filter(a => a.platform === 'instagram').length;
+    if (igCount === 0) {
+        try {
+            console.log('[SOCIAL] No IG found via Pages, trying direct discovery...');
+            const directIgResponse = await axios.get(`${FB_API_URL}/me/instagram_business_accounts`, {
+                params: {
+                    fields: 'id,username,profile_picture_url',
+                    access_token: userAccessToken
+                }
+            });
+            const directIgs = directIgResponse.data.data || [];
+            for (const ig of directIgs) {
+                console.log(`[SOCIAL] Found IG Account via Direct Discovery: ${ig.username}`);
+                accounts.push({
+                    platform: 'instagram',
+                    accountId: ig.id,
+                    accountName: ig.username,
+                    avatar: ig.profile_picture_url,
+                    accessToken: userAccessToken, // Fallback to User token if no Page token
+                    metadata: { discovery: 'direct' }
+                });
+            }
+        } catch (e) {
+            console.warn('[SOCIAL] Direct IG discovery failed (common):', e.message);
+        }
+    }
+
+    // Final Identity Check: Businesses
+    if (accounts.length === 0) {
+        try {
+            const bizRes = await axios.get(`${FB_API_URL}/me/businesses`, {
+                params: { access_token: userAccessToken }
+            });
+            const businesses = bizRes.data.data || [];
+            if (businesses.length > 0) {
+                console.warn(`[SOCIAL] User ${userAccessToken.substring(0, 8)}... has ${businesses.length} Businesses but 0 accessible Pages. Check Asset assignments in Meta Business Suite.`);
+            }
+        } catch (e) { /* ignore */ }
     }
 
     return accounts;
