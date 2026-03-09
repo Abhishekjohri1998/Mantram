@@ -305,6 +305,7 @@ export const publishToInstagram = async (igAccountId, accessToken, text, imageUr
             access_token: accessToken
         });
 
+        console.log(`[SOCIAL] Successfully published to Instagram! Post ID: ${publishResponse.data.id}`);
         return publishResponse.data.id;
     } catch (error) {
         console.error('Instagram Publish Error:', error.response?.data || error.message);

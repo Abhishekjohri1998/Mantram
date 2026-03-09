@@ -276,20 +276,6 @@ router.post('/publish', protect, async (req, res) => {
                 // Log what we are about to do
                 console.log(`[SOCIAL] Publishing to ${account.platform} (${account.accountName}) - Image: ${absoluteImageUrl || 'None'}`);
 
-                // Debug Meta tokens: check if the stored token actually has the requested permissions
-                if (account.platform === 'facebook' || account.platform === 'instagram') {
-                    try {
-                        const debugRes = await axios.get(`${FB_API_URL}/me/permissions`, {
-                            params: { access_token: account.accessToken }
-                        });
-                        console.log(`[DEBUG] Meta Token permissions for ${account.accountName} (${account.platform}):`,
-                            debugRes.data.data.filter(p => p.status === 'granted').map(p => p.permission).join(', ')
-                        );
-                    } catch (debugErr) {
-                        console.warn(`[DEBUG] Could not fetch permissions for ${account.accountName}:`, debugErr.message);
-                    }
-                }
-
                 let postId = null;
 
                 if (account.platform === 'facebook') {
