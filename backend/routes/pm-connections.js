@@ -40,15 +40,26 @@ router.get('/connect/meta/auth', protect, (req, res) => {
     }
 
     // Encode user/brand info in state
+    // Robust origin detection for cross-device support
+    let origin = req.headers.origin;
+    if (!origin && req.headers.referer) {
+        try {
+            const refUrl = new URL(req.headers.referer);
+            origin = `${refUrl.protocol}//${refUrl.host}`;
+        } catch (e) { /* ignore */ }
+    }
+    if (!origin) origin = config.frontendUrl[0];
+
     const state = Buffer.from(JSON.stringify({
         userId: req.user._id.toString(),
         brandId: req.query.brandId || '',
+        origin: origin,
         ts: Date.now(),
     })).toString('base64');
 
     const redirectUri = `${BASE_URL}/api/pm-studio/connect/meta/callback`;
 
-    const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?` +
+    const authUrl = `https://www.facebook.com/v22.0/dialog/oauth?` +
         `client_id=${appId}` +
         `&redirect_uri=${encodeURIComponent(redirectUri)}` +
         `&scope=${META_SCOPES}` +
@@ -81,14 +92,14 @@ router.get('/connect/meta/callback', async (req, res) => {
             return res.send(closePopupScript('Invalid state parameter.'));
         }
 
-        const { userId, brandId } = stateData;
+        const { userId, brandId, origin } = stateData;
         const appId = config.metaAds.appId || config.facebook.appId;
         const appSecret = config.metaAds.appSecret || config.facebook.appSecret;
         const redirectUri = `${BASE_URL}/api/pm-studio/connect/meta/callback`;
 
         // Exchange code for access token
         const tokenResp = await fetch(
-            `https://graph.facebook.com/v21.0/oauth/access_token?` +
+            `https://graph.facebook.com/v22.0/oauth/access_token?` +
             `client_id=${appId}` +
             `&redirect_uri=${encodeURIComponent(redirectUri)}` +
             `&client_secret=${appSecret}` +
@@ -108,7 +119,7 @@ router.get('/connect/meta/callback', async (req, res) => {
         let tokenExpiry = new Date(Date.now() + 3600 * 1000); // 1 hour default
         try {
             const longResp = await fetch(
-                `https://graph.facebook.com/v21.0/oauth/access_token?` +
+                `https://graph.facebook.com/v22.0/oauth/access_token?` +
                 `grant_type=fb_exchange_token` +
                 `&client_id=${appId}` +
                 `&client_secret=${appSecret}` +
@@ -128,13 +139,13 @@ router.get('/connect/meta/callback', async (req, res) => {
         let displayName = '';
         try {
             const meResp = await fetch(
-                `https://graph.facebook.com/v21.0/me?fields=name,id&access_token=${accessToken}`
+                `https://graph.facebook.com/v22.0/me?fields=name,id&access_token=${accessToken}`
             );
             const meData = await meResp.json();
             displayName = meData.name || '';
 
             const acctResp = await fetch(
-                `https://graph.facebook.com/v21.0/me/adaccounts?fields=id,name,account_status,currency,business_name&access_token=${accessToken}`
+                `https://graph.facebook.com/v22.0/me/adaccounts?fields=id,name,account_status,currency,business_name&access_token=${accessToken}`
             );
             const acctData = await acctResp.json();
             adAccounts = (acctData.data || []).map(a => ({
@@ -176,11 +187,11 @@ router.get('/connect/meta/callback', async (req, res) => {
         );
 
         console.log(`✅ Meta Ads connected for user ${userId} — ${adAccounts.length} ad accounts found`);
-        res.send(closePopupScript(null, 'meta'));
+        res.send(closePopupScript(null, 'meta', stateData));
 
     } catch (error) {
         console.error('Meta callback error:', error);
-        res.send(closePopupScript(`Connection failed: ${error.message}`));
+        res.send(closePopupScript(`Connection failed: ${error.message}`, 'meta', typeof stateData !== 'undefined' ? stateData : null));
     }
 });
 
@@ -204,9 +215,20 @@ router.get('/connect/google/auth', protect, (req, res) => {
         return res.status(400).json({ success: false, error: 'Google Client ID not configured' });
     }
 
+    // Robust origin detection for cross-device support
+    let origin = req.headers.origin;
+    if (!origin && req.headers.referer) {
+        try {
+            const refUrl = new URL(req.headers.referer);
+            origin = `${refUrl.protocol}//${refUrl.host}`;
+        } catch (e) { /* ignore */ }
+    }
+    if (!origin) origin = config.frontendUrl[0];
+
     const state = Buffer.from(JSON.stringify({
         userId: req.user._id.toString(),
         brandId: req.query.brandId || '',
+        origin: origin,
         ts: Date.now(),
     })).toString('base64');
 
@@ -246,7 +268,7 @@ router.get('/connect/google/callback', async (req, res) => {
             return res.send(closePopupScript('Invalid state parameter.'));
         }
 
-        const { userId, brandId } = stateData;
+        const { userId, brandId, origin } = stateData;
         const clientId = config.googleAds.clientId || config.google.clientId;
         const clientSecret = config.googleAds.clientSecret || config.google.clientSecret;
         const redirectUri = `${BASE_URL}/api/pm-studio/connect/google/callback`;
@@ -335,11 +357,11 @@ router.get('/connect/google/callback', async (req, res) => {
         );
 
         console.log(`✅ Google Ads connected for user ${userId} — ${customerIds.length} customer IDs found`);
-        res.send(closePopupScript(null, 'google'));
+        res.send(closePopupScript(null, 'google', stateData));
 
     } catch (error) {
         console.error('Google callback error:', error);
-        res.send(closePopupScript(`Connection failed: ${error.message}`));
+        res.send(closePopupScript(`Connection failed: ${error.message}`, 'google', typeof stateData !== 'undefined' ? stateData : null));
     }
 });
 
@@ -427,7 +449,8 @@ router.get('/connect/status', protect, async (req, res) => {
 // Helper — Close popup and notify parent
 // ══════════════════════════════════════════════════════════════════════════════
 
-function closePopupScript(error, platform = '') {
+function closePopupScript(error, platform = '', stateData = null) {
+    const targetOrigin = stateData?.origin || '*';
     return `<!DOCTYPE html>
 <html><head><title>Connecting...</title></head>
 <body style="background:#0a0a0a;color:#fff;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
@@ -443,7 +466,7 @@ ${error
             type: 'PM_PLATFORM_CONNECTED',
             platform: '${platform}',
             ${error ? `error: ${JSON.stringify(error)}` : 'success: true'}
-        }, '*');
+        }, '${targetOrigin}');
     }
     ${!error ? 'setTimeout(() => window.close(), 2000);' : ''}
 </script>
