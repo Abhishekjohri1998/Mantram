@@ -4,14 +4,25 @@
  */
 
 import { Router } from 'express';
+import nodemailer from 'nodemailer';
 import { protect } from '../middleware/auth.js';
 import User from '../models/User.js';
 import Brand from '../models/Brand.js';
 import TeamInvite from '../models/TeamInvite.js';
 import TeamChat from '../models/TeamChat.js';
 import ApprovalRequest from '../models/ApprovalRequest.js';
+import env from '../config/env.js';
 
 const router = Router();
+
+// Configure nodemailer transporter (same as waitlist)
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: env.email.user,
+        pass: env.email.pass
+    }
+});
 
 // ═══════════════════════════════════════════════════════════════
 // HELPER: Get the organization owner (team head)
@@ -131,11 +142,52 @@ router.post('/invite', protect, async (req, res) => {
             message,
         });
 
-        // TODO: Send email with invite link (for now return token)
+        // Build invite link using production frontend URL
+        const frontendBase = Array.isArray(env.frontendUrl) ? env.frontendUrl[env.frontendUrl.length - 1] : (env.frontendUrl || 'https://mantram.ai');
+        const inviteLink = `${frontendBase}/join/${invite.token}`;
+
+        // Send invite email
+        const inviterName = req.user.name || 'Your teammate';
+        const inviteMailOptions = {
+            from: `"Mantram AI" <${env.email.user}>`,
+            to: email.toLowerCase(),
+            subject: `${inviterName} invited you to join their team on Mantram AI 🚀`,
+            html: `
+                <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0f0f23; color: #e2e8f0; border-radius: 16px; overflow: hidden;">
+                    <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 32px 24px; text-align: center;">
+                        <h1 style="margin: 0; font-size: 24px; color: #fff;">You're Invited! 🎉</h1>
+                        <p style="margin: 8px 0 0; color: rgba(255,255,255,0.85); font-size: 14px;">${inviterName} wants you on their Mantram AI team</p>
+                    </div>
+                    <div style="padding: 32px 24px;">
+                        <p style="font-size: 15px; line-height: 1.6; color: #cbd5e1;">Hi${name ? ` ${name}` : ''},</p>
+                        <p style="font-size: 15px; line-height: 1.6; color: #cbd5e1;">
+                            <strong style="color: #fff;">${inviterName}</strong> has invited you to join their team on <strong style="color: #818cf8;">Mantram AI</strong> as a <strong style="color: #fff;">${role}</strong>.
+                        </p>
+                        ${message ? `<div style="margin: 16px 0; padding: 12px 16px; background: rgba(99,102,241,0.1); border-left: 3px solid #6366f1; border-radius: 0 8px 8px 0;"><p style="margin: 0; font-size: 14px; color: #94a3b8; font-style: italic;">"${message}"</p></div>` : ''}
+                        <div style="text-align: center; margin: 32px 0;">
+                            <a href="${inviteLink}" style="display: inline-block; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; text-decoration: none; padding: 14px 36px; border-radius: 12px; font-size: 16px; font-weight: 700; letter-spacing: 0.5px;">Accept Invitation</a>
+                        </div>
+                        <p style="font-size: 13px; color: #64748b; text-align: center;">This invitation expires in 7 days.</p>
+                        <hr style="border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 24px 0;" />
+                        <p style="font-size: 12px; color: #475569; text-align: center;">
+                            If the button doesn't work, copy and paste this link:<br/>
+                            <a href="${inviteLink}" style="color: #818cf8; word-break: break-all;">${inviteLink}</a>
+                        </p>
+                    </div>
+                    <div style="padding: 16px 24px; background: rgba(255,255,255,0.02); text-align: center;">
+                        <p style="margin: 0; font-size: 11px; color: #475569;">Mantram AI — Your Brand Operating System</p>
+                    </div>
+                </div>
+            `,
+        };
+
+        // Send email asynchronously (don't block the response)
+        transporter.sendMail(inviteMailOptions).catch(err => console.error('Error sending team invite email:', err));
+
         res.json({
             success: true,
             invite,
-            inviteLink: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/join/${invite.token}`,
+            sentTo: email.toLowerCase(),
         });
     } catch (error) {
         res.status(500).json({ error: error.message });

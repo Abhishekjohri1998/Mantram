@@ -683,7 +683,7 @@ export default function TeamDashboard() {
 
                             {inviteResult && (
                                 <div className={`p-3 rounded-xl text-sm ${inviteResult.error ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
-                                    {inviteResult.error || `✅ Invite sent! Link: ${inviteResult.inviteLink}`}
+                                    {inviteResult.error || `✅ Invite sent to ${inviteResult.sentTo}! They'll receive an email with a link to join your team.`}
                                 </div>
                             )}
 
