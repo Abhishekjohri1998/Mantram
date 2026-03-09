@@ -65,19 +65,6 @@ export const exchangeCodeForToken = async (code, platform = 'facebook') => {
 };
 
 export const fetchUserPagesAndIgAccounts = async (userAccessToken) => {
-    // DEBUG: Fetch user info and permissions
-    try {
-        const [meRes, permRes] = await Promise.all([
-            axios.get(`${FB_API_URL}/me?fields=id,name,email`, { params: { access_token: userAccessToken } }),
-            axios.get(`${FB_API_URL}/me/permissions`, { params: { access_token: userAccessToken } })
-        ]);
-        console.log(`[SOCIAL] Token Identity: ${meRes.data.name} (${meRes.data.id})`);
-        const granted = permRes.data.data.filter(p => p.status === 'granted').map(p => p.permission);
-        console.log(`[SOCIAL] Granted Scopes: ${granted.join(', ')}`);
-    } catch (debugErr) {
-        console.error('[SOCIAL] Debug fetch failed:', debugErr.response?.data || debugErr.message);
-    }
-
     // 1. Fetch all Pages the user manages (Try multiple routes for robustness)
     let pages = [];
     try {
@@ -167,22 +154,18 @@ export const fetchUserPagesAndIgAccounts = async (userAccessToken) => {
         }
     }
 
-    // De-duplicate pages by ID (in case multiple routes found the same page)
     const uniquePages = Array.from(new Map(pages.map(p => [p.id, p])).values());
     const accounts = [];
 
-    // Process all discovered Pages
     for (const page of uniquePages) {
-        // Collect the Facebook Page
         accounts.push({
             platform: 'facebook',
             accountId: page.id,
             accountName: page.name,
-            accessToken: page.access_token || userAccessToken, // Use page token if available, else user token
+            accessToken: page.access_token || userAccessToken,
             metadata: { category: page.category }
         });
 
-        // Fetch connected Instagram Business Account for this Page
         try {
             const igResponse = await axios.get(`${FB_API_URL}/${page.id}`, {
                 params: {
@@ -193,7 +176,6 @@ export const fetchUserPagesAndIgAccounts = async (userAccessToken) => {
 
             if (igResponse.data.instagram_business_account) {
                 const igAccount = igResponse.data.instagram_business_account;
-                console.log(`[SOCIAL] Found IG Business Account via Page ${page.name}: ${igAccount.username}`);
                 accounts.push({
                     platform: 'instagram',
                     accountId: igAccount.id,
@@ -204,20 +186,18 @@ export const fetchUserPagesAndIgAccounts = async (userAccessToken) => {
                 });
             }
         } catch (error) {
-            // Ignore individual page failures in deep search
+            // Standard page might not have a linked IG, ignore
         }
     }
 
-    // Direct Check Fallback: If still no IG accounts, try direct Discovery
-    const igCount = accounts.filter(a => a.platform === 'instagram').length;
-    if (igCount === 0) {
+    // Direct Discovery Fallback
+    if (!accounts.some(a => a.platform === 'instagram')) {
         try {
             const directIgResponse = await axios.get(`${FB_API_URL}/me/instagram_business_accounts`, {
                 params: { fields: 'id,username,profile_picture_url', access_token: userAccessToken }
             });
             const directIgs = directIgResponse.data.data || [];
             for (const ig of directIgs) {
-                console.log(`[SOCIAL] Found IG Account via Direct Discovery: ${ig.username}`);
                 accounts.push({
                     platform: 'instagram',
                     accountId: ig.id,
@@ -227,7 +207,7 @@ export const fetchUserPagesAndIgAccounts = async (userAccessToken) => {
                     metadata: { discovery: 'direct' }
                 });
             }
-        } catch (e) { /* ignore fallback error */ }
+        } catch (e) { }
     }
 
     return accounts;
