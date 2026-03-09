@@ -344,7 +344,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
             const autoAnalyze = async () => {
                 setAnalyzing(true)
                 try {
-                    const data = await agentsAPI.analyzeImage({ image: initialImage, goal, platform: '' })
+                    const data = await agentsAPI.analyzeImage({ image: initialImage, goal, platform: '', brandId })
                     if (data.success) {
                         setImageAnalysis(data.analysis)
                         setDetails(data.analysis)
@@ -548,7 +548,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                                     setAnalyzing(true)
                                     setAnalysisError('')
                                     try {
-                                        const data = await agentsAPI.analyzeImage({ image: imagePreview, goal, platform: '' })
+                                        const data = await agentsAPI.analyzeImage({ image: imagePreview, goal, platform: '', brandId })
                                         if (data.success) {
                                             setImageAnalysis(data.analysis)
                                             setDetails(data.analysis)
@@ -661,7 +661,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                                     setImageAnalysis('')
                                     setAnalysisError('')
                                     setAnalyzing(true)
-                                    agentsAPI.analyzeImage({ image: img.imageUrl, goal, platform: '' })
+                                    agentsAPI.analyzeImage({ image: img.imageUrl, goal, platform: '', brandId, brief: img.title || '' })
                                         .then(data => {
                                             if (data.success) { setImageAnalysis(data.analysis); setDetails(data.analysis) }
                                             else setAnalysisError(data.error || 'Analysis failed')
@@ -2172,7 +2172,7 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
 // RESULT VIEW (with Edit & AI Refine)
 // ============================================================================
 
-function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating, activeBrand, onCreateVisual, accepted, onRefine, contentFeedback }) {
+function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating, activeBrand, onCreateVisual, accepted, onRefine, contentFeedback, imageUrl }) {
     const [copied, setCopied] = useState(false)
     const [editing, setEditing] = useState(false)
     const [editContent, setEditContent] = useState(result?.content || '')
@@ -2396,6 +2396,8 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                 isOpen={showPublish}
                 onClose={() => setShowPublish(false)}
                 defaultText={result?.content || ''}
+                defaultImage={imageUrl}
+                brandId={activeBrand?._id}
             />
 
             <div className="flex gap-2">
@@ -3220,6 +3222,7 @@ SPOKESPERSON QUOTES:`
                     activeBrand={activeBrand}
                     generating={generating}
                     accepted={accepted}
+                    imageUrl={imagePreview}
                     onRegenerate={handleRegenerate}
                     onFeedback={handleFeedback}
                     onNewContent={resetAll}

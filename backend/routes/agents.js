@@ -204,7 +204,7 @@ router.post('/product-ideas', protect, async (req, res) => {
 // POST /api/agents/analyze-image — AI Image Analysis for Content Brief
 router.post('/analyze-image', optionalAuth, async (req, res) => {
     try {
-        const { image, goal, platform } = req.body; // image = base64 data URL
+        const { image, goal, platform, brandId, brief } = req.body; // image = base64 data URL or URL
         if (!image) return res.status(400).json({ success: false, error: 'Image is required' });
 
         // Use image API key first (has separate quota), fall back to general key
@@ -213,40 +213,84 @@ router.post('/analyze-image', optionalAuth, async (req, res) => {
             return res.status(500).json({ success: false, error: 'Gemini API key not configured' });
         }
 
-        // Extract base64 data from data URL using string ops (regex fails on large strings)
-        const commaIdx = image.indexOf(',');
-        if (commaIdx === -1 || !image.startsWith('data:image/')) {
-            return res.status(400).json({ success: false, error: 'Invalid image format. Send as base64 data URL.' });
+        // Load brand for voice/style context
+        let brandContext = '';
+        if (brandId) {
+            try {
+                const brand = await Brand.findById(brandId);
+                if (brand) {
+                    const dna = brand.dna || {};
+                    brandContext = `\nBRAND: ${brand.name}
+Industry: ${dna.industry || 'General'}
+Voice: ${dna.voice?.personality || 'Professional, friendly'}
+Target Audience: ${dna.targetAudience || 'General audience'}
+Tone: ${dna.voice?.tone || 'Engaging'}`;
+                }
+            } catch (e) { /* ignore */ }
         }
-        const header = image.substring(0, commaIdx);
-        const mimeType = header.split(':')[1].split(';')[0];
-        const base64Data = image.substring(commaIdx + 1);
 
-        const analysisPrompt = `Analyze this image thoroughly for marketing content creation. Provide a detailed analysis in the following format:
+        // Support both base64 data URLs and regular image URLs
+        let mimeType, base64Data;
 
-**WHAT I SEE:**
-Describe everything visible — products, people, setting, objects, text on image, branding elements.
+        if (image.startsWith('data:image/')) {
+            // Already base64 data URL
+            const commaIdx = image.indexOf(',');
+            if (commaIdx === -1) {
+                return res.status(400).json({ success: false, error: 'Invalid image format.' });
+            }
+            const header = image.substring(0, commaIdx);
+            mimeType = header.split(':')[1].split(';')[0];
+            base64Data = image.substring(commaIdx + 1);
+        } else if (image.startsWith('http://') || image.startsWith('https://')) {
+            // URL — fetch and convert to base64 server-side
+            try {
+                const imgResp = await fetch(image, {
+                    headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'image/*' },
+                    redirect: 'follow',
+                });
+                if (!imgResp.ok) throw new Error(`Failed to fetch image: ${imgResp.status}`);
+                const arrayBuffer = await imgResp.arrayBuffer();
+                const buffer = Buffer.from(arrayBuffer);
+                mimeType = (imgResp.headers.get('content-type') || 'image/jpeg').split(';')[0];
+                base64Data = buffer.toString('base64');
+                console.log(`[ANALYZE] Fetched image from URL (${Math.round(buffer.byteLength / 1024)}KB)`);
+            } catch (fetchErr) {
+                console.error('[ANALYZE] Failed to fetch image URL:', fetchErr.message);
+                return res.status(400).json({ success: false, error: 'Could not download image from URL. Try uploading directly.' });
+            }
+        } else {
+            return res.status(400).json({ success: false, error: 'Invalid image format. Send as base64 data URL or image URL.' });
+        }
 
-**PRODUCT/SUBJECT:**
-What is the main product or subject? Its features, quality indicators, unique selling points visible.
+        // Build the creative context — use brief if available, else goal
+        const creativeContext = brief
+            ? `This image was created for: ${brief}`
+            : goal
+                ? `Content goal: ${goal}`
+                : '';
 
-**VISUAL MOOD:**
-Colors, lighting, aesthetic style, emotional feel, energy level.
+        const analysisPrompt = `You are a social media copywriter for ${brandContext ? 'the brand described below' : 'a brand'}.
+${brandContext}
+${creativeContext ? `\n${creativeContext}` : ''}
 
-**TEXT ON IMAGE:**
-Any text, logos, taglines, or branding visible in the image. Transcribe them exactly.
+Look at this image and write 3 ready-to-post social media captions that are IN SYNC with the image theme and creative intent.
 
-**TARGET AUDIENCE:**
-Who would this appeal to? Demographics, psychographics.
+RULES:
+- DO NOT use any markdown formatting. No ** for bold, no ## for headers, no * for bullets.
+- Write PLAIN TEXT only — exactly as it would appear when pasted into a social media platform.
+- Use emojis, line breaks, and hashtags naturally as needed per platform.
+- The captions must reflect what the image is about and the creative intent behind it.
 
-**MARKETING ANGLES:**
-3-5 content angles or hooks that could be used for ${platform || 'social media'} posts about this image.
-${goal ? `\nThe content goal is: ${goal}` : ''}
+📸 INSTAGRAM CAPTION:
+Write an engaging, scroll-stopping Instagram caption. Start with a hook. Use emojis naturally. Add line breaks for readability. End with 5-8 relevant hashtags.
 
-**SUGGESTED HASHTAGS:**
-5-8 relevant hashtags for this image.
+📘 FACEBOOK POST:
+Write a warm, conversational Facebook post. Keep it shareable. Include a call-to-action. 1-2 emojis max.
 
-Be specific and detailed. This analysis will be used as a brief for AI content generation.`;
+💼 LINKEDIN POST:
+Write a professional, value-driven LinkedIn post. Include a thought-provoking question at the end. Add 3-5 hashtags at the very end.
+
+Each caption should be complete, polished, and ready to copy-paste. Do not include any analysis, metadata, or explanations — only the captions.`;
 
         // Model fallback chain — try multiple Gemini models, then fall back to GPT
         const models = ['gemini-2.0-flash', 'gemini-2.5-flash-preview-05-20', 'gemini-1.5-flash'];

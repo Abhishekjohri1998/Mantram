@@ -9,6 +9,7 @@ import { getOrchestrator } from '../agents/orchestrator.js';
 import { addWatermark } from '../utils/watermark.js';
 import { getSetting } from '../models/SystemSettings.js';
 import { uploadToS3 } from '../utils/s3.js';
+import { GoogleGenAI } from '@google/genai';
 
 const router = Router();
 
@@ -61,12 +62,14 @@ function extractBase64(dataUri) {
     return { mimeType, data };
 }
 
-// ── Gemini image generation with model fallback ─────────────────────────
-async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1') {
+// ── Gemini image generation via @google/genai SDK ───────────────────────
+async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K') {
     const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
     if (!imageKey) throw new Error('Gemini API key not configured');
 
-    // Match AI Photoshoot model order — gemini-3.1-flash-image-preview (Nano Banana 2) first
+    const ai = new GoogleGenAI({ apiKey: imageKey });
+
+    // Model fallback chain — Nano Banana 2 first
     const models = [
         'gemini-3.1-flash-image-preview',        // Nano Banana 2 — best, latest
         'gemini-3-pro-image-preview',             // Pro fallback
@@ -74,8 +77,8 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
         'gemini-2.0-flash-exp-image-generation',  // Legacy fallback
     ];
 
-    // imageParts now come pre-formatted: mix of { text: '...' } labels and { inlineData: { mimeType, data } }
-    const parts = [
+    // Build content parts — images first, then prompt text (Gemini works best this way)
+    const contents = [
         ...imageParts,
         { text: promptText },
     ];
@@ -85,38 +88,37 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
     let textResponse = '';
 
     const imageCount = imageParts.filter(p => p.inlineData).length;
-    console.log(`\n══════ CREATIVE STUDIO IMAGE GENERATION ══════`);
+    console.log(`\n══════ CREATIVE STUDIO IMAGE GENERATION (SDK) ══════`);
     console.log(`🎨 Models to try: ${models.length}`);
     console.log(`🖼️  Reference images: ${imageCount}`);
-    console.log(`📐 Aspect ratio: ${aspectRatio}`);
+    console.log(`📐 Aspect ratio: ${aspectRatio} | Resolution: ${imageSize}`);
     console.log(`📝 Prompt (first 200 chars): ${promptText.substring(0, 200)}...`);
 
     for (const modelId of models) {
         try {
             console.log(`\n🔄 Trying model: ${modelId}...`);
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${imageKey}`;
-            const resp = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts }],
-                    generationConfig: {
-                        responseModalities: ['TEXT', 'IMAGE'],
-                        temperature,
-                        // aspectRatio goes inside imageConfig, NOT directly in generationConfig
-                        ...(aspectRatio ? { imageConfig: { aspectRatio } } : {}),
+
+            const response = await ai.models.generateContent({
+                model: modelId,
+                contents,
+                config: {
+                    responseModalities: ['TEXT', 'IMAGE'],
+                    temperature,
+                    imageConfig: {
+                        aspectRatio,
+                        ...(imageSize ? { imageSize } : {}),
                     },
-                }),
+                },
             });
-            const data = await resp.json();
-            if (data.error) { console.error(`❌ Model ${modelId} error:`, data.error.message); continue; }
-            const resParts = data.candidates?.[0]?.content?.parts || [];
+
+            const resParts = response.candidates?.[0]?.content?.parts || [];
             for (const part of resParts) {
                 if (part.inlineData?.mimeType?.startsWith('image/')) {
                     imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
                 }
                 if (part.text) textResponse += part.text;
             }
+
             if (imageUrl) {
                 usedModel = modelId;
                 console.log(`✅ Image generated successfully with model: ${modelId}`);
@@ -158,6 +160,7 @@ RULES:
 7. If reference images are mentioned, incorporate their visual elements into the enhanced prompt
 8. Match the brand's personality and style
 9. NEVER wrap in quotes or add prefixes like "Generate:" — just return the raw enhanced prompt text
+10. NEVER describe the output as a "design mockup", "floating card", "framed poster", or "presented on a background". The prompt must describe the ACTUAL content that fills the entire canvas — not a presentation of content.
 
 RESPOND WITH ONLY THE ENHANCED PROMPT TEXT. Nothing else.`;
 
@@ -321,16 +324,57 @@ router.post('/generate', protect, requireCredits('creative'), async (req, res) =
             imageParts.push({ inlineData: { mimeType: uploadRef.part.mimeType, data: uploadRef.part.data } });
             referenceInstructions.push('Use the attached general reference image as contextual inspiration.');
         }
+        // ── Template Inpainting Mode ──────────────────────────────────────
+        // When templateInpainting is true, the reference image is THE BASE to edit.
+        // Gemini will keep layout/colors/logo/text placement and only swap the product.
+        let isInpainting = false;
+        if (options?.templateInpainting && options?.templateRefImageUrl) {
+            isInpainting = true;
+            console.log('🎨 TEMPLATE INPAINTING MODE — keeping layout, swapping product');
 
-        // Base image from AI Photoshoot
-        if (options?.baseImage && options.baseImage.startsWith('data:image/')) {
+            // Resolve the template reference image (always first — it's the base)
+            const templateRef = await resolveRefImage(options.templateRefImageUrl, 'template-base');
+            if (templateRef) {
+                imageParts.push({ text: 'TEMPLATE BASE IMAGE — this is the layout to preserve exactly:' });
+                imageParts.push({ inlineData: { mimeType: templateRef.part.mimeType, data: templateRef.part.data } });
+            }
+
+            // If a new product image is provided, add it as the replacement
+            if (options?.baseImage && options.baseImage.startsWith('data:image/')) {
+                imageParts.push({ text: 'NEW PRODUCT IMAGE — replace the product in the template with this:' });
+                imageParts.push({ inlineData: extractBase64(options.baseImage) });
+                referenceInstructions.push('INPAINTING: Replace ONLY the product in the template with the new product image. Keep everything else pixel-perfect: same layout, colors, typography, logo placement, background, and content positions.');
+            } else if (options?.productImageUrl) {
+                try {
+                    console.log(`📦 Fetching product image for inpainting: ${options.productImageUrl.substring(0, 80)}...`);
+                    const prodResp = await fetch(options.productImageUrl, {
+                        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'image/*' },
+                        redirect: 'follow',
+                    });
+                    if (prodResp.ok) {
+                        const prodBuf = await prodResp.arrayBuffer();
+                        const prodCt = (prodResp.headers.get('content-type') || 'image/jpeg').split(';')[0];
+                        imageParts.push({ text: 'NEW PRODUCT IMAGE — replace the product in the template with this:' });
+                        imageParts.push({ inlineData: { mimeType: prodCt, data: Buffer.from(prodBuf).toString('base64') } });
+                        referenceInstructions.push('INPAINTING: Replace ONLY the product in the template with the new product image. Keep everything else pixel-perfect: same layout, colors, typography, logo placement, background, and content positions.');
+                        console.log(`✅ Product image for inpainting loaded (${Math.round(prodBuf.byteLength / 1024)}KB)`);
+                    }
+                } catch (e) { console.warn('⚠️ Could not fetch product for inpainting:', e.message); }
+            } else {
+                // No product image — just regenerate with same layout but different content
+                referenceInstructions.push('INPAINTING: Recreate this exact design with the same layout, colors, typography, logo, and content placement. Replace the placeholder text ({{HEADLINE}}, {{SUBTEXT}}, {{CTA}}) with the content specified in the prompt.');
+            }
+        }
+
+        // Base image from AI Photoshoot (skip if inpainting mode already handled it)
+        if (!isInpainting && options?.baseImage && options.baseImage.startsWith('data:image/')) {
             imageParts.push({ text: 'PRODUCT BASE IMAGE (keep this product exactly as-is, only change background and styling):' });
             imageParts.push({ inlineData: extractBase64(options.baseImage) });
             referenceInstructions.push('PRODUCT IMAGE: Keep this product exactly as-is — same colors, labels, text, shape. Only change background and styling.');
         }
 
         // Product image from catalog (remote URL — fetch and convert to base64)
-        if (options?.productImageUrl && !options?.baseImage) {
+        if (!isInpainting && options?.productImageUrl && !options?.baseImage) {
             try {
                 console.log(`📦 Fetching product image: ${options.productImageUrl}`);
                 const imgResponse = await fetch(options.productImageUrl, {
@@ -353,9 +397,10 @@ router.post('/generate', protect, requireCredits('creative'), async (req, res) =
             }
         }
 
-        // Determine the aspect ratio to pass to Gemini API
+        // Determine the aspect ratio and resolution to pass to Gemini API
         const geminiAspectRatio = options?.aspectRatio || '1:1';
-        console.log(`📐 Final aspect ratio for Gemini: ${geminiAspectRatio} (from type: ${type})`);
+        const geminiImageSize = options?.imageSize || '1K';
+        console.log(`📐 Final aspect ratio: ${geminiAspectRatio}, resolution: ${geminiImageSize} (from type: ${type})`);
 
         // ── Build the full prompt ───────────────────────────────────────
         const hasImages = imageParts.filter(p => p.inlineData).length > 0;
@@ -387,17 +432,35 @@ router.post('/generate', protect, requireCredits('creative'), async (req, res) =
         }
 
         // Keep the prompt SHORT and focused — like the Photoshoot's ~50-word prompts
-        const fullPrompt = `${prompt}${textOverlayPart}${characterPlacement}
+        // CRITICAL: Avoid the word "design" — Gemini interprets it as "render a mockup presentation"
+        // which creates a picture-in-picture effect (card on blurred background).
+        let fullPrompt;
+        if (isInpainting) {
+            // Inpainting prompt — focused on editing the template image
+            fullPrompt = `Edit this template image for ${brand.name}. ${prompt}
 
-${platformSize} ${styleWord} design for ${brand.name}.${colorPart}${refPart}
-Output only the finished design, edge-to-edge. No labels, text overlays, hex codes, or metadata.`;
+${refPart}
+
+CRITICAL INSTRUCTIONS:
+- Keep the EXACT SAME layout, composition, background, color scheme, and content placement as the template image.
+- Keep the logo, brand elements, and typography style exactly where they are.
+- Replace the placeholder text ({{HEADLINE}}, {{SUBTEXT}}, {{CTA}}) with the values from the prompt above.
+- If a new product image is attached, swap ONLY the product — keep everything else identical.
+- The output must be a pixel-perfect recreation of the template layout with updated content.
+- Output must fill the ENTIRE canvas edge-to-edge. No mockups, frames, or borders.`;
+        } else {
+            fullPrompt = `${prompt}${textOverlayPart}${characterPlacement}
+
+${platformSize} ${styleWord} image for ${brand.name}.${colorPart}${refPart}
+IMPORTANT: The output must fill the ENTIRE canvas edge-to-edge. Do NOT create a mockup, frame, device screen, floating card, or picture-in-picture effect. Do NOT place the image on a blurred background of itself. No borders, no drop shadows around the content. The content itself IS the final image — render it directly, full-bleed.`;
+        }
 
         console.log('📸 Full prompt (first 300 chars):', fullPrompt.substring(0, 300) + '...');
 
         if (hasImages) {
             // Multi-image Gemini call — lower temperature (0.2) for higher quality
             console.log(`🎨 Creative Studio: generating with ${imageParts.filter(p => p.inlineData).length} reference image(s) + ${imageParts.filter(p => p.text).length} labels, aspect: ${geminiAspectRatio}`);
-            const genResult = await geminiImageGenerate(fullPrompt, imageParts, 0.2, geminiAspectRatio);
+            const genResult = await geminiImageGenerate(fullPrompt, imageParts, 0.2, geminiAspectRatio, geminiImageSize);
             result = {
                 title: `${type.replace('-', ' ')} — ${brand.name}`,
                 imageUrl: genResult.imageUrl || '',
@@ -412,7 +475,7 @@ Output only the finished design, edge-to-edge. No labels, text overlays, hex cod
         } else {
             // Text-only generation — use Gemini directly for brand-aware output
             console.log(`🎨 Creative Studio: generating from text prompt, aspect: ${geminiAspectRatio}`);
-            const genResult = await geminiImageGenerate(fullPrompt, [], 0.3, geminiAspectRatio);
+            const genResult = await geminiImageGenerate(fullPrompt, [], 0.3, geminiAspectRatio, geminiImageSize);
             if (genResult.imageUrl) {
                 result = {
                     title: `${type.replace('-', ' ')} — ${brand.name}`,
@@ -481,10 +544,12 @@ router.get('/', protect, async (req, res) => {
         if (type) filter.type = type;
 
         const creatives = await Creative.find(filter)
+            .select('-designData')
             .sort('-createdAt')
             .limit(parseInt(limit))
             .skip((parseInt(page) - 1) * parseInt(limit))
-            .populate('brand', 'name');
+            .populate('brand', 'name')
+            .lean();
 
         const total = await Creative.countDocuments(filter);
         res.json({ success: true, creatives, total });
@@ -576,7 +641,6 @@ router.post('/save-to-bank', protect, async (req, res) => {
 router.get('/image-bank', protect, async (req, res) => {
     try {
         const { brandId, limit = 30, page = 1, category } = req.query;
-        console.log('📸 image-bank request:', { userId: req.user._id, brandId, category, page, limit });
 
         const match = { user: req.user._id, imageUrl: { $exists: true, $ne: '' } };
         if (brandId) match.brand = new mongoose.Types.ObjectId(brandId);
@@ -588,16 +652,13 @@ router.get('/image-bank', protect, async (req, res) => {
             match.type = { $in: ['ai-photoshoot', 'instagram-post', 'instagram-story', 'facebook-ad', 'linkedin-post', 'youtube-thumb', 'banner', 'twitter-post', 'pinterest', 'photoshoot', 'other'] };
         }
 
-        // CRITICAL: Project FIRST to strip 3-4MB base64 imageUrl, THEN sort.
-        // MongoDB Atlas Free Tier has a 32MB sort memory limit — sorting full documents
-        // with base64 images exceeds this. By projecting first, sort operates on ~500 byte docs.
+        // Lightweight projection — strip base64 to first 500 chars (enough for HTTP URLs)
         const pipeline = [
             { $match: match },
             {
                 $project: {
                     type: 1, title: 1, prompt: 1, createdAt: 1, brand: 1,
-                    tags: 1, status: 1, designData: 1,
-                    // Only get first 500 chars — enough for full HTTP URLs, tiny vs 3-4MB base64
+                    tags: 1, status: 1,
                     imageUrlPrefix: { $substrBytes: [{ $ifNull: ['$imageUrl', ''] }, 0, 500] },
                     thumbnailUrl: { $substrBytes: [{ $ifNull: ['$thumbnailUrl', ''] }, 0, 500] },
                 }
@@ -605,12 +666,16 @@ router.get('/image-bank', protect, async (req, res) => {
             { $sort: { createdAt: -1 } },
             { $skip: (parseInt(page) - 1) * parseInt(limit) },
             { $limit: parseInt(limit) },
-            { $lookup: { from: 'brands', localField: 'brand', foreignField: '_id', as: 'brandData' } },
-            { $addFields: { brand: { $arrayElemAt: ['$brandData', 0] } } },
-            { $project: { brandData: 0, 'brand.dna': 0, 'brand.user': 0, 'brand.__v': 0 } },
         ];
 
-        const images = await Creative.aggregate(pipeline).allowDiskUse(true);
+        // Run aggregation and counts IN PARALLEL — much faster than sequential
+        const baseFilter = { user: req.user._id, imageUrl: { $exists: true, $ne: '' } };
+        const [images, total, uploadedCount, generatedCount] = await Promise.all([
+            Creative.aggregate(pipeline),
+            Creative.countDocuments(match),
+            Creative.countDocuments({ ...baseFilter, type: 'uploaded' }),
+            Creative.countDocuments({ ...baseFilter, type: { $nin: ['uploaded'] } }),
+        ]);
 
         // Post-process: replace base64 refs with proxy URLs
         const API_BASE = `${req.protocol}://${req.get('host')}`;
@@ -619,16 +684,13 @@ router.get('/image-bank', protect, async (req, res) => {
             const thumbPrefix = img.thumbnailUrl || '';
 
             if (prefix.startsWith('http')) {
-                // Real HTTP URL — the 500-char prefix is the full URL
                 img.imageUrl = prefix;
             } else if (prefix.startsWith('data:image/')) {
-                // Base64 data URI — use proxy URL instead (avoids 3-4MB in response)
                 img.imageUrl = `${API_BASE}/api/creatives/${img._id}/image`;
             } else {
                 img.imageUrl = '';
             }
 
-            // Clean up thumbnailUrl
             if (thumbPrefix.startsWith('http')) {
                 img.thumbnailUrl = thumbPrefix;
             } else {
@@ -638,14 +700,6 @@ router.get('/image-bank', protect, async (req, res) => {
             delete img.imageUrlPrefix;
         }
 
-        const total = await Creative.countDocuments(match);
-
-        // Get category counts for UI
-        const baseFilter = { user: req.user._id, imageUrl: { $exists: true, $ne: '' } };
-        const uploadedCount = await Creative.countDocuments({ ...baseFilter, type: 'uploaded' });
-        const generatedCount = await Creative.countDocuments({ ...baseFilter, type: { $nin: ['uploaded'] } });
-
-        console.log('📸 image-bank result:', { total, returned: images.length, uploaded: uploadedCount, generated: generatedCount });
         res.json({ success: true, images, total, counts: { uploaded: uploadedCount, generated: generatedCount, all: uploadedCount + generatedCount } });
     } catch (error) {
         console.error('📸 image-bank error:', error);

@@ -259,6 +259,7 @@ export default function PublishSchedule() {
                 }}
                 defaultText={publishItem?.content || ''}
                 defaultImage={publishItem?.imageUrl || publishItem?.files?.[0]?.url || ''}
+                brandId={activeBrand?._id}
             />
         </DashboardLayout>
     )
