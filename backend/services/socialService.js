@@ -17,6 +17,7 @@ export const getMetaAuthUrl = (stateId, platform = 'facebook') => {
         'pages_read_engagement',
         'pages_manage_posts',
         'pages_read_user_content',
+        'business_management',
         'public_profile'
     ];
 
@@ -72,6 +73,7 @@ export const fetchUserPagesAndIgAccounts = async (userAccessToken) => {
 
     const accounts = [];
     const pages = pagesResponse.data.data;
+    console.log(`[SOCIAL] Found ${pages?.length || 0} pages from Meta:`, JSON.stringify(pagesResponse.data));
 
     for (const page of pages) {
         // Collect the Facebook Page
@@ -86,6 +88,7 @@ export const fetchUserPagesAndIgAccounts = async (userAccessToken) => {
         // 2. Fetch connected Instagram Business Account for this Page
         try {
             const igUrl = `${FB_API_URL}/${page.id}`;
+            console.log(`[SOCIAL] Fetching IG account for page: ${page.name} (${page.id})`);
             const igResponse = await axios.get(igUrl, {
                 params: {
                     fields: 'instagram_business_account{id,username,profile_picture_url}',
@@ -93,8 +96,11 @@ export const fetchUserPagesAndIgAccounts = async (userAccessToken) => {
                 }
             });
 
+            console.log(`[SOCIAL] IG Response for ${page.name}:`, JSON.stringify(igResponse.data));
+
             if (igResponse.data.instagram_business_account) {
                 const igAccount = igResponse.data.instagram_business_account;
+                console.log(`[SOCIAL] Found IG Business Account: ${igAccount.username} (${igAccount.id})`);
                 accounts.push({
                     platform: 'instagram',
                     accountId: igAccount.id,
@@ -103,9 +109,11 @@ export const fetchUserPagesAndIgAccounts = async (userAccessToken) => {
                     accessToken: page.access_token, // IG uses the connected Page's token
                     metadata: { connectedPageId: page.id }
                 });
+            } else {
+                console.warn(`[SOCIAL] Page ${page.name} has no linked instagram_business_account`);
             }
         } catch (error) {
-            console.error(`Failed to fetch IG account for page ${page.name}: ${error.message}`);
+            console.error(`Failed to fetch IG account for page ${page.name}:`, error.response?.data || error.message);
         }
     }
 
