@@ -65,6 +65,19 @@ export const exchangeCodeForToken = async (code, platform = 'facebook') => {
 };
 
 export const fetchUserPagesAndIgAccounts = async (userAccessToken) => {
+    // DEBUG: Fetch user info and permissions
+    try {
+        const [meRes, permRes] = await Promise.all([
+            axios.get(`${FB_API_URL}/me?fields=id,name,email`, { params: { access_token: userAccessToken } }),
+            axios.get(`${FB_API_URL}/me/permissions`, { params: { access_token: userAccessToken } })
+        ]);
+        console.log(`[SOCIAL] Token Identity: ${meRes.data.name} (${meRes.data.id})`);
+        const granted = permRes.data.data.filter(p => p.status === 'granted').map(p => p.permission);
+        console.log(`[SOCIAL] Granted Scopes: ${granted.join(', ')}`);
+    } catch (debugErr) {
+        console.error('[SOCIAL] Debug fetch failed:', debugErr.response?.data || debugErr.message);
+    }
+
     // 1. Fetch all Pages the user manages
     const pagesUrl = `${FB_API_URL}/me/accounts`;
     const pagesResponse = await axios.get(pagesUrl, {
