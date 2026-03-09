@@ -106,25 +106,64 @@ export const fetchUserPagesAndIgAccounts = async (userAccessToken) => {
         }
     }
 
+    // Final Identity Check: Crawl Businesses for hidden Pages
+    if (pages.length === 0) {
+        try {
+            const bizRes = await axios.get(`${FB_API_URL}/me/businesses`, {
+                params: { access_token: userAccessToken, fields: 'id,name' }
+            });
+            const businesses = bizRes.data.data || [];
+
+            for (const biz of businesses) {
+                console.log(`[SOCIAL] Deep searching Business Portfolio: ${biz.name} (${biz.id})`);
+
+                // Try fetching pages owned by the business
+                const ownedPagesRes = await axios.get(`${FB_API_URL}/${biz.id}/owned_pages`, {
+                    params: { access_token: userAccessToken, fields: 'id,name,access_token,category' }
+                });
+
+                const bizPages = ownedPagesRes.data.data || [];
+                if (bizPages.length > 0) {
+                    console.log(`[SOCIAL] Found ${bizPages.length} pages owned by business ${biz.name}`);
+                    pages.push(...bizPages);
+                }
+
+                // Try fetching pages where the business is a client
+                const clientPagesRes = await axios.get(`${FB_API_URL}/${biz.id}/client_pages`, {
+                    params: { access_token: userAccessToken, fields: 'id,name,access_token,category' }
+                });
+                const clientPages = clientPagesRes.data.data || [];
+                if (clientPages.length > 0) {
+                    console.log(`[SOCIAL] Found ${clientPages.length} client pages in business ${biz.name}`);
+                    pages.push(...clientPages);
+                }
+            }
+        } catch (e) {
+            console.warn('[SOCIAL] Business deep search failed:', e.response?.data || e.message);
+        }
+    }
+
+    // De-duplicate pages by ID (in case multiple routes found the same page)
+    const uniquePages = Array.from(new Map(pages.map(p => [p.id, p])).values());
     const accounts = [];
 
-    // Process Pages found
-    for (const page of pages) {
+    // Process all discovered Pages
+    for (const page of uniquePages) {
         // Collect the Facebook Page
         accounts.push({
             platform: 'facebook',
             accountId: page.id,
             accountName: page.name,
-            accessToken: page.access_token,
+            accessToken: page.access_token || userAccessToken, // Use page token if available, else user token
             metadata: { category: page.category }
         });
 
-        // 2. Fetch connected Instagram Business Account for this Page
+        // Fetch connected Instagram Business Account for this Page
         try {
             const igResponse = await axios.get(`${FB_API_URL}/${page.id}`, {
                 params: {
                     fields: 'instagram_business_account{id,username,profile_picture_url}',
-                    access_token: page.access_token
+                    access_token: page.access_token || userAccessToken
                 }
             });
 
@@ -136,26 +175,21 @@ export const fetchUserPagesAndIgAccounts = async (userAccessToken) => {
                     accountId: igAccount.id,
                     accountName: igAccount.username,
                     avatar: igAccount.profile_picture_url,
-                    accessToken: page.access_token, // IG uses the connected Page's token
+                    accessToken: page.access_token || userAccessToken,
                     metadata: { connectedPageId: page.id }
                 });
             }
         } catch (error) {
-            console.error(`[SOCIAL] Failed to fetch IG account for page ${page.name}:`, error.response?.data || error.message);
+            // Ignore individual page failures in deep search
         }
     }
 
     // Direct Check Fallback: If still no IG accounts, try direct Discovery
-    // This works if the User has a role on the IG account directly or if discovery is allowed
     const igCount = accounts.filter(a => a.platform === 'instagram').length;
     if (igCount === 0) {
         try {
-            console.log('[SOCIAL] No IG found via Pages, trying direct discovery...');
             const directIgResponse = await axios.get(`${FB_API_URL}/me/instagram_business_accounts`, {
-                params: {
-                    fields: 'id,username,profile_picture_url',
-                    access_token: userAccessToken
-                }
+                params: { fields: 'id,username,profile_picture_url', access_token: userAccessToken }
             });
             const directIgs = directIgResponse.data.data || [];
             for (const ig of directIgs) {
@@ -165,26 +199,11 @@ export const fetchUserPagesAndIgAccounts = async (userAccessToken) => {
                     accountId: ig.id,
                     accountName: ig.username,
                     avatar: ig.profile_picture_url,
-                    accessToken: userAccessToken, // Fallback to User token if no Page token
+                    accessToken: userAccessToken,
                     metadata: { discovery: 'direct' }
                 });
             }
-        } catch (e) {
-            console.warn('[SOCIAL] Direct IG discovery failed (common):', e.message);
-        }
-    }
-
-    // Final Identity Check: Businesses
-    if (accounts.length === 0) {
-        try {
-            const bizRes = await axios.get(`${FB_API_URL}/me/businesses`, {
-                params: { access_token: userAccessToken }
-            });
-            const businesses = bizRes.data.data || [];
-            if (businesses.length > 0) {
-                console.warn(`[SOCIAL] User ${userAccessToken.substring(0, 8)}... has ${businesses.length} Businesses but 0 accessible Pages. Check Asset assignments in Meta Business Suite.`);
-            }
-        } catch (e) { /* ignore */ }
+        } catch (e) { /* ignore fallback error */ }
     }
 
     return accounts;
