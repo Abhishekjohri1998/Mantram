@@ -100,11 +100,28 @@ class ModelRouter {
      */
     async generateText(params, preferences = {}) {
         const provider = this.getTextProvider(preferences);
+
+        // Skip if provider is in cooldown
+        if (provider.cooldownUntil && Date.now() < provider.cooldownUntil) {
+            const fallback = this._getFallback(provider.name, 'text');
+            if (fallback) return await fallback.generateText(params);
+        }
+
         try {
             const result = await provider.generateText(params);
             this._logUsage('text', provider.name, result.tokensUsed);
             return result;
         } catch (error) {
+            const isQuotaError = error.message?.toLowerCase().includes('quota') ||
+                error.message?.toLowerCase().includes('rate limit') ||
+                error.message?.toLowerCase().includes('429');
+
+            if (isQuotaError) {
+                // Cool down for 5 minutes
+                provider.cooldownUntil = Date.now() + (5 * 60 * 1000);
+                console.warn(`⏳ Provider ${provider.name} hit quota limits. Cooling down for 5 mins.`);
+            }
+
             // Try fallback provider
             console.error(`Provider ${provider.name} failed, trying fallback:`, error.message);
             const fallback = this._getFallback(provider.name, 'text');
@@ -117,9 +134,6 @@ class ModelRouter {
         }
     }
 
-    /**
-     * Analyze text with automatic provider selection
-     */
     async analyzeText(params, preferences = {}) {
         const provider = this.getTextProvider(preferences);
         return provider.analyzeText(params);
@@ -130,9 +144,24 @@ class ModelRouter {
      */
     async generateImage(params, preferences = {}) {
         const provider = this.getImageProvider(preferences);
+
+        if (provider.cooldownUntil && Date.now() < provider.cooldownUntil) {
+            const fallback = this._getFallback(provider.name, 'image');
+            if (fallback) return await fallback.generateImage(params);
+        }
+
         try {
             return await provider.generateImage(params);
         } catch (error) {
+            const isQuotaError = error.message?.toLowerCase().includes('quota') ||
+                error.message?.toLowerCase().includes('rate limit') ||
+                error.message?.toLowerCase().includes('429');
+
+            if (isQuotaError) {
+                provider.cooldownUntil = Date.now() + (5 * 60 * 1000);
+                console.warn(`⏳ Image provider ${provider.name} hit quota limits. Cooling down for 5 mins.`);
+            }
+
             console.error(`Image provider ${provider.name} failed:`, error.message);
             // Try fallback provider
             const fallback = this._getFallback(provider.name, 'image');
@@ -146,8 +175,21 @@ class ModelRouter {
 
     _getFallback(failedProvider, type) {
         const available = Object.entries(this.providers)
-            .filter(([name, p]) => name !== failedProvider && p.isAvailable())
+            .filter(([name, p]) => {
+                const isFailed = name === failedProvider;
+                const isAvailable = p.isAvailable();
+                const inCooldown = p.cooldownUntil && Date.now() < p.cooldownUntil;
+                return !isFailed && isAvailable && !inCooldown;
+            })
             .map(([_, p]) => p);
+
+        // If everything else is in cooldown or unavailable, just return the first available one that isn't the failed one
+        if (available.length === 0) {
+            return Object.entries(this.providers)
+                .filter(([name, p]) => name !== failedProvider && p.isAvailable())
+                .map(([_, p]) => p)[0] || null;
+        }
+
         return available[0] || null;
     }
 

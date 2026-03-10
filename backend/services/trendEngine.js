@@ -51,6 +51,10 @@ async function fetchGoogleTrendsRSS(geo = 'IN') {
 async function fetchGoogleTrendsDaily(geo = 'IN') {
     try {
         const result = await googleTrends.dailyTrends({ geo });
+        if (result && result.trim().startsWith('<')) {
+            console.warn('⚠️ Google Daily Trends returned HTML (likely rate-limited).');
+            return [];
+        }
         const parsed = JSON.parse(result);
         const days = parsed.default?.trendingSearchesDays || [];
         const searches = [];
@@ -73,7 +77,9 @@ async function fetchGoogleTrendsDaily(geo = 'IN') {
         }
         return searches;
     } catch (err) {
-        console.warn('⚠️ Google daily trends failed:', err.message);
+        if (!err.message?.includes('Unexpected token')) {
+            console.warn('⚠️ Google daily trends failed:', err.message);
+        }
         return [];
     }
 }
@@ -82,6 +88,10 @@ async function fetchGoogleTrendsDaily(geo = 'IN') {
 async function fetchGoogleTrendsRealtime(geo = 'IN') {
     try {
         const result = await googleTrends.realTimeTrends({ geo, category: 'all' });
+        if (result && result.trim().startsWith('<')) {
+            console.warn('⚠️ Google Real-time Trends returned HTML (likely rate-limited).');
+            return [];
+        }
         const parsed = JSON.parse(result);
         const stories = parsed.storySummaries?.trendingStories || [];
 
@@ -96,7 +106,9 @@ async function fetchGoogleTrendsRealtime(geo = 'IN') {
             pubDate: new Date(),
         }));
     } catch (err) {
-        console.warn('⚠️ Google real-time trends failed:', err.message);
+        if (!err.message?.includes('Unexpected token')) {
+            console.warn('⚠️ Google real-time trends failed:', err.message);
+        }
         return [];
     }
 }

@@ -46,6 +46,9 @@ import skillsRoutes from './routes/skills.js';
 
 const app = express();
 
+// Required for express-rate-limit when behind a proxy (CloudFront/ALB)
+app.set('trust proxy', 1);
+
 // Connect Database
 connectDB();
 
