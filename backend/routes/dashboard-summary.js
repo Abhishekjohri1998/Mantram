@@ -15,8 +15,8 @@ import { protect } from '../middleware/auth.js';
 import Brand from '../models/Brand.js';
 import Content from '../models/Content.js';
 import Creative from '../models/Creative.js';
-import {
 import { safeErrorMessage } from '../utils/safeError.js';
+import {
     getTrendingTopics,
     getTrendingSEOKeywords,
     getContentSuggestions,
@@ -497,9 +497,9 @@ All percentage arrays must sum to 100. Make data realistic for the industry.`,
     return null;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ── ═══════════════════════════════════════════════════════════════════════════
 // GET /api/dashboard-summary
-// ═══════════════════════════════════════════════════════════════════════════
+// ── ═══════════════════════════════════════════════════════════════════════════
 
 router.get('/', protect, async (req, res) => {
     try {
@@ -560,9 +560,9 @@ router.get('/', protect, async (req, res) => {
     }
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ── ═══════════════════════════════════════════════════════════════════════════
 // POST /api/dashboard-summary/strategy — AI Strategy from radar data
-// ═══════════════════════════════════════════════════════════════════════════
+// ── ═══════════════════════════════════════════════════════════════════════════
 
 router.post('/strategy', protect, async (req, res) => {
     try {

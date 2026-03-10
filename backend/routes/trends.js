@@ -8,8 +8,8 @@ import { requireCredits } from '../middleware/credits.js';
 import Brand from '../models/Brand.js';
 import { getOrchestrator } from '../agents/orchestrator.js';
 import { fetchAllTrends, matchTrendsToBrand, clearTrendCache } from '../services/trendEngine.js';
-import {
 import { safeErrorMessage } from '../utils/safeError.js';
+import {
     getTrendingTopics,
     getTrendingSEOKeywords,
     getCompetitorTrendIntel,
