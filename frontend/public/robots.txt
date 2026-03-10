@@ -1,0 +1,68 @@
+# Mantram AI — robots.txt
+# AI-Friendly Crawling Rules
+
+User-agent: *
+Allow: /
+Allow: /studio/
+Allow: /privacy-policy
+Allow: /terms
+Allow: /data-deletion
+
+# Block authenticated/internal pages from indexing
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /superadmin
+Disallow: /onboarding
+Disallow: /auth
+Disallow: /nexus
+Disallow: /brand-dna
+Disallow: /brands
+Disallow: /analytics
+Disallow: /content-studio
+Disallow: /creative-studio
+Disallow: /video-studio
+Disallow: /performance-marketing
+Disallow: /d2c-analytics
+Disallow: /integrations
+Disallow: /smart-calendar
+Disallow: /publish
+Disallow: /brainstorm
+Disallow: /seo-studio
+Disallow: /conversations
+Disallow: /credits
+Disallow: /skills
+Disallow: /team
+
+# Sitemap
+Sitemap: https://mantram.ai/sitemap.xml
+
+# AI Crawlers — Explicitly Allow
+User-agent: GPTBot
+Allow: /
+Allow: /studio/
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Anthropic-AI
+Allow: /
+
+User-agent: CCBot
+Allow: /
+Allow: /studio/
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: cohere-ai
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+# Crawl-delay for polite crawling
+User-agent: *
+Crawl-delay: 1

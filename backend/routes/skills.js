@@ -4,6 +4,7 @@ import { requireCredits } from '../middleware/credits.js';
 import Skill from '../models/Skill.js';
 import Brand from '../models/Brand.js';
 import { seedDefaultSkills } from '../seeds/defaultSkills.js';
+import { resolveTargetMarkets, getMarketContext, getRelevantFestivals } from '../utils/globalCalendar.js';
 
 const router = Router();
 
@@ -399,9 +400,21 @@ router.post('/:id/execute', protect, async (req, res) => {
             }).filter(Boolean).join('\n');
         }
 
+        // Resolve target markets from brand data
+        const targetMarkets = resolveTargetMarkets(brand);
+
         // Construct the AI prompt
         const now = new Date();
         const dateContext = `TODAY'S DATE: ${now.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}. Current year is ${now.getFullYear()}. All dates in your response MUST be in ${now.getFullYear()} or later. NEVER use past dates.`;
+
+        // Get market-specific context (cultural norms, currency, language)
+        const marketCtx = getMarketContext(targetMarkets);
+
+        // Get real festival dates filtered by target markets
+        const festivalContext = getRelevantFestivals(
+            `${userInputText} ${skill.name} ${skill.description} ${skill.instructions}`,
+            targetMarkets,
+        );
 
         const systemPrompt = [
             skill.systemPrompt || `You are an expert AI assistant executing the "${skill.name}" skill.`,
@@ -409,10 +422,18 @@ router.post('/:id/execute', protect, async (req, res) => {
             `=== CURRENT DATE ===`,
             dateContext,
             '',
+            marketCtx || '',
+            festivalContext || '',
             '=== SKILL INSTRUCTIONS ===',
             skill.instructions,
             '',
-            brandContext ? `=== BRAND CONTEXT ===\n${brandContext}` : '',
+            brandContext ? `=== BRAND CONTEXT ===\n${brandContext}\nTarget Markets: ${targetMarkets.join(', ')}` : `Target Markets: ${targetMarkets.join(', ')}`,
+            '',
+            'CRITICAL RULES:',
+            '1. DATES: Use ONLY verified dates from the festival calendar above. NEVER guess or hallucinate dates.',
+            '2. MARKET: Adapt all content to the specified target markets — use their currency, cultural references, language nuances, and local trends.',
+            '3. LANGUAGE: Generate content in the language appropriate for the target market (e.g., Portuguese for Brazil, Arabic for Saudi, Hinglish for India).',
+            '4. CULTURAL: Respect cultural sensitivities of each target market. If multiple markets, note differences.',
             '',
             skill.outputFormat === 'json' || skill.outputFormat === 'structured'
                 ? 'Respond in valid JSON format.'
@@ -422,8 +443,8 @@ router.post('/:id/execute', protect, async (req, res) => {
         ].filter(Boolean).join('\n');
 
         const userPrompt = userInputText
-            ? `Execute this skill with the following inputs:\n\n${userInputText}\n\nRemember: today is ${now.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}. Use current/future dates only.`
-            : `Execute this skill for the brand context provided. Remember: today is ${now.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}. Use current/future dates only.`;
+            ? `Execute this skill with the following inputs:\n\n${userInputText}\n\nTarget Markets: ${targetMarkets.join(', ')}. Today: ${now.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}. Use ONLY verified dates. Adapt content for the specified target markets.`
+            : `Execute this skill for the brand context provided. Target Markets: ${targetMarkets.join(', ')}. Today: ${now.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}. Use ONLY verified dates. Adapt content for the specified target markets.`;
 
         // Execute
         const isJson = skill.outputFormat === 'json' || skill.outputFormat === 'structured';
@@ -504,6 +525,60 @@ Make the skill highly specific to D2C marketing in India. Include Hinglish suppo
         res.json({ success: true, generated: parsed });
     } catch (error) {
         console.error('Generate skill error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+
+// ============================================================================
+// ENHANCE INSTRUCTIONS — Polish rough instructions with AI
+// ============================================================================
+
+router.post('/enhance-instructions', protect, async (req, res) => {
+    try {
+        const { instructions, skillName, skillDescription } = req.body;
+        if (!instructions?.trim()) return res.status(400).json({ success: false, error: 'Instructions text is required' });
+
+        const today = new Date();
+        const currentDate = today.toISOString().split('T')[0];
+        const currentYear = today.getFullYear();
+
+        const systemPrompt = `You are an expert AI prompt engineer and D2C marketing strategist for Mantram AI.
+Your job is to take rough, basic instructions and transform them into highly detailed, expert-level AI instructions.
+
+Today's date: ${currentDate}. Current year: ${currentYear}.
+
+Rules:
+- Keep the original intent but make instructions dramatically more detailed and actionable
+- Add clear structure with numbered steps or sections  
+- Include output formatting rules (JSON keys, markdown structure, etc.)
+- Add quality standards and what to avoid
+- Include Indian D2C marketing context where relevant
+- Add tone/voice guidelines
+- Specify word counts, lengths, or quantity expectations where appropriate
+- Include edge cases to handle
+- Make instructions at least 200-400 words
+- Do NOT wrap output in markdown code blocks or JSON — return plain text instructions only
+- Use current dates and year (${currentYear}) in any examples or references`;
+
+        const context = [
+            skillName ? `Skill Name: ${skillName}` : '',
+            skillDescription ? `Skill Description: ${skillDescription}` : '',
+            `\nOriginal Instructions:\n${instructions.trim()}`,
+            `\nEnhance these instructions to be comprehensive, detailed, and production-ready. Return ONLY the enhanced instructions text, nothing else.`,
+        ].filter(Boolean).join('\n');
+
+        const result = await aiCall(systemPrompt, context, { temperature: 0.4 });
+
+        // Clean any accidental markdown wrapping
+        let enhanced = result.trim();
+        if (enhanced.startsWith('```')) {
+            enhanced = enhanced.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim();
+        }
+
+        res.json({ success: true, enhanced });
+    } catch (error) {
+        console.error('Enhance instructions error:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

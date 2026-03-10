@@ -35,10 +35,169 @@ import {
     advancedGenerateNode,
 } from '../agents/videoStudio/nodes.js';
 import { estimateCost, getModelsInfo, MODEL_CAPABILITIES } from '../agents/videoStudio/falClient.js';
+import { submitPiApiImageToVideo, submitPiApiVideoExtend } from '../agents/videoStudio/piApiClient.js';
 import { saveLearnings, getStylePreferences } from '../agents/videoStudio/selfLearning.js';
 import { getRouter as getAIRouter } from '../ai/router.js';
 
 const router = Router();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/video-studio/advanced/image-to-video — Seedance I2V (Advanced Mode)
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/advanced/image-to-video', protect, requireCredits('videoGenerate'), async (req, res) => {
+    try {
+        const { imageUrl, prompt, duration, aspectRatio, qualityMode, brandId, referenceImages } = req.body;
+
+        if (!imageUrl) {
+            return res.status(400).json({ success: false, error: 'An image is required for Image-to-Video' });
+        }
+
+        console.log(`🖼️→🎬 I2V request: quality=${qualityMode}, duration=${duration}`);
+
+        // Create project
+        const project = await VideoProject.create({
+            user: req.user._id,
+            brand: brandId || null,
+            title: (prompt || 'Image to Video').substring(0, 60),
+            status: 'advanced-generating',
+            mode: 'image-to-video',
+            advancedConfig: {
+                prompt: prompt || '',
+                firstImageUrl: imageUrl,
+                aspectRatio: aspectRatio || '16:9',
+                duration: duration || 5,
+            },
+            routing: {
+                selectedModel: 'seedance-2.0',
+                resolution: '1080p',
+                mode: qualityMode || 'fast',
+            },
+        });
+
+        // Submit to PiAPI
+        const result = await submitPiApiImageToVideo({
+            imageUrl,
+            prompt: prompt || 'Animate this image with natural cinematic motion',
+            duration: duration || 5,
+            aspectRatio: aspectRatio || '16:9',
+            qualityMode: qualityMode || 'fast',
+            referenceImages: referenceImages || [],
+        });
+
+        // Update project with generation details
+        await VideoProject.findByIdAndUpdate(project._id, {
+            generation: {
+                falRequestId: result.taskId,
+                falEndpoint: 'piapi-seedance-2.0-i2v',
+                provider: 'piapi',
+                _piApiPayload: result._payload,
+                videoUrl: '',
+                progress: 5,
+                startedAt: new Date(),
+            },
+            backendPrompt: prompt || '',
+        });
+
+        res.json({
+            success: true,
+            project: {
+                _id: project._id,
+                status: 'advanced-generating',
+                mode: 'image-to-video',
+                generation: {
+                    falRequestId: result.taskId,
+                    provider: 'piapi',
+                    progress: 5,
+                },
+                costPreview: estimateCost('seedance-2.0', duration || 5, '1080p', qualityMode || 'fast'),
+            },
+        });
+    } catch (error) {
+        console.error('I2V generate error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/video-studio/:id/extend — Extend a completed video (Seedance 2.0)
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/extend-video', protect, requireCredits('videoGenerate'), async (req, res) => {
+    try {
+        const { projectId, prompt, duration, qualityMode } = req.body;
+
+        if (!projectId) {
+            return res.status(400).json({ success: false, error: 'Project ID is required' });
+        }
+
+        // Load original project
+        const original = await VideoProject.findOne({ _id: projectId, user: req.user._id });
+        if (!original) return res.status(404).json({ success: false, error: 'Original video project not found' });
+
+        const parentTaskId = original.generation?.falRequestId;
+        if (!parentTaskId) return res.status(400).json({ success: false, error: 'No task ID found on original video — cannot extend' });
+        if (original.generation?.provider !== 'piapi') return res.status(400).json({ success: false, error: 'Video Extend is only available for Seedance 2.0 videos' });
+
+        console.log(`🔗 Extend request: parent=${parentTaskId}, duration=${duration}, quality=${qualityMode}`);
+
+        // Submit extension to PiAPI
+        const result = await submitPiApiVideoExtend({
+            parentTaskId,
+            prompt: prompt || '',
+            duration: duration || 5,
+            qualityMode: qualityMode || 'fast',
+        });
+
+        // Create new project for the extended video
+        const extended = await VideoProject.create({
+            user: req.user._id,
+            brand: original.brand || null,
+            title: `${original.title} (Extended)`.substring(0, 80),
+            status: 'advanced-generating',
+            mode: 'extend',
+            advancedConfig: {
+                prompt: prompt || `Continuation of: ${original.backendPrompt || ''}`,
+                duration: duration || 5,
+                aspectRatio: original.advancedConfig?.aspectRatio || '16:9',
+            },
+            routing: {
+                selectedModel: 'seedance-2.0',
+                resolution: '1080p',
+                mode: qualityMode || 'fast',
+            },
+            generation: {
+                falRequestId: result.taskId,
+                falEndpoint: 'piapi-seedance-2.0-extend',
+                provider: 'piapi',
+                _piApiPayload: result._payload,
+                videoUrl: '',
+                progress: 5,
+                startedAt: new Date(),
+            },
+            backendPrompt: prompt || '',
+        });
+
+        res.json({
+            success: true,
+            project: {
+                _id: extended._id,
+                status: 'advanced-generating',
+                mode: 'extend',
+                parentProjectId: projectId,
+                generation: {
+                    falRequestId: result.taskId,
+                    provider: 'piapi',
+                    progress: 5,
+                },
+                costPreview: estimateCost('seedance-2.0', duration || 5, '1080p', qualityMode || 'fast'),
+            },
+        });
+    } catch (error) {
+        console.error('Video extend error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/video-studio/advanced/generate — Direct generation (Advanced Mode)

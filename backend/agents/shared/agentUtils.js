@@ -11,6 +11,7 @@
 import Brand from '../../models/Brand.js';
 import Product from '../../models/Product.js';
 import { getRouter } from '../../ai/router.js';
+import { resolveTargetMarkets, getMarketContext, getRelevantFestivals } from '../../utils/globalCalendar.js';
 
 /**
  * Call Claude Sonnet and parse JSON response
@@ -86,7 +87,23 @@ export function buildBrandContext(brand, products = []) {
     if (dna.industry) parts.push(`Industry: ${dna.industry}`);
     if (dna.targetAudience) parts.push(`Target Audience: ${dna.targetAudience}`);
     if (dna.brandDescription) parts.push(`Description: ${dna.brandDescription}`);
-    if (dna.country) parts.push(`Market: ${dna.country}${dna.region ? ` (${dna.region})` : ''}`);
+    if (dna.country) parts.push(`Origin: ${dna.country}${dna.region ? ` (${dna.region})` : ''}`);
+
+    // ── Target Markets & Global Intelligence ──
+    const targetMarkets = resolveTargetMarkets(brand);
+    parts.push(`Target Markets: ${targetMarkets.join(', ')}`);
+
+    const marketCtx = getMarketContext(targetMarkets);
+    if (marketCtx) parts.push(marketCtx);
+
+    // Inject verified festival dates filtered by target markets
+    const festivalCtx = getRelevantFestivals('', targetMarkets, 8);
+    if (festivalCtx) parts.push(festivalCtx);
+
+    // Language directive
+    if (dna.defaultLanguage && dna.defaultLanguage !== 'english') {
+        parts.push(`Content Language: Generate content primarily in ${dna.defaultLanguage}`);
+    }
 
     // ── Voice & Tone ──
     if (dna.voice?.personality) parts.push(`Voice: ${dna.voice.personality}`);
@@ -148,6 +165,14 @@ export function buildBrandContext(brand, products = []) {
             parts.push(`... and ${products.length - maxProducts} more products`);
         }
     }
+
+    // ── Market Rules ──
+    parts.push('');
+    parts.push('=== MARKET RULES ===');
+    parts.push('1. Adapt ALL content for the target markets — use their currency, language, cultural references, and local trends.');
+    parts.push('2. If multiple target markets, create content that resonates across all of them, noting key differences.');
+    parts.push('3. Use ONLY verified dates from the festival calendar. NEVER hallucinate dates.');
+    parts.push('4. Respect cultural sensitivities of each target market.');
 
     // ── Brand Images Summary ──
     const brandImages = dna.brandImages || [];

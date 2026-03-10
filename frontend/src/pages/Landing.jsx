@@ -80,7 +80,7 @@ export default function Landing() {
     /* ── Studios data with SVG conceptual animations ── */
     const studios = [
         {
-            icon: 'draw', name: 'Content Studio', desc: 'AI-generated blog posts, social captions, ad copy & emails — perfectly aligned to your brand voice.', color: 'from-violet-500 to-purple-600', tag: 'Writing', accentHex: '#8b5cf6',
+            icon: 'draw', name: 'Content Studio', slug: 'content-studio', desc: 'AI-generated blog posts, social captions, ad copy & emails — perfectly aligned to your brand voice.', color: 'from-violet-500 to-purple-600', tag: 'Writing', accentHex: '#8b5cf6',
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden" style={{ background: 'radial-gradient(ellipse at 50% 40%, rgba(139,92,246,0.08) 0%, transparent 70%)' }}>
                     <svg viewBox="0 0 400 280" className="w-full h-auto max-h-full p-4" fill="none">
@@ -115,7 +115,7 @@ export default function Landing() {
             )
         },
         {
-            icon: 'auto_fix_high', name: 'Creative Studio', desc: 'Design social posts, stories, ads, banners & AI photoshoots with one-click brand consistency.', color: 'from-pink-500 to-rose-600', tag: 'Design', accentHex: '#ec4899',
+            icon: 'auto_fix_high', name: 'Creative Studio', slug: 'creative-studio', desc: 'Design social posts, stories, ads, banners & AI photoshoots with one-click brand consistency.', color: 'from-pink-500 to-rose-600', tag: 'Design', accentHex: '#ec4899',
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden" style={{ background: 'radial-gradient(ellipse at 50% 50%, rgba(236,72,153,0.06) 0%, transparent 70%)' }}>
                     <svg viewBox="0 0 400 280" className="w-full h-auto max-h-full p-4" fill="none">
@@ -154,7 +154,7 @@ export default function Landing() {
             )
         },
         {
-            icon: 'smart_display', name: 'Video Studio', desc: 'Multi-model video generation — Seedance, Kling, Veo 2 — from brief to cinematic final cut.', color: 'from-amber-500 to-orange-600', tag: 'Video', accentHex: '#f59e0b',
+            icon: 'smart_display', name: 'Video Studio', slug: 'video-studio', desc: 'Multi-model video generation — Seedance, Kling, Veo 2 — from brief to cinematic final cut.', color: 'from-amber-500 to-orange-600', tag: 'Video', accentHex: '#f59e0b',
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden" style={{ background: 'radial-gradient(ellipse at 50% 40%, rgba(245,158,11,0.06) 0%, transparent 70%)' }}>
                     <svg viewBox="0 0 400 280" className="w-full h-auto max-h-full p-4" fill="none">
@@ -185,7 +185,7 @@ export default function Landing() {
             )
         },
         {
-            icon: 'campaign', name: 'Performance Studio', desc: 'AI ad strategist that researches competitors, plans budgets & generates Meta/Google ad campaigns.', color: 'from-emerald-500 to-teal-600', tag: 'Ads', accentHex: '#10b981',
+            icon: 'campaign', name: 'Performance Studio', slug: 'performance-studio', desc: 'AI ad strategist that researches competitors, plans budgets & generates Meta/Google ad campaigns.', color: 'from-emerald-500 to-teal-600', tag: 'Ads', accentHex: '#10b981',
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden" style={{ background: 'radial-gradient(ellipse at 50% 60%, rgba(16,185,129,0.06) 0%, transparent 70%)' }}>
                     <svg viewBox="0 0 400 280" className="w-full h-auto max-h-full p-4" fill="none">
@@ -213,7 +213,7 @@ export default function Landing() {
             )
         },
         {
-            icon: 'query_stats', name: 'SEO Studio', desc: 'AI-powered keyword research, site audits, content gap analysis & competitive intelligence.', color: 'from-blue-500 to-indigo-600', tag: 'SEO', accentHex: '#3b82f6',
+            icon: 'query_stats', name: 'SEO Studio', slug: 'seo-studio', desc: 'AI-powered keyword research, site audits, content gap analysis & competitive intelligence.', color: 'from-blue-500 to-indigo-600', tag: 'SEO', accentHex: '#3b82f6',
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden" style={{ background: 'radial-gradient(ellipse at 50% 30%, rgba(59,130,246,0.06) 0%, transparent 70%)' }}>
                     <svg viewBox="0 0 400 280" className="w-full h-auto max-h-full p-4" fill="none">
@@ -246,7 +246,7 @@ export default function Landing() {
             )
         },
         {
-            icon: 'storefront', name: 'D2C Studio', desc: 'Shopify Intelligence Hub — product velocity, abandonment signals & AI-powered e-commerce insights.', color: 'from-cyan-500 to-sky-600', tag: 'Commerce', accentHex: '#06b6d4',
+            icon: 'storefront', name: 'D2C Studio', slug: 'd2c-studio', desc: 'Shopify Intelligence Hub — product velocity, abandonment signals & AI-powered e-commerce insights.', color: 'from-cyan-500 to-sky-600', tag: 'Commerce', accentHex: '#06b6d4',
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden" style={{ background: 'radial-gradient(ellipse at 50% 60%, rgba(6,182,212,0.06) 0%, transparent 70%)' }}>
                     <svg viewBox="0 0 400 280" className="w-full h-auto max-h-full p-4" fill="none">
@@ -271,7 +271,7 @@ export default function Landing() {
             )
         },
         {
-            icon: 'forum', name: 'Conversation Studio', desc: 'AI auto-responder for Instagram & Facebook DMs — route leads, answer FAQs, never miss a message.', color: 'from-fuchsia-500 to-pink-600', tag: 'DMs', accentHex: '#d946ef',
+            icon: 'forum', name: 'Conversation Studio', slug: 'conversation-studio', desc: 'AI auto-responder for Instagram & Facebook DMs — route leads, answer FAQs, never miss a message.', color: 'from-fuchsia-500 to-pink-600', tag: 'DMs', accentHex: '#d946ef',
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden" style={{ background: 'radial-gradient(ellipse at 50% 50%, rgba(217,70,239,0.06) 0%, transparent 70%)' }}>
                     <svg viewBox="0 0 400 280" className="w-full h-auto max-h-full p-4" fill="none">
@@ -310,7 +310,7 @@ export default function Landing() {
             )
         },
         {
-            icon: 'lightbulb', name: 'Brainstorm Studio', desc: 'AI creative director — generate campaign ideas, ad films, mood boards & content calendars.', color: 'from-yellow-500 to-amber-600', tag: 'Ideas', accentHex: '#eab308',
+            icon: 'lightbulb', name: 'Brainstorm Studio', slug: 'brainstorm-studio', desc: 'AI creative director & strategist — brand strategy, campaign ideas, ad concepts, mood boards & content calendars.', color: 'from-yellow-500 to-amber-600', tag: 'Strategy', accentHex: '#eab308',
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden" style={{ background: 'radial-gradient(ellipse at 50% 45%, rgba(234,179,8,0.06) 0%, transparent 70%)' }}>
                     <svg viewBox="0 0 400 280" className="w-full h-auto max-h-full p-4" fill="none">
@@ -346,7 +346,7 @@ export default function Landing() {
             )
         },
         {
-            icon: 'calendar_month', name: 'Smart Calendar', desc: 'Marketing intelligence calendar — trending moments, festivals & AI-suggested content dates.', color: 'from-teal-500 to-emerald-600', tag: 'Planning', accentHex: '#14b8a6',
+            icon: 'calendar_month', name: 'Smart Calendar', slug: 'smart-calendar', desc: 'Marketing intelligence calendar — trending moments, festivals & AI-suggested content dates.', color: 'from-teal-500 to-emerald-600', tag: 'Planning', accentHex: '#14b8a6',
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden" style={{ background: 'radial-gradient(ellipse at 50% 50%, rgba(20,184,166,0.06) 0%, transparent 70%)' }}>
                     <svg viewBox="0 0 400 280" className="w-full h-auto max-h-full p-4" fill="none">
@@ -386,7 +386,7 @@ export default function Landing() {
             )
         },
         {
-            icon: 'analytics', name: 'Analytics', desc: 'Traffic intelligence, audience insights, Google Analytics integration & AI-powered growth strategies.', color: 'from-indigo-500 to-violet-600', tag: 'Insights', accentHex: '#6366f1',
+            icon: 'analytics', name: 'Analytics', slug: 'analytics', desc: 'Traffic intelligence, audience insights, Google Analytics integration & AI-powered growth strategies.', color: 'from-indigo-500 to-violet-600', tag: 'Insights', accentHex: '#6366f1',
             preview: () => (
                 <div className="h-full w-full flex items-center justify-center relative overflow-hidden" style={{ background: 'radial-gradient(ellipse at 50% 40%, rgba(99,102,241,0.06) 0%, transparent 70%)' }}>
                     <svg viewBox="0 0 400 280" className="w-full h-auto max-h-full p-4" fill="none">
@@ -414,6 +414,79 @@ export default function Landing() {
                         {/* Line chart at bottom */}
                         <rect x="30" y="218" width="350" height="50" rx="10" fill="rgba(99,102,241,0.03)" stroke="rgba(99,102,241,0.08)" strokeWidth=".5" />
                         <path d="M 50 255 Q 80 235 130 245 T 230 230 T 300 238 T 360 225" stroke="#6366f1" strokeWidth="1.5" fill="none" strokeLinecap="round" className="st-draw-path" strokeDasharray="400" strokeDashoffset="400" />
+                    </svg>
+                </div>
+            )
+        },
+        {
+            icon: 'build_circle', name: 'Skills Hub', slug: 'skills-hub', desc: 'Build custom AI marketing skills — reusable workflows with AI-enhanced instructions that run on demand.', color: 'from-lime-500 to-green-600', tag: 'Automation', accentHex: '#84cc16',
+            preview: () => (
+                <div className="h-full w-full flex items-center justify-center relative overflow-hidden" style={{ background: 'radial-gradient(ellipse at 50% 50%, rgba(132,204,22,0.06) 0%, transparent 70%)' }}>
+                    <svg viewBox="0 0 400 280" className="w-full h-auto max-h-full p-4" fill="none">
+                        {/* Skill cards grid */}
+                        {[
+                            { x: 45, y: 30, label: 'WhatsApp\nBroadcast', icon: '💬', delay: 0 },
+                            { x: 165, y: 30, label: 'Festival\nCampaign', icon: '🎉', delay: .3 },
+                            { x: 285, y: 30, label: 'Product\nLaunch', icon: '🚀', delay: .6 },
+                            { x: 45, y: 120, label: 'Email\nSequence', icon: '📧', delay: .9 },
+                            { x: 165, y: 120, label: 'Social\nCalendar', icon: '📅', delay: 1.2 },
+                            { x: 285, y: 120, label: 'Ad Copy\nGenerator', icon: '✍️', delay: 1.5 },
+                        ].map((c, i) => (
+                            <g key={i} className="st-scale-in" style={{ transformOrigin: `${c.x + 45}px ${c.y + 35}px`, animationDelay: `${c.delay}s` }}>
+                                <rect x={c.x} y={c.y} width="90" height="70" rx="10" fill="rgba(132,204,22,0.04)" stroke="rgba(132,204,22,0.12)" strokeWidth=".5" />
+                                <text x={c.x + 45} y={c.y + 28} textAnchor="middle" fontSize="18">{c.icon}</text>
+                                {c.label.split('\n').map((line, li) => (
+                                    <text key={li} x={c.x + 45} y={c.y + 45 + li * 12} textAnchor="middle" fill="#a3e635" fontSize="8" fontWeight="600">{line}</text>
+                                ))}
+                            </g>
+                        ))}
+                        {/* Enhance with AI bar */}
+                        <g className="st-fade-in" style={{ animationDelay: '2s' }}>
+                            <rect x="80" y="220" width="240" height="34" rx="17" fill="rgba(132,204,22,0.06)" stroke="rgba(132,204,22,0.2)" strokeWidth=".5" />
+                            <text x="200" y="241" textAnchor="middle" fill="#a3e635" fontSize="10" fontWeight="700">✦ Enhance Instructions with AI</text>
+                        </g>
+                    </svg>
+                </div>
+            )
+        },
+        {
+            icon: 'smart_toy', name: 'Fidato — AI Assistant', slug: 'fidato', desc: 'Your personal AI marketing assistant — ask anything, run skills, switch studios, all from a single command bar.', color: 'from-sky-500 to-blue-600', tag: 'Assistant', accentHex: '#0ea5e9',
+            preview: () => (
+                <div className="h-full w-full flex items-center justify-center relative overflow-hidden" style={{ background: 'radial-gradient(ellipse at 50% 45%, rgba(14,165,233,0.07) 0%, transparent 70%)' }}>
+                    <svg viewBox="0 0 400 280" className="w-full h-auto max-h-full p-4" fill="none">
+                        {/* Central Fidato orb */}
+                        <circle cx="200" cy="120" r="45" fill="rgba(14,165,233,0.06)" className="st-glow" style={{ transformOrigin: '200px 120px' }} />
+                        <circle cx="200" cy="120" r="28" fill="rgba(14,165,233,0.12)" className="st-pulse" style={{ transformOrigin: '200px 120px' }} />
+                        <text x="200" y="127" textAnchor="middle" fill="#38bdf8" fontSize="22" fontWeight="800">F</text>
+                        {/* Orbiting studio connections */}
+                        {[
+                            { label: 'Content', angle: 0, dist: 95 },
+                            { label: 'Creative', angle: 51, dist: 100 },
+                            { label: 'Video', angle: 102, dist: 95 },
+                            { label: 'Ads', angle: 153, dist: 100 },
+                            { label: 'SEO', angle: 204, dist: 95 },
+                            { label: 'Skills', angle: 255, dist: 100 },
+                            { label: 'Calendar', angle: 306, dist: 95 },
+                        ].map((n, i) => {
+                            const x = 200 + n.dist * Math.cos(n.angle * Math.PI / 180)
+                            const y = 120 + n.dist * Math.sin(n.angle * Math.PI / 180) * 0.65
+                            return (
+                                <g key={i} className="st-scale-in" style={{ transformOrigin: `${x}px ${y}px`, animationDelay: `${i * 0.25}s` }}>
+                                    <line x1="200" y1="120" x2={x} y2={y} stroke="rgba(14,165,233,0.1)" strokeWidth=".5" strokeDasharray="3 3" />
+                                    <rect x={x - 26} y={y - 10} width="52" height="20" rx="10" fill="rgba(14,165,233,0.06)" stroke="rgba(14,165,233,0.15)" strokeWidth=".5" />
+                                    <text x={x} y={y + 4} textAnchor="middle" fill="#38bdf8" fontSize="7" fontWeight="600">{n.label}</text>
+                                </g>
+                            )
+                        })}
+                        {/* Command bar */}
+                        <g className="st-slide-up" style={{ animationDelay: '2s' }}>
+                            <rect x="70" y="225" width="260" height="36" rx="18" fill="rgba(14,165,233,0.04)" stroke="rgba(14,165,233,0.15)" strokeWidth=".5" />
+                            <circle cx="98" cy="243" r="10" fill="rgba(14,165,233,0.12)" />
+                            <text x="98" y="247" textAnchor="middle" fill="#38bdf8" fontSize="9" fontWeight="700">F</text>
+                            <rect x="118" y="238" width="90" height="4" rx="2" fill="rgba(14,165,233,0.15)" className="st-type" />
+                            <rect x="210" y="238" width="2" height="10" rx="1" fill="#0ea5e9" className="st-blink" />
+                            <text x="280" y="247" textAnchor="middle" fill="#64748b" fontSize="8">⌘K</text>
+                        </g>
                     </svg>
                 </div>
             )
@@ -493,7 +566,7 @@ export default function Landing() {
                             </h1>
 
                             <p className="text-slate-400 text-lg md:text-xl max-w-lg leading-relaxed">
-                                10 AI studios. One platform. From brand DNA extraction to content creation, video production, ad optimization & e-commerce intelligence — Mantram AI is your full-stack marketing operating system.
+                                12 AI studios. One platform. From brand DNA extraction to content creation, video production, ad optimization, strategy & e-commerce intelligence — Mantram AI is your full-stack marketing operating system.
                             </p>
 
                             <div className="flex flex-col sm:flex-row gap-4">
@@ -514,7 +587,7 @@ export default function Landing() {
                             <div className="flex items-center gap-6 pt-4">
                                 {[
                                     { icon: 'verified_user', text: 'Enterprise Secure' },
-                                    { icon: 'memory', text: '10 AI Studios' },
+                                    { icon: 'memory', text: '12 AI Studios' },
                                     { icon: 'speed', text: 'Real-Time Intelligence' },
                                 ].map((b, i) => (
                                     <div key={i} className="flex items-center gap-1.5 text-slate-500 text-xs font-semibold uppercase tracking-wider">
@@ -600,7 +673,7 @@ export default function Landing() {
                 <section className="border-y border-white/[0.04] py-10" style={{ background: 'rgba(255,255,255,0.01)' }}>
                     <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8">
                         {[
-                            { value: '10+', label: 'AI Studios', icon: 'dashboard' },
+                            { value: '12+', label: 'AI Studios', icon: 'dashboard' },
                             { value: '6+', label: 'AI Models', icon: 'psychology' },
                             { value: '50+', label: 'Content Types', icon: 'article' },
                             { value: '∞', label: 'Possibilities', icon: 'all_inclusive' },
@@ -621,9 +694,9 @@ export default function Landing() {
                     <div className="text-center mb-16">
                         <p className="text-primary text-sm font-bold uppercase tracking-widest mb-3">The Studio Ecosystem</p>
                         <h2 className="text-4xl md:text-5xl font-black text-white mb-5">
-                            10 Studios. <span className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">One Platform.</span>
+                            12 Studios. <span className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">One Platform.</span>
                         </h2>
-                        <p className="text-slate-400 text-lg max-w-2xl mx-auto">Every marketing function — content, design, video, ads, SEO, e-commerce, conversations — powered by specialized AI agent teams.</p>
+                        <p className="text-slate-400 text-lg max-w-2xl mx-auto">Every marketing function — content, design, video, ads, SEO, e-commerce, conversations, strategy, skills & AI assistant — powered by specialized AI agent teams.</p>
                     </div>
 
                     {/* Interactive tabbed studio explorer */}
@@ -685,12 +758,73 @@ export default function Landing() {
                                         {/* Preview footer */}
                                         <div className="mt-6 pt-4 flex items-center justify-between" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                                             <p className="text-slate-500 text-xs max-w-md">{s.desc}</p>
-                                            <div className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer hover:bg-white/[0.05] transition-colors" style={{ color: s.accentHex }}>
+                                            <Link to={`/studio/${s.slug}`} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer hover:bg-white/[0.05] transition-colors" style={{ color: s.accentHex }}>
                                                 <span>Explore</span>
                                                 <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                                            </div>
+                                            </Link>
                                         </div>
                                     </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
+                {/* ═══════════════════════════════════════════════════════ */}
+                {/*  FIDATO AI ASSISTANT HIGHLIGHT                         */}
+                {/* ═══════════════════════════════════════════════════════ */}
+                <section className="py-24 relative overflow-hidden">
+                    {/* Ambient glow */}
+                    <div className="absolute inset-0 pointer-events-none">
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-sky-500/[0.04] rounded-full blur-[120px]" />
+                    </div>
+
+                    <div className="max-w-5xl mx-auto px-6 relative z-10">
+                        <div className="text-center mb-12">
+                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest mb-6"
+                                style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)', color: '#38bdf8' }}>
+                                <span className="material-symbols-outlined text-sm">smart_toy</span>
+                                Meet Your AI Marketing Partner
+                            </div>
+                            <h2 className="text-4xl md:text-5xl font-black text-white mb-5">
+                                Fidato. <span className="bg-gradient-to-r from-sky-400 to-blue-400 bg-clip-text text-transparent">Your Brand OS Concierge.</span>
+                            </h2>
+                            <p className="text-slate-400 text-lg max-w-2xl mx-auto">
+                                One command bar to rule all 12 studios. Ask anything, run skills, generate content, switch studios — Fidato orchestrates your entire marketing stack.
+                            </p>
+                        </div>
+
+                        {/* Command bar mockup */}
+                        <div className="max-w-2xl mx-auto mb-12">
+                            <div className="rounded-2xl p-1" style={{ background: 'linear-gradient(135deg, rgba(14,165,233,0.15), rgba(139,92,246,0.1))', border: '1px solid rgba(14,165,233,0.2)' }}>
+                                <div className="rounded-xl px-5 py-4 flex items-center gap-4" style={{ background: 'rgba(7,7,15,0.9)' }}>
+                                    <div className="size-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-sky-500/20">
+                                        <span className="text-white font-black text-lg">F</span>
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-white text-sm font-medium">"Create a Diwali campaign for my skincare brand with posts, reels & ad copy"</p>
+                                        <p className="text-sky-400/60 text-[10px] mt-1 font-semibold">Fidato will auto-route to Brainstorm → Content → Creative → Calendar</p>
+                                    </div>
+                                    <div className="flex items-center gap-1 text-slate-600 text-xs font-mono px-2 py-1 rounded-lg" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                        ⌘K
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Three capability highlights */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {[
+                                { icon: 'bolt', title: 'Instant Answers', desc: 'Ask brand questions, get instant strategy advice, competitive insights & trend analysis — all contextual to your brand.', color: 'from-amber-500/20 to-orange-500/20', iconColor: 'text-amber-400' },
+                                { icon: 'hub', title: 'Cross-Studio Orchestration', desc: 'One prompt triggers multiple studios. Fidato plans, delegates & combines outputs — like having a marketing team on call.', color: 'from-sky-500/20 to-blue-500/20', iconColor: 'text-sky-400' },
+                                { icon: 'build_circle', title: 'Skills on Demand', desc: 'Run any custom skill directly from the command bar. Festival campaigns, product launches, email sequences — one command away.', color: 'from-lime-500/20 to-green-500/20', iconColor: 'text-lime-400' },
+                            ].map((c, i) => (
+                                <div key={i} className="rounded-2xl p-6 transition-all hover:translate-y-[-2px]" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <div className={`size-12 rounded-xl bg-gradient-to-br ${c.color} flex items-center justify-center mb-4`} style={{ border: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <span className={`material-symbols-outlined text-2xl ${c.iconColor}`}>{c.icon}</span>
+                                    </div>
+                                    <h3 className="text-white font-bold text-lg mb-2">{c.title}</h3>
+                                    <p className="text-slate-400 text-sm leading-relaxed">{c.desc}</p>
                                 </div>
                             ))}
                         </div>

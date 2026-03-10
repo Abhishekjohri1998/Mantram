@@ -1096,6 +1096,7 @@ export default function BrandDNA() {
                 industry: dna.industry || '',
                 country: dna.country || 'India',
                 defaultLanguage: dna.defaultLanguage || 'english',
+                targetMarkets: dna.targetMarkets || [],
             })
         } else if (section === 'contentStyle') {
             setEditData({
@@ -1136,6 +1137,7 @@ export default function BrandDNA() {
                     industry: editData.industry,
                     country: editData.country,
                     defaultLanguage: editData.defaultLanguage,
+                    targetMarkets: editData.targetMarkets || [],
                 })
             } else if (editSection === 'contentStyle') {
                 await updateBrandDNA(brand._id, {
@@ -1246,10 +1248,19 @@ export default function BrandDNA() {
                     <h3 className="text-2xl font-extrabold text-white">{brand.name}</h3>
                     {brand.website && <p className="text-sm text-primary">{brand.website}</p>}
                     {dna.brandDescription && <p className="text-sm text-slate-400 mt-1 line-clamp-2">{dna.brandDescription}</p>}
-                    <div className="flex gap-2 mt-2">
+                    <div className="flex gap-2 mt-2 flex-wrap">
                         {dna.industry && <span className="px-2 py-0.5 rounded-lg bg-white/[0.06] text-sm text-slate-400">{dna.industry}</span>}
                         <span className="px-2 py-0.5 rounded-lg bg-white/[0.06] text-sm text-slate-400 capitalize">{brand.onboardingMethod}</span>
                         <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${brand.status === 'active' ? 'bg-emerald-400/10 text-emerald-400' : 'bg-slate-500/10 text-slate-500'}`}>{brand.status}</span>
+                        {dna.targetMarkets?.length > 0 && (
+                            <>
+                                <span className="text-slate-600 text-xs self-center">•</span>
+                                {dna.targetMarkets.map(m => {
+                                    const flags = { IN: '🇮🇳', US: '🇺🇸', CA: '🇨🇦', UK: '🇬🇧', EU: '🇪🇺', AE: '🇦🇪', SA: '🇸🇦', SG: '🇸🇬', MY: '🇲🇾', ID: '🇮🇩', TH: '🇹🇭', AU: '🇦🇺', NZ: '🇳🇿', BR: '🇧🇷', JP: '🇯🇵', KR: '🇰🇷' };
+                                    return <span key={m} className="px-2 py-0.5 rounded-lg bg-primary/10 text-primary text-xs font-bold" title={`Target Market: ${m}`}>{flags[m] || '🌐'} {m}</span>;
+                                })}
+                            </>
+                        )}
                     </div>
                 </div>
                 <button onClick={() => startEdit('description')}
@@ -1536,7 +1547,7 @@ export default function BrandDNA() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="text-sm text-slate-400 mb-1 block">Country</label>
+                            <label className="text-sm text-slate-400 mb-1 block">Country (Origin)</label>
                             <input type="text" value={editData.country} onChange={e => setEditData(p => ({ ...p, country: e.target.value }))}
                                 className="w-full input-glass rounded-xl p-3 text-sm text-white" />
                         </div>
@@ -1545,6 +1556,62 @@ export default function BrandDNA() {
                             <input type="text" value={editData.defaultLanguage} onChange={e => setEditData(p => ({ ...p, defaultLanguage: e.target.value }))}
                                 className="w-full input-glass rounded-xl p-3 text-sm text-white" />
                         </div>
+                    </div>
+                    {/* Target Markets Multi-Select */}
+                    <div>
+                        <label className="text-sm text-slate-400 mb-1.5 block">Target Markets</label>
+                        <p className="text-xs text-slate-600 mb-3">Select the markets where this brand sells or advertises. AI will adapt all content — festivals, currency, language, cultural references — for these markets.</p>
+                        <div className="flex flex-wrap gap-2">
+                            {[
+                                { code: 'IN', flag: '🇮🇳', name: 'India' },
+                                { code: 'US', flag: '🇺🇸', name: 'United States' },
+                                { code: 'CA', flag: '🇨🇦', name: 'Canada' },
+                                { code: 'UK', flag: '🇬🇧', name: 'United Kingdom' },
+                                { code: 'EU', flag: '🇪🇺', name: 'Europe' },
+                                { code: 'AE', flag: '🇦🇪', name: 'UAE' },
+                                { code: 'SA', flag: '🇸🇦', name: 'Saudi Arabia' },
+                                { code: 'SG', flag: '🇸🇬', name: 'Singapore' },
+                                { code: 'MY', flag: '🇲🇾', name: 'Malaysia' },
+                                { code: 'ID', flag: '🇮🇩', name: 'Indonesia' },
+                                { code: 'TH', flag: '🇹🇭', name: 'Thailand' },
+                                { code: 'AU', flag: '🇦🇺', name: 'Australia' },
+                                { code: 'NZ', flag: '🇳🇿', name: 'New Zealand' },
+                                { code: 'BR', flag: '🇧🇷', name: 'Brazil' },
+                                { code: 'JP', flag: '🇯🇵', name: 'Japan' },
+                                { code: 'KR', flag: '🇰🇷', name: 'South Korea' },
+                            ].map(market => {
+                                const isSelected = (editData.targetMarkets || []).includes(market.code);
+                                return (
+                                    <button key={market.code} type="button"
+                                        onClick={() => setEditData(p => ({
+                                            ...p,
+                                            targetMarkets: isSelected
+                                                ? (p.targetMarkets || []).filter(m => m !== market.code)
+                                                : [...(p.targetMarkets || []), market.code]
+                                        }))}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${isSelected
+                                            ? 'bg-primary/15 text-primary border-primary/30 shadow-md shadow-primary/10'
+                                            : 'bg-white/[0.03] text-slate-500 border-white/[0.06] hover:border-white/[0.15] hover:text-slate-300'
+                                            }`}>
+                                        <span className="text-sm">{market.flag}</span>
+                                        {market.name}
+                                        {isSelected && <span className="material-symbols-outlined text-xs">check</span>}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        {(editData.targetMarkets || []).length === 0 && (
+                            <p className="text-xs text-amber-400/70 mt-2 flex items-center gap-1">
+                                <span className="material-symbols-outlined text-xs">info</span>
+                                No markets selected — AI will auto-detect from the Country field above.
+                            </p>
+                        )}
+                        {(editData.targetMarkets || []).length > 0 && (
+                            <p className="text-xs text-emerald-400/70 mt-2 flex items-center gap-1">
+                                <span className="material-symbols-outlined text-xs">check_circle</span>
+                                {(editData.targetMarkets || []).length} market{(editData.targetMarkets || []).length > 1 ? 's' : ''} selected — AI will adapt content for {(editData.targetMarkets || []).join(', ')}
+                            </p>
+                        )}
                     </div>
                 </EditModal>
             )}

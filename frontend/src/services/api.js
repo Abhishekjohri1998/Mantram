@@ -505,6 +505,7 @@ export const skills = {
     rate: (id, data) => apiFetch(`/skills/${id}/rate`, { method: 'POST', body: JSON.stringify(data) }),
     execute: (id, data) => apiFetch(`/skills/${id}/execute`, { method: 'POST', body: JSON.stringify(data) }),
     generate: (data) => apiFetch('/skills/generate', { method: 'POST', body: JSON.stringify(data) }),
+    enhanceInstructions: (data) => apiFetch('/skills/enhance-instructions', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ============ Google Analytics + Search Console API (brand-aware) ============

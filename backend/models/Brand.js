@@ -48,6 +48,9 @@ const brandSchema = new mongoose.Schema({
         brandDescription: { type: String, default: '' },
         country: { type: String, default: 'India' },
         region: { type: String, default: '' },
+        // Target markets — ISO country codes, e.g. ['IN', 'US', 'UK', 'AE']
+        // Used for market-aware festivals, content localization, and cultural context
+        targetMarkets: { type: [String], default: [] },
         defaultLanguage: { type: String, default: 'english' },
         languageStyle: { type: String, default: 'pure' },
         // All images scraped from the brand's homepage

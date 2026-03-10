@@ -396,6 +396,110 @@ export async function resubmitPiApiTask(storedPayload) {
     return { taskId, provider: 'piapi', model: 'seedance-2.0' };
 }
 
+
+/**
+ * Submit Image-to-Video generation to PiAPI (Seedance 2.0)
+ * Animates a still image into a video.
+ * 
+ * The key difference from regular generation:
+ *   - image_urls contains the SOURCE image (not just a reference)
+ *   - Prompt describes the MOTION, not the scene
+ *   - @image1 tag tells Seedance to use it as the starting frame
+ * 
+ * Returns { taskId, provider: 'piapi', model: 'seedance-2.0', mode: 'i2v', _payload }
+ */
+export async function submitPiApiImageToVideo({ imageUrl, prompt, duration, aspectRatio, qualityMode = 'fast', referenceImages = [] }) {
+    if (!imageUrl) throw new Error('Image URL is required for Image-to-Video');
+
+    const dur = Math.min(Math.max(duration || 5, 4), 15);
+
+    console.log(`🖼️→🎬 PiAPI I2V: imageUrl=${imageUrl.substring(0, 60)}..., refs=${referenceImages.length}, quality=${qualityMode}`);
+
+    // Upload to catbox if base64
+    let hostedUrl = imageUrl;
+    if (imageUrl.startsWith('data:')) {
+        // Resize to match target aspect ratio (PiAPI bug workaround)
+        const resized = await resizeToAspectRatio(imageUrl, aspectRatio || '16:9');
+        hostedUrl = await uploadImageToHostedUrl(resized);
+        if (!hostedUrl) throw new Error('Failed to host image for I2V generation');
+    }
+
+    // Build prompt with @image1 as the primary frame source
+    let finalPrompt = prompt || 'Animate this image with natural cinematic motion';
+    if (!finalPrompt.includes('@image1')) {
+        finalPrompt = `@image1 ${finalPrompt}`;
+    }
+
+    // Clean residual HTML tags
+    finalPrompt = finalPrompt.replace(/<img>[^<]*<\/img>/g, '').trim();
+
+    const taskType = qualityMode === 'quality' ? 'seedance-2-preview' : 'seedance-2-fast-preview';
+    console.log(`🎯 PiAPI I2V task_type: ${taskType}`);
+
+    const payload = {
+        model: 'seedance',
+        task_type: taskType,
+        input: {
+            prompt: finalPrompt,
+            image_urls: [hostedUrl, ...referenceImages.filter(Boolean)],
+            aspect_ratio: aspectRatio || '16:9',
+            duration: dur,
+        },
+    };
+
+    const taskId = await submitPiApiPayload(payload);
+
+    return {
+        taskId,
+        provider: 'piapi',
+        model: 'seedance-2.0',
+        mode: 'i2v',
+        _payload: payload,
+    };
+}
+
+
+/**
+ * Submit Video Extension to PiAPI (Seedance 2.0)
+ * Continues a previously generated video seamlessly.
+ * 
+ * Uses `parent_task_id` to reference the original PiAPI task,
+ * allowing Seedance to extend the video while preserving style,
+ * motion, characters, and audio consistency.
+ * 
+ * Returns { taskId, provider: 'piapi', model: 'seedance-2.0', mode: 'extend', _payload }
+ */
+export async function submitPiApiVideoExtend({ parentTaskId, prompt, duration, qualityMode = 'fast' }) {
+    if (!parentTaskId) throw new Error('Parent task ID is required for Video Extend');
+
+    const dur = Math.min(Math.max(duration || 5, 4), 10);
+
+    console.log(`🔗 PiAPI Extend: parentTaskId=${parentTaskId}, duration=${dur}s, quality=${qualityMode}`);
+
+    const taskType = qualityMode === 'quality' ? 'seedance-2-preview' : 'seedance-2-fast-preview';
+
+    const payload = {
+        model: 'seedance',
+        task_type: taskType,
+        input: {
+            prompt: prompt || '',
+            duration: dur,
+            parent_task_id: parentTaskId,
+        },
+    };
+
+    const taskId = await submitPiApiPayload(payload);
+
+    return {
+        taskId,
+        provider: 'piapi',
+        model: 'seedance-2.0',
+        mode: 'extend',
+        _payload: payload,
+        parentTaskId,
+    };
+}
+
 /**
  * Poll PiAPI video generation status
  * Returns { status, progress, videoUrl }

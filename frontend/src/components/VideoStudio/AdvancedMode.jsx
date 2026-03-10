@@ -126,6 +126,32 @@ const css = `
 
 @keyframes adv-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .adv-spin { animation: adv-spin 1s linear infinite; }
+
+/* Mode Tabs */
+.adv-mode-tabs { display: flex; gap: 4px; margin-bottom: 20px; padding: 4px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); }
+.adv-mode-tab { flex: 1; padding: 10px 12px; border-radius: 10px; border: none; background: transparent; color: #64748b; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s; }
+.adv-mode-tab:hover { color: #94a3b8; }
+.adv-mode-tab.active { background: linear-gradient(135deg, rgba(139,92,246,0.15), rgba(6,182,212,0.1)); color: #e2e8f0; border: 1px solid rgba(139,92,246,0.3); }
+.adv-mode-tab .badge-new { font-size: 9px; font-weight: 800; padding: 1px 5px; border-radius: 6px; background: linear-gradient(135deg, #f59e0b, #ef4444); color: #fff; text-transform: uppercase; }
+
+/* I2V Upload Zone */
+.adv-i2v-zone { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 40px 20px; border-radius: 16px; border: 2px dashed rgba(139,92,246,0.25); background: rgba(139,92,246,0.04); cursor: pointer; transition: all 0.2s; margin-bottom: 16px; }
+.adv-i2v-zone:hover { border-color: rgba(139,92,246,0.5); background: rgba(139,92,246,0.08); }
+.adv-i2v-zone.has-image { border-style: solid; border-color: rgba(34,197,94,0.4); background: rgba(34,197,94,0.04); padding: 12px; }
+.adv-i2v-zone .preview { width: 100%; max-height: 280px; border-radius: 12px; object-fit: contain; }
+.adv-i2v-zone .icon { font-size: 36px; color: #7c3aed; }
+.adv-i2v-zone .label { font-size: 14px; color: #94a3b8; }
+.adv-i2v-zone .sublabel { font-size: 11px; color: #475569; }
+.adv-i2v-remove { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); border: none; border-radius: 50%; width: 28px; height: 28px; color: #f87171; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+
+/* Extend Panel */
+.adv-extend-panel { padding: 16px; border-radius: 14px; background: rgba(139,92,246,0.06); border: 1px solid rgba(139,92,246,0.2); margin-top: 12px; }
+.adv-extend-panel h4 { font-size: 13px; font-weight: 700; color: #c4b5fd; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+.adv-extend-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.adv-extend-input { flex: 1; min-width: 160px; padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: #e2e8f0; font-size: 13px; }
+.adv-extend-input::placeholder { color: #475569; }
+.adv-btn-extend { padding: 10px 18px; border-radius: 10px; border: none; background: linear-gradient(135deg, #7c3aed, #06b6d4); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.adv-btn-extend:disabled { opacity: 0.4; cursor: default; }
 `
 
 export default function AdvancedMode({ activeBrand, initialData }) {
@@ -135,6 +161,13 @@ export default function AdvancedMode({ activeBrand, initialData }) {
     const [aspectRatio, setAspectRatio] = useState('16:9')
     const [quality, setQuality] = useState('fast')
     const [phase, setPhase] = useState('compose')
+    const [videoMode, setVideoMode] = useState('t2v') // 't2v' | 'i2v'
+    const [i2vImage, setI2vImage] = useState(null) // { url, source }
+    const [extending, setExtending] = useState(false)
+    const [showExtendPanel, setShowExtendPanel] = useState(false)
+    const [extendPrompt, setExtendPrompt] = useState('')
+    const [extendDuration, setExtendDuration] = useState(5)
+    const i2vRef = useRef(null)
 
     const [firstFrame, setFirstFrame] = useState(null)
     const [lastFrame, setLastFrame] = useState(null)
@@ -318,12 +351,11 @@ export default function AdvancedMode({ activeBrand, initialData }) {
         return prompt.trim()
     }
 
-    // ── Generate ──
+    // ── Generate (T2V) ──
     async function handleGenerate() {
         if (!prompt.trim()) { setError('Write your ad idea first'); return }
         setLoading(true); setError('')
         try {
-            // Send ALL ref images (base64 or URL) — PiAPI supports both
             const allRefUrls = refImages.map(r => r.url).filter(Boolean)
             console.log(`🎬 Sending ${allRefUrls.length} ref images to backend`)
 
@@ -341,6 +373,61 @@ export default function AdvancedMode({ activeBrand, initialData }) {
             setProjectId(d.project._id); setGeneration(d.project.generation); setPhase('generating'); startPolling(d.project._id)
         } catch (e) { setError(e.message) }
         setLoading(false)
+    }
+
+    // ── Generate (I2V) ──
+    async function handleI2VGenerate() {
+        if (!i2vImage?.url) { setError('Upload an image first'); return }
+        setLoading(true); setError('')
+        try {
+            const d = await api('/video-studio/advanced/image-to-video', {
+                method: 'POST',
+                body: JSON.stringify({
+                    imageUrl: i2vImage.url,
+                    prompt: prompt.trim() || 'Animate this image with natural cinematic motion',
+                    duration, aspectRatio, qualityMode: quality,
+                    brandId: activeBrand?._id || null,
+                    referenceImages: refImages.map(r => r.url).filter(Boolean),
+                }),
+            })
+            setProjectId(d.project._id); setGeneration(d.project.generation); setPhase('generating'); startPolling(d.project._id)
+        } catch (e) { setError(e.message) }
+        setLoading(false)
+    }
+
+    // ── Extend Video ──
+    async function handleExtend() {
+        if (!projectId) return
+        setExtending(true); setError('')
+        try {
+            const d = await api('/video-studio/extend-video', {
+                method: 'POST',
+                body: JSON.stringify({
+                    projectId,
+                    prompt: extendPrompt.trim(),
+                    duration: extendDuration,
+                    qualityMode: quality,
+                }),
+            })
+            setProjectId(d.project._id); setGeneration(d.project.generation); setPhase('generating'); startPolling(d.project._id)
+            setShowExtendPanel(false); setExtendPrompt('')
+        } catch (e) { setError(e.message) }
+        setExtending(false)
+    }
+
+    // ── I2V file handler ──
+    function onI2VFile(e) {
+        const file = e.target.files?.[0]
+        if (!file) return
+        const reader = new FileReader()
+        reader.onload = async () => {
+            const base64 = reader.result
+            setI2vImage({ url: base64, source: 'upload', uploading: true })
+            const hosted = await uploadImage(base64)
+            if (hosted) setI2vImage({ url: hosted, source: 'upload', uploading: false })
+            else setI2vImage({ url: base64, source: 'upload', uploading: false })
+        }
+        reader.readAsDataURL(file)
     }
 
     const startPolling = useCallback((pid) => {
@@ -375,14 +462,14 @@ export default function AdvancedMode({ activeBrand, initialData }) {
                 <div style={{ padding: '60px 20px' }}>
                     <div className="adv-gen-card">
                         <div className="adv-gen-preview">
-                            {firstFrame?.url && <img src={firstFrame.url} alt="" />}
+                            {(firstFrame?.url || i2vImage?.url) && <img src={i2vImage?.url || firstFrame?.url} alt="" />}
                             <div className="badges">
                                 <span className="adv-gen-badge" style={{ background: 'rgba(139,92,246,0.85)', color: '#fff' }}>{generation?.progress || 5}%</span>
-                                <span className="adv-gen-badge" style={{ background: 'rgba(0,0,0,0.5)', color: '#ccc' }}>{m.name}</span>
+                                <span className="adv-gen-badge" style={{ background: 'rgba(0,0,0,0.5)', color: '#ccc' }}>{videoMode === 'i2v' ? '🖼️→🎬 I2V' : m.name}</span>
                             </div>
                         </div>
                         <div className="adv-gen-info">
-                            <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '12px' }}>🎬 Creating your ad film — usually 1-3 minutes</p>
+                            <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '12px' }}>{videoMode === 'i2v' ? '🖼️ Animating your image — usually 1-3 minutes' : '🎬 Creating your ad film — usually 1-3 minutes'}</p>
                             <div className="adv-progress-bar"><div className="adv-progress-fill" style={{ width: `${generation?.progress || 5}%` }} /></div>
                         </div>
                     </div>
@@ -396,9 +483,14 @@ export default function AdvancedMode({ activeBrand, initialData }) {
                         <>
                             <div className="adv-done-card"><video controls src={projectId ? `${API_BASE}/video-studio/${projectId}/video` : generation.videoUrl} /></div>
                             <div className="adv-done-btns">
-                                <button className="adv-btn-secondary" onClick={() => { setPhase('compose'); setGeneration(null) }}>
+                                <button className="adv-btn-secondary" onClick={() => { setPhase('compose'); setGeneration(null); setShowExtendPanel(false) }}>
                                     <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>edit</span> Edit & Retry
                                 </button>
+                                {generation?.provider === 'piapi' && (
+                                    <button className="adv-btn-secondary" onClick={() => setShowExtendPanel(v => !v)} style={showExtendPanel ? { borderColor: 'rgba(139,92,246,0.4)', background: 'rgba(139,92,246,0.08)' } : {}}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>add_circle</span> Extend Video
+                                    </button>
+                                )}
                                 <button className="adv-btn-primary" onClick={async () => {
                                     try {
                                         const videoSrc = projectId ? `${API_BASE}/video-studio/${projectId}/video` : generation.videoUrl
@@ -416,6 +508,22 @@ export default function AdvancedMode({ activeBrand, initialData }) {
                                     <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>download</span> Download
                                 </button>
                             </div>
+                            {/* Extend Panel */}
+                            {showExtendPanel && (
+                                <div className="adv-extend-panel">
+                                    <h4><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>add_circle</span> Extend this video</h4>
+                                    <div className="adv-extend-row">
+                                        <input className="adv-extend-input" value={extendPrompt} onChange={e => setExtendPrompt(e.target.value)} placeholder="What should happen next? (optional)" />
+                                        <select className="adv-select" value={extendDuration} onChange={e => setExtendDuration(Number(e.target.value))} style={{ width: '80px' }}>
+                                            {[4, 5, 6, 7, 8, 9, 10].map(d => <option key={d} value={d}>{d}s</option>)}
+                                        </select>
+                                        <button className="adv-btn-extend" onClick={handleExtend} disabled={extending}>
+                                            {extending ? <><span className="material-symbols-outlined adv-spin" style={{ fontSize: '14px' }}>progress_activity</span> Extending...</>
+                                                : <>🔗 Extend +{extendDuration}s</>}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </>
                     ) : (
                         <div style={{ textAlign: 'center', padding: '60px 20px' }}>
@@ -440,53 +548,134 @@ export default function AdvancedMode({ activeBrand, initialData }) {
                         </div>
                     )}
 
-                    {/* §1 — PROMPT */}
-                    <div className="adv-prompt-card" style={{ position: 'relative' }}>
-                        <textarea
-                            ref={promptRef}
-                            className="adv-textarea"
-                            value={prompt}
-                            onChange={handlePromptChange}
-                            placeholder={activeBrand?.name
-                                ? `What's your ${activeBrand.name} ad about? Type @ to tag ref images...`
-                                : `What's your ad about? Type @ to tag ref images...`}
-                        />
-                        {/* @ Autocomplete popup */}
-                        {showAutocomplete && refImages.length > 0 && (
-                            <div className="adv-autocomplete">
-                                {refImages.map((img, i) => (
-                                    <button key={img.id} className="adv-ac-item" onClick={() => insertTag(i)}>
-                                        <img src={img.url} alt="" />
-                                        <span>@image{i + 1}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                        {/* Ref image tags */}
-                        {refImages.length > 0 && (
-                            <div className="adv-tags">
-                                {refImages.map((img, i) => {
-                                    const isLinked = prompt.includes(`@image${i + 1}`)
-                                    return (
-                                        <div key={img.id} className="adv-tag" style={isLinked ? { borderColor: 'rgba(34,197,94,0.4)', background: 'rgba(34,197,94,0.08)' } : {}}>
-                                            <img src={img.url} alt="" />
-                                            <span style={isLinked ? { color: '#4ade80' } : {}}>@image{i + 1}</span>
-                                            {isLinked && <span style={{ fontSize: 10 }}>🔗</span>}
-                                            {!isLinked && !img.uploading && <span style={{ fontSize: 9, color: '#64748b' }}>type @ to link</span>}
-                                            {img.uploading && <span className="uploading">uploading...</span>}
-                                            <button onClick={() => setRefImages(prev => prev.filter(r => r.id !== img.id))}>×</button>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        )}
-                        <div className="adv-prompt-footer">
-                            <button className="adv-enhance" onClick={handleEnhance} disabled={enhancing || !prompt.trim()}>
-                                {enhancing ? <><span className="material-symbols-outlined adv-spin" style={{ fontSize: '14px' }}>progress_activity</span> Enhancing...</> : <>✨ Enhance as Ad Film</>}
-                            </button>
-                            <span className="adv-chars">{prompt.length} chars</span>
-                        </div>
+                    {/* Mode Toggle */}
+                    <div className="adv-mode-tabs">
+                        <button className={`adv-mode-tab ${videoMode === 't2v' ? 'active' : ''}`} onClick={() => setVideoMode('t2v')}>
+                            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>text_fields</span> Text to Video
+                        </button>
+                        <button className={`adv-mode-tab ${videoMode === 'i2v' ? 'active' : ''}`} onClick={() => setVideoMode('i2v')}>
+                            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>image</span> Image to Video <span className="badge-new">New</span>
+                        </button>
                     </div>
+
+                    {/* ═══ I2V MODE ═══ */}
+                    {videoMode === 'i2v' && (
+                        <>
+                            {/* Image Upload Zone */}
+                            <div className={`adv-i2v-zone ${i2vImage ? 'has-image' : ''}`} onClick={() => !i2vImage && i2vRef.current?.click()} style={{ position: 'relative' }}>
+                                {i2vImage ? (
+                                    <>
+                                        <img className="preview" src={i2vImage.url} alt="Source" />
+                                        {i2vImage.uploading && <p style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>Uploading...</p>}
+                                        <button className="adv-i2v-remove" onClick={e => { e.stopPropagation(); setI2vImage(null) }}>×</button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="icon material-symbols-outlined">add_photo_alternate</span>
+                                        <span className="label">Upload image to animate</span>
+                                        <span className="sublabel">Product photo, brand image, or any still — Seedance will bring it to life</span>
+                                    </>
+                                )}
+                            </div>
+                            <input ref={i2vRef} type="file" accept="image/*" onChange={onI2VFile} style={{ display: 'none' }} />
+
+                            {/* Motion Prompt */}
+                            <div className="adv-prompt-card">
+                                <textarea
+                                    className="adv-textarea"
+                                    value={prompt}
+                                    onChange={e => setPrompt(e.target.value)}
+                                    placeholder="Describe the motion... e.g. 'Camera slowly zooms in, product rotates 360°, soft light sweep'"
+                                    style={{ minHeight: '80px' }}
+                                />
+                                <div className="adv-prompt-footer">
+                                    <span style={{ fontSize: '11px', color: '#475569' }}>💡 Describe how the image should move, not what it looks like</span>
+                                    <span className="adv-chars">{prompt.length} chars</span>
+                                </div>
+                            </div>
+
+                            {/* Ref Images for I2V */}
+                            <div className="adv-features" style={{ marginTop: '8px' }}>
+                                <div className={`adv-fcard ${refImages.length > 0 ? 'has-content' : ''}`}>
+                                    <div className="adv-fcard-head">
+                                        <span className="icon">🎨</span>
+                                        <span className="title">Reference Images</span>
+                                        <span style={{ fontSize: '10px', color: '#64748b', marginLeft: 'auto' }}>Style, scene, or character refs</span>
+                                    </div>
+                                    {refImages.length > 0 && (
+                                        <div className="adv-tags" style={{ padding: '8px 12px' }}>
+                                            {refImages.map((img, i) => (
+                                                <div key={img.id} className="adv-tag">
+                                                    <img src={img.url} alt="" />
+                                                    <span>ref {i + 1}</span>
+                                                    {img.uploading && <span className="uploading">uploading...</span>}
+                                                    <button onClick={() => setRefImages(prev => prev.filter(r => r.id !== img.id))}>×</button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    <div className="adv-fcard-btns">
+                                        <button className="adv-fcard-btn" onClick={() => refImgRef.current?.click()}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>add_photo_alternate</span> Add Ref
+                                        </button>
+                                        <button className="adv-fcard-btn" onClick={() => openLibrary('ref')}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>photo_library</span> Library
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* ═══ T2V MODE (original) ═══ */}
+                    {videoMode === 't2v' && (
+                        <div className="adv-prompt-card" style={{ position: 'relative' }}>
+                            <textarea
+                                ref={promptRef}
+                                className="adv-textarea"
+                                value={prompt}
+                                onChange={handlePromptChange}
+                                placeholder={activeBrand?.name
+                                    ? `What's your ${activeBrand.name} ad about? Type @ to tag ref images...`
+                                    : `What's your ad about? Type @ to tag ref images...`}
+                            />
+                            {/* @ Autocomplete popup */}
+                            {showAutocomplete && refImages.length > 0 && (
+                                <div className="adv-autocomplete">
+                                    {refImages.map((img, i) => (
+                                        <button key={img.id} className="adv-ac-item" onClick={() => insertTag(i)}>
+                                            <img src={img.url} alt="" />
+                                            <span>@image{i + 1}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                            {/* Ref image tags */}
+                            {refImages.length > 0 && (
+                                <div className="adv-tags">
+                                    {refImages.map((img, i) => {
+                                        const isLinked = prompt.includes(`@image${i + 1}`)
+                                        return (
+                                            <div key={img.id} className="adv-tag" style={isLinked ? { borderColor: 'rgba(34,197,94,0.4)', background: 'rgba(34,197,94,0.08)' } : {}}>
+                                                <img src={img.url} alt="" />
+                                                <span style={isLinked ? { color: '#4ade80' } : {}}>@image{i + 1}</span>
+                                                {isLinked && <span style={{ fontSize: 10 }}>🔗</span>}
+                                                {!isLinked && !img.uploading && <span style={{ fontSize: 9, color: '#64748b' }}>type @ to link</span>}
+                                                {img.uploading && <span className="uploading">uploading...</span>}
+                                                <button onClick={() => setRefImages(prev => prev.filter(r => r.id !== img.id))}>×</button>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
+                            <div className="adv-prompt-footer">
+                                <button className="adv-enhance" onClick={handleEnhance} disabled={enhancing || !prompt.trim()}>
+                                    {enhancing ? <><span className="material-symbols-outlined adv-spin" style={{ fontSize: '14px' }}>progress_activity</span> Enhancing...</> : <>✨ Enhance as Ad Film</>}
+                                </button>
+                                <span className="adv-chars">{prompt.length} chars</span>
+                            </div>
+                        </div>
+                    )}
 
                     {/* §2 — CONFIG ROW */}
                     <div className="adv-config">
@@ -517,8 +706,8 @@ export default function AdvancedMode({ activeBrand, initialData }) {
                         </div>
                     </div>
 
-                    {/* §3 — DYNAMIC FEATURE CARDS */}
-                    <div className="adv-features">
+                    {/* §3 — DYNAMIC FEATURE CARDS (T2V only) */}
+                    {videoMode === 't2v' && <div className="adv-features">
                         {/* First Frame */}
                         {m.has.firstFrame && (
                             <div className={`adv-fcard ${firstFrame ? 'has-content' : ''}`}>
@@ -635,7 +824,7 @@ export default function AdvancedMode({ activeBrand, initialData }) {
                                 <input ref={refAudioRef} type="file" accept="audio/*" onChange={e => onMediaFile(e, setRefAudio)} style={{ display: 'none' }} />
                             </div>
                         )}
-                    </div>
+                    </div>}
 
                     {/* Library Modal */}
                     {showLibrary && (
@@ -654,9 +843,15 @@ export default function AdvancedMode({ activeBrand, initialData }) {
                     )}
 
                     {/* §4 — GENERATE BUTTON */}
-                    <button className="adv-generate" onClick={handleGenerate} disabled={loading || !prompt.trim()}>
-                        {loading ? <><span className="material-symbols-outlined adv-spin" style={{ fontSize: '18px' }}>progress_activity</span> Submitting to {m.name}...</> : <>🎬 Generate Ad Film · {credits} credits · ~2 min</>}
-                    </button>
+                    {videoMode === 'i2v' ? (
+                        <button className="adv-generate" onClick={handleI2VGenerate} disabled={loading || !i2vImage?.url}>
+                            {loading ? <><span className="material-symbols-outlined adv-spin" style={{ fontSize: '18px' }}>progress_activity</span> Animating image...</> : <>🖼️→🎬 Animate Image · {credits} credits · ~2 min</>}
+                        </button>
+                    ) : (
+                        <button className="adv-generate" onClick={handleGenerate} disabled={loading || !prompt.trim()}>
+                            {loading ? <><span className="material-symbols-outlined adv-spin" style={{ fontSize: '18px' }}>progress_activity</span> Submitting to {m.name}...</> : <>🎬 Generate Ad Film · {credits} credits · ~2 min</>}
+                        </button>
+                    )}
                 </div>
             )}
         </>

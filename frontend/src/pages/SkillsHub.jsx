@@ -186,6 +186,7 @@ export default function SkillsHub() {
     const [buildForm, setBuildForm] = useState({ name: '', description: '', instructions: '', category: 'general', tags: '', icon: 'auto_awesome', color: 'violet', temperature: 0.7, outputFormat: 'structured', inputFields: [] })
     const [aiPrompt, setAiPrompt] = useState('')
     const [generating, setGenerating] = useState(false)
+    const [enhancingInstructions, setEnhancingInstructions] = useState(false)
 
     // Load skills
     useEffect(() => {
@@ -297,6 +298,23 @@ export default function SkillsHub() {
     }
 
     const goHome = () => { setView('browse'); setSelectedSkill(null); setResult(null); setError('') }
+
+    // ── Enhance instructions with AI ──
+    const enhanceInstructions = async () => {
+        if (!buildForm.instructions.trim()) { setError('Write some rough instructions first, then enhance'); return }
+        setEnhancingInstructions(true); setError('')
+        try {
+            const data = await skillsAPI.enhanceInstructions({
+                instructions: buildForm.instructions,
+                skillName: buildForm.name,
+                skillDescription: buildForm.description,
+            })
+            if (data.success && data.enhanced) {
+                setBuildForm({ ...buildForm, instructions: data.enhanced })
+            } else { setError(data.error || 'Enhancement failed') }
+        } catch (e) { setError(e.message) }
+        finally { setEnhancingInstructions(false) }
+    }
 
     // ── RENDER ──
     return (
@@ -592,6 +610,12 @@ export default function SkillsHub() {
                                 <textarea value={buildForm.instructions} onChange={e => setBuildForm({ ...buildForm, instructions: e.target.value })}
                                     placeholder="Write detailed instructions for the AI: what to produce, how to structure the output, what tone to use, quality rules..."
                                     rows={8} className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:border-primary focus:outline-none resize-none font-mono" />
+                                <button onClick={enhanceInstructions} disabled={enhancingInstructions || !buildForm.instructions.trim()}
+                                    className="mt-2 px-4 py-2 rounded-xl bg-gradient-to-r from-violet-500/15 to-cyan-500/10 border border-violet-500/30 text-violet-300 text-xs font-bold hover:from-violet-500/25 hover:to-cyan-500/20 cursor-pointer transition-all flex items-center gap-1.5 disabled:opacity-30">
+                                    {enhancingInstructions
+                                        ? <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Enhancing...</>
+                                        : <><span className="material-symbols-outlined text-sm">auto_awesome</span> Enhance with AI</>}
+                                </button>
                             </div>
 
                             <div className="grid grid-cols-3 gap-4">

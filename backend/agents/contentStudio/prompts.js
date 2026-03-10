@@ -46,6 +46,8 @@ RULES:
 5. Write for the specified platform (Instagram caption differs from LinkedIn article)
 6. Include a compelling CTA aligned with brand goals
 7. Never use asterisks, markdown formatting, or special characters for emphasis — write clean, final copy
+8. MARKET ADAPTATION: Adapt language, cultural references, idioms, currency, and examples for the brand's target markets. Use the market context provided in the brand bible.
+9. If the brand targets non-English markets, write in the appropriate language or blend (e.g., Hinglish for India, Portuguese for Brazil)
 
 RESPONSE FORMAT — valid JSON only:
 {
@@ -95,9 +97,11 @@ RULES:
 2. Check for consistency with brand's dos and don'ts
 3. Verify key phrases and terminology are used appropriately
 4. Adjust tone intensity (too formal? too casual? too salesy?)
-5. Ensure cultural sensitivity for the target market
+5. Ensure cultural sensitivity for the target market — check that references, idioms, humor, and examples are appropriate for the brand's target markets
 6. Make subtle refinements — don't rewrite the content
 7. Never use asterisks, markdown formatting, or special characters
+8. Verify currency, date formats, and measurement units match the target market (e.g., USD for US, £ for UK, ₹ for India)
+9. If the brand targets multiple markets, ensure the tone works universally across all specified target markets
 
 RESPONSE FORMAT — valid JSON only:
 {

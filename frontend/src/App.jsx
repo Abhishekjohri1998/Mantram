@@ -32,6 +32,7 @@ import PerformanceMarketing from './pages/PerformanceMarketing'
 import D2CAnalytics from './pages/D2CAnalytics'
 import BrandManagement from './pages/BrandManagement'
 import SkillsHub from './pages/SkillsHub'
+import StudioPreview from './pages/StudioPreview'
 
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
@@ -59,6 +60,7 @@ function App() {
                 <Route path="/terms" element={<TermsOfService />} />
                 <Route path="/data-deletion" element={<DataDeletion />} />
                 <Route path="/data-deletion-status" element={<DataDeletion />} />
+                <Route path="/studio/:slug" element={<StudioPreview />} />
 
                 {/* Protected routes — require authentication */}
                 <Route path="/nexus" element={<ProtectedRoute><Nexus /></ProtectedRoute>} />
