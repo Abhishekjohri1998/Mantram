@@ -19,6 +19,7 @@ const INTENTS = [
     { id: 'offer', icon: 'sell', label: 'Offer Strategy', desc: 'Pricing, bundles, promotions', color: 'from-rose-500 to-pink-600' },
     { id: 'positioning', icon: 'target', label: 'Brand Positioning', desc: 'Differentiation & market stance', color: 'from-indigo-500 to-blue-700' },
     { id: 'trend-hijack', icon: 'trending_up', label: 'Trend Hijack', desc: 'Ride viral moments & trends', color: 'from-fuchsia-500 to-purple-700' },
+    { id: 'brand-strategy', icon: 'architecture', label: 'Brand Strategy', desc: 'Full 1–3 month measurable strategy', color: 'from-amber-500 to-yellow-600' },
     { id: 'custom', icon: 'edit', label: 'Something Custom', desc: 'Free-form brainstorm session', color: 'from-slate-500 to-gray-700' },
 ]
 
@@ -175,6 +176,18 @@ export default function BrainstormStudio() {
     const [screenplay, setScreenplay] = useState(null)
     const [screenplayLoading, setScreenplayLoading] = useState(false)
     const [error, setError] = useState('')
+
+    // Strategy state
+    const [strategyData, setStrategyData] = useState(null)
+    const [strategyId, setStrategyId] = useState(null)
+    const [strategyKpis, setStrategyKpis] = useState([])
+    const [strategyMilestones, setStrategyMilestones] = useState([])
+    const [slides, setSlides] = useState(null)
+    const [slideIndex, setSlideIndex] = useState(0)
+    const [slidesLoading, setSlidesLoading] = useState(false)
+    const [savedStrategies, setSavedStrategies] = useState([])
+    const [trackerView, setTrackerView] = useState(null) // null or strategy object
+    const [kpiEditing, setKpiEditing] = useState(null)
 
     // Chat state (for interactive film refinement)
     const [chatFilm, setChatFilm] = useState(null)
@@ -377,7 +390,93 @@ export default function BrainstormStudio() {
         setCurrentAnswer(''); setConfirmation(null); setIdeas(null); setExpandedIdea(null);
         setBrandInsight(null); setIdeaFeedback({}); setScreenplay(null); setError(''); setLoading(false);
         setChatFilm(null); setChatHistory([]); setChatMessage(''); setChatLoading(false)
+        setStrategyData(null); setStrategyId(null); setStrategyKpis([]); setStrategyMilestones([]);
+        setSlides(null); setSlideIndex(0); setSlidesLoading(false); setTrackerView(null); setKpiEditing(null)
     }
+
+    // ========== STRATEGY HANDLERS ==========
+
+    const generateStrategy = async () => {
+        setLoading(true)
+        setLoadingMsg('Building your comprehensive brand strategy...')
+        setStep(6)
+        setError('')
+        try {
+            const data = await bsAPI.strategy({
+                answers,
+                brand: activeBrand ? { _id: activeBrand._id, name: activeBrand.name, dna: activeBrand.dna } : null,
+            })
+            if (data.success && data.strategy) {
+                setStrategyData(data.strategy)
+                setStrategyId(data.strategyId)
+                setStrategyKpis(data.kpis || [])
+                setStrategyMilestones(data.milestones || [])
+            } else {
+                setError(data.error || 'Strategy generation failed')
+            }
+        } catch (e) { setError(e.message) }
+        finally { setLoading(false) }
+    }
+
+    const generateSlides = async () => {
+        setSlidesLoading(true)
+        setSlides(null)
+        try {
+            const data = await bsAPI.strategySlides({
+                strategyId,
+                strategy: strategyData,
+                brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna } : null,
+            })
+            if (data.success && data.slides) {
+                setSlides(data.slides)
+                setSlideIndex(0)
+                setStep(7)
+            } else { setError(data.error || 'Slides generation failed') }
+        } catch (e) { setError(e.message) }
+        finally { setSlidesLoading(false) }
+    }
+
+    const updateKpiValue = async (kpiName, value) => {
+        if (!strategyId) return
+        try {
+            const data = await bsAPI.updateKpi(strategyId, { kpiName, current: Number(value) })
+            if (data.success) { setStrategyKpis(data.kpis); setKpiEditing(null) }
+        } catch (e) { console.warn('KPI update failed:', e) }
+    }
+
+    const toggleMilestone = async (milestoneId, completed) => {
+        if (!strategyId) return
+        try {
+            const data = await bsAPI.toggleMilestone(strategyId, { milestoneId, completed })
+            if (data.success) setStrategyMilestones(data.milestones)
+        } catch (e) { console.warn('Milestone toggle failed:', e) }
+    }
+
+    const loadSavedStrategies = async () => {
+        try {
+            const data = await bsAPI.listStrategies()
+            if (data.success) setSavedStrategies(data.strategies || [])
+        } catch (e) { console.warn('Failed to load strategies:', e) }
+    }
+
+    const openSavedStrategy = async (id) => {
+        setLoading(true); setLoadingMsg('Loading strategy...')
+        try {
+            const data = await bsAPI.getStrategy(id)
+            if (data.success && data.strategy) {
+                const s = data.strategy
+                setStrategyData(s.strategy)
+                setStrategyId(s._id)
+                setStrategyKpis(s.kpis || [])
+                setStrategyMilestones(s.milestones || [])
+                setIntent('brand-strategy')
+                setStep(6)
+            }
+        } catch (e) { setError(e.message) }
+        finally { setLoading(false) }
+    }
+
+    useEffect(() => { loadSavedStrategies() }, [])
 
     // ========== RENDER ==========
 
@@ -454,6 +553,38 @@ export default function BrainstormStudio() {
                         <div className="text-center mt-8">
                             <span className="material-symbols-outlined text-3xl text-primary animate-spin block mb-2">progress_activity</span>
                             <p className="text-sm text-slate-400">{loadingMsg}</p>
+                        </div>
+                    )}
+
+                    {/* Saved Strategies */}
+                    {savedStrategies.length > 0 && (
+                        <div className="max-w-4xl mx-auto mt-10">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="flex-1 h-px bg-white/[0.06]" />
+                                <span className="text-sm text-slate-500 font-bold uppercase tracking-wider">Your Strategies</span>
+                                <div className="flex-1 h-px bg-white/[0.06]" />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                {savedStrategies.slice(0, 6).map(s => (
+                                    <button key={s._id} onClick={() => openSavedStrategy(s._id)}
+                                        className="glass-panel rounded-xl p-4 text-left hover:border-amber-500/30 cursor-pointer transition-all group">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="material-symbols-outlined text-amber-400 text-base">architecture</span>
+                                            <h4 className="text-sm font-bold text-white truncate flex-1">{s.title}</h4>
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${s.status === 'active' ? 'bg-emerald-500/10 text-emerald-400' : s.status === 'completed' ? 'bg-blue-500/10 text-blue-400' : 'bg-slate-500/10 text-slate-400'}`}>
+                                                {s.status}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-slate-500 mb-2 truncate">{s.objective}</p>
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                                <div className="h-full bg-amber-500 rounded-full" style={{ width: `${s.overallProgress || 0}%` }} />
+                                            </div>
+                                            <span className="text-[10px] text-slate-500">{s.overallProgress || 0}%</span>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>
@@ -581,10 +712,10 @@ export default function BrainstormStudio() {
                             {/* Confirm / Refine */}
                             <div className="flex flex-col gap-3 pl-13">
                                 <CreditTooltipWrapper action="brainstorm">
-                                    <button onClick={() => generateIdeas()}
+                                    <button onClick={() => intent === 'brand-strategy' ? generateStrategy() : generateIdeas()}
                                         className="btn-primary w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 cursor-pointer">
                                         <span className="material-symbols-outlined text-lg">check_circle</span>
-                                        Yes, that's right — Generate Ideas! <CreditBadge action="brainstorm" />
+                                        {intent === 'brand-strategy' ? 'Yes — Generate My Strategy!' : "Yes, that's right — Generate Ideas!"} <CreditBadge action="brainstorm" />
                                     </button>
                                 </CreditTooltipWrapper>
 
@@ -880,6 +1011,513 @@ export default function BrainstormStudio() {
                             )}
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* ========== STEP 6: STRATEGY DASHBOARD ========== */}
+            {step === 6 && (
+                <div className="animate-fade-in">
+                    {loading ? (
+                        <div className="text-center py-20">
+                            <div className="relative inline-block mb-6">
+                                <span className="material-symbols-outlined text-6xl text-amber-400 animate-spin block">architecture</span>
+                                <span className="absolute -bottom-1 -right-1 material-symbols-outlined text-2xl text-primary animate-pulse">stars</span>
+                            </div>
+                            <h3 className="text-lg font-bold text-white mb-2">{loadingMsg}</h3>
+                            <p className="text-sm text-slate-500 max-w-md mx-auto mt-2">Our CMO agent is analyzing your brand, objectives, and market to build a measurable strategy</p>
+                            <div className="flex items-center justify-center gap-3 mt-6">
+                                {['Market Analysis', 'Channel Planning', 'KPI Setting', 'Budget Allocation', 'Timeline'].map((a, i) => (
+                                    <div key={a} className="flex flex-col items-center gap-1 animate-fade-in" style={{ animationDelay: `${i * 500}ms` }}>
+                                        <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center">
+                                            <span className="material-symbols-outlined text-amber-400 text-sm">{['analytics', 'hub', 'target', 'payments', 'schedule'][i]}</span>
+                                        </div>
+                                        <span className="text-[10px] text-slate-500">{a}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ) : strategyData && (
+                        <div>
+                            {/* Header */}
+                            <div className="flex items-center justify-between mb-6">
+                                <div>
+                                    <h2 className="text-xl font-black text-white">{strategyData.title}</h2>
+                                    <p className="text-sm text-slate-400 mt-1">{strategyData.duration} · {strategyData.budget_total}</p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={generateSlides} disabled={slidesLoading}
+                                        className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold hover:border-amber-400/50 cursor-pointer transition-all flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-sm">{slidesLoading ? 'progress_activity' : 'slideshow'}</span>
+                                        {slidesLoading ? 'Generating...' : 'Generate Presentation'}
+                                    </button>
+                                    <button onClick={resetAll} className="px-3 py-2.5 rounded-xl glass-panel text-xs text-slate-400 hover:text-white cursor-pointer transition-all">
+                                        <span className="material-symbols-outlined text-sm">restart_alt</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Executive Summary */}
+                            <div className="glass-panel rounded-2xl p-5 mb-6 border-l-4 border-amber-500">
+                                <h3 className="text-sm font-bold text-amber-400 uppercase mb-2">Executive Summary</h3>
+                                <p className="text-sm text-white leading-relaxed">{strategyData.executive_summary}</p>
+                                <p className="text-xs text-slate-400 mt-2"><strong>Objective:</strong> {strategyData.objective}</p>
+                            </div>
+
+                            {/* Success Probability + Competitive Landscape */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                {strategyData.success_probability && (
+                                    <div className="glass-panel rounded-2xl p-5">
+                                        <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-emerald-400 text-base">speed</span> Success Probability
+                                        </h3>
+                                        <div className="flex items-center gap-4 mb-3">
+                                            <div className="relative w-16 h-16">
+                                                <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+                                                    <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3" />
+                                                    <circle cx="18" cy="18" r="14" fill="none" strokeWidth="3" strokeDasharray={`${strategyData.success_probability.overall * 0.88} 88`}
+                                                        stroke={strategyData.success_probability.overall >= 70 ? '#10b981' : strategyData.success_probability.overall >= 50 ? '#f59e0b' : '#ef4444'}
+                                                        strokeLinecap="round" />
+                                                </svg>
+                                                <span className="absolute inset-0 flex items-center justify-center text-sm font-black text-white">{strategyData.success_probability.overall}%</span>
+                                            </div>
+                                            <p className="text-xs text-slate-300 flex-1 leading-relaxed">{strategyData.success_probability.reasoning}</p>
+                                        </div>
+                                        {strategyData.success_probability.key_dependencies?.length > 0 && (
+                                            <div className="space-y-1 mt-2">
+                                                <p className="text-[10px] text-slate-500 uppercase font-bold">Key Dependencies</p>
+                                                {strategyData.success_probability.key_dependencies.map((d, i) => (
+                                                    <p key={i} className="text-[11px] text-slate-400 flex items-start gap-1.5"><span className="text-amber-400">⚡</span> {d}</p>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {strategyData.competitive_landscape && (
+                                    <div className="glass-panel rounded-2xl p-5">
+                                        <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-violet-400 text-base">groups</span> Competitive Landscape
+                                        </h3>
+                                        {strategyData.competitive_landscape.likely_competitors?.length > 0 && (
+                                            <div className="flex flex-wrap gap-1.5 mb-3">
+                                                {strategyData.competitive_landscape.likely_competitors.map((c, i) => (
+                                                    <span key={i} className="text-[10px] bg-violet-500/10 text-violet-300 px-2 py-0.5 rounded-full">{c}</span>
+                                                ))}
+                                            </div>
+                                        )}
+                                        <p className="text-xs text-slate-400 mb-2"><strong className="text-slate-300">Strengths:</strong> {strategyData.competitive_landscape.competitor_strengths}</p>
+                                        <p className="text-xs text-emerald-300 mb-3"><strong className="text-emerald-200">🎯 Gap:</strong> {strategyData.competitive_landscape.competitive_gaps}</p>
+                                        {strategyData.competitive_landscape.industry_benchmarks && (
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {Object.entries(strategyData.competitive_landscape.industry_benchmarks).map(([k, v]) => (
+                                                    <div key={k} className="text-center p-2 rounded-lg bg-white/3">
+                                                        <p className="text-xs font-bold text-white">{v}</p>
+                                                        <p className="text-[10px] text-slate-500 capitalize">{k.replace(/avg_/g, '').replace(/_/g, ' ')}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Channel Synergy */}
+                            {strategyData.channel_synergy?.length > 0 && (
+                                <div className="glass-panel rounded-2xl p-4 mb-6 border-l-4 border-primary">
+                                    <h3 className="text-sm font-bold text-primary uppercase mb-2">🔗 Channel Synergy</h3>
+                                    <div className="space-y-2">
+                                        {strategyData.channel_synergy.map((s, i) => (
+                                            <div key={i} className="flex items-start gap-3 p-2.5 rounded-lg bg-white/2">
+                                                <span className="text-base">🔄</span>
+                                                <div className="flex-1">
+                                                    <p className="text-xs text-white font-mono">{s.flow}</p>
+                                                    <p className="text-[11px] text-emerald-400 mt-0.5">↳ {s.impact}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Impact Factors */}
+                            {strategyData.impact_factors?.length > 0 && (
+                                <div className="glass-panel rounded-2xl p-4 mb-6">
+                                    <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-cyan-400 text-base">trending_up</span> Impact Factors
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                        {strategyData.impact_factors.map((f, i) => (
+                                            <div key={i} className="flex items-start gap-2 p-2.5 rounded-lg bg-white/2">
+                                                <span className={`text-xs mt-0.5 ${f.impact === 'positive' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                    {f.impact === 'positive' ? '↑' : '↓'}
+                                                </span>
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs font-bold text-white">{f.factor}</span>
+                                                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${f.magnitude === 'high' ? 'bg-amber-500/10 text-amber-400' : 'bg-slate-500/10 text-slate-400'}`}>{f.magnitude}</span>
+                                                    </div>
+                                                    <p className="text-[11px] text-slate-400 mt-0.5">{f.detail}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Reality Check */}
+                            {strategyData.reality_check?.length > 0 && (
+                                <div className="glass-panel rounded-2xl p-4 mb-6 border-l-4 border-cyan-500">
+                                    <h3 className="text-sm font-bold text-cyan-400 uppercase mb-3">🔍 Reality Check</h3>
+                                    <div className="space-y-3">
+                                        {strategyData.reality_check.map((r, i) => (
+                                            <div key={i} className="p-3 rounded-xl bg-white/2">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="text-xs font-bold text-white">"{r.claim}"</span>
+                                                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ml-auto ${r.verdict?.toLowerCase().includes('achievable') || r.verdict?.toLowerCase().includes('realistic') ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                                                        {r.verdict}
+                                                    </span>
+                                                </div>
+                                                <p className="text-[11px] text-slate-400">{r.reality}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Quick Wins */}
+                            {strategyData.quick_wins?.length > 0 && (
+                                <div className="glass-panel rounded-2xl p-4 mb-6 border-l-4 border-emerald-500">
+                                    <h3 className="text-sm font-bold text-emerald-400 uppercase mb-2">⚡ Quick Wins</h3>
+                                    <div className="space-y-1">
+                                        {strategyData.quick_wins.map((w, i) => (
+                                            <p key={i} className="text-sm text-slate-300 flex items-start gap-2"><span className="text-emerald-400 mt-0.5">•</span> {w}</p>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Channel Strategy Cards */}
+                            <div className="mb-6">
+                                <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">hub</span> Channel Strategies
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {strategyData.channels && Object.entries(strategyData.channels).filter(([, d]) => d?.enabled).map(([key, ch]) => {
+                                        const icons = { social_media: '📱', seo_sem: '🔍', performance_marketing: '📊', influencer_marketing: '🤝', content_marketing: '✍️', ad_films_reels: '🎬', offline_campaigns: '🏪' }
+                                        const colors = { social_media: 'violet', seo_sem: 'blue', performance_marketing: 'emerald', influencer_marketing: 'rose', content_marketing: 'cyan', ad_films_reels: 'amber', offline_campaigns: 'slate' }
+                                        const c = colors[key] || 'slate'
+                                        return (
+                                            <div key={key} className={`glass-panel rounded-2xl p-5 border-t-2 border-${c}-500/40`}>
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <span className="text-lg">{icons[key] || '📌'}</span>
+                                                    <h4 className="text-sm font-bold text-white capitalize">{key.replace(/_/g, ' ')}</h4>
+                                                    <span className={`text-[10px] ml-auto bg-${c}-500/10 text-${c}-400 px-2 py-0.5 rounded-full font-bold`}>{ch.budget_split}</span>
+                                                </div>
+                                                {ch.why_this_channel && <p className="text-[10px] text-primary italic mb-2">💡 {ch.why_this_channel}</p>}
+                                                <p className="text-xs text-slate-300 leading-relaxed mb-3">{ch.strategy}</p>
+                                                {ch.tactics?.length > 0 && (
+                                                    <div className="space-y-1 mb-3">
+                                                        {ch.tactics.slice(0, 3).map((t, i) => (
+                                                            <p key={i} className="text-[11px] text-slate-400 flex items-start gap-1.5"><span className={`text-${c}-400 mt-0.5`}>→</span> {t}</p>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {ch.expected_output && <p className="text-[10px] text-emerald-300/70 mb-2">📊 {ch.expected_output}</p>}
+                                                {ch.budget_rationale && <p className="text-[10px] text-amber-300/60 mb-2">💰 {ch.budget_rationale}</p>}
+                                                {ch.platforms?.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {ch.platforms.map(p => <span key={p} className="text-[10px] bg-white/5 text-slate-400 px-1.5 py-0.5 rounded-full">{p}</span>)}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* KPI Tracker */}
+                            <div className="glass-panel rounded-2xl p-5 mb-6">
+                                <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-emerald-400">target</span> KPI Tracker
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {strategyKpis.map((kpi, i) => {
+                                        const pct = kpi.target > 0 ? Math.min(100, Math.round((kpi.current / kpi.target) * 100)) : 0
+                                        return (
+                                            <div key={i} className="p-3 rounded-xl bg-white/3 border border-white/5">
+                                                <div className="flex items-center justify-between mb-1.5">
+                                                    <span className="text-xs font-bold text-white">{kpi.name}</span>
+                                                    <span className="text-[10px] text-slate-500 capitalize">{kpi.channel?.replace(/_/g, ' ')}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                                                        <div className={`h-full rounded-full transition-all duration-700 ${pct >= 80 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                                                            style={{ width: `${pct}%` }} />
+                                                    </div>
+                                                    <span className="text-xs font-bold text-slate-300 w-10 text-right">{pct}%</span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    {kpiEditing === kpi.name ? (
+                                                        <input type="number" autoFocus className="input-glass w-20 py-1 px-2 text-xs"
+                                                            defaultValue={kpi.current}
+                                                            onBlur={e => updateKpiValue(kpi.name, e.target.value)}
+                                                            onKeyDown={e => e.key === 'Enter' && updateKpiValue(kpi.name, e.target.value)} />
+                                                    ) : (
+                                                        <button onClick={() => setKpiEditing(kpi.name)}
+                                                            className="text-[11px] text-slate-500 hover:text-primary cursor-pointer transition-colors">
+                                                            {kpi.current} / {kpi.target} {kpi.unit}
+                                                        </button>
+                                                    )}
+                                                    <button onClick={() => setKpiEditing(kpi.name)}
+                                                        className="text-[10px] text-primary/60 hover:text-primary cursor-pointer">update</button>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Milestones */}
+                            {strategyMilestones.length > 0 && (
+                                <div className="glass-panel rounded-2xl p-5 mb-6">
+                                    <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-violet-400">checklist</span> Milestones
+                                    </h3>
+                                    <div className="space-y-2">
+                                        {strategyMilestones.map((m) => (
+                                            <label key={m._id} className="flex items-center gap-3 p-2.5 rounded-xl bg-white/2 hover:bg-white/4 cursor-pointer transition-all group">
+                                                <input type="checkbox" checked={m.completed} onChange={e => toggleMilestone(m._id, e.target.checked)}
+                                                    className="w-4 h-4 rounded border-slate-600 bg-white/5 accent-primary cursor-pointer" />
+                                                <span className={`text-sm flex-1 ${m.completed ? 'text-slate-500 line-through' : 'text-white'}`}>{m.title}</span>
+                                                <span className="text-[10px] text-slate-600 capitalize">{m.channel?.replace(/_/g, ' ')}</span>
+                                                <span className="text-[10px] text-slate-600">Wk {m.week}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Timeline */}
+                            {strategyData.timeline?.length > 0 && (
+                                <div className="glass-panel rounded-2xl p-5 mb-6">
+                                    <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-blue-400">timeline</span> Execution Roadmap
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        {strategyData.timeline.map((phase, i) => (
+                                            <div key={i} className="relative p-4 rounded-xl bg-white/3 border border-white/5">
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black ${i === 0 ? 'bg-amber-500/20 text-amber-400' : i === 1 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}`}>{i + 1}</span>
+                                                    <div>
+                                                        <p className="text-sm font-bold text-white">{phase.phase}</p>
+                                                        <p className="text-[10px] text-slate-500">{phase.weeks}</p>
+                                                    </div>
+                                                </div>
+                                                <p className="text-xs text-slate-400 mb-2">{phase.focus}</p>
+                                                <div className="space-y-1">
+                                                    {phase.deliverables?.map((d, j) => (
+                                                        <p key={j} className="text-[11px] text-slate-300 flex items-start gap-1.5"><span className="text-primary">•</span> {d}</p>
+                                                    ))}
+                                                </div>
+                                                {phase.expected_results && <p className="text-[10px] text-emerald-400/60 mt-2 italic">📈 {phase.expected_results}</p>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Budget Breakdown */}
+                            {strategyData.budget_breakdown?.length > 0 && (
+                                <div className="glass-panel rounded-2xl p-5 mb-6">
+                                    <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-amber-400 text-base">payments</span> Budget Allocation
+                                    </h3>
+                                    <div className="space-y-2">
+                                        {strategyData.budget_breakdown.map((b, i) => (
+                                            <div key={i}>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-xs text-slate-300 w-32 truncate">{b.channel}</span>
+                                                    <div className="flex-1 h-3 bg-white/5 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full transition-all" style={{ width: `${b.percentage}%` }} />
+                                                    </div>
+                                                    <span className="text-xs text-slate-400 w-16 text-right">{b.amount}</span>
+                                                    <span className="text-xs text-amber-400 w-10 text-right font-bold">{b.percentage}%</span>
+                                                </div>
+                                                {b.rationale && <p className="text-[10px] text-slate-500 ml-32 pl-3 mt-0.5">↳ {b.rationale}</p>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Risk Mitigation */}
+                            {strategyData.risk_mitigation?.length > 0 && (
+                                <div className="glass-panel rounded-2xl p-4 mb-6">
+                                    <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-rose-400 text-base">shield</span> Risk Mitigation
+                                    </h3>
+                                    <div className="space-y-2">
+                                        {strategyData.risk_mitigation.map((r, i) => (
+                                            <div key={i} className="flex items-start gap-2 text-xs">
+                                                <span className="text-rose-400 font-bold shrink-0">⚠️ {r.risk}:</span>
+                                                <span className="text-slate-300">{r.mitigation}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ========== STEP 7: SLIDESHOW VIEWER ========== */}
+            {step === 7 && slides && (
+                <div className="fixed inset-0 z-50 bg-[#0a0a0f] flex flex-col"
+                    tabIndex={0}
+                    onKeyDown={e => {
+                        if (e.key === 'ArrowRight' || e.key === ' ') setSlideIndex(i => Math.min(i + 1, slides.length - 1))
+                        if (e.key === 'ArrowLeft') setSlideIndex(i => Math.max(i - 1, 0))
+                        if (e.key === 'Escape') setStep(6)
+                    }}
+                    ref={el => el?.focus()}>
+                    {/* Top bar */}
+                    <div className="flex items-center justify-between px-6 py-3 bg-black/40 border-b border-white/5">
+                        <span className="text-sm text-slate-400">{slideIndex + 1} / {slides.length}</span>
+                        <button onClick={() => setStep(6)} className="text-sm text-slate-400 hover:text-white cursor-pointer flex items-center gap-1">
+                            <span className="material-symbols-outlined text-sm">close</span> Exit
+                        </button>
+                    </div>
+
+                    {/* Slide */}
+                    <div className="flex-1 flex items-center justify-center p-8 relative">
+                        {(() => {
+                            const slide = slides[slideIndex]
+                            if (!slide) return null
+                            const accent = slide.accent_color || '#6366f1'
+                            return (
+                                <div className="w-full max-w-4xl aspect-[16/9] rounded-3xl p-10 flex flex-col justify-center relative overflow-hidden animate-fade-in"
+                                    style={{ background: `linear-gradient(135deg, ${accent}15, ${accent}05, #0f0f1a)`, border: `1px solid ${accent}25` }}>
+                                    {slide.layout === 'hero' && (
+                                        <div className="text-center">
+                                            <h1 className="text-4xl font-black text-white mb-4">{slide.title}</h1>
+                                            {slide.subtitle && <p className="text-lg text-slate-300">{slide.subtitle}</p>}
+                                        </div>
+                                    )}
+                                    {slide.layout === 'bullets' && (
+                                        <div>
+                                            <h2 className="text-2xl font-black text-white mb-6">{slide.title}</h2>
+                                            <div className="space-y-3">
+                                                {slide.content?.items?.map((item, i) => (
+                                                    <div key={i} className="flex items-start gap-3 animate-fade-in" style={{ animationDelay: `${i * 100}ms` }}>
+                                                        <div className="w-2 h-2 rounded-full mt-2 shrink-0" style={{ background: accent }} />
+                                                        <p className="text-base text-slate-200">{item}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {slide.layout === 'stats' && (
+                                        <div>
+                                            <h2 className="text-2xl font-black text-white mb-2">{slide.title}</h2>
+                                            {slide.subtitle && <p className="text-sm text-slate-400 mb-6">{slide.subtitle}</p>}
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                {slide.content?.stats?.map((s, i) => (
+                                                    <div key={i} className="text-center p-4 rounded-xl" style={{ background: `${accent}10`, border: `1px solid ${accent}20` }}>
+                                                        <p className="text-2xl font-black text-white">{s.value}</p>
+                                                        <p className="text-xs text-slate-400 mt-1">{s.label}</p>
+                                                        {s.sub && <p className="text-[10px] text-slate-500">{s.sub}</p>}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {slide.layout === 'grid' && (
+                                        <div>
+                                            <h2 className="text-2xl font-black text-white mb-6">{slide.title}</h2>
+                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                                {slide.content?.cards?.map((card, i) => (
+                                                    <div key={i} className="p-4 rounded-xl bg-white/5 border border-white/5">
+                                                        <span className="text-xl mb-2 block">{card.icon}</span>
+                                                        <p className="text-sm font-bold text-white mb-1">{card.title}</p>
+                                                        <p className="text-xs text-slate-400">{card.desc}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {slide.layout === 'timeline' && (
+                                        <div>
+                                            <h2 className="text-2xl font-black text-white mb-6">{slide.title}</h2>
+                                            <div className="flex gap-4">
+                                                {slide.content?.phases?.map((phase, i) => (
+                                                    <div key={i} className="flex-1 p-4 rounded-xl border border-white/5" style={{ background: `${accent}08` }}>
+                                                        <p className="text-sm font-bold text-white mb-1">{phase.name}</p>
+                                                        <p className="text-[10px] text-slate-500 mb-2">{phase.weeks}</p>
+                                                        <div className="space-y-1">
+                                                            {phase.items?.map((t, j) => <p key={j} className="text-xs text-slate-300">• {t}</p>)}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {slide.layout === 'comparison' && (
+                                        <div>
+                                            <h2 className="text-2xl font-black text-white mb-6">{slide.title}</h2>
+                                            <div className="space-y-3">
+                                                {slide.content?.rows?.map((row, i) => (
+                                                    <div key={i} className="flex items-center gap-3">
+                                                        <span className="text-sm text-slate-300 w-36">{row.label}</span>
+                                                        <div className="flex-1 h-4 bg-white/5 rounded-full overflow-hidden">
+                                                            <div className="h-full rounded-full" style={{ width: `${row.bar}%`, background: accent }} />
+                                                        </div>
+                                                        <span className="text-sm text-white font-bold w-16 text-right">{row.value}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {(slide.layout === 'quote' || slide.layout === 'cta') && (
+                                        <div className="text-center">
+                                            <h2 className="text-3xl font-black text-white mb-4">{slide.title}</h2>
+                                            {slide.subtitle && <p className="text-lg text-slate-300 mb-4">{slide.subtitle}</p>}
+                                            {slide.content?.text && <p className="text-base text-slate-400 max-w-xl mx-auto">{slide.content.text}</p>}
+                                        </div>
+                                    )}
+                                    {!['hero', 'bullets', 'stats', 'grid', 'timeline', 'comparison', 'quote', 'cta'].includes(slide.layout) && (
+                                        <div>
+                                            <h2 className="text-2xl font-black text-white mb-4">{slide.title}</h2>
+                                            {slide.subtitle && <p className="text-base text-slate-300 mb-3">{slide.subtitle}</p>}
+                                            {slide.content && typeof slide.content === 'object' && (
+                                                <pre className="text-xs text-slate-400 whitespace-pre-wrap">{JSON.stringify(slide.content, null, 2)}</pre>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        })()}
+
+                        {/* Nav arrows */}
+                        {slideIndex > 0 && (
+                            <button onClick={() => setSlideIndex(i => i - 1)} className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all">
+                                <span className="material-symbols-outlined text-white">chevron_left</span>
+                            </button>
+                        )}
+                        {slideIndex < slides.length - 1 && (
+                            <button onClick={() => setSlideIndex(i => i + 1)} className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center cursor-pointer transition-all">
+                                <span className="material-symbols-outlined text-white">chevron_right</span>
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Slide dots */}
+                    <div className="flex items-center justify-center gap-1.5 py-4">
+                        {slides.map((_, i) => (
+                            <button key={i} onClick={() => setSlideIndex(i)}
+                                className={`w-2 h-2 rounded-full transition-all cursor-pointer ${i === slideIndex ? 'bg-primary w-6' : 'bg-white/10 hover:bg-white/20'}`} />
+                        ))}
+                    </div>
                 </div>
             )}
 

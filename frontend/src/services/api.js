@@ -400,6 +400,14 @@ export const brainstormStudio = {
     feedback: (data) => apiFetch('/brainstorm-studio/feedback', { method: 'POST', body: JSON.stringify(data) }),
     screenplay: (data) => apiFetch('/brainstorm-studio/screenplay', { method: 'POST', body: JSON.stringify(data) }),
     chat: (data) => apiFetch('/brainstorm-studio/chat', { method: 'POST', body: JSON.stringify(data) }),
+    // Brand Strategy
+    strategy: (data) => apiFetch('/brainstorm-studio/strategy', { method: 'POST', body: JSON.stringify(data) }),
+    strategySlides: (data) => apiFetch('/brainstorm-studio/strategy-slides', { method: 'POST', body: JSON.stringify(data) }),
+    listStrategies: () => apiFetch('/brainstorm-studio/strategies'),
+    getStrategy: (id) => apiFetch(`/brainstorm-studio/strategies/${id}`),
+    updateKpi: (id, data) => apiFetch(`/brainstorm-studio/strategies/${id}/kpi`, { method: 'PATCH', body: JSON.stringify(data) }),
+    toggleMilestone: (id, data) => apiFetch(`/brainstorm-studio/strategies/${id}/milestone`, { method: 'PATCH', body: JSON.stringify(data) }),
+    updateStrategyStatus: (id, data) => apiFetch(`/brainstorm-studio/strategies/${id}/status`, { method: 'PATCH', body: JSON.stringify(data) }),
 };
 
 // ============ Agent Command API ============
