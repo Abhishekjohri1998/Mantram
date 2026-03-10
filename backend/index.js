@@ -37,7 +37,7 @@ import dashboardSummaryRoutes from './routes/dashboard-summary.js';
 import teamRoutes from './routes/team.js';
 import fidatoRoutes from './routes/fidato.js';
 import nexusRoutes from './routes/nexus.js';
-import spyMissionRoutes from './routes/spyMissions.js';
+import intelMissionRoutes from './routes/intelMissions.js';
 import paymentRoutes from './routes/payments.js';
 import waitlistRoutes from './routes/waitlist.js';
 
@@ -140,7 +140,7 @@ app.use('/api/dashboard-summary', dashboardSummaryRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/fidato', fidatoRoutes);
 app.use('/api/nexus', nexusRoutes);
-app.use('/api/spy', spyMissionRoutes);
+app.use('/api/intel', intelMissionRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/social', socialRoutes);
 app.use('/api/waitlist', waitlistRoutes);
@@ -183,12 +183,12 @@ const server = app.listen(config.port, () => {
         console.log('🤖 Autonomous Agent active — Follow-up scheduler running every 30 min');
     }).catch(() => { });
 
-    // Start spy agent scheduler (every 2 hours)
-    import('./services/spyAgent.js').then(({ runSpyMissions }) => {
+    // Start intelligence agent scheduler (every 2 hours)
+    import('./services/intelligenceAgent.js').then(({ runIntelMissions }) => {
         setInterval(() => {
-            runSpyMissions().catch(err => console.warn('🕵️ Spy Agent check failed:', err.message));
+            runIntelMissions().catch(err => console.warn('🕵️ Intel Agent check failed:', err.message));
         }, 2 * 60 * 60 * 1000);
-        console.log('🕵️ Agent Fidato active — Spy missions scheduler running every 2 hours');
+        console.log('🕵️ Agent Fidato active — Intelligence missions scheduler running every 2 hours');
     }).catch(() => { });
 
     // Start scheduled post publisher (every 60 seconds)

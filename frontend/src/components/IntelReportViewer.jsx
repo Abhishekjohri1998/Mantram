@@ -1,9 +1,9 @@
 /**
- * SpyReportViewer — Cinematic Bond-Movie-Style Intelligence Report
+ * IntelReportViewer — Cinematic Premium Intelligence Report
  * 
  * Full-screen overlay with dramatic SVG animations:
  * Phase 1: Black screen → scanner line sweep
- * Phase 2: Radar crosshair + "CLASSIFIED" stamp
+ * Phase 2: Radar crosshair + "CONFIDENTIAL" stamp
  * Phase 3: Typewriter decode of report content
  * Phase 4: Staggered finding cards slide in
  */
@@ -16,7 +16,7 @@ const THREAT_COLORS = {
     info: { primary: '#06b6d4', glow: 'rgba(6,182,212,0.4)', label: 'INTEL', bar: 30 },
 }
 
-export default function SpyReportViewer({ mission, findings, onClose }) {
+export default function IntelReportViewer({ mission, findings, onClose }) {
     const [phase, setPhase] = useState(0) // 0=scanner, 1=stamp, 2=content, 3=findings
     const [decodedLines, setDecodedLines] = useState(0)
     const [visibleFindings, setVisibleFindings] = useState(0)
@@ -61,7 +61,7 @@ export default function SpyReportViewer({ mission, findings, onClose }) {
         dateStyle: 'medium', timeStyle: 'short', hour12: false,
     })
 
-    const missionType = mission?.type?.replace('_', ' ').toUpperCase() || 'RECON'
+    const missionType = mission?.type?.replace('_', ' ').toUpperCase() || 'INTEL'
     const targetName = findings?.target?.name || mission?.target?.name || 'UNKNOWN'
     const totalFindings = findings?.findings?.length || 0
     const criticalCount = findings?.findings?.filter(f => f.severity === 'critical').length || 0
@@ -97,7 +97,7 @@ export default function SpyReportViewer({ mission, findings, onClose }) {
                 <rect width="100%" height="100%" fill="url(#grid)" />
             </svg>
 
-            {/* ═══ Phase 1: Radar Crosshair + CLASSIFIED Stamp ═══ */}
+            {/* ═══ Phase 1: Radar Crosshair + CONFIDENTIAL Stamp ═══ */}
             {phase >= 1 && (
                 <div style={{
                     position: 'absolute', inset: 0, display: 'flex',
@@ -106,7 +106,7 @@ export default function SpyReportViewer({ mission, findings, onClose }) {
                 }}>
                     {/* Crosshair SVG */}
                     <svg width="300" height="300" viewBox="0 0 300 300" style={{
-                        position: 'absolute', animation: 'spy-crosshair-appear 0.6s ease-out',
+                        position: 'absolute', animation: 'intel-crosshair-appear 0.6s ease-out',
                     }}>
                         {/* Rings */}
                         <circle cx="150" cy="150" r="120" fill="none" stroke="rgba(139,92,246,0.2)" strokeWidth="1" />
@@ -116,7 +116,7 @@ export default function SpyReportViewer({ mission, findings, onClose }) {
                         <line x1="150" y1="10" x2="150" y2="290" stroke="rgba(139,92,246,0.3)" strokeWidth="0.5" strokeDasharray="4 4" />
                         <line x1="10" y1="150" x2="290" y2="150" stroke="rgba(139,92,246,0.3)" strokeWidth="0.5" strokeDasharray="4 4" />
                         {/* Rotating sweep */}
-                        <g style={{ transformOrigin: '150px 150px', animation: 'spy-sweep 2s linear infinite' }}>
+                        <g style={{ transformOrigin: '150px 150px', animation: 'intel-sweep 2s linear infinite' }}>
                             <defs>
                                 <linearGradient id="sweepG" gradientTransform="rotate(90)">
                                     <stop offset="0%" stopColor="rgba(139,92,246,0.4)" />
@@ -131,17 +131,17 @@ export default function SpyReportViewer({ mission, findings, onClose }) {
                         <circle cx="150" cy="150" r="8" fill="none" stroke="#8b5cf6" strokeWidth="1" opacity="0.5" />
                     </svg>
 
-                    {/* CLASSIFIED stamp */}
+                    {/* CONFIDENTIAL stamp */}
                     <div style={{
                         position: 'absolute',
-                        animation: 'spy-stamp 0.4s cubic-bezier(0.34,1.56,0.64,1) 0.4s both',
-                        fontSize: '48px', fontWeight: 900, letterSpacing: '0.15em',
+                        animation: 'intel-stamp 0.4s cubic-bezier(0.34,1.56,0.64,1) 0.4s both',
+                        fontSize: '40px', fontWeight: 900, letterSpacing: '0.15em',
                         color: '#ef4444', textShadow: '0 0 30px rgba(239,68,68,0.5)',
                         border: '4px solid #ef4444', padding: '8px 32px',
                         transform: 'rotate(-12deg)', borderRadius: '4px',
                         fontFamily: 'monospace',
                     }}>
-                        CLASSIFIED
+                        CONFIDENTIAL
                     </div>
                 </div>
             )}
@@ -151,7 +151,7 @@ export default function SpyReportViewer({ mission, findings, onClose }) {
                 <div style={{
                     position: 'relative', width: '680px', maxWidth: '94vw', maxHeight: '92vh',
                     overflow: 'hidden', display: 'flex', flexDirection: 'column',
-                    animation: 'spy-content-appear 0.8s ease-out',
+                    animation: 'intel-content-appear 0.8s ease-out',
                 }}>
                     {/* Film grain overlay */}
                     <svg width="0" height="0" style={{ position: 'absolute' }}>
@@ -167,7 +167,7 @@ export default function SpyReportViewer({ mission, findings, onClose }) {
                         pointerEvents: 'none', zIndex: 1,
                     }} />
 
-                    {/* ── Header: Mission Dossier ── */}
+                    {/* ── Header: Dossier ── */}
                     <div style={{
                         background: 'linear-gradient(180deg, rgba(10,12,22,0.98) 0%, rgba(10,12,22,0.95) 100%)',
                         backdropFilter: 'blur(20px)',
@@ -215,35 +215,35 @@ export default function SpyReportViewer({ mission, findings, onClose }) {
                             </button>
                         </div>
 
-                        {/* Decoded mission info lines */}
+                        {/* Decoded info lines */}
                         <div style={{ fontFamily: 'monospace', fontSize: '12px', lineHeight: '1.8' }}>
                             {decodedLines >= 1 && (
-                                <div style={{ animation: 'spy-line-decode 0.3s ease', display: 'flex', gap: '8px' }}>
-                                    <span style={{ color: '#475569', width: '80px', textAlign: 'right' }}>MISSION:</span>
+                                <div style={{ animation: 'intel-line-decode 0.3s ease', display: 'flex', gap: '8px' }}>
+                                    <span style={{ color: '#475569', width: '80px', textAlign: 'right' }}>TASK:</span>
                                     <span style={{ color: '#e2e8f0', fontWeight: 700 }}>{findings?.title || mission?.title || '—'}</span>
                                 </div>
                             )}
                             {decodedLines >= 2 && (
-                                <div style={{ animation: 'spy-line-decode 0.3s ease', display: 'flex', gap: '8px' }}>
+                                <div style={{ animation: 'intel-line-decode 0.3s ease', display: 'flex', gap: '8px' }}>
                                     <span style={{ color: '#475569', width: '80px', textAlign: 'right' }}>TARGET:</span>
                                     <span style={{ color: '#f59e0b', fontWeight: 700 }}>{targetName}</span>
                                 </div>
                             )}
                             {decodedLines >= 3 && (
-                                <div style={{ animation: 'spy-line-decode 0.3s ease', display: 'flex', gap: '8px' }}>
+                                <div style={{ animation: 'intel-line-decode 0.3s ease', display: 'flex', gap: '8px' }}>
                                     <span style={{ color: '#475569', width: '80px', textAlign: 'right' }}>CHECKS:</span>
                                     <span style={{ color: '#94a3b8' }}>{findings?.stats?.totalChecks || 0} sweeps conducted</span>
                                 </div>
                             )}
                             {decodedLines >= 4 && (
-                                <div style={{ animation: 'spy-line-decode 0.3s ease', display: 'flex', gap: '8px' }}>
+                                <div style={{ animation: 'intel-line-decode 0.3s ease', display: 'flex', gap: '8px' }}>
                                     <span style={{ color: '#475569', width: '80px', textAlign: 'right' }}>INTEL:</span>
                                     <span style={{ color: '#34d399' }}>{totalFindings} findings intercepted</span>
                                     {criticalCount > 0 && (
                                         <span style={{
                                             fontSize: '10px', padding: '1px 8px', borderRadius: '4px',
                                             background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
-                                            color: '#ef4444', fontWeight: 800, animation: 'spy-blink 1s ease infinite',
+                                            color: '#ef4444', fontWeight: 800, animation: 'intel-blink 1s ease infinite',
                                         }}>
                                             {criticalCount} CRITICAL
                                         </span>
@@ -251,7 +251,7 @@ export default function SpyReportViewer({ mission, findings, onClose }) {
                                 </div>
                             )}
                             {decodedLines >= 5 && (
-                                <div style={{ animation: 'spy-line-decode 0.3s ease' }}>
+                                <div style={{ animation: 'intel-line-decode 0.3s ease' }}>
                                     {/* Threat Level Meter */}
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
                                         <span style={{ color: '#475569', width: '80px', textAlign: 'right', fontSize: '12px' }}>THREAT:</span>
@@ -267,7 +267,7 @@ export default function SpyReportViewer({ mission, findings, onClose }) {
                                                         ? 'linear-gradient(90deg, #06b6d4, #f59e0b)'
                                                         : 'linear-gradient(90deg, #06b6d4, #34d399)',
                                                 width: `${Math.min(100, criticalCount > 0 ? 85 : totalFindings > 3 ? 55 : 25)}%`,
-                                                transition: 'width 1s ease', animation: 'spy-threat-fill 1.5s ease-out',
+                                                transition: 'width 1s ease', animation: 'intel-threat-fill 1.5s ease-out',
                                                 boxShadow: criticalCount > 0 ? '0 0 12px rgba(239,68,68,0.4)' : 'none',
                                             }} />
                                         </div>
@@ -299,10 +299,10 @@ export default function SpyReportViewer({ mission, findings, onClose }) {
                             <div style={{ textAlign: 'center', padding: '60px 0' }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '48px', color: '#1e293b', marginBottom: '12px', display: 'block' }}>radar</span>
                                 <div style={{ fontSize: '14px', color: '#475569', fontFamily: 'monospace' }}>
-                                    NO INTELLIGENCE INTERCEPTED YET
+                                    NO INSIGHTS INTERCEPTED YET
                                 </div>
                                 <div style={{ fontSize: '12px', color: '#334155', fontFamily: 'monospace', marginTop: '4px' }}>
-                                    Agent is deployed and scanning...
+                                    Agent is monitoring and scanning...
                                 </div>
                             </div>
                         )}
@@ -320,7 +320,7 @@ export default function SpyReportViewer({ mission, findings, onClose }) {
                                         border: `1px solid ${threat.primary}25`,
                                         background: `linear-gradient(135deg, ${threat.primary}08, transparent)`,
                                         overflow: 'hidden',
-                                        animation: 'spy-finding-slide 0.5s ease-out both',
+                                        animation: 'intel-finding-slide 0.5s ease-out both',
                                         animationDelay: `${i * 0.15}s`,
                                     }}
                                 >
@@ -342,7 +342,7 @@ export default function SpyReportViewer({ mission, findings, onClose }) {
                                                     width: '8px', height: '8px', borderRadius: '50%',
                                                     background: threat.primary,
                                                     boxShadow: `0 0 8px ${threat.glow}`,
-                                                    animation: f.severity === 'critical' ? 'spy-blink 1s ease infinite' : 'none',
+                                                    animation: f.severity === 'critical' ? 'intel-blink 1s ease infinite' : 'none',
                                                 }} />
                                                 <span style={{
                                                     fontSize: '10px', fontWeight: 800,
@@ -376,7 +376,7 @@ export default function SpyReportViewer({ mission, findings, onClose }) {
                         })}
                     </div>
 
-                    {/* ── Footer: Classified Watermark ── */}
+                    {/* ── Footer: Confidential Watermark ── */}
                     <div style={{
                         padding: '12px 28px',
                         background: 'rgba(6,8,16,0.98)',
@@ -388,7 +388,7 @@ export default function SpyReportViewer({ mission, findings, onClose }) {
                             fontSize: '9px', color: '#1e293b', letterSpacing: '0.3em',
                             fontFamily: 'monospace', fontWeight: 800,
                         }}>
-                            AGENT FIDATO · FIELD REPORT · CLASSIFIED · DO NOT DISTRIBUTE
+                            AGENT FIDATO · FIELD REPORT · CONFIDENTIAL · INTERNAL USE ONLY
                         </div>
                         <div style={{ display: 'flex', gap: '4px' }}>
                             {[0, 1, 2, 3].map(i => (
@@ -415,35 +415,35 @@ export default function SpyReportViewer({ mission, findings, onClose }) {
 
             {/* ═══ Keyframe Animations ═══ */}
             <style>{`
-                @keyframes spy-sweep {
+                @keyframes intel-sweep {
                     from { transform: rotate(0deg); }
                     to { transform: rotate(360deg); }
                 }
-                @keyframes spy-crosshair-appear {
+                @keyframes intel-crosshair-appear {
                     from { opacity: 0; transform: scale(1.5); }
                     to { opacity: 1; transform: scale(1); }
                 }
-                @keyframes spy-stamp {
+                @keyframes intel-stamp {
                     from { opacity: 0; transform: rotate(-12deg) scale(3); }
                     to { opacity: 1; transform: rotate(-12deg) scale(1); }
                 }
-                @keyframes spy-content-appear {
+                @keyframes intel-content-appear {
                     from { opacity: 0; transform: scale(0.95) translateY(20px); }
                     to { opacity: 1; transform: scale(1) translateY(0); }
                 }
-                @keyframes spy-line-decode {
+                @keyframes intel-line-decode {
                     from { opacity: 0; transform: translateX(-10px); clip-path: inset(0 100% 0 0); }
                     to { opacity: 1; transform: translateX(0); clip-path: inset(0 0 0 0); }
                 }
-                @keyframes spy-finding-slide {
+                @keyframes intel-finding-slide {
                     from { opacity: 0; transform: translateX(-30px); }
                     to { opacity: 1; transform: translateX(0); }
                 }
-                @keyframes spy-blink {
+                @keyframes intel-blink {
                     0%, 100% { opacity: 1; }
                     50% { opacity: 0.3; }
                 }
-                @keyframes spy-threat-fill {
+                @keyframes intel-threat-fill {
                     from { width: 0%; }
                 }
             `}</style>

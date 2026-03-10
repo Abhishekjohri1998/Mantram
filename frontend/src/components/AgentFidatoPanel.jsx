@@ -1,13 +1,13 @@
 /**
- * AgentFidatoPanel — Competitive Intelligence Spy Module
+ * AgentFidatoPanel — Competitive Intelligence Module
  * 
  * Shared component used in SEO, Performance, and D2C studios.
- * Lets users create, manage, and view spy missions that track competitors.
+ * Lets users create, manage, and view intelligence missions that track competitors.
  */
 
 import { useState, useEffect, useCallback } from 'react'
 import { useBrand } from '../context/BrandContext'
-import SpyReportViewer from './SpyReportViewer'
+import IntelReportViewer from './IntelReportViewer'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -67,7 +67,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
     const loadMissions = useCallback(async () => {
         if (!brandId) return
         try {
-            const resp = await fetch(`${API_BASE}/spy/missions?brandId=${brandId}`, { headers })
+            const resp = await fetch(`${API_BASE}/intel/missions?brandId=${brandId}`, { headers })
             if (resp.ok) {
                 const data = await resp.json()
                 setMissions(data.missions || [])
@@ -86,7 +86,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
         if (!form.title || !form.targetName) return
 
         try {
-            const resp = await fetch(`${API_BASE}/spy/missions`, {
+            const resp = await fetch(`${API_BASE}/intel/missions`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
@@ -117,7 +117,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
     const toggleMission = async (mission) => {
         const newStatus = mission.status === 'active' ? 'paused' : 'active'
         try {
-            await fetch(`${API_BASE}/spy/missions/${mission._id}`, {
+            await fetch(`${API_BASE}/intel/missions/${mission._id}`, {
                 method: 'PUT',
                 headers,
                 body: JSON.stringify({ status: newStatus }),
@@ -131,7 +131,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
     // ── Delete mission ──
     const deleteMission = async (id) => {
         try {
-            await fetch(`${API_BASE}/spy/missions/${id}`, { method: 'DELETE', headers })
+            await fetch(`${API_BASE}/intel/missions/${id}`, { method: 'DELETE', headers })
             setSelectedMission(null)
             setFindings(null)
             loadMissions()
@@ -144,13 +144,13 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
     const forceRun = async (id) => {
         setRunningMission(id)
         try {
-            const resp = await fetch(`${API_BASE}/spy/missions/${id}/run`, { method: 'POST', headers })
+            const resp = await fetch(`${API_BASE}/intel/missions/${id}/run`, { method: 'POST', headers })
             if (resp.ok) {
                 const result = await resp.json()
                 // Refresh missions list
                 loadMissions()
-                // Load findings and auto-open cinematic spy report
-                const findingsResp = await fetch(`${API_BASE}/spy/missions/${id}/findings`, { headers })
+                // Load insights and auto-open cinematic report
+                const findingsResp = await fetch(`${API_BASE}/intel/missions/${id}/findings`, { headers })
                 if (findingsResp.ok) {
                     const data = await findingsResp.json()
                     setFindings(data)
@@ -170,10 +170,10 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
         }
     }
 
-    // ── Load findings ──
+    // ── Load insights ──
     const loadFindings = async (id) => {
         try {
-            const resp = await fetch(`${API_BASE}/spy/missions/${id}/findings`, { headers })
+            const resp = await fetch(`${API_BASE}/intel/missions/${id}/findings`, { headers })
             if (resp.ok) {
                 const data = await resp.json()
                 setFindings(data)
@@ -231,7 +231,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                         </div>
                         <p className="text-[11px] text-slate-500 mt-0.5 truncate">
                             {missions.length > 0
-                                ? `${missions.filter(m => m.status === 'active').length} active · ${missions.reduce((a, m) => a + (m.totalFindings || 0), 0)} findings`
+                                ? `${missions.filter(m => m.status === 'active').length} active · ${missions.reduce((a, m) => a + (m.totalFindings || 0), 0)} insights`
                                 : 'Deploy competitive intelligence missions'
                             }
                         </p>
@@ -253,7 +253,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                 </button>
             )}
 
-            {/* ── Spy Panel ── */}
+            {/* Intel Panel */}
             {panelOpen && (
                 <div style={{
                     position: 'fixed',
@@ -294,7 +294,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                             justifyContent: 'space-between',
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <span style={{ fontSize: '24px' }}>🕵️</span>
+                                <span style={{ fontSize: '24px' }}>📡</span>
                                 <div>
                                     <div style={{ fontSize: '16px', fontWeight: 800, color: '#a78bfa', letterSpacing: '0.05em' }}>
                                         AGENT FIDATO
@@ -349,7 +349,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                     marginBottom: '20px',
                                 }}>
                                     <div style={{ fontSize: '14px', fontWeight: 700, color: '#a78bfa', marginBottom: '16px' }}>
-                                        🎯 New Spy Mission
+                                        🎯 New Intel Mission
                                     </div>
 
                                     {/* Mission title */}
@@ -458,7 +458,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                                 opacity: form.title && form.targetName ? 1 : 0.5,
                                             }}
                                         >
-                                            🕵️ Deploy Agent
+                                            📡 Deploy Agent
                                         </button>
                                         <button
                                             onClick={() => setShowCreate(false)}
@@ -501,12 +501,12 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                         {findings.title}
                                     </div>
                                     <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '16px' }}>
-                                        Target: {findings.target?.name} → {findings.stats?.totalFindings} findings from {findings.stats?.totalChecks} checks
+                                        Target: {findings.target?.name} → {findings.stats?.totalFindings} insights from {findings.stats?.totalChecks} checks
                                     </div>
 
                                     {findings.findings?.length === 0 && (
                                         <div style={{ textAlign: 'center', padding: '40px', color: '#475569', fontSize: '13px' }}>
-                                            No findings yet. Agent is on the lookout 🕵️
+                                            No insights yet. Agent is monitoring 📡
                                         </div>
                                     )}
 
@@ -551,7 +551,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
 
                                     {!loading && missions.length === 0 && !showCreate && (
                                         <div style={{ textAlign: 'center', padding: '40px' }}>
-                                            <div style={{ fontSize: '40px', marginBottom: '12px' }}>🕵️</div>
+                                            <div style={{ fontSize: '40px', marginBottom: '12px' }}>📡</div>
                                             <div style={{ fontSize: '14px', color: '#94a3b8', fontWeight: 600, marginBottom: '4px' }}>
                                                 No active missions
                                             </div>
@@ -704,7 +704,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                                         {FREQUENCY_OPTIONS.find(f => f.value === m.frequency)?.label || m.frequency}
                                                     </span>
                                                     <span style={{ fontSize: '10px', color: '#475569' }}>
-                                                        → {m.totalFindings || 0} findings
+                                                        → {m.totalFindings || 0} insights
                                                     </span>
                                                     {(m.totalFindings || 0) > 0 && (
                                                         <span style={{
@@ -716,7 +716,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                                             border: '1px solid rgba(139,92,246,0.2)',
                                                             animation: 'slideInRight 0.3s ease',
                                                         }}>
-                                                            🔓 DECRYPT
+                                                            VIEW INSIGHTS
                                                         </span>
                                                     )}
                                                 </div>
@@ -731,10 +731,10 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
             )
             }
 
-            {/* ── Cinematic Spy Report Overlay ── */}
+            {/* Cinematic Intel Report Overlay */}
             {
                 showReport && findings && (
-                    <SpyReportViewer
+                    <IntelReportViewer
                         mission={reportMission}
                         findings={findings}
                         onClose={() => { setShowReport(false); setReportMission(null); setFindings(null); setSelectedMission(null) }}

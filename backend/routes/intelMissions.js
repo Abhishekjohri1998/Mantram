@@ -1,18 +1,18 @@
 /**
- * Spy Missions API — Agent Fidato Competitive Intelligence
+ * Intelligence Missions API — Agent Fidato Market Intelligence
  * 
- * CRUD + force-run for spy missions.
+ * CRUD + force-run for intel missions.
  */
 
 import { Router } from 'express';
 import { protect } from '../middleware/auth.js';
-import SpyMission from '../models/SpyMission.js';
-import { forceRunMission } from '../services/spyAgent.js';
+import IntelMission from '../models/IntelMission.js';
+import { forceRunMission } from '../services/intelligenceAgent.js';
 
 const router = Router();
 
 // ============================================================================
-// GET /api/spy/missions — List missions for current brand
+// GET /api/intel/missions — List missions for current brand
 // ============================================================================
 router.get('/missions', protect, async (req, res) => {
     try {
@@ -23,20 +23,20 @@ router.get('/missions', protect, async (req, res) => {
         if (studio) filter.studio = studio;
         if (status) filter.status = status;
 
-        const missions = await SpyMission.find(filter)
+        const missions = await IntelMission.find(filter)
             .select('-findings.rawData') // Don't send raw data in list view
             .sort({ updatedAt: -1 })
             .limit(20);
 
         res.json({ missions });
     } catch (err) {
-        console.error('Spy missions list error:', err.message);
+        console.error('Intel missions list error:', err.message);
         res.status(500).json({ error: 'Failed to load missions' });
     }
 });
 
 // ============================================================================
-// POST /api/spy/missions — Create a new spy mission
+// POST /api/intel/missions — Create a new intel mission
 // ============================================================================
 router.post('/missions', protect, async (req, res) => {
     try {
@@ -48,12 +48,12 @@ router.post('/missions', protect, async (req, res) => {
         if (!target?.name) return res.status(400).json({ error: 'Competitor name is required' });
 
         // Check mission limit (max 10 per brand)
-        const count = await SpyMission.countDocuments({ brand: brandId, user: req.user._id, status: 'active' });
+        const count = await IntelMission.countDocuments({ brand: brandId, user: req.user._id, status: 'active' });
         if (count >= 10) {
             return res.status(429).json({ error: 'Maximum 10 active missions per brand. Pause or delete existing ones.' });
         }
 
-        const mission = await SpyMission.create({
+        const mission = await IntelMission.create({
             brand: brandId,
             user: req.user._id,
             title,
@@ -81,11 +81,11 @@ router.post('/missions', protect, async (req, res) => {
 });
 
 // ============================================================================
-// PUT /api/spy/missions/:id — Update mission (pause/resume/edit)
+// PUT /api/intel/missions/:id — Update mission (pause/resume/edit)
 // ============================================================================
 router.put('/missions/:id', protect, async (req, res) => {
     try {
-        const mission = await SpyMission.findOne({ _id: req.params.id, user: req.user._id });
+        const mission = await IntelMission.findOne({ _id: req.params.id, user: req.user._id });
         if (!mission) return res.status(404).json({ error: 'Mission not found' });
 
         const { title, status, frequency, instructions, target, notifyVia } = req.body;
@@ -111,11 +111,11 @@ router.put('/missions/:id', protect, async (req, res) => {
 });
 
 // ============================================================================
-// DELETE /api/spy/missions/:id — Delete a mission
+// DELETE /api/intel/missions/:id — Delete a mission
 // ============================================================================
 router.delete('/missions/:id', protect, async (req, res) => {
     try {
-        const result = await SpyMission.findOneAndDelete({ _id: req.params.id, user: req.user._id });
+        const result = await IntelMission.findOneAndDelete({ _id: req.params.id, user: req.user._id });
         if (!result) return res.status(404).json({ error: 'Mission not found' });
 
         res.json({ message: 'Mission deleted' });
@@ -126,11 +126,11 @@ router.delete('/missions/:id', protect, async (req, res) => {
 });
 
 // ============================================================================
-// GET /api/spy/missions/:id/findings — Get detailed findings history
+// GET /api/intel/missions/:id/findings — Get detailed findings history
 // ============================================================================
 router.get('/missions/:id/findings', protect, async (req, res) => {
     try {
-        const mission = await SpyMission.findOne({ _id: req.params.id, user: req.user._id })
+        const mission = await IntelMission.findOne({ _id: req.params.id, user: req.user._id })
             .select('title type target findings totalChecks totalFindings lastCheckedAt lastFindingAt');
 
         if (!mission) return res.status(404).json({ error: 'Mission not found' });
@@ -165,11 +165,11 @@ router.get('/missions/:id/findings', protect, async (req, res) => {
 });
 
 // ============================================================================
-// POST /api/spy/missions/:id/run — Force-run a mission immediately
+// POST /api/intel/missions/:id/run — Force-run a mission immediately
 // ============================================================================
 router.post('/missions/:id/run', protect, async (req, res) => {
     try {
-        const mission = await SpyMission.findOne({ _id: req.params.id, user: req.user._id });
+        const mission = await IntelMission.findOne({ _id: req.params.id, user: req.user._id });
         if (!mission) return res.status(404).json({ error: 'Mission not found' });
 
         const result = await forceRunMission(mission._id);
@@ -181,14 +181,14 @@ router.post('/missions/:id/run', protect, async (req, res) => {
 });
 
 // ============================================================================
-// GET /api/spy/alerts — Get unread findings count across all missions
+// GET /api/intel/alerts — Get unread findings count across all missions
 // ============================================================================
 router.get('/alerts', protect, async (req, res) => {
     try {
         const { brandId } = req.query;
         if (!brandId) return res.status(400).json({ error: 'brandId is required' });
 
-        const missions = await SpyMission.find({
+        const missions = await IntelMission.find({
             brand: brandId,
             user: req.user._id,
             status: 'active',
@@ -214,7 +214,7 @@ router.get('/alerts', protect, async (req, res) => {
 
         res.json({ totalAlerts, alerts });
     } catch (err) {
-        console.error('Spy alerts error:', err.message);
+        console.error('Intel alerts error:', err.message);
         res.status(500).json({ error: 'Failed to load alerts' });
     }
 });

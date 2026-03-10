@@ -264,6 +264,17 @@ export const fidato = {
     clear: () => apiFetch('/fidato/clear', { method: 'POST' }),
 };
 
+// ============ Intel & Competitive Insights API ============
+export const intel = {
+    list: (brandId) => apiFetch(`/intel/missions?brandId=${brandId}`),
+    create: (data) => apiFetch('/intel/missions', { method: 'POST', body: JSON.stringify(data) }),
+    getFindings: (id) => apiFetch(`/intel/missions/${id}/findings`),
+    run: (id) => apiFetch(`/intel/missions/${id}/run`, { method: 'POST' }),
+    update: (id, data) => apiFetch(`/intel/missions/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id) => apiFetch(`/intel/missions/${id}`, { method: 'DELETE' }),
+    alerts: (brandId) => apiFetch(`/intel/missions/alerts?brandId=${brandId}`),
+};
+
 // ============ Nexus — Unified Agentic Interface ============
 export const nexus = {
     chat: (message, brandId, options = {}) => apiFetch('/nexus/chat', {

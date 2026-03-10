@@ -6,7 +6,7 @@ import { useBrand } from '../context/BrandContext'
 import { content as contentAPI, creatives as creativesAPI, trends as trendsAPI, dashboardSummary, shopifyAnalytics } from '../services/api'
 import { getUpcomingEvents, EVENT_COLORS } from '../data/calendarData'
 import SmartCommandBox from '../components/SmartCommandBox'
-import SpyReportViewer from '../components/SpyReportViewer'
+import IntelReportViewer from '../components/IntelReportViewer'
 import AgentFidatoPanel from '../components/AgentFidatoPanel'
 
 // ── Helpers ──
@@ -88,10 +88,10 @@ export default function UserDashboard() {
     const [radarHover, setRadarHover] = useState(null)
     const [d2cSnapshot, setD2cSnapshot] = useState(null)
 
-    // Spy mission state
-    const [spyMissions, setSpyMissions] = useState([])
-    const [spyReport, setSpyReport] = useState(null) // { mission, findings }
-    const [showSpyReport, setShowSpyReport] = useState(false)
+    // Intel state
+    const [intelMissions, setIntelMissions] = useState([])
+    const [intelReport, setIntelReport] = useState(null) // { mission, findings }
+    const [showIntelReport, setShowIntelReport] = useState(false)
     const [showFidatoPanel, setShowFidatoPanel] = useState(false)
 
 
@@ -148,36 +148,36 @@ export default function UserDashboard() {
         return () => clearInterval(interval)
     }, [loadSummary, loadTrends])
 
-    // ── Load spy missions ──
+    // ── Load intel missions ──
     useEffect(() => {
-        async function fetchSpyData() {
+        async function fetchIntelData() {
             if (!activeBrand?._id) return
             try {
                 const token = localStorage.getItem('mantram_token')
                 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
-                const resp = await fetch(`${API_BASE}/spy/missions?brandId=${activeBrand._id}`, {
+                const resp = await fetch(`${API_BASE}/intel/missions?brandId=${activeBrand._id}`, {
                     headers: { Authorization: `Bearer ${token}` },
                 })
                 if (resp.ok) {
                     const data = await resp.json()
-                    setSpyMissions(data.missions || [])
+                    setIntelMissions(data.missions || [])
                 }
             } catch { /* silent */ }
         }
-        fetchSpyData()
+        fetchIntelData()
     }, [activeBrand?._id])
 
-    const openSpyReport = async (mission) => {
+    const openIntelReport = async (mission) => {
         try {
             const token = localStorage.getItem('mantram_token')
             const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
-            const resp = await fetch(`${API_BASE}/spy/missions/${mission._id}/findings`, {
+            const resp = await fetch(`${API_BASE}/intel/missions/${mission._id}/findings`, {
                 headers: { Authorization: `Bearer ${token}` },
             })
             if (resp.ok) {
                 const data = await resp.json()
-                setSpyReport({ mission, findings: data })
-                setShowSpyReport(true)
+                setIntelReport({ mission, findings: data })
+                setShowIntelReport(true)
             }
         } catch { /* silent */ }
     }
@@ -797,7 +797,7 @@ export default function UserDashboard() {
                                         Intel
                                     </span>
                                 </h3>
-                                {spyMissions.some(m => m.status === 'active') && (
+                                {intelMissions.some(m => m.status === 'active') && (
                                     <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
                                         <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
                                         <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Live</span>
@@ -831,7 +831,7 @@ export default function UserDashboard() {
                                     </div>
                                     <p className="text-sm font-bold text-white mb-1">Competitive Intelligence</p>
                                     <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                                        Deploy spy missions to track competitor<br />
+                                        Deploy intel missions to track competitor<br />
                                         pricing, ads, launches & strategy changes
                                     </p>
                                     <button onClick={() => setShowFidatoPanel(true)}
@@ -850,23 +850,23 @@ export default function UserDashboard() {
                                 <>
                                     <div className="grid grid-cols-3 gap-2 mb-4">
                                         <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04] text-center">
-                                            <p className="text-lg font-extrabold text-white">{spyMissions.length}</p>
+                                            <p className="text-lg font-extrabold text-white">{intelMissions.length}</p>
                                             <p className="text-[10px] text-slate-500 uppercase">Missions</p>
                                         </div>
                                         <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04] text-center">
-                                            <p className="text-lg font-extrabold text-white">{spyMissions.filter(m => m.status === 'active').length}</p>
+                                            <p className="text-lg font-extrabold text-white">{intelMissions.filter(m => m.status === 'active').length}</p>
                                             <p className="text-[10px] text-slate-500 uppercase">Active</p>
                                         </div>
                                         <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04] text-center">
-                                            <p className="text-lg font-extrabold text-white">{spyMissions.reduce((a, m) => a + (m.totalFindings || 0), 0)}</p>
-                                            <p className="text-[10px] text-slate-500 uppercase">Findings</p>
+                                            <p className="text-lg font-extrabold text-white">{intelMissions.reduce((a, m) => a + (m.totalFindings || 0), 0)}</p>
+                                            <p className="text-[10px] text-slate-500 uppercase">Insights</p>
                                         </div>
                                     </div>
 
                                     {/* Recent missions with findings */}
                                     <div className="space-y-2 mb-4">
-                                        {spyMissions.filter(m => (m.totalFindings || 0) > 0).slice(0, 3).map((m, i) => (
-                                            <button key={m._id} onClick={() => openSpyReport(m)}
+                                        {intelMissions.filter(m => (m.totalFindings || 0) > 0).slice(0, 3).map((m, i) => (
+                                            <button key={m._id} onClick={() => openIntelReport(m)}
                                                 className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-violet-500/30 hover:bg-white/[0.04] transition-all cursor-pointer text-left group"
                                                 style={{ animation: `slide-up 0.4s ease-out ${i * 80}ms both` }}>
                                                 <div className="size-8 rounded-lg bg-gradient-to-br from-violet-500/15 to-emerald-500/10 flex items-center justify-center shrink-0">
@@ -874,10 +874,10 @@ export default function UserDashboard() {
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-sm font-bold text-white truncate">{m.title}</p>
-                                                    <p className="text-[11px] text-slate-500">{m.target?.name} · {m.totalFindings} findings</p>
+                                                    <p className="text-[11px] text-slate-500">{m.target?.name} · {m.totalFindings} insights</p>
                                                 </div>
                                                 <span className="text-[9px] font-bold font-mono text-violet-400 opacity-0 group-hover:opacity-100 transition-opacity tracking-wider">
-                                                    DECRYPT
+                                                    VIEW
                                                 </span>
                                             </button>
                                         ))}
@@ -1069,12 +1069,12 @@ export default function UserDashboard() {
 
             {/* Bottom spacer for floating bar */}
             <div className="h-20" />
-            {/* Cinematic Spy Report Overlay */}
-            {showSpyReport && spyReport && (
-                <SpyReportViewer
-                    mission={spyReport.mission}
-                    findings={spyReport.findings}
-                    onClose={() => { setShowSpyReport(false); setSpyReport(null) }}
+            {/* Cinematic Intel Report Overlay */}
+            {showIntelReport && intelReport && (
+                <IntelReportViewer
+                    mission={intelReport.mission}
+                    findings={intelReport.findings}
+                    onClose={() => { setShowIntelReport(false); setIntelReport(null) }}
                 />
             )}
             {/* Agent Fidato Mission Panel — rendered at root to avoid stacking context issues */}

@@ -33,7 +33,7 @@ export default function NexusBar() {
 
     // Notifications
     const [notifications, setNotifications] = useState([])
-    const [spyAlertCount, setSpyAlertCount] = useState(0)
+    const [intelAlertCount, setIntelAlertCount] = useState(0)
 
     // Refs
     const inputRef = useRef(null)
@@ -124,26 +124,26 @@ export default function NexusBar() {
 
     useEffect(() => { loadNotifications() }, [loadNotifications])
 
-    // ── Load spy mission alerts ──
-    const loadSpyAlerts = useCallback(async () => {
+    // ── Load intel mission alerts ──
+    const loadIntelAlerts = useCallback(async () => {
         if (!brandId) return
         try {
             const token = localStorage.getItem('mantram_token')
-            const resp = await fetch(`${API_BASE}/spy/missions/alerts?brandId=${brandId}`, {
+            const resp = await fetch(`${API_BASE}/intel/missions/alerts?brandId=${brandId}`, {
                 headers: { Authorization: `Bearer ${token}` },
             })
             if (resp.ok) {
                 const data = await resp.json()
-                setSpyAlertCount(data.unreadCount || 0)
+                setIntelAlertCount(data.unreadCount || 0)
             }
         } catch { /* silent */ }
     }, [brandId])
 
     useEffect(() => {
-        loadSpyAlerts()
-        const interval = setInterval(loadSpyAlerts, 120000) // every 2 minutes
+        loadIntelAlerts()
+        const interval = setInterval(loadIntelAlerts, 120000) // every 2 minutes
         return () => clearInterval(interval)
-    }, [loadSpyAlerts])
+    }, [loadIntelAlerts])
 
     // ── Dismiss briefing ──
     const dismissBriefing = (permanent = false) => {
@@ -757,10 +757,10 @@ export default function NexusBar() {
                     {!open && notifications.length > 0 && (
                         <span className="absolute top-0 right-0 size-3.5 rounded-full bg-rose-500 border-2 border-[#0a0a1a] animate-pulse" />
                     )}
-                    {/* Spy alert badge */}
-                    {!open && spyAlertCount > 0 && (
+                    {/* Intel alert badge */}
+                    {!open && intelAlertCount > 0 && (
                         <span className="absolute -top-1 -left-1 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-amber-500 text-black border border-amber-400 shadow-lg animate-pulse">
-                            🕵️ {spyAlertCount}
+                            📡 {intelAlertCount}
                         </span>
                     )}
                 </button>

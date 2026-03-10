@@ -10,7 +10,7 @@ const findingSchema = new mongoose.Schema({
     notified: { type: Boolean, default: false },
 }, { timestamps: true });
 
-const spyMissionSchema = new mongoose.Schema({
+const intelMissionSchema = new mongoose.Schema({
     brand: { type: mongoose.Schema.Types.ObjectId, ref: 'Brand', required: true, index: true },
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
@@ -48,6 +48,6 @@ const spyMissionSchema = new mongoose.Schema({
 });
 
 // Index for scheduler: find active missions due for check
-spyMissionSchema.index({ status: 1, lastCheckedAt: 1, frequency: 1 });
+intelMissionSchema.index({ status: 1, lastCheckedAt: 1, frequency: 1 });
 
-export default mongoose.model('SpyMission', spyMissionSchema);
+export default mongoose.model('IntelMission', intelMissionSchema);

@@ -1,7 +1,7 @@
 /**
- * Spy Agent — Agent Fidato's Competitive Intelligence Engine
+ * Intelligence Agent — Agent Fidato's Market Intelligence Engine
  * 
- * Background service that runs spy missions:
+ * Background service that runs intelligence missions:
  *   1. Finds active missions due for checking
  *   2. Executes web search scoped to competitor + brand
  *   3. AI-powered diff to detect NEW intel vs old findings
@@ -10,7 +10,7 @@
  * Uses Grok's built-in web search (search_parameters) for live data.
  */
 
-import SpyMission from '../models/SpyMission.js';
+import IntelMission from '../models/IntelMission.js';
 import Brand from '../models/Brand.js';
 
 // ============================================================================
@@ -50,19 +50,19 @@ function buildSearchQuery(mission, brandName) {
 }
 
 // ============================================================================
-// EXECUTE A SINGLE RECON MISSION
+// EXECUTE A SINGLE INSIGHT MISSION
 // ============================================================================
-async function executeRecon(mission, brand) {
+async function executeInsight(mission, brand) {
     const grokKey = process.env.GROK_API_KEY;
     if (!grokKey) {
-        console.warn('🕵️ Spy Agent: No GROK_API_KEY — cannot execute recon');
+        console.warn('🕵️ Intel Agent: No GROK_API_KEY — cannot execute insight');
         return null;
     }
 
     const brandName = brand?.name || '';
     const searchQuery = buildSearchQuery(mission, brandName);
 
-    console.log(`🕵️ Recon: "${mission.title}" — searching: ${searchQuery.slice(0, 80)}...`);
+    console.log(`🕵️ Insight: "${mission.title}" — searching: ${searchQuery.slice(0, 80)}...`);
 
     try {
         const resp = await fetch('https://api.x.ai/v1/chat/completions', {
@@ -103,7 +103,7 @@ Do NOT make things up. Only report real findings from your search.`,
         });
 
         if (!resp.ok) {
-            console.error(`🕵️ Recon failed for "${mission.title}":`, resp.status);
+            console.error(`🕵️ Insight failed for "${mission.title}":`, resp.status);
             return null;
         }
 
@@ -117,7 +117,7 @@ Do NOT make things up. Only report real findings from your search.`,
 
         return report;
     } catch (err) {
-        console.error(`🕵️ Recon error for "${mission.title}":`, err.message);
+        console.error(`🕵️ Insight error for "${mission.title}":`, err.message);
         return null;
     }
 }
@@ -216,12 +216,12 @@ function getSearchDateRange(frequency) {
 // ============================================================================
 // MAIN SCHEDULER — RUN ALL DUE MISSIONS
 // ============================================================================
-export async function runSpyMissions() {
+export async function runIntelMissions() {
     try {
         const now = new Date();
 
         // Find all active missions
-        const missions = await SpyMission.find({ status: 'active' })
+        const missions = await IntelMission.find({ status: 'active' })
             .populate('brand', 'name dna')
             .limit(20);
 
@@ -237,8 +237,8 @@ export async function runSpyMissions() {
 
             console.log(`🕵️ Running mission: "${mission.title}" (${mission.type})`);
 
-            // Execute recon
-            const report = await executeRecon(mission, mission.brand);
+            // Execute insight
+            const report = await executeInsight(mission, mission.brand);
 
             // Update check timestamp
             mission.lastCheckedAt = now;
@@ -277,10 +277,10 @@ export async function runSpyMissions() {
         }
 
         if (executed > 0) {
-            console.log(`🕵️ Spy Agent: ${executed} missions produced new intel`);
+            console.log(`🕵️ Intel Agent: ${executed} missions produced new intel`);
         }
     } catch (err) {
-        console.error('🕵️ Spy Agent scheduler error:', err.message);
+        console.error('🕵️ Intel Agent scheduler error:', err.message);
     }
 }
 
@@ -288,19 +288,19 @@ export async function runSpyMissions() {
 // FORCE-RUN A SINGLE MISSION (on-demand)
 // ============================================================================
 export async function forceRunMission(missionId) {
-    const mission = await SpyMission.findById(missionId).populate('brand', 'name dna');
+    const mission = await IntelMission.findById(missionId).populate('brand', 'name dna');
     if (!mission) throw new Error('Mission not found');
 
-    console.log(`🕵️ Force-running mission: "${mission.title}"`);
+    console.log(`🕵️ Running mission: "${mission.title}"`);
 
-    const report = await executeRecon(mission, mission.brand);
+    const report = await executeInsight(mission, mission.brand);
 
     mission.lastCheckedAt = new Date();
     mission.totalChecks += 1;
 
     if (!report) {
         await mission.save();
-        return { status: 'no_intel', message: 'No significant findings detected in this recon.' };
+        return { status: 'no_intel', message: 'No significant findings detected in this check.' };
     }
 
     const result = await detectChanges(mission, report);
