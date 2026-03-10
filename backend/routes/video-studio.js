@@ -124,7 +124,7 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
         });
     } catch (error) {
         console.error('Advanced generate error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -197,7 +197,7 @@ router.post('/start', protect, requireCredits('videoBrainstorm'), async (req, re
         });
     } catch (error) {
         console.error('Video Studio start error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -238,7 +238,7 @@ router.post('/:id/select', protect, async (req, res) => {
         });
     } catch (error) {
         console.error('Video Studio select error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -356,7 +356,7 @@ Output ONLY the image, no text or labels.`;
         });
     } catch (error) {
         console.error('Video Studio approve error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -411,7 +411,7 @@ router.post('/:id/generate', protect, requireCredits('videoGenerate'), async (re
         });
     } catch (error) {
         console.error('Video Studio generate error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -493,7 +493,7 @@ router.get('/:id/status', protect, async (req, res) => {
         });
     } catch (error) {
         console.error('Video Studio status error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -546,7 +546,7 @@ router.post('/:id/edit', protect, requireCredits('videoEdit'), async (req, res) 
         });
     } catch (error) {
         console.error('Video Studio edit error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -595,7 +595,7 @@ router.post('/:id/finalize', protect, async (req, res) => {
         });
     } catch (error) {
         console.error('Video Studio finalize error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -671,7 +671,7 @@ router.get('/', protect, async (req, res) => {
 
         res.json({ success: true, projects, total });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -693,7 +693,7 @@ router.get('/:id', protect, async (req, res) => {
             },
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -919,7 +919,7 @@ ${brandContext ? '- IMPORTANT: Align the visual style, colors, mood, and tone wi
         });
     } catch (error) {
         console.error('Enhance prompt error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -932,7 +932,7 @@ router.delete('/:id', protect, async (req, res) => {
         if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
         res.json({ success: true, message: 'Project deleted' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -940,6 +940,7 @@ router.delete('/:id', protect, async (req, res) => {
 // VIDEO CACHING — Download ephemeral CDN videos → Upload to S3
 // ══════════════════════════════════════════════════════════════════════════════
 import { uploadToS3 } from '../utils/s3.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 /**
  * Download a video from an ephemeral CDN URL and upload to S3.
@@ -1017,7 +1018,7 @@ router.get('/:id/video', async (req, res) => {
         });
     } catch (error) {
         console.error('Video serve error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

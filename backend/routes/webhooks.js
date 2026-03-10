@@ -10,6 +10,7 @@ import { runAutonomousPipeline, handleCommentAutonomously } from '../services/au
 import Integration from '../models/Integration.js';
 import Conversation from '../models/Conversation.js';
 import config from '../config/env.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -267,7 +268,7 @@ export async function sendMetaReply(recipientId, messageText, platform = 'instag
         return { success: true, messageId: data.message_id };
     } catch (error) {
         console.error('❌ Error sending Meta reply:', error.message);
-        return { success: false, error: error.message };
+        return { success: false, error: safeErrorMessage(error) };
     }
 }
 
@@ -302,7 +303,7 @@ export async function sendMetaQuickReplies(recipientId, text, buttons, platform 
 
         return { success: true, messageId: data.message_id };
     } catch (error) {
-        return { success: false, error: error.message };
+        return { success: false, error: safeErrorMessage(error) };
     }
 }
 

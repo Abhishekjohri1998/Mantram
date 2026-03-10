@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { optionalAuth, protect } from '../middleware/auth.js';
 import { requireCredits } from '../middleware/credits.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -329,7 +330,7 @@ Respond in JSON:
         const questions = INTENT_QUESTIONS[intent] || INTENT_QUESTIONS.custom;
         res.json({ success: true, intent, questions, brandAware: false });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -365,7 +366,7 @@ Respond in JSON format:
         res.json({ success: true, ...parsed });
     } catch (error) {
         console.error('Brainstorm confirm error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -527,7 +528,7 @@ ${outputFormat}`;
         res.json({ success: true, ideas: parsed, intent });
     } catch (error) {
         console.error('Brainstorm generate error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -560,7 +561,7 @@ ${isAdFilm ? 'Respond with: filmConcepts (3), productionApproaches (3), namingId
         res.json({ success: true, ideas: parsed, intent });
     } catch (error) {
         console.error('Brainstorm refine error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -594,7 +595,7 @@ router.post('/feedback', optionalAuth, async (req, res) => {
 
         res.json({ success: true, message: feedback === 'like' ? 'Idea approved! ✅' : 'Got it, noted. 👍' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -670,7 +671,7 @@ ${brandContext}`;
         res.json({ success: true, screenplay: parsed });
     } catch (error) {
         console.error('Screenplay generation error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -729,7 +730,7 @@ Respond in JSON:
         res.json({ success: true, ...parsed });
     } catch (error) {
         console.error('Brainstorm chat error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

@@ -5,6 +5,7 @@ import Brand from '../models/Brand.js';
 import { protect, optionalAuth } from '../middleware/auth.js';
 import { getOrchestrator } from '../agents/orchestrator.js';
 import { requireCredits } from '../middleware/credits.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -15,7 +16,7 @@ router.get('/providers', optionalAuth, async (req, res) => {
         const providers = orchestrator.getAvailableProviders();
         res.json({ success: true, providers });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -78,7 +79,7 @@ router.post('/generate', protect, requireCredits('content'), async (req, res) =>
         res.json({ success: true, content, brandAlignmentScore: result.aiMeta?.brandAlignmentScore });
     } catch (error) {
         console.error('Content generation error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -100,7 +101,7 @@ router.get('/', protect, async (req, res) => {
         const total = await Content.countDocuments(filter);
         res.json({ success: true, content, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -111,7 +112,7 @@ router.get('/:id', protect, async (req, res) => {
         if (!content) return res.status(404).json({ success: false, error: 'Content not found' });
         res.json({ success: true, content });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -149,7 +150,7 @@ router.put('/:id', protect, async (req, res) => {
         const content = await Content.findByIdAndUpdate(req.params.id, updates, { new: true });
         res.json({ success: true, content });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -182,7 +183,7 @@ router.post('/:id/feedback', protect, async (req, res) => {
 
         res.json({ success: true, feedback });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -229,7 +230,7 @@ router.post('/:id/regenerate', protect, requireCredits('contentRefine'), async (
 
         res.json({ success: true, content });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -300,7 +301,7 @@ RULES:
         });
     } catch (error) {
         console.error('Content refine error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -342,7 +343,7 @@ RULES:
         res.json({ success: true, content: result.content, aiMeta: result.aiMeta });
     } catch (error) {
         console.error('Refine text error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -352,7 +353,7 @@ router.delete('/:id', protect, async (req, res) => {
         await Content.findOneAndDelete({ _id: req.params.id, user: req.user._id });
         res.json({ success: true, message: 'Content deleted' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

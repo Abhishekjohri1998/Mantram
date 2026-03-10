@@ -15,6 +15,7 @@ import Brand from '../models/Brand.js';
 import { protect } from '../middleware/auth.js';
 import { requireCredits } from '../middleware/credits.js';
 import {
+import { safeErrorMessage } from '../utils/safeError.js';
     researchNode,
     writerNode,
     seoNode,
@@ -89,7 +90,7 @@ router.post('/start', protect, requireCredits('content'), async (req, res) => {
         });
     } catch (error) {
         console.error('Content agentic start error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -154,7 +155,7 @@ router.post('/:id/refine', protect, requireCredits('contentRefine'), async (req,
         });
     } catch (error) {
         console.error('Content agentic refine error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -194,7 +195,7 @@ router.post('/:id/edit', protect, async (req, res) => {
             },
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -277,7 +278,7 @@ router.post('/youtube', protect, requireCredits('content'), async (req, res) => 
         });
     } catch (error) {
         console.error('YouTube content generation error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -354,7 +355,7 @@ router.post('/youtube-seo', protect, requireCredits('content'), async (req, res)
         });
     } catch (error) {
         console.error('YouTube SEO generation error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

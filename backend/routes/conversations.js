@@ -9,6 +9,7 @@ import Conversation from '../models/Conversation.js';
 import Contact from '../models/Contact.js';
 import Brand from '../models/Brand.js';
 import { detectIntent, detectIntentAI, checkCompliance, generateAIReplies, processIncomingMessage } from '../services/conversationEngine.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -44,7 +45,7 @@ router.get('/', protect, async (req, res) => {
 
         res.json({ success: true, conversations, total, page: parseInt(page), limit: parseInt(limit), statusCounts: counts });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -171,7 +172,7 @@ router.get('/stats/overview', protect, async (req, res) => {
             },
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -202,7 +203,7 @@ router.post('/simulate', protect, async (req, res) => {
 
         res.json({ success: true, ...result });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -226,7 +227,7 @@ router.get('/:id', protect, async (req, res) => {
 
         res.json({ success: true, conversation, compliance });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -291,7 +292,7 @@ router.post('/:id/reply', protect, async (req, res) => {
 
         res.json({ success: true, message: conversation.messages[conversation.messages.length - 1] });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -315,7 +316,7 @@ router.post('/:id/takeover', protect, async (req, res) => {
 
         res.json({ success: true, conversation: { status: conversation.status, isAIHandling: false } });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -333,7 +334,7 @@ router.post('/:id/resolve', protect, async (req, res) => {
 
         res.json({ success: true });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -356,7 +357,7 @@ router.post('/:id/ai-mode', protect, async (req, res) => {
 
         res.json({ success: true, isAIHandling: conversation.isAIHandling });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -380,7 +381,7 @@ router.get('/:id/suggestions', protect, async (req, res) => {
 
         res.json({ success: true, suggestions, intent });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

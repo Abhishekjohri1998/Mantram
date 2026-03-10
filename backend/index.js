@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import connectDB from './config/db.js';
 import config from './config/env.js';
 
@@ -45,6 +47,12 @@ const app = express();
 
 // Connect Database
 connectDB();
+
+// BUG-17 FIX: Security headers
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    contentSecurityPolicy: false, // Disabled for API server — frontend handles CSP
+}));
 
 // Middleware
 app.use(cors({
@@ -104,6 +112,25 @@ if (config.nodeEnv === 'development') {
         next();
     });
 }
+
+// BUG-14 FIX: Rate limiting on sensitive endpoints
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 15, // 15 attempts per window
+    message: { success: false, error: 'Too many attempts. Please try again after 15 minutes.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 300, // 300 requests per 15 minutes per IP
+    message: { success: false, error: 'Rate limit exceeded. Please slow down.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+app.use('/api/', apiLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
 
 // API Routes
 app.use('/api/auth', authRoutes);

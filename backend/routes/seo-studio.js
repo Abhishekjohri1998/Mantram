@@ -3,6 +3,7 @@ import { protect, optionalAuth } from '../middleware/auth.js';
 import { requireCredits } from '../middleware/credits.js';
 import Brand from '../models/Brand.js';
 import {
+import { safeErrorMessage } from '../utils/safeError.js';
   researchDomain, researchCompetitors,
   formatSiteResearch, formatCompetitorResearch,
 } from '../utils/web-research.js';
@@ -238,7 +239,7 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
     res.json({ success: true, ...parsed });
   } catch (error) {
     console.error('SEO Health Check error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 
@@ -336,7 +337,7 @@ Generate 5-8 keyword clusters. For each, explain WHY it matters strategically. T
     res.json({ success: true, ...parsed });
   } catch (error) {
     console.error('SEO Traffic error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 
@@ -477,7 +478,7 @@ Be STRATEGIC and SPECIFIC. Every insight must have a WHY and an actionable HOW. 
     res.json({ success: true, ...parsed });
   } catch (error) {
     console.error('SEO Competitors error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 
@@ -600,7 +601,7 @@ Be STRATEGIC. Every recommendation must explain WHY it matters for AI visibility
     res.json({ success: true, ...parsed });
   } catch (error) {
     console.error('AI Visibility error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 
@@ -664,7 +665,7 @@ Respond in JSON:
     res.json({ success: true, ...parsed });
   } catch (error) {
     console.error('Page audit error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 
@@ -706,7 +707,7 @@ router.post('/competitors/manage', protect, async (req, res) => {
 
     res.json({ success: true, competitors: brand.competitors });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 
@@ -752,7 +753,7 @@ CRITICAL: Only include REAL existing companies. Do not make up fictional compani
 
     res.json({ success: true, competitors: brand.competitors });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 
@@ -795,7 +796,7 @@ Respond in JSON:
     res.json({ success: true, ...parsed });
   } catch (error) {
     console.error('SEO Ask error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 
@@ -933,7 +934,7 @@ Generate 10-15 keyword battles. Be RUTHLESSLY strategic. Every insight must answ
     res.json({ success: true, ...parsed });
   } catch (error) {
     console.error('Competitor War Room error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 
@@ -1060,7 +1061,7 @@ Respond in JSON:
     res.json({ success: true, ...finalResult });
   } catch (error) {
     console.error('LLM Brand Probe error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 
@@ -1117,7 +1118,7 @@ CRITICAL: Code must be PRODUCTION READY. Use the brand's actual name, website, a
     res.json({ success: true, ...parsed });
   } catch (error) {
     console.error('Auto-fix error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 
@@ -1202,7 +1203,7 @@ Be STRATEGIC. Focus on HIGH-VALUE prompts where the brand has the best chance of
     res.json({ success: true, ...parsed });
   } catch (error) {
     console.error('Prompt Mining error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 
@@ -1228,7 +1229,7 @@ router.get('/history', optionalAuth, async (req, res) => {
 
     res.json({ success: true, audits });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 
@@ -1239,7 +1240,7 @@ router.get('/history/:id', optionalAuth, async (req, res) => {
     if (!audit) return res.status(404).json({ success: false, error: 'Audit not found' });
     res.json({ success: true, audit });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 

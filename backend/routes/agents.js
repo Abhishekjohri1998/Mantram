@@ -4,6 +4,7 @@ import { protect, optionalAuth } from '../middleware/auth.js';
 import { getOrchestrator } from '../agents/orchestrator.js';
 import { addWatermark } from '../utils/watermark.js';
 import { getSetting } from '../models/SystemSettings.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -55,7 +56,7 @@ router.post('/scan-website', optionalAuth, async (req, res) => {
         res.json({ success: true, brand, scanResult });
     } catch (error) {
         console.error('Scan error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -70,7 +71,7 @@ router.post('/brainstorm', optionalAuth, async (req, res) => {
 
         res.json({ success: true, brandSuggestion: result });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -115,7 +116,7 @@ router.post('/brainstorm/save', protect, async (req, res) => {
         await req.user.updateOne({ $inc: { 'usage.brandsCreated': 1 } });
         res.status(201).json({ success: true, brand });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -147,7 +148,7 @@ router.post('/generate-logo', optionalAuth, async (req, res) => {
         res.json({ success: true, logoUrl: result.imageUrl });
     } catch (error) {
         console.error('Logo generation error:', error.message);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -197,7 +198,7 @@ router.post('/product-ideas', protect, async (req, res) => {
         res.json({ success: true, ideas, occasion });
     } catch (error) {
         console.error('Product ideas error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -379,7 +380,7 @@ Each caption should be complete, polished, and ready to copy-paste. Do not inclu
 
     } catch (error) {
         console.error('Image analysis error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -545,7 +546,7 @@ Bold, creative, eye-catching visual suitable for advertising and social media.`;
 
     } catch (error) {
         console.error('AI Photoshoot error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

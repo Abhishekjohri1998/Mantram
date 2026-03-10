@@ -17,6 +17,7 @@ import SubscriptionPackage from '../models/SubscriptionPackage.js';
 import SystemSettings, { getSetting, setSetting } from '../models/SystemSettings.js';
 import { CREDIT_COSTS, getCreditCosts, getCreditBalance, invalidateCreditCostCache } from '../middleware/credits.js';
 import { protect, authorize, generateToken } from '../middleware/auth.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -95,7 +96,7 @@ router.get('/stats', async (req, res) => {
             },
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -134,7 +135,7 @@ router.get('/users', async (req, res) => {
 
         res.json({ success: true, users: usersWithCredits, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -157,7 +158,7 @@ router.get('/users/:id', async (req, res) => {
             stats: { brandCount, contentCount, creativeCount, integrationCount },
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -182,7 +183,7 @@ router.put('/users/:id', async (req, res) => {
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
         res.json({ success: true, user: { ...user.toJSON(), creditBalance: getCreditBalance(user) } });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -204,7 +205,7 @@ router.delete('/users/:id', async (req, res) => {
         ]);
         res.json({ success: true, message: 'User and all data deleted' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -216,7 +217,7 @@ router.post('/users/:id/impersonate', async (req, res) => {
         const token = generateToken(user._id);
         res.json({ success: true, token, user: { id: user._id, name: user.name, email: user.email, role: user.role, plan: user.plan }, message: `Impersonating ${user.name}` });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -228,7 +229,7 @@ router.post('/users/:id/add-credits', async (req, res) => {
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
         res.json({ success: true, user: { ...user.toJSON(), creditBalance: getCreditBalance(user) } });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -238,7 +239,7 @@ router.post('/users/:id/reset-credits', async (req, res) => {
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
         res.json({ success: true, user: { ...user.toJSON(), creditBalance: getCreditBalance(user) } });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -258,7 +259,7 @@ router.get('/subscriptions', async (req, res) => {
             .sort('-createdAt').limit(100);
         res.json({ success: true, subscriptions });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -285,7 +286,7 @@ router.post('/subscriptions', async (req, res) => {
         });
         res.json({ success: true, subscription });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -298,7 +299,7 @@ router.get('/coupons', async (req, res) => {
         const coupons = await Coupon.find().populate('createdBy', 'name email').sort('-createdAt');
         res.json({ success: true, coupons });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -316,7 +317,7 @@ router.post('/coupons', async (req, res) => {
         });
         res.status(201).json({ success: true, coupon });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -326,7 +327,7 @@ router.put('/coupons/:id', async (req, res) => {
         if (!coupon) return res.status(404).json({ success: false, error: 'Coupon not found' });
         res.json({ success: true, coupon });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -335,7 +336,7 @@ router.delete('/coupons/:id', async (req, res) => {
         await Coupon.findByIdAndDelete(req.params.id);
         res.json({ success: true, message: 'Coupon deleted' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -378,7 +379,7 @@ router.get('/brands', async (req, res) => {
 
         res.json({ success: true, brands: brandsWithCounts, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -397,7 +398,7 @@ router.delete('/brands/:id', async (req, res) => {
         ]);
         res.json({ success: true, message: 'Brand and all associated data deleted' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -416,7 +417,7 @@ router.get('/content', async (req, res) => {
         const total = await Content.countDocuments(filter);
         res.json({ success: true, content, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -425,7 +426,7 @@ router.delete('/content/:id', async (req, res) => {
         await Content.findByIdAndDelete(req.params.id);
         res.json({ success: true, message: 'Content deleted' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -443,7 +444,7 @@ router.get('/creatives', async (req, res) => {
         const total = await Creative.countDocuments(filter);
         res.json({ success: true, creatives, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -478,7 +479,7 @@ router.get('/ai-health', async (req, res) => {
 
         res.json({ success: true, aiHealth: { recentFeedback, feedbackTrend, providerUsage, providers, status: 'operational' } });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -489,7 +490,7 @@ router.get('/system-settings', async (req, res) => {
         const maintenanceMode = await getSetting('maintenance_mode', false);
         res.json({ success: true, settings: { watermarkEnabled, defaultProvider, maintenanceMode } });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -501,7 +502,7 @@ router.put('/system-settings', async (req, res) => {
         if (maintenanceMode !== undefined) await setSetting('maintenance_mode', !!maintenanceMode, req.user._id);
         res.json({ success: true, message: 'Settings updated' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -528,7 +529,7 @@ router.get('/integrations', async (req, res) => {
 
         res.json({ success: true, integrations, summary });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -543,7 +544,7 @@ router.get('/products', async (req, res) => {
         const total = await Product.countDocuments();
         res.json({ success: true, products, total });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -556,7 +557,7 @@ router.get('/packages', async (req, res) => {
         const packages = await SubscriptionPackage.find().sort('displayOrder tier').populate('createdBy', 'name email');
         res.json({ success: true, packages });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -571,7 +572,7 @@ router.post('/packages', async (req, res) => {
         const pkg = await SubscriptionPackage.create(data);
         res.status(201).json({ success: true, package: pkg });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -581,7 +582,7 @@ router.put('/packages/:id', async (req, res) => {
         if (!pkg) return res.status(404).json({ success: false, error: 'Package not found' });
         res.json({ success: true, package: pkg });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -590,7 +591,7 @@ router.delete('/packages/:id', async (req, res) => {
         await SubscriptionPackage.findByIdAndDelete(req.params.id);
         res.json({ success: true, message: 'Package deleted' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -785,7 +786,7 @@ router.post('/packages/ai-suggest', async (req, res) => {
             },
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -832,7 +833,7 @@ router.post('/packages/seed-defaults', async (req, res) => {
         const created = await SubscriptionPackage.insertMany(defaults);
         res.json({ success: true, packages: created, message: `${created.length} default packages created` });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -846,7 +847,7 @@ router.get('/credit-costs', async (req, res) => {
         const costs = await getCreditCosts();
         res.json({ success: true, costs, defaults: CREDIT_COSTS });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -872,7 +873,7 @@ router.put('/credit-costs', async (req, res) => {
         const updated = await getCreditCosts();
         res.json({ success: true, costs: updated, message: 'Credit costs updated' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -883,7 +884,7 @@ router.post('/credit-costs/reset', async (req, res) => {
         invalidateCreditCostCache();
         res.json({ success: true, costs: CREDIT_COSTS, message: 'Reset to defaults' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -899,7 +900,7 @@ creditRouter.get('/balance', protect, async (req, res) => {
         const costs = await getCreditCosts();
         res.json({ success: true, ...getCreditBalance(user), plan: user.plan, costs });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -921,7 +922,7 @@ creditRouter.get('/usage', protect, async (req, res) => {
 
         res.json({ success: true, records, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -974,7 +975,7 @@ creditRouter.get('/summary', protect, async (req, res) => {
             dailyTrend,
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

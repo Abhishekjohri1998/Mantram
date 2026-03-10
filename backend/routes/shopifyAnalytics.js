@@ -14,6 +14,7 @@ import Product from '../models/Product.js';
 import ShopifyOrder from '../models/ShopifyOrder.js';
 import ShopifyCustomer from '../models/ShopifyCustomer.js';
 import { getShopInfo } from '../services/shopifyService.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -463,7 +464,7 @@ router.get('/overview', protect, async (req, res) => {
         res.json(result);
     } catch (error) {
         console.error('Shopify analytics overview error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -585,7 +586,7 @@ Customers: Total ${overview.customerAnalytics?.totalCustomers}, New: ${overview.
         res.json({ insights: parsed });
     } catch (error) {
         console.error('AI insights error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -666,7 +667,7 @@ Store AOV: ₹${kpis?.avgOrderValue || 0}, Total Customers: ${kpis?.totalCustome
         res.json({ boostPlan: parsed });
     } catch (error) {
         console.error('Boost plan error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -683,7 +684,7 @@ router.post('/sync', protect, async (req, res) => {
         });
         res.json({ success: true, message: 'Cache cleared. Analytics will refresh on next load.' });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -800,7 +801,7 @@ router.get('/creative-cockpit', protect, async (req, res) => {
         res.json(result);
     } catch (error) {
         console.error('Creative cockpit error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -928,7 +929,7 @@ router.get('/cohort-ltv', protect, async (req, res) => {
         res.json(result);
     } catch (error) {
         console.error('Cohort LTV error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -1041,7 +1042,7 @@ router.get('/profitability', protect, async (req, res) => {
         res.json(result);
     } catch (error) {
         console.error('Profitability error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -1100,7 +1101,7 @@ User Question: ${question}`,
         res.json({ ...parsed, aiPowered: true });
     } catch (error) {
         console.error('AI copilot error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 

@@ -16,6 +16,7 @@ import Brand from '../models/Brand.js';
 import Content from '../models/Content.js';
 import Creative from '../models/Creative.js';
 import {
+import { safeErrorMessage } from '../utils/safeError.js';
     getTrendingTopics,
     getTrendingSEOKeywords,
     getContentSuggestions,
@@ -555,7 +556,7 @@ router.get('/', protect, async (req, res) => {
         });
     } catch (error) {
         console.error('Dashboard summary error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -649,7 +650,7 @@ Content Stats: ${JSON.stringify(contentStats)}`,
         res.json({ strategy: parsed });
     } catch (error) {
         console.error('Strategy generation error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 

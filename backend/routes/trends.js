@@ -9,6 +9,7 @@ import Brand from '../models/Brand.js';
 import { getOrchestrator } from '../agents/orchestrator.js';
 import { fetchAllTrends, matchTrendsToBrand, clearTrendCache } from '../services/trendEngine.js';
 import {
+import { safeErrorMessage } from '../utils/safeError.js';
     getTrendingTopics,
     getTrendingSEOKeywords,
     getCompetitorTrendIntel,
@@ -31,7 +32,7 @@ router.get('/now', protect, async (req, res) => {
         });
     } catch (error) {
         console.error('Trends fetch error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -56,7 +57,7 @@ router.get('/brand-match', protect, async (req, res) => {
         });
     } catch (error) {
         console.error('Brand trend match error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -74,7 +75,7 @@ router.post('/refresh', protect, requireCredits('trendRefresh'), async (req, res
         });
     } catch (error) {
         console.error('Trend refresh error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -96,7 +97,7 @@ router.get('/grok-topics', protect, async (req, res) => {
         const data = await getTrendingTopics(brandIndustry, country || 'India');
         res.json({ success: true, ...data, source: 'grok' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -117,7 +118,7 @@ router.get('/grok-seo', protect, async (req, res) => {
         const data = await getTrendingSEOKeywords(brandIndustry, brandWebsite, country || 'India');
         res.json({ success: true, ...data, source: 'grok' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -141,7 +142,7 @@ router.get('/grok-competitors', protect, async (req, res) => {
         const data = await getCompetitorTrendIntel(compList, brandIndustry, country || 'India');
         res.json({ success: true, ...data, source: 'grok' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -157,7 +158,7 @@ router.get('/grok-content', protect, async (req, res) => {
         const data = await getContentSuggestions(brand, platList);
         res.json({ success: true, ...data, source: 'grok', brandName: brand.name });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

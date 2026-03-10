@@ -10,6 +10,7 @@ import { protect } from '../middleware/auth.js';
 import Product from '../models/Product.js';
 import Brand from '../models/Brand.js';
 import { getOrchestrator } from '../agents/orchestrator.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -507,7 +508,7 @@ RULES:
         });
     } catch (error) {
         console.error('Website scan error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -656,7 +657,7 @@ RULES:
         });
     } catch (error) {
         console.error('Smart match error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -743,7 +744,7 @@ RULES:
     } catch (error) {
         console.error('Enrich error:', error);
         if (!res.headersSent) {
-            res.status(500).json({ success: false, error: error.message });
+            res.status(500).json({ success: false, error: safeErrorMessage(error) });
         }
     }
 });
@@ -779,7 +780,7 @@ router.post('/', protect, async (req, res) => {
         res.json({ success: true, product });
     } catch (error) {
         console.error('Product create error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -817,7 +818,7 @@ router.get('/', protect, async (req, res) => {
             categories: categories.filter(Boolean),
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -828,7 +829,7 @@ router.get('/:id', protect, async (req, res) => {
         if (!product) return res.status(404).json({ success: false, error: 'Product not found' });
         res.json({ success: true, product });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -850,7 +851,7 @@ router.put('/:id', protect, async (req, res) => {
 
         res.json({ success: true, product });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -868,7 +869,7 @@ router.delete('/:id', protect, async (req, res) => {
 
         res.json({ success: true, message: 'Product archived' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -932,7 +933,7 @@ Industry: ${brand?.dna?.industry || 'General'}`,
         res.json({ success: true, product });
     } catch (error) {
         console.error('AI enrich error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -984,7 +985,7 @@ Write in the brand's voice while following platform conventions.`,
         res.json({ success: true, content: result.content, platform: platformInfo.name, aiMeta: result.aiMeta });
     } catch (error) {
         console.error('Product listing generation error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

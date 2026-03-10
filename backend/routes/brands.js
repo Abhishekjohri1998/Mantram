@@ -61,7 +61,7 @@ router.get('/', protect, async (req, res) => {
         const brands = await Brand.find(query).sort('-updatedAt');
         res.json({ success: true, brands });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -74,7 +74,7 @@ router.get('/:id', protect, async (req, res) => {
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
         res.json({ success: true, brand });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -90,7 +90,7 @@ router.post('/', protect, async (req, res) => {
         });
         res.status(201).json({ success: true, brand });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -113,7 +113,7 @@ router.put('/:id', protect, async (req, res) => {
 
         res.json({ success: true, brand });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -170,7 +170,7 @@ router.put('/:id/dna', protect, async (req, res) => {
 
         res.json({ success: true, brand });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -231,7 +231,7 @@ router.put('/:id/knowledge', protect, async (req, res) => {
 
         res.json({ success: true, brand });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -260,7 +260,7 @@ router.get('/:id/audit-log', protect, async (req, res) => {
             pages: Math.ceil(total / parseInt(limit)),
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -281,7 +281,7 @@ router.put('/:id/autonomy', protect, async (req, res) => {
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
         res.json({ success: true, brand });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -323,7 +323,7 @@ router.delete('/:id', protect, async (req, res) => {
             },
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -349,7 +349,7 @@ router.put('/:id/status', protect, async (req, res) => {
 
         res.json({ success: true, brand });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -379,7 +379,7 @@ router.post('/:id/templates', protect, async (req, res) => {
         await brand.save();
         res.status(201).json({ success: true, template: newTemplate, total: brand.customTemplates.length });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -390,7 +390,7 @@ router.get('/:id/templates', protect, async (req, res) => {
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
         res.json({ success: true, templates: brand.customTemplates || [] });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -403,7 +403,7 @@ router.delete('/:id/templates/:templateId', protect, async (req, res) => {
         await brand.save();
         res.json({ success: true, message: 'Template deleted' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -432,7 +432,7 @@ router.post('/:id/categories', protect, async (req, res) => {
         await brand.save();
         res.status(201).json({ success: true, category: newCategory });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -443,7 +443,7 @@ router.get('/:id/categories', protect, async (req, res) => {
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
         res.json({ success: true, categories: brand.customCategories || [] });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -457,7 +457,7 @@ router.delete('/:id/categories/:categoryId', protect, async (req, res) => {
         await brand.save();
         res.json({ success: true, message: 'Category and its templates deleted' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -466,6 +466,7 @@ router.delete('/:id/categories/:categoryId', protect, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 import multer from 'multer';
 import crypto from 'crypto';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const knowledgeUpload = multer({
     storage: multer.memoryStorage(),
@@ -631,7 +632,7 @@ router.post('/:id/knowledge/ingest', protect, knowledgeUpload.single('file'), as
         res.json({ success: true, entry });
     } catch (error) {
         console.error('Knowledge ingest error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -654,7 +655,7 @@ router.get('/:id/knowledge/entries', protect, async (req, res) => {
 
         res.json({ success: true, entries });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -677,7 +678,7 @@ router.delete('/:id/knowledge/entries/:entryId', protect, async (req, res) => {
 
         res.json({ success: true, message: 'Entry deleted' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

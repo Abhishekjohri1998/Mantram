@@ -7,6 +7,7 @@ import { Router } from 'express';
 import { protect } from '../middleware/auth.js';
 import Automation from '../models/Automation.js';
 import { RECIPE_TEMPLATES, startAutomation, findMatchingAutomation } from '../services/automationEngine.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -58,7 +59,7 @@ router.post('/from-recipe', protect, async (req, res) => {
 
         res.json({ success: true, automation });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -108,7 +109,7 @@ router.post('/', protect, async (req, res) => {
 
         res.json({ success: true, automation });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -128,7 +129,7 @@ router.get('/', protect, async (req, res) => {
 
         res.json({ success: true, automations });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -153,7 +154,7 @@ router.get('/stats/overview', protect, async (req, res) => {
 
         res.json({ success: true, stats: totals });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -166,7 +167,7 @@ router.get('/:id', protect, async (req, res) => {
         if (!automation) return res.status(404).json({ success: false, error: 'Not found' });
         res.json({ success: true, automation });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -194,7 +195,7 @@ router.put('/:id', protect, async (req, res) => {
         if (!automation) return res.status(404).json({ success: false, error: 'Not found' });
         res.json({ success: true, automation });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -212,7 +213,7 @@ router.post('/:id/toggle', protect, async (req, res) => {
 
         res.json({ success: true, isActive: automation.isActive, status: automation.status });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -225,7 +226,7 @@ router.delete('/:id', protect, async (req, res) => {
         if (!automation) return res.status(404).json({ success: false, error: 'Not found' });
         res.json({ success: true });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

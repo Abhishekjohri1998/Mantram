@@ -20,6 +20,7 @@ import {
 } from '../services/socialService.js';
 import config from '../config/env.js';
 import { uploadToS3 } from '../utils/s3.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = express.Router();
 const FB_API_URL = 'https://graph.facebook.com/v22.0';
@@ -420,7 +421,7 @@ Do not include any text outside the JSON. Do not wrap in markdown code blocks.`;
 
     } catch (error) {
         console.error('[CAPTION] Generate caption error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -557,7 +558,7 @@ router.get('/accounts/:id/posts', protect, async (req, res) => {
         res.json({ success: true, data: posts });
     } catch (error) {
         console.error('Fetch posts error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -577,7 +578,7 @@ router.get('/accounts/:id/posts/:postId/insights', protect, async (req, res) => 
         res.json({ success: true, data: insights });
     } catch (error) {
         console.error('Fetch insights error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

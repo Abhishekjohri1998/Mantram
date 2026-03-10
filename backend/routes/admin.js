@@ -9,6 +9,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { protect, authorize } from '../middleware/auth.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 const __filename = fileURLToPath(import.meta.url);
@@ -47,7 +48,7 @@ router.get('/stats', async (req, res) => {
             },
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -72,7 +73,7 @@ router.get('/users', async (req, res) => {
         const total = await User.countDocuments(filter);
         res.json({ success: true, users, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -88,7 +89,7 @@ router.put('/users/:id', async (req, res) => {
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
         res.json({ success: true, user });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -98,7 +99,7 @@ router.delete('/users/:id', async (req, res) => {
         await User.findByIdAndDelete(req.params.id);
         res.json({ success: true, message: 'User deleted' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -118,7 +119,7 @@ router.get('/ai-health', async (req, res) => {
             },
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -142,7 +143,7 @@ router.get('/settings/watermark', async (req, res) => {
         const enabled = await getSetting('watermark_enabled', true);
         res.json({ success: true, watermarkEnabled: enabled });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -154,7 +155,7 @@ router.put('/settings/watermark', async (req, res) => {
         console.log(`⚙️ Watermark ${enabled ? 'ENABLED' : 'DISABLED'} by admin ${req.user.email}`);
         res.json({ success: true, watermarkEnabled: !!enabled });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

@@ -12,6 +12,7 @@ import TeamInvite from '../models/TeamInvite.js';
 import TeamChat from '../models/TeamChat.js';
 import ApprovalRequest from '../models/ApprovalRequest.js';
 import env from '../config/env.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -52,7 +53,7 @@ router.get('/members', protect, async (req, res) => {
 
         res.json({ members, invites, isAdmin: isTeamAdmin(req.user) });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -83,7 +84,7 @@ router.get('/plan-limits', protect, async (req, res) => {
             canInvite: (memberCount + 1) < planLimits.maxTeamMembers,
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -190,7 +191,7 @@ router.post('/invite', protect, async (req, res) => {
             sentTo: email.toLowerCase(),
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -251,7 +252,7 @@ router.post('/accept-invite/:token', async (req, res) => {
 
         res.json({ success: true, message: 'Welcome to the team!' });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -289,7 +290,7 @@ router.put('/members/:id/access', protect, async (req, res) => {
 
         res.json({ success: true, member });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -327,7 +328,7 @@ router.put('/members/:id/brands', protect, async (req, res) => {
 
         res.json({ success: true, member, assignedBrands: brandIds.length });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -362,7 +363,7 @@ router.delete('/members/:id', protect, async (req, res) => {
 
         res.json({ success: true });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -378,7 +379,7 @@ router.delete('/invites/:id', protect, async (req, res) => {
         await invite.save();
         res.json({ success: true });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -427,7 +428,7 @@ router.get('/chat/channels', protect, async (req, res) => {
 
         res.json({ channels, dmChannels: Array.from(dmChannels.values()) });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -453,7 +454,7 @@ router.get('/chat/:channelId/messages', protect, async (req, res) => {
 
         res.json({ messages: messages.reverse() });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -489,7 +490,7 @@ router.post('/chat/:channelId/send', protect, async (req, res) => {
 
         res.json({ message: populated });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -514,7 +515,7 @@ router.post('/chat/:channelId/react', protect, async (req, res) => {
 
         res.json({ reactions: msg.reactions });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -563,7 +564,7 @@ router.post('/approvals', protect, async (req, res) => {
 
         res.json({ success: true, approval });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -591,7 +592,7 @@ router.get('/approvals', protect, async (req, res) => {
 
         res.json({ approvals, stats });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -632,7 +633,7 @@ router.put('/approvals/:id', protect, async (req, res) => {
 
         res.json({ success: true, approval: populated });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 
@@ -702,7 +703,7 @@ router.post('/ai/team-health', protect, async (req, res) => {
 
         res.json(analysis);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeErrorMessage(error) });
     }
 });
 

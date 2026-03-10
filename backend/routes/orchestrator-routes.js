@@ -10,6 +10,7 @@
 import { Router } from 'express';
 import { protect } from '../middleware/auth.js';
 import { routeCommand, planCampaign } from '../agents/masterOrchestrator.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -48,7 +49,7 @@ router.post('/', protect, async (req, res) => {
         });
     } catch (error) {
         console.error('Orchestrate error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -68,7 +69,7 @@ router.post('/campaign', protect, async (req, res) => {
         });
     } catch (error) {
         console.error('Campaign plan error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

@@ -12,6 +12,7 @@ import { Router } from 'express';
 import { protect } from '../middleware/auth.js';
 import Integration from '../models/Integration.js';
 import config from '../config/env.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -394,7 +395,7 @@ router.delete('/connect/:platform', protect, async (req, res) => {
 
         res.json({ success: true, message: `${platform} disconnected` });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -441,7 +442,7 @@ router.get('/connect/status', protect, async (req, res) => {
             },
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

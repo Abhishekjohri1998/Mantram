@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import { protect } from '../middleware/auth.js';
 import { getRules, setRules, addRule, updateRule, deleteRule } from '../services/routingEngine.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -19,7 +20,7 @@ router.get('/', protect, (req, res) => {
         const rules = getRules(brandId);
         res.json({ success: true, rules, count: rules.length });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -35,7 +36,7 @@ router.post('/', protect, (req, res) => {
         const rule = addRule(brandId, { name, priority, enabled, conditions, action, actionConfig });
         res.status(201).json({ success: true, rule });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -51,7 +52,7 @@ router.put('/:id', protect, (req, res) => {
 
         res.json({ success: true, rule });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -67,7 +68,7 @@ router.delete('/:id', protect, (req, res) => {
 
         res.json({ success: true });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -83,7 +84,7 @@ router.post('/reorder', protect, (req, res) => {
         const updated = setRules(brandId, rules);
         res.json({ success: true, rules: updated });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -132,7 +133,7 @@ router.post('/test', protect, async (req, res) => {
             matchingRules: matchingRules.map(r => ({ name: r.name, action: r.action })),
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

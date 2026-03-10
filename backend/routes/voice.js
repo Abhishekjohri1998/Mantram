@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { optionalAuth } from '../middleware/auth.js';
 import multer from 'multer';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -80,7 +81,7 @@ router.post('/transcribe', optionalAuth, upload.single('audio'), async (req, res
 
     } catch (error) {
         console.error('Voice transcription error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

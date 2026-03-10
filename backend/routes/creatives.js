@@ -10,6 +10,7 @@ import { addWatermark } from '../utils/watermark.js';
 import { getSetting } from '../models/SystemSettings.js';
 import { uploadToS3 } from '../utils/s3.js';
 import { GoogleGenAI } from '@google/genai';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -192,7 +193,7 @@ RESPOND WITH ONLY THE ENHANCED PROMPT TEXT. Nothing else.`;
         res.json({ success: true, enhancedPrompt: enhanced });
     } catch (error) {
         console.error('Prompt enhance error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -531,7 +532,7 @@ IMPORTANT: The output must fill the ENTIRE canvas edge-to-edge. Do NOT create a 
         await req.user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } });
         res.json({ success: true, creative });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -554,7 +555,7 @@ router.get('/', protect, async (req, res) => {
         const total = await Creative.countDocuments(filter);
         res.json({ success: true, creatives, total });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -581,7 +582,7 @@ router.post('/:id/feedback', protect, async (req, res) => {
 
         res.json({ success: true, feedback });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -591,7 +592,7 @@ router.delete('/:id', protect, async (req, res) => {
         await Creative.findOneAndDelete({ _id: req.params.id, user: req.user._id });
         res.json({ success: true, message: 'Creative deleted' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -633,7 +634,7 @@ router.post('/save-to-bank', protect, async (req, res) => {
 
         res.json({ success: true, creative });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -703,7 +704,7 @@ router.get('/image-bank', protect, async (req, res) => {
         res.json({ success: true, images, total, counts: { uploaded: uploadedCount, generated: generatedCount, all: uploadedCount + generatedCount } });
     } catch (error) {
         console.error('📸 image-bank error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -736,7 +737,7 @@ router.get('/:id/image', async (req, res) => {
         // HTTP URL — redirect
         res.redirect(creative.imageUrl);
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -774,7 +775,7 @@ router.post('/upload-to-bank', protect, async (req, res) => {
 
         res.json({ success: true, creative });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

@@ -10,6 +10,7 @@ import { protect } from '../middleware/auth.js';
 import { getRouter } from '../ai/router.js';
 import { loadBrandContext } from '../agents/shared/agentUtils.js';
 import User from '../models/User.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -491,7 +492,7 @@ router.post('/preferences', protect, async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('Fidato preferences error:', error.message);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

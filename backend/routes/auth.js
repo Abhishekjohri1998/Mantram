@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import User from '../models/User.js';
 import { protect, generateToken } from '../middleware/auth.js';
 import config from '../config/env.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -42,7 +43,7 @@ router.post('/register', async (req, res) => {
             user: { id: user._id, name: user.name, email: user.email, role: user.role, plan: user.plan },
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -68,7 +69,7 @@ router.post('/login', async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Login Error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

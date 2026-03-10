@@ -24,6 +24,7 @@ import {
 import config from '../config/env.js';
 import { verifyShopifyWebhook } from '../middleware/shopifyWebhookAuth.js';
 import { verifyShopifySessionToken } from '../middleware/shopifySessionAuth.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -85,7 +86,7 @@ router.post('/connect', protect, async (req, res) => {
         res.json({ success: true, authUrl, shopDomain: cleanDomain });
     } catch (error) {
         console.error('Shopify connect error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -138,7 +139,7 @@ router.post('/connect-token', protect, async (req, res) => {
         res.json({ success: true, shopName: shopInfo.name, shopDomain: cleanDomain });
     } catch (error) {
         console.error('Shopify connect-token error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -255,7 +256,7 @@ router.post('/sync', protect, async (req, res) => {
         res.json({ success: true, ...results });
     } catch (error) {
         console.error('Shopify sync error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -284,7 +285,7 @@ router.get('/products', protect, async (req, res) => {
 
         res.json({ success: true, products, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)), categories });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -295,7 +296,7 @@ router.get('/products/:id', protect, async (req, res) => {
         if (!product) return res.status(404).json({ success: false, error: 'Product not found' });
         res.json({ success: true, product });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -310,7 +311,7 @@ router.delete('/disconnect', protect, async (req, res) => {
         );
         res.json({ success: true, message: 'Shopify disconnected' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 // ============================================================================

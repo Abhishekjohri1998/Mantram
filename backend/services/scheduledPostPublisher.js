@@ -38,6 +38,18 @@ async function publishScheduledPost(post) {
             return;
         }
 
+        // BUG-19 FIX: Check token expiry before attempting publish
+        if (account.tokenExpiresAt && new Date(account.tokenExpiresAt) < new Date()) {
+            console.warn(`[SCHEDULER] Token expired for ${post.platform} account ${account.accountId} — marking failed`);
+            post.status = 'failed';
+            post.error = `Your ${post.platform} access token has expired. Please reconnect your account and reschedule this post.`;
+            // Deactivate the expired account
+            account.isActive = false;
+            await account.save();
+            await post.save();
+            return;
+        }
+
         // Ensure imageUrl is absolute
         let absoluteImageUrl = post.imageUrl;
         if (absoluteImageUrl && !absoluteImageUrl.startsWith('http')) {

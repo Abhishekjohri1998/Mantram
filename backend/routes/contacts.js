@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import { protect } from '../middleware/auth.js';
 import Contact from '../models/Contact.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -38,7 +39,7 @@ router.get('/', protect, async (req, res) => {
 
         res.json({ success: true, contacts, total, page: parseInt(page) });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -50,7 +51,7 @@ router.get('/:id', protect, async (req, res) => {
         if (!contact) return res.status(404).json({ success: false, error: 'Contact not found' });
         res.json({ success: true, contact });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -76,7 +77,7 @@ router.put('/:id', protect, async (req, res) => {
         if (!contact) return res.status(404).json({ success: false, error: 'Not found' });
         res.json({ success: true, contact });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -88,7 +89,7 @@ router.delete('/:id', protect, async (req, res) => {
         if (!contact) return res.status(404).json({ success: false, error: 'Not found' });
         res.json({ success: true });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -114,7 +115,7 @@ router.get('/stats/overview', protect, async (req, res) => {
 
         res.json({ success: true, stats: { total, newLeads, warmLeads, hotLeads, platformBreakdown } });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

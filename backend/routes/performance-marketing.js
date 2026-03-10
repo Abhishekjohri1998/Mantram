@@ -36,6 +36,7 @@ import { runAttribution, runAIAttribution } from '../agents/performanceMarketing
 import { generatePixelScript, getPixelClientScript, processPixelEvent } from '../agents/performanceMarketing/pixelTracking.js';
 import { sendAlert, sendAnomalyAlert } from '../agents/performanceMarketing/alertEngine.js';
 import { getBenchmarkComparison, getAIBenchmarkInsights } from '../agents/performanceMarketing/benchmarkEngine.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -122,7 +123,7 @@ router.post('/research', protect, async (req, res) => {
         });
     } catch (error) {
         console.error('PM Research error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -144,7 +145,7 @@ router.get('/reports', protect, async (req, res) => {
 
         res.json({ success: true, reports });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -167,7 +168,7 @@ router.get('/reports/:id', protect, async (req, res) => {
             pipeline: getPipelineInfo(report.status),
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -209,7 +210,7 @@ router.post('/strategy', protect, async (req, res) => {
         res.json({ success: true, report: updatedReport, pipeline: getPipelineInfo(updatedReport.status) });
     } catch (error) {
         console.error('PM Strategy error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -251,7 +252,7 @@ router.post('/budget', protect, async (req, res) => {
         res.json({ success: true, report: updatedReport, pipeline: getPipelineInfo(updatedReport.status) });
     } catch (error) {
         console.error('PM Budget error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -305,7 +306,7 @@ router.post('/campaigns', protect, async (req, res) => {
         res.json({ success: true, campaign });
     } catch (error) {
         console.error('PM Campaign create error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -328,7 +329,7 @@ router.get('/campaigns', protect, async (req, res) => {
 
         res.json({ success: true, campaigns });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -346,7 +347,7 @@ router.get('/campaigns/:id', protect, async (req, res) => {
         if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
         res.json({ success: true, campaign });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -365,7 +366,7 @@ router.put('/campaigns/:id', protect, async (req, res) => {
         if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
         res.json({ success: true, campaign });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -403,7 +404,7 @@ router.post('/campaigns/:id/ab-test', protect, async (req, res) => {
         res.json({ success: true, campaign, abTestPlan: state.abTestPlan });
     } catch (error) {
         console.error('PM A/B Test error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -461,7 +462,7 @@ router.post('/analyze', protect, async (req, res) => {
         res.json({ success: true, report: updatedReport });
     } catch (error) {
         console.error('PM Analysis error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -498,7 +499,7 @@ router.post('/report', protect, async (req, res) => {
         res.json({ success: true, report: { ...updatedReport, generatedReport: state.report } });
     } catch (error) {
         console.error('PM Report error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -532,7 +533,7 @@ router.post('/generate-creatives', protect, async (req, res) => {
         res.json({ success: true, creatives: state.adCreatives || [] });
     } catch (error) {
         console.error('PM Creative generation error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -598,7 +599,7 @@ router.get('/dashboard', protect, async (req, res) => {
             },
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -624,7 +625,7 @@ router.get('/connections', protect, async (req, res) => {
 
         res.json({ success: true, connections });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -658,7 +659,7 @@ router.get('/trends', protect, async (req, res) => {
             relatedQueries,
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -684,7 +685,7 @@ router.get('/learnings', protect, async (req, res) => {
 
         res.json({ success: true, learnings });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -703,7 +704,7 @@ router.put('/learnings/:id/status', protect, async (req, res) => {
         if (!learning) return res.status(404).json({ success: false, error: 'Learning not found' });
         res.json({ success: true, learning });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -777,7 +778,7 @@ router.post('/generate-ad-image', protect, async (req, res) => {
         res.json({ success: true, imageUrl, model: usedModel, platform: platform || 'meta-feed' });
     } catch (error) {
         console.error('PM Ad image generation error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -796,7 +797,7 @@ router.post('/sync-campaigns', protect, async (req, res) => {
         res.json({ success: true, ...result });
     } catch (error) {
         console.error('PM Campaign sync error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -823,7 +824,7 @@ router.get('/anomalies', protect, async (req, res) => {
         res.json({ success: true, ...result, recommendedActions: actions });
     } catch (error) {
         console.error('PM Anomaly detection error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -840,7 +841,7 @@ router.post('/anomalies/auto-fix', protect, async (req, res) => {
         res.json({ success: true, ...result });
     } catch (error) {
         console.error('PM Auto-fix error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -866,7 +867,7 @@ router.get('/blended-roas', protect, async (req, res) => {
         res.json({ success: true, ...result, utmAttribution: attribution });
     } catch (error) {
         console.error('PM Blended ROAS error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -887,7 +888,7 @@ router.post('/roas-forecast', protect, async (req, res) => {
         res.json({ success: true, forecast });
     } catch (error) {
         console.error('PM ROAS Forecast error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -906,7 +907,7 @@ router.post('/optimize', protect, async (req, res) => {
         res.json({ success: true, ...result });
     } catch (error) {
         console.error('PM Optimization error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -925,7 +926,7 @@ router.get('/optimization-log', protect, async (req, res) => {
 
         res.json({ success: true, log: learnings });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -945,7 +946,7 @@ router.put('/campaigns/:id/autopilot', protect, async (req, res) => {
         if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
         res.json({ success: true, campaign });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -964,7 +965,7 @@ router.get('/cross-studio/opportunities', protect, async (req, res) => {
         res.json({ success: true, ...result });
     } catch (error) {
         console.error('PM Cross-studio error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -1003,7 +1004,7 @@ router.post('/cross-studio/create-from-seo', protect, async (req, res) => {
         });
     } catch (error) {
         console.error('PM Create from SEO error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -1028,7 +1029,7 @@ router.get('/attribution', protect, async (req, res) => {
         res.json({ success: true, ...result });
     } catch (error) {
         console.error('PM Attribution error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -1047,7 +1048,7 @@ router.get('/pixel/setup', protect, async (req, res) => {
         const pixelData = generatePixelScript(brandId, serverUrl);
         res.json({ success: true, ...pixelData });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -1099,7 +1100,7 @@ router.post('/alerts/send', protect, async (req, res) => {
         res.json({ success: true, ...result });
     } catch (error) {
         console.error('PM Alert error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -1117,7 +1118,7 @@ router.post('/alerts/test', protect, async (req, res) => {
         });
         res.json({ success: true, ...result });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -1136,7 +1137,7 @@ router.get('/benchmarks', protect, async (req, res) => {
         res.json({ success: true, ...result });
     } catch (error) {
         console.error('PM Benchmark error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -1151,7 +1152,7 @@ router.get('/benchmarks/ai', protect, async (req, res) => {
         res.json({ success: true, ...result });
     } catch (error) {
         console.error('PM AI Benchmark error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

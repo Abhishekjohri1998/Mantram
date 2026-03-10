@@ -15,6 +15,7 @@ import { protect } from '../middleware/auth.js';
 import { requireCredits } from '../middleware/credits.js';
 import { getOrchestrator } from '../agents/orchestrator.js';
 import {
+import { safeErrorMessage } from '../utils/safeError.js';
     artDirectorNode,
     promptEngineerNode,
     styleCriticNode,
@@ -105,7 +106,7 @@ router.post('/start', protect, requireCredits('creative'), async (req, res) => {
         });
     } catch (error) {
         console.error('Creative agentic start error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -150,7 +151,7 @@ router.post('/:id/variations', protect, requireCredits('creative'), async (req, 
         });
     } catch (error) {
         console.error('Creative variation error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -190,7 +191,7 @@ router.post('/:id/regenerate', protect, requireCredits('creative'), async (req, 
         res.json({ success: true, creative: newCreative });
     } catch (error) {
         console.error('Creative regenerate error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

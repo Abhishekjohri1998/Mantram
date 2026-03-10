@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { optionalAuth } from '../middleware/auth.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -270,7 +271,7 @@ RESPONSE FORMAT — respond in STRICT JSON:
         res.json({ success: true, ...parsed });
     } catch (error) {
         console.error('Agent command error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
