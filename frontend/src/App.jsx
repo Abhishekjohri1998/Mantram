@@ -31,6 +31,7 @@ import VideoStudio from './pages/VideoStudio'
 import PerformanceMarketing from './pages/PerformanceMarketing'
 import D2CAnalytics from './pages/D2CAnalytics'
 import BrandManagement from './pages/BrandManagement'
+import SkillsHub from './pages/SkillsHub'
 
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
@@ -83,6 +84,7 @@ function App() {
                 <Route path="/conversations/ai-settings" element={<ProtectedRoute><AISettings /></ProtectedRoute>} />
                 <Route path="/conversations/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
                 <Route path="/credits" element={<ProtectedRoute><CreditsPage /></ProtectedRoute>} />
+                <Route path="/skills" element={<ProtectedRoute><SkillsHub /></ProtectedRoute>} />
                 <Route path="/superadmin" element={<ProtectedRoute allowedRoles={['superadmin']}><SuperAdminDashboard /></ProtectedRoute>} />
               </Routes>
             </CreditProvider>

@@ -563,7 +563,7 @@ router.get('/', protect, async (req, res) => {
 router.post('/:id/feedback', protect, async (req, res) => {
     try {
         const { signalType, rating, thumbs } = req.body;
-        const creative = await Creative.findById(req.params.id);
+        const creative = await Creative.findOne({ _id: req.params.id, user: req.user._id });
         if (!creative) return res.status(404).json({ success: false, error: 'Creative not found' });
 
         if (rating) await creative.updateOne({ rating });

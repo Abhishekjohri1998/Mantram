@@ -243,7 +243,7 @@ export default function AdvancedMode({ activeBrand, initialData }) {
         const r = new FileReader()
         r.onload = async () => {
             const id = `r${Date.now()}`
-            setRefImages(prev => [...prev, { id, url: r.result, uploading: true }])
+            setRefImages(prev => [...prev, { id, url: r.result, label: `@image${prev.length + 1}`, uploading: true }])
             const hostedUrl = await uploadImage(r.result)
             setRefImages(prev => prev.map(img => img.id === id ? { ...img, url: hostedUrl, uploading: false } : img))
         }
@@ -251,7 +251,10 @@ export default function AdvancedMode({ activeBrand, initialData }) {
     }
     function onMediaFile(e, setter) {
         const f = e.target.files?.[0]; if (!f) return
-        setter({ url: URL.createObjectURL(f), name: f.name })
+        setter(prev => {
+            if (prev?.url?.startsWith('blob:')) URL.revokeObjectURL(prev.url)
+            return { url: URL.createObjectURL(f), name: f.name }
+        })
     }
 
     // ── @ Autocomplete ──
@@ -579,7 +582,7 @@ export default function AdvancedMode({ activeBrand, initialData }) {
                                     {refImages.map((img, i) => (
                                         <div key={img.id} className="adv-ref-thumb">
                                             <img src={img.url} alt="" />
-                                            <span className="label">@img{i + 1}</span>
+                                            <span className="label">@image{i + 1}</span>
                                             <button className="del" onClick={() => setRefImages(prev => prev.filter(r => r.id !== img.id))}>×</button>
                                         </div>
                                     ))}

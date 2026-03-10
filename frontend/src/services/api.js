@@ -400,6 +400,14 @@ export const brainstormStudio = {
     feedback: (data) => apiFetch('/brainstorm-studio/feedback', { method: 'POST', body: JSON.stringify(data) }),
     screenplay: (data) => apiFetch('/brainstorm-studio/screenplay', { method: 'POST', body: JSON.stringify(data) }),
     chat: (data) => apiFetch('/brainstorm-studio/chat', { method: 'POST', body: JSON.stringify(data) }),
+    // Brand Strategy
+    strategy: (data) => apiFetch('/brainstorm-studio/strategy', { method: 'POST', body: JSON.stringify(data) }),
+    strategySlides: (data) => apiFetch('/brainstorm-studio/strategy-slides', { method: 'POST', body: JSON.stringify(data) }),
+    listStrategies: () => apiFetch('/brainstorm-studio/strategies'),
+    getStrategy: (id) => apiFetch(`/brainstorm-studio/strategies/${id}`),
+    updateKpi: (id, data) => apiFetch(`/brainstorm-studio/strategies/${id}/kpi`, { method: 'PATCH', body: JSON.stringify(data) }),
+    toggleMilestone: (id, data) => apiFetch(`/brainstorm-studio/strategies/${id}/milestone`, { method: 'PATCH', body: JSON.stringify(data) }),
+    updateStrategyStatus: (id, data) => apiFetch(`/brainstorm-studio/strategies/${id}/status`, { method: 'PATCH', body: JSON.stringify(data) }),
 };
 
 // ============ Agent Command API ============
@@ -481,6 +489,22 @@ export const seoStudio = {
         return apiFetch(`/seo-studio/history?${query}`);
     },
     getAudit: (id) => apiFetch(`/seo-studio/history/${id}`),
+};
+
+// ============ Skills System API ============
+export const skills = {
+    list: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/skills?${query}`);
+    },
+    get: (id) => apiFetch(`/skills/${id}`),
+    create: (data) => apiFetch('/skills', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id, data) => apiFetch(`/skills/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id) => apiFetch(`/skills/${id}`, { method: 'DELETE' }),
+    clone: (id) => apiFetch(`/skills/${id}/clone`, { method: 'POST' }),
+    rate: (id, data) => apiFetch(`/skills/${id}/rate`, { method: 'POST', body: JSON.stringify(data) }),
+    execute: (id, data) => apiFetch(`/skills/${id}/execute`, { method: 'POST', body: JSON.stringify(data) }),
+    generate: (data) => apiFetch('/skills/generate', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ============ Google Analytics + Search Console API (brand-aware) ============

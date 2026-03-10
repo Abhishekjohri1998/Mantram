@@ -53,13 +53,13 @@ export default function PublishSchedule() {
     const fetchHistory = useCallback(async () => {
         setHistoryLoading(true)
         try {
-            const data = await social.publishHistory({})
+            const data = await social.publishHistory({ brand: activeBrand?._id || '' })
             setSocialPosts(data.posts || [])
         } catch (err) { console.error('Failed to load social posts:', err) }
         finally { setHistoryLoading(false) }
-    }, [])
+    }, [activeBrand?._id])
 
-    useEffect(() => { fetchHistory() }, [activeBrand?._id, fetchHistory])
+    useEffect(() => { fetchHistory() }, [fetchHistory])
 
     const publishedPosts = socialPosts.filter(p => p.status === 'published')
     const scheduledPosts = socialPosts.filter(p => p.status === 'scheduled')

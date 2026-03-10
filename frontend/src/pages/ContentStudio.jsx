@@ -2992,7 +2992,7 @@ SPOKESPERSON QUOTES:`
         setStep(0); setGoal(null); setSubType(null); setChannel(null)
         setContext(null); setToneSettings(null); setResult(null); setError('')
         setAccepted(false); setPrefilledOccasion(null); setSelectedProduct(null)
-        setYoutubeData(null); setYoutubeSeoData(null)
+        setYoutubeData(null); setYoutubeSeoData(null); setContentFeedback(null)
     }
 
     // YouTube content generation handler (Script & Ideation)
@@ -3222,7 +3222,7 @@ SPOKESPERSON QUOTES:`
                     activeBrand={activeBrand}
                     generating={generating}
                     accepted={accepted}
-                    imageUrl={imagePreview}
+                    imageUrl={null}
                     onRegenerate={handleRegenerate}
                     onFeedback={handleFeedback}
                     onNewContent={resetAll}
