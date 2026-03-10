@@ -29,7 +29,9 @@ export const uploadToS3 = async (fileContent, fileName, mimeType = "image/png") 
             buffer = Buffer.from(fileContent, "base64");
         }
 
-        const key = fileName || `uploads/${crypto.randomUUID()}.png`;
+        // BUG-22 FIX: Sanitize filename to prevent path traversal
+        const sanitizedName = fileName ? fileName.replace(/\.\./g, '').replace(/\/+/g, '/').replace(/^\//, '') : null;
+        const key = sanitizedName || `uploads/${crypto.randomUUID()}.png`;
 
         const upload = new Upload({
             client: s3Client,

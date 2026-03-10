@@ -146,7 +146,7 @@ export const requireCredits = (actionOrCost = 1) => {
             next();
         } catch (error) {
             console.error('Credit check error:', error);
-            next(); // Don't block on credit check failures
+            return res.status(500).json({ success: false, error: 'Credit system error. Please try again.' });
         }
     };
 };

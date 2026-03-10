@@ -13,6 +13,23 @@ import { getOrchestrator } from '../agents/orchestrator.js';
 
 const router = Router();
 
+// ── SSRF Protection: Block internal/private IP URLs ──
+function isUrlSafe(urlStr) {
+    try {
+        const parsed = new URL(urlStr);
+        const host = parsed.hostname.toLowerCase();
+        // Block private IPs, localhost, metadata endpoints
+        const blocked = [
+            /^localhost$/i, /^127\./, /^10\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./,
+            /^169\.254\./, /^0\./, /^\[::1?\]$/, /^fc00:/, /^fe80:/,
+            /\.internal$/, /\.local$/,
+        ];
+        if (blocked.some(p => p.test(host))) return false;
+        if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+        return true;
+    } catch { return false; }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // PLATFORM-SPECIFIC PRODUCT CONTENT KNOWLEDGE
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -138,6 +155,10 @@ router.post('/scan-website', protect, async (req, res) => {
             return res.status(400).json({ success: false, error: 'No website URL found. Add one in Brand settings or provide websiteUrl.' });
         }
         if (!/^https?:\/\//i.test(siteUrl)) siteUrl = `https://${siteUrl}`;
+        // BUG-8 FIX: Block SSRF to internal/private networks
+        if (!isUrlSafe(siteUrl)) {
+            return res.status(400).json({ success: false, error: 'URL points to an internal or blocked network. Use a public URL.' });
+        }
 
         console.log(`🔍 Starting product scan for: ${siteUrl}`);
 

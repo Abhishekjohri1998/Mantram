@@ -87,9 +87,11 @@ router.post('/verify', protect, async (req, res) => {
             razorpay_order_id,
             razorpay_payment_id,
             razorpay_signature,
-            packageId,
-            billingCycle
         } = req.body;
+
+        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+            return res.status(400).json({ success: false, error: 'Missing payment verification fields' });
+        }
 
         // Verify signature
         const body = razorpay_order_id + "|" + razorpay_payment_id;
@@ -102,7 +104,21 @@ router.post('/verify', protect, async (req, res) => {
             return res.status(400).json({ success: false, error: 'Invalid payment signature' });
         }
 
-        // Signature valid -> Upgrade user plan
+        // BUG-2 FIX: Read packageId and billingCycle from Razorpay order notes
+        // instead of trusting req.body (prevents plan upgrade attack)
+        const order = await getRazorpay().orders.fetch(razorpay_order_id);
+        const packageId = order.notes?.packageId;
+        const billingCycle = order.notes?.billingCycle || 'monthly';
+
+        if (!packageId) {
+            return res.status(400).json({ success: false, error: 'Order missing package information' });
+        }
+
+        // Verify the paying user matches the order creator
+        if (order.notes?.userId && order.notes.userId !== req.user._id.toString()) {
+            return res.status(403).json({ success: false, error: 'Payment user mismatch' });
+        }
+
         const pkg = await SubscriptionPackage.findById(packageId);
         if (!pkg) {
             return res.status(404).json({ success: false, error: 'Package not found' });

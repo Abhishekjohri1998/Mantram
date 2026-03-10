@@ -31,7 +31,7 @@ export function requireStudio(studioKey) {
 
         // Resolve studio key
         const key = STUDIO_MAP[studioKey] || studioKey;
-        const hasAccess = user.studioAccess?.[key] !== false;
+        const hasAccess = user.studioAccess?.[key] === true;
 
         if (!hasAccess) {
             return res.status(403).json({

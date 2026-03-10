@@ -56,7 +56,10 @@ router.get('/users', async (req, res) => {
     try {
         const { page = 1, limit = 20, search, plan, role } = req.query;
         const filter = {};
-        if (search) filter.$or = [{ name: new RegExp(search, 'i') }, { email: new RegExp(search, 'i') }];
+        if (search) {
+            const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            filter.$or = [{ name: new RegExp(safeSearch, 'i') }, { email: new RegExp(safeSearch, 'i') }];
+        }
         if (plan) filter.plan = plan;
         if (role) filter.role = role;
 
@@ -77,6 +80,10 @@ router.get('/users', async (req, res) => {
 router.put('/users/:id', async (req, res) => {
     try {
         const { role, plan } = req.body;
+        // BUG-13 FIX: Prevent admin from escalating to superadmin
+        if (role === 'superadmin') {
+            return res.status(403).json({ success: false, error: 'Cannot assign superadmin role' });
+        }
         const user = await User.findByIdAndUpdate(req.params.id, { role, plan }, { new: true }).select('-password');
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
         res.json({ success: true, user });
