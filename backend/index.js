@@ -175,20 +175,20 @@ const server = app.listen(config.port, () => {
     console.log(`📡 AI Provider: ${config.ai.defaultTextProvider} (${config.ai.defaultTextModel})`);
     console.log(`🌐 Frontend: ${config.frontendUrl}\n`);
 
-    // Start follow-up scheduler (every 30 minutes)
+    // Start follow-up scheduler (every 4 hours — Meta Compliance: Decelerated from 30min)
     import('./services/autonomousAgent.js').then(({ runFollowUpCheck }) => {
         setInterval(() => {
             runFollowUpCheck().catch(err => console.warn('⚠️ Follow-up check failed:', err.message));
-        }, 30 * 60 * 1000);
-        console.log('🤖 Autonomous Agent active — Follow-up scheduler running every 30 min');
+        }, 4 * 60 * 60 * 1000);
+        console.log('🤖 Autonomous Agent active — Follow-up scheduler running every 4 hours (Compliance Optimized)');
     }).catch(() => { });
 
-    // Start intelligence agent scheduler (every 2 hours)
+    // Start intelligence agent scheduler (every 6 hours — Meta Compliance: Decelerated from 2hrs)
     import('./services/intelligenceAgent.js').then(({ runIntelMissions }) => {
         setInterval(() => {
             runIntelMissions().catch(err => console.warn('🕵️ Intel Agent check failed:', err.message));
-        }, 2 * 60 * 60 * 1000);
-        console.log('🕵️ Agent Fidato active — Intelligence missions scheduler running every 2 hours');
+        }, 6 * 60 * 60 * 1000);
+        console.log('🕵️ Agent Intelligence active — Missions scheduler running every 6 hours (Compliance Optimized)');
     }).catch(() => { });
 
     // Start scheduled post publisher (every 60 seconds)

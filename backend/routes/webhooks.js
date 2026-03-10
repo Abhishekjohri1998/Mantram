@@ -12,7 +12,8 @@ import Conversation from '../models/Conversation.js';
 const router = Router();
 
 const VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN || 'mantram_verify_2025';
-const PAGE_ACCESS_TOKEN = process.env.META_PAGE_ACCESS_TOKEN;
+// removed shared global token fallback to comply with Meta "Account Integrity" policies
+const PAGE_ACCESS_TOKEN = null;
 const META_API_VERSION = 'v21.0';
 const META_GRAPH_URL = `https://graph.facebook.com/${META_API_VERSION}`;
 
@@ -193,7 +194,7 @@ async function handleComment(change, platform, pageId) {
 
 async function getSenderProfile(senderId, integration) {
     try {
-        const token = integration?.platformData?.pageAccessToken || integration?.accessToken || PAGE_ACCESS_TOKEN;
+        const token = integration?.platformData?.pageAccessToken || integration?.accessToken;
         if (!token) return {};
 
         const response = await fetch(`${META_GRAPH_URL}/${senderId}?fields=name,profile_pic,username&access_token=${token}`);
@@ -207,11 +208,11 @@ async function getSenderProfile(senderId, integration) {
 
 // ── Send reply via Meta Graph API ──
 
-export async function sendMetaReply(recipientId, messageText, platform = 'instagram') {
+export async function sendMetaReply(recipientId, messageText, platform = 'instagram', explicitToken = null) {
     try {
-        const token = PAGE_ACCESS_TOKEN;
+        const token = explicitToken;
         if (!token) {
-            console.error('❌ No META_PAGE_ACCESS_TOKEN configured');
+            console.error('❌ No valid Page Access Token provided for reply. Global fallbacks disabled for Meta Compliance.');
             return { success: false, error: 'No access token' };
         }
 
@@ -246,10 +247,13 @@ export async function sendMetaReply(recipientId, messageText, platform = 'instag
 
 // ── Send quick reply buttons via Meta ──
 
-export async function sendMetaQuickReplies(recipientId, text, buttons, platform = 'instagram') {
+export async function sendMetaQuickReplies(recipientId, text, buttons, platform = 'instagram', explicitToken = null) {
     try {
-        const token = PAGE_ACCESS_TOKEN;
-        if (!token) return { success: false, error: 'No access token' };
+        const token = explicitToken;
+        if (!token) {
+            console.error('❌ No valid Page Access Token provided for quick replies. Global fallbacks disabled for Meta Compliance.');
+            return { success: false, error: 'No access token' };
+        }
 
         const quick_replies = buttons.map(btn => ({
             content_type: 'text',

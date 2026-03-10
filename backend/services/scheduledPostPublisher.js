@@ -15,7 +15,7 @@ import {
 import { uploadToS3 } from '../utils/s3.js';
 import config from '../config/env.js';
 
-const POLL_INTERVAL_MS = 60 * 1000; // 1 minute
+const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes (Compliance: Decelerated from 1min)
 let isRunning = false;
 
 /**
@@ -135,5 +135,5 @@ export function startScheduledPostPublisher() {
         processDuePosts().catch(err => console.warn('[SCHEDULER] Tick failed:', err.message));
     }, POLL_INTERVAL_MS);
 
-    console.log('📅 Scheduled Post Publisher active — checking every 60 seconds');
+    console.log('📅 Scheduled Post Publisher active — checking every 5 minutes (Compliance Optimized)');
 }

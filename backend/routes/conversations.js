@@ -269,7 +269,17 @@ router.post('/:id/reply', protect, async (req, res) => {
             try {
                 const { sendMetaReply } = await import('./webhooks.js');
                 if (sendMetaReply) {
-                    const metaResult = await sendMetaReply(conversation.contact.platformId, content.trim(), conversation.platform);
+                    // Look up brand-specific token (Meta Compliance: no global fallback)
+                    const Integration = (await import('../models/Integration.js')).default;
+                    const integration = await Integration.findOne({
+                        brand: conversation.brand?._id || conversation.brand,
+                        platform: { $in: ['instagram', 'facebook'] },
+                        status: 'connected'
+                    }).select('+accessToken +platformData.pageAccessToken');
+
+                    const brandToken = integration?.platformData?.pageAccessToken || integration?.accessToken;
+
+                    const metaResult = await sendMetaReply(conversation.contact.platformId, content.trim(), conversation.platform, brandToken);
                     if (!metaResult.success) {
                         console.warn('⚠️ Meta reply failed (saved locally):', metaResult.error);
                     }

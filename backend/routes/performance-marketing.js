@@ -193,7 +193,7 @@ router.post('/strategy', protect, async (req, res) => {
                 brand: brandId || req.user.activeBrand,
                 title: `Strategy: ${objective || 'Performance Marketing'}`,
                 type: 'strategy',
-                status: 'researching',
+                status: 'analyzing',
                 input: { query, platforms: platforms || ['meta', 'google'] },
             });
         }

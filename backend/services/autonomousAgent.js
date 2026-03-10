@@ -218,7 +218,9 @@ export async function runAutonomousPipeline({ userId, brandId, platform, senderI
                     // Send the reply that routing engine saved to conversation
                     const lastMsg = conversation.messages[conversation.messages.length - 1];
                     if (lastMsg?.sentBy === 'ai' && contact.platformUserId) {
-                        await sendViaMeta(contact.platformUserId, lastMsg.content, conversation.platform);
+                        const routeIntegration = await findIntegration(brandId, platform);
+                        const routeToken = routeIntegration?.platformData?.pageAccessToken || routeIntegration?.accessToken;
+                        await sendViaMeta(contact.platformUserId, lastMsg.content, conversation.platform, routeToken);
                         pipelineLog.steps.push('meta:sent');
                     }
                     pipelineLog.action = 'auto_replied_via_routing';
@@ -247,7 +249,14 @@ export async function runAutonomousPipeline({ userId, brandId, platform, senderI
                 await sendAutoReply(conversation, contact, best.content, 'ai', best.confidence);
 
                 if (contact.platformUserId) {
-                    await sendViaMeta(contact.platformUserId, best.content, conversation.platform);
+                    // Meta Compliance: Add a "human-like" delay so replies aren't instant (Anti-Mimicry)
+                    console.log(`🤖 AI prepared reply, waiting 20s to simulate human processing...`);
+                    await new Promise(resolve => setTimeout(resolve, 20000));
+
+                    const integration = await findIntegration(brandId, platform);
+                    const token = integration?.platformData?.pageAccessToken || integration?.accessToken;
+
+                    await sendViaMeta(contact.platformUserId, best.content, conversation.platform, token);
                     pipelineLog.steps.push('meta:sent');
                 }
 
@@ -314,7 +323,9 @@ export async function handleCommentAutonomously({ brandId, commentText, commente
             // Send a DM prompt to the commenter
             const dmMessage = generateCommentToDMMessage(brand, commentText, intent);
             if (commenterId) {
-                await sendViaMeta(commenterId, dmMessage, platform);
+                const dmIntegration = await findIntegration(brandId, platform);
+                const dmToken = dmIntegration?.platformData?.pageAccessToken || dmIntegration?.accessToken;
+                await sendViaMeta(commenterId, dmMessage, platform, dmToken);
                 console.log(`📤 Comment-to-DM sent to ${commenterName}`);
             }
             return { action: 'comment_to_dm', intent, dmMessage };
@@ -324,7 +335,7 @@ export async function handleCommentAutonomously({ brandId, commentText, commente
         if (autonomy.commentAutoReply && intent.confidence >= 60) {
             const replyText = generateCommentReply(brand, commentText, intent);
             if (commentId && replyText) {
-                await replyToComment(commentId, replyText);
+                await replyToComment(commentId, replyText, brandId);
                 console.log(`💬 Comment auto-replied: "${replyText.substring(0, 40)}..."`);
             }
             return { action: 'comment_replied', intent, reply: replyText };
@@ -362,7 +373,8 @@ export async function runFollowUpCheck() {
                 isAIHandling: true,
                 lastMessageAt: { $lt: cutoff },
                 'complianceWindow.closesAt': { $gt: new Date() }, // still within compliance window
-            }).populate('contact').populate('brand', 'name dna autonomy').limit(10);
+                tags: { $ne: 'followed_up' } // Meta Compliance: Only follow up ONCE per conversation
+            }).populate('contact').populate('brand', 'name dna autonomy').limit(5);
 
             for (const convo of staleConvos) {
                 // Check if last message was from contact (not from us)
@@ -381,7 +393,9 @@ export async function runFollowUpCheck() {
                     await sendAutoReply(convo, convo.contact, followUp.content, 'ai', followUp.confidence);
 
                     if (convo.contact?.platformUserId) {
-                        await sendViaMeta(convo.contact.platformUserId, followUp.content, convo.platform);
+                        const integration = await findIntegration(brand._id, convo.platform);
+                        const token = integration?.platformData?.pageAccessToken || integration?.accessToken;
+                        await sendViaMeta(convo.contact.platformUserId, followUp.content, convo.platform, token);
                     }
 
                     convo.tags = [...new Set([...(convo.tags || []), 'followed_up'])];
@@ -419,13 +433,13 @@ async function sendAutoReply(conversation, contact, content, sentBy = 'ai', conf
 }
 
 /**
- * Send message via Meta Graph API
+ * Send message via Meta Graph API with explicit token
  */
-async function sendViaMeta(recipientId, messageText, platform = 'instagram') {
+async function sendViaMeta(recipientId, messageText, platform = 'instagram', token = null) {
     try {
         const { sendMetaReply } = await import('../routes/webhooks.js');
         if (sendMetaReply) {
-            return await sendMetaReply(recipientId, messageText, platform);
+            return await sendMetaReply(recipientId, messageText, platform, token);
         }
     } catch (err) {
         console.warn('⚠️ Meta send unavailable:', err.message);
@@ -434,12 +448,32 @@ async function sendViaMeta(recipientId, messageText, platform = 'instagram') {
 }
 
 /**
- * Reply to a Meta comment
+ * Helper to find brand integration
  */
-async function replyToComment(commentId, text) {
+async function findIntegration(brandId, platform) {
     try {
-        const token = process.env.META_PAGE_ACCESS_TOKEN;
-        if (!token) return { success: false };
+        const Integration = (await import('../models/Integration.js')).default;
+        return await Integration.findOne({
+            brand: brandId,
+            platform: { $in: ['instagram', 'facebook'] },
+            status: 'connected'
+        }).select('+accessToken +platformData.pageAccessToken');
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Reply to a Meta comment using brand-specific token
+ */
+async function replyToComment(commentId, text, brandId) {
+    try {
+        const integration = await findIntegration(brandId);
+        const token = integration?.platformData?.pageAccessToken || integration?.accessToken;
+        if (!token) {
+            console.warn('⚠️ No brand token available for comment reply');
+            return { success: false, error: 'No brand token' };
+        }
 
         const response = await fetch(`https://graph.facebook.com/v21.0/${commentId}/replies`, {
             method: 'POST',

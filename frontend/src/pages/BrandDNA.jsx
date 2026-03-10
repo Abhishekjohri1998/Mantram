@@ -891,12 +891,12 @@ function KnowledgeBank({ brandId }) {
                             placeholder="https://example.com/about-us"
                             className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-primary/40" />
                     </div>
-                    <p className="text-xs text-slate-600">We'll scrape text content from this page and add it to your brand's knowledge base.</p>
+                    <p className="text-xs text-slate-600">We'll extract text content from this page and add it to your brand's knowledge base.</p>
                     <div className="flex justify-end">
                         <button onClick={handleSubmit} disabled={submitting || !urlInput.trim()}
                             className="btn-primary px-5 py-2.5 rounded-xl text-sm font-bold cursor-pointer disabled:opacity-30 flex items-center gap-2">
                             <span className="material-symbols-outlined text-sm">{submitting ? 'progress_activity' : 'download'}</span>
-                            {submitting ? 'Scraping page...' : 'Scrape & Add'}
+                            {submitting ? 'Fetching page...' : 'Fetch & Add'}
                         </button>
                     </div>
                 </div>

@@ -780,7 +780,7 @@ export default function UserDashboard() {
                 {/* ═══════════════════════════════════════════════════════════ */}
                 <div className="col-span-12 lg:col-span-4 space-y-6">
 
-                    {/* ── SPY INTELLIGENCE CARD ── */}
+                    {/* ── INTEL CARD ── */}
                     <div className="glass-panel rounded-2xl p-5 lg:p-6 border border-violet-500/20 anim-slide-up anim-border-glow overflow-hidden relative"
                         style={{ animationDelay: '150ms' }}>
                         {/* Background grid effect */}
@@ -805,7 +805,7 @@ export default function UserDashboard() {
                                 )}
                             </div>
 
-                            {spyMissions.length === 0 ? (
+                            {intelMissions.length === 0 ? (
                                 /* ── Empty / Onboarding State ── */
                                 <div className="text-center py-4">
                                     {/* Animated radar */}

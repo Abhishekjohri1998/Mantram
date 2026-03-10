@@ -74,7 +74,7 @@ function WebsiteScan({ onComplete, onBack, initialUrl = '' }) {
         { label: 'Extracting brand logo', icon: 'image', duration: 1000 },
         { label: 'Determining your visual aesthetic', icon: 'palette', duration: 1200 },
         { label: 'Detecting typography', icon: 'text_fields', duration: 800 },
-        { label: 'Scraping homepage images', icon: 'photo_library', duration: 1500 },
+        { label: 'Collecting homepage images', icon: 'photo_library', duration: 1500 },
         { label: 'Analyzing brand voice & tone', icon: 'record_voice_over', duration: 2000 },
         { label: 'Building your Brand DNA', icon: 'fingerprint', duration: 1500 },
     ]
