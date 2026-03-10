@@ -1,6 +1,7 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import axios from 'axios';
+import crypto from 'crypto';
 import { protect } from '../middleware/auth.js';
 import SocialAccount from '../models/SocialAccount.js';
 import SocialPost from '../models/SocialPost.js';
@@ -22,6 +23,33 @@ import { uploadToS3 } from '../utils/s3.js';
 
 const router = express.Router();
 const FB_API_URL = 'https://graph.facebook.com/v22.0';
+
+// BUG-3 FIX: Sign OAuth state with HMAC to prevent tampering
+function signState(payload) {
+    const secret = config.jwtSecret || 'dev-secret';
+    const hmac = crypto.createHmac('sha256', secret).update(payload).digest('hex').substring(0, 16);
+    return `${payload}:${hmac}`;
+}
+function verifyState(signedState) {
+    const parts = signedState.split(':');
+    if (parts.length < 4) return null; // userId:platform:origin:hmac
+    const hmac = parts.pop();
+    const payload = parts.join(':');
+    const secret = config.jwtSecret || 'dev-secret';
+    const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex').substring(0, 16);
+    if (hmac !== expected) return null;
+    return parts; // [userId, platform, originBase64]
+}
+// BUG-10 FIX: Validate redirect URL against whitelist
+function getSafeRedirectUrl(base64Origin) {
+    try {
+        const decoded = Buffer.from(base64Origin, 'base64').toString('ascii');
+        const cleanDecoded = decoded.toLowerCase().replace(/\/$/, '');
+        const allowed = config.frontendUrl.map(u => u.toLowerCase().replace(/\/$/, ''));
+        if (allowed.includes(cleanDecoded)) return decoded;
+    } catch { /* ignore */ }
+    return config.frontendUrl[0];
+}
 
 /**
  * @route   GET /api/social/auth/:platform
@@ -46,7 +74,7 @@ router.get('/auth/:platform', protect, (req, res) => {
         }
         if (!origin) origin = config.frontendUrl[0];
 
-        const state = `${req.user._id.toString()}:${platform}:${Buffer.from(origin).toString('base64')}`;
+        const state = signState(`${req.user._id.toString()}:${platform}:${Buffer.from(origin).toString('base64')}`);
 
         const authUrl = platform === 'linkedin' ? getLinkedInAuthUrl(state) : getMetaAuthUrl(state, platform);
         res.json({ success: true, authUrl });
@@ -70,7 +98,7 @@ router.get('/auth/facebook/callback', async (req, res) => {
         if (state) {
             const parts = state.split(':');
             if (parts.length >= 3) {
-                targetFrontend = Buffer.from(parts[2], 'base64').toString('ascii');
+                targetFrontend = getSafeRedirectUrl(parts[2]);
             }
         }
     } catch (e) {
@@ -88,8 +116,13 @@ router.get('/auth/facebook/callback', async (req, res) => {
     }
 
     try {
-        // State is "userId:platform:originBase64"
-        const [userId, platform] = state.split(':');
+        // BUG-3 FIX: Verify HMAC on state to prevent userId tampering
+        const verifiedParts = verifyState(state);
+        if (!verifiedParts) {
+            console.warn('[SOCIAL] Meta Callback state HMAC verification failed');
+            return res.redirect(`${targetFrontend}/integrations?social=invalid_state`);
+        }
+        const [userId, platform] = verifiedParts;
         const activePlatform = platform || 'facebook';
 
         // Exchange code for access token
@@ -147,7 +180,7 @@ router.get('/auth/linkedin/callback', async (req, res) => {
         if (state) {
             const parts = state.split(':');
             if (parts.length >= 3) {
-                targetFrontend = Buffer.from(parts[2], 'base64').toString('ascii');
+                targetFrontend = getSafeRedirectUrl(parts[2]);
             }
         }
     } catch (e) {
@@ -160,7 +193,12 @@ router.get('/auth/linkedin/callback', async (req, res) => {
     }
 
     try {
-        const [userId] = state.split(':');
+        // BUG-3 FIX: Verify HMAC on state
+        const verifiedParts = verifyState(state);
+        if (!verifiedParts) {
+            return res.redirect(`${targetFrontend}/integrations?social=invalid_state&platform=linkedin`);
+        }
+        const [userId] = verifiedParts;
         const tokenData = await exchangeLinkedInCodeForToken(code);
         const profile = await fetchLinkedInProfile(tokenData.access_token);
 
@@ -429,7 +467,7 @@ router.post('/publish', protect, async (req, res) => {
             _id: { $in: accountIds },
             user: req.user._id,
             isActive: true
-        });
+        }).select('+accessToken');
 
         if (accounts.length === 0) {
             return res.status(400).json({ success: false, error: 'No valid connected accounts selected' });
@@ -510,7 +548,7 @@ router.post('/publish', protect, async (req, res) => {
  */
 router.get('/accounts/:id/posts', protect, async (req, res) => {
     try {
-        const account = await SocialAccount.findOne({ _id: req.params.id, user: req.user._id });
+        const account = await SocialAccount.findOne({ _id: req.params.id, user: req.user._id }).select('+accessToken');
         if (!account) {
             return res.status(404).json({ success: false, error: 'Account not found' });
         }
@@ -530,7 +568,7 @@ router.get('/accounts/:id/posts', protect, async (req, res) => {
  */
 router.get('/accounts/:id/posts/:postId/insights', protect, async (req, res) => {
     try {
-        const account = await SocialAccount.findOne({ _id: req.params.id, user: req.user._id });
+        const account = await SocialAccount.findOne({ _id: req.params.id, user: req.user._id }).select('+accessToken');
         if (!account) {
             return res.status(404).json({ success: false, error: 'Account not found' });
         }

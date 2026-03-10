@@ -21,10 +21,11 @@ router.get('/', protect, async (req, res) => {
         if (leadStatus) filter.leadStatus = leadStatus;
         if (platform) filter.platform = platform;
         if (search) {
+            const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             filter.$or = [
-                { name: { $regex: search, $options: 'i' } },
-                { platformUsername: { $regex: search, $options: 'i' } },
-                { email: { $regex: search, $options: 'i' } },
+                { name: { $regex: safeSearch, $options: 'i' } },
+                { platformUsername: { $regex: safeSearch, $options: 'i' } },
+                { email: { $regex: safeSearch, $options: 'i' } },
             ];
         }
 

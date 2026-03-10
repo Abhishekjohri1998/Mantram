@@ -70,7 +70,7 @@ router.get('/', protect, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 router.get('/:id', protect, async (req, res) => {
     try {
-        const brand = await Brand.findById(req.params.id);
+        const brand = await findBrandWithAccess(req.params.id, req.user._id);
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
         res.json({ success: true, brand });
     } catch (error) {
@@ -386,7 +386,7 @@ router.post('/:id/templates', protect, async (req, res) => {
 // GET /api/brands/:id/templates — list custom templates
 router.get('/:id/templates', protect, async (req, res) => {
     try {
-        const brand = await Brand.findById(req.params.id).select('customTemplates');
+        const brand = await findBrandWithAccess(req.params.id, req.user._id);
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
         res.json({ success: true, templates: brand.customTemplates || [] });
     } catch (error) {
@@ -439,7 +439,7 @@ router.post('/:id/categories', protect, async (req, res) => {
 // GET /api/brands/:id/categories — list custom categories
 router.get('/:id/categories', protect, async (req, res) => {
     try {
-        const brand = await Brand.findById(req.params.id).select('customCategories');
+        const brand = await findBrandWithAccess(req.params.id, req.user._id);
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
         res.json({ success: true, categories: brand.customCategories || [] });
     } catch (error) {
@@ -531,6 +531,15 @@ router.post('/:id/knowledge/ingest', protect, knowledgeUpload.single('file'), as
         // ── URL SCRAPING ──
         else if (sourceType === 'url') {
             if (!url) return res.status(400).json({ success: false, error: 'URL is required' });
+            // BUG-9 FIX: Block SSRF to internal/private networks
+            try {
+                const parsed = new URL(url);
+                const host = parsed.hostname.toLowerCase();
+                const blocked = [/^localhost$/i, /^127\./, /^10\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./, /^169\.254\./, /^0\./, /\.internal$/, /\.local$/];
+                if (blocked.some(p => p.test(host)) || !['http:', 'https:'].includes(parsed.protocol)) {
+                    return res.status(400).json({ success: false, error: 'URL points to an internal or blocked network' });
+                }
+            } catch { return res.status(400).json({ success: false, error: 'Invalid URL format' }); }
             sourceUrl = url;
             try {
                 const { crawlPage } = await import('../utils/web-research.js');

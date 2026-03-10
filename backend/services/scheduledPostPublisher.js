@@ -1,7 +1,7 @@
 /**
  * Scheduled Post Publisher — Background Service
  * 
- * Runs every 60 seconds, finds posts with status='scheduled' and scheduledFor <= now,
+ * Runs every 5 minutes, finds posts with status='scheduled' and scheduledFor <= now,
  * and publishes them via the platform-specific APIs.
  */
 
@@ -28,7 +28,7 @@ async function publishScheduledPost(post) {
             user: post.user,
             platform: post.platform,
             isActive: true,
-        });
+        }).select('+accessToken');
 
         if (!account) {
             console.warn(`[SCHEDULER] No active ${post.platform} account found for user ${post.user} — marking failed`);
@@ -101,11 +101,18 @@ async function processDuePosts() {
     try {
         const now = new Date();
 
-        // Find all posts that are scheduled and due
-        const duePosts = await SocialPost.find({
-            status: 'scheduled',
-            scheduledFor: { $lte: now },
-        }).limit(20); // Process max 20 per tick to avoid overwhelming APIs
+        // BUG-16 FIX: Find and atomically lock each post before publishing
+        // Use findOneAndUpdate to set status='publishing' atomically, preventing duplicates
+        const duePosts = [];
+        for (let i = 0; i < 20; i++) {
+            const post = await SocialPost.findOneAndUpdate(
+                { status: 'scheduled', scheduledFor: { $lte: now } },
+                { $set: { status: 'publishing' } },
+                { new: true }
+            );
+            if (!post) break;
+            duePosts.push(post);
+        }
 
         if (duePosts.length > 0) {
             console.log(`[SCHEDULER] Found ${duePosts.length} due post(s) — processing...`);

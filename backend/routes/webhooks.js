@@ -5,9 +5,11 @@
  */
 
 import { Router } from 'express';
+import crypto from 'crypto';
 import { runAutonomousPipeline, handleCommentAutonomously } from '../services/autonomousAgent.js';
 import Integration from '../models/Integration.js';
 import Conversation from '../models/Conversation.js';
+import config from '../config/env.js';
 
 const router = Router();
 
@@ -16,6 +18,22 @@ const VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN || 'mantram_verify_20
 const PAGE_ACCESS_TOKEN = null;
 const META_API_VERSION = 'v21.0';
 const META_GRAPH_URL = `https://graph.facebook.com/${META_API_VERSION}`;
+
+/**
+ * Verify Meta X-Hub-Signature-256 header to prevent forged webhooks.
+ */
+function verifyMetaSignature(rawBody, signatureHeader) {
+    if (!signatureHeader) return false;
+    const appSecret = config.facebook?.appSecret;
+    if (!appSecret) {
+        console.warn('⚠️ FACEBOOK_APP_SECRET not configured — skipping webhook signature verification');
+        return true; // Allow in dev, but log warning
+    }
+    const [algo, signature] = signatureHeader.split('=');
+    if (algo !== 'sha256' || !signature) return false;
+    const expected = crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex');
+    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+}
 
 // ── GET /api/webhooks/meta — Webhook verification (Meta requires this) ──
 
@@ -36,6 +54,14 @@ router.get('/meta', (req, res) => {
 // ── POST /api/webhooks/meta — Receive real events from Meta ──
 
 router.post('/meta', async (req, res) => {
+    // BUG-1 FIX: Verify webhook signature before processing
+    const signature = req.headers['x-hub-signature-256'];
+    const rawBody = JSON.stringify(req.body);
+    if (!verifyMetaSignature(rawBody, signature)) {
+        console.warn('⚠️ Meta webhook signature verification failed — rejecting');
+        return res.sendStatus(403);
+    }
+
     // Immediately respond 200 (Meta retries on slow responses)
     res.sendStatus(200);
 

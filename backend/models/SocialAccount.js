@@ -10,8 +10,8 @@ const socialAccountSchema = new mongoose.Schema({
     avatar: { type: String, default: '' },
 
     // For Meta, we need the page access token or user access token
-    accessToken: { type: String, required: true },
-    refreshToken: { type: String, default: '' },
+    accessToken: { type: String, required: true, select: false },
+    refreshToken: { type: String, default: '', select: false },
 
     // Additional metadata (e.g., category for FB pages)
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },

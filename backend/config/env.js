@@ -11,7 +11,14 @@ export default {
     port: process.env.PORT || 3001,
     nodeEnv: process.env.NODE_ENV || 'development',
     mongoUri: process.env.MONGODB_URI || 'mongodb://localhost:27017/da-mantram',
-    jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-me',
+    jwtSecret: (() => {
+        if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
+        if (process.env.NODE_ENV === 'production') {
+            throw new Error('❌ FATAL: JWT_SECRET must be set in production!');
+        }
+        console.warn('⚠️ Using default JWT secret — NOT safe for production');
+        return 'dev-secret-change-me';
+    })(),
     jwtExpire: process.env.JWT_EXPIRE || '7d',
     frontendUrl: (process.env.FRONTEND_URL || 'http://localhost:5173')
         .split(',')

@@ -20,6 +20,16 @@ router.post('/register', async (req, res) => {
     if (!requireDB(req, res)) return;
     try {
         const { name, email, password, company } = req.body;
+        // BUG-18 FIX: Input validation
+        if (!name || name.trim().length < 2) {
+            return res.status(400).json({ success: false, error: 'Name must be at least 2 characters' });
+        }
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return res.status(400).json({ success: false, error: 'Valid email is required' });
+        }
+        if (!password || password.length < 6) {
+            return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
+        }
         const exists = await User.findOne({ email });
         if (exists) {
             return res.status(400).json({ success: false, error: 'Email already registered' });

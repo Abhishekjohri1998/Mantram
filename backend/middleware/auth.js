@@ -50,10 +50,9 @@ export const protect = async (req, res, next) => {
             req.shopifyAuth = true;
             return next();
         } else {
-            // Valid Shopify token but no integration found yet
-            req.shopifyShop = shopDomain;
-            req.shopifyAuth = true;
-            return next();
+            // Valid Shopify token but no integration/user found — cannot proceed
+            console.warn(`⚠️ [AUTH] Valid Shopify token for ${shopDomain} but no integration found`);
+            return res.status(401).json({ success: false, error: 'Shopify store not connected. Please install the app first.' });
         }
     } catch (shopifyErr) {
         console.error(`❌ [AUTH] Token verification failed (Standard & Shopify): ${shopifyErr.message}`);

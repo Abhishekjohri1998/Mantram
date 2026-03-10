@@ -107,11 +107,14 @@ router.get('/users', async (req, res) => {
     try {
         const { page = 1, limit = 20, search, plan, role, sort = '-createdAt' } = req.query;
         const filter = { role: { $ne: 'superadmin' } };
-        if (search) filter.$or = [
-            { name: new RegExp(search, 'i') },
-            { email: new RegExp(search, 'i') },
-            { company: new RegExp(search, 'i') },
-        ];
+        if (search) {
+            const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            filter.$or = [
+                { name: new RegExp(safeSearch, 'i') },
+                { email: new RegExp(safeSearch, 'i') },
+                { company: new RegExp(safeSearch, 'i') },
+            ];
+        }
         if (plan) filter.plan = plan;
         if (role && role !== 'superadmin') filter.role = role;
 
@@ -344,7 +347,10 @@ router.get('/brands', async (req, res) => {
     try {
         const { search, page = 1, limit = 20 } = req.query;
         const filter = {};
-        if (search) filter.$or = [{ name: new RegExp(search, 'i') }, { website: new RegExp(search, 'i') }];
+        if (search) {
+            const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            filter.$or = [{ name: new RegExp(safeSearch, 'i') }, { website: new RegExp(safeSearch, 'i') }];
+        }
         const brands = await Brand.find(filter)
             .populate('user', 'name email')
             .sort('-createdAt')
