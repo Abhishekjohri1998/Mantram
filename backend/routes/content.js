@@ -107,7 +107,7 @@ router.get('/', protect, async (req, res) => {
 // GET /api/content/:id
 router.get('/:id', protect, async (req, res) => {
     try {
-        const content = await Content.findById(req.params.id).populate('brand', 'name dna.voice');
+        const content = await Content.findOne({ _id: req.params.id, user: req.user._id }).populate('brand', 'name dna.voice');
         if (!content) return res.status(404).json({ success: false, error: 'Content not found' });
         res.json({ success: true, content });
     } catch (error) {
@@ -118,7 +118,7 @@ router.get('/:id', protect, async (req, res) => {
 // PUT /api/content/:id — update (user edits content)
 router.put('/:id', protect, async (req, res) => {
     try {
-        const existing = await Content.findById(req.params.id);
+        const existing = await Content.findOne({ _id: req.params.id, user: req.user._id });
         if (!existing) return res.status(404).json({ success: false, error: 'Content not found' });
 
         const updates = { ...req.body };
@@ -157,7 +157,7 @@ router.put('/:id', protect, async (req, res) => {
 router.post('/:id/feedback', protect, async (req, res) => {
     try {
         const { signalType, rating, thumbs } = req.body;
-        const content = await Content.findById(req.params.id);
+        const content = await Content.findOne({ _id: req.params.id, user: req.user._id });
         if (!content) return res.status(404).json({ success: false, error: 'Content not found' });
 
         // Update content rating
@@ -189,7 +189,7 @@ router.post('/:id/feedback', protect, async (req, res) => {
 // POST /api/content/:id/regenerate
 router.post('/:id/regenerate', protect, requireCredits('contentRefine'), async (req, res) => {
     try {
-        const existing = await Content.findById(req.params.id);
+        const existing = await Content.findOne({ _id: req.params.id, user: req.user._id });
         if (!existing) return res.status(404).json({ success: false, error: 'Content not found' });
 
         // Record negative feedback (regenerate signal)
@@ -239,7 +239,7 @@ router.post('/:id/refine', protect, requireCredits('contentRefine'), async (req,
         const { instruction, currentContent } = req.body;
         if (!instruction) return res.status(400).json({ success: false, error: 'Refine instruction is required' });
 
-        const existing = await Content.findById(req.params.id);
+        const existing = await Content.findOne({ _id: req.params.id, user: req.user._id });
         const textToRefine = currentContent || existing?.content || '';
         if (!textToRefine) return res.status(400).json({ success: false, error: 'No content to refine' });
 

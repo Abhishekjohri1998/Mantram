@@ -611,10 +611,11 @@ Be STRATEGIC. Every recommendation must explain WHY it matters for AI visibility
 
 router.post('/audit-page', protect, requireCredits('seoAuditPage'), async (req, res) => {
   try {
-    const { pageUrl, brand, keyword } = req.body;
+    const { pageUrl, brand: brandPayload, brandId, keyword } = req.body;
     if (!pageUrl) return res.status(400).json({ success: false, error: 'Page URL is required' });
 
-    const brandContext = buildBrandContext(brand);
+    const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
+    const brandContext = buildBrandContext(brand || brandPayload);
 
     // Crawl the specific page
     const { crawlPage } = await import('../utils/web-research.js');
@@ -716,7 +717,7 @@ router.post('/competitors/discover', protect, requireCredits('seoCompetitorDisco
     const { brandId } = req.body;
     if (!brandId) return res.status(400).json({ success: false, error: 'Brand ID required' });
 
-    const brand = await Brand.findById(brandId);
+    const brand = await loadBrand(brandId, req.user._id);
     if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
 
     const brandContext = buildBrandContext(brand);
@@ -1232,10 +1233,10 @@ router.get('/history', optionalAuth, async (req, res) => {
   }
 });
 
-router.get('/history/:id', optionalAuth, async (req, res) => {
+router.get('/history/:id', protect, async (req, res) => {
   try {
     const SeoAudit = (await import('../models/SeoAudit.js')).default;
-    const audit = await SeoAudit.findById(req.params.id).lean();
+    const audit = await SeoAudit.findOne({ _id: req.params.id, user: req.user._id }).lean();
     if (!audit) return res.status(404).json({ success: false, error: 'Audit not found' });
     res.json({ success: true, audit });
   } catch (error) {

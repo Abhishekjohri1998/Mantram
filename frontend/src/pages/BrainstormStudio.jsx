@@ -305,12 +305,13 @@ export default function BrainstormStudio() {
     }
 
     const handleIdeaAction = (type, idea) => {
-        const context = `${idea.title}: ${idea.hook}. ${idea.description}`
+        const hook = idea.hook || idea.logline || ''
+        const desc = idea.description || idea.synopsis || ''
         if (type === 'content') {
-            sessionStorage.setItem('brainstormContext', JSON.stringify({ title: idea.title, hook: idea.hook, description: idea.description }))
+            sessionStorage.setItem('brainstormContext', JSON.stringify({ title: idea.title, hook, description: desc }))
             navigate('/content-studio?fromBrainstorm=true')
         } else if (type === 'creative') {
-            sessionStorage.setItem('brainstormContext', JSON.stringify({ prompt: `${idea.title} — ${idea.visualDirection || idea.hook}` }))
+            sessionStorage.setItem('brainstormContext', JSON.stringify({ prompt: `${idea.title} — ${idea.visualDirection || idea.visualStyle || hook}` }))
             navigate('/creative-studio?fromBrainstorm=true')
         } else if (type === 'calendar') {
             navigate('/smart-calendar')
@@ -733,7 +734,7 @@ export default function BrainstormStudio() {
                                     ))}
                                 </div>
 
-                                <button onClick={() => { setStep(1); setCurrentQ(0) }}
+                                <button onClick={() => { setStep(1); setCurrentQ(0); setAnswers({}); setCurrentAnswer('') }}
                                     className="text-sm text-slate-500 hover:text-slate-300 mt-2 cursor-pointer transition-colors">
                                     ← Go back and change answers
                                 </button>
@@ -1204,21 +1205,21 @@ export default function BrainstormStudio() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {strategyData.channels && Object.entries(strategyData.channels).filter(([, d]) => d?.enabled).map(([key, ch]) => {
                                         const icons = { social_media: '📱', seo_sem: '🔍', performance_marketing: '📊', influencer_marketing: '🤝', content_marketing: '✍️', ad_films_reels: '🎬', offline_campaigns: '🏪' }
-                                        const colors = { social_media: 'violet', seo_sem: 'blue', performance_marketing: 'emerald', influencer_marketing: 'rose', content_marketing: 'cyan', ad_films_reels: 'amber', offline_campaigns: 'slate' }
-                                        const c = colors[key] || 'slate'
+                                        const colorMap = { social_media: '#8b5cf6', seo_sem: '#3b82f6', performance_marketing: '#10b981', influencer_marketing: '#f43f5e', content_marketing: '#06b6d4', ad_films_reels: '#f59e0b', offline_campaigns: '#64748b' }
+                                        const hex = colorMap[key] || '#64748b'
                                         return (
-                                            <div key={key} className={`glass-panel rounded-2xl p-5 border-t-2 border-${c}-500/40`}>
+                                            <div key={key} className="glass-panel rounded-2xl p-5 border-t-2" style={{ borderTopColor: `${hex}66` }}>
                                                 <div className="flex items-center gap-2 mb-3">
                                                     <span className="text-lg">{icons[key] || '📌'}</span>
                                                     <h4 className="text-sm font-bold text-white capitalize">{key.replace(/_/g, ' ')}</h4>
-                                                    <span className={`text-[10px] ml-auto bg-${c}-500/10 text-${c}-400 px-2 py-0.5 rounded-full font-bold`}>{ch.budget_split}</span>
+                                                    <span className="text-[10px] ml-auto px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: `${hex}1a`, color: hex }}>{ch.budget_split}</span>
                                                 </div>
                                                 {ch.why_this_channel && <p className="text-[10px] text-primary italic mb-2">💡 {ch.why_this_channel}</p>}
                                                 <p className="text-xs text-slate-300 leading-relaxed mb-3">{ch.strategy}</p>
                                                 {ch.tactics?.length > 0 && (
                                                     <div className="space-y-1 mb-3">
                                                         {ch.tactics.slice(0, 3).map((t, i) => (
-                                                            <p key={i} className="text-[11px] text-slate-400 flex items-start gap-1.5"><span className={`text-${c}-400 mt-0.5`}>→</span> {t}</p>
+                                                            <p key={i} className="text-[11px] text-slate-400 flex items-start gap-1.5"><span className="mt-0.5" style={{ color: hex }}>→</span> {t}</p>
                                                         ))}
                                                     </div>
                                                 )}

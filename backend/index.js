@@ -40,6 +40,7 @@ import nexusRoutes from './routes/nexus.js';
 import intelMissionRoutes from './routes/intelMissions.js';
 import paymentRoutes from './routes/payments.js';
 import waitlistRoutes from './routes/waitlist.js';
+import skillsRoutes from './routes/skills.js';
 
 const app = express();
 
@@ -144,6 +145,7 @@ app.use('/api/intel', intelMissionRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/social', socialRoutes);
 app.use('/api/waitlist', waitlistRoutes);
+app.use('/api/skills', skillsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

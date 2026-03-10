@@ -23,12 +23,15 @@ let isRunning = false;
  */
 async function publishScheduledPost(post) {
     try {
-        // Find the connected social account
-        const account = await SocialAccount.findOne({
+        // Find the connected social account — use accountId to match the exact account
+        // the user selected (important when user has multiple accounts on the same platform)
+        const accountQuery = {
             user: post.user,
             platform: post.platform,
             isActive: true,
-        }).select('+accessToken');
+        };
+        if (post.accountId) accountQuery.accountId = post.accountId;
+        const account = await SocialAccount.findOne(accountQuery).select('+accessToken');
 
         if (!account) {
             console.warn(`[SCHEDULER] No active ${post.platform} account found for user ${post.user} — marking failed`);

@@ -1200,9 +1200,9 @@ router.patch('/strategies/:id/kpi', protect, async (req, res) => {
 
     // Recalculate overall progress
     const totalProgress = strategy.kpis.reduce((sum, k) => {
-      return sum + Math.min(100, (k.current / k.target) * 100);
+      return sum + (k.target > 0 ? Math.min(100, (k.current / k.target) * 100) : 0);
     }, 0);
-    strategy.overallProgress = Math.round(totalProgress / strategy.kpis.length);
+    strategy.overallProgress = strategy.kpis.length > 0 ? Math.round(totalProgress / strategy.kpis.length) : 0;
 
     await strategy.save();
     res.json({ success: true, kpis: strategy.kpis, overallProgress: strategy.overallProgress });
@@ -1225,7 +1225,7 @@ router.patch('/strategies/:id/milestone', protect, async (req, res) => {
 
     // Recalculate overall progress (50% KPIs + 50% milestones)
     const kpiProgress = strategy.kpis.length > 0
-      ? strategy.kpis.reduce((sum, k) => sum + Math.min(100, (k.current / k.target) * 100), 0) / strategy.kpis.length
+      ? strategy.kpis.reduce((sum, k) => sum + (k.target > 0 ? Math.min(100, (k.current / k.target) * 100) : 0), 0) / strategy.kpis.length
       : 0;
     const milestoneProgress = strategy.milestones.length > 0
       ? (strategy.milestones.filter(m => m.completed).length / strategy.milestones.length) * 100
