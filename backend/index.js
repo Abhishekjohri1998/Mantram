@@ -168,9 +168,7 @@ app.use('/api/dashboard-summary', dashboardSummaryRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/fidato', fidatoRoutes);
 app.use('/api/nexus', nexusRoutes);
-app.use('/api/intel', intelMissionRoutes);
 app.use('/api/payments', paymentRoutes);
-app.use('/api/social', socialRoutes);
 app.use('/api/waitlist', waitlistRoutes);
 app.use('/api/skills', skillsRoutes);
 
@@ -204,26 +202,26 @@ const server = app.listen(config.port, () => {
     console.log(`📡 AI Provider: ${config.ai.defaultTextProvider} (${config.ai.defaultTextModel})`);
     console.log(`🌐 Frontend: ${config.frontendUrl}\n`);
 
-    // Start follow-up scheduler (every 4 hours — Meta Compliance: Decelerated from 30min)
+    // Start follow-up scheduler
     import('./services/autonomousAgent.js').then(({ runFollowUpCheck }) => {
         setInterval(() => {
             runFollowUpCheck().catch(err => console.warn('⚠️ Follow-up check failed:', err.message));
         }, 4 * 60 * 60 * 1000);
-        console.log('🤖 Autonomous Agent active — Follow-up scheduler running every 4 hours (Compliance Optimized)');
-    }).catch(() => { });
+        console.log('🤖 Autonomous Agent active');
+    }).catch(err => console.error('❌ Failed to load autonomousAgent.js:', err));
 
-    // Start intelligence agent scheduler (every 6 hours — Meta Compliance: Decelerated from 2hrs)
+    // Start intelligence agent scheduler
     import('./services/intelligenceAgent.js').then(({ runIntelMissions }) => {
         setInterval(() => {
             runIntelMissions().catch(err => console.warn('🕵️ Intel Agent check failed:', err.message));
         }, 6 * 60 * 60 * 1000);
-        console.log('🕵️ Agent Intelligence active — Missions scheduler running every 6 hours (Compliance Optimized)');
-    }).catch(() => { });
+        console.log('🕵️ Agent Intelligence active');
+    }).catch(err => console.error('❌ Failed to load intelligenceAgent.js:', err));
 
-    // Start scheduled post publisher (every 60 seconds)
+    // Start scheduled post publisher
     import('./services/scheduledPostPublisher.js').then(({ startScheduledPostPublisher }) => {
         startScheduledPostPublisher();
-    }).catch((err) => { console.warn('📅 Scheduled Post Publisher failed to start:', err.message); });
+    }).catch(err => console.error('❌ Failed to load scheduledPostPublisher.js:', err));
 });
 
 // Configure Keep-Alive timeout to be larger than AWS ALB / CloudFront idle timeout (60s)
