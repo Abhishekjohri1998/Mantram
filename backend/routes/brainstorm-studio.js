@@ -383,7 +383,8 @@ Respond in JSON format:
   } catch (error) {
     console.error('Brainstorm confirm error:', error);
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
-  });
+  }
+});
 
 // POST /api/brainstorm-studio/generate — Generate multi-layer scored ideas (intent-specific)
 router.post('/generate', protect, requireCredits('brainstorm'), async (req, res) => {
@@ -544,7 +545,8 @@ ${outputFormat}`;
   } catch (error) {
     console.error('Brainstorm generate error:', error);
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
-  });
+  }
+});
 
 // POST /api/brainstorm-studio/refine — Refine existing ideas
 router.post('/refine', protect, requireCredits('brainstormRefine'), async (req, res) => {
@@ -576,7 +578,8 @@ ${isAdFilm ? 'Respond with: filmConcepts (3), productionApproaches (3), namingId
   } catch (error) {
     console.error('Brainstorm refine error:', error);
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
-  });
+  }
+});
 
 // POST /api/brainstorm-studio/feedback — Like/Dislike an idea (saves for brand learning)
 router.post('/feedback', optionalAuth, async (req, res) => {
@@ -685,7 +688,8 @@ ${brandContext}`;
   } catch (error) {
     console.error('Screenplay generation error:', error);
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
-  });
+  }
+});
 
 // POST /api/brainstorm-studio/chat — Multi-turn film refinement chat
 router.post('/chat', protect, requireCredits('brainstormChat'), async (req, res) => {
@@ -739,16 +743,10 @@ Respond in JSON:
     const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.75, maxTokens: 4096 });
     const parsed = parseJSON(result);
 
-<<<<<<< HEAD
     res.json({ success: true, ...parsed });
   } catch (error) {
     console.error('Brainstorm chat error:', error);
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
-=======
-    res.json({ success: true, ...parsed });
-  } catch (error) {
-    console.error('Brainstorm chat error:', error);
-    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -848,7 +846,6 @@ Respond in STRICT JSON format:
       "avg_cpl": "₹X",
       "avg_roas": "Xx",
       "avg_follower_growth": "X%/month"
->>>>>>> origin/sachin
   }
 },
 
@@ -996,13 +993,13 @@ Respond in STRICT JSON format:
 ]
 }`;
 
-    const userPrompt = `Create a deeply researched, expert - level ${ duration } brand strategy.Every number must have a logical basis.Think step by step.
+    const userPrompt = `Create a deeply researched, expert - level ${duration} brand strategy.Every number must have a logical basis.Think step by step.
 
 BRAND CONTEXT:
-  ${ brandContext }
+  ${brandContext}
 
 CLIENT BRIEF:
-  ${ answersText }
+  ${answersText}
 
 IMPORTANT: Do NOT give generic advice.Analyze THIS specific brand's situation and create a strategy that a real CMO would stake their reputation on. Every budget allocation needs a "why". Every KPI needs a calculation basis. If a channel doesn't make sense for this budget / team, say so and explain why.`;
 
@@ -1072,8 +1069,8 @@ router.post('/strategy-slides', protect, async (req, res) => {
 
     const systemPrompt = `You are creating a stunning strategy presentation in JSON format.
 
-  Brand: ${ brandName }
-Brand Colors: ${ brandColors.join(', ') }
+  Brand: ${brandName}
+Brand Colors: ${brandColors.join(', ')}
 
 Create 12 - 15 slides.Each slide must have:
 - A layout type: hero, stats, timeline, grid, bullets, comparison, chart - data, quote, cta
@@ -1144,7 +1141,7 @@ Respond in JSON:
 
 IMPORTANT: Create slides that cover ALL major sections — summary, objectives, each active channel, timeline, budget, KPIs, risks, and a closing CTA.Make it 12 - 15 slides total.`;
 
-    const userPrompt = `Create a presentation from this strategy: \n${ JSON.stringify(strategy).substring(0, 6000) } `;
+    const userPrompt = `Create a presentation from this strategy: \n${JSON.stringify(strategy).substring(0, 6000)} `;
 
     const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 6000 });
     const parsed = parseJSON(result);
