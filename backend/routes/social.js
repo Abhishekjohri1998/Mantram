@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import axios from 'axios';
 import { protect } from '../middleware/auth.js';
 import SocialAccount from '../models/SocialAccount.js';
+import SocialPost from '../models/SocialPost.js';
 import {
     getMetaAuthUrl,
     exchangeCodeForToken,
@@ -363,7 +364,21 @@ Do not include any text outside the JSON. Do not wrap in markdown code blocks.`;
             return res.status(500).json({ success: false, error: 'Failed to generate captions' });
         }
 
-        res.json({ success: true, captions: captionsResult.captions });
+        // Normalize keys to lowercase platform names (AI may return "Instagram" vs "instagram")
+        const normalized = {};
+        for (const [key, val] of Object.entries(captionsResult.captions)) {
+            const lower = key.toLowerCase().replace(/[^a-z]/g, '');
+            // Map common variations to canonical platform keys
+            const canonical = lower.startsWith('instagram') ? 'instagram'
+                : lower.startsWith('facebook') ? 'facebook'
+                    : lower.startsWith('linkedin') ? 'linkedin'
+                        : lower.startsWith('twitter') ? 'twitter'
+                            : lower;
+            normalized[canonical] = val;
+        }
+        console.log(`[CAPTION] Normalized keys: ${Object.keys(normalized).join(', ')}`);
+
+        res.json({ success: true, captions: normalized });
 
     } catch (error) {
         console.error('[CAPTION] Generate caption error:', error);
@@ -459,6 +474,27 @@ router.post('/publish', protect, async (req, res) => {
             }
         }
 
+        // ── Save SocialPost records for each result ──
+        for (const r of results) {
+            try {
+                await SocialPost.create({
+                    user: req.user._id,
+                    brand: req.body.brandId || undefined,
+                    platform: r.platform,
+                    accountId: r.accountId?.toString() || '',
+                    accountName: r.accountName,
+                    caption: captions?.[r.platform] || text || '',
+                    imageUrl: absoluteImageUrl || '',
+                    postId: r.postId || '',
+                    status: r.status === 'success' ? 'published' : 'failed',
+                    error: r.error || '',
+                    publishedAt: r.status === 'success' ? new Date() : undefined,
+                });
+            } catch (saveErr) {
+                console.error('[SOCIAL] Failed to save SocialPost record:', saveErr.message);
+            }
+        }
+
         res.json({ success: true, results });
 
     } catch (error) {
@@ -507,6 +543,108 @@ router.get('/accounts/:id/posts/:postId/insights', protect, async (req, res) => 
     }
 });
 
+
+/**
+ * @route   POST /api/social/schedule
+ * @desc    Schedule content for future publishing
+ * @access  Private
+ */
+router.post('/schedule', protect, async (req, res) => {
+    const { accountIds, text, imageUrl, captions, scheduledFor, brandId } = req.body;
+
+    if (!accountIds || accountIds.length === 0 || (!text && !captions)) {
+        return res.status(400).json({ success: false, error: 'Please provide text/captions and select at least one account' });
+    }
+    if (!scheduledFor) {
+        return res.status(400).json({ success: false, error: 'scheduledFor date is required' });
+    }
+    const scheduleDate = new Date(scheduledFor);
+    if (scheduleDate <= new Date()) {
+        return res.status(400).json({ success: false, error: 'Scheduled time must be in the future' });
+    }
+
+    try {
+        const accounts = await SocialAccount.find({
+            _id: { $in: accountIds },
+            user: req.user._id,
+            isActive: true
+        });
+
+        if (accounts.length === 0) {
+            return res.status(400).json({ success: false, error: 'No valid connected accounts selected' });
+        }
+
+        const scheduled = [];
+        for (const account of accounts) {
+            const postCaption = captions?.[account.platform] || text || '';
+            const record = await SocialPost.create({
+                user: req.user._id,
+                brand: brandId || undefined,
+                platform: account.platform,
+                accountId: account.accountId,
+                accountName: account.accountName,
+                caption: postCaption,
+                imageUrl: imageUrl || '',
+                status: 'scheduled',
+                scheduledFor: scheduleDate,
+            });
+            scheduled.push({
+                _id: record._id,
+                platform: account.platform,
+                accountName: account.accountName,
+                scheduledFor: scheduleDate,
+            });
+        }
+
+        res.json({ success: true, scheduled });
+    } catch (error) {
+        console.error('Schedule API Error:', error);
+        res.status(500).json({ success: false, error: 'Server error during scheduling' });
+    }
+});
+
+/**
+ * @route   GET /api/social/posts/history
+ * @desc    Get all SocialPost records for the user
+ * @access  Private
+ */
+router.get('/posts/history', protect, async (req, res) => {
+    try {
+        const filter = { user: req.user._id };
+        if (req.query.status) filter.status = req.query.status;
+        if (req.query.brand) filter.brand = req.query.brand;
+
+        const posts = await SocialPost.find(filter)
+            .sort({ createdAt: -1 })
+            .limit(parseInt(req.query.limit) || 100);
+
+        res.json({ success: true, posts });
+    } catch (error) {
+        console.error('Post history error:', error);
+        res.status(500).json({ success: false, error: 'Server error fetching post history' });
+    }
+});
+
+/**
+ * @route   PUT /api/social/posts/:id/cancel
+ * @desc    Cancel a scheduled post
+ * @access  Private
+ */
+router.put('/posts/:id/cancel', protect, async (req, res) => {
+    try {
+        const post = await SocialPost.findOne({ _id: req.params.id, user: req.user._id });
+        if (!post) return res.status(404).json({ success: false, error: 'Post not found' });
+        if (post.status !== 'scheduled') {
+            return res.status(400).json({ success: false, error: 'Only scheduled posts can be cancelled' });
+        }
+        post.status = 'cancelled';
+        await post.save();
+        res.json({ success: true, message: 'Scheduled post cancelled' });
+    } catch (error) {
+        console.error('Cancel post error:', error);
+        res.status(500).json({ success: false, error: 'Server error cancelling post' });
+    }
+});
 
 /**
  * @route   ANY /api/social/delete-data

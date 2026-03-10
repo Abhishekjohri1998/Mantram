@@ -190,6 +190,11 @@ const server = app.listen(config.port, () => {
         }, 2 * 60 * 60 * 1000);
         console.log('🕵️ Agent Fidato active — Spy missions scheduler running every 2 hours');
     }).catch(() => { });
+
+    // Start scheduled post publisher (every 60 seconds)
+    import('./services/scheduledPostPublisher.js').then(({ startScheduledPostPublisher }) => {
+        startScheduledPostPublisher();
+    }).catch((err) => { console.warn('📅 Scheduled Post Publisher failed to start:', err.message); });
 });
 
 // Configure Keep-Alive timeout to be larger than AWS ALB / CloudFront idle timeout (60s)

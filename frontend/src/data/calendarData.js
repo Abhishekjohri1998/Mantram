@@ -15,6 +15,8 @@ export const EVENT_COLORS = {
     social_media: { bg: '#EC489920', border: '#EC4899', dot: '#EC4899', label: 'Social Media' },
     industry: { bg: '#06B6D420', border: '#06B6D4', dot: '#06B6D4', label: 'Industry' },
     brand: { bg: '#22C55E20', border: '#22C55E', dot: '#22C55E', label: 'Brand Planned' },
+    scheduled: { bg: '#8B5CF620', border: '#8B5CF6', dot: '#8B5CF6', label: 'Scheduled' },
+    published: { bg: '#22D3EE20', border: '#22D3EE', dot: '#22D3EE', label: 'Published' },
 }
 
 // ═══════════════════════════════════════════════════

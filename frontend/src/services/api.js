@@ -282,6 +282,12 @@ export const social = {
     connect: (platform) => apiFetch(`/social/auth/${platform}`),
     disconnect: (accountId) => apiFetch(`/social/accounts/${accountId}`, { method: 'DELETE' }),
     publish: (data) => apiFetch('/social/publish', { method: 'POST', body: JSON.stringify(data) }),
+    schedule: (data) => apiFetch('/social/schedule', { method: 'POST', body: JSON.stringify(data) }),
+    publishHistory: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/social/posts/history?${query}`);
+    },
+    cancelScheduled: (id) => apiFetch(`/social/posts/${id}/cancel`, { method: 'PUT' }),
     generateCaption: (data) => apiFetch('/social/generate-caption', { method: 'POST', body: JSON.stringify(data) }),
     status: () => apiFetch('/social/status'),
     getPosts: (accountId) => apiFetch(`/social/accounts/${accountId}/posts`),
