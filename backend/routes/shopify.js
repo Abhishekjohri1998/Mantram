@@ -69,9 +69,13 @@ router.post('/connect', protect, async (req, res) => {
         const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
         const authUrl = getShopifyAuthUrl(cleanDomain, clientId, redirectUri) + `&state=${statePayload}`;
 
-        // Save pending integration — unique per shopDomain so multiple stores are supported
+        // Save pending integration — must match unique index (user, platform, brand) to prevent duplicate key errors
         await Integration.findOneAndUpdate(
-            { user: req.user._id, platform: 'shopify', 'platformData.shopDomain': cleanDomain },
+            {
+                user: req.user._id,
+                platform: 'shopify',
+                ...(brandId ? { brand: brandId } : { brand: { $exists: false } })
+            },
             {
                 user: req.user._id,
                 platform: 'shopify',
