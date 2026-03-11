@@ -1,0 +1,30 @@
+# Mantram AI
+
+Mantram AI is an autonomous, AI-powered marketing teammate built specifically for Direct-to-Consumer (D2C) and e-commerce brands. It automates full-funnel marketing workflows, from social media management to ad campaign generation, landing page creation, and lead nurturing.
+
+## Core Features
+1. **Brand DNA Initialization**: Scrapes a brand's website to understand its tone, audience, colors, and core offerings, ensuring all AI-generated content is strictly on-brand.
+2. **Autonomous Agents**: 
+   - **Publisher Agent**: Automatically schedules and posts to Instagram, Facebook, and LinkedIn.
+   - **Intelligence Agent**: Monitors metrics, runs A/B tests, and provides actionable insights.
+   - **Follow-up Agent**: Manages email, SMS, and WhatsApp nurturing sequences.
+3. **Omnichannel Studio Suite**:
+   - **Creative Studio**: AI-driven image generation, background removal, and branded asset creation.
+   - **Content Studio**: Generates captions, blogs, and ad copy.
+   - **Video Studio**: Converts standard product images into engaging video ads.
+   - **Funnel Studio**: Drag-and-drop landing page builder with built-in A/B testing and performance tracking.
+   - **Performance Marketing (PM) Studio**: Integrates with Meta Ads and Google Ads to launch and optimize campaigns.
+
+## Key Integrations
+- Meta (Facebook, Instagram)
+- Google Analytics
+- Shopify
+- Stripe & Razorpay
+- Multi-AI Provider backend (Anthropic Claude, Google Gemini, OpenAI Auto-routing)
+
+## Pricing Plans
+Mantram AI offers multiple subscription tiers (Free, Pro, Enterprise) tailored to D2C growth stages.
+
+## Contact Information
+- Website: https://mantram.ai
+- Support: support@mantram.ai

@@ -1054,7 +1054,7 @@ IMPORTANT: Do NOT give generic advice.Analyze THIS specific brand's situation an
     res.json({ success: true, strategy: parsed, strategyId: savedStrategy._id, kpis, milestones });
   } catch (error) {
     console.error('Strategy generation error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 
@@ -1156,7 +1156,7 @@ IMPORTANT: Create slides that cover ALL major sections — summary, objectives, 
     res.json({ success: true, slides: parsed.slides });
   } catch (error) {
     console.error('Strategy slides error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 
@@ -1173,7 +1173,7 @@ router.get('/strategies', protect, async (req, res) => {
       .limit(20);
     res.json({ success: true, strategies });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 
@@ -1184,7 +1184,7 @@ router.get('/strategies/:id', protect, async (req, res) => {
     if (!strategy) return res.status(404).json({ success: false, error: 'Strategy not found' });
     res.json({ success: true, strategy });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 
@@ -1208,7 +1208,7 @@ router.patch('/strategies/:id/kpi', protect, async (req, res) => {
     await strategy.save();
     res.json({ success: true, kpis: strategy.kpis, overallProgress: strategy.overallProgress });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 
@@ -1236,7 +1236,7 @@ router.patch('/strategies/:id/milestone', protect, async (req, res) => {
     await strategy.save();
     res.json({ success: true, milestones: strategy.milestones, overallProgress: strategy.overallProgress });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 
@@ -1252,7 +1252,7 @@ router.patch('/strategies/:id/status', protect, async (req, res) => {
     if (!strategy) return res.status(404).json({ success: false, error: 'Strategy not found' });
     res.json({ success: true, status: strategy.status });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 

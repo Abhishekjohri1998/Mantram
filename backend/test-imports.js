@@ -41,6 +41,11 @@ const files = [
     './routes/payments.js',
     './routes/waitlist.js',
     './routes/skills.js',
+    './routes/funnel-studio.js',
+    './routes/funnel-automation.js',
+    './routes/funnel-intelligence.js',
+    './routes/funnel-webhooks.js',
+    './routes/nurture-sequences.js',
     './services/autonomousAgent.js',
     './services/intelligenceAgent.js',
     './services/scheduledPostPublisher.js'

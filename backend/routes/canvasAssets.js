@@ -1,5 +1,8 @@
 import express from 'express'
 import { getOrchestrator } from '../agents/orchestrator.js'
+import { protect } from '../middleware/auth.js'
+import { URL } from 'url'
+import { safeErrorMessage } from '../utils/safeError.js';
 const router = express.Router()
 
 // ══════════════════════════════════════════════════════════════════════
@@ -7,7 +10,7 @@ const router = express.Router()
 // ══════════════════════════════════════════════════════════════════════
 
 // POST /api/canvas-assets/ai-analyze — Analyze image and return TEXT description (for reverse prompting)
-router.post('/ai-analyze', async (req, res) => {
+router.post('/ai-analyze', protect, async (req, res) => {
     try {
         const { prompt, imageBase64, imageUrl } = req.body
         if (!prompt) return res.status(400).json({ error: 'Prompt is required' })
@@ -57,12 +60,12 @@ router.post('/ai-analyze', async (req, res) => {
         res.json({ description: text })
     } catch (err) {
         console.error('AI analyze error:', err.message)
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ error: safeErrorMessage(err) })
     }
 })
 
 // POST /api/canvas-assets/ai-generate — Generate image from text prompt
-router.post('/ai-generate', async (req, res) => {
+router.post('/ai-generate', protect, async (req, res) => {
     try {
         const { prompt, size = '1024x1024' } = req.body
         if (!prompt) return res.status(400).json({ error: 'Prompt is required' })
@@ -105,12 +108,12 @@ router.post('/ai-generate', async (req, res) => {
         res.json({ imageUrl, model: 'NanoBanana 2' })
     } catch (err) {
         console.error('AI generate error:', err.message)
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ error: safeErrorMessage(err) })
     }
 })
 
 // POST /api/canvas-assets/ai-edit — Edit image with prompt (inpaint/outpaint)
-router.post('/ai-edit', async (req, res) => {
+router.post('/ai-edit', protect, async (req, res) => {
     try {
         const { prompt, imageBase64 } = req.body
         if (!prompt || !imageBase64) return res.status(400).json({ error: 'Prompt and imageBase64 required' })
@@ -162,12 +165,12 @@ router.post('/ai-edit', async (req, res) => {
         res.json({ imageUrl, model: 'NanoBanana 2' })
     } catch (err) {
         console.error('AI edit error:', err.message)
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ error: safeErrorMessage(err) })
     }
 })
 
 // POST /api/canvas-assets/ai-edit-visual — Inpaint with mask (Visual tool)
-router.post('/ai-edit-visual', async (req, res) => {
+router.post('/ai-edit-visual', protect, async (req, res) => {
     try {
         const { prompt, imageBase64, maskBase64 } = req.body
         if (!prompt || !imageBase64) return res.status(400).json({ error: 'Prompt and imageBase64 required' })
@@ -216,12 +219,12 @@ router.post('/ai-edit-visual', async (req, res) => {
         res.json({ imageUrl, model: 'Gemini Flash' })
     } catch (err) {
         console.error('AI visual edit error:', err.message)
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ error: safeErrorMessage(err) })
     }
 })
 
 // POST /api/canvas-assets/ai-retouch — Retouch/Replace masked area
-router.post('/ai-retouch', async (req, res) => {
+router.post('/ai-retouch', protect, async (req, res) => {
     try {
         const { prompt, imageBase64, maskBase64, replaceImageBase64 } = req.body
         if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' })
@@ -274,12 +277,12 @@ router.post('/ai-retouch', async (req, res) => {
         res.json({ imageUrl, model: 'Gemini Flash' })
     } catch (err) {
         console.error('AI retouch error:', err.message)
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ error: safeErrorMessage(err) })
     }
 })
 
 // POST /api/canvas-assets/ai-background — Remove or replace background
-router.post('/ai-background', async (req, res) => {
+router.post('/ai-background', protect, async (req, res) => {
     try {
         const { imageBase64, action = 'remove', bgPrompt } = req.body
         if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' })
@@ -328,12 +331,12 @@ router.post('/ai-background', async (req, res) => {
         res.json({ imageUrl, action, model: 'Gemini Flash' })
     } catch (err) {
         console.error('AI background error:', err.message)
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ error: safeErrorMessage(err) })
     }
 })
 
 // POST /api/canvas-assets/ai-copy — Generate marketing copy
-router.post('/ai-copy', async (req, res) => {
+router.post('/ai-copy', protect, async (req, res) => {
     try {
         const { prompt, brandName, brandVoice, type = 'all' } = req.body
         if (!prompt) return res.status(400).json({ error: 'Prompt is required' })
@@ -376,12 +379,12 @@ Return ONLY valid JSON (no markdown backticks) with these fields:
         res.json({ copy })
     } catch (err) {
         console.error('AI copy error:', err.message)
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ error: safeErrorMessage(err) })
     }
 })
 // ── Unsplash Photo Search Proxy ──
 // Proxies search requests to Unsplash API to keep credentials server-side
-router.get('/photos', async (req, res) => {
+router.get('/photos', protect, async (req, res) => {
     try {
         const key = process.env.UNSPLASH_ACCESS_KEY
         if (!key) {
@@ -423,12 +426,12 @@ router.get('/photos', async (req, res) => {
         })
     } catch (err) {
         console.error('Unsplash proxy error:', err.message)
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ error: safeErrorMessage(err) })
     }
 })
 
 // ── Random / Trending Photos ──
-router.get('/photos/random', async (req, res) => {
+router.get('/photos/random', protect, async (req, res) => {
     try {
         const key = process.env.UNSPLASH_ACCESS_KEY
         if (!key) return res.json({ results: [], setup_required: true })
@@ -454,12 +457,12 @@ router.get('/photos/random', async (req, res) => {
         })
     } catch (err) {
         console.error('Unsplash random error:', err.message)
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ error: safeErrorMessage(err) })
     }
 })
 
 // ── Pixabay Textures & Overlays Proxy ──
-router.get('/textures', async (req, res) => {
+router.get('/textures', protect, async (req, res) => {
     try {
         const key = process.env.PIXABAY_API_KEY
         if (!key) {
@@ -494,7 +497,7 @@ router.get('/textures', async (req, res) => {
         })
     } catch (err) {
         console.error('Pixabay proxy error:', err.message)
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ error: safeErrorMessage(err) })
     }
 })
 

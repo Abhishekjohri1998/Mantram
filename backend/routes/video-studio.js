@@ -114,7 +114,7 @@ router.post('/advanced/image-to-video', protect, requireCredits('videoGenerate')
         });
     } catch (error) {
         console.error('I2V generate error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -194,7 +194,7 @@ router.post('/extend-video', protect, requireCredits('videoGenerate'), async (re
         });
     } catch (error) {
         console.error('Video extend error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -942,7 +942,7 @@ router.post('/upload-image', protect, async (req, res) => {
         }
     } catch (err) {
         console.error('Upload image error:', err);
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -980,7 +980,7 @@ router.post('/generate-first-frame', protect, async (req, res) => {
         }
     } catch (err) {
         console.error('Generate first frame error:', err);
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 

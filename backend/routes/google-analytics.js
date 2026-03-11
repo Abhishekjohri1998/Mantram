@@ -1,6 +1,25 @@
 import { Router } from 'express';
 import { protect, optionalAuth } from '../middleware/auth.js';
 import config from '../config/env.js';
+import crypto from 'crypto';
+
+// State signing helper
+const STATE_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+
+function encodeState(data) {
+    const payload = Buffer.from(JSON.stringify(data)).toString('base64');
+    const signature = crypto.createHmac('sha256', STATE_SECRET).update(payload).digest('hex');
+    return `${payload}.${signature}`;
+}
+
+function decodeState(stateParam) {
+    if (!stateParam) throw new Error('Missing state parameter');
+    const [payload, signature] = stateParam.split('.');
+    if (!payload || !signature) throw new Error('Invalid state format');
+    const expected = crypto.createHmac('sha256', STATE_SECRET).update(payload).digest('hex');
+    if (signature !== expected) throw new Error('State signature verification failed');
+    return JSON.parse(Buffer.from(payload, 'base64').toString());
+}
 
 const router = Router();
 
@@ -93,11 +112,12 @@ async function googleAPIFetch(url, accessToken, options = {}) {
 
 // GET /api/google-analytics/connect — Start OAuth
 router.get('/connect', protect, (req, res) => {
-    const state = Buffer.from(JSON.stringify({
+    // BUG-26 FIX: Cryptographically sign the state param
+    const state = encodeState({
         userId: req.user._id,
         brandId: req.query.brandId || '',
         ts: Date.now(),
-    })).toString('base64');
+    });
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` + new URLSearchParams({
         client_id: config.google.clientId,
         redirect_uri: REDIRECT_URI,
@@ -116,7 +136,8 @@ router.get('/callback', async (req, res) => {
         const { code, state } = req.query;
         if (!code) return res.status(400).send('Missing authorization code');
 
-        const { userId, brandId } = JSON.parse(Buffer.from(state, 'base64').toString());
+        // BUG-26 FIX: Decode and verify state signature
+        const { userId, brandId } = decodeState(state);
         const tokens = await getTokensFromCode(code);
 
         if (tokens.error) {

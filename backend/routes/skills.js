@@ -5,6 +5,7 @@ import Skill from '../models/Skill.js';
 import Brand from '../models/Brand.js';
 import { seedDefaultSkills } from '../seeds/defaultSkills.js';
 import { resolveTargetMarkets, getMarketContext, getRelevantFestivals } from '../utils/globalCalendar.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -152,7 +153,7 @@ router.get('/', protect, async (req, res) => {
         res.json({ success: true, skills });
     } catch (error) {
         console.error('List skills error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -175,7 +176,7 @@ router.get('/:id', protect, async (req, res) => {
         if (!skill) return res.status(404).json({ success: false, error: 'Skill not found' });
         res.json({ success: true, skill });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -218,7 +219,7 @@ router.post('/', protect, async (req, res) => {
         res.status(201).json({ success: true, skill });
     } catch (error) {
         console.error('Create skill error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -257,7 +258,7 @@ router.put('/:id', protect, async (req, res) => {
         await skill.save();
         res.json({ success: true, skill });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -275,7 +276,7 @@ router.delete('/:id', protect, async (req, res) => {
         await skill.deleteOne();
         res.json({ success: true, message: 'Skill deleted' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -319,7 +320,7 @@ router.post('/:id/clone', protect, async (req, res) => {
 
         res.status(201).json({ success: true, skill: clone });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -346,7 +347,7 @@ router.post('/:id/rate', protect, async (req, res) => {
 
         res.json({ success: true, avgRating: skill.avgRating, ratingCount: skill.ratingCount });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -477,7 +478,7 @@ router.post('/:id/execute', protect, async (req, res) => {
         });
     } catch (error) {
         console.error('Execute skill error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -525,7 +526,7 @@ Make the skill highly specific to D2C marketing in India. Include Hinglish suppo
         res.json({ success: true, generated: parsed });
     } catch (error) {
         console.error('Generate skill error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -579,7 +580,7 @@ Rules:
         res.json({ success: true, enhanced });
     } catch (error) {
         console.error('Enhance instructions error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

@@ -393,8 +393,8 @@ router.post('/pages/:id/submit', async (req, res) => {
         });
 
         // 🤖 Automation Hook: form_submitted + entry_created (fire-and-forget)
-        runAutomationRules(funnel._id, 'form_submitted', { entryId: entry._id }).catch(() => {});
-        runAutomationRules(funnel._id, 'entry_created', { entryId: entry._id }).catch(() => {});
+        runAutomationRules(funnel._id, 'form_submitted', { entryId: entry._id }).catch(() => { });
+        runAutomationRules(funnel._id, 'entry_created', { entryId: entry._id }).catch(() => { });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -659,8 +659,8 @@ router.post('/deliver', protect, async (req, res) => {
             return res.status(400).json({ success: false, error: 'entryId, channel, and body required' });
         }
 
-        const entry = await FunnelEntry.findOne({ _id: entryId });
-        if (!entry) return res.status(404).json({ success: false, error: 'Entry not found' });
+        const entry = await FunnelEntry.findOne({ _id: entryId, user: req.user._id });
+        if (!entry) return res.status(404).json({ success: false, error: 'Entry not found or unauthorized' });
 
         const deliveryLog = {
             entryId: entry._id,
@@ -747,7 +747,7 @@ router.post('/deliver-batch', protect, async (req, res) => {
             return res.status(400).json({ success: false, error: 'funnelId, channel, and body required' });
         }
 
-        const filter = { funnel: funnelId, status: 'active' };
+        const filter = { funnel: funnelId, user: req.user._id, status: 'active' };
         if (stageName) filter.currentStage = stageName;
 
         const entries = await FunnelEntry.find(filter).limit(200);

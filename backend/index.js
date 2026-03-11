@@ -82,33 +82,39 @@ app.use(cors({
     },
     credentials: true
 }));
-// Special middleware for Shopify Webhooks to ensure raw body capture for HMAC verification
-app.use('/api/shopify/webhooks', express.raw({ type: '*/*', limit: '50mb' }), (req, res, next) => {
-    if (Buffer.isBuffer(req.body)) {
-        req.rawBody = req.body;
-        try {
-            // Attempt to parse JSON so subsequent handlers can use req.body
-            const bodyString = req.body.toString('utf8');
-            if (bodyString && (bodyString.startsWith('{') || bodyString.startsWith('['))) {
-                req.body = JSON.parse(bodyString);
+// Special middleware for Webhooks to ensure raw body capture for HMAC verification
+app.use((req, res, next) => {
+    if (req.originalUrl && (req.originalUrl.includes('/api/shopify/webhooks') || req.originalUrl.includes('/api/funnel-webhooks') || req.originalUrl.includes('/api/webhooks'))) {
+        express.raw({ type: '*/*', limit: '50mb' })(req, res, (err) => {
+            if (err) return next(err);
+            if (Buffer.isBuffer(req.body)) {
+                req.rawBody = req.body;
+                try {
+                    const bodyString = req.body.toString('utf8');
+                    if (bodyString && (bodyString.startsWith('{') || bodyString.startsWith('['))) {
+                        req.body = JSON.parse(bodyString);
+                    }
+                } catch (e) {
+                    console.warn('⚠️ Webhook body is not valid JSON, but rawBody captured');
+                }
             }
-        } catch (e) {
-            console.warn('⚠️ Webhook body is not valid JSON, but rawBody captured');
-        }
+            next();
+        });
+    } else {
+        next();
     }
-    next();
 });
 
 // Regular body parsers - Skip for webhooks to avoid interference
 app.use((req, res, next) => {
-    if (req.originalUrl && req.originalUrl.includes('/api/shopify/webhooks')) {
+    if (req.originalUrl && (req.originalUrl.includes('/api/shopify/webhooks') || req.originalUrl.includes('/api/funnel-webhooks') || req.originalUrl.includes('/api/webhooks'))) {
         return next();
     }
     express.json({ limit: '50mb' })(req, res, next);
 });
 
 app.use((req, res, next) => {
-    if (req.originalUrl && req.originalUrl.includes('/api/shopify/webhooks')) {
+    if (req.originalUrl && (req.originalUrl.includes('/api/shopify/webhooks') || req.originalUrl.includes('/api/funnel-webhooks') || req.originalUrl.includes('/api/webhooks'))) {
         return next();
     }
     express.urlencoded({ extended: true, limit: '50mb' })(req, res, next);

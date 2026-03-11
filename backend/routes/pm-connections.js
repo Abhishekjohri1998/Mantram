@@ -13,6 +13,25 @@ import { protect } from '../middleware/auth.js';
 import Integration from '../models/Integration.js';
 import config from '../config/env.js';
 import { safeErrorMessage } from '../utils/safeError.js';
+import crypto from 'crypto';
+
+// State signing helper
+const STATE_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+
+function encodeState(data) {
+    const payload = Buffer.from(JSON.stringify(data)).toString('base64');
+    const signature = crypto.createHmac('sha256', STATE_SECRET).update(payload).digest('hex');
+    return `${payload}.${signature}`;
+}
+
+function decodeState(stateParam) {
+    if (!stateParam) throw new Error('Missing state parameter');
+    const [payload, signature] = stateParam.split('.');
+    if (!payload || !signature) throw new Error('Invalid state format');
+    const expected = crypto.createHmac('sha256', STATE_SECRET).update(payload).digest('hex');
+    if (signature !== expected) throw new Error('State signature verification failed');
+    return JSON.parse(Buffer.from(payload, 'base64').toString());
+}
 
 const router = Router();
 

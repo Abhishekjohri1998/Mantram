@@ -4,13 +4,17 @@
  */
 
 import { Router } from 'express';
+import crypto from 'crypto';
+import Stripe from 'stripe';
 import Funnel from '../models/Funnel.js';
 import FunnelEntry from '../models/FunnelEntry.js';
 import Contact from '../models/Contact.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { runAutomationRules } from './funnel-automation.js';
+import config from '../config/env.js';
 
 const router = Router();
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_dummy');
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -95,7 +99,7 @@ router.post('/:webhookToken/ingest', async (req, res) => {
         });
 
         // Fire automation rules
-        runAutomationRules(funnel._id, 'entry_created', { entryId: entry._id }).catch(() => {});
+        runAutomationRules(funnel._id, 'entry_created', { entryId: entry._id }).catch(() => { });
 
         res.status(201).json({ success: true, action: 'created', entryId: entry._id });
     } catch (error) {
@@ -113,6 +117,20 @@ router.post('/:webhookToken/shopify', async (req, res) => {
         const { webhookToken } = req.params;
         const funnel = await Funnel.findOne({ webhookToken });
         if (!funnel) return res.status(404).json({ success: false, error: 'Invalid webhook token' });
+
+        // BUG-23 FIX: Verify Shopify HMAC signature
+        const hmac = req.header('x-shopify-hmac-sha256');
+        if (!hmac) return res.status(401).json({ success: false, error: 'No HMAC signature found' });
+
+        const secret = config.shopify?.clientSecret || process.env.SHOPIFY_API_SECRET;
+        if (secret) {
+            const generatedHash = crypto.createHmac('sha256', secret).update(req.rawBody || '').digest('base64');
+            if (generatedHash !== hmac) {
+                return res.status(401).json({ success: false, error: 'Invalid HMAC signature' });
+            }
+        } else {
+            console.warn('⚠️ SHOPIFY_API_SECRET not provided, skipping webhook verification for funnel ingest');
+        }
 
         const event = req.headers['x-shopify-topic'] || 'orders/create';
         const body = req.body;
@@ -153,7 +171,7 @@ router.post('/:webhookToken/shopify', async (req, res) => {
                 stageHistory: [{ stage, enteredAt: new Date(), movedBy: 'shopify_webhook' }],
                 touchpoints: [{ type: 'purchase', details: `Shopify ${event}: Order #${body.order_number || body.id}`, timestamp: new Date() }],
             });
-            runAutomationRules(funnel._id, 'entry_created', { entryId: entry._id }).catch(() => {});
+            runAutomationRules(funnel._id, 'entry_created', { entryId: entry._id }).catch(() => { });
         }
 
         res.json({ success: true, entryId: entry._id });
@@ -173,7 +191,23 @@ router.post('/:webhookToken/stripe', async (req, res) => {
         const funnel = await Funnel.findOne({ webhookToken });
         if (!funnel) return res.status(404).json({ success: false, error: 'Invalid webhook token' });
 
-        const event = req.body;
+        // BUG-24 FIX: Verify Stripe signature
+        const sig = req.headers['stripe-signature'];
+        if (!sig) return res.status(400).json({ success: false, error: 'No Stripe signature found' });
+
+        const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+        let event = req.body;
+
+        if (endpointSecret && req.rawBody) {
+            try {
+                event = stripe.webhooks.constructEvent(req.rawBody, sig, endpointSecret);
+            } catch (err) {
+                return res.status(400).send(`Webhook Error: ${err.message}`);
+            }
+        } else if (!endpointSecret) {
+            console.warn('⚠️ STRIPE_WEBHOOK_SECRET not configured, skipping verification for funnel ingest');
+        }
+
         const eventType = event.type || 'payment_intent.succeeded';
         const data = event.data?.object || {};
 
