@@ -30,6 +30,7 @@ import CreditsPage from './pages/CreditsPage'
 import VideoStudio from './pages/VideoStudio'
 import PerformanceMarketing from './pages/PerformanceMarketing'
 import D2CAnalytics from './pages/D2CAnalytics'
+import FunnelStudio from './pages/FunnelStudio'
 import BrandManagement from './pages/BrandManagement'
 import SkillsHub from './pages/SkillsHub'
 import StudioPreview from './pages/StudioPreview'
@@ -77,6 +78,7 @@ function App() {
                 <Route path="/performance-marketing" element={<ProtectedRoute><PerformanceMarketing /></ProtectedRoute>} />
                 <Route path="/d2c-analytics" element={<ProtectedRoute><D2CAnalytics /></ProtectedRoute>} />
                 <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
+                <Route path="/funnel-studio" element={<ProtectedRoute><FunnelStudio /></ProtectedRoute>} />
                 <Route path="/smart-calendar" element={<ProtectedRoute><SmartCalendar /></ProtectedRoute>} />
                 <Route path="/publish" element={<ProtectedRoute><PublishSchedule /></ProtectedRoute>} />
                 <Route path="/brainstorm" element={<ProtectedRoute><BrainstormStudio /></ProtectedRoute>} />

@@ -141,6 +141,10 @@ export default function D2CAnalytics() {
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-6 gap-3">
                 <div></div>
                 <div className="flex items-center gap-2">
+                    <button onClick={() => setTab('help')}
+                        className="px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-slate-400 text-xs font-bold hover:bg-white/[0.08] cursor-pointer transition-all flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">menu_book</span> How It Works
+                    </button>
                     <select value={days} onChange={e => setDays(parseInt(e.target.value))}
                         className="input-glass py-2 px-3 rounded-xl text-xs bg-white/[0.04] cursor-pointer">
                         <option value={7}>Last 7 days</option>
@@ -161,8 +165,12 @@ export default function D2CAnalytics() {
             {/* Agent Fidato — Competitive Intelligence */}
             <AgentFidatoPanel studio="d2c" />
 
-            {/* Loading */}
-            {loading ? (
+            {/* Help View */}
+            {tab === 'help' ? (
+                <div className="animate-fade-in">
+                    <D2CHelpView onBack={() => setTab('overview')} />
+                </div>
+            ) : loading ? (
                 <div className="flex items-center justify-center py-24 text-slate-400">
                     <span className="material-symbols-outlined animate-spin mr-3 text-3xl">progress_activity</span>
                     <span className="text-lg">Loading D2C Studio...</span>
@@ -1011,5 +1019,216 @@ export default function D2CAnalytics() {
                 </>
             )}
         </DashboardLayout>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// D2C STUDIO — Help Documentation View
+// ═══════════════════════════════════════════════════════════════
+const D2C_HELP_SECTIONS = [
+    {
+        id: 'getting-started',
+        icon: 'rocket_launch',
+        color: '#8b5cf6',
+        title: 'Getting Started',
+        subtitle: 'Connect your Shopify store and get started',
+        steps: [
+            { icon: 'storefront', title: 'Connect Shopify', description: 'Go to Integrations and connect your Shopify store. D2C Studio pulls real-time data from your store — orders, products, customers, and inventory.' },
+            { icon: 'dashboard', title: 'Overview Dashboard', description: 'Once connected, the Overview tab shows your key KPIs: Revenue, Orders, AOV, Customers, Repeat Rate, and Refund Rate. Each card is color-coded with trend indicators.' },
+            { icon: 'date_range', title: 'Time Range', description: 'Use the dropdown in the header to switch between 7, 30, 60, or 90 day views. All KPIs and insights update to reflect the selected period.' },
+            { icon: 'sync', title: 'Refresh Data', description: 'Click the Refresh button to pull the latest data from Shopify. Data is cached for performance but can be force-refreshed anytime.' },
+        ]
+    },
+    {
+        id: 'products',
+        icon: 'inventory_2',
+        color: '#06b6d4',
+        title: 'Product Intelligence',
+        subtitle: 'Product health radar & performance tracking',
+        steps: [
+            { icon: 'radar', title: 'Product Health Radar', description: 'A visual radar shows your product portfolio health. Products are plotted based on sales velocity, revenue contribution, and inventory status. Hot 🟢, Warm 🟡, Cold 🔴 classification.' },
+            { icon: 'speed', title: 'Velocity Scoring', description: 'Each product gets a velocity score based on sales frequency. High velocity = consistent sellers. Track velocity trends to identify rising and declining products.' },
+            { icon: 'trending_down', title: 'Slow Movers', description: 'Easily identify products that aren\'t selling. The Products tab highlights cold products that may need promotion, discounting, or discontinuation.' },
+            { icon: 'auto_awesome', title: 'AI Boost Plans', description: 'Click "Boost" on any product to generate an AI-powered marketing plan. The AI analyzes the product\'s data and creates a customized growth strategy.' },
+        ]
+    },
+    {
+        id: 'customers',
+        icon: 'group',
+        color: '#ec4899',
+        title: 'Customer Analytics',
+        subtitle: 'Understand your customers deeply',
+        steps: [
+            { icon: 'person', title: 'Customer Overview', description: 'See total customers, new vs returning, repeat purchase rate, and customer lifetime value metrics. Understand who your best customers are.' },
+            { icon: 'autorenew', title: 'Repeat Rate', description: 'The repeat rate KPI is one of the most important D2C metrics. Above 20% is healthy. Below that, you need retention strategies. The AI Co-Pilot can help.' },
+            { icon: 'monetization_on', title: 'AOV Analysis', description: 'Average Order Value tracking helps you understand purchasing behavior. Compare AOV across time periods to identify trends and optimize pricing.' },
+        ]
+    },
+    {
+        id: 'alerts',
+        icon: 'warning',
+        color: '#f43f5e',
+        title: 'Red Flag Alerts',
+        subtitle: 'Catch problems before they hurt your business',
+        steps: [
+            { icon: 'notification_important', title: 'Automatic Detection', description: 'D2C Studio continuously monitors your store data for anomalies: sudden revenue drops, high refund rates, inventory issues, declining repeat rates, and more.' },
+            { icon: 'priority_high', title: 'Severity Levels', description: 'Alerts are classified as High (needs immediate action), Medium (investigate soon), and Low (monitor). High severity alerts have red borders, medium amber, low green.' },
+            { icon: 'build', title: 'AI Recommendations', description: 'Each alert comes with AI-generated recommendations on how to fix the issue. These are specific, actionable steps tailored to your store\'s data.' },
+        ]
+    },
+    {
+        id: 'creative',
+        icon: 'palette',
+        color: '#f59e0b',
+        title: 'Creative Cockpit & Advanced Tabs',
+        subtitle: 'Creative performance, cohorts, and profitability',
+        steps: [
+            { icon: 'palette', title: 'Creative Cockpit', description: 'Track which product visuals and descriptions drive the most sales. Optimize your creative assets based on actual conversion data.' },
+            { icon: 'timeline', title: 'Cohort & LTV', description: 'Cohort analysis shows customer retention over time. Lifetime Value projections help you understand how much each customer is worth and optimize acquisition costs.' },
+            { icon: 'account_balance', title: 'Profitability', description: 'See your true profitability after COGS, shipping, returns, and marketing costs. Identify which products and channels are actually profitable.' },
+        ]
+    },
+    {
+        id: 'copilot',
+        icon: 'smart_toy',
+        color: '#10b981',
+        title: 'AI Co-Pilot',
+        subtitle: 'Ask anything about your store',
+        steps: [
+            { icon: 'chat', title: 'Chat Interface', description: 'The AI Co-Pilot tab opens a chat interface. Ask any question about your store: "Why did revenue drop last week?" "Which products should I discount?" "How can I improve repeat rate?"' },
+            { icon: 'auto_awesome', title: 'Data-Grounded', description: 'The Co-Pilot has access to all your store data. Its answers are grounded in your actual metrics, not generic advice. It references specific products, time periods, and customer segments.' },
+            { icon: 'lightbulb', title: 'Proactive Insights', description: 'The AI Insights panel automatically generates insights when you load the Overview. It identifies what\'s working, what\'s not, and provides an action plan without you having to ask.' },
+        ]
+    },
+]
+
+const D2C_PRO_TIPS = [
+    { icon: '📊', tip: 'Check the Overview tab daily. Revenue trends and red flags are your early warning system.' },
+    { icon: '🟢', tip: 'Focus on products with Hot health status. They\'re your money makers — double down on their promotion.' },
+    { icon: '🔄', tip: 'Repeat Rate below 20%? Use AI Co-Pilot to generate a retention strategy tailored to your data.' },
+    { icon: '🚨', tip: 'Never ignore High severity red flags. They indicate revenue-threatening issues that need immediate action.' },
+    { icon: '🚀', tip: 'Use AI Boost Plans on cold products. The AI might find untapped potential you\'re missing.' },
+    { icon: '💰', tip: 'Check Profitability tab monthly. Revenue growth means nothing if margins are shrinking.' },
+]
+
+function D2CHelpView({ onBack }) {
+    const [expanded, setExpanded] = useState('getting-started')
+    return (
+        <div>
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                    <button onClick={onBack} className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                    </button>
+                    <div>
+                        <h2 className="text-white font-bold text-lg flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary">menu_book</span> D2C Studio Guide
+                        </h2>
+                        <p className="text-sm text-slate-500">Master Shopify intelligence and grow your D2C brand</p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'linear-gradient(135deg, #8b5cf608, #06b6d408, #ec489808)' }}>
+                <h3 className="text-white font-bold mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-primary">info</span> What is D2C Studio?</h3>
+                <p className="text-slate-400 text-sm leading-relaxed mb-4">
+                    D2C Studio is your <strong className="text-white">Shopify intelligence hub</strong>.
+                    It connects to your store and provides <strong className="text-white">real-time KPIs</strong>, a <strong className="text-white">product health radar</strong>,
+                    <strong className="text-white"> customer analytics</strong>, <strong className="text-white">automated red flag alerts</strong>,
+                    and an <strong className="text-white">AI Co-Pilot</strong> that knows your data.
+                    From revenue tracking to profitability analysis, everything is AI-powered and brand-aware.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                    {['Shopify Connected', 'Real-time KPIs', 'Product Radar', 'Customer Insights', 'Red Flag Alerts', 'AI Co-Pilot', 'Cohort & LTV', 'Profitability'].map(t => (
+                        <span key={t} className="px-3 py-1 rounded-full text-xs font-bold bg-white/[0.04] border border-white/[0.06] text-slate-400">{t}</span>
+                    ))}
+                </div>
+            </div>
+
+            <div className="glass-panel rounded-2xl p-5 mb-6">
+                <h3 className="text-white font-bold mb-4 text-sm flex items-center gap-2">
+                    <span className="material-symbols-outlined text-amber-400 text-lg">account_tree</span> Typical Workflow
+                </h3>
+                <div className="flex items-center gap-0 overflow-x-auto pb-2">
+                    {[
+                        { label: 'Connect Store', icon: 'storefront', color: '#8b5cf6' },
+                        { label: 'Check KPIs', icon: 'dashboard', color: '#06b6d4' },
+                        { label: 'Review Alerts', icon: 'warning', color: '#f43f5e' },
+                        { label: 'Analyze Products', icon: 'inventory_2', color: '#f59e0b' },
+                        { label: 'Ask AI', icon: 'smart_toy', color: '#10b981' },
+                        { label: 'Take Action', icon: 'rocket_launch', color: '#ec4899' },
+                    ].map((step, idx, arr) => (
+                        <div key={step.label} className="flex items-center shrink-0">
+                            <div className="flex flex-col items-center gap-1.5 w-20">
+                                <div className="size-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${step.color}15` }}>
+                                    <span className="material-symbols-outlined text-lg" style={{ color: step.color }}>{step.icon}</span>
+                                </div>
+                                <p className="text-xs text-slate-400 text-center leading-tight font-medium">{step.label}</p>
+                            </div>
+                            {idx < arr.length - 1 && <span className="material-symbols-outlined text-slate-700 text-sm mx-1 shrink-0">chevron_right</span>}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="space-y-3 mb-6">
+                {D2C_HELP_SECTIONS.map(section => (
+                    <div key={section.id} className="glass-panel rounded-2xl overflow-hidden">
+                        <button onClick={() => setExpanded(expanded === section.id ? null : section.id)}
+                            className="w-full flex items-center gap-3 p-5 text-left hover:bg-white/[0.02] transition-all cursor-pointer">
+                            <div className="size-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${section.color}15` }}>
+                                <span className="material-symbols-outlined" style={{ color: section.color }}>{section.icon}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-white font-bold text-sm">{section.title}</p>
+                                <p className="text-slate-500 text-xs">{section.subtitle}</p>
+                            </div>
+                            <span className="text-xs text-slate-600 font-bold mr-1">{section.steps.length} topics</span>
+                            <span className={`material-symbols-outlined text-slate-500 transition-transform ${expanded === section.id ? 'rotate-180' : ''}`}>expand_more</span>
+                        </button>
+                        {expanded === section.id && (
+                            <div className="px-5 pb-5 space-y-3 border-t border-white/[0.04] pt-4">
+                                {section.steps.map((step, idx) => (
+                                    <div key={idx} className="flex gap-3">
+                                        <div className="flex flex-col items-center">
+                                            <div className="size-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${section.color}10` }}>
+                                                <span className="material-symbols-outlined text-sm" style={{ color: section.color }}>{step.icon}</span>
+                                            </div>
+                                            {idx < section.steps.length - 1 && <div className="w-px flex-1 mt-1" style={{ backgroundColor: `${section.color}20` }} />}
+                                        </div>
+                                        <div className="pb-3">
+                                            <p className="text-white font-bold text-sm mb-0.5">{step.title}</p>
+                                            <p className="text-slate-400 text-xs leading-relaxed">{step.description}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+
+            <div className="glass-panel rounded-2xl p-6" style={{ background: 'linear-gradient(135deg, #f59e0b08, #ef444408)' }}>
+                <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-amber-400">emoji_objects</span> Pro Tips
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {D2C_PRO_TIPS.map((tip, idx) => (
+                        <div key={idx} className="flex gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                            <span className="text-lg shrink-0 mt-0.5">{tip.icon}</span>
+                            <p className="text-xs text-slate-400 leading-relaxed">{tip.tip}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="text-center mt-6 py-6">
+                <p className="text-slate-500 text-sm mb-3">Ready to grow?</p>
+                <button onClick={onBack} className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-purple-500 text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2 mx-auto">
+                    <span className="material-symbols-outlined text-sm">dashboard</span> Go to Dashboard
+                </button>
+            </div>
+        </div>
     )
 }

@@ -596,3 +596,82 @@ export const payments = {
         }),
 };
 
+// ============ Funnel Studio API ============
+export const funnelStudio = {
+    // Templates
+    templates: () => apiFetch('/funnel-studio/templates'),
+
+    // Funnel CRUD
+    list: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/funnel-studio?${query}`);
+    },
+    get: (id) => apiFetch(`/funnel-studio/${id}`),
+    create: (data) => apiFetch('/funnel-studio', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id, data) => apiFetch(`/funnel-studio/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id) => apiFetch(`/funnel-studio/${id}`, { method: 'DELETE' }),
+
+    // Entries (Pipeline)
+    entries: (funnelId, params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/funnel-studio/${funnelId}/entries?${query}`);
+    },
+    addEntry: (funnelId, data) => apiFetch(`/funnel-studio/${funnelId}/entries`, { method: 'POST', body: JSON.stringify(data) }),
+    updateEntry: (funnelId, entryId, data) => apiFetch(`/funnel-studio/${funnelId}/entries/${entryId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    moveEntry: (funnelId, entryId, toStage) => apiFetch(`/funnel-studio/${funnelId}/entries/${entryId}/move`, { method: 'PUT', body: JSON.stringify({ toStage }) }),
+    deleteEntry: (funnelId, entryId) => apiFetch(`/funnel-studio/${funnelId}/entries/${entryId}`, { method: 'DELETE' }),
+
+    // Analytics
+    analytics: (funnelId) => apiFetch(`/funnel-studio/${funnelId}/analytics`),
+
+    // AI
+    aiGenerate: (data) => apiFetch('/funnel-studio/ai/generate', { method: 'POST', body: JSON.stringify(data) }),
+
+    // Phase 2: Builder + Studio Connections
+    duplicate: (id) => apiFetch(`/funnel-studio/${id}/duplicate`, { method: 'POST' }),
+    importContacts: (funnelId, data) => apiFetch(`/funnel-studio/${funnelId}/import-contacts`, { method: 'POST', body: JSON.stringify(data) }),
+    aiSuggestions: (funnelId) => apiFetch(`/funnel-studio/${funnelId}/ai-suggestions`, { method: 'POST' }),
+};
+
+// ── Nurture Sequences ──
+export const nurtureSequences = {
+    list: (funnelId) => apiFetch(`/nurture-sequences?funnelId=${funnelId}`),
+    get: (id) => apiFetch(`/nurture-sequences/${id}`),
+    create: (data) => apiFetch('/nurture-sequences', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id, data) => apiFetch(`/nurture-sequences/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id) => apiFetch(`/nurture-sequences/${id}`, { method: 'DELETE' }),
+    aiGenerate: (data) => apiFetch('/nurture-sequences/ai/generate', { method: 'POST', body: JSON.stringify(data) }),
+    aiStepContent: (data) => apiFetch('/nurture-sequences/ai/generate-step-content', { method: 'POST', body: JSON.stringify(data) }),
+    preview: (id) => apiFetch(`/nurture-sequences/${id}/preview`, { method: 'POST' }),
+    toggle: (id) => apiFetch(`/nurture-sequences/${id}/toggle`, { method: 'POST' }),
+};
+
+// ── Funnel Intelligence (Phase 4) ──
+export const funnelIntelligence = {
+    // AI Lead Scoring
+    scoreEntries: (funnelId) => apiFetch(`/funnel-intelligence/${funnelId}/score-entries`, { method: 'POST' }),
+    // Funnel Health
+    health: (funnelId) => apiFetch(`/funnel-intelligence/${funnelId}/health`),
+    // Landing Pages
+    listPages: (funnelId) => apiFetch(`/funnel-intelligence/pages?funnelId=${funnelId}`),
+    getPage: (id) => apiFetch(`/funnel-intelligence/pages/${id}`),
+    createPage: (data) => apiFetch('/funnel-intelligence/pages', { method: 'POST', body: JSON.stringify(data) }),
+    updatePage: (id, data) => apiFetch(`/funnel-intelligence/pages/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deletePage: (id) => apiFetch(`/funnel-intelligence/pages/${id}`, { method: 'DELETE' }),
+    aiGeneratePage: (data) => apiFetch('/funnel-intelligence/pages/ai/generate', { method: 'POST', body: JSON.stringify(data) }),
+};
+
+// ── Funnel Automation Engine ──
+export const funnelAutomation = {
+    list: (funnelId) => apiFetch(`/funnel-automation?funnelId=${funnelId}`),
+    get: (id) => apiFetch(`/funnel-automation/${id}`),
+    create: (data) => apiFetch('/funnel-automation', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id, data) => apiFetch(`/funnel-automation/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id) => apiFetch(`/funnel-automation/${id}`, { method: 'DELETE' }),
+    toggle: (id) => apiFetch(`/funnel-automation/${id}/toggle`, { method: 'POST' }),
+    run: (data) => apiFetch('/funnel-automation/run', { method: 'POST', body: JSON.stringify(data) }),
+    runInactivity: (data) => apiFetch('/funnel-automation/run-inactivity', { method: 'POST', body: JSON.stringify(data) }),
+    aiGenerate: (data) => apiFetch('/funnel-automation/ai/generate', { method: 'POST', body: JSON.stringify(data) }),
+    executeSuggestion: (data) => apiFetch('/funnel-automation/execute-suggestion', { method: 'POST', body: JSON.stringify(data) }),
+    scoreEntry: (data) => apiFetch('/funnel-automation/score-entry', { method: 'POST', body: JSON.stringify(data) }),
+};

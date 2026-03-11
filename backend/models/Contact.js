@@ -40,6 +40,9 @@ const contactSchema = new mongoose.Schema({
         status: { type: String, enum: ['active', 'completed', 'dropped'] },
     }],
 
+    // Funnel references
+    funnelIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Funnel' }],
+
     // Opt-out
     optedOut: { type: Boolean, default: false },
 

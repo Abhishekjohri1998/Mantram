@@ -43,6 +43,10 @@ import intelMissionRoutes from './routes/intelMissions.js';
 import paymentRoutes from './routes/payments.js';
 import waitlistRoutes from './routes/waitlist.js';
 import skillsRoutes from './routes/skills.js';
+import funnelStudioRoutes from './routes/funnel-studio.js';
+import nurtureSequenceRoutes from './routes/nurture-sequences.js';
+import funnelIntelligenceRoutes from './routes/funnel-intelligence.js';
+import funnelAutomationRoutes from './routes/funnel-automation.js';
 
 const app = express();
 
@@ -174,6 +178,10 @@ app.use('/api/nexus', nexusRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/waitlist', waitlistRoutes);
 app.use('/api/skills', skillsRoutes);
+app.use('/api/funnel-studio', funnelStudioRoutes);
+app.use('/api/nurture-sequences', nurtureSequenceRoutes);
+app.use('/api/funnel-intelligence', funnelIntelligenceRoutes);
+app.use('/api/funnel-automation', funnelAutomationRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -1,0 +1,2728 @@
+import { useState, useEffect, useCallback } from 'react'
+import DashboardLayout from '../components/DashboardLayout'
+import SEOHead from '../components/SEOHead'
+import { useBrand } from '../context/BrandContext'
+import { funnelStudio as api, nurtureSequences as nurtureApi, funnelIntelligence as intelApi, funnelAutomation as autoApi } from '../services/api'
+
+// ═══════════════════════════════════════════════════════════════
+// FUNNEL STUDIO — Dashboard + Pipeline Kanban + Funnel Builder
+// ═══════════════════════════════════════════════════════════════
+
+const STAGE_TYPE_COLORS = {
+    awareness: '#6366f1',
+    interest: '#8b5cf6',
+    consideration: '#f59e0b',
+    decision: '#ef4444',
+    retention: '#10b981',
+    custom: '#64748b',
+}
+
+const SOURCE_ICONS = {
+    ad: 'campaign', seo: 'search', social: 'share', dm: 'chat', direct: 'link',
+    referral: 'group', email: 'email', shopify: 'storefront', manual: 'person_add', other: 'more_horiz',
+}
+
+const STATUS_STYLES = {
+    active: { color: '#10b981', bg: 'rgba(16,185,129,0.1)', label: '● Active' },
+    converted: { color: '#6366f1', bg: 'rgba(99,102,241,0.1)', label: '★ Converted' },
+    lost: { color: '#ef4444', bg: 'rgba(239,68,68,0.1)', label: '✕ Lost' },
+    paused: { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', label: '⏸ Paused' },
+}
+
+export default function FunnelStudio() {
+    const { activeBrand: currentBrand } = useBrand()
+    const [view, setView] = useState('dashboard') // 'dashboard' | 'pipeline' | 'builder' | 'analytics'
+    const [funnels, setFunnels] = useState([])
+    const [templates, setTemplates] = useState([])
+    const [selectedFunnel, setSelectedFunnel] = useState(null)
+    const [entriesByStage, setEntriesByStage] = useState({})
+    const [analytics, setAnalytics] = useState(null)
+    const [loading, setLoading] = useState(false)
+    const [creatingTemplate, setCreatingTemplate] = useState(null)
+    const [showAddEntry, setShowAddEntry] = useState(false)
+    const [showAIModal, setShowAIModal] = useState(false)
+    const [showImportModal, setShowImportModal] = useState(false)
+    const [suggestions, setSuggestions] = useState(null)
+    const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+    const [duplicating, setDuplicating] = useState(null)
+    const [nurtureSequencesData, setNurtureSequencesData] = useState([])
+    const [showNurtureBuilder, setShowNurtureBuilder] = useState(false)
+    const [nurtureLoading, setNurtureLoading] = useState(false)
+    const [healthData, setHealthData] = useState(null)
+    const [healthLoading, setHealthLoading] = useState(false)
+    const [scoringResult, setScoringResult] = useState(null)
+    const [scoringLoading, setScoringLoading] = useState(false)
+    const [landingPages, setLandingPages] = useState([])
+    const [pagesLoading, setPagesLoading] = useState(false)
+
+    // Automation engine state
+    const [automationRules, setAutomationRules] = useState([])
+    const [autoLoading, setAutoLoading] = useState(false)
+    const [autoRunning, setAutoRunning] = useState(false)
+    const [autoGenerating, setAutoGenerating] = useState(false)
+
+    // ── Fetch data ──
+    const fetchFunnels = useCallback(async () => {
+        if (!currentBrand?._id) return
+        setLoading(true)
+        try {
+            const data = await api.list({ brandId: currentBrand._id })
+            setFunnels(data.funnels || [])
+        } catch { }
+        finally { setLoading(false) }
+    }, [currentBrand])
+
+    const fetchTemplates = useCallback(async () => {
+        try {
+            const data = await api.templates()
+            setTemplates(data.templates || [])
+        } catch { }
+    }, [])
+
+    useEffect(() => { fetchTemplates() }, [fetchTemplates])
+    useEffect(() => { fetchFunnels() }, [fetchFunnels])
+
+    const openFunnel = async (funnel) => {
+        try {
+            const data = await api.get(funnel._id)
+            setSelectedFunnel(data.funnel)
+            setEntriesByStage(data.entriesByStage || {})
+            setView('pipeline')
+        } catch { }
+    }
+
+    const openAnalytics = async (funnel) => {
+        try {
+            const [fData, aData] = await Promise.all([
+                api.get(funnel._id),
+                api.analytics(funnel._id),
+            ])
+            setSelectedFunnel(fData.funnel)
+            setAnalytics(aData.analytics)
+            setView('analytics')
+        } catch { }
+    }
+
+    const createFromTemplate = async (templateId) => {
+        if (!currentBrand?._id) return
+        setCreatingTemplate(templateId)
+        try {
+            const data = await api.create({ brandId: currentBrand._id, templateId })
+            if (data.funnel) {
+                await fetchFunnels()
+                openFunnel(data.funnel)
+            }
+        } catch (err) { alert(err.message) }
+        finally { setCreatingTemplate(null) }
+    }
+
+    const deleteFunnel = async (id, e) => {
+        e.stopPropagation()
+        if (!confirm('Delete this funnel and all its entries?')) return
+        try {
+            await api.delete(id)
+            if (selectedFunnel?._id === id) { setSelectedFunnel(null); setView('dashboard') }
+            await fetchFunnels()
+        } catch { }
+    }
+
+    const toggleFunnelStatus = async (id, currentStatus, e) => {
+        e.stopPropagation()
+        const newStatus = currentStatus === 'active' ? 'paused' : 'active'
+        try {
+            await api.update(id, { status: newStatus })
+            await fetchFunnels()
+        } catch { }
+    }
+
+    const duplicateFunnel = async (id, e) => {
+        e.stopPropagation()
+        setDuplicating(id)
+        try {
+            const data = await api.duplicate(id)
+            if (data.funnel) { await fetchFunnels(); openFunnel(data.funnel) }
+        } catch (err) { alert(err.message) }
+        finally { setDuplicating(null) }
+    }
+
+    const importContacts = async (formData) => {
+        if (!selectedFunnel) return
+        try {
+            const data = await api.importContacts(selectedFunnel._id, formData)
+            alert(`Imported ${data.imported} contacts!`)
+            const refreshed = await api.get(selectedFunnel._id)
+            setSelectedFunnel(refreshed.funnel)
+            setEntriesByStage(refreshed.entriesByStage || {})
+            setShowImportModal(false)
+        } catch (err) { alert(err.message) }
+    }
+
+    const fetchSuggestions = async () => {
+        if (!selectedFunnel) return
+        setLoadingSuggestions(true)
+        try {
+            const data = await api.aiSuggestions(selectedFunnel._id)
+            setSuggestions(data.suggestions || [])
+        } catch { }
+        finally { setLoadingSuggestions(false) }
+    }
+
+    const saveBuilderStages = async (newStages) => {
+        if (!selectedFunnel) return
+        try {
+            const data = await api.update(selectedFunnel._id, { stages: newStages })
+            setSelectedFunnel(data.funnel)
+        } catch (err) { alert(err.message) }
+    }
+
+    // ── Nurture Sequences ──
+    const fetchNurtureSequences = async (funnelId) => {
+        if (!funnelId) return
+        setNurtureLoading(true)
+        try {
+            const data = await nurtureApi.list(funnelId)
+            setNurtureSequencesData(data.sequences || [])
+        } catch { }
+        finally { setNurtureLoading(false) }
+    }
+
+    const createNurtureSequence = async (data) => {
+        try {
+            const result = await nurtureApi.create(data)
+            if (result.sequence) {
+                setNurtureSequencesData(prev => [...prev, result.sequence])
+            }
+            return result
+        } catch (err) { alert(err.message) }
+    }
+
+    const aiGenerateNurture = async (data) => {
+        try {
+            const result = await nurtureApi.aiGenerate(data)
+            if (result.sequence) {
+                setNurtureSequencesData(prev => [...prev, result.sequence])
+            }
+            return result
+        } catch (err) { alert(err.message) }
+    }
+
+    const updateNurtureSequence = async (id, data) => {
+        try {
+            const result = await nurtureApi.update(id, data)
+            if (result.sequence) {
+                setNurtureSequencesData(prev => prev.map(s => s._id === id ? result.sequence : s))
+            }
+            return result
+        } catch (err) { alert(err.message) }
+    }
+
+    const deleteNurtureSequence = async (id) => {
+        if (!confirm('Delete this nurture sequence?')) return
+        try {
+            await nurtureApi.delete(id)
+            setNurtureSequencesData(prev => prev.filter(s => s._id !== id))
+        } catch (err) { alert(err.message) }
+    }
+
+    const toggleNurtureSequence = async (id) => {
+        try {
+            const result = await nurtureApi.toggle(id)
+            if (result.sequence) {
+                setNurtureSequencesData(prev => prev.map(s => s._id === id ? result.sequence : s))
+            }
+        } catch (err) { alert(err.message) }
+    }
+
+    // ── Phase 4: Intelligence ──
+    const fetchHealth = async (funnelId) => {
+        setHealthLoading(true)
+        try {
+            const data = await intelApi.health(funnelId)
+            setHealthData(data.health)
+        } catch { }
+        finally { setHealthLoading(false) }
+    }
+
+    const runScoring = async () => {
+        if (!selectedFunnel) return
+        setScoringLoading(true)
+        try {
+            const data = await intelApi.scoreEntries(selectedFunnel._id)
+            setScoringResult(data)
+            // Refresh entries
+            const refreshed = await api.get(selectedFunnel._id)
+            setSelectedFunnel(refreshed.funnel)
+            setEntriesByStage(refreshed.entriesByStage || {})
+        } catch { }
+        finally { setScoringLoading(false) }
+    }
+
+    const fetchLandingPages = async (funnelId) => {
+        setPagesLoading(true)
+        try {
+            const data = await intelApi.listPages(funnelId)
+            setLandingPages(data.pages || [])
+        } catch { }
+        finally { setPagesLoading(false) }
+    }
+
+    const createLandingPage = async (data) => {
+        try {
+            const result = await intelApi.createPage(data)
+            if (result.page) setLandingPages(prev => [...prev, result.page])
+            return result
+        } catch (err) { alert(err.message) }
+    }
+
+    const aiGeneratePage = async (data) => {
+        try {
+            const result = await intelApi.aiGeneratePage(data)
+            if (result.page) setLandingPages(prev => [...prev, result.page])
+            return result
+        } catch (err) { alert(err.message) }
+    }
+
+    const deleteLandingPage = async (id) => {
+        if (!confirm('Delete this landing page?')) return
+        try {
+            await intelApi.deletePage(id)
+            setLandingPages(prev => prev.filter(p => p._id !== id))
+        } catch (err) { alert(err.message) }
+    }
+
+    // ── Automation Engine ──
+    const fetchAutomationRules = async (funnelId) => {
+        setAutoLoading(true)
+        try {
+            const data = await autoApi.list(funnelId)
+            setAutomationRules(data.rules || [])
+        } catch { }
+        finally { setAutoLoading(false) }
+    }
+
+    const createAutomationRule = async (data) => {
+        try {
+            const result = await autoApi.create(data)
+            if (result.rule) setAutomationRules(prev => [...prev, result.rule])
+            return result
+        } catch (err) { alert(err.message) }
+    }
+
+    const deleteAutomationRule = async (id) => {
+        if (!confirm('Delete this automation rule?')) return
+        try {
+            await autoApi.delete(id)
+            setAutomationRules(prev => prev.filter(r => r._id !== id))
+        } catch (err) { alert(err.message) }
+    }
+
+    const toggleAutomationRule = async (id) => {
+        try {
+            const result = await autoApi.toggle(id)
+            if (result.rule) setAutomationRules(prev => prev.map(r => r._id === id ? result.rule : r))
+        } catch (err) { alert(err.message) }
+    }
+
+    const aiGenerateRules = async (prompt) => {
+        if (!selectedFunnel) return
+        setAutoGenerating(true)
+        try {
+            const result = await autoApi.aiGenerate({ funnelId: selectedFunnel._id, prompt })
+            if (result.rules) setAutomationRules(prev => [...prev, ...result.rules])
+            return result
+        } catch (err) { alert(err.message) }
+        finally { setAutoGenerating(false) }
+    }
+
+    const runAllAutomations = async () => {
+        if (!selectedFunnel) return
+        setAutoRunning(true)
+        try {
+            const result = await autoApi.run({ funnelId: selectedFunnel._id, triggerType: 'manual' })
+            alert(`Executed ${result.executed} automation actions!`)
+            // Refresh entries
+            const refreshed = await api.get(selectedFunnel._id)
+            setSelectedFunnel(refreshed.funnel)
+            setEntriesByStage(refreshed.entriesByStage || {})
+        } catch (err) { alert(err.message) }
+        finally { setAutoRunning(false) }
+    }
+
+    const addEntry = async (formData) => {
+        if (!selectedFunnel) return
+        try {
+            await api.addEntry(selectedFunnel._id, formData)
+            const data = await api.get(selectedFunnel._id)
+            setSelectedFunnel(data.funnel)
+            setEntriesByStage(data.entriesByStage || {})
+            setShowAddEntry(false)
+        } catch (err) { alert(err.message) }
+    }
+
+    const moveEntry = async (entryId, toStage) => {
+        if (!selectedFunnel) return
+        try {
+            await api.moveEntry(selectedFunnel._id, entryId, toStage)
+            const data = await api.get(selectedFunnel._id)
+            setSelectedFunnel(data.funnel)
+            setEntriesByStage(data.entriesByStage || {})
+        } catch { }
+    }
+
+    const updateEntryStatus = async (entryId, status) => {
+        if (!selectedFunnel) return
+        try {
+            await api.updateEntry(selectedFunnel._id, entryId, { status })
+            const data = await api.get(selectedFunnel._id)
+            setSelectedFunnel(data.funnel)
+            setEntriesByStage(data.entriesByStage || {})
+        } catch { }
+    }
+
+    const deleteEntry = async (entryId) => {
+        if (!selectedFunnel || !confirm('Remove this entry?')) return
+        try {
+            await api.deleteEntry(selectedFunnel._id, entryId)
+            const data = await api.get(selectedFunnel._id)
+            setSelectedFunnel(data.funnel)
+            setEntriesByStage(data.entriesByStage || {})
+        } catch { }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // BUILDER VIEW
+    // ═══════════════════════════════════════════════════════════
+    if (view === 'builder' && selectedFunnel) {
+        return (
+            <DashboardLayout title="Funnel Builder" subtitle={selectedFunnel.name}>
+                <SEOHead title={`Edit ${selectedFunnel.name} — Funnel Studio`} noIndex={true} />
+                <FunnelBuilderView
+                    funnel={selectedFunnel}
+                    onSave={async (updatedFunnel) => {
+                        setSelectedFunnel(updatedFunnel)
+                        await fetchFunnels()
+                    }}
+                    onBack={() => setView('pipeline')}
+                    saveStages={saveBuilderStages}
+                />
+            </DashboardLayout>
+        )
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // NURTURE VIEW
+    // ═══════════════════════════════════════════════════════════
+    if (view === 'nurture' && selectedFunnel) {
+        return (
+            <DashboardLayout title="Nurture Sequences" subtitle={selectedFunnel.name}>
+                <SEOHead title={`Nurture — ${selectedFunnel.name}`} noIndex={true} />
+                <NurtureView
+                    funnel={selectedFunnel}
+                    sequences={nurtureSequencesData}
+                    loading={nurtureLoading}
+                    onBack={() => setView('pipeline')}
+                    onCreate={createNurtureSequence}
+                    onAIGenerate={aiGenerateNurture}
+                    onUpdate={updateNurtureSequence}
+                    onDelete={deleteNurtureSequence}
+                    onToggle={toggleNurtureSequence}
+                    onRefresh={() => fetchNurtureSequences(selectedFunnel._id)}
+                />
+            </DashboardLayout>
+        )
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // HEALTH DASHBOARD VIEW
+    // ═══════════════════════════════════════════════════════════
+    if (view === 'health' && selectedFunnel) {
+        return (
+            <DashboardLayout title="Funnel Health" subtitle={selectedFunnel.name}>
+                <SEOHead title={`Health — ${selectedFunnel.name}`} noIndex={true} />
+                <HealthDashboardView
+                    funnel={selectedFunnel}
+                    health={healthData}
+                    loading={healthLoading}
+                    scoringResult={scoringResult}
+                    scoringLoading={scoringLoading}
+                    onBack={() => setView('pipeline')}
+                    onRefresh={() => fetchHealth(selectedFunnel._id)}
+                    onRunScoring={runScoring}
+                />
+            </DashboardLayout>
+        )
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // LANDING PAGES VIEW
+    // ═══════════════════════════════════════════════════════════
+    if (view === 'pages' && selectedFunnel) {
+        return (
+            <DashboardLayout title="Landing Pages" subtitle={selectedFunnel.name}>
+                <SEOHead title={`Pages — ${selectedFunnel.name}`} noIndex={true} />
+                <LandingPagesView
+                    funnel={selectedFunnel}
+                    pages={landingPages}
+                    loading={pagesLoading}
+                    onBack={() => setView('pipeline')}
+                    onRefresh={() => fetchLandingPages(selectedFunnel._id)}
+                    onCreate={createLandingPage}
+                    onAIGenerate={aiGeneratePage}
+                    onDelete={deleteLandingPage}
+                />
+            </DashboardLayout>
+        )
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // AUTOMATIONS VIEW
+    // ═══════════════════════════════════════════════════════════
+    if (view === 'automations' && selectedFunnel) {
+        return (
+            <DashboardLayout title="Automations" subtitle={selectedFunnel.name}>
+                <SEOHead title={`Automations — ${selectedFunnel.name}`} noIndex={true} />
+                <AutomationView
+                    funnel={selectedFunnel}
+                    rules={automationRules}
+                    loading={autoLoading}
+                    running={autoRunning}
+                    generating={autoGenerating}
+                    onBack={() => setView('pipeline')}
+                    onRefresh={() => fetchAutomationRules(selectedFunnel._id)}
+                    onCreate={createAutomationRule}
+                    onDelete={deleteAutomationRule}
+                    onToggle={toggleAutomationRule}
+                    onAIGenerate={aiGenerateRules}
+                    onRunAll={runAllAutomations}
+                />
+            </DashboardLayout>
+        )
+    }
+
+    // ANALYTICS VIEW
+    // ═══════════════════════════════════════════════════════════
+    if (view === 'analytics' && selectedFunnel && analytics) {
+        return (
+            <DashboardLayout title="Funnel Analytics" subtitle={selectedFunnel.name}>
+                <SEOHead title="Funnel Analytics — Mantram AI" noIndex={true} />
+                <div className="flex items-center gap-3 mb-6">
+                    <button onClick={() => { setView('dashboard'); setAnalytics(null) }}
+                        className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                    </button>
+                    <div>
+                        <h2 className="text-white font-bold text-lg">{selectedFunnel.name}</h2>
+                        <p className="text-sm text-slate-500">Conversion Analytics</p>
+                    </div>
+                </div>
+
+                {/* Overview Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                    {[
+                        { label: 'Total Entries', value: analytics.overview.totalEntries, icon: 'people', color: '#6366f1' },
+                        { label: 'Active', value: analytics.overview.activeEntries, icon: 'directions_run', color: '#f59e0b' },
+                        { label: 'Converted', value: analytics.overview.convertedEntries, icon: 'check_circle', color: '#10b981' },
+                        { label: 'Lost', value: analytics.overview.lostEntries, icon: 'cancel', color: '#ef4444' },
+                        { label: 'Conversion Rate', value: `${analytics.overview.conversionRate}%`, icon: 'trending_up', color: '#8b5cf6' },
+                        { label: 'Revenue', value: `₹${(analytics.overview.totalRevenue || 0).toLocaleString()}`, icon: 'payments', color: '#10b981' },
+                    ].map((card) => (
+                        <div key={card.label} className="glass-panel rounded-xl p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="material-symbols-outlined text-sm" style={{ color: card.color }}>{card.icon}</span>
+                                <span className="text-xs text-slate-500 uppercase tracking-widest font-bold">{card.label}</span>
+                            </div>
+                            <p className="text-2xl font-bold text-white">{card.value}</p>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Stage Funnel Visualization */}
+                <div className="glass-panel rounded-2xl p-6 mb-8">
+                    <h3 className="text-white font-bold mb-6 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary">filter_alt</span> Stage Breakdown
+                    </h3>
+                    <div className="space-y-3">
+                        {analytics.stages.map((stage, idx) => {
+                            const maxEver = Math.max(...analytics.stages.map(s => s.everEntered), 1)
+                            const barWidth = Math.max(8, (stage.everEntered / maxEver) * 100)
+                            return (
+                                <div key={stage.stageName} className="flex items-center gap-4">
+                                    <div className="w-32 shrink-0 text-right">
+                                        <p className="text-sm text-white font-bold">{stage.stageName}</p>
+                                        <p className="text-xs text-slate-500">{stage.everEntered} entered</p>
+                                    </div>
+                                    <div className="flex-1 h-10 bg-white/[0.02] rounded-lg overflow-hidden relative">
+                                        <div className="h-full rounded-lg transition-all duration-700 flex items-center px-3"
+                                            style={{ width: `${barWidth}%`, backgroundColor: `${stage.stageColor}30`, borderLeft: `3px solid ${stage.stageColor}` }}>
+                                            <span className="text-sm font-bold" style={{ color: stage.stageColor }}>{stage.currentCount} active</span>
+                                        </div>
+                                    </div>
+                                    <div className="w-24 shrink-0">
+                                        {idx > 0 && (
+                                            <span className={`text-sm font-bold ${stage.dropOffRate > 50 ? 'text-rose-400' : stage.dropOffRate > 25 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                                ↓ {stage.dropOffRate}% drop
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+
+                {/* Source Breakdown */}
+                {analytics.sourceBreakdown?.length > 0 && (
+                    <div className="glass-panel rounded-2xl p-6">
+                        <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary">donut_large</span> Traffic Sources
+                        </h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                            {analytics.sourceBreakdown.map(s => (
+                                <div key={s.source} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                                    <span className="material-symbols-outlined text-primary text-sm">{SOURCE_ICONS[s.source] || 'help'}</span>
+                                    <div>
+                                        <p className="text-sm text-white font-bold capitalize">{s.source}</p>
+                                        <p className="text-xs text-slate-500">{s.count} entries</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </DashboardLayout>
+        )
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // PIPELINE VIEW (Kanban Board)
+    // ═══════════════════════════════════════════════════════════
+    if (view === 'pipeline' && selectedFunnel) {
+        const stages = selectedFunnel.stages || []
+        return (
+            <DashboardLayout title="Pipeline" subtitle={selectedFunnel.name}>
+                <SEOHead title={`${selectedFunnel.name} — Funnel Studio`} noIndex={true} />
+                {/* Header */}
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                        <button onClick={() => { setView('dashboard'); setSelectedFunnel(null) }}
+                            className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
+                            <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                        </button>
+                        <div className="size-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${selectedFunnel.color || '#6366f1'}20` }}>
+                            <span className="material-symbols-outlined" style={{ color: selectedFunnel.color || '#6366f1' }}>{selectedFunnel.icon || 'filter_alt'}</span>
+                        </div>
+                        <div>
+                            <h2 className="text-white font-bold text-lg">{selectedFunnel.name}</h2>
+                            <p className="text-sm text-slate-500">{stages.length} stages · {Object.values(entriesByStage).flat().length} active entries</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => setView('builder')}
+                            className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">build</span> Edit
+                        </button>
+                        <button onClick={() => setShowImportModal(true)}
+                            className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">download</span> Import
+                        </button>
+                        <button onClick={() => { fetchNurtureSequences(selectedFunnel._id); setView('nurture') }}
+                            className="px-4 py-2 rounded-xl text-sm font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-500/[0.06] hover:bg-emerald-500/[0.1] border border-emerald-500/10 transition-all cursor-pointer flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">mail</span> Nurture
+                        </button>
+                        <button onClick={() => { fetchHealth(selectedFunnel._id); setView('health') }}
+                            className="px-4 py-2 rounded-xl text-sm font-bold text-cyan-400 hover:text-cyan-300 bg-cyan-500/[0.06] hover:bg-cyan-500/[0.1] border border-cyan-500/10 transition-all cursor-pointer flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">health_and_safety</span> Health
+                        </button>
+                        <button onClick={() => { fetchLandingPages(selectedFunnel._id); setView('pages') }}
+                            className="px-4 py-2 rounded-xl text-sm font-bold text-violet-400 hover:text-violet-300 bg-violet-500/[0.06] hover:bg-violet-500/[0.1] border border-violet-500/10 transition-all cursor-pointer flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">web</span> Pages
+                        </button>
+                        <button onClick={() => openAnalytics(selectedFunnel)}
+                            className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">analytics</span> Analytics
+                        </button>
+                        <button onClick={() => { fetchAutomationRules(selectedFunnel._id); setView('automations') }}
+                            className="px-4 py-2 rounded-xl text-sm font-bold text-orange-400 hover:text-orange-300 bg-orange-500/[0.06] hover:bg-orange-500/[0.1] border border-orange-500/10 transition-all cursor-pointer flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">bolt</span> Automations
+                        </button>
+                        <button onClick={() => { fetchSuggestions() }}
+                            className="px-4 py-2 rounded-xl text-sm font-bold text-amber-400 hover:text-amber-300 bg-amber-500/[0.06] hover:bg-amber-500/[0.1] border border-amber-500/10 transition-all cursor-pointer flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Tips
+                        </button>
+                        <button onClick={() => setShowAddEntry(true)}
+                            className="px-5 py-2.5 rounded-xl text-sm font-bold btn-primary flex items-center gap-1.5 cursor-pointer">
+                            <span className="material-symbols-outlined text-sm">person_add</span> Add Entry
+                        </button>
+                    </div>
+                </div>
+
+                {/* Kanban Columns */}
+                <div className="flex gap-4 overflow-x-auto pb-4" style={{ minHeight: '60vh' }}>
+                    {stages.map((stage) => {
+                        const stageEntries = entriesByStage[stage.name] || []
+                        return (
+                            <div key={stage._id || stage.name} className="flex-shrink-0 w-72">
+                                {/* Column Header */}
+                                <div className="flex items-center justify-between mb-3 px-1">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: stage.color }} />
+                                        <h3 className="text-sm font-bold text-white">{stage.name}</h3>
+                                        <span className="text-xs px-1.5 py-0.5 rounded-md bg-white/[0.06] text-slate-400 font-bold">{stageEntries.length}</span>
+                                    </div>
+                                </div>
+
+                                {/* Cards */}
+                                <div className="space-y-2 min-h-[200px] p-2 rounded-xl bg-white/[0.01] border border-white/[0.04]"
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={(e) => {
+                                        const entryId = e.dataTransfer.getData('entryId')
+                                        if (entryId) moveEntry(entryId, stage.name)
+                                    }}>
+                                    {stageEntries.map(entry => (
+                                        <div key={entry._id} draggable
+                                            onDragStart={(e) => e.dataTransfer.setData('entryId', entry._id)}
+                                            className="group glass-panel rounded-xl p-3 cursor-grab active:cursor-grabbing hover:border-primary/20 transition-all">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <div className="size-8 rounded-full bg-gradient-to-br from-primary/30 to-purple-500/30 flex items-center justify-center text-xs font-bold text-white shrink-0">
+                                                        {(entry.name || '?')[0].toUpperCase()}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm text-white font-bold truncate">{entry.name || 'Unknown'}</p>
+                                                        {entry.email && <p className="text-xs text-slate-500 truncate">{entry.email}</p>}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                                    <button onClick={() => updateEntryStatus(entry._id, 'converted')} title="Mark Converted"
+                                                        className="size-6 rounded-md flex items-center justify-center text-emerald-400 hover:bg-emerald-500/10 cursor-pointer">
+                                                        <span className="material-symbols-outlined text-xs">check_circle</span>
+                                                    </button>
+                                                    <button onClick={() => updateEntryStatus(entry._id, 'lost')} title="Mark Lost"
+                                                        className="size-6 rounded-md flex items-center justify-center text-rose-400 hover:bg-rose-500/10 cursor-pointer">
+                                                        <span className="material-symbols-outlined text-xs">cancel</span>
+                                                    </button>
+                                                    <button onClick={() => deleteEntry(entry._id)} title="Delete"
+                                                        className="size-6 rounded-md flex items-center justify-center text-slate-500 hover:bg-white/[0.06] cursor-pointer">
+                                                        <span className="material-symbols-outlined text-xs">delete</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Score bar */}
+                                            <div className="flex items-center gap-2 mb-1.5">
+                                                <div className="flex-1 h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                                                    <div className="h-full rounded-full transition-all" style={{
+                                                        width: `${entry.score || 0}%`,
+                                                        backgroundColor: entry.score > 70 ? '#10b981' : entry.score > 40 ? '#f59e0b' : '#64748b',
+                                                    }} />
+                                                </div>
+                                                <span className="text-xs text-slate-500 font-bold shrink-0">{entry.score || 0}</span>
+                                            </div>
+
+                                            {/* Tags & Source */}
+                                            <div className="flex flex-wrap gap-1">
+                                                {entry.source && entry.source !== 'manual' && (
+                                                    <span className="px-1.5 py-0.5 rounded text-xs bg-primary/10 text-primary font-medium flex items-center gap-0.5">
+                                                        <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>{SOURCE_ICONS[entry.source] || 'help'}</span>
+                                                        {entry.source}
+                                                    </span>
+                                                )}
+                                                {entry.company && (
+                                                    <span className="px-1.5 py-0.5 rounded text-xs bg-white/[0.06] text-slate-400">{entry.company}</span>
+                                                )}
+                                            </div>
+
+                                            {/* Stage move arrows */}
+                                            <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                {stages.map((s, sIdx) => {
+                                                    if (s.name === stage.name) return null
+                                                    return (
+                                                        <button key={s.name} onClick={() => moveEntry(entry._id, s.name)} title={`Move to ${s.name}`}
+                                                            className="px-1.5 py-0.5 rounded text-xs font-medium hover:bg-white/[0.06] transition-all cursor-pointer text-slate-500 hover:text-white truncate max-w-[60px]">
+                                                            → {s.name}
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {stageEntries.length === 0 && (
+                                        <div className="text-center py-8 text-slate-600">
+                                            <span className="material-symbols-outlined text-2xl mb-1">inbox</span>
+                                            <p className="text-xs">No entries</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+
+                {/* AI Suggestions Panel */}
+                {(suggestions || loadingSuggestions) && (
+                    <AISuggestionsPanel suggestions={suggestions} loading={loadingSuggestions} onClose={() => setSuggestions(null)} />
+                )}
+
+                {/* Add Entry Modal */}
+                {showAddEntry && <AddEntryModal stages={stages} onSubmit={addEntry} onClose={() => setShowAddEntry(false)} />}
+                {showImportModal && <ImportContactsModal stages={stages} onImport={importContacts} onClose={() => setShowImportModal(false)} />}
+            </DashboardLayout>
+        )
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // HELP / DOCUMENTATION VIEW
+    // ═══════════════════════════════════════════════════════════
+    if (view === 'help') {
+        return (
+            <DashboardLayout title="Funnel Studio Guide" subtitle="Learn how to use funnels">
+                <SEOHead title="Help — Funnel Studio" noIndex={true} />
+                <HelpDocumentationView onBack={() => setView('dashboard')} />
+            </DashboardLayout>
+        )
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // DASHBOARD VIEW (Default)
+    // ═══════════════════════════════════════════════════════════
+    return (
+        <DashboardLayout title="Funnel Studio" subtitle="Build and manage your sales funnels">
+            <SEOHead title="Funnel Studio — Mantram AI" noIndex={true} />
+
+            {/* Template Gallery Header */}
+            <div className="mb-8">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary">auto_awesome</span>
+                        <h2 className="text-white font-bold text-lg">Create Funnel</h2>
+                        <span className="text-sm text-slate-500">Choose a template or use AI</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => setView('help')}
+                            className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">help</span> How It Works
+                        </button>
+                        <button onClick={() => setShowAIModal(true)}
+                            className="px-5 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-purple-500 text-white flex items-center gap-2 cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all">
+                            <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Generate
+                        </button>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                    {templates.map(t => (
+                        <button key={t.id} onClick={() => createFromTemplate(t.id)} disabled={creatingTemplate === t.id}
+                            className="text-left glass-panel rounded-2xl p-5 hover:border-primary/20 hover:bg-primary/[0.02] transition-all cursor-pointer group disabled:opacity-50">
+                            <div className="size-12 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"
+                                style={{ backgroundColor: `${t.color}20` }}>
+                                <span className="material-symbols-outlined text-xl" style={{ color: t.color }}>{t.icon}</span>
+                            </div>
+                            <p className="text-white font-bold text-sm mb-1">{t.name}</p>
+                            <p className="text-slate-500 text-xs leading-relaxed line-clamp-2">{t.description}</p>
+                            <div className="flex items-center gap-2 mt-3 text-xs text-slate-600">
+                                <span>{t.stages.length} stages</span>
+                            </div>
+                            {creatingTemplate === t.id && (
+                                <div className="flex items-center gap-1.5 mt-2 text-primary text-xs">
+                                    <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                                    Creating...
+                                </div>
+                            )}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Funnels List */}
+            <div>
+                <div className="flex items-center gap-2 mb-4">
+                    <span className="material-symbols-outlined text-slate-400">list_alt</span>
+                    <h2 className="text-white font-bold text-lg">Your Funnels</h2>
+                    <span className="text-sm text-slate-500">{funnels.length} total</span>
+                </div>
+
+                {loading ? (
+                    <div className="flex items-center justify-center h-32">
+                        <span className="material-symbols-outlined text-primary text-3xl animate-spin">progress_activity</span>
+                    </div>
+                ) : funnels.length === 0 ? (
+                    <div className="glass-panel rounded-2xl p-12 text-center">
+                        <span className="material-symbols-outlined text-6xl text-slate-700 mb-4">filter_alt</span>
+                        <p className="text-white font-bold text-lg mb-1">No funnels yet</p>
+                        <p className="text-slate-500 text-sm">Pick a template above or use AI to create your first sales funnel.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {funnels.map(f => {
+                            const statusStyle = STATUS_STYLES[f.status] || STATUS_STYLES.active
+                            return (
+                                <div key={f._id} onClick={() => openFunnel(f)}
+                                    className="glass-panel rounded-2xl p-5 hover:border-primary/20 hover:bg-primary/[0.02] transition-all cursor-pointer group">
+                                    {/* Top Row */}
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="size-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${f.color}20` }}>
+                                                <span className="material-symbols-outlined text-lg" style={{ color: f.color }}>{f.icon || 'filter_alt'}</span>
+                                            </div>
+                                            <div>
+                                                <p className="text-white font-bold text-sm">{f.name}</p>
+                                                <p className="text-xs text-slate-500">{f.stages?.length || 0} stages</p>
+                                            </div>
+                                        </div>
+                                        <span className="px-2.5 py-1 rounded-lg text-xs font-bold" style={{ backgroundColor: statusStyle.bg, color: statusStyle.color }}>
+                                            {statusStyle.label}
+                                        </span>
+                                    </div>
+
+                                    {/* Stage Preview */}
+                                    <div className="flex items-center gap-1 mb-4">
+                                        {(f.stages || []).map((s, idx) => (
+                                            <div key={idx} className="flex items-center gap-1">
+                                                <div className="h-1.5 rounded-full flex-1 min-w-[24px]" style={{ backgroundColor: `${s.color}60` }} />
+                                                {idx < (f.stages.length - 1) && <span className="text-slate-700 text-xs">›</span>}
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Metrics Row */}
+                                    <div className="grid grid-cols-4 gap-2 text-center mb-3">
+                                        <div>
+                                            <p className="text-lg font-bold text-white">{f.metrics?.totalEntries || 0}</p>
+                                            <p className="text-xs text-slate-600 uppercase">Total</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-lg font-bold text-white">{f.metrics?.activeEntries || 0}</p>
+                                            <p className="text-xs text-slate-600 uppercase">Active</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-lg font-bold text-emerald-400">{f.metrics?.convertedEntries || 0}</p>
+                                            <p className="text-xs text-slate-600 uppercase">Won</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-lg font-bold text-primary">{f.metrics?.conversionRate || 0}%</p>
+                                            <p className="text-xs text-slate-600 uppercase">CVR</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Actions */}
+                                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={(e) => { e.stopPropagation(); openAnalytics(f) }}
+                                            className="flex-1 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer flex items-center justify-center gap-1">
+                                            <span className="material-symbols-outlined text-xs">analytics</span> Analytics
+                                        </button>
+                                        <button onClick={(e) => duplicateFunnel(f._id, e)} disabled={duplicating === f._id}
+                                            className="flex-1 py-1.5 rounded-lg text-xs font-bold text-primary hover:bg-primary/10 transition-all cursor-pointer flex items-center justify-center gap-1 disabled:opacity-50">
+                                            {duplicating === f._id ? '...' : <><span className="material-symbols-outlined text-xs">content_copy</span> Clone</>}
+                                        </button>
+                                        <button onClick={(e) => toggleFunnelStatus(f._id, f.status, e)}
+                                            className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${f.status === 'active'
+                                                ? 'text-amber-400 hover:bg-amber-500/10' : 'text-emerald-400 hover:bg-emerald-500/10'}`}>
+                                            {f.status === 'active' ? '⏸ Pause' : '▶ Activate'}
+                                        </button>
+                                        <button onClick={(e) => deleteFunnel(f._id, e)}
+                                            className="size-8 rounded-lg flex items-center justify-center text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer">
+                                            <span className="material-symbols-outlined text-sm">delete</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
+            </div>
+
+            {/* AI Generate Modal */}
+            {showAIModal && <AIGenerateModal brandId={currentBrand?._id} onCreated={(f) => { fetchFunnels(); openFunnel(f); setShowAIModal(false) }} onClose={() => setShowAIModal(false)} />}
+        </DashboardLayout>
+    )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ADD ENTRY MODAL
+// ═══════════════════════════════════════════════════════════════
+function AddEntryModal({ stages, onSubmit, onClose }) {
+    const [name, setName] = useState('')
+    const [email, setEmail] = useState('')
+    const [phone, setPhone] = useState('')
+    const [company, setCompany] = useState('')
+    const [source, setSource] = useState('manual')
+    const [score, setScore] = useState(0)
+    const [stage, setStage] = useState(stages[0]?.name || '')
+
+    return (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+            <div style={{ background: '#1e293b', borderRadius: '16px', border: '1px solid #334155', width: '480px', maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+                <div style={{ padding: '1.25rem', borderBottom: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                        <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '1rem', fontWeight: 700 }}>Add Entry to Funnel</h3>
+                        <p style={{ color: '#64748b', margin: '0.2rem 0 0', fontSize: '0.7rem' }}>Add a new lead or contact to this funnel</p>
+                    </div>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
+                </div>
+                <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                    {[
+                        { label: 'Name', value: name, onChange: setName, placeholder: 'Lead name', type: 'text' },
+                        { label: 'Email', value: email, onChange: setEmail, placeholder: 'email@example.com', type: 'email' },
+                        { label: 'Phone', value: phone, onChange: setPhone, placeholder: '+91 98765 43210', type: 'tel' },
+                        { label: 'Company', value: company, onChange: setCompany, placeholder: 'Company name', type: 'text' },
+                    ].map(f => (
+                        <div key={f.label}>
+                            <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>{f.label}</label>
+                            <input type={f.type} value={f.value} onChange={e => f.onChange(e.target.value)} placeholder={f.placeholder}
+                                style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.55rem 0.7rem', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }} />
+                        </div>
+                    ))}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                        <div>
+                            <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Source</label>
+                            <select value={source} onChange={e => setSource(e.target.value)}
+                                style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.55rem 0.7rem', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none' }}>
+                                {['manual', 'ad', 'seo', 'social', 'dm', 'direct', 'referral', 'email', 'shopify', 'other'].map(s => (
+                                    <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Stage</label>
+                            <select value={stage} onChange={e => setStage(e.target.value)}
+                                style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.55rem 0.7rem', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none' }}>
+                                {stages.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Lead Score: {score}</label>
+                        <input type="range" min={0} max={100} value={score} onChange={e => setScore(parseInt(e.target.value))}
+                            style={{ width: '100%', accentColor: '#6366f1' }} />
+                    </div>
+                    <button onClick={() => onSubmit({ name, email, phone, company, source, score, stage })}
+                        style={{ width: '100%', padding: '0.7rem', background: '#6366f1', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>
+                        Add Entry
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AI GENERATE FUNNEL MODAL
+// ═══════════════════════════════════════════════════════════════
+function AIGenerateModal({ brandId, onCreated, onClose }) {
+    const [prompt, setPrompt] = useState('')
+    const [generating, setGenerating] = useState(false)
+
+    const handleGenerate = async () => {
+        if (!prompt.trim()) return
+        setGenerating(true)
+        try {
+            const data = await api.aiGenerate({ brandId, prompt })
+            if (data.funnel) onCreated(data.funnel)
+        } catch (err) { alert(err.message) }
+        finally { setGenerating(false) }
+    }
+
+    return (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+            <div style={{ background: '#1e293b', borderRadius: '16px', border: '1px solid #334155', width: '520px', maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+                <div style={{ padding: '1.25rem', borderBottom: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                        <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '1rem', fontWeight: 700 }}>✨ AI Funnel Architect</h3>
+                        <p style={{ color: '#64748b', margin: '0.2rem 0 0', fontSize: '0.7rem' }}>Describe your goal and AI will design the perfect funnel</p>
+                    </div>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
+                </div>
+                <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div>
+                        <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>What do you want to achieve?</label>
+                        <textarea value={prompt} onChange={e => setPrompt(e.target.value)}
+                            placeholder="e.g. I'm launching a new organic skincare line for Gen Z women. Create a funnel to generate leads through Instagram, nurture them with educational content about clean beauty, and convert them to first-time buyers with a launch discount."
+                            rows={5}
+                            style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '10px', padding: '0.75rem', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none', resize: 'none', boxSizing: 'border-box', lineHeight: 1.5 }} />
+                    </div>
+
+                    {/* Suggestion chips */}
+                    <div>
+                        <p style={{ color: '#64748b', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.4rem' }}>Quick Ideas:</p>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                            {[
+                                'SaaS free trial to paid conversion',
+                                'E-commerce product launch with influencers',
+                                'Course launch with webinar + email nurture',
+                                'B2B lead gen through LinkedIn + content',
+                                'App downloads through social ads + referrals',
+                            ].map(idea => (
+                                <button key={idea} onClick={() => setPrompt(idea)}
+                                    style={{ padding: '0.35rem 0.6rem', background: '#6366f110', border: '1px solid #6366f130', borderRadius: '8px', color: '#a5b4fc', fontSize: '0.7rem', cursor: 'pointer' }}>
+                                    {idea}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <button onClick={handleGenerate} disabled={generating || !prompt.trim()}
+                        style={{ width: '100%', padding: '0.75rem', background: generating ? '#4b5563' : 'linear-gradient(to right, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 700, fontSize: '0.85rem', cursor: generating ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                        {generating ? (
+                            <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Generating funnel...</>
+                        ) : (
+                            <><span className="material-symbols-outlined text-sm">auto_awesome</span> Generate Funnel with AI</>
+                        )}
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FUNNEL BUILDER VIEW — Edit stages, configure studio links
+// ═══════════════════════════════════════════════════════════════
+const STUDIO_OPTIONS = [
+    { key: 'contentStudio', label: 'Content Studio', icon: 'edit_note', color: '#6366f1' },
+    { key: 'creativeStudio', label: 'Creative Studio', icon: 'auto_fix_high', color: '#8b5cf6' },
+    { key: 'conversationStudio', label: 'Conversation Studio', icon: 'forum', color: '#10b981' },
+    { key: 'seoStudio', label: 'SEO Studio', icon: 'travel_explore', color: '#f59e0b' },
+    { key: 'performanceMarketing', label: 'Performance Studio', icon: 'monitoring', color: '#ef4444' },
+    { key: 'videoStudio', label: 'Video Studio', icon: 'movie', color: '#ec4899' },
+]
+
+const STAGE_COLORS = ['#6366f1', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981', '#ec4899', '#14b8a6', '#f97316', '#64748b']
+
+function FunnelBuilderView({ funnel, onBack, saveStages }) {
+    const [stages, setStages] = useState(funnel.stages?.map(s => ({ ...s })) || [])
+    const [editingIdx, setEditingIdx] = useState(null)
+    const [saving, setSaving] = useState(false)
+    const [dragIdx, setDragIdx] = useState(null)
+
+    const addStage = () => {
+        setStages(prev => [...prev, {
+            name: `Stage ${prev.length + 1}`,
+            order: prev.length,
+            type: 'custom',
+            color: STAGE_COLORS[prev.length % STAGE_COLORS.length],
+            description: '',
+            studioLinks: [],
+        }])
+        setEditingIdx(stages.length)
+    }
+
+    const removeStage = (idx) => {
+        if (stages.length <= 2) return alert('Funnel must have at least 2 stages')
+        setStages(prev => prev.filter((_, i) => i !== idx).map((s, i) => ({ ...s, order: i })))
+        setEditingIdx(null)
+    }
+
+    const updateStage = (idx, field, value) => {
+        setStages(prev => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s))
+    }
+
+    const toggleStudioLink = (idx, studioKey) => {
+        setStages(prev => prev.map((s, i) => {
+            if (i !== idx) return s
+            const links = s.studioLinks || []
+            const exists = links.find(l => l.studio === studioKey)
+            return {
+                ...s,
+                studioLinks: exists
+                    ? links.filter(l => l.studio !== studioKey)
+                    : [...links, { studio: studioKey, action: 'generate' }],
+            }
+        }))
+    }
+
+    const handleDragStart = (idx) => setDragIdx(idx)
+    const handleDragOver = (e, idx) => { e.preventDefault() }
+    const handleDrop = (idx) => {
+        if (dragIdx === null || dragIdx === idx) return
+        const newStages = [...stages]
+        const [moved] = newStages.splice(dragIdx, 1)
+        newStages.splice(idx, 0, moved)
+        setStages(newStages.map((s, i) => ({ ...s, order: i })))
+        setDragIdx(null)
+    }
+
+    const handleSave = async () => {
+        setSaving(true)
+        try {
+            await saveStages(stages)
+        } catch { }
+        finally { setSaving(false) }
+    }
+
+    return (
+        <div>
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                    <button onClick={onBack}
+                        className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                    </button>
+                    <div>
+                        <h2 className="text-white font-bold text-lg">Edit Funnel Stages</h2>
+                        <p className="text-sm text-slate-500">Drag to reorder · Click to configure · Link Mantram studios</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button onClick={addStage}
+                        className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">add</span> Add Stage
+                    </button>
+                    <button onClick={handleSave} disabled={saving}
+                        className="px-5 py-2.5 rounded-xl text-sm font-bold btn-primary flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
+                        {saving ? <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Saving...</>
+                            : <><span className="material-symbols-outlined text-sm">check</span> Save</>}
+                    </button>
+                </div>
+            </div>
+
+            {/* Stage Flow Preview */}
+            <div className="flex items-center gap-1 mb-6 px-2 overflow-x-auto">
+                {stages.map((s, idx) => (
+                    <div key={idx} className="flex items-center gap-1">
+                        <div className="px-3 py-1.5 rounded-lg text-xs font-bold text-white" style={{ backgroundColor: `${s.color}40`, borderBottom: `2px solid ${s.color}` }}>
+                            {s.name}
+                        </div>
+                        {idx < stages.length - 1 && <span className="text-slate-600 text-sm">→</span>}
+                    </div>
+                ))}
+            </div>
+
+            {/* Stage Cards */}
+            <div className="space-y-3">
+                {stages.map((stage, idx) => {
+                    const isEditing = editingIdx === idx
+                    return (
+                        <div key={idx} draggable onDragStart={() => handleDragStart(idx)} onDragOver={(e) => handleDragOver(e, idx)} onDrop={() => handleDrop(idx)}
+                            className={`glass-panel rounded-2xl p-5 transition-all cursor-grab active:cursor-grabbing ${isEditing ? 'border-primary/30 bg-primary/[0.02]' : ''}`}
+                            onClick={() => setEditingIdx(isEditing ? null : idx)}>
+                            {/* Stage Header */}
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-1 text-slate-600">
+                                        <span className="material-symbols-outlined text-sm cursor-grab">drag_indicator</span>
+                                        <span className="text-xs font-bold">{idx + 1}</span>
+                                    </div>
+                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: stage.color }} />
+                                    {isEditing ? (
+                                        <input type="text" value={stage.name} onClick={e => e.stopPropagation()}
+                                            onChange={e => updateStage(idx, 'name', e.target.value)}
+                                            className="bg-transparent border-b border-primary/40 text-white font-bold text-sm outline-none px-1 py-0.5" />
+                                    ) : (
+                                        <h3 className="text-white font-bold text-sm">{stage.name}</h3>
+                                    )}
+                                    <span className="px-2 py-0.5 rounded text-xs bg-white/[0.06] text-slate-500 capitalize">{stage.type}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-sm text-slate-600">{isEditing ? 'expand_less' : 'expand_more'}</span>
+                                    <button onClick={(e) => { e.stopPropagation(); removeStage(idx) }} title="Remove stage"
+                                        className="size-7 rounded-md flex items-center justify-center text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer">
+                                        <span className="material-symbols-outlined text-sm">close</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Expanded Edit Panel */}
+                            {isEditing && (
+                                <div className="space-y-4 mt-4 pt-4 border-t border-white/[0.06]" onClick={e => e.stopPropagation()}>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs text-slate-500 font-bold uppercase mb-1">Type</label>
+                                            <select value={stage.type} onChange={e => updateStage(idx, 'type', e.target.value)}
+                                                style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.5rem', color: '#e2e8f0', fontSize: '0.8rem', outline: 'none' }}>
+                                                {['awareness', 'interest', 'consideration', 'decision', 'retention', 'custom'].map(t =>
+                                                    <option key={t} value={t}>{t[0].toUpperCase() + t.slice(1)}</option>
+                                                )}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-slate-500 font-bold uppercase mb-1">Color</label>
+                                            <div className="flex gap-1.5 flex-wrap">
+                                                {STAGE_COLORS.map(c => (
+                                                    <button key={c} onClick={() => updateStage(idx, 'color', c)}
+                                                        className={`size-6 rounded-full transition-all cursor-pointer ${stage.color === c ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-900 scale-110' : 'hover:scale-110'}`}
+                                                        style={{ backgroundColor: c }} />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-slate-500 font-bold uppercase mb-1">Description</label>
+                                        <textarea value={stage.description || ''} onChange={e => updateStage(idx, 'description', e.target.value)}
+                                            rows={2} placeholder="What happens at this stage?"
+                                            style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.5rem', color: '#e2e8f0', fontSize: '0.8rem', outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
+                                    </div>
+
+                                    {/* Studio Links */}
+                                    <div>
+                                        <label className="block text-xs text-slate-500 font-bold uppercase mb-2">
+                                            <span className="material-symbols-outlined text-xs align-middle mr-1">link</span>
+                                            Connected Studios
+                                        </label>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                            {STUDIO_OPTIONS.map(studio => {
+                                                const isLinked = (stage.studioLinks || []).some(l => l.studio === studio.key)
+                                                return (
+                                                    <button key={studio.key} onClick={() => toggleStudioLink(idx, studio.key)}
+                                                        className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${isLinked
+                                                            ? 'border-primary/30 bg-primary/[0.06] text-white'
+                                                            : 'border-white/[0.06] bg-transparent text-slate-500 hover:bg-white/[0.04]'}`}>
+                                                        <span className="material-symbols-outlined text-sm" style={{ color: isLinked ? studio.color : '#64748b' }}>{studio.icon}</span>
+                                                        {studio.label}
+                                                        {isLinked && <span className="material-symbols-outlined text-xs text-emerald-400 ml-auto">check_circle</span>}
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )
+                })}
+            </div>
+        </div>
+    )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// IMPORT CONTACTS MODAL
+// ═══════════════════════════════════════════════════════════════
+function ImportContactsModal({ stages, onImport, onClose }) {
+    const [leadStatus, setLeadStatus] = useState('')
+    const [platform, setPlatform] = useState('')
+    const [stage, setStage] = useState(stages[0]?.name || '')
+    const [maxImport, setMaxImport] = useState(50)
+    const [importing, setImporting] = useState(false)
+
+    const handleImport = async () => {
+        setImporting(true)
+        try {
+            await onImport({ leadStatus: leadStatus || undefined, platform: platform || undefined, stage, maxImport })
+        } catch { }
+        finally { setImporting(false) }
+    }
+
+    return (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+            <div style={{ background: '#1e293b', borderRadius: '16px', border: '1px solid #334155', width: '460px', maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+                <div style={{ padding: '1.25rem', borderBottom: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                        <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '1rem', fontWeight: 700 }}>📥 Import Contacts</h3>
+                        <p style={{ color: '#64748b', margin: '0.2rem 0 0', fontSize: '0.7rem' }}>Pull existing CRM contacts into this funnel</p>
+                    </div>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
+                </div>
+                <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                    <div>
+                        <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Filter by Lead Status</label>
+                        <select value={leadStatus} onChange={e => setLeadStatus(e.target.value)}
+                            style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.55rem 0.7rem', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none' }}>
+                            <option value="">All statuses</option>
+                            {['new', 'warm', 'hot', 'cold', 'converted'].map(s => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Filter by Platform</label>
+                        <select value={platform} onChange={e => setPlatform(e.target.value)}
+                            style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.55rem 0.7rem', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none' }}>
+                            <option value="">All platforms</option>
+                            {['instagram', 'facebook', 'whatsapp', 'email', 'website'].map(p => <option key={p} value={p}>{p[0].toUpperCase() + p.slice(1)}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Enter at Stage</label>
+                        <select value={stage} onChange={e => setStage(e.target.value)}
+                            style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.55rem 0.7rem', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none' }}>
+                            {stages.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Max Contacts: {maxImport}</label>
+                        <input type="range" min={10} max={200} step={10} value={maxImport} onChange={e => setMaxImport(parseInt(e.target.value))}
+                            style={{ width: '100%', accentColor: '#6366f1' }} />
+                    </div>
+                    <button onClick={handleImport} disabled={importing}
+                        style={{ width: '100%', padding: '0.7rem', background: importing ? '#4b5563' : '#6366f1', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 700, fontSize: '0.85rem', cursor: importing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                        {importing ? <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Importing...</>
+                            : <><span className="material-symbols-outlined text-sm">download</span> Import up to {maxImport} contacts</>}
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AI SUGGESTIONS PANEL
+// ═══════════════════════════════════════════════════════════════
+const SUGGESTION_STYLES = {
+    warning: { icon: 'warning', color: '#ef4444', bg: 'rgba(239,68,68,0.06)' },
+    opportunity: { icon: 'lightbulb', color: '#f59e0b', bg: 'rgba(245,158,11,0.06)' },
+    quick_win: { icon: 'bolt', color: '#10b981', bg: 'rgba(16,185,129,0.06)' },
+    automation: { icon: 'smart_toy', color: '#6366f1', bg: 'rgba(99,102,241,0.06)' },
+}
+
+function AISuggestionsPanel({ suggestions, loading, onClose }) {
+    return (
+        <div className="mt-6 glass-panel rounded-2xl p-5 border-amber-500/10">
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-amber-400">auto_awesome</span>
+                    <h3 className="text-white font-bold text-sm">AI Optimization Tips</h3>
+                </div>
+                <button onClick={onClose} className="size-7 rounded-md flex items-center justify-center text-slate-500 hover:bg-white/[0.06] cursor-pointer">
+                    <span className="material-symbols-outlined text-sm">close</span>
+                </button>
+            </div>
+            {loading ? (
+                <div className="flex items-center gap-2 py-6 justify-center text-slate-500">
+                    <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                    Analyzing your funnel...
+                </div>
+            ) : !suggestions?.length ? (
+                <p className="text-slate-500 text-sm text-center py-4">No suggestions available</p>
+            ) : (
+                <div className="space-y-3">
+                    {suggestions.map((s, idx) => {
+                        const style = SUGGESTION_STYLES[s.type] || SUGGESTION_STYLES.opportunity
+                        const studioInfo = STUDIO_OPTIONS.find(st => st.key === s.studioLink)
+                        return (
+                            <div key={idx} className="flex gap-3 p-3 rounded-xl border border-white/[0.04]" style={{ backgroundColor: style.bg }}>
+                                <span className="material-symbols-outlined text-lg shrink-0 mt-0.5" style={{ color: style.color }}>{s.icon || style.icon}</span>
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                        <p className="text-sm text-white font-bold">{s.title}</p>
+                                        <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${s.priority === 'high' ? 'bg-rose-500/10 text-rose-400'
+                                            : s.priority === 'medium' ? 'bg-amber-500/10 text-amber-400' : 'bg-slate-500/10 text-slate-400'}`}>
+                                            {s.priority}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-slate-400 leading-relaxed">{s.description}</p>
+                                    {studioInfo && (
+                                        <div className="flex items-center gap-1 mt-1.5 text-xs text-slate-500">
+                                            <span className="material-symbols-outlined text-xs" style={{ color: studioInfo.color }}>{studioInfo.icon}</span>
+                                            Use {studioInfo.label}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NURTURE VIEW — Manage multi-channel nurture sequences per stage
+// ═══════════════════════════════════════════════════════════════
+const CHANNEL_META = {
+    dm: { icon: 'chat', label: 'DM', color: '#6366f1' },
+    email: { icon: 'mail', label: 'Email', color: '#f59e0b' },
+    sms: { icon: 'sms', label: 'SMS', color: '#10b981' },
+    whatsapp: { icon: 'chat_bubble', label: 'WhatsApp', color: '#25d366' },
+    push_notification: { icon: 'notifications', label: 'Push', color: '#ef4444' },
+    internal_task: { icon: 'task_alt', label: 'Task', color: '#8b5cf6' },
+}
+
+const TRIGGER_LABELS = {
+    stage_enter: 'When lead enters stage',
+    stage_exit: 'When lead exits stage',
+    manual: 'Manual trigger',
+    score_threshold: 'Score reaches threshold',
+    time_in_stage: 'Time spent in stage',
+}
+
+function NurtureView({ funnel, sequences, loading, onBack, onCreate, onAIGenerate, onUpdate, onDelete, onToggle, onRefresh }) {
+    const [aiGenStage, setAiGenStage] = useState(null)
+    const [aiPrompt, setAiPrompt] = useState('')
+    const [aiChannels, setAiChannels] = useState(['dm', 'email'])
+    const [generating, setGenerating] = useState(false)
+    const [expandedSeq, setExpandedSeq] = useState(null)
+    const [showCreate, setShowCreate] = useState(null) // stageName to create for
+
+    const stages = funnel.stages || []
+
+    const handleAiGenerate = async () => {
+        if (!aiGenStage) return
+        setGenerating(true)
+        try {
+            await onAIGenerate({
+                funnelId: funnel._id,
+                triggerStage: aiGenStage,
+                prompt: aiPrompt || undefined,
+                channels: aiChannels,
+            })
+            setAiGenStage(null)
+            setAiPrompt('')
+        } catch { }
+        finally { setGenerating(false) }
+    }
+
+    const handleQuickCreate = async (stageName) => {
+        await onCreate({
+            funnelId: funnel._id,
+            name: `${stageName} Nurture`,
+            triggerStage: stageName,
+            triggerEvent: 'stage_enter',
+            steps: [
+                { name: 'Welcome', channel: 'dm', delay: { value: 0, unit: 'hours' }, content: `Hi {{name}}! Thanks for your interest.`, contentType: 'text' },
+                { name: 'Follow Up', channel: 'email', delay: { value: 24, unit: 'hours' }, subject: 'Just checking in', content: `Hi {{name}}, we wanted to follow up...`, contentType: 'text' },
+            ],
+        })
+    }
+
+    return (
+        <div>
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                    <button onClick={onBack}
+                        className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                    </button>
+                    <div>
+                        <h2 className="text-white font-bold text-lg flex items-center gap-2">
+                            <span className="material-symbols-outlined text-emerald-400">mail</span> Nurture Sequences
+                        </h2>
+                        <p className="text-sm text-slate-500">Automated multi-channel follow-ups for each funnel stage</p>
+                    </div>
+                </div>
+                <button onClick={onRefresh}
+                    className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-sm">refresh</span> Refresh
+                </button>
+            </div>
+
+            {loading ? (
+                <div className="flex items-center gap-2 py-12 justify-center text-slate-500">
+                    <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                    Loading sequences...
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {stages.map(stage => {
+                        const stageSeqs = sequences.filter(s => s.triggerStage === stage.name)
+                        return (
+                            <div key={stage.name} className="glass-panel rounded-2xl p-5">
+                                {/* Stage Header */}
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: stage.color }} />
+                                        <h3 className="text-white font-bold text-sm">{stage.name}</h3>
+                                        <span className="px-2 py-0.5 rounded text-xs bg-white/[0.06] text-slate-500 capitalize">{stage.type}</span>
+                                        {stageSeqs.length > 0 && (
+                                            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400">
+                                                {stageSeqs.length} sequence{stageSeqs.length > 1 ? 's' : ''}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={() => handleQuickCreate(stage.name)}
+                                            className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-xs">add</span> Quick
+                                        </button>
+                                        <button onClick={() => setAiGenStage(stage.name)}
+                                            className="px-3 py-1.5 rounded-lg text-xs font-bold text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-all cursor-pointer flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-xs">auto_awesome</span> AI Generate
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Sequences for this stage */}
+                                {stageSeqs.length === 0 ? (
+                                    <p className="text-slate-600 text-xs italic py-2">No nurture sequences — add one to automate follow-ups</p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {stageSeqs.map(seq => {
+                                            const isExpanded = expandedSeq === seq._id
+                                            return (
+                                                <div key={seq._id} className={`rounded-xl border transition-all ${seq.status === 'active' ? 'border-emerald-500/20 bg-emerald-500/[0.02]' : 'border-white/[0.06] bg-white/[0.02]'}`}>
+                                                    {/* Sequence Header */}
+                                                    <div className="flex items-center justify-between p-3 cursor-pointer" onClick={() => setExpandedSeq(isExpanded ? null : seq._id)}>
+                                                        <div className="flex items-center gap-3 min-w-0">
+                                                            <div className={`size-8 rounded-lg flex items-center justify-center ${seq.status === 'active' ? 'bg-emerald-500/10' : 'bg-white/[0.04]'}`}>
+                                                                <span className={`material-symbols-outlined text-sm ${seq.status === 'active' ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                                                    {seq.status === 'active' ? 'play_circle' : 'pause_circle'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="text-sm text-white font-bold truncate">{seq.name}</p>
+                                                                <p className="text-xs text-slate-500">{seq.steps?.length || 0} steps · {TRIGGER_LABELS[seq.triggerEvent] || seq.triggerEvent}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 shrink-0">
+                                                            {/* Channel pills */}
+                                                            <div className="flex gap-1">
+                                                                {[...new Set(seq.steps?.map(s => s.channel) || [])].map(ch => {
+                                                                    const meta = CHANNEL_META[ch] || CHANNEL_META.dm
+                                                                    return (
+                                                                        <span key={ch} className="size-6 rounded-md flex items-center justify-center" style={{ backgroundColor: `${meta.color}15` }}>
+                                                                            <span className="material-symbols-outlined text-xs" style={{ color: meta.color }}>{meta.icon}</span>
+                                                                        </span>
+                                                                    )
+                                                                })}
+                                                            </div>
+                                                            {seq.aiGenerated && <span className="material-symbols-outlined text-xs text-amber-400" title="AI generated">auto_awesome</span>}
+                                                            <button onClick={(e) => { e.stopPropagation(); onToggle(seq._id) }}
+                                                                className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${seq.status === 'active' ? 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/15' : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/15'}`}>
+                                                                {seq.status === 'active' ? 'Pause' : 'Activate'}
+                                                            </button>
+                                                            <button onClick={(e) => { e.stopPropagation(); onDelete(seq._id) }}
+                                                                className="size-7 rounded-md flex items-center justify-center text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer">
+                                                                <span className="material-symbols-outlined text-sm">delete</span>
+                                                            </button>
+                                                            <span className="material-symbols-outlined text-sm text-slate-600">{isExpanded ? 'expand_less' : 'expand_more'}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Expanded: Step Timeline */}
+                                                    {isExpanded && (
+                                                        <div className="px-4 pb-4 border-t border-white/[0.04]">
+                                                            <div className="relative mt-3">
+                                                                {seq.steps?.map((step, sIdx) => {
+                                                                    const chMeta = CHANNEL_META[step.channel] || CHANNEL_META.dm
+                                                                    const delayLabel = step.delay?.value > 0
+                                                                        ? `${step.delay.value} ${step.delay.unit}`
+                                                                        : 'Immediately'
+                                                                    return (
+                                                                        <div key={sIdx} className="flex gap-3 mb-3 last:mb-0">
+                                                                            {/* Timeline dot + line */}
+                                                                            <div className="flex flex-col items-center">
+                                                                                <div className="size-7 rounded-full flex items-center justify-center border-2 shrink-0" style={{ borderColor: chMeta.color, backgroundColor: `${chMeta.color}15` }}>
+                                                                                    <span className="material-symbols-outlined text-xs" style={{ color: chMeta.color }}>{chMeta.icon}</span>
+                                                                                </div>
+                                                                                {sIdx < seq.steps.length - 1 && <div className="w-px flex-1 bg-white/[0.08] my-1" />}
+                                                                            </div>
+                                                                            {/* Step content */}
+                                                                            <div className="flex-1 min-w-0 pb-2">
+                                                                                <div className="flex items-center gap-2 mb-1">
+                                                                                    <p className="text-sm text-white font-bold">{step.name || `Step ${sIdx + 1}`}</p>
+                                                                                    <span className="px-1.5 py-0.5 rounded text-xs font-bold" style={{ backgroundColor: `${chMeta.color}15`, color: chMeta.color }}>{chMeta.label}</span>
+                                                                                    <span className="text-xs text-slate-600">⏱ {delayLabel}</span>
+                                                                                </div>
+                                                                                {step.subject && <p className="text-xs text-slate-400 mb-0.5">📌 {step.subject}</p>}
+                                                                                <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">{step.content}</p>
+                                                                                {(step.onComplete?.moveToStage || step.onComplete?.addTag || step.onComplete?.updateScore) && (
+                                                                                    <div className="flex gap-2 mt-1.5">
+                                                                                        {step.onComplete.moveToStage && (
+                                                                                            <span className="px-1.5 py-0.5 rounded text-xs bg-primary/10 text-primary">→ {step.onComplete.moveToStage}</span>
+                                                                                        )}
+                                                                                        {step.onComplete.addTag && (
+                                                                                            <span className="px-1.5 py-0.5 rounded text-xs bg-amber-500/10 text-amber-400">🏷 {step.onComplete.addTag}</span>
+                                                                                        )}
+                                                                                        {step.onComplete.updateScore > 0 && (
+                                                                                            <span className="px-1.5 py-0.5 rounded text-xs bg-emerald-500/10 text-emerald-400">+{step.onComplete.updateScore} pts</span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    )
+                                                                })}
+                                                            </div>
+                                                            {/* Sequence Stats */}
+                                                            {seq.metrics && seq.metrics.totalRuns > 0 && (
+                                                                <div className="flex gap-4 mt-3 pt-3 border-t border-white/[0.04]">
+                                                                    <div className="text-center"><p className="text-sm text-white font-bold">{seq.metrics.totalRuns}</p><p className="text-xs text-slate-600">Runs</p></div>
+                                                                    <div className="text-center"><p className="text-sm text-white font-bold">{seq.metrics.totalSent}</p><p className="text-xs text-slate-600">Sent</p></div>
+                                                                    <div className="text-center"><p className="text-sm text-white font-bold">{seq.metrics.totalOpened}</p><p className="text-xs text-slate-600">Opened</p></div>
+                                                                    <div className="text-center"><p className="text-sm text-white font-bold">{seq.metrics.totalReplied}</p><p className="text-xs text-slate-600">Replied</p></div>
+                                                                    <div className="text-center"><p className="text-sm text-emerald-400 font-bold">{seq.metrics.conversionRate}%</p><p className="text-xs text-slate-600">Conv.</p></div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+
+            {/* AI Generate Modal */}
+            {aiGenStage && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setAiGenStage(null)}>
+                    <div style={{ background: '#1e293b', borderRadius: '16px', border: '1px solid #334155', width: '500px', maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ padding: '1.25rem', borderBottom: '1px solid #334155' }}>
+                            <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '1rem', fontWeight: 700 }}>✨ AI Nurture Generator</h3>
+                            <p style={{ color: '#64748b', margin: '0.2rem 0 0', fontSize: '0.7rem' }}>Generate a complete nurture sequence for the <strong>{aiGenStage}</strong> stage</p>
+                        </div>
+                        <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                            <div>
+                                <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Instructions (optional)</label>
+                                <textarea value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} rows={3}
+                                    placeholder="e.g. Focus on education, include a special offer in the last step, keep messages short..."
+                                    style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.55rem 0.7rem', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Channels</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {Object.entries(CHANNEL_META).map(([key, meta]) => (
+                                        <button key={key}
+                                            onClick={() => setAiChannels(prev => prev.includes(key) ? prev.filter(c => c !== key) : [...prev, key])}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${aiChannels.includes(key)
+                                                ? 'border-primary/30 bg-primary/[0.06] text-white' : 'border-white/[0.06] text-slate-500 hover:bg-white/[0.04]'}`}>
+                                            <span className="material-symbols-outlined text-xs" style={{ color: aiChannels.includes(key) ? meta.color : '#64748b' }}>{meta.icon}</span>
+                                            {meta.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <button onClick={handleAiGenerate} disabled={generating}
+                                style={{ width: '100%', padding: '0.7rem', background: generating ? '#4b5563' : '#6366f1', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 700, fontSize: '0.85rem', cursor: generating ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                                {generating ? <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Generating sequence...</>
+                                    : <><span className="material-symbols-outlined text-sm">auto_awesome</span> Generate Nurture Sequence</>}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HEALTH DASHBOARD VIEW — Funnel health score, bottlenecks,
+// AI lead scoring, and optimization recommendations
+// ═══════════════════════════════════════════════════════════════
+const GRADE_COLORS = { A: '#10b981', B: '#6366f1', C: '#f59e0b', D: '#f97316', F: '#ef4444' }
+const SEVERITY_STYLES = {
+    high: { color: '#ef4444', bg: '#ef444410', icon: 'error' },
+    medium: { color: '#f59e0b', bg: '#f59e0b10', icon: 'warning' },
+    low: { color: '#64748b', bg: '#64748b10', icon: 'info' },
+}
+
+function HealthDashboardView({ funnel, health, loading, scoringResult, scoringLoading, onBack, onRefresh, onRunScoring }) {
+    return (
+        <div>
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                    <button onClick={onBack} className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                    </button>
+                    <div>
+                        <h2 className="text-white font-bold text-lg flex items-center gap-2">
+                            <span className="material-symbols-outlined text-cyan-400">health_and_safety</span> Funnel Health
+                        </h2>
+                        <p className="text-sm text-slate-500">Real-time diagnostics and AI-powered recommendations</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button onClick={onRunScoring} disabled={scoringLoading}
+                        className="px-4 py-2 rounded-xl text-sm font-bold text-amber-400 hover:text-amber-300 bg-amber-500/[0.06] hover:bg-amber-500/[0.1] border border-amber-500/10 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
+                        <span className={`material-symbols-outlined text-sm ${scoringLoading ? 'animate-spin' : ''}`}>{scoringLoading ? 'progress_activity' : 'score'}</span>
+                        {scoringLoading ? 'Scoring...' : 'Score Leads'}
+                    </button>
+                    <button onClick={onRefresh} className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">refresh</span> Refresh
+                    </button>
+                </div>
+            </div>
+
+            {loading ? (
+                <div className="flex items-center gap-2 py-12 justify-center text-slate-500">
+                    <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Analyzing funnel health...
+                </div>
+            ) : !health ? (
+                <p className="text-slate-500 text-center py-12">Health data not yet loaded</p>
+            ) : (
+                <div className="space-y-5">
+                    {/* Grade + Summary Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="glass-panel rounded-2xl p-6 flex flex-col items-center justify-center">
+                            <div className="size-20 rounded-2xl flex items-center justify-center mb-3 border-2" style={{ borderColor: GRADE_COLORS[health.grade] || '#64748b', backgroundColor: `${GRADE_COLORS[health.grade] || '#64748b'}10` }}>
+                                <span className="text-4xl font-black" style={{ color: GRADE_COLORS[health.grade] }}>{health.grade}</span>
+                            </div>
+                            <p className="text-white font-bold text-sm">Health Score</p>
+                            <p className="text-2xl font-black mt-1" style={{ color: GRADE_COLORS[health.grade] }}>{health.overallScore}/100</p>
+                        </div>
+                        <div className="glass-panel rounded-2xl p-5 flex flex-col justify-center">
+                            <p className="text-slate-500 text-xs uppercase font-bold mb-1">Total Entries</p>
+                            <p className="text-white text-3xl font-black">{health.totalEntries}</p>
+                        </div>
+                        <div className="glass-panel rounded-2xl p-5 flex flex-col justify-center">
+                            <p className="text-slate-500 text-xs uppercase font-bold mb-1">Converted</p>
+                            <p className="text-emerald-400 text-3xl font-black">{health.convertedEntries}</p>
+                            <p className="text-emerald-400/60 text-sm font-bold">{health.conversionRate}% rate</p>
+                        </div>
+                        <div className="glass-panel rounded-2xl p-5 flex flex-col justify-center">
+                            <p className="text-slate-500 text-xs uppercase font-bold mb-1">Lost</p>
+                            <p className="text-rose-400 text-3xl font-black">{health.lostEntries}</p>
+                        </div>
+                    </div>
+
+                    {/* Stage Health */}
+                    <div className="glass-panel rounded-2xl p-6">
+                        <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-cyan-400">monitoring</span> Stage-by-Stage Health
+                        </h3>
+                        <div className="space-y-2">
+                            {health.stageHealth?.map((stage, idx) => (
+                                <div key={stage.stageName} className={`flex items-center gap-4 p-3 rounded-xl border ${stage.isBottleneck ? 'border-rose-500/20 bg-rose-500/[0.03]' : stage.isStagnant ? 'border-amber-500/20 bg-amber-500/[0.03]' : 'border-white/[0.04] bg-white/[0.01]'}`}>
+                                    <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: stage.stageColor }} />
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-sm text-white font-bold">{stage.stageName}</p>
+                                            <span className="text-xs text-slate-500 capitalize">{stage.stageType}</span>
+                                            {stage.isBottleneck && <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-rose-500/10 text-rose-400">🚨 Bottleneck</span>}
+                                            {stage.isStagnant && <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-amber-500/10 text-amber-400">⏳ Stagnant</span>}
+                                        </div>
+                                        <div className="flex gap-4 mt-1">
+                                            <span className="text-xs text-slate-400">{stage.activeEntries} active</span>
+                                            <span className="text-xs text-slate-400">{stage.totalEverEntered} total</span>
+                                            <span className="text-xs text-slate-400">{stage.avgTimeHrs}h avg</span>
+                                            <span className="text-xs text-slate-400">{stage.studioLinksCount} links</span>
+                                        </div>
+                                    </div>
+                                    {idx > 0 && (
+                                        <span className={`text-sm font-bold shrink-0 ${stage.dropOffRate > 50 ? 'text-rose-400' : stage.dropOffRate > 25 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                            ↓ {stage.dropOffRate}%
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Issues + Recommendations */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="glass-panel rounded-2xl p-5">
+                            <h3 className="text-white font-bold mb-3 flex items-center gap-2 text-sm">
+                                <span className="material-symbols-outlined text-rose-400 text-lg">bug_report</span> Issues ({health.issues?.length || 0})
+                            </h3>
+                            {!health.issues?.length ? (
+                                <p className="text-emerald-400 text-sm flex items-center gap-1.5"><span className="material-symbols-outlined text-sm">check_circle</span> No issues!</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {health.issues.map((issue, idx) => {
+                                        const st = SEVERITY_STYLES[issue.severity] || SEVERITY_STYLES.low
+                                        return (
+                                            <div key={idx} className="flex gap-2 p-2.5 rounded-lg" style={{ backgroundColor: st.bg }}>
+                                                <span className="material-symbols-outlined text-sm shrink-0 mt-0.5" style={{ color: st.color }}>{st.icon}</span>
+                                                <div><p className="text-xs text-white font-bold">{issue.message}</p><p className="text-xs text-slate-500 capitalize">{issue.type.replace(/_/g, ' ')} · {issue.severity}</p></div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                        <div className="glass-panel rounded-2xl p-5">
+                            <h3 className="text-white font-bold mb-3 flex items-center gap-2 text-sm">
+                                <span className="material-symbols-outlined text-amber-400 text-lg">tips_and_updates</span> Recommendations ({health.recommendations?.length || 0})
+                            </h3>
+                            {!health.recommendations?.length ? (
+                                <p className="text-slate-500 text-sm">No recommendations at this time</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {health.recommendations.map((rec, idx) => (
+                                        <div key={idx} className="p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="material-symbols-outlined text-xs text-amber-400">lightbulb</span>
+                                                <p className="text-xs text-white font-bold">{rec.action}</p>
+                                                <span className="text-xs text-slate-600">({rec.stage})</span>
+                                            </div>
+                                            <p className="text-xs text-slate-500">{rec.description}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Lead Scoring Results */}
+                    {scoringResult && (
+                        <div className="glass-panel rounded-2xl p-6">
+                            <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-amber-400">score</span> Lead Scoring
+                                <span className="text-xs text-slate-500 font-normal ml-2">{scoringResult.scored} scored</span>
+                            </h3>
+                            <div className="flex gap-3 mb-4">
+                                <div className="flex-1 p-3 rounded-xl bg-rose-500/[0.06] border border-rose-500/10 text-center">
+                                    <p className="text-rose-400 text-2xl font-black">{scoringResult.summary?.hot || 0}</p>
+                                    <p className="text-rose-400/60 text-xs font-bold">🔥 Hot (70+)</p>
+                                </div>
+                                <div className="flex-1 p-3 rounded-xl bg-amber-500/[0.06] border border-amber-500/10 text-center">
+                                    <p className="text-amber-400 text-2xl font-black">{scoringResult.summary?.warm || 0}</p>
+                                    <p className="text-amber-400/60 text-xs font-bold">🌡️ Warm (40-69)</p>
+                                </div>
+                                <div className="flex-1 p-3 rounded-xl bg-blue-500/[0.06] border border-blue-500/10 text-center">
+                                    <p className="text-blue-400 text-2xl font-black">{scoringResult.summary?.cold || 0}</p>
+                                    <p className="text-blue-400/60 text-xs font-bold">❄️ Cold (&lt;40)</p>
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                {scoringResult.entries?.slice(0, 10).map((entry, idx) => (
+                                    <div key={idx} className="flex items-center gap-3 p-2 rounded-lg bg-white/[0.02]">
+                                        <div className="size-8 rounded-full flex items-center justify-center text-xs font-black" style={{
+                                            backgroundColor: entry.newScore >= 70 ? '#ef444415' : entry.newScore >= 40 ? '#f59e0b15' : '#3b82f615',
+                                            color: entry.newScore >= 70 ? '#ef4444' : entry.newScore >= 40 ? '#f59e0b' : '#3b82f6'
+                                        }}>{entry.newScore}</div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm text-white font-bold truncate">{entry.name}</p>
+                                            <p className="text-xs text-slate-500">{entry.stage} · {entry.signals?.slice(0, 2).join(', ')}</p>
+                                        </div>
+                                        {entry.previousScore !== entry.newScore && (
+                                            <span className={`text-xs font-bold ${entry.newScore > entry.previousScore ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                {entry.newScore > entry.previousScore ? '▲' : '▼'} {Math.abs(entry.newScore - entry.previousScore)}
+                                            </span>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// LANDING PAGES VIEW — Create, manage, AI-generate landing pages
+// ═══════════════════════════════════════════════════════════════
+const SECTION_ICONS = {
+    hero: 'web_asset', features: 'view_list', testimonial: 'format_quote', cta: 'ads_click',
+    form: 'description', text: 'article', image: 'image', video: 'videocam', faq: 'quiz', pricing: 'payments'
+}
+
+function LandingPagesView({ funnel, pages, loading, onBack, onRefresh, onCreate, onAIGenerate, onDelete }) {
+    const [showAiGen, setShowAiGen] = useState(false)
+    const [aiStage, setAiStage] = useState(funnel.stages?.[0]?.name || '')
+    const [aiPrompt, setAiPrompt] = useState('')
+    const [generating, setGenerating] = useState(false)
+    const stages = funnel.stages || []
+
+    const handleAiGenerate = async () => {
+        setGenerating(true)
+        try {
+            await onAIGenerate({ funnelId: funnel._id, targetStage: aiStage, prompt: aiPrompt || undefined })
+            setShowAiGen(false); setAiPrompt('')
+        } catch { }
+        finally { setGenerating(false) }
+    }
+
+    const handleQuickCreate = async () => {
+        await onCreate({ funnelId: funnel._id, name: `${funnel.name} Landing Page`, targetStage: stages[0]?.name || 'Top' })
+    }
+
+    return (
+        <div>
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                    <button onClick={onBack} className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                    </button>
+                    <div>
+                        <h2 className="text-white font-bold text-lg flex items-center gap-2">
+                            <span className="material-symbols-outlined text-violet-400">web</span> Landing Pages
+                        </h2>
+                        <p className="text-sm text-slate-500">Capture leads with branded landing pages and forms</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button onClick={handleQuickCreate} className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">add</span> Quick Page
+                    </button>
+                    <button onClick={() => setShowAiGen(true)} className="px-4 py-2 rounded-xl text-sm font-bold text-amber-400 hover:text-amber-300 bg-amber-500/[0.06] hover:bg-amber-500/[0.1] border border-amber-500/10 transition-all cursor-pointer flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Generate
+                    </button>
+                    <button onClick={onRefresh} className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">refresh</span>
+                    </button>
+                </div>
+            </div>
+
+            {loading ? (
+                <div className="flex items-center gap-2 py-12 justify-center text-slate-500">
+                    <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Loading pages...
+                </div>
+            ) : pages.length === 0 ? (
+                <div className="glass-panel rounded-2xl p-10 text-center">
+                    <span className="material-symbols-outlined text-5xl text-slate-600 mb-3">web</span>
+                    <p className="text-white font-bold mb-1">No Landing Pages Yet</p>
+                    <p className="text-slate-500 text-sm mb-4">Create a branded landing page to capture leads into your funnel</p>
+                    <div className="flex gap-3 justify-center">
+                        <button onClick={handleQuickCreate} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] transition-all cursor-pointer flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">add</span> Create Page
+                        </button>
+                        <button onClick={() => setShowAiGen(true)} className="px-5 py-2.5 rounded-xl text-sm font-bold btn-primary flex items-center gap-1.5 cursor-pointer">
+                            <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Generate
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {pages.map(page => (
+                        <div key={page._id} className="glass-panel rounded-2xl overflow-hidden hover:border-white/[0.1] transition-all">
+                            <div className="h-28 relative flex items-center justify-center" style={{ backgroundColor: page.style?.primaryColor ? `${page.style.primaryColor}15` : '#6366f115' }}>
+                                <div className="text-center px-4">
+                                    <p className="text-white font-bold text-sm truncate">{page.sections?.[0]?.content?.headline || page.name}</p>
+                                    <p className="text-slate-400 text-xs truncate mt-0.5">{page.sections?.[0]?.content?.subheadline || ''}</p>
+                                </div>
+                                <span className={`absolute top-2 right-2 px-2 py-0.5 rounded text-xs font-bold ${page.status === 'published' ? 'bg-emerald-500/10 text-emerald-400' : page.status === 'archived' ? 'bg-slate-500/10 text-slate-400' : 'bg-amber-500/10 text-amber-400'}`}>{page.status}</span>
+                            </div>
+                            <div className="p-4">
+                                <p className="text-white font-bold text-sm truncate">{page.name}</p>
+                                <p className="text-slate-500 text-xs mt-0.5">/{page.slug}</p>
+                                <div className="flex items-center gap-3 mt-2">
+                                    <span className="text-xs text-slate-400">→ {page.targetStage}</span>
+                                    {page.aiGenerated && <span className="material-symbols-outlined text-xs text-amber-400">auto_awesome</span>}
+                                </div>
+                                <div className="flex gap-3 mt-3 pt-3 border-t border-white/[0.04]">
+                                    <div><p className="text-white text-sm font-bold">{page.metrics?.views || 0}</p><p className="text-xs text-slate-600">Views</p></div>
+                                    <div><p className="text-white text-sm font-bold">{page.metrics?.submissions || 0}</p><p className="text-xs text-slate-600">Leads</p></div>
+                                    <div><p className="text-emerald-400 text-sm font-bold">{page.metrics?.conversionRate || 0}%</p><p className="text-xs text-slate-600">Conv.</p></div>
+                                </div>
+                                <div className="flex gap-1 mt-3">
+                                    {page.sections?.map((s, idx) => (
+                                        <span key={idx} className="size-6 rounded flex items-center justify-center bg-white/[0.04]" title={s.type}>
+                                            <span className="material-symbols-outlined text-xs text-slate-500">{SECTION_ICONS[s.type] || 'article'}</span>
+                                        </span>
+                                    ))}
+                                    {page.form?.enabled && <span className="size-6 rounded flex items-center justify-center bg-violet-500/10"><span className="material-symbols-outlined text-xs text-violet-400">description</span></span>}
+                                </div>
+                                <div className="flex gap-2 mt-3">
+                                    <button onClick={() => onDelete(page._id)} className="size-7 rounded-md flex items-center justify-center text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer">
+                                        <span className="material-symbols-outlined text-sm">delete</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {showAiGen && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowAiGen(false)}>
+                    <div style={{ background: '#1e293b', borderRadius: '16px', border: '1px solid #334155', width: '480px', maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ padding: '1.25rem', borderBottom: '1px solid #334155' }}>
+                            <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '1rem', fontWeight: 700 }}>✨ AI Landing Page Generator</h3>
+                            <p style={{ color: '#64748b', margin: '0.2rem 0 0', fontSize: '0.7rem' }}>Generate a conversion-optimized landing page</p>
+                        </div>
+                        <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                            <div>
+                                <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Target Stage</label>
+                                <select value={aiStage} onChange={e => setAiStage(e.target.value)}
+                                    style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.55rem 0.7rem', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none' }}>
+                                    {stages.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Instructions (optional)</label>
+                                <textarea value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} rows={3}
+                                    placeholder="e.g. Focus on social proof, include pricing table, use urgency..."
+                                    style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.55rem 0.7rem', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
+                            </div>
+                            <button onClick={handleAiGenerate} disabled={generating}
+                                style={{ width: '100%', padding: '0.7rem', background: generating ? '#4b5563' : '#6366f1', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 700, fontSize: '0.85rem', cursor: generating ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                                {generating ? <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Generating page...</>
+                                    : <><span className="material-symbols-outlined text-sm">auto_awesome</span> Generate Landing Page</>}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// HELP DOCUMENTATION VIEW — Comprehensive in-app guide
+// ═══════════════════════════════════════════════════════════════
+const HELP_SECTIONS = [
+    {
+        id: 'getting-started',
+        icon: 'rocket_launch',
+        color: '#6366f1',
+        title: 'Getting Started',
+        subtitle: 'Create your first funnel in minutes',
+        steps: [
+            { icon: 'add_circle', title: 'Create a Funnel', description: 'Click a template card on the dashboard to instantly create a pre-configured funnel. Choose from Lead Gen, E-commerce, Webinar, Onboarding, or Content funnels — each comes with optimized stages.' },
+            { icon: 'auto_awesome', title: 'Use AI Generate', description: 'Click "AI Generate" and describe your business goal. The AI will design a custom funnel with the right stages, colors, and structure tailored to your brand.' },
+            { icon: 'open_in_new', title: 'Open Your Funnel', description: 'Click any funnel card to open the Pipeline view — your Kanban-style board where you\'ll manage leads moving through each stage.' },
+        ]
+    },
+    {
+        id: 'templates',
+        icon: 'dashboard_customize',
+        color: '#10b981',
+        title: 'Templates & AI Architect',
+        subtitle: 'Pre-built funnels and intelligent automation',
+        steps: [
+            { icon: 'filter_alt', title: 'Lead Generation Funnel', description: '6-stage funnel: Awareness → Interest → Consideration → Intent → Evaluation → Closed Won. Perfect for B2B and service businesses capturing leads through content and outreach.' },
+            { icon: 'shopping_cart', title: 'E-commerce Funnel', description: '5-stage funnel: Browse → Cart → Checkout → Purchase → Repeat. Designed for D2C brands to track the buyer journey from product discovery to purchase.' },
+            { icon: 'videocam', title: 'Webinar / Event Funnel', description: '4-stage funnel: Registered → Attended → Engaged → Converted. Track registrations, attendance, engagement signals, and post-event conversions.' },
+            { icon: 'person_add', title: 'Onboarding Funnel', description: '5-stage funnel: Signed Up → Activated → Engaged → Power User → Advocate. Map the user journey from signup to becoming a product champion.' },
+            { icon: 'article', title: 'Content Marketing Funnel', description: '4-stage funnel: Visitor → Subscriber → Engaged Reader → Customer. Convert content consumers into paying customers.' },
+            { icon: 'psychology', title: 'AI Architect', description: 'Describe your goal in plain text (e.g. "SaaS onboarding for a CRM tool targeting SMBs"). The AI designs a complete funnel with branded stages, descriptions, colors, and types.' },
+        ]
+    },
+    {
+        id: 'pipeline',
+        icon: 'view_kanban',
+        color: '#f59e0b',
+        title: 'Pipeline & Lead Management',
+        subtitle: 'Manage your leads with the Kanban board',
+        steps: [
+            { icon: 'person_add', title: 'Add Entries', description: 'Click "Add Entry" in the pipeline toolbar to manually add a lead. Enter their name, email, phone, company, and source. They\'ll appear in the first stage.' },
+            { icon: 'drag_indicator', title: 'Move Entries Between Stages', description: 'Use the arrow buttons on each entry card to move leads forward or backward through your funnel stages. Every move is tracked in the entry\'s stage history.' },
+            { icon: 'download', title: 'Import Contacts', description: 'Click "Import" to pull existing contacts from your CRM. Filter by tags, source, or date range — then bulk-import them into any funnel stage.' },
+            { icon: 'score', title: 'Lead Scoring', description: 'Each entry has a score (0-100). Scores are calculated based on touchpoints, engagement recency, source quality, and stage progression. Higher scores = hotter leads.' },
+            { icon: 'check_circle', title: 'Status Management', description: 'Mark entries as "converted" (won) or "lost" (dropped). Converted entries celebrate with a confetti moment. Lost entries help you identify where leads drop off.' },
+            { icon: 'content_copy', title: 'Clone Funnel', description: 'Click the clone icon on any funnel card to duplicate it. Great for A/B testing different funnel structures or creating seasonal variants.' },
+        ]
+    },
+    {
+        id: 'builder',
+        icon: 'build',
+        color: '#8b5cf6',
+        title: 'Visual Funnel Builder',
+        subtitle: 'Customize stages, colors, and studio connections',
+        steps: [
+            { icon: 'edit', title: 'Edit Stages', description: 'Click "Edit" in the pipeline toolbar to open the Builder. Rename stages, change colors, update descriptions, and set stage types (awareness, interest, consideration, decision, retention).' },
+            { icon: 'reorder', title: 'Drag & Reorder', description: 'Drag stages up or down to reorder them. Your funnel flow updates automatically across all views.' },
+            { icon: 'add', title: 'Add New Stages', description: 'Click "Add Stage" at the bottom of the builder to insert a new stage. Configure its name, type, color, and description.' },
+            { icon: 'link', title: 'Connect Studios', description: 'Toggle studio connections for each stage. Link to Content Studio, Creative Studio, SEO Studio, Performance Marketing, and more. When a lead enters a connected stage, relevant studio workflows can trigger.' },
+            { icon: 'delete', title: 'Remove Stages', description: 'Delete stages you no longer need. Entries in deleted stages will be moved to the nearest adjacent stage.' },
+        ]
+    },
+    {
+        id: 'nurture',
+        icon: 'mail',
+        color: '#10b981',
+        title: 'Nurture Sequences',
+        subtitle: 'Automated multi-channel follow-up sequences',
+        steps: [
+            { icon: 'mail', title: 'What Are Nurture Sequences?', description: 'Automated step-by-step communication sequences that engage leads at each funnel stage. Sequences support 6 channels: DM, Email, SMS, WhatsApp, Push Notifications, and Internal Tasks.' },
+            { icon: 'auto_awesome', title: 'AI Generate Sequence', description: 'Click "Nurture" in the pipeline toolbar → "AI Generate". Select your target stage, pick channels, and add instructions. The AI creates a multi-step sequence with personalized content, optimal delays, and conditions.' },
+            { icon: 'bolt', title: 'Quick Create', description: 'Click "Quick Create" to instantly generate a basic 2-step DM + Email sequence. Customize the content, delays, and conditions afterward.' },
+            { icon: 'schedule', title: 'Step Delays', description: 'Configure delay between steps: 30 minutes, 1 hour, 4 hours, 1 day, 3 days, or 7 days. Delays determine when the next step fires after the previous one completes.' },
+            { icon: 'rule', title: 'Conditional Logic', description: 'Add conditions to steps: skip if contact has specific tags, score range, status, or source. This ensures leads only receive relevant communications.' },
+            { icon: 'play_arrow', title: 'Activate & Manage', description: 'Toggle sequences on/off with the activate button. Active sequences will trigger when entries enter the linked stage. Monitor delivery, open, click, and reply metrics per step.' },
+        ]
+    },
+    {
+        id: 'health',
+        icon: 'health_and_safety',
+        color: '#06b6d4',
+        title: 'Funnel Health & Lead Scoring',
+        subtitle: 'AI-powered diagnostics and optimization',
+        steps: [
+            { icon: 'health_and_safety', title: 'Health Dashboard', description: 'Click "Health" in the pipeline toolbar. See your funnel\'s overall grade (A–F), based on conversion rate, bottlenecks, stagnation, and stage health.' },
+            { icon: 'error', title: 'Bottleneck Detection', description: 'Stages with more than 50% drop-off are flagged as bottlenecks with a 🚨 alert. These are the biggest leaks in your funnel and need immediate attention.' },
+            { icon: 'hourglass_bottom', title: 'Stagnation Alerts', description: 'Stages where leads sit for 7+ days on average are flagged as stagnant with a ⏳ alert. Consider adding nurture sequences or reviewing your stage criteria.' },
+            { icon: 'tips_and_updates', title: 'AI Recommendations', description: 'The health dashboard generates specific recommendations: add nurture sequences, connect studios, split stages, or add intermediary touchpoints.' },
+            { icon: 'score', title: 'Score Leads', description: 'Click "Score Leads" to run the AI scoring engine. It analyzes each entry\'s touchpoints, recency, source quality, stage progress, and contact completeness to assign a 0-100 score.' },
+            { icon: 'local_fire_department', title: 'Hot / Warm / Cold', description: 'After scoring, leads are categorized: 🔥 Hot (70+), 🌡️ Warm (40-69), ❄️ Cold (<40). Focus your team\'s effort on hot leads first for maximum conversion.' },
+        ]
+    },
+    {
+        id: 'pages',
+        icon: 'web',
+        color: '#8b5cf6',
+        title: 'Landing Pages & Forms',
+        subtitle: 'Capture leads with branded landing pages',
+        steps: [
+            { icon: 'web', title: 'Landing Pages', description: 'Click "Pages" in the pipeline toolbar. Create landing pages that feed leads directly into your funnel stages. Each page has customizable sections and a lead capture form.' },
+            { icon: 'auto_awesome', title: 'AI Generate Page', description: 'Click "AI Generate" to create a complete landing page. The AI uses your brand DNA, funnel context, and target stage to generate hero sections, features, testimonials, CTAs, and forms.' },
+            { icon: 'description', title: 'Form Builder', description: 'Each landing page includes a configurable form. Fields map directly to your CRM Contact model (name, email, phone). Form submissions automatically create a Contact AND a Funnel Entry.' },
+            { icon: 'analytics', title: 'Page Metrics', description: 'Track views, form submissions, and conversion rate for each page. Use these metrics to optimize your landing page copy, design, and form fields.' },
+            { icon: 'public', title: 'Publish Pages', description: 'Pages start as "draft". Change status to "published" to make them live. Published pages accept form submissions through a public endpoint — no authentication required.' },
+        ]
+    },
+    {
+        id: 'automations',
+        icon: 'bolt',
+        color: '#f97316',
+        title: 'Automation Engine',
+        subtitle: 'Make your funnel self-running with WHEN → THEN rules',
+        steps: [
+            { icon: 'bolt', title: 'What Are Automation Rules?', description: 'Rules that automatically take action when events happen in your funnel. Each rule follows a WHEN (trigger) + IF (conditions) → THEN (actions) pattern. No coding required — rules fire in real-time.' },
+            { icon: 'sensors', title: '7 Trigger Types', description: 'Rules can fire on: Entry Created, Stage Changed, Score Threshold (above/below), Inactivity (X days), Status Changed, Form Submitted, and Score Changed. Each trigger monitors real-time funnel events.' },
+            { icon: 'checklist', title: 'Conditions (Filters)', description: 'Add optional conditions to ensure rules only apply to the right leads. Filter by score range, specific stage, source type, activity days, contact completeness, tags, and more. All conditions must match.' },
+            { icon: 'arrow_forward', title: '10 Action Types', description: 'Actions include: Move to Stage, Change Status, Update Score (+/-), Add/Remove Tag, Start Nurture Sequence, Send Notification, Log Touchpoint, and Trigger Studio (cross-studio orchestration).' },
+            { icon: 'auto_awesome', title: 'AI Auto-Generate Rules', description: 'Click "AI Generate" in the Automations view to have AI create 3-5 smart rules tailored to your funnel. Describe what you want (e.g. "auto-advance hot leads") or leave blank for smart defaults.' },
+            { icon: 'play_arrow', title: 'Run All & Manual Trigger', description: 'Click "Run All" to manually execute all enabled rules across active entries. Rules also fire automatically when their trigger events occur — no manual action needed.' },
+            { icon: 'toggle_on', title: 'Enable / Disable Rules', description: 'Toggle rules on or off with one click. Disabled rules won\'t fire on events. View execution history by expanding any rule card — see which leads were affected and what actions were taken.' },
+        ]
+    },
+]
+
+const PRO_TIPS = [
+    { icon: '🎯', tip: 'Start with a template, then customize stages using the Builder. Templates give you best-practice stage flows.' },
+    { icon: '🤖', tip: 'Use AI Generate to create funnels, nurture sequences, and landing pages — all tailored to your brand voice and industry.' },
+    { icon: '📊', tip: 'Check Funnel Health weekly. Fix bottlenecks first — they have the biggest impact on conversion rates.' },
+    { icon: '🔥', tip: 'Run lead scoring regularly. Your sales team should focus on Hot leads (70+) for maximum ROI.' },
+    { icon: '📧', tip: 'Every stage should have a Nurture Sequence. Leads that receive timely follow-ups convert 2-3x better.' },
+    { icon: '🔗', tip: 'Connect stages to studios (Content, Creative, SEO). This enables cross-studio workflows triggered by funnel events.' },
+    { icon: '📱', tip: 'Use multi-channel nurture (DM + Email + WhatsApp) for 5x higher engagement vs. single-channel sequences.' },
+    { icon: '📄', tip: 'Create a dedicated landing page for your top-of-funnel stage. AI-generated pages convert well right out of the box.' },
+    { icon: '⚡', tip: 'Use AI Auto-Generate to create automation rules instantly. One click sets up smart rules for stage advancement, inactivity detection, and lead scoring.' },
+    { icon: '🔄', tip: 'Automation rules fire in real-time on every event. Set up a "Score > 70 → Move to Decision" rule and watch hot leads advance automatically.' },
+]
+
+function HelpDocumentationView({ onBack }) {
+    const [expanded, setExpanded] = useState('getting-started')
+
+    return (
+        <div>
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                    <button onClick={onBack}
+                        className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                    </button>
+                    <div>
+                        <h2 className="text-white font-bold text-lg flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary">menu_book</span>
+                            Funnel Studio Guide
+                        </h2>
+                        <p className="text-sm text-slate-500">Everything you need to build, manage, and optimize your sales funnels</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Quick Overview */}
+            <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'linear-gradient(135deg, #6366f108, #8b5cf608, #06b6d408)' }}>
+                <h3 className="text-white font-bold mb-3 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary">info</span> What is Funnel Studio?
+                </h3>
+                <p className="text-slate-400 text-sm leading-relaxed mb-4">
+                    Funnel Studio is your complete sales funnel management system. It lets you <strong className="text-white">build custom funnels</strong> using templates or AI,
+                    <strong className="text-white"> track leads</strong> through a Kanban pipeline, set up <strong className="text-white">automated nurture sequences</strong> across 6 channels,
+                    run <strong className="text-white">automation rules</strong> that auto-move leads based on behavior,
+                    monitor <strong className="text-white">funnel health</strong> with AI diagnostics, <strong className="text-white">score leads</strong> automatically, and create
+                    <strong className="text-white"> landing pages</strong> that capture leads into your funnels — all connected to your Brand DNA.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                    {['Templates', 'AI Generate', 'Kanban Pipeline', 'Automation Rules', 'Nurture Sequences', 'Lead Scoring', 'Health Monitor', 'Landing Pages', 'Studio Links'].map(tag => (
+                        <span key={tag} className="px-3 py-1 rounded-full text-xs font-bold bg-white/[0.04] border border-white/[0.06] text-slate-400">{tag}</span>
+                    ))}
+                </div>
+            </div>
+
+            {/* Workflow Diagram */}
+            <div className="glass-panel rounded-2xl p-5 mb-6">
+                <h3 className="text-white font-bold mb-4 text-sm flex items-center gap-2">
+                    <span className="material-symbols-outlined text-amber-400 text-lg">account_tree</span> Typical Workflow
+                </h3>
+                <div className="flex items-center gap-0 overflow-x-auto pb-2">
+                    {[
+                        { label: 'Create Funnel', icon: 'add_circle', color: '#6366f1' },
+                        { label: 'Edit Stages', icon: 'build', color: '#8b5cf6' },
+                        { label: 'Add Leads', icon: 'person_add', color: '#f59e0b' },
+                        { label: 'Set Rules', icon: 'bolt', color: '#f97316' },
+                        { label: 'Set Nurture', icon: 'mail', color: '#10b981' },
+                        { label: 'Create Page', icon: 'web', color: '#a855f7' },
+                        { label: 'Score Leads', icon: 'score', color: '#ef4444' },
+                        { label: 'Check Health', icon: 'health_and_safety', color: '#06b6d4' },
+                        { label: 'Convert! 🎉', icon: 'celebration', color: '#10b981' },
+                    ].map((step, idx, arr) => (
+                        <div key={step.label} className="flex items-center shrink-0">
+                            <div className="flex flex-col items-center gap-1.5 w-20">
+                                <div className="size-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${step.color}15` }}>
+                                    <span className="material-symbols-outlined text-lg" style={{ color: step.color }}>{step.icon}</span>
+                                </div>
+                                <p className="text-xs text-slate-400 text-center leading-tight font-medium">{step.label}</p>
+                            </div>
+                            {idx < arr.length - 1 && (
+                                <span className="material-symbols-outlined text-slate-700 text-sm mx-1 shrink-0">chevron_right</span>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Expandable Sections */}
+            <div className="space-y-3 mb-6">
+                {HELP_SECTIONS.map(section => (
+                    <div key={section.id} className="glass-panel rounded-2xl overflow-hidden">
+                        <button
+                            onClick={() => setExpanded(expanded === section.id ? null : section.id)}
+                            className="w-full flex items-center gap-3 p-5 text-left hover:bg-white/[0.02] transition-all cursor-pointer"
+                        >
+                            <div className="size-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${section.color}15` }}>
+                                <span className="material-symbols-outlined" style={{ color: section.color }}>{section.icon}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-white font-bold text-sm">{section.title}</p>
+                                <p className="text-slate-500 text-xs">{section.subtitle}</p>
+                            </div>
+                            <span className="text-xs text-slate-600 font-bold mr-1">{section.steps.length} topics</span>
+                            <span className={`material-symbols-outlined text-slate-500 transition-transform ${expanded === section.id ? 'rotate-180' : ''}`}>expand_more</span>
+                        </button>
+
+                        {expanded === section.id && (
+                            <div className="px-5 pb-5 space-y-3 border-t border-white/[0.04] pt-4">
+                                {section.steps.map((step, idx) => (
+                                    <div key={idx} className="flex gap-3">
+                                        <div className="flex flex-col items-center">
+                                            <div className="size-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${section.color}10` }}>
+                                                <span className="material-symbols-outlined text-sm" style={{ color: section.color }}>{step.icon}</span>
+                                            </div>
+                                            {idx < section.steps.length - 1 && <div className="w-px flex-1 mt-1" style={{ backgroundColor: `${section.color}20` }} />}
+                                        </div>
+                                        <div className="pb-3">
+                                            <p className="text-white font-bold text-sm mb-0.5">{step.title}</p>
+                                            <p className="text-slate-400 text-xs leading-relaxed">{step.description}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+
+            {/* Pro Tips */}
+            <div className="glass-panel rounded-2xl p-6" style={{ background: 'linear-gradient(135deg, #f59e0b08, #ef444408)' }}>
+                <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-amber-400">emoji_objects</span> Pro Tips for Maximum Conversions
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {PRO_TIPS.map((tip, idx) => (
+                        <div key={idx} className="flex gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                            <span className="text-lg shrink-0 mt-0.5">{tip.icon}</span>
+                            <p className="text-xs text-slate-400 leading-relaxed">{tip.tip}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* CTA */}
+            <div className="text-center mt-6 py-6">
+                <p className="text-slate-500 text-sm mb-3">Ready to get started?</p>
+                <button onClick={onBack}
+                    className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-purple-500 text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2 mx-auto">
+                    <span className="material-symbols-outlined text-sm">rocket_launch</span> Go to Dashboard
+                </button>
+            </div>
+        </div>
+    )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AUTOMATION VIEW — Agentic Rules Engine UI
+// ═══════════════════════════════════════════════════════════════
+
+const TRIGGER_TYPES = [
+    { value: 'entry_created', label: 'Entry Created', icon: 'person_add', desc: 'When a new lead enters the funnel' },
+    { value: 'stage_changed', label: 'Stage Changed', icon: 'swap_horiz', desc: 'When a lead moves to a new stage' },
+    { value: 'score_threshold', label: 'Score Threshold', icon: 'speed', desc: 'When lead score crosses a threshold' },
+    { value: 'inactivity', label: 'Inactivity', icon: 'hourglass_empty', desc: 'When a lead is inactive for X days' },
+    { value: 'status_changed', label: 'Status Changed', icon: 'toggle_on', desc: 'When lead status changes' },
+    { value: 'form_submitted', label: 'Form Submitted', icon: 'description', desc: 'When a landing page form is submitted' },
+    { value: 'score_changed', label: 'Score Changed', icon: 'trending_up', desc: 'When lead score is updated' },
+]
+
+const ACTION_TYPES = [
+    { value: 'move_stage', label: 'Move to Stage', icon: 'arrow_forward' },
+    { value: 'change_status', label: 'Change Status', icon: 'toggle_on' },
+    { value: 'update_score', label: 'Update Score', icon: 'speed' },
+    { value: 'add_tag', label: 'Add Tag', icon: 'label' },
+    { value: 'remove_tag', label: 'Remove Tag', icon: 'label_off' },
+    { value: 'start_nurture', label: 'Start Nurture Sequence', icon: 'mail' },
+    { value: 'send_notification', label: 'Send Notification', icon: 'notifications' },
+    { value: 'add_touchpoint', label: 'Log Touchpoint', icon: 'touch_app' },
+    { value: 'trigger_studio', label: 'Trigger Studio', icon: 'hub' },
+]
+
+function AutomationView({ funnel, rules, loading, running, generating, onBack, onRefresh, onCreate, onDelete, onToggle, onAIGenerate, onRunAll }) {
+    const [showCreate, setShowCreate] = useState(false)
+    const [aiPrompt, setAiPrompt] = useState('')
+    const [showAiInput, setShowAiInput] = useState(false)
+    const [expandedRule, setExpandedRule] = useState(null)
+
+    // Create form state
+    const [newRule, setNewRule] = useState({
+        name: '', triggerType: 'entry_created', triggerConfig: {},
+        conditions: [], actionType: 'move_stage', actionConfig: {},
+    })
+
+    const handleCreate = async () => {
+        if (!newRule.name.trim()) return alert('Rule name is required')
+        const trigger = { type: newRule.triggerType, ...newRule.triggerConfig }
+        const actions = [{ type: newRule.actionType, ...newRule.actionConfig }]
+        await onCreate({ funnelId: funnel._id, name: newRule.name, trigger, actions })
+        setNewRule({ name: '', triggerType: 'entry_created', triggerConfig: {}, conditions: [], actionType: 'move_stage', actionConfig: {} })
+        setShowCreate(false)
+    }
+
+    const handleAIGenerate = async () => {
+        await onAIGenerate(aiPrompt)
+        setAiPrompt('')
+        setShowAiInput(false)
+    }
+
+    const enabledCount = rules.filter(r => r.enabled).length
+    const totalExec = rules.reduce((s, r) => s + (r.executionCount || 0), 0)
+
+    return (
+        <div className="space-y-6 max-w-5xl mx-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <button onClick={onBack}
+                        className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                    </button>
+                    <div>
+                        <h2 className="text-white font-bold text-lg flex items-center gap-2">
+                            <span className="material-symbols-outlined text-orange-400">bolt</span> Automation Engine
+                        </h2>
+                        <p className="text-sm text-slate-500">{enabledCount} active rules · {totalExec} total executions</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button onClick={onRefresh}
+                        className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">refresh</span> Refresh
+                    </button>
+                    <button onClick={() => setShowAiInput(!showAiInput)}
+                        className="px-4 py-2 rounded-xl text-sm font-bold text-purple-400 hover:text-purple-300 bg-purple-500/[0.06] hover:bg-purple-500/[0.1] border border-purple-500/10 transition-all cursor-pointer flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Generate
+                    </button>
+                    <button onClick={onRunAll} disabled={running}
+                        className="px-4 py-2 rounded-xl text-sm font-bold text-amber-400 hover:text-amber-300 bg-amber-500/[0.06] hover:bg-amber-500/[0.1] border border-amber-500/10 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
+                        <span className={`material-symbols-outlined text-sm ${running ? 'animate-spin' : ''}`}>
+                            {running ? 'progress_activity' : 'play_arrow'}
+                        </span> {running ? 'Running...' : 'Run All'}
+                    </button>
+                    <button onClick={() => setShowCreate(!showCreate)}
+                        className="px-5 py-2.5 rounded-xl text-sm font-bold btn-primary flex items-center gap-1.5 cursor-pointer">
+                        <span className="material-symbols-outlined text-sm">add</span> New Rule
+                    </button>
+                </div>
+            </div>
+
+            {/* AI Generation Input */}
+            {showAiInput && (
+                <div className="glass-panel rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, #8b5cf610, #6366f110)' }}>
+                    <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-purple-400">auto_awesome</span>
+                        AI Auto-Generate Rules
+                    </h3>
+                    <p className="text-xs text-slate-500 mb-3">Describe what you want to automate, or leave blank to get smart defaults.</p>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            value={aiPrompt}
+                            onChange={(e) => setAiPrompt(e.target.value)}
+                            placeholder="e.g. Auto-move hot leads to Decision stage, flag inactive leads after 7 days..."
+                            className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none focus:border-purple-500/30 transition-all"
+                        />
+                        <button onClick={handleAIGenerate} disabled={generating}
+                            className="px-5 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-purple-500 to-indigo-500 text-white cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
+                            {generating ? (
+                                <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Generating...</>
+                            ) : (
+                                <><span className="material-symbols-outlined text-sm">bolt</span> Generate Rules</>
+                            )}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Create Rule Form */}
+            {showCreate && (
+                <div className="glass-panel rounded-2xl p-6" style={{ background: 'linear-gradient(135deg, #f59e0b08, #ef444408)' }}>
+                    <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-orange-400">build</span> Create Automation Rule
+                    </h3>
+                    <div className="space-y-4">
+                        {/* Name */}
+                        <input
+                            type="text"
+                            value={newRule.name}
+                            onChange={(e) => setNewRule({ ...newRule, name: e.target.value })}
+                            placeholder="Rule name (e.g. Hot Lead Auto-Advance)"
+                            className="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none focus:border-orange-500/30 transition-all"
+                        />
+
+                        {/* Trigger */}
+                        <div>
+                            <label className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-2 block">When (Trigger)</label>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                {TRIGGER_TYPES.map(t => (
+                                    <button key={t.value} onClick={() => setNewRule({ ...newRule, triggerType: t.value, triggerConfig: {} })}
+                                        className={`p-3 rounded-xl text-xs font-bold border transition-all cursor-pointer text-left
+                                            ${newRule.triggerType === t.value
+                                                ? 'bg-orange-500/10 border-orange-500/30 text-orange-300'
+                                                : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:bg-white/[0.04]'}`}>
+                                        <span className="material-symbols-outlined text-sm block mb-1">{t.icon}</span>
+                                        {t.label}
+                                    </button>
+                                ))}
+                            </div>
+                            {/* Trigger config */}
+                            {newRule.triggerType === 'stage_changed' && (
+                                <div className="mt-3 flex gap-2">
+                                    <select value={newRule.triggerConfig.toStage || ''} onChange={e => setNewRule({ ...newRule, triggerConfig: { ...newRule.triggerConfig, toStage: e.target.value } })}
+                                        className="flex-1 px-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none">
+                                        <option value="">Any stage</option>
+                                        {funnel.stages?.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+                                    </select>
+                                </div>
+                            )}
+                            {newRule.triggerType === 'score_threshold' && (
+                                <div className="mt-3 flex gap-2">
+                                    <select value={newRule.triggerConfig.scoreDirection || 'above'} onChange={e => setNewRule({ ...newRule, triggerConfig: { ...newRule.triggerConfig, scoreDirection: e.target.value } })}
+                                        className="px-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none">
+                                        <option value="above">Score Above</option>
+                                        <option value="below">Score Below</option>
+                                    </select>
+                                    <input type="number" min="0" max="100" placeholder="Threshold" value={newRule.triggerConfig.scoreThreshold || ''}
+                                        onChange={e => setNewRule({ ...newRule, triggerConfig: { ...newRule.triggerConfig, scoreThreshold: parseInt(e.target.value) } })}
+                                        className="w-24 px-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none" />
+                                </div>
+                            )}
+                            {newRule.triggerType === 'inactivity' && (
+                                <div className="mt-3 flex items-center gap-2">
+                                    <span className="text-sm text-slate-400">Inactive for</span>
+                                    <input type="number" min="1" max="90" placeholder="7" value={newRule.triggerConfig.inactivityDays || ''}
+                                        onChange={e => setNewRule({ ...newRule, triggerConfig: { ...newRule.triggerConfig, inactivityDays: parseInt(e.target.value) } })}
+                                        className="w-20 px-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none" />
+                                    <span className="text-sm text-slate-400">days</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Action */}
+                        <div>
+                            <label className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-2 block">Then (Action)</label>
+                            <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+                                {ACTION_TYPES.map(a => (
+                                    <button key={a.value} onClick={() => setNewRule({ ...newRule, actionType: a.value, actionConfig: {} })}
+                                        className={`p-3 rounded-xl text-xs font-bold border transition-all cursor-pointer text-left
+                                            ${newRule.actionType === a.value
+                                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                                                : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:bg-white/[0.04]'}`}>
+                                        <span className="material-symbols-outlined text-sm block mb-1">{a.icon}</span>
+                                        {a.label}
+                                    </button>
+                                ))}
+                            </div>
+                            {/* Action config */}
+                            {newRule.actionType === 'move_stage' && (
+                                <select value={newRule.actionConfig.targetStage || ''} onChange={e => setNewRule({ ...newRule, actionConfig: { ...newRule.actionConfig, targetStage: e.target.value } })}
+                                    className="mt-3 w-full px-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none">
+                                    <option value="">Select target stage</option>
+                                    {funnel.stages?.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+                                </select>
+                            )}
+                            {newRule.actionType === 'change_status' && (
+                                <select value={newRule.actionConfig.targetStatus || ''} onChange={e => setNewRule({ ...newRule, actionConfig: { ...newRule.actionConfig, targetStatus: e.target.value } })}
+                                    className="mt-3 w-full px-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none">
+                                    <option value="">Select status</option>
+                                    <option value="active">Active</option>
+                                    <option value="converted">Converted</option>
+                                    <option value="lost">Lost</option>
+                                    <option value="paused">Paused</option>
+                                </select>
+                            )}
+                            {newRule.actionType === 'update_score' && (
+                                <input type="number" placeholder="Score change (+10 or -5)" value={newRule.actionConfig.scoreChange || ''}
+                                    onChange={e => setNewRule({ ...newRule, actionConfig: { ...newRule.actionConfig, scoreChange: parseInt(e.target.value) } })}
+                                    className="mt-3 w-full px-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none" />
+                            )}
+                            {(newRule.actionType === 'add_tag' || newRule.actionType === 'remove_tag') && (
+                                <input type="text" placeholder="Tag name" value={newRule.actionConfig.tagName || ''}
+                                    onChange={e => setNewRule({ ...newRule, actionConfig: { ...newRule.actionConfig, tagName: e.target.value } })}
+                                    className="mt-3 w-full px-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none" />
+                            )}
+                            {newRule.actionType === 'send_notification' && (
+                                <input type="text" placeholder="Notification message" value={newRule.actionConfig.notificationMessage || ''}
+                                    onChange={e => setNewRule({ ...newRule, actionConfig: { ...newRule.actionConfig, notificationMessage: e.target.value } })}
+                                    className="mt-3 w-full px-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm outline-none" />
+                            )}
+                        </div>
+
+                        {/* Create Button */}
+                        <div className="flex justify-end gap-2 pt-2">
+                            <button onClick={() => setShowCreate(false)} className="px-4 py-2 rounded-xl text-sm text-slate-400 hover:text-white cursor-pointer">Cancel</button>
+                            <button onClick={handleCreate}
+                                className="px-5 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-orange-500 to-amber-500 text-white cursor-pointer flex items-center gap-1.5">
+                                <span className="material-symbols-outlined text-sm">bolt</span> Create Rule
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Rules List */}
+            {loading ? (
+                <div className="text-center py-12">
+                    <span className="material-symbols-outlined text-4xl text-orange-400 animate-spin">progress_activity</span>
+                    <p className="text-slate-500 mt-3">Loading automations...</p>
+                </div>
+            ) : rules.length === 0 ? (
+                <div className="glass-panel rounded-2xl p-12 text-center">
+                    <span className="material-symbols-outlined text-5xl text-orange-400/40 mb-4 block">bolt</span>
+                    <h3 className="text-white font-bold text-lg mb-2">No Automation Rules Yet</h3>
+                    <p className="text-slate-500 text-sm mb-6 max-w-lg mx-auto">
+                        Automation rules make your funnel self-running. Create rules to auto-move leads, update scores,
+                        trigger nurture sequences, and more — all based on real-time behavior.
+                    </p>
+                    <div className="flex gap-3 justify-center">
+                        <button onClick={() => setShowAiInput(true)}
+                            className="px-5 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-purple-500 to-indigo-500 text-white cursor-pointer flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Auto-Generate
+                        </button>
+                        <button onClick={() => setShowCreate(true)}
+                            className="px-5 py-2.5 rounded-xl text-sm font-bold bg-white/[0.06] border border-white/[0.08] text-white cursor-pointer flex items-center gap-1.5 hover:bg-white/[0.1] transition-all">
+                            <span className="material-symbols-outlined text-sm">add</span> Create Manually
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    {rules.map(rule => {
+                        const triggerInfo = TRIGGER_TYPES.find(t => t.value === rule.trigger?.type) || { label: rule.trigger?.type, icon: 'bolt' }
+                        const isExpanded = expandedRule === rule._id
+
+                        return (
+                            <div key={rule._id} className={`glass-panel rounded-2xl overflow-hidden transition-all ${rule.enabled ? '' : 'opacity-50'}`}>
+                                {/* Rule Header */}
+                                <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-white/[0.02] transition-all"
+                                    onClick={() => setExpandedRule(isExpanded ? null : rule._id)}>
+                                    <div className="flex items-center gap-3 flex-1">
+                                        <div className="size-10 rounded-xl flex items-center justify-center" style={{ background: `${rule.color || '#f59e0b'}15` }}>
+                                            <span className="material-symbols-outlined" style={{ color: rule.color || '#f59e0b', fontSize: '20px' }}>
+                                                {rule.icon || 'bolt'}
+                                            </span>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="text-white font-bold text-sm truncate flex items-center gap-2">
+                                                {rule.name}
+                                                {rule.aiGenerated && (
+                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300">AI</span>
+                                                )}
+                                            </h4>
+                                            <p className="text-xs text-slate-500 truncate">
+                                                When <span className="text-orange-300">{triggerInfo.label}</span>
+                                                {' → '}
+                                                <span className="text-emerald-300">{rule.actions?.length || 0} action{(rule.actions?.length || 0) !== 1 ? 's' : ''}</span>
+                                                {rule.executionCount > 0 && (
+                                                    <span className="ml-2 text-slate-600">· {rule.executionCount} runs</span>
+                                                )}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={(e) => { e.stopPropagation(); onToggle(rule._id) }}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer
+                                                ${rule.enabled
+                                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                    : 'bg-white/[0.04] text-slate-500 border border-white/[0.06]'}`}>
+                                            {rule.enabled ? 'Active' : 'Paused'}
+                                        </button>
+                                        <button onClick={(e) => { e.stopPropagation(); onDelete(rule._id) }}
+                                            className="size-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer">
+                                            <span className="material-symbols-outlined text-sm">delete</span>
+                                        </button>
+                                        <span className={`material-symbols-outlined text-slate-500 text-sm transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                                            expand_more
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Expanded Details */}
+                                {isExpanded && (
+                                    <div className="border-t border-white/[0.06] p-4 space-y-4">
+                                        {rule.description && (
+                                            <p className="text-sm text-slate-400">{rule.description}</p>
+                                        )}
+
+                                        {/* Trigger + Actions visual */}
+                                        <div className="flex items-start gap-4">
+                                            <div className="flex-1 p-3 rounded-xl bg-orange-500/5 border border-orange-500/10">
+                                                <div className="text-xs text-orange-400 font-bold uppercase tracking-wider mb-1">Trigger</div>
+                                                <div className="flex items-center gap-2 text-sm text-white">
+                                                    <span className="material-symbols-outlined text-orange-400 text-sm">{triggerInfo.icon}</span>
+                                                    {triggerInfo.label}
+                                                    {rule.trigger?.toStage && <span className="text-slate-500">→ {rule.trigger.toStage}</span>}
+                                                    {rule.trigger?.scoreThreshold && <span className="text-slate-500">{rule.trigger.scoreDirection} {rule.trigger.scoreThreshold}</span>}
+                                                    {rule.trigger?.inactivityDays && <span className="text-slate-500">{rule.trigger.inactivityDays} days</span>}
+                                                </div>
+                                            </div>
+                                            <span className="material-symbols-outlined text-slate-600 mt-3">arrow_forward</span>
+                                            <div className="flex-1 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
+                                                <div className="text-xs text-emerald-400 font-bold uppercase tracking-wider mb-1">Actions</div>
+                                                {rule.actions?.map((a, i) => {
+                                                    const aInfo = ACTION_TYPES.find(at => at.value === a.type) || { label: a.type, icon: 'bolt' }
+                                                    return (
+                                                        <div key={i} className="flex items-center gap-2 text-sm text-white mb-1">
+                                                            <span className="material-symbols-outlined text-emerald-400 text-sm">{aInfo.icon}</span>
+                                                            {aInfo.label}
+                                                            {a.targetStage && <span className="text-slate-500">→ "{a.targetStage}"</span>}
+                                                            {a.targetStatus && <span className="text-slate-500">→ {a.targetStatus}</span>}
+                                                            {a.scoreChange && <span className="text-slate-500">{a.scoreChange > 0 ? '+' : ''}{a.scoreChange}</span>}
+                                                            {a.tagName && <span className="text-slate-500">"{a.tagName}"</span>}
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        {/* Recent Executions */}
+                                        {rule.recentExecutions?.length > 0 && (
+                                            <div>
+                                                <div className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Recent Executions</div>
+                                                <div className="space-y-1 max-h-32 overflow-y-auto">
+                                                    {rule.recentExecutions.slice(0, 5).map((ex, i) => (
+                                                        <div key={i} className="flex items-center gap-2 text-xs p-2 rounded-lg bg-white/[0.02]">
+                                                            <span className="material-symbols-outlined text-emerald-400 text-xs">check_circle</span>
+                                                            <span className="text-white font-medium">{ex.entryName}</span>
+                                                            <span className="text-slate-500">—</span>
+                                                            <span className="text-slate-400 flex-1 truncate">{ex.actionsExecuted?.join(', ')}</span>
+                                                            <span className="text-slate-600 text-[10px]">{new Date(ex.executedAt).toLocaleDateString()}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+
+            {/* How It Works */}
+            <div className="glass-panel rounded-2xl p-6" style={{ background: 'linear-gradient(135deg, #f59e0b06, #ef444406)' }}>
+                <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-orange-400 text-sm">info</span>
+                    How Automations Work
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {[
+                        { icon: 'sensors', title: 'Triggers Fire', desc: 'Rules auto-execute when events happen — entry created, stage moved, score changes, lead goes inactive' },
+                        { icon: 'checklist', title: 'Conditions Check', desc: 'Optional filters ensure rules only apply to the right leads (score > 70, specific source, etc.)' },
+                        { icon: 'bolt', title: 'Actions Execute', desc: 'Move stages, update scores, add tags, trigger nurture sequences — all automatically' },
+                    ].map(item => (
+                        <div key={item.title} className="flex gap-3">
+                            <div className="size-9 rounded-xl bg-orange-500/10 flex items-center justify-center shrink-0">
+                                <span className="material-symbols-outlined text-orange-400 text-sm">{item.icon}</span>
+                            </div>
+                            <div>
+                                <h4 className="text-white text-xs font-bold mb-0.5">{item.title}</h4>
+                                <p className="text-[11px] text-slate-500 leading-relaxed">{item.desc}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    )
+}

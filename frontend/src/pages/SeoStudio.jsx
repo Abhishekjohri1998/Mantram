@@ -278,6 +278,13 @@ export default function SeoStudio() {
                     </div>
                 )}
 
+                {/* ═══ HELP VIEW ═══ */}
+                {view === 'help' && (
+                    <div className="animate-fade-in">
+                        <SeoHelpView onBack={goHome} />
+                    </div>
+                )}
+
                 {/* ═══ HOME VIEW ═══ */}
                 {view === 'home' && (
                     <div className="animate-fade-in">
@@ -306,7 +313,13 @@ export default function SeoStudio() {
                                             </p>
                                         </div>
                                     </div>
-                                    {!website && <button onClick={() => navigate(`/brand-dna`)} className="text-sm text-primary hover:text-primary-light cursor-pointer font-bold">Add Website →</button>}
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={() => setView('help')}
+                                            className="px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-slate-400 text-xs font-bold hover:bg-white/[0.08] cursor-pointer transition-all flex items-center gap-1.5">
+                                            <span className="material-symbols-outlined text-sm">menu_book</span> How It Works
+                                        </button>
+                                        {!website && <button onClick={() => navigate(`/brand-dna`)} className="text-sm text-primary hover:text-primary-light cursor-pointer font-bold">Add Website →</button>}
+                                    </div>
                                 </div>
 
                                 {error && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 mb-4"><p className="text-rose-400 text-xs">{error}</p></div>}
@@ -1293,6 +1306,226 @@ function PromptMiningResults({ results }) {
                     </div>
                 </div>
             )}
+        </div>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// SEO STUDIO — Help Documentation View
+// ═══════════════════════════════════════════════════════════════
+// Uses useState from the top-level import
+
+const SEO_HELP_SECTIONS = [
+    {
+        id: 'overview',
+        icon: 'rocket_launch',
+        color: '#6366f1',
+        title: 'Getting Started',
+        subtitle: 'How SEO Studio works',
+        steps: [
+            { icon: 'domain', title: 'Brand & Website', description: 'SEO Studio requires an active brand with a website URL. Select your brand and ensure the website is set in Brand DNA. All workflows analyze your actual website content.' },
+            { icon: 'search', title: 'Ask Bar', description: 'The search bar at the top lets you ask any SEO question in plain English. Example: "Find trending keywords for my category" or "Why am I not ranking for my brand name?" The AI provides answers with action items and follow-up questions.' },
+            { icon: 'dashboard', title: 'Workflow Cards', description: 'The home screen shows 8 AI-powered workflow cards. Click any card to run that workflow. Each one crawls your website, analyzes the data, and returns actionable results.' },
+        ]
+    },
+    {
+        id: 'workflows',
+        icon: 'health_and_safety',
+        color: '#10b981',
+        title: 'Core Workflows',
+        subtitle: 'The 8 AI-powered SEO workflows',
+        steps: [
+            { icon: 'health_and_safety', title: 'Health Check', description: 'Full SEO + AI visibility audit. Returns 5 scores (SEO Health, AI Visibility, Technical, Content, Authority), categorized issues by severity, and a Fix Now / Create Next / Monitor action board.' },
+            { icon: 'trending_up', title: 'Get Me Traffic', description: 'Keyword cluster discovery and content gap analysis. Returns keyword clusters with difficulty/intent, rising keywords, seasonal peaks, quick wins, and a 30-day traffic plan.' },
+            { icon: 'swords', title: 'Beat Competitors', description: 'Competitor gap analysis with outrank strategies. Analyzes competitor strengths/weaknesses, explains why they win, and provides a content plan to beat them.' },
+            { icon: 'smart_toy', title: 'AI Visibility', description: 'Checks if AI search engines (ChatGPT, Gemini, Perplexity) can find and recommend your brand. Scores your schema, FAQs, structured data, and provides optimization templates.' },
+            { icon: 'shield', title: 'Competitor War Room', description: 'Side-by-side scoring matrix against all your competitors. Includes keyword battles, content comparison, and a 90-day playbook to outperform them.' },
+            { icon: 'psychology', title: 'LLM Brand Probe', description: 'Live test: asks multiple AI models about your brand and checks if they mention you. Scores your visibility, accuracy, and sentiment across AI systems.' },
+            { icon: 'build', title: 'Auto-Fix Issues', description: 'Generates copy-paste code fixes from your last Health Check. Run a Health Check first, then Auto-Fix creates ready-to-implement schema blocks, meta tags, and HTML fixes.' },
+            { icon: 'chat_bubble', title: 'AI Prompt Mining', description: 'Discovers AI prompts where your brand should be recommended. Returns a content calendar to create pages that get cited by AI models.' },
+        ]
+    },
+    {
+        id: 'competitors',
+        icon: 'swords',
+        color: '#f59e0b',
+        title: 'Competitor Management',
+        subtitle: 'Map and manage your SEO competitors',
+        steps: [
+            { icon: 'person_add', title: 'Add Competitors', description: 'Expand the Competitors panel on the home screen. Enter a competitor\'s URL and click Add. Competitors are saved to your brand and used across all competitor-related workflows.' },
+            { icon: 'auto_awesome', title: 'Auto-Discover', description: 'Click "Auto-Discover" to let AI find your top competitors based on your website content and industry. AI-discovered competitors are tagged differently from manual ones.' },
+            { icon: 'close', title: 'Remove Competitors', description: 'Click the X icon on any competitor chip to remove it. You can have up to 8 competitors mapped at a time.' },
+        ]
+    },
+    {
+        id: 'analytics',
+        icon: 'monitoring',
+        color: '#3b82f6',
+        title: 'Google Analytics & Search Console',
+        subtitle: 'Real traffic data from your connected accounts',
+        steps: [
+            { icon: 'link', title: 'Connect', description: 'Connect Google Analytics and Search Console from the Integrations hub. Once connected, SEO Studio reads real data — no separate setup needed.' },
+            { icon: 'bar_chart', title: 'GA4 Dashboard', description: 'Select a GA4 property to see: Users, Sessions, Page Views, Bounce Rate, daily traffic chart, traffic channels breakdown, and top pages.' },
+            { icon: 'search', title: 'Search Console Data', description: 'Select a Search Console site to see: Clicks, Impressions, Avg Position, Avg CTR, top keywords with their SERP positions, and top pages by clicks.' },
+        ]
+    },
+    {
+        id: 'advanced',
+        icon: 'tune',
+        color: '#8b5cf6',
+        title: 'Advanced Tools',
+        subtitle: 'Deep-dive SEO tools for power users',
+        steps: [
+            { icon: 'space_dashboard', title: 'Overview Dashboard', description: 'Consolidated view of all your SEO metrics, recent audits, and quick access to all advanced features.' },
+            { icon: 'bug_report', title: 'Site Audit', description: 'Detailed technical SEO audit with issue categorization, severity badges, and specific fix recommendations.' },
+            { icon: 'key', title: 'Keyword Intelligence', description: 'Deep keyword research with volume, difficulty, intent classification, and opportunity scoring.' },
+            { icon: 'article', title: 'Content Opportunities', description: 'Content gap analysis showing topics your competitors rank for but you don\'t, with content briefs.' },
+            { icon: 'smart_toy', title: 'AI SEO Optimization', description: 'Optimize your pages for AI search engines. Structured data, FAQ schemas, and AI-friendly content patterns.' },
+            { icon: 'tune', title: 'On-Page Fixer', description: 'Page-level optimization with meta tag suggestions, heading structure fixes, and internal linking recommendations.' },
+        ]
+    },
+    {
+        id: 'ai-visibility',
+        icon: 'smart_toy',
+        color: '#06b6d4',
+        title: 'AI Search Visibility',
+        subtitle: 'Get recommended by ChatGPT, Gemini & Perplexity',
+        steps: [
+            { icon: 'psychology', title: 'Why AI SEO Matters', description: 'AI search (ChatGPT, Gemini, Perplexity) is replacing traditional search for many queries. If AI doesn\'t know about your brand, you\'re invisible to a growing segment of users.' },
+            { icon: 'verified', title: 'LLM Brand Probe', description: 'Run the LLM Probe to test if AI models mention your brand. See exactly how they describe you, what they say about your competitors, and where you\'re missing.' },
+            { icon: 'chat_bubble', title: 'Prompt Mining', description: 'Discover the specific prompts where your brand should appear. Create targeted content that gets cited by AI models when users ask relevant questions.' },
+            { icon: 'schema', title: 'Structured Data', description: 'AI models rely heavily on schema.org markup, JSON-LD, and FAQ blocks. Auto-Fix generates ready-to-paste code to improve your AI discoverability.' },
+        ]
+    },
+]
+
+const SEO_PRO_TIPS = [
+    { icon: '📊', tip: 'Run Health Check first — it gives you the baseline scores that all other workflows build upon.' },
+    { icon: '🔍', tip: 'Use the Ask Bar for quick questions before running a full workflow. It often has the answer you need.' },
+    { icon: '⚔️', tip: 'Map at least 3 competitors before running Beat Competitors or War Room for the best results.' },
+    { icon: '🤖', tip: 'AI Visibility is the future of SEO. Run LLM Probe and Prompt Mining to get ahead of competitors.' },
+    { icon: '🔧', tip: 'After Health Check, immediately run Auto-Fix. It generates copy-paste code you can implement instantly.' },
+    { icon: '📊', tip: 'Connect Google Analytics & Search Console to ground your AI analysis in real traffic data.' },
+]
+
+function SeoHelpView({ onBack }) {
+    const [expanded, setExpanded] = useState('overview')
+    return (
+        <div>
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                    <button onClick={onBack} className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                    </button>
+                    <div>
+                        <h2 className="text-white font-bold text-lg flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary">menu_book</span> SEO Studio Guide
+                        </h2>
+                        <p className="text-sm text-slate-500">Master AI-powered SEO intelligence for your brand</p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'linear-gradient(135deg, #10b98108, #3b82f608, #8b5cf608)' }}>
+                <h3 className="text-white font-bold mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-primary">info</span> What is SEO Studio?</h3>
+                <p className="text-slate-400 text-sm leading-relaxed mb-4">
+                    SEO Studio is your AI-powered <strong className="text-white">search intelligence hub</strong>.
+                    It has <strong className="text-white">8 specialized workflows</strong> that crawl your website, analyze competitors, and generate actionable strategies.
+                    From <strong className="text-white">health audits</strong> and <strong className="text-white">keyword discovery</strong> to
+                    <strong className="text-white"> AI visibility optimization</strong> and <strong className="text-white">auto-generated code fixes</strong>.
+                    Connected to Google Analytics & Search Console for real data.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                    {['8 Workflows', 'AI Ask Bar', 'Health Audit', 'Traffic Strategy', 'Competitor Analysis', 'AI Visibility', 'Auto-Fix', 'GA/GSC Data'].map(t => (
+                        <span key={t} className="px-3 py-1 rounded-full text-xs font-bold bg-white/[0.04] border border-white/[0.06] text-slate-400">{t}</span>
+                    ))}
+                </div>
+            </div>
+
+            <div className="glass-panel rounded-2xl p-5 mb-6">
+                <h3 className="text-white font-bold mb-4 text-sm flex items-center gap-2">
+                    <span className="material-symbols-outlined text-amber-400 text-lg">account_tree</span> Typical Workflow
+                </h3>
+                <div className="flex items-center gap-0 overflow-x-auto pb-2">
+                    {[
+                        { label: 'Health Check', icon: 'health_and_safety', color: '#10b981' },
+                        { label: 'Fix Issues', icon: 'build', color: '#f59e0b' },
+                        { label: 'Map Rivals', icon: 'swords', color: '#ef4444' },
+                        { label: 'Get Traffic', icon: 'trending_up', color: '#3b82f6' },
+                        { label: 'AI Visibility', icon: 'smart_toy', color: '#8b5cf6' },
+                        { label: 'Dominate! 🚀', icon: 'emoji_events', color: '#10b981' },
+                    ].map((step, idx, arr) => (
+                        <div key={step.label} className="flex items-center shrink-0">
+                            <div className="flex flex-col items-center gap-1.5 w-20">
+                                <div className="size-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${step.color}15` }}>
+                                    <span className="material-symbols-outlined text-lg" style={{ color: step.color }}>{step.icon}</span>
+                                </div>
+                                <p className="text-xs text-slate-400 text-center leading-tight font-medium">{step.label}</p>
+                            </div>
+                            {idx < arr.length - 1 && <span className="material-symbols-outlined text-slate-700 text-sm mx-1 shrink-0">chevron_right</span>}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="space-y-3 mb-6">
+                {SEO_HELP_SECTIONS.map(section => (
+                    <div key={section.id} className="glass-panel rounded-2xl overflow-hidden">
+                        <button onClick={() => setExpanded(expanded === section.id ? null : section.id)}
+                            className="w-full flex items-center gap-3 p-5 text-left hover:bg-white/[0.02] transition-all cursor-pointer">
+                            <div className="size-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${section.color}15` }}>
+                                <span className="material-symbols-outlined" style={{ color: section.color }}>{section.icon}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-white font-bold text-sm">{section.title}</p>
+                                <p className="text-slate-500 text-xs">{section.subtitle}</p>
+                            </div>
+                            <span className="text-xs text-slate-600 font-bold mr-1">{section.steps.length} topics</span>
+                            <span className={`material-symbols-outlined text-slate-500 transition-transform ${expanded === section.id ? 'rotate-180' : ''}`}>expand_more</span>
+                        </button>
+                        {expanded === section.id && (
+                            <div className="px-5 pb-5 space-y-3 border-t border-white/[0.04] pt-4">
+                                {section.steps.map((step, idx) => (
+                                    <div key={idx} className="flex gap-3">
+                                        <div className="flex flex-col items-center">
+                                            <div className="size-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${section.color}10` }}>
+                                                <span className="material-symbols-outlined text-sm" style={{ color: section.color }}>{step.icon}</span>
+                                            </div>
+                                            {idx < section.steps.length - 1 && <div className="w-px flex-1 mt-1" style={{ backgroundColor: `${section.color}20` }} />}
+                                        </div>
+                                        <div className="pb-3">
+                                            <p className="text-white font-bold text-sm mb-0.5">{step.title}</p>
+                                            <p className="text-slate-400 text-xs leading-relaxed">{step.description}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+
+            <div className="glass-panel rounded-2xl p-6" style={{ background: 'linear-gradient(135deg, #f59e0b08, #ef444408)' }}>
+                <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-amber-400">emoji_objects</span> Pro Tips
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {SEO_PRO_TIPS.map((tip, idx) => (
+                        <div key={idx} className="flex gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                            <span className="text-lg shrink-0 mt-0.5">{tip.icon}</span>
+                            <p className="text-xs text-slate-400 leading-relaxed">{tip.tip}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="text-center mt-6 py-6">
+                <p className="text-slate-500 text-sm mb-3">Ready to optimize?</p>
+                <button onClick={onBack} className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-purple-500 text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2 mx-auto">
+                    <span className="material-symbols-outlined text-sm">travel_explore</span> Go to SEO Studio
+                </button>
+            </div>
         </div>
     )
 }

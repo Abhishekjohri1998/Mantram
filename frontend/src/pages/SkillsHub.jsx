@@ -344,6 +344,10 @@ export default function SkillsHub() {
                                 <p className="text-xs text-slate-500 mt-0.5">{skillsList.length} skills available • Click to run, clone to customize</p>
                             </div>
                             <div className="flex gap-2">
+                                <button onClick={() => setView('help')}
+                                    className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-slate-400 text-xs font-bold hover:bg-white/[0.08] cursor-pointer transition-all flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-sm">menu_book</span> How It Works
+                                </button>
                                 <button onClick={() => setView('build')}
                                     className="px-4 py-2.5 rounded-xl bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 cursor-pointer transition-all flex items-center gap-2">
                                     <span className="material-symbols-outlined text-sm">add</span> Create Skill
@@ -413,6 +417,12 @@ export default function SkillsHub() {
                     </div>
                 )}
 
+                {/* ═══ HELP VIEW ═══ */}
+                {view === 'help' && (
+                    <div className="animate-fade-in">
+                        <SkillsHelpView onBack={goHome} />
+                    </div>
+                )}
 
                 {/* ═══ RUN SKILL VIEW ═══ */}
                 {view === 'run' && selectedSkill && (
@@ -676,5 +686,206 @@ export default function SkillsHub() {
                 )}
             </div>
         </DashboardLayout>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// SKILLS HUB — Help Documentation View
+// ═══════════════════════════════════════════════════════════════
+const SKILLS_HELP_SECTIONS = [
+    {
+        id: 'getting-started',
+        icon: 'rocket_launch',
+        color: '#6366f1',
+        title: 'Getting Started',
+        subtitle: 'Understand the Skills Hub in 30 seconds',
+        steps: [
+            { icon: 'apps', title: 'What Are Skills?', description: 'Skills are reusable AI-powered marketing automations. Each skill has instructions, inputs, and an output format — configured once, run anytime. Think of them as custom AI copilots for specific marketing tasks.' },
+            { icon: 'browse_activity', title: 'Browse the Library', description: 'The Skills Hub opens to the Browse view showing all available skills. Use category tabs (Content, Creative, SEO, Social, Performance, General) to filter. Each card shows the skill name, description, category, usage count, and average rating.' },
+            { icon: 'play_arrow', title: 'Run a Skill', description: 'Click any skill card to open the Run view. Fill in the required inputs, and click "Run Skill". The AI processes your inputs with your brand context and delivers structured results.' },
+        ]
+    },
+    {
+        id: 'run-skill',
+        icon: 'play_circle',
+        color: '#10b981',
+        title: 'Running Skills',
+        subtitle: 'Execute skills and get AI-powered output',
+        steps: [
+            { icon: 'input', title: 'Input Fields', description: 'Each skill defines its own input fields — text, textarea, select, number, or URL. Required fields are marked with a red asterisk. Some skills need no inputs at all — they use your brand context directly.' },
+            { icon: 'domain', title: 'Brand Context', description: 'When you run a skill, your active brand\'s DNA (name, industry, tone, values, audience) is automatically injected. The AI output is tailored to your brand identity every time.' },
+            { icon: 'auto_awesome', title: 'AI Output', description: 'Results are rendered based on the skill\'s output format: Structured JSON shows organized sections with key-value pairs, Markdown renders formatted text, and HTML outputs display rich content.' },
+            { icon: 'star', title: 'Rate Results', description: 'After running a skill, rate the output from 1 to 5 stars. Ratings help the community identify the best skills and provide feedback for improvement.' },
+            { icon: 'content_copy', title: 'Copy Output', description: 'Click "Copy Output" to copy the full result to your clipboard. Use it in your content tools, emails, campaigns, or presentations.' },
+        ]
+    },
+    {
+        id: 'build-skill',
+        icon: 'build',
+        color: '#8b5cf6',
+        title: 'Building Custom Skills',
+        subtitle: 'Create your own AI marketing skills',
+        steps: [
+            { icon: 'add', title: 'Open the Builder', description: 'Click "Create Skill" in the header. You\'ll see the Build view with fields for name, description, instructions, category, tags, output format, temperature, and input fields.' },
+            { icon: 'edit_note', title: 'Write Instructions', description: 'The Instructions field is the most important. Write clear, detailed instructions for the AI: what to produce, the structure, tone, quality rules, and any constraints. Be specific — better instructions = better output.' },
+            { icon: 'auto_awesome', title: 'Enhance with AI', description: 'Click "Enhance with AI" to automatically improve your rough instructions. The AI rewrites them into professional-grade prompts with structured output rules, quality checks, and formatting guidelines.' },
+            { icon: 'tune', title: 'Configure Settings', description: 'Set the category (Content, Creative, SEO, etc.), tags for discoverability, output format (Structured JSON, Markdown, HTML), and temperature (0.0 = precise, 2.0 = creative). Default 0.7 works for most skills.' },
+            { icon: 'text_fields', title: 'Define Input Fields', description: 'Click "Add Field" to create input fields users fill in when running the skill. Each field needs a name (field_name), display label, type (text, textarea, select, number, URL), and required flag.' },
+        ]
+    },
+    {
+        id: 'ai-generator',
+        icon: 'psychology',
+        color: '#f59e0b',
+        title: 'AI Skill Generator',
+        subtitle: 'Describe a skill and AI builds it for you',
+        steps: [
+            { icon: 'chat', title: 'Describe Your Skill', description: 'Type a natural language description in the AI Generator bar at the top of the Build view. Example: "Create a skill for generating WhatsApp broadcast messages with Hinglish tone for D2C brands."' },
+            { icon: 'auto_awesome', title: 'Auto-Generated', description: 'The AI creates the complete skill config: name, description, detailed instructions, category, tags, icon, color, temperature, output format, and all necessary input fields — ready to save.' },
+            { icon: 'edit', title: 'Review & Customize', description: 'The generated skill populates all form fields. Review and customize anything — tweak instructions, add/remove input fields, change the category or output format before saving.' },
+        ]
+    },
+    {
+        id: 'manage',
+        icon: 'settings',
+        color: '#06b6d4',
+        title: 'Managing Skills',
+        subtitle: 'Clone, customize, and organize your skills library',
+        steps: [
+            { icon: 'content_copy', title: 'Clone a Skill', description: 'Click the Clone button on any skill to duplicate it. This creates an editable copy — perfect for customizing a built-in skill to your specific needs without losing the original.' },
+            { icon: 'delete', title: 'Delete Skills', description: 'Remove custom skills you no longer need. Built-in skills can\'t be deleted, but you can clone and modify them instead.' },
+            { icon: 'label', title: 'BUILT-IN Badge', description: 'Skills marked with a "BUILT-IN" badge are pre-configured by Mantram. They\'re available to all users and can\'t be modified directly — clone them first to customize.' },
+            { icon: 'filter_alt', title: 'Category Filters', description: 'Use the category tabs to filter skills: All Skills, Content, Creative, SEO, Social, Performance, General. Categories help organize your library as it grows.' },
+        ]
+    },
+]
+
+const SKILLS_PRO_TIPS = [
+    { icon: '🎯', tip: 'Start by running built-in skills to understand how they work, then clone and customize them for your brand.' },
+    { icon: '✍️', tip: 'The more detailed your Instructions, the better the output. Include format rules, quality checks, and examples.' },
+    { icon: '🤖', tip: 'Use the AI Skill Generator for quick skill creation — it handles 80% of the setup automatically.' },
+    { icon: '⚡', tip: 'Use "Enhance with AI" to upgrade rough instructions into professional prompt engineering.' },
+    { icon: '📊', tip: 'Set output format to "Structured JSON" for data you want to reuse in other tools.' },
+    { icon: '🌡️', tip: 'Lower temperature (0.3-0.5) for factual/analytical output, higher (0.8-1.2) for creative/brainstorming.' },
+]
+
+function SkillsHelpView({ onBack }) {
+    const [expanded, setExpanded] = useState('getting-started')
+    return (
+        <div>
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                    <button onClick={onBack} className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                    </button>
+                    <div>
+                        <h2 className="text-white font-bold text-lg flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary">menu_book</span> Skills Hub Guide
+                        </h2>
+                        <p className="text-sm text-slate-500">Create, run, and manage AI-powered marketing skills</p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'linear-gradient(135deg, #6366f108, #8b5cf608, #10b98108)' }}>
+                <h3 className="text-white font-bold mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-primary">info</span> What is Skills Hub?</h3>
+                <p className="text-slate-400 text-sm leading-relaxed mb-4">
+                    Skills Hub is your library of <strong className="text-white">reusable AI marketing automations</strong>.
+                    Each skill is a pre-configured AI workflow — with instructions, inputs, and output format — that you can <strong className="text-white">run anytime</strong> with your brand context.
+                    <strong className="text-white"> Build custom skills</strong> from scratch, use the <strong className="text-white">AI Generator</strong> to create them from a description,
+                    or <strong className="text-white">clone and customize</strong> built-in skills.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                    {['Browse Library', 'Run Skills', 'Build Custom', 'AI Generator', 'Clone & Edit', 'Rate & Review'].map(t => (
+                        <span key={t} className="px-3 py-1 rounded-full text-xs font-bold bg-white/[0.04] border border-white/[0.06] text-slate-400">{t}</span>
+                    ))}
+                </div>
+            </div>
+
+            <div className="glass-panel rounded-2xl p-5 mb-6">
+                <h3 className="text-white font-bold mb-4 text-sm flex items-center gap-2">
+                    <span className="material-symbols-outlined text-amber-400 text-lg">account_tree</span> Typical Workflow
+                </h3>
+                <div className="flex items-center gap-0 overflow-x-auto pb-2">
+                    {[
+                        { label: 'Browse Skills', icon: 'apps', color: '#6366f1' },
+                        { label: 'Pick a Skill', icon: 'touch_app', color: '#10b981' },
+                        { label: 'Fill Inputs', icon: 'input', color: '#f59e0b' },
+                        { label: 'Run Skill', icon: 'play_arrow', color: '#8b5cf6' },
+                        { label: 'Get Output', icon: 'auto_awesome', color: '#06b6d4' },
+                        { label: 'Rate & Reuse', icon: 'star', color: '#ec4899' },
+                    ].map((step, idx, arr) => (
+                        <div key={step.label} className="flex items-center shrink-0">
+                            <div className="flex flex-col items-center gap-1.5 w-20">
+                                <div className="size-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${step.color}15` }}>
+                                    <span className="material-symbols-outlined text-lg" style={{ color: step.color }}>{step.icon}</span>
+                                </div>
+                                <p className="text-xs text-slate-400 text-center leading-tight font-medium">{step.label}</p>
+                            </div>
+                            {idx < arr.length - 1 && <span className="material-symbols-outlined text-slate-700 text-sm mx-1 shrink-0">chevron_right</span>}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="space-y-3 mb-6">
+                {SKILLS_HELP_SECTIONS.map(section => (
+                    <div key={section.id} className="glass-panel rounded-2xl overflow-hidden">
+                        <button onClick={() => setExpanded(expanded === section.id ? null : section.id)}
+                            className="w-full flex items-center gap-3 p-5 text-left hover:bg-white/[0.02] transition-all cursor-pointer">
+                            <div className="size-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${section.color}15` }}>
+                                <span className="material-symbols-outlined" style={{ color: section.color }}>{section.icon}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-white font-bold text-sm">{section.title}</p>
+                                <p className="text-slate-500 text-xs">{section.subtitle}</p>
+                            </div>
+                            <span className="text-xs text-slate-600 font-bold mr-1">{section.steps.length} topics</span>
+                            <span className={`material-symbols-outlined text-slate-500 transition-transform ${expanded === section.id ? 'rotate-180' : ''}`}>expand_more</span>
+                        </button>
+                        {expanded === section.id && (
+                            <div className="px-5 pb-5 space-y-3 border-t border-white/[0.04] pt-4">
+                                {section.steps.map((step, idx) => (
+                                    <div key={idx} className="flex gap-3">
+                                        <div className="flex flex-col items-center">
+                                            <div className="size-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${section.color}10` }}>
+                                                <span className="material-symbols-outlined text-sm" style={{ color: section.color }}>{step.icon}</span>
+                                            </div>
+                                            {idx < section.steps.length - 1 && <div className="w-px flex-1 mt-1" style={{ backgroundColor: `${section.color}20` }} />}
+                                        </div>
+                                        <div className="pb-3">
+                                            <p className="text-white font-bold text-sm mb-0.5">{step.title}</p>
+                                            <p className="text-slate-400 text-xs leading-relaxed">{step.description}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+
+            <div className="glass-panel rounded-2xl p-6" style={{ background: 'linear-gradient(135deg, #f59e0b08, #ef444408)' }}>
+                <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-amber-400">emoji_objects</span> Pro Tips
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {SKILLS_PRO_TIPS.map((tip, idx) => (
+                        <div key={idx} className="flex gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                            <span className="text-lg shrink-0 mt-0.5">{tip.icon}</span>
+                            <p className="text-xs text-slate-400 leading-relaxed">{tip.tip}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="text-center mt-6 py-6">
+                <p className="text-slate-500 text-sm mb-3">Ready to explore?</p>
+                <button onClick={onBack} className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-purple-500 text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2 mx-auto">
+                    <span className="material-symbols-outlined text-sm">apps</span> Browse Skills
+                </button>
+            </div>
+        </div>
     )
 }

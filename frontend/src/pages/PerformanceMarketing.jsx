@@ -319,10 +319,24 @@ export default function PerformanceMarketing() {
                             {t.label}
                         </button>
                     ))}
+                    <button onClick={() => setTab('help')}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${tab === 'help' ? 'bg-gradient-to-r from-violet-500/20 to-cyan-500/20 text-white border border-violet-500/30' : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'}`}>
+                        <span className="material-symbols-outlined text-lg">menu_book</span>
+                        How It Works
+                    </button>
                 </div>
 
                 {/* Agent Fidato — Competitive Intelligence */}
                 <AgentFidatoPanel studio="performance" />
+
+                {/* ════════════════════════════════════════════════════════════ */}
+                {/* TAB: HELP                                                   */}
+                {/* ════════════════════════════════════════════════════════════ */}
+                {tab === 'help' && (
+                    <div className="animate-fade-in">
+                        <PMHelpView onBack={() => setTab('dashboard')} />
+                    </div>
+                )}
 
                 {/* ════════════════════════════════════════════════════════════ */}
                 {/* TAB: DASHBOARD                                             */}
@@ -1292,5 +1306,229 @@ export default function PerformanceMarketing() {
                 )}
             </div>
         </DashboardLayout>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// PERFORMANCE MARKETING — Help Documentation View
+// ═══════════════════════════════════════════════════════════════
+const PM_HELP_SECTIONS = [
+    {
+        id: 'getting-started',
+        icon: 'rocket_launch',
+        color: '#8b5cf6',
+        title: 'Getting Started',
+        subtitle: 'Understand Performance Marketing Studio',
+        steps: [
+            { icon: 'campaign', title: 'What is PM Studio?', description: 'Performance Marketing Studio is your AI-powered advertising command center. It handles competitor research, strategy generation, campaign creation, A/B testing, and performance analysis — all from one place.' },
+            { icon: 'link', title: 'Connect Platforms', description: 'Connect Meta Ads and Google Ads from the Dashboard tab. Platform connections enable real campaign management and performance tracking.' },
+            { icon: 'space_dashboard', title: 'Dashboard Overview', description: 'The Dashboard tab shows overall performance metrics (Total Spend, Impressions, Clicks, CTR, ROAS), platform connection status, and quick actions.' },
+        ]
+    },
+    {
+        id: 'research',
+        icon: 'search_insights',
+        color: '#3b82f6',
+        title: 'Research',
+        subtitle: 'AI-powered competitor and market research',
+        steps: [
+            { icon: 'search', title: 'Research Query', description: 'Enter a research focus (e.g., "Instagram ads for fitness brands") and list competitors. The AI analyzes competitor strategies, ad creatives, targeting patterns, and budget estimates.' },
+            { icon: 'trending_up', title: 'Trend Data', description: 'Research results include trend data: market movements, seasonal patterns, and emerging opportunities in your category.' },
+            { icon: 'auto_awesome', title: 'Grok AI Trends', description: 'The Dashboard shows Grok-powered trending topics, SEO keywords, and content ideas relevant to your brand. Updated in real-time from X/Twitter trends.' },
+            { icon: 'summarize', title: 'Saved Reports', description: 'Research and strategy results are automatically saved as reports. Access them from the Reports tab to reference past insights.' },
+        ]
+    },
+    {
+        id: 'strategy',
+        icon: 'strategy',
+        color: '#10b981',
+        title: 'Strategy Generation',
+        subtitle: 'AI-generated marketing strategies',
+        steps: [
+            { icon: 'target', title: 'Set Objective', description: 'Choose your campaign objective: Traffic, Conversions, Brand Awareness, Engagement, or App Installs. Each objective shapes the AI\'s strategy differently.' },
+            { icon: 'payments', title: 'Budget & Duration', description: 'Specify your budget and campaign duration (7, 14, 30, 60, or 90 days). The AI distributes budget across platforms and campaigns optimally.' },
+            { icon: 'auto_awesome', title: 'AI Strategy', description: 'The AI generates a complete strategy: audience targeting, platform mix, budget allocation, creative direction, bidding strategy, and expected outcomes. Based on your brand DNA and research data.' },
+            { icon: 'edit', title: 'Customize & Iterate', description: 'Review the generated strategy. Run new strategies with different objectives or budgets to compare approaches. Each strategy builds on previous research.' },
+        ]
+    },
+    {
+        id: 'campaigns',
+        icon: 'campaign',
+        color: '#f59e0b',
+        title: 'Campaigns',
+        subtitle: 'Manage ad campaigns across platforms',
+        steps: [
+            { icon: 'add_circle', title: 'Create Campaign', description: 'Create campaigns manually or from a strategy recommendation. Fill in campaign name, platform (Meta/Google), objective, budget, and targeting details.' },
+            { icon: 'play_arrow', title: 'Launch & Monitor', description: 'Launch campaigns to your connected platforms. Monitor performance in real-time: spend, impressions, clicks, CTR, conversions, and ROAS.' },
+            { icon: 'pause', title: 'Manage State', description: 'Pause, resume, or stop campaigns. View campaign status (Active, Paused, Draft, Completed) and make adjustments based on performance.' },
+            { icon: 'bar_chart', title: 'Performance Cards', description: 'Each campaign has a performance card showing key metrics. Color-coded ROAS indicators: Green (profitable), Amber (break-even), Red (unprofitable).' },
+        ]
+    },
+    {
+        id: 'ab-tests',
+        icon: 'science',
+        color: '#ec4899',
+        title: 'A/B Testing',
+        subtitle: 'Test variations to optimize performance',
+        steps: [
+            { icon: 'compare', title: 'Create Tests', description: 'Set up A/B tests to compare different ad creatives, copy, targeting, or landing pages. The system tracks which variation performs better.' },
+            { icon: 'analytics', title: 'Statistical Significance', description: 'Tests run until statistically significant results are achieved. The AI declares a winner and provides insights on why one variation outperformed.' },
+            { icon: 'auto_awesome', title: 'AI Recommendations', description: 'Based on test results, the AI suggests optimizations: scale the winner, test new variations, or adjust targeting.' },
+        ]
+    },
+    {
+        id: 'learnings',
+        icon: 'psychology',
+        color: '#06b6d4',
+        title: 'Learnings',
+        subtitle: 'AI-compiled insights from your campaigns',
+        steps: [
+            { icon: 'school', title: 'Automatic Learning', description: 'The AI analyzes all your campaigns, tests, and strategies to extract actionable learnings. What works for your brand, what doesn\'t, and why.' },
+            { icon: 'lightbulb', title: 'Pattern Detection', description: 'Identifies patterns across campaigns: best performing platforms, optimal budgets, winning audience segments, and seasonal trends.' },
+            { icon: 'trending_up', title: 'Improvement Tracking', description: 'Track how your performance marketing improves over time. The learnings feed back into new strategy generation.' },
+        ]
+    },
+    {
+        id: 'ad-creative',
+        icon: 'image',
+        color: '#f43f5e',
+        title: 'AI Ad Creative',
+        subtitle: 'Generate ad images with AI',
+        steps: [
+            { icon: 'auto_awesome', title: 'Prompt-Based Generation', description: 'Enter a description of the ad image you want. Example: "Minimalist product shot of a fitness tracker on a marble surface with warm lighting."' },
+            { icon: 'image', title: 'AI-Generated Images', description: 'The AI generates high-quality ad images based on your prompt. Download and use them directly in your Meta or Google ad campaigns.' },
+            { icon: 'palette', title: 'Brand Consistency', description: 'The generator considers your brand DNA to ensure generated images align with your brand\'s visual identity and tone.' },
+        ]
+    },
+]
+
+const PM_PRO_TIPS = [
+    { icon: '🔍', tip: 'Always start with Research before creating a Strategy. Research data makes strategies 10x more effective.' },
+    { icon: '🎯', tip: 'Match your campaign objective to your business goal. Traffic ≠ Conversions ≠ Brand Awareness.' },
+    { icon: '🧪', tip: 'Run A/B tests on everything. Small improvements in CTR compound into massive ROAS gains.' },
+    { icon: '📊', tip: 'Check Grok trends daily. Being first to trend-jack gives you 3x cheaper CPMs.' },
+    { icon: '🧠', tip: 'Review Learnings before creating new campaigns. Your past data is your biggest competitive advantage.' },
+    { icon: '🖼️', tip: 'Use AI Ad Creative to generate multiple variations quickly, then A/B test the best ones.' },
+]
+
+function PMHelpView({ onBack }) {
+    const [expanded, setExpanded] = useState('getting-started')
+    return (
+        <div>
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                    <button onClick={onBack} className="size-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-slate-400">arrow_back</span>
+                    </button>
+                    <div>
+                        <h2 className="text-white font-bold text-lg flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary">menu_book</span> Performance Marketing Guide
+                        </h2>
+                        <p className="text-sm text-slate-500">Master AI-powered ad strategies, campaigns, and optimization</p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'linear-gradient(135deg, #8b5cf608, #3b82f608, #10b98108)' }}>
+                <h3 className="text-white font-bold mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-primary">info</span> What is Performance Marketing Studio?</h3>
+                <p className="text-slate-400 text-sm leading-relaxed mb-4">
+                    Performance Marketing Studio is your <strong className="text-white">AI advertising command center</strong>.
+                    Run <strong className="text-white">competitor research</strong>, generate <strong className="text-white">AI strategies</strong>,
+                    create and manage <strong className="text-white">campaigns on Meta & Google</strong>,
+                    <strong className="text-white"> A/B test</strong> variations, and track <strong className="text-white">learnings</strong> —
+                    all powered by AI with your brand context. Plus <strong className="text-white">Grok-powered real-time trends</strong>.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                    {['Research', 'Strategy', 'Campaigns', 'A/B Tests', 'Learnings', 'Reports', 'Ad Creative', 'Grok Trends'].map(t => (
+                        <span key={t} className="px-3 py-1 rounded-full text-xs font-bold bg-white/[0.04] border border-white/[0.06] text-slate-400">{t}</span>
+                    ))}
+                </div>
+            </div>
+
+            <div className="glass-panel rounded-2xl p-5 mb-6">
+                <h3 className="text-white font-bold mb-4 text-sm flex items-center gap-2">
+                    <span className="material-symbols-outlined text-amber-400 text-lg">account_tree</span> Typical Workflow
+                </h3>
+                <div className="flex items-center gap-0 overflow-x-auto pb-2">
+                    {[
+                        { label: 'Research', icon: 'search_insights', color: '#3b82f6' },
+                        { label: 'Strategy', icon: 'strategy', color: '#10b981' },
+                        { label: 'Create Ads', icon: 'image', color: '#f43f5e' },
+                        { label: 'Launch', icon: 'campaign', color: '#f59e0b' },
+                        { label: 'A/B Test', icon: 'science', color: '#ec4899' },
+                        { label: 'Optimize', icon: 'trending_up', color: '#8b5cf6' },
+                    ].map((step, idx, arr) => (
+                        <div key={step.label} className="flex items-center shrink-0">
+                            <div className="flex flex-col items-center gap-1.5 w-20">
+                                <div className="size-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${step.color}15` }}>
+                                    <span className="material-symbols-outlined text-lg" style={{ color: step.color }}>{step.icon}</span>
+                                </div>
+                                <p className="text-xs text-slate-400 text-center leading-tight font-medium">{step.label}</p>
+                            </div>
+                            {idx < arr.length - 1 && <span className="material-symbols-outlined text-slate-700 text-sm mx-1 shrink-0">chevron_right</span>}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="space-y-3 mb-6">
+                {PM_HELP_SECTIONS.map(section => (
+                    <div key={section.id} className="glass-panel rounded-2xl overflow-hidden">
+                        <button onClick={() => setExpanded(expanded === section.id ? null : section.id)}
+                            className="w-full flex items-center gap-3 p-5 text-left hover:bg-white/[0.02] transition-all cursor-pointer">
+                            <div className="size-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${section.color}15` }}>
+                                <span className="material-symbols-outlined" style={{ color: section.color }}>{section.icon}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-white font-bold text-sm">{section.title}</p>
+                                <p className="text-slate-500 text-xs">{section.subtitle}</p>
+                            </div>
+                            <span className="text-xs text-slate-600 font-bold mr-1">{section.steps.length} topics</span>
+                            <span className={`material-symbols-outlined text-slate-500 transition-transform ${expanded === section.id ? 'rotate-180' : ''}`}>expand_more</span>
+                        </button>
+                        {expanded === section.id && (
+                            <div className="px-5 pb-5 space-y-3 border-t border-white/[0.04] pt-4">
+                                {section.steps.map((step, idx) => (
+                                    <div key={idx} className="flex gap-3">
+                                        <div className="flex flex-col items-center">
+                                            <div className="size-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${section.color}10` }}>
+                                                <span className="material-symbols-outlined text-sm" style={{ color: section.color }}>{step.icon}</span>
+                                            </div>
+                                            {idx < section.steps.length - 1 && <div className="w-px flex-1 mt-1" style={{ backgroundColor: `${section.color}20` }} />}
+                                        </div>
+                                        <div className="pb-3">
+                                            <p className="text-white font-bold text-sm mb-0.5">{step.title}</p>
+                                            <p className="text-slate-400 text-xs leading-relaxed">{step.description}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+
+            <div className="glass-panel rounded-2xl p-6" style={{ background: 'linear-gradient(135deg, #f59e0b08, #ef444408)' }}>
+                <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-amber-400">emoji_objects</span> Pro Tips
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {PM_PRO_TIPS.map((tip, idx) => (
+                        <div key={idx} className="flex gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                            <span className="text-lg shrink-0 mt-0.5">{tip.icon}</span>
+                            <p className="text-xs text-slate-400 leading-relaxed">{tip.tip}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="text-center mt-6 py-6">
+                <p className="text-slate-500 text-sm mb-3">Ready to advertise?</p>
+                <button onClick={onBack} className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-purple-500 text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2 mx-auto">
+                    <span className="material-symbols-outlined text-sm">space_dashboard</span> Go to Dashboard
+                </button>
+            </div>
+        </div>
     )
 }
