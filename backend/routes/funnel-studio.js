@@ -824,4 +824,125 @@ Provide 3-6 specific, actionable suggestions. Consider:
 });
 
 
+// ═══════════════════════════════════════════════════════════════
+//  #11 FUNNEL SHARING / TEMPLATE MARKETPLACE
+// ═══════════════════════════════════════════════════════════════
+
+// POST /api/funnel-studio/:id/share — Share funnel as template
+router.post('/:id/share', protect, async (req, res) => {
+    try {
+        const funnel = await Funnel.findOne({ _id: req.params.id, user: req.user._id });
+        if (!funnel) return res.status(404).json({ success: false, error: 'Funnel not found' });
+
+        const brand = await Brand.findById(funnel.brand);
+
+        funnel.isShared = true;
+        funnel.sharedBy = brand?.name || 'Anonymous';
+        funnel.shareDescription = req.body.description || funnel.description;
+        funnel.shareCategory = req.body.category || funnel.type;
+        await funnel.save();
+
+        res.json({ success: true, message: 'Funnel shared as template', funnel });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// POST /api/funnel-studio/:id/unshare — Remove from shared
+router.post('/:id/unshare', protect, async (req, res) => {
+    try {
+        const funnel = await Funnel.findOne({ _id: req.params.id, user: req.user._id });
+        if (!funnel) return res.status(404).json({ success: false, error: 'Funnel not found' });
+        funnel.isShared = false;
+        await funnel.save();
+        res.json({ success: true, funnel });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// GET /api/funnel-studio/shared/browse — Browse shared funnel templates
+router.get('/shared/browse', protect, async (req, res) => {
+    try {
+        const { category } = req.query;
+        const filter = { isShared: true };
+        if (category) filter.shareCategory = category;
+
+        const sharedFunnels = await Funnel.find(filter)
+            .select('name description icon color type stages sharedBy shareDescription shareCategory cloneCount createdAt')
+            .sort({ cloneCount: -1, createdAt: -1 })
+            .limit(50);
+
+        res.json({ success: true, templates: sharedFunnels });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// POST /api/funnel-studio/shared/:id/clone — Clone a shared funnel
+router.post('/shared/:id/clone', protect, async (req, res) => {
+    try {
+        const original = await Funnel.findOne({ _id: req.params.id, isShared: true });
+        if (!original) return res.status(404).json({ success: false, error: 'Shared template not found' });
+
+        const brandId = req.body.brandId || req.query.brandId;
+        if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
+
+        // Clone with stripped IDs
+        const newFunnel = await Funnel.create({
+            user: req.user._id,
+            brand: brandId,
+            name: `${original.name} (cloned)`,
+            description: original.description,
+            icon: original.icon,
+            color: original.color,
+            type: original.type,
+            stages: original.stages.map((s, idx) => ({
+                name: s.name, order: idx, type: s.type,
+                color: s.color, description: s.description,
+                studioLinks: s.studioLinks || [],
+            })),
+            status: 'active',
+        });
+
+        // Increment clone count
+        original.cloneCount = (original.cloneCount || 0) + 1;
+        await original.save();
+
+        res.status(201).json({ success: true, funnel: newFunnel });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ═══════════════════════════════════════════════════════════════
+//  WEBHOOK TOKEN — Get webhook URL for a funnel
+// ═══════════════════════════════════════════════════════════════
+
+router.get('/:id/webhook-token', protect, async (req, res) => {
+    try {
+        const funnel = await Funnel.findOne({ _id: req.params.id, user: req.user._id });
+        if (!funnel) return res.status(404).json({ success: false, error: 'Funnel not found' });
+
+        // Ensure token exists
+        if (!funnel.webhookToken) {
+            await funnel.save(); // pre-save hook will generate it
+        }
+
+        res.json({
+            success: true,
+            webhookToken: funnel.webhookToken,
+            endpoints: {
+                generic: `/api/funnel-webhooks/${funnel.webhookToken}/ingest`,
+                shopify: `/api/funnel-webhooks/${funnel.webhookToken}/shopify`,
+                stripe: `/api/funnel-webhooks/${funnel.webhookToken}/stripe`,
+            },
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
 export default router;

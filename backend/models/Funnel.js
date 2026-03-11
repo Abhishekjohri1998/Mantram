@@ -64,7 +64,25 @@ const funnelSchema = new mongoose.Schema({
     aiGenerated: { type: Boolean, default: false },
     aiPrompt: { type: String, default: '' },
 
+    // #4 Webhook integration token
+    webhookToken: { type: String, unique: true, sparse: true },
+
+    // #11 Funnel sharing / template marketplace
+    isShared: { type: Boolean, default: false },
+    sharedBy: { type: String, default: '' }, // Brand name for attribution
+    shareDescription: { type: String, default: '' },
+    shareCategory: { type: String, default: '' },
+    cloneCount: { type: Number, default: 0 },
+
 }, { timestamps: true });
+
+// Auto-generate webhook token on creation
+funnelSchema.pre('save', function (next) {
+    if (!this.webhookToken) {
+        this.webhookToken = [...Array(32)].map(() => Math.random().toString(36)[2]).join('');
+    }
+    next();
+});
 
 funnelSchema.index({ user: 1, brand: 1 });
 funnelSchema.index({ status: 1 });

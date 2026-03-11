@@ -644,4 +644,307 @@ router.post('/score-entry', protect, async (req, res) => {
 });
 
 
+// ═══════════════════════════════════════════════════════════════
+//  #7 SCORE DECAY CRON — Run inactivity-based scoring decay
+// ═══════════════════════════════════════════════════════════════
+
+router.post('/score-decay', protect, async (req, res) => {
+    try {
+        const { funnelId } = req.body;
+        if (!funnelId) return res.status(400).json({ success: false, error: 'funnelId required' });
+
+        const funnel = await Funnel.findOne({ _id: funnelId, user: req.user._id });
+        if (!funnel) return res.status(404).json({ success: false, error: 'Funnel not found' });
+
+        const entries = await FunnelEntry.find({ funnel: funnelId, status: 'active' });
+        let decayed = 0;
+
+        for (const entry of entries) {
+            const daysSince = Math.floor((Date.now() - new Date(entry.updatedAt || entry.createdAt)) / 86400000);
+            let decay = 0;
+
+            if (daysSince > 30) decay = -15;
+            else if (daysSince > 14) decay = -10;
+            else if (daysSince > 7) decay = -5;
+            else if (daysSince > 3) decay = -2;
+
+            if (decay < 0) {
+                const oldScore = entry.score;
+                entry.score = Math.max(0, entry.score + decay);
+                if (entry.score !== oldScore) {
+                    entry.touchpoints.push({ type: 'custom', details: `Score decay: ${decay} (inactive ${daysSince}d)`, timestamp: new Date() });
+                    await entry.save();
+                    decayed++;
+                }
+            }
+        }
+
+        // Also run inactivity automation rules
+        await runAutomationRules(funnelId, 'inactivity', {});
+
+        res.json({ success: true, decayed, total: entries.length });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ═══════════════════════════════════════════════════════════════
+//  #9 PREDICTIVE SCORING — ML-style scoring from conversion history
+// ═══════════════════════════════════════════════════════════════
+
+router.post('/predictive-score', protect, async (req, res) => {
+    try {
+        const { funnelId } = req.body;
+        if (!funnelId) return res.status(400).json({ success: false, error: 'funnelId required' });
+
+        const funnel = await Funnel.findOne({ _id: funnelId, user: req.user._id });
+        if (!funnel) return res.status(404).json({ success: false, error: 'Funnel not found' });
+
+        // Get historical conversion patterns
+        const convertedEntries = await FunnelEntry.find({ funnel: funnelId, status: 'converted' }).limit(200);
+        const activeEntries = await FunnelEntry.find({ funnel: funnelId, status: 'active' }).limit(500);
+
+        if (convertedEntries.length === 0) {
+            return res.json({ success: true, message: 'No converted entries yet — need conversion data for predictions', scored: 0 });
+        }
+
+        // Build patterns from converted entries
+        const patterns = {
+            avgTouchpoints: 0, avgStages: 0, avgDaysToConvert: 0,
+            topSources: {}, avgScoreAtConversion: 0,
+            hadEmail: 0, hadPhone: 0, hadCompany: 0,
+        };
+
+        for (const e of convertedEntries) {
+            patterns.avgTouchpoints += (e.touchpoints?.length || 0);
+            patterns.avgStages += (e.stageHistory?.length || 0);
+            if (e.convertedAt && e.createdAt) {
+                patterns.avgDaysToConvert += Math.floor((new Date(e.convertedAt) - new Date(e.createdAt)) / 86400000);
+            }
+            patterns.topSources[e.source] = (patterns.topSources[e.source] || 0) + 1;
+            patterns.avgScoreAtConversion += (e.score || 0);
+            if (e.email) patterns.hadEmail++;
+            if (e.phone) patterns.hadPhone++;
+            if (e.company) patterns.hadCompany++;
+        }
+
+        const n = convertedEntries.length;
+        patterns.avgTouchpoints /= n;
+        patterns.avgStages /= n;
+        patterns.avgDaysToConvert /= n;
+        patterns.avgScoreAtConversion /= n;
+        patterns.emailRate = patterns.hadEmail / n;
+        patterns.phoneRate = patterns.hadPhone / n;
+        patterns.companyRate = patterns.hadCompany / n;
+
+        // Find best source
+        const bestSource = Object.entries(patterns.topSources).sort((a, b) => b[1] - a[1])[0];
+
+        // Score active entries based on similarity to conversion patterns
+        let scored = 0;
+        for (const entry of activeEntries) {
+            let predictiveScore = 0;
+
+            // Touchpoint similarity (0-20)
+            const tpRatio = Math.min((entry.touchpoints?.length || 0) / Math.max(patterns.avgTouchpoints, 1), 2);
+            predictiveScore += Math.round(tpRatio * 10);
+
+            // Stage progression similarity (0-20)
+            const stageRatio = Math.min((entry.stageHistory?.length || 0) / Math.max(patterns.avgStages, 1), 2);
+            predictiveScore += Math.round(stageRatio * 10);
+
+            // Source match (0-15)
+            if (bestSource && entry.source === bestSource[0]) predictiveScore += 15;
+            else if (patterns.topSources[entry.source]) predictiveScore += 8;
+
+            // Contact completeness match (0-15)
+            if (entry.email && patterns.emailRate > 0.7) predictiveScore += 5;
+            if (entry.phone && patterns.phoneRate > 0.5) predictiveScore += 5;
+            if (entry.company && patterns.companyRate > 0.5) predictiveScore += 5;
+
+            // Velocity — is lead progressing at similar speed? (0-15)
+            const daysActive = Math.floor((Date.now() - new Date(entry.createdAt)) / 86400000);
+            if (daysActive > 0 && patterns.avgDaysToConvert > 0) {
+                const velocityRatio = daysActive / patterns.avgDaysToConvert;
+                if (velocityRatio < 0.5) predictiveScore += 15; // Faster than avg
+                else if (velocityRatio < 1) predictiveScore += 10;
+                else if (velocityRatio < 1.5) predictiveScore += 5;
+                // Slower = 0 bonus
+            }
+
+            // Recency (0-15)
+            const daysSince = Math.floor((Date.now() - new Date(entry.updatedAt || entry.createdAt)) / 86400000);
+            if (daysSince <= 1) predictiveScore += 15;
+            else if (daysSince <= 3) predictiveScore += 10;
+            else if (daysSince <= 7) predictiveScore += 5;
+
+            entry.score = Math.max(0, Math.min(100, predictiveScore));
+            entry.touchpoints.push({ type: 'custom', details: `Predictive score: ${predictiveScore} (based on ${n} converted leads)`, timestamp: new Date() });
+            await entry.save();
+            scored++;
+        }
+
+        res.json({
+            success: true,
+            scored,
+            patterns: {
+                convertedCount: n,
+                avgTouchpoints: Math.round(patterns.avgTouchpoints * 10) / 10,
+                avgStages: Math.round(patterns.avgStages * 10) / 10,
+                avgDaysToConvert: Math.round(patterns.avgDaysToConvert),
+                bestSource: bestSource?.[0],
+                emailRate: Math.round(patterns.emailRate * 100),
+                phoneRate: Math.round(patterns.phoneRate * 100),
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ═══════════════════════════════════════════════════════════════
+//  #10 PIPELINE REVENUE FORECAST
+// ═══════════════════════════════════════════════════════════════
+
+router.get('/revenue-forecast', protect, async (req, res) => {
+    try {
+        const { funnelId } = req.query;
+        if (!funnelId) return res.status(400).json({ success: false, error: 'funnelId required' });
+
+        const funnel = await Funnel.findOne({ _id: funnelId, user: req.user._id });
+        if (!funnel) return res.status(404).json({ success: false, error: 'Funnel not found' });
+
+        const entries = await FunnelEntry.find({ funnel: funnelId });
+        const stages = funnel.stages || [];
+
+        // Historical conversion rate
+        const converted = entries.filter(e => e.status === 'converted');
+        const lost = entries.filter(e => e.status === 'lost');
+        const active = entries.filter(e => e.status === 'active');
+        const conversionRate = entries.length > 0 ? (converted.length / entries.length) : 0;
+
+        // Revenue from converted
+        const actualRevenue = converted.reduce((s, e) => s + (e.dealValue || 0), 0);
+        const avgDealValue = converted.length > 0 ? actualRevenue / converted.length : 0;
+
+        // Stage-by-stage forecast
+        const stageConversionRates = {};
+        const stageForecasts = stages.map((stage, idx) => {
+            const stageEntries = active.filter(e => e.currentStage === stage.name);
+            // Probability increases with each stage
+            const stageProbability = stages.length > 1 ? ((idx + 1) / stages.length) : 0.5;
+            const weightedRevenue = stageEntries.reduce((s, e) => {
+                const dv = e.dealValue || avgDealValue;
+                return s + (dv * stageProbability);
+            }, 0);
+
+            stageConversionRates[stage.name] = stageProbability;
+
+            return {
+                stage: stage.name,
+                color: stage.color,
+                activeEntries: stageEntries.length,
+                probability: Math.round(stageProbability * 100),
+                weightedRevenue: Math.round(weightedRevenue),
+                potentialRevenue: stageEntries.reduce((s, e) => s + (e.dealValue || avgDealValue), 0),
+            };
+        });
+
+        // Average conversion time
+        let avgConversionDays = 0;
+        if (converted.length > 0) {
+            const totalDays = converted.reduce((s, e) => {
+                return s + (e.convertedAt && e.createdAt ? Math.max(1, Math.floor((new Date(e.convertedAt) - new Date(e.createdAt)) / 86400000)) : 30);
+            }, 0);
+            avgConversionDays = Math.round(totalDays / converted.length);
+        }
+
+        const totalWeightedRevenue = stageForecasts.reduce((s, f) => s + f.weightedRevenue, 0);
+        const totalPotentialRevenue = stageForecasts.reduce((s, f) => s + f.potentialRevenue, 0);
+
+        res.json({
+            success: true,
+            forecast: {
+                totalEntries: entries.length,
+                activeEntries: active.length,
+                convertedEntries: converted.length,
+                lostEntries: lost.length,
+                conversionRate: Math.round(conversionRate * 100),
+                actualRevenue: Math.round(actualRevenue),
+                avgDealValue: Math.round(avgDealValue),
+                avgConversionDays,
+                totalWeightedRevenue: Math.round(totalWeightedRevenue),
+                totalPotentialRevenue: Math.round(totalPotentialRevenue),
+                stages: stageForecasts,
+                // 30-day projection
+                projected30Day: Math.round(totalWeightedRevenue * (30 / Math.max(avgConversionDays, 1))),
+                // 90-day projection
+                projected90Day: Math.round(totalWeightedRevenue * (90 / Math.max(avgConversionDays, 1))),
+            },
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ═══════════════════════════════════════════════════════════════
+//  #12 REAL-TIME ACTIVITY FEED
+// ═══════════════════════════════════════════════════════════════
+
+router.get('/activity-feed', protect, async (req, res) => {
+    try {
+        const { funnelId } = req.query;
+        if (!funnelId) return res.status(400).json({ success: false, error: 'funnelId required' });
+
+        // Get all rules with recent executions
+        const rules = await AutomationRule.find({ funnel: funnelId, user: req.user._id });
+
+        // Flatten all executions into a single feed
+        const feed = [];
+        for (const rule of rules) {
+            for (const exec of (rule.recentExecutions || [])) {
+                feed.push({
+                    ruleId: rule._id,
+                    ruleName: rule.name,
+                    ruleIcon: rule.icon,
+                    ruleColor: rule.color,
+                    entryId: exec.entryId,
+                    entryName: exec.entryName,
+                    actions: exec.actionsExecuted,
+                    executedAt: exec.executedAt,
+                    triggerType: rule.trigger?.type,
+                });
+            }
+        }
+
+        // Also get recent touchpoints from entries for non-automation events
+        const recentEntries = await FunnelEntry.find({ funnel: funnelId }).sort({ updatedAt: -1 }).limit(30);
+        for (const entry of recentEntries) {
+            const recent = (entry.touchpoints || []).slice(-3);
+            for (const tp of recent) {
+                if (!tp.details?.includes('automation')) {
+                    feed.push({
+                        type: 'touchpoint',
+                        entryId: entry._id,
+                        entryName: entry.name,
+                        action: tp.details,
+                        touchpointType: tp.type,
+                        executedAt: tp.timestamp,
+                    });
+                }
+            }
+        }
+
+        // Sort by time, limit to 50
+        feed.sort((a, b) => new Date(b.executedAt) - new Date(a.executedAt));
+        res.json({ success: true, feed: feed.slice(0, 50) });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
 export default router;

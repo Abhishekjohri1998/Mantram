@@ -5,7 +5,7 @@ const stageHistorySchema = new mongoose.Schema({
     stage: { type: String, required: true },
     enteredAt: { type: Date, default: Date.now },
     exitedAt: { type: Date },
-    movedBy: { type: String, enum: ['manual', 'automation', 'ai', 'system'], default: 'manual' },
+    movedBy: { type: String, enum: ['manual', 'automation', 'ai', 'system', 'webhook', 'shopify_webhook', 'stripe_webhook'], default: 'manual' },
 }, { _id: false });
 
 // ── Touchpoint Schema ──
@@ -13,7 +13,7 @@ const touchpointSchema = new mongoose.Schema({
     type: {
         type: String,
         enum: ['ad_click', 'seo_visit', 'social_engage', 'dm_received', 'dm_sent', 'email_open', 'email_click',
-               'page_visit', 'form_submit', 'purchase', 'cart_abandon', 'content_view', 'video_view', 'custom'],
+               'page_visit', 'form_submit', 'purchase', 'cart_abandon', 'content_view', 'video_view', 'webhook', 'custom'],
         required: true,
     },
     timestamp: { type: Date, default: Date.now },
@@ -63,6 +63,7 @@ const funnelEntrySchema = new mongoose.Schema({
     // Conversion data
     convertedAt: { type: Date },
     revenue: { type: Number, default: 0 },
+    dealValue: { type: Number, default: 0 },
     lostReason: { type: String, default: '' },
 
     // Notes

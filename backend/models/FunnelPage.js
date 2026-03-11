@@ -89,6 +89,13 @@ const funnelPageSchema = new mongoose.Schema({
         avgTimeOnPage: { type: Number, default: 0 },     // seconds
     },
 
+    // #5 A/B Testing
+    isVariant: { type: Boolean, default: false },
+    variantName: { type: String, default: 'A' },          // 'A', 'B', 'C', etc.
+    parentPage: { type: mongoose.Schema.Types.ObjectId, ref: 'FunnelPage' }, // original page
+    abTestActive: { type: Boolean, default: false },
+    abTrafficSplit: { type: Number, default: 50 },        // % traffic to variant B
+
 }, { timestamps: true });
 
 funnelPageSchema.index({ user: 1, brand: 1 });

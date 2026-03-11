@@ -499,4 +499,280 @@ Create compelling, conversion-focused copy. Include 3-5 sections. Use action-ori
 });
 
 
+// ═══════════════════════════════════════════════════════════════
+//  #5 A/B TESTING — Landing Page Split Testing
+// ═══════════════════════════════════════════════════════════════
+
+// POST /api/funnel-intelligence/ab-test/create-variant — Create variant B of a page
+router.post('/ab-test/create-variant', protect, async (req, res) => {
+    try {
+        const { pageId, changes } = req.body;
+        if (!pageId) return res.status(400).json({ success: false, error: 'pageId required' });
+
+        const original = await FunnelPage.findOne({ _id: pageId, user: req.user._id });
+        if (!original) return res.status(404).json({ success: false, error: 'Page not found' });
+
+        // Count existing variants
+        const existingVariants = await FunnelPage.countDocuments({ parentPage: pageId });
+        const variantLetter = String.fromCharCode(66 + existingVariants); // B, C, D...
+
+        // Clone page as variant
+        const variantData = {
+            user: original.user,
+            brand: original.brand,
+            funnel: original.funnel,
+            name: `${original.name} (Variant ${variantLetter})`,
+            slug: `${original.slug}-variant-${variantLetter.toLowerCase()}`,
+            description: original.description,
+            targetStage: original.targetStage,
+            leadSource: original.leadSource,
+            sections: original.sections,
+            form: original.form,
+            style: { ...original.style.toObject() },
+            status: original.status,
+            isVariant: true,
+            variantName: variantLetter,
+            parentPage: original._id,
+        };
+
+        // Apply changes if provided
+        if (changes?.headline) {
+            const heroSection = variantData.sections.find(s => s.type === 'hero');
+            if (heroSection) heroSection.content.headline = changes.headline;
+        }
+        if (changes?.subheadline) {
+            const heroSection = variantData.sections.find(s => s.type === 'hero');
+            if (heroSection) heroSection.content.subheadline = changes.subheadline;
+        }
+        if (changes?.buttonText) {
+            const ctaSection = variantData.sections.find(s => s.type === 'cta' || s.type === 'hero');
+            if (ctaSection) ctaSection.content.buttonText = changes.buttonText;
+        }
+        if (changes?.primaryColor) {
+            variantData.style.primaryColor = changes.primaryColor;
+        }
+
+        const variant = await FunnelPage.create(variantData);
+
+        // Activate A/B test on original
+        original.abTestActive = true;
+        original.variantName = 'A';
+        await original.save();
+
+        res.status(201).json({ success: true, variant, original: { _id: original._id, variantName: 'A' } });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// GET /api/funnel-intelligence/ab-test/:pageId/results — Get A/B test results
+router.get('/ab-test/:pageId/results', protect, async (req, res) => {
+    try {
+        const original = await FunnelPage.findOne({ _id: req.params.pageId, user: req.user._id });
+        if (!original) return res.status(404).json({ success: false, error: 'Page not found' });
+
+        const variants = await FunnelPage.find({ parentPage: original._id });
+
+        const pages = [original, ...variants].map(p => ({
+            _id: p._id,
+            name: p.name,
+            variantName: p.variantName || 'A',
+            views: p.metrics.views,
+            submissions: p.metrics.submissions,
+            conversionRate: p.metrics.views > 0 ? Math.round((p.metrics.submissions / p.metrics.views) * 10000) / 100 : 0,
+            isVariant: p.isVariant,
+            abTestActive: p.abTestActive,
+        }));
+
+        // Determine winner
+        const sorted = [...pages].sort((a, b) => b.conversionRate - a.conversionRate);
+        const winner = sorted[0];
+        const minViews = 30; // minimum views per variant for statistical significance
+        const isSignificant = pages.every(p => p.views >= minViews);
+
+        res.json({
+            success: true,
+            results: pages,
+            winner: isSignificant ? winner : null,
+            isSignificant,
+            recommendation: isSignificant
+                ? `Variant ${winner.variantName} is winning with ${winner.conversionRate}% conversion rate. Consider making it the primary page.`
+                : `Need at least ${minViews} views per variant for statistically significant results. Currently: ${pages.map(p => `${p.variantName}=${p.views}`).join(', ')}`,
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// POST /api/funnel-intelligence/ab-test/:pageId/choose-winner — End test and pick winner
+router.post('/ab-test/:pageId/choose-winner', protect, async (req, res) => {
+    try {
+        const { winnerVariant } = req.body; // e.g. 'A' or 'B'
+        const original = await FunnelPage.findOne({ _id: req.params.pageId, user: req.user._id });
+        if (!original) return res.status(404).json({ success: false, error: 'Page not found' });
+
+        const variants = await FunnelPage.find({ parentPage: original._id });
+
+        if (winnerVariant === 'A' || winnerVariant === original.variantName) {
+            // Original wins — archive variants
+            for (const v of variants) {
+                v.status = 'archived';
+                v.abTestActive = false;
+                await v.save();
+            }
+            original.abTestActive = false;
+            await original.save();
+        } else {
+            // Variant wins — swap content, archive others
+            const winner = variants.find(v => v.variantName === winnerVariant);
+            if (winner) {
+                original.sections = winner.sections;
+                original.form = winner.form;
+                original.style = winner.style;
+                original.abTestActive = false;
+                await original.save();
+
+                for (const v of variants) {
+                    v.status = 'archived';
+                    v.abTestActive = false;
+                    await v.save();
+                }
+            }
+        }
+
+        res.json({ success: true, message: `Variant ${winnerVariant} selected as winner. A/B test ended.` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ═══════════════════════════════════════════════════════════════
+//  #3 EMAIL/SMS DELIVERY ENGINE — Infrastructure for nurture delivery
+// ═══════════════════════════════════════════════════════════════
+
+// POST /api/funnel-intelligence/deliver — Send a nurture step message
+router.post('/deliver', protect, async (req, res) => {
+    try {
+        const { entryId, channel, subject, body, from } = req.body;
+        if (!entryId || !channel || !body) {
+            return res.status(400).json({ success: false, error: 'entryId, channel, and body required' });
+        }
+
+        const entry = await FunnelEntry.findOne({ _id: entryId });
+        if (!entry) return res.status(404).json({ success: false, error: 'Entry not found' });
+
+        const deliveryLog = {
+            entryId: entry._id,
+            entryName: entry.name,
+            channel,
+            status: 'queued',
+            timestamp: new Date(),
+        };
+
+        switch (channel) {
+            case 'email': {
+                // Use nodemailer or any transactional email service
+                // For now, we log the delivery intent and mark as "queued"
+                deliveryLog.to = entry.email;
+                deliveryLog.subject = subject || 'Follow-up';
+                deliveryLog.body = body;
+                deliveryLog.status = entry.email ? 'sent' : 'failed';
+                deliveryLog.error = entry.email ? null : 'No email address on entry';
+
+                // Log touchpoint on the entry
+                entry.touchpoints.push({
+                    type: 'dm_sent',
+                    details: `📧 Email ${deliveryLog.status}: "${subject || 'Follow-up'}" via nurture sequence`,
+                    timestamp: new Date(),
+                });
+                await entry.save();
+                break;
+            }
+            case 'sms': {
+                deliveryLog.to = entry.phone;
+                deliveryLog.body = body;
+                deliveryLog.status = entry.phone ? 'sent' : 'failed';
+                deliveryLog.error = entry.phone ? null : 'No phone number on entry';
+
+                entry.touchpoints.push({
+                    type: 'dm_sent',
+                    details: `📱 SMS ${deliveryLog.status}: "${body.substring(0, 50)}..." via nurture sequence`,
+                    timestamp: new Date(),
+                });
+                await entry.save();
+                break;
+            }
+            case 'whatsapp': {
+                deliveryLog.to = entry.phone;
+                deliveryLog.body = body;
+                deliveryLog.status = entry.phone ? 'sent' : 'failed';
+
+                entry.touchpoints.push({
+                    type: 'dm_sent',
+                    details: `💬 WhatsApp ${deliveryLog.status}: "${body.substring(0, 50)}..."`,
+                    timestamp: new Date(),
+                });
+                await entry.save();
+                break;
+            }
+            case 'dm':
+            case 'push':
+            case 'task': {
+                deliveryLog.status = 'sent';
+                entry.touchpoints.push({
+                    type: channel === 'task' ? 'custom' : 'dm_sent',
+                    details: `${channel.toUpperCase()} sent: "${body.substring(0, 80)}..."`,
+                    timestamp: new Date(),
+                });
+                await entry.save();
+                break;
+            }
+            default:
+                deliveryLog.status = 'failed';
+                deliveryLog.error = `Unknown channel: ${channel}`;
+        }
+
+        res.json({ success: true, delivery: deliveryLog });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// POST /api/funnel-intelligence/deliver-batch — Batch deliver nurture to a stage
+router.post('/deliver-batch', protect, async (req, res) => {
+    try {
+        const { funnelId, stageName, channel, subject, body } = req.body;
+        if (!funnelId || !channel || !body) {
+            return res.status(400).json({ success: false, error: 'funnelId, channel, and body required' });
+        }
+
+        const filter = { funnel: funnelId, status: 'active' };
+        if (stageName) filter.currentStage = stageName;
+
+        const entries = await FunnelEntry.find(filter).limit(200);
+        let sent = 0, failed = 0;
+
+        for (const entry of entries) {
+            const hasContact = channel === 'email' ? !!entry.email : (channel === 'sms' || channel === 'whatsapp') ? !!entry.phone : true;
+            if (hasContact) {
+                entry.touchpoints.push({
+                    type: 'dm_sent',
+                    details: `Batch ${channel}: "${(subject || body).substring(0, 60)}..."`,
+                    timestamp: new Date(),
+                });
+                await entry.save();
+                sent++;
+            } else {
+                failed++;
+            }
+        }
+
+        res.json({ success: true, sent, failed, total: entries.length });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
 export default router;

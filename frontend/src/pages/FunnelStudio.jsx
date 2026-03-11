@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import DashboardLayout from '../components/DashboardLayout'
 import SEOHead from '../components/SEOHead'
 import { useBrand } from '../context/BrandContext'
-import { funnelStudio as api, nurtureSequences as nurtureApi, funnelIntelligence as intelApi, funnelAutomation as autoApi } from '../services/api'
+import { funnelStudio as api, nurtureSequences as nurtureApi, funnelIntelligence as intelApi, funnelAutomation as autoApi, funnelSharing as shareApi } from '../services/api'
 
 // ═══════════════════════════════════════════════════════════════
 // FUNNEL STUDIO — Dashboard + Pipeline Kanban + Funnel Builder
@@ -60,6 +60,14 @@ export default function FunnelStudio() {
     const [autoLoading, setAutoLoading] = useState(false)
     const [autoRunning, setAutoRunning] = useState(false)
     const [autoGenerating, setAutoGenerating] = useState(false)
+
+    // New feature states
+    const [revenueForecast, setRevenueForecast] = useState(null)
+    const [activityFeed, setActivityFeed] = useState([])
+    const [webhookData, setWebhookData] = useState(null)
+    const [sharedTemplates, setSharedTemplates] = useState([])
+    const [fidatoOpen, setFidatoOpen] = useState(false)
+    const [showTemplates, setShowTemplates] = useState(false)
 
     // ── Fetch data ──
     const fetchFunnels = useCallback(async () => {
@@ -477,6 +485,61 @@ export default function FunnelStudio() {
     // ═══════════════════════════════════════════════════════════
     // AUTOMATIONS VIEW
     // ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════
+    // REVENUE FORECAST VIEW (#10)
+    // ═══════════════════════════════════════════════════════════
+    if (view === 'forecast' && selectedFunnel) {
+        return (
+            <DashboardLayout title="Revenue Forecast" subtitle={selectedFunnel.name}>
+                <SEOHead title={`Forecast — ${selectedFunnel.name}`} noIndex={true} />
+                <RevenueForecastView forecast={revenueForecast} funnel={selectedFunnel} onBack={() => setView('pipeline')} />
+            </DashboardLayout>
+        )
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ACTIVITY FEED VIEW (#12)
+    // ═══════════════════════════════════════════════════════════
+    if (view === 'activity' && selectedFunnel) {
+        return (
+            <DashboardLayout title="Activity Feed" subtitle={selectedFunnel.name}>
+                <SEOHead title={`Activity — ${selectedFunnel.name}`} noIndex={true} />
+                <ActivityFeedView feed={activityFeed} funnel={selectedFunnel} onBack={() => setView('pipeline')}
+                    onRefresh={async () => { try { const r = await autoApi.activityFeed(selectedFunnel._id); setActivityFeed(r.feed || []) } catch {} }} />
+            </DashboardLayout>
+        )
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // WEBHOOKS VIEW (#4)
+    // ═══════════════════════════════════════════════════════════
+    if (view === 'webhooks' && selectedFunnel) {
+        return (
+            <DashboardLayout title="Webhook Integrations" subtitle={selectedFunnel.name}>
+                <SEOHead title={`Webhooks — ${selectedFunnel.name}`} noIndex={true} />
+                <WebhooksView webhookData={webhookData} funnel={selectedFunnel} onBack={() => setView('pipeline')} />
+            </DashboardLayout>
+        )
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // SHARED TEMPLATES VIEW (#11)
+    // ═══════════════════════════════════════════════════════════
+    if (view === 'sharing') {
+        return (
+            <DashboardLayout title="Template Marketplace" subtitle="Browse and share funnel templates">
+                <SEOHead title="Template Marketplace — Funnel Studio" noIndex={true} />
+                <SharedTemplatesView
+                    templates={sharedTemplates} funnels={funnels} brandId={currentBrand?._id}
+                    onBack={() => setView('dashboard')}
+                    onRefresh={async () => { try { const r = await shareApi.browse(); setSharedTemplates(r.templates || []) } catch {} }}
+                    onClone={async (id) => { try { await shareApi.clone(id, { brandId: currentBrand?._id }); fetchFunnels() } catch {} }}
+                    onShare={async (id) => { try { await shareApi.share(id, {}); } catch {} }}
+                />
+            </DashboardLayout>
+        )
+    }
+
     if (view === 'automations' && selectedFunnel) {
         return (
             <DashboardLayout title="Automations" subtitle={selectedFunnel.name}>
@@ -617,43 +680,113 @@ export default function FunnelStudio() {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button onClick={() => setView('builder')}
-                            className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-sm">build</span> Edit
+                        <button onClick={() => setShowAddEntry(true)}
+                            className="px-5 py-2.5 rounded-xl text-sm font-bold btn-primary flex items-center gap-1.5 cursor-pointer">
+                            <span className="material-symbols-outlined text-sm">person_add</span> Add Lead
                         </button>
                         <button onClick={() => setShowImportModal(true)}
                             className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer flex items-center gap-1.5">
                             <span className="material-symbols-outlined text-sm">download</span> Import
                         </button>
-                        <button onClick={() => { fetchNurtureSequences(selectedFunnel._id); setView('nurture') }}
-                            className="px-4 py-2 rounded-xl text-sm font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-500/[0.06] hover:bg-emerald-500/[0.1] border border-emerald-500/10 transition-all cursor-pointer flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-sm">mail</span> Nurture
-                        </button>
-                        <button onClick={() => { fetchHealth(selectedFunnel._id); setView('health') }}
-                            className="px-4 py-2 rounded-xl text-sm font-bold text-cyan-400 hover:text-cyan-300 bg-cyan-500/[0.06] hover:bg-cyan-500/[0.1] border border-cyan-500/10 transition-all cursor-pointer flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-sm">health_and_safety</span> Health
-                        </button>
-                        <button onClick={() => { fetchLandingPages(selectedFunnel._id); setView('pages') }}
-                            className="px-4 py-2 rounded-xl text-sm font-bold text-violet-400 hover:text-violet-300 bg-violet-500/[0.06] hover:bg-violet-500/[0.1] border border-violet-500/10 transition-all cursor-pointer flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-sm">web</span> Pages
-                        </button>
-                        <button onClick={() => openAnalytics(selectedFunnel)}
-                            className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-sm">analytics</span> Analytics
-                        </button>
-                        <button onClick={() => { fetchAutomationRules(selectedFunnel._id); setView('automations') }}
-                            className="px-4 py-2 rounded-xl text-sm font-bold text-orange-400 hover:text-orange-300 bg-orange-500/[0.06] hover:bg-orange-500/[0.1] border border-orange-500/10 transition-all cursor-pointer flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-sm">bolt</span> Automations
-                        </button>
-                        <button onClick={() => { fetchSuggestions() }}
-                            className="px-4 py-2 rounded-xl text-sm font-bold text-amber-400 hover:text-amber-300 bg-amber-500/[0.06] hover:bg-amber-500/[0.1] border border-amber-500/10 transition-all cursor-pointer flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Tips
-                        </button>
-                        <button onClick={() => setShowAddEntry(true)}
-                            className="px-5 py-2.5 rounded-xl text-sm font-bold btn-primary flex items-center gap-1.5 cursor-pointer">
-                            <span className="material-symbols-outlined text-sm">person_add</span> Add Entry
+                        <button onClick={() => setFidatoOpen(!fidatoOpen)}
+                            className={`size-10 rounded-xl flex items-center justify-center transition-all cursor-pointer ${fidatoOpen ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-white/[0.04] text-slate-400 hover:text-white hover:bg-white/[0.08] border border-white/[0.06]'}`}>
+                            <span className="material-symbols-outlined text-sm">smart_toy</span>
                         </button>
                     </div>
+                </div>
+
+                {/* ── Tabbed Navigation Bar ── */}
+                <div className="flex items-center gap-1 mb-5 p-1 rounded-2xl bg-white/[0.02] border border-white/[0.04] overflow-x-auto">
+                    {[
+                        { id: 'kanban', icon: 'view_kanban', label: 'Pipeline', color: '#6366f1' },
+                        { id: 'intelligence', icon: 'insights', label: 'Intelligence', color: '#06b6d4' },
+                        { id: 'engage', icon: 'campaign', label: 'Engage', color: '#10b981' },
+                        { id: 'settings', icon: 'tune', label: 'Configure', color: '#f59e0b' },
+                    ].map(tab => {
+
+                        const isActive = tab.id === 'kanban' ? view === 'pipeline' :
+                            (tab.id === 'intelligence' && ['health', 'analytics', 'forecast'].includes(view)) ||
+                            (tab.id === 'engage' && ['nurture', 'automations', 'pages', 'activity'].includes(view)) ||
+                            (tab.id === 'settings' && ['builder', 'webhooks'].includes(view))
+                        return (
+                            <button key={tab.id}
+                                onClick={() => {
+                                    if (tab.id === 'kanban') setView('pipeline')
+                                    else if (tab.id === 'intelligence') { fetchHealth(selectedFunnel._id); setView('health') }
+                                    else if (tab.id === 'engage') { fetchAutomationRules(selectedFunnel._id); setView('automations') }
+                                    else if (tab.id === 'settings') setView('builder')
+                                }}
+                                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${isActive
+                                    ? 'text-white shadow-lg'
+                                    : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'}`}
+                                style={isActive ? { backgroundColor: `${tab.color}20`, color: tab.color, boxShadow: `0 0 20px ${tab.color}10` } : undefined}>
+                                <span className="material-symbols-outlined text-sm">{tab.icon}</span>
+                                {tab.label}
+                            </button>
+                        )
+                    })}
+                    <div className="w-px h-5 bg-white/[0.06] mx-1" />
+                    {/* Sub-tabs for active group */}
+                    {view === 'pipeline' && (
+                        <>
+                            <button onClick={() => { fetchSuggestions() }}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold text-amber-400 hover:bg-amber-500/10 transition-all cursor-pointer whitespace-nowrap">
+                                <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>auto_awesome</span> AI Tips
+                            </button>
+                        </>
+                    )}
+                    {['health', 'analytics', 'forecast'].some(v => v === view) && (
+                        <>
+                            <button onClick={() => { fetchHealth(selectedFunnel._id); setView('health') }}
+                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'health' ? 'bg-cyan-500/15 text-cyan-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>health_and_safety</span> Health
+                            </button>
+                            <button onClick={() => openAnalytics(selectedFunnel)}
+                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'analytics' ? 'bg-cyan-500/15 text-cyan-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>analytics</span> Analytics
+                            </button>
+                            <button onClick={async () => { try { const r = await autoApi.revenueForecast(selectedFunnel._id); setRevenueForecast(r.forecast); setView('forecast') } catch {} }}
+                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'forecast' ? 'bg-cyan-500/15 text-cyan-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>trending_up</span> Forecast
+                            </button>
+                            <button onClick={async () => { try { await runScoring(); setView('health') } catch {} }}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold text-amber-400 hover:bg-amber-500/10 transition-all cursor-pointer whitespace-nowrap">
+                                <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>score</span> Score Leads
+                            </button>
+                        </>
+                    )}
+                    {['nurture', 'automations', 'pages', 'activity'].some(v => v === view) && (
+                        <>
+                            <button onClick={() => { fetchAutomationRules(selectedFunnel._id); setView('automations') }}
+                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'automations' ? 'bg-emerald-500/15 text-emerald-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>bolt</span> Automations
+                            </button>
+                            <button onClick={() => { fetchNurtureSequences(selectedFunnel._id); setView('nurture') }}
+                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'nurture' ? 'bg-emerald-500/15 text-emerald-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>mail</span> Nurture
+                            </button>
+                            <button onClick={() => { fetchLandingPages(selectedFunnel._id); setView('pages') }}
+                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'pages' ? 'bg-emerald-500/15 text-emerald-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>web</span> Pages
+                            </button>
+                            <button onClick={async () => { try { const r = await autoApi.activityFeed(selectedFunnel._id); setActivityFeed(r.feed || []); setView('activity') } catch {} }}
+                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'activity' ? 'bg-emerald-500/15 text-emerald-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>dynamic_feed</span> Feed
+                            </button>
+                        </>
+                    )}
+                    {['builder', 'webhooks'].some(v => v === view) && (
+                        <>
+                            <button onClick={() => setView('builder')}
+                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'builder' ? 'bg-amber-500/15 text-amber-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>build</span> Stage Builder
+                            </button>
+                            <button onClick={async () => { try { const r = await shareApi.webhookToken(selectedFunnel._id); setWebhookData(r); setView('webhooks') } catch {} }}
+                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'webhooks' ? 'bg-amber-500/15 text-amber-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>webhook</span> Webhooks
+                            </button>
+                        </>
+                    )}
                 </div>
 
                 {/* Kanban Columns */}
@@ -678,26 +811,44 @@ export default function FunnelStudio() {
                                         const entryId = e.dataTransfer.getData('entryId')
                                         if (entryId) moveEntry(entryId, stage.name)
                                     }}>
-                                    {stageEntries.map(entry => (
+                                    {stageEntries.map(entry => {
+                                        const scoreColor = entry.score > 70 ? '#10b981' : entry.score > 40 ? '#f59e0b' : '#475569'
+                                        const lastActivity = entry.lastTouchpoint ? new Date(entry.lastTouchpoint) : entry.updatedAt ? new Date(entry.updatedAt) : null
+                                        const timeAgo = lastActivity ? (() => {
+                                            const diff = Date.now() - lastActivity.getTime()
+                                            const mins = Math.floor(diff / 60000)
+                                            if (mins < 60) return `${mins}m ago`
+                                            const hrs = Math.floor(mins / 60)
+                                            if (hrs < 24) return `${hrs}h ago`
+                                            const days = Math.floor(hrs / 24)
+                                            return `${days}d ago`
+                                        })() : null
+                                        return (
                                         <div key={entry._id} draggable
                                             onDragStart={(e) => e.dataTransfer.setData('entryId', entry._id)}
                                             className="group glass-panel rounded-xl p-3 cursor-grab active:cursor-grabbing hover:border-primary/20 transition-all">
                                             <div className="flex items-center justify-between mb-2">
                                                 <div className="flex items-center gap-2 min-w-0">
-                                                    <div className="size-8 rounded-full bg-gradient-to-br from-primary/30 to-purple-500/30 flex items-center justify-center text-xs font-bold text-white shrink-0">
-                                                        {(entry.name || '?')[0].toUpperCase()}
+                                                    {/* Score Ring Avatar */}
+                                                    <div className="relative shrink-0">
+                                                        <div className="size-8 rounded-full bg-gradient-to-br from-primary/30 to-purple-500/30 flex items-center justify-center text-xs font-bold text-white"
+                                                            style={{ boxShadow: `0 0 0 2px ${scoreColor}50` }}>
+                                                            {(entry.name || '?')[0].toUpperCase()}
+                                                        </div>
+                                                        {entry.score > 70 && <div className="absolute -top-0.5 -right-0.5 size-3 rounded-full bg-emerald-400 border-2 border-[#0f1729]" title="Hot lead" />}
                                                     </div>
                                                     <div className="min-w-0">
                                                         <p className="text-sm text-white font-bold truncate">{entry.name || 'Unknown'}</p>
                                                         {entry.email && <p className="text-xs text-slate-500 truncate">{entry.email}</p>}
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                                    <button onClick={() => updateEntryStatus(entry._id, 'converted')} title="Mark Converted"
+                                                {/* Compact Hover Actions */}
+                                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                                    <button onClick={() => updateEntryStatus(entry._id, 'converted')} title="Convert"
                                                         className="size-6 rounded-md flex items-center justify-center text-emerald-400 hover:bg-emerald-500/10 cursor-pointer">
                                                         <span className="material-symbols-outlined text-xs">check_circle</span>
                                                     </button>
-                                                    <button onClick={() => updateEntryStatus(entry._id, 'lost')} title="Mark Lost"
+                                                    <button onClick={() => updateEntryStatus(entry._id, 'lost')} title="Lost"
                                                         className="size-6 rounded-md flex items-center justify-center text-rose-400 hover:bg-rose-500/10 cursor-pointer">
                                                         <span className="material-symbols-outlined text-xs">cancel</span>
                                                     </button>
@@ -708,19 +859,24 @@ export default function FunnelStudio() {
                                                 </div>
                                             </div>
 
-                                            {/* Score bar */}
+                                            {/* Deal Value + Score */}
                                             <div className="flex items-center gap-2 mb-1.5">
                                                 <div className="flex-1 h-1 rounded-full bg-white/[0.06] overflow-hidden">
                                                     <div className="h-full rounded-full transition-all" style={{
                                                         width: `${entry.score || 0}%`,
-                                                        backgroundColor: entry.score > 70 ? '#10b981' : entry.score > 40 ? '#f59e0b' : '#64748b',
+                                                        backgroundColor: scoreColor,
                                                     }} />
                                                 </div>
-                                                <span className="text-xs text-slate-500 font-bold shrink-0">{entry.score || 0}</span>
+                                                <span className="text-xs font-bold shrink-0" style={{ color: scoreColor }}>{entry.score || 0}</span>
+                                                {entry.dealValue && (
+                                                    <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                                        ₹{entry.dealValue.toLocaleString()}
+                                                    </span>
+                                                )}
                                             </div>
 
-                                            {/* Tags & Source */}
-                                            <div className="flex flex-wrap gap-1">
+                                            {/* Tags, Source & Last Activity */}
+                                            <div className="flex flex-wrap items-center gap-1">
                                                 {entry.source && entry.source !== 'manual' && (
                                                     <span className="px-1.5 py-0.5 rounded text-xs bg-primary/10 text-primary font-medium flex items-center gap-0.5">
                                                         <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>{SOURCE_ICONS[entry.source] || 'help'}</span>
@@ -730,9 +886,18 @@ export default function FunnelStudio() {
                                                 {entry.company && (
                                                     <span className="px-1.5 py-0.5 rounded text-xs bg-white/[0.06] text-slate-400">{entry.company}</span>
                                                 )}
+                                                {(entry.tags || []).slice(0, 2).map(tag => (
+                                                    <span key={tag} className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-400 font-medium">{tag}</span>
+                                                ))}
+                                                {timeAgo && (
+                                                    <span className="text-[10px] text-slate-600 ml-auto flex items-center gap-0.5">
+                                                        <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>schedule</span>
+                                                        {timeAgo}
+                                                    </span>
+                                                )}
                                             </div>
 
-                                            {/* Stage move arrows */}
+                                            {/* Stage move arrows — compact */}
                                             <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 {stages.map((s, sIdx) => {
                                                     if (s.name === stage.name) return null
@@ -745,11 +910,15 @@ export default function FunnelStudio() {
                                                 })}
                                             </div>
                                         </div>
-                                    ))}
+                                        )
+                                    })}
                                     {stageEntries.length === 0 && (
-                                        <div className="text-center py-8 text-slate-600">
-                                            <span className="material-symbols-outlined text-2xl mb-1">inbox</span>
-                                            <p className="text-xs">No entries</p>
+                                        <div className="text-center py-6 text-slate-600">
+                                            <div className="size-10 rounded-xl bg-white/[0.03] flex items-center justify-center mx-auto mb-2">
+                                                <span className="material-symbols-outlined text-lg text-slate-700">person_add</span>
+                                            </div>
+                                            <p className="text-xs font-medium text-slate-500 mb-1">No leads here</p>
+                                            <p className="text-[10px] text-slate-600">Drag leads here or add new ones</p>
                                         </div>
                                     )}
                                 </div>
@@ -766,6 +935,15 @@ export default function FunnelStudio() {
                 {/* Add Entry Modal */}
                 {showAddEntry && <AddEntryModal stages={stages} onSubmit={addEntry} onClose={() => setShowAddEntry(false)} />}
                 {showImportModal && <ImportContactsModal stages={stages} onImport={importContacts} onClose={() => setShowImportModal(false)} />}
+
+                {/* #8 Fidato AI Sidebar */}
+                {fidatoOpen && (
+                    <FidatoFunnelSidebar funnel={selectedFunnel} onClose={() => setFidatoOpen(false)}
+                        onScoreDecay={async () => { try { await autoApi.scoreDecay({ funnelId: selectedFunnel._id }); const r = await api.get(selectedFunnel._id); setSelectedFunnel(r.funnel); setEntriesByStage(r.entriesByStage || {}) } catch {} }}
+                        onPredictiveScore={async () => { try { await autoApi.predictiveScore({ funnelId: selectedFunnel._id }); const r = await api.get(selectedFunnel._id); setSelectedFunnel(r.funnel); setEntriesByStage(r.entriesByStage || {}) } catch {} }}
+                        onRunAutomations={async () => { try { await autoApi.run({ funnelId: selectedFunnel._id }); const r = await api.get(selectedFunnel._id); setSelectedFunnel(r.funnel); setEntriesByStage(r.entriesByStage || {}) } catch {} }}
+                    />
+                )}
             </DashboardLayout>
         )
     }
@@ -783,62 +961,113 @@ export default function FunnelStudio() {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // DASHBOARD VIEW (Default)
+    // DASHBOARD VIEW — Intelligence-First Agentic Dashboard
     // ═══════════════════════════════════════════════════════════
+    const totalLeads = funnels.reduce((s, f) => s + (f.metrics?.totalEntries || 0), 0)
+    const totalConverted = funnels.reduce((s, f) => s + (f.metrics?.convertedEntries || 0), 0)
+    const totalActive = funnels.reduce((s, f) => s + (f.metrics?.activeEntries || 0), 0)
+    const avgCvr = funnels.length > 0 ? Math.round(funnels.reduce((s, f) => s + (f.metrics?.conversionRate || 0), 0) / funnels.length) : 0
+
+
     return (
         <DashboardLayout title="Funnel Studio" subtitle="Build and manage your sales funnels">
             <SEOHead title="Funnel Studio — Mantram AI" noIndex={true} />
 
-            {/* Template Gallery Header */}
-            <div className="mb-8">
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-primary">auto_awesome</span>
-                        <h2 className="text-white font-bold text-lg">Create Funnel</h2>
-                        <span className="text-sm text-slate-500">Choose a template or use AI</span>
+            {/* ── Intelligence Hero Banner ── */}
+            <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'linear-gradient(135deg, #6366f108, #8b5cf608, #06b6d408)' }}>
+                <div className="flex items-center justify-between mb-5">
+                    <div>
+                        <h2 className="text-white font-bold text-xl flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary">hub</span>
+                            Command Center
+                        </h2>
+                        <p className="text-sm text-slate-500 mt-0.5">Your funnel performance at a glance</p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button onClick={() => setView('help')}
-                            className="px-4 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-sm">help</span> How It Works
-                        </button>
                         <button onClick={() => setShowAIModal(true)}
                             className="px-5 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-purple-500 text-white flex items-center gap-2 cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all">
-                            <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Generate
+                            <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Architect
                         </button>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                    {templates.map(t => (
-                        <button key={t.id} onClick={() => createFromTemplate(t.id)} disabled={creatingTemplate === t.id}
-                            className="text-left glass-panel rounded-2xl p-5 hover:border-primary/20 hover:bg-primary/[0.02] transition-all cursor-pointer group disabled:opacity-50">
-                            <div className="size-12 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"
-                                style={{ backgroundColor: `${t.color}20` }}>
-                                <span className="material-symbols-outlined text-xl" style={{ color: t.color }}>{t.icon}</span>
-                            </div>
-                            <p className="text-white font-bold text-sm mb-1">{t.name}</p>
-                            <p className="text-slate-500 text-xs leading-relaxed line-clamp-2">{t.description}</p>
-                            <div className="flex items-center gap-2 mt-3 text-xs text-slate-600">
-                                <span>{t.stages.length} stages</span>
-                            </div>
-                            {creatingTemplate === t.id && (
-                                <div className="flex items-center gap-1.5 mt-2 text-primary text-xs">
-                                    <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
-                                    Creating...
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {[
+                        { label: 'Active Funnels', value: funnels.filter(f => f.status === 'active').length, icon: 'filter_alt', color: '#6366f1', subtext: `${funnels.length} total` },
+                        { label: 'Total Leads', value: totalLeads, icon: 'group', color: '#3b82f6', subtext: `${totalActive} active` },
+                        { label: 'Conversions', value: totalConverted, icon: 'emoji_events', color: '#10b981', subtext: `${avgCvr}% avg CVR` },
+                        { label: 'Pipeline Value', value: `${funnels.length > 0 ? '●●●' : '—'}`, icon: 'account_balance', color: '#f59e0b', subtext: 'Open a funnel to see' },
+                    ].map(m => (
+                        <div key={m.label} className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.04] hover:border-white/[0.08] transition-all">
+                            <div className="flex items-center gap-2 mb-2">
+                                <div className="size-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${m.color}15` }}>
+                                    <span className="material-symbols-outlined text-sm" style={{ color: m.color }}>{m.icon}</span>
                                 </div>
-                            )}
-                        </button>
+                                <span className="text-xs text-slate-500 font-medium">{m.label}</span>
+                            </div>
+                            <p className="text-2xl font-bold text-white">{m.value}</p>
+                            <p className="text-[11px] text-slate-600 mt-1">{m.subtext}</p>
+                        </div>
                     ))}
                 </div>
             </div>
 
-            {/* Funnels List */}
-            <div>
+            {/* ── Quick Actions Bar ── */}
+            <div className="flex items-center gap-3 mb-6 overflow-x-auto pb-1">
+                {[
+                    { label: 'AI Generate', icon: 'auto_awesome', color: '#8b5cf6', onClick: () => setShowAIModal(true) },
+                    { label: 'Marketplace', icon: 'storefront', color: '#6366f1', onClick: async () => { try { const r = await shareApi.browse(); setSharedTemplates(r.templates || []) } catch {}; setView('sharing') } },
+                    { label: 'How It Works', icon: 'menu_book', color: '#06b6d4', onClick: () => setView('help') },
+                ].map(a => (
+                    <button key={a.label} onClick={a.onClick}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer whitespace-nowrap hover:scale-[1.02]"
+                        style={{ color: a.color, backgroundColor: `${a.color}08`, borderColor: `${a.color}15` }}>
+                        <span className="material-symbols-outlined text-sm">{a.icon}</span> {a.label}
+                    </button>
+                ))}
+            </div>
+
+            {/* ── What To Do Next — Agentic Suggestions ── */}
+            {funnels.length > 0 && (
+                <div className="glass-panel rounded-2xl p-5 mb-6">
+                    <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-amber-400">emoji_objects</span>
+                        What To Do Next
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {[
+                            ...(funnels.some(f => (f.metrics?.totalEntries || 0) === 0)
+                                ? [{ icon: 'person_add', text: 'Add leads to your empty funnels', action: 'Import contacts or set up webhooks', color: '#3b82f6',
+                                    onClick: () => { const f = funnels.find(f => (f.metrics?.totalEntries || 0) === 0); if (f) openFunnel(f) } }]
+                                : []),
+                            ...(avgCvr < 30
+                                ? [{ icon: 'health_and_safety', text: 'Optimize your conversion rate', action: 'Check funnel health for bottlenecks', color: '#ef4444',
+                                    onClick: () => { if (funnels[0]) { openFunnel(funnels[0]); setTimeout(() => { fetchHealth(funnels[0]._id); setView('health') }, 100) } } }]
+                                : []),
+                            { icon: 'bolt', text: 'Set up automation rules', action: 'Let AI auto-advance hot leads', color: '#f59e0b',
+                                onClick: () => { if (funnels[0]) { openFunnel(funnels[0]); setTimeout(() => { fetchAutomationRules(funnels[0]._id); setView('automations') }, 100) } } },
+                        ].slice(0, 3).map((item, idx) => (
+                            <button key={idx} onClick={item.onClick}
+                                className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] hover:border-white/[0.08] transition-all cursor-pointer text-left">
+                                <div className="size-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: `${item.color}15` }}>
+                                    <span className="material-symbols-outlined text-sm" style={{ color: item.color }}>{item.icon}</span>
+                                </div>
+                                <div>
+                                    <p className="text-white text-xs font-bold">{item.text}</p>
+                                    <p className="text-[11px] text-slate-500 mt-0.5">{item.action}</p>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* ── Your Funnels ── */}
+            <div className="mb-6">
                 <div className="flex items-center gap-2 mb-4">
                     <span className="material-symbols-outlined text-slate-400">list_alt</span>
                     <h2 className="text-white font-bold text-lg">Your Funnels</h2>
-                    <span className="text-sm text-slate-500">{funnels.length} total</span>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-white/[0.06] text-slate-400">{funnels.length}</span>
                 </div>
 
                 {loading ? (
@@ -847,9 +1076,21 @@ export default function FunnelStudio() {
                     </div>
                 ) : funnels.length === 0 ? (
                     <div className="glass-panel rounded-2xl p-12 text-center">
-                        <span className="material-symbols-outlined text-6xl text-slate-700 mb-4">filter_alt</span>
-                        <p className="text-white font-bold text-lg mb-1">No funnels yet</p>
-                        <p className="text-slate-500 text-sm">Pick a template above or use AI to create your first sales funnel.</p>
+                        <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                            <span className="material-symbols-outlined text-3xl text-primary">rocket_launch</span>
+                        </div>
+                        <p className="text-white font-bold text-lg mb-2">Create Your First Funnel</p>
+                        <p className="text-slate-500 text-sm mb-6 max-w-md mx-auto">Choose a template below or use AI Architect to build a custom sales funnel tailored to your brand.</p>
+                        <div className="flex gap-3 justify-center">
+                            <button onClick={() => setShowAIModal(true)}
+                                className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-purple-500 text-white flex items-center gap-2 cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all">
+                                <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Architect
+                            </button>
+                            <button onClick={() => setShowTemplates(true)}
+                                className="px-6 py-3 rounded-xl text-sm font-bold text-white bg-white/[0.06] border border-white/[0.08] flex items-center gap-2 cursor-pointer hover:bg-white/[0.1] transition-all">
+                                <span className="material-symbols-outlined text-sm">dashboard_customize</span> Browse Templates
+                            </button>
+                        </div>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -857,9 +1098,12 @@ export default function FunnelStudio() {
                             const statusStyle = STATUS_STYLES[f.status] || STATUS_STYLES.active
                             return (
                                 <div key={f._id} onClick={() => openFunnel(f)}
-                                    className="glass-panel rounded-2xl p-5 hover:border-primary/20 hover:bg-primary/[0.02] transition-all cursor-pointer group">
+                                    className="glass-panel rounded-2xl p-5 hover:border-primary/20 hover:bg-primary/[0.02] transition-all cursor-pointer group relative overflow-hidden">
+                                    {/* Gradient Accent */}
+                                    <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{ background: `linear-gradient(90deg, ${f.color || '#6366f1'}, ${f.color || '#6366f1'}50)` }} />
+
                                     {/* Top Row */}
-                                    <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center justify-between mb-3 mt-1">
                                         <div className="flex items-center gap-3">
                                             <div className="size-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${f.color}20` }}>
                                                 <span className="material-symbols-outlined text-lg" style={{ color: f.color }}>{f.icon || 'filter_alt'}</span>
@@ -931,6 +1175,45 @@ export default function FunnelStudio() {
                 )}
             </div>
 
+            {/* ── Templates — Collapsible ── */}
+            <div className="glass-panel rounded-2xl overflow-hidden">
+                <button onClick={() => setShowTemplates(!showTemplates)}
+                    className="w-full flex items-center justify-between p-5 hover:bg-white/[0.02] transition-all cursor-pointer">
+                    <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary">dashboard_customize</span>
+                        <span className="text-white font-bold text-sm">Funnel Templates</span>
+                        <span className="text-xs text-slate-500">Quick-start with proven templates</span>
+                    </div>
+                    <span className={`material-symbols-outlined text-slate-500 transition-transform ${showTemplates ? 'rotate-180' : ''}`}>expand_more</span>
+                </button>
+                {(showTemplates || funnels.length === 0) && (
+                    <div className="px-5 pb-5 pt-0">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                            {templates.map(t => (
+                                <button key={t.id} onClick={() => createFromTemplate(t.id)} disabled={creatingTemplate === t.id}
+                                    className="text-left glass-panel rounded-2xl p-5 hover:border-primary/20 hover:bg-primary/[0.02] transition-all cursor-pointer group disabled:opacity-50">
+                                    <div className="size-12 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"
+                                        style={{ backgroundColor: `${t.color}20` }}>
+                                        <span className="material-symbols-outlined text-xl" style={{ color: t.color }}>{t.icon}</span>
+                                    </div>
+                                    <p className="text-white font-bold text-sm mb-1">{t.name}</p>
+                                    <p className="text-slate-500 text-xs leading-relaxed line-clamp-2">{t.description}</p>
+                                    <div className="flex items-center gap-2 mt-3 text-xs text-slate-600">
+                                        <span>{t.stages.length} stages</span>
+                                    </div>
+                                    {creatingTemplate === t.id && (
+                                        <div className="flex items-center gap-1.5 mt-2 text-primary text-xs">
+                                            <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                                            Creating...
+                                        </div>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+
             {/* AI Generate Modal */}
             {showAIModal && <AIGenerateModal brandId={currentBrand?._id} onCreated={(f) => { fetchFunnels(); openFunnel(f); setShowAIModal(false) }} onClose={() => setShowAIModal(false)} />}
         </DashboardLayout>
@@ -948,56 +1231,67 @@ function AddEntryModal({ stages, onSubmit, onClose }) {
     const [source, setSource] = useState('manual')
     const [score, setScore] = useState(0)
     const [stage, setStage] = useState(stages[0]?.name || '')
+    const [dealValue, setDealValue] = useState('')
 
     return (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
-            <div style={{ background: '#1e293b', borderRadius: '16px', border: '1px solid #334155', width: '480px', maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
-                <div style={{ padding: '1.25rem', borderBottom: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center" onClick={onClose}>
+            <div className="bg-[#1a1f35] rounded-2xl border border-white/[0.08] w-[480px] max-h-[85vh] overflow-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
                     <div>
-                        <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '1rem', fontWeight: 700 }}>Add Entry to Funnel</h3>
-                        <p style={{ color: '#64748b', margin: '0.2rem 0 0', fontSize: '0.7rem' }}>Add a new lead or contact to this funnel</p>
+                        <h3 className="text-white font-bold text-base flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary text-lg">person_add</span>
+                            Add Lead
+                        </h3>
+                        <p className="text-slate-500 text-xs mt-0.5">Add a new lead or contact to this funnel</p>
                     </div>
-                    <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
+                    <button onClick={onClose} className="size-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-sm">close</span>
+                    </button>
                 </div>
-                <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                <div className="p-5 space-y-3">
                     {[
-                        { label: 'Name', value: name, onChange: setName, placeholder: 'Lead name', type: 'text' },
+                        { label: 'Name *', value: name, onChange: setName, placeholder: 'Lead name', type: 'text' },
                         { label: 'Email', value: email, onChange: setEmail, placeholder: 'email@example.com', type: 'email' },
                         { label: 'Phone', value: phone, onChange: setPhone, placeholder: '+91 98765 43210', type: 'tel' },
                         { label: 'Company', value: company, onChange: setCompany, placeholder: 'Company name', type: 'text' },
                     ].map(f => (
                         <div key={f.label}>
-                            <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>{f.label}</label>
+                            <label className="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">{f.label}</label>
                             <input type={f.type} value={f.value} onChange={e => f.onChange(e.target.value)} placeholder={f.placeholder}
-                                style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.55rem 0.7rem', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }} />
+                                className="w-full bg-white/[0.04] border border-white/[0.06] rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-primary/30 transition-all placeholder-slate-600" />
                         </div>
                     ))}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Source</label>
+                            <label className="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">Source</label>
                             <select value={source} onChange={e => setSource(e.target.value)}
-                                style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.55rem 0.7rem', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none' }}>
+                                className="w-full bg-white/[0.04] border border-white/[0.06] rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-primary/30 transition-all">
                                 {['manual', 'ad', 'seo', 'social', 'dm', 'direct', 'referral', 'email', 'shopify', 'other'].map(s => (
                                     <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>
                                 ))}
                             </select>
                         </div>
                         <div>
-                            <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Stage</label>
+                            <label className="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">Stage</label>
                             <select value={stage} onChange={e => setStage(e.target.value)}
-                                style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.55rem 0.7rem', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none' }}>
+                                className="w-full bg-white/[0.04] border border-white/[0.06] rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-primary/30 transition-all">
                                 {stages.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
                             </select>
                         </div>
                     </div>
                     <div>
-                        <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Lead Score: {score}</label>
-                        <input type="range" min={0} max={100} value={score} onChange={e => setScore(parseInt(e.target.value))}
-                            style={{ width: '100%', accentColor: '#6366f1' }} />
+                        <label className="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">Deal Value (₹)</label>
+                        <input type="number" value={dealValue} onChange={e => setDealValue(e.target.value)} placeholder="e.g. 50000"
+                            className="w-full bg-white/[0.04] border border-white/[0.06] rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-primary/30 transition-all placeholder-slate-600" />
                     </div>
-                    <button onClick={() => onSubmit({ name, email, phone, company, source, score, stage })}
-                        style={{ width: '100%', padding: '0.7rem', background: '#6366f1', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>
-                        Add Entry
+                    <div>
+                        <label className="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">Lead Score: <span className="text-primary">{score}</span></label>
+                        <input type="range" min={0} max={100} value={score} onChange={e => setScore(parseInt(e.target.value))}
+                            className="w-full accent-primary" />
+                    </div>
+                    <button onClick={() => onSubmit({ name, email, phone, company, source, score, stage, dealValue: dealValue ? parseInt(dealValue) : undefined })}
+                        className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-primary to-purple-500 text-white cursor-pointer hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center justify-center gap-2 mt-2">
+                        <span className="material-symbols-outlined text-sm">person_add</span> Add Lead
                     </button>
                 </div>
             </div>
@@ -1023,28 +1317,33 @@ function AIGenerateModal({ brandId, onCreated, onClose }) {
     }
 
     return (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
-            <div style={{ background: '#1e293b', borderRadius: '16px', border: '1px solid #334155', width: '520px', maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
-                <div style={{ padding: '1.25rem', borderBottom: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center" onClick={onClose}>
+            <div className="bg-[#1a1f35] rounded-2xl border border-white/[0.08] w-[520px] max-h-[85vh] overflow-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
                     <div>
-                        <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '1rem', fontWeight: 700 }}>✨ AI Funnel Architect</h3>
-                        <p style={{ color: '#64748b', margin: '0.2rem 0 0', fontSize: '0.7rem' }}>Describe your goal and AI will design the perfect funnel</p>
+                        <h3 className="text-white font-bold text-base flex items-center gap-2">
+                            <span className="material-symbols-outlined text-amber-400 text-lg">auto_awesome</span>
+                            AI Funnel Architect
+                        </h3>
+                        <p className="text-slate-500 text-xs mt-0.5">Describe your goal and AI will design the perfect funnel</p>
                     </div>
-                    <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
+                    <button onClick={onClose} className="size-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-sm">close</span>
+                    </button>
                 </div>
-                <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="p-5 space-y-4">
                     <div>
-                        <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>What do you want to achieve?</label>
+                        <label className="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">What do you want to achieve?</label>
                         <textarea value={prompt} onChange={e => setPrompt(e.target.value)}
                             placeholder="e.g. I'm launching a new organic skincare line for Gen Z women. Create a funnel to generate leads through Instagram, nurture them with educational content about clean beauty, and convert them to first-time buyers with a launch discount."
                             rows={5}
-                            style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '10px', padding: '0.75rem', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none', resize: 'none', boxSizing: 'border-box', lineHeight: 1.5 }} />
+                            className="w-full bg-white/[0.04] border border-white/[0.06] rounded-xl px-3 py-3 text-white text-sm outline-none focus:border-primary/30 transition-all placeholder-slate-600 resize-none leading-relaxed" />
                     </div>
 
                     {/* Suggestion chips */}
                     <div>
-                        <p style={{ color: '#64748b', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.4rem' }}>Quick Ideas:</p>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Quick Ideas:</p>
+                        <div className="flex flex-wrap gap-1.5">
                             {[
                                 'SaaS free trial to paid conversion',
                                 'E-commerce product launch with influencers',
@@ -1053,7 +1352,7 @@ function AIGenerateModal({ brandId, onCreated, onClose }) {
                                 'App downloads through social ads + referrals',
                             ].map(idea => (
                                 <button key={idea} onClick={() => setPrompt(idea)}
-                                    style={{ padding: '0.35rem 0.6rem', background: '#6366f110', border: '1px solid #6366f130', borderRadius: '8px', color: '#a5b4fc', fontSize: '0.7rem', cursor: 'pointer' }}>
+                                    className="px-2.5 py-1.5 rounded-lg text-xs bg-primary/[0.06] border border-primary/10 text-primary/80 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer">
                                     {idea}
                                 </button>
                             ))}
@@ -1061,7 +1360,7 @@ function AIGenerateModal({ brandId, onCreated, onClose }) {
                     </div>
 
                     <button onClick={handleGenerate} disabled={generating || !prompt.trim()}
-                        style={{ width: '100%', padding: '0.75rem', background: generating ? '#4b5563' : 'linear-gradient(to right, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 700, fontSize: '0.85rem', cursor: generating ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                        className={`w-full py-3 rounded-xl text-sm font-bold text-white cursor-pointer flex items-center justify-center gap-2 transition-all ${generating ? 'bg-slate-600 cursor-not-allowed' : 'bg-gradient-to-r from-primary to-purple-500 hover:shadow-lg hover:shadow-primary/20'} disabled:opacity-50`}>
                         {generating ? (
                             <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> Generating funnel...</>
                         ) : (
@@ -2046,9 +2345,24 @@ const HELP_SECTIONS = [
         title: 'Getting Started',
         subtitle: 'Create your first funnel in minutes',
         steps: [
-            { icon: 'add_circle', title: 'Create a Funnel', description: 'Click a template card on the dashboard to instantly create a pre-configured funnel. Choose from Lead Gen, E-commerce, Webinar, Onboarding, or Content funnels — each comes with optimized stages.' },
-            { icon: 'auto_awesome', title: 'Use AI Generate', description: 'Click "AI Generate" and describe your business goal. The AI will design a custom funnel with the right stages, colors, and structure tailored to your brand.' },
-            { icon: 'open_in_new', title: 'Open Your Funnel', description: 'Click any funnel card to open the Pipeline view — your Kanban-style board where you\'ll manage leads moving through each stage.' },
+            { icon: 'hub', title: 'Command Center Dashboard', description: 'When you open Funnel Studio, you land on the Command Center — an intelligence-first dashboard showing your active funnels, total leads, conversions, and average CVR at a glance. Use the "What To Do Next" section for AI-suggested actions.' },
+            { icon: 'add_circle', title: 'Create a Funnel', description: 'Expand the "Funnel Templates" section at the bottom of the dashboard. Click any template card to instantly create a pre-configured funnel — Lead Gen, E-commerce, Webinar, Onboarding, or Content.' },
+            { icon: 'auto_awesome', title: 'Use AI Architect', description: 'Click "AI Architect" at the top of the dashboard and describe your business goal. The AI designs a custom funnel with the right stages, colors, and structure tailored to your brand.' },
+            { icon: 'open_in_new', title: 'Open Your Funnel', description: 'Click any funnel card to open the Pipeline view — a Kanban-style board with tabbed navigation for all features.' },
+        ]
+    },
+    {
+        id: 'navigation',
+        icon: 'tab',
+        color: '#3b82f6',
+        title: 'Tabbed Navigation System',
+        subtitle: 'Navigate all features through 4 organized tabs',
+        steps: [
+            { icon: 'view_kanban', title: 'Pipeline Tab (Indigo)', description: 'Your default view — the Kanban board with drag-and-drop lead cards. Use "Add Lead" to create entries and "Import" to bulk-import contacts. The "AI Tips" button fetches smart suggestions.' },
+            { icon: 'insights', title: 'Intelligence Tab (Cyan)', description: 'Access Health diagnostics, Analytics charts, Revenue Forecast, and Lead Scoring. Sub-tabs appear when active. "Score Leads" runs the AI scoring engine across all entries.' },
+            { icon: 'campaign', title: 'Engage Tab (Green)', description: 'Manage Automations, Nurture Sequences, Landing Pages, and the Activity Feed. Each sub-tab opens its dedicated management view.' },
+            { icon: 'tune', title: 'Configure Tab (Amber)', description: 'Access the Stage Builder to customize your funnel stages and Webhooks to connect external integrations. Configure studio connections per stage.' },
+            { icon: 'smart_toy', title: 'Fidato AI Button', description: 'The blue AI button in the top-right opens the Fidato AI sidebar. Fidato can score leads, run predictions, execute automations, and answer questions about your funnel — all in context.' },
         ]
     },
     {
@@ -2064,6 +2378,7 @@ const HELP_SECTIONS = [
             { icon: 'person_add', title: 'Onboarding Funnel', description: '5-stage funnel: Signed Up → Activated → Engaged → Power User → Advocate. Map the user journey from signup to becoming a product champion.' },
             { icon: 'article', title: 'Content Marketing Funnel', description: '4-stage funnel: Visitor → Subscriber → Engaged Reader → Customer. Convert content consumers into paying customers.' },
             { icon: 'psychology', title: 'AI Architect', description: 'Describe your goal in plain text (e.g. "SaaS onboarding for a CRM tool targeting SMBs"). The AI designs a complete funnel with branded stages, descriptions, colors, and types.' },
+            { icon: 'expand_more', title: 'Collapsible Templates', description: 'Templates are shown in a collapsible section on the dashboard. When you already have funnels, templates collapse automatically to keep the dashboard clean — expand anytime.' },
         ]
     },
     {
@@ -2071,14 +2386,16 @@ const HELP_SECTIONS = [
         icon: 'view_kanban',
         color: '#f59e0b',
         title: 'Pipeline & Lead Management',
-        subtitle: 'Manage your leads with the Kanban board',
+        subtitle: 'Manage your leads with enhanced Kanban cards',
         steps: [
-            { icon: 'person_add', title: 'Add Entries', description: 'Click "Add Entry" in the pipeline toolbar to manually add a lead. Enter their name, email, phone, company, and source. They\'ll appear in the first stage.' },
-            { icon: 'drag_indicator', title: 'Move Entries Between Stages', description: 'Use the arrow buttons on each entry card to move leads forward or backward through your funnel stages. Every move is tracked in the entry\'s stage history.' },
-            { icon: 'download', title: 'Import Contacts', description: 'Click "Import" to pull existing contacts from your CRM. Filter by tags, source, or date range — then bulk-import them into any funnel stage.' },
-            { icon: 'score', title: 'Lead Scoring', description: 'Each entry has a score (0-100). Scores are calculated based on touchpoints, engagement recency, source quality, and stage progression. Higher scores = hotter leads.' },
-            { icon: 'check_circle', title: 'Status Management', description: 'Mark entries as "converted" (won) or "lost" (dropped). Converted entries celebrate with a confetti moment. Lost entries help you identify where leads drop off.' },
-            { icon: 'content_copy', title: 'Clone Funnel', description: 'Click the clone icon on any funnel card to duplicate it. Great for A/B testing different funnel structures or creating seasonal variants.' },
+            { icon: 'person_add', title: 'Add Leads', description: 'Click "Add Lead" in the pipeline header. Enter name, email, phone, company, source, deal value (₹), and lead score. The lead appears in your selected stage.' },
+            { icon: 'drag_indicator', title: 'Drag & Drop Between Stages', description: 'Drag lead cards between Kanban columns to move them through your funnel. You can also use the quick "→ Stage" buttons that appear on hover.' },
+            { icon: 'download', title: 'Import Contacts', description: 'Click "Import" to bulk-import existing contacts into your funnel. Filter by tags, source, or date range — then assign them to any stage.' },
+            { icon: 'local_fire_department', title: 'Score Ring & Hot Leads', description: 'Each lead card has a color-coded score ring around the avatar: green (70+), amber (40-69), gray (<40). Hot leads (70+) show a green dot indicator for quick visual identification.' },
+            { icon: 'currency_rupee', title: 'Deal Value Badge', description: 'When you add a deal value, it appears as a ₹ badge on the card. This helps you prioritize high-value deals at a glance across your pipeline.' },
+            { icon: 'schedule', title: 'Last Activity Timer', description: 'Each card shows how long ago the lead was last active (e.g. "2h ago", "3d ago"). Stale leads stand out, helping your team prioritize follow-ups.' },
+            { icon: 'label', title: 'Tags & Source Badges', description: 'Tags and source badges appear directly on cards. Up to 2 tags are visible per card, and the source (ad, SEO, social, etc.) is shown with an icon.' },
+            { icon: 'check_circle', title: 'Quick Actions', description: 'Hover on any card to see: ✅ Convert, ❌ Mark Lost, and 🗑 Delete buttons. Converted entries celebrate with confetti!' },
         ]
     },
     {
@@ -2088,7 +2405,7 @@ const HELP_SECTIONS = [
         title: 'Visual Funnel Builder',
         subtitle: 'Customize stages, colors, and studio connections',
         steps: [
-            { icon: 'edit', title: 'Edit Stages', description: 'Click "Edit" in the pipeline toolbar to open the Builder. Rename stages, change colors, update descriptions, and set stage types (awareness, interest, consideration, decision, retention).' },
+            { icon: 'edit', title: 'Edit Stages', description: 'Navigate to the Configure tab → Stage Builder. Rename stages, change colors, update descriptions, and set stage types (awareness, interest, consideration, decision, retention).' },
             { icon: 'reorder', title: 'Drag & Reorder', description: 'Drag stages up or down to reorder them. Your funnel flow updates automatically across all views.' },
             { icon: 'add', title: 'Add New Stages', description: 'Click "Add Stage" at the bottom of the builder to insert a new stage. Configure its name, type, color, and description.' },
             { icon: 'link', title: 'Connect Studios', description: 'Toggle studio connections for each stage. Link to Content Studio, Creative Studio, SEO Studio, Performance Marketing, and more. When a lead enters a connected stage, relevant studio workflows can trigger.' },
@@ -2103,11 +2420,11 @@ const HELP_SECTIONS = [
         subtitle: 'Automated multi-channel follow-up sequences',
         steps: [
             { icon: 'mail', title: 'What Are Nurture Sequences?', description: 'Automated step-by-step communication sequences that engage leads at each funnel stage. Sequences support 6 channels: DM, Email, SMS, WhatsApp, Push Notifications, and Internal Tasks.' },
-            { icon: 'auto_awesome', title: 'AI Generate Sequence', description: 'Click "Nurture" in the pipeline toolbar → "AI Generate". Select your target stage, pick channels, and add instructions. The AI creates a multi-step sequence with personalized content, optimal delays, and conditions.' },
+            { icon: 'auto_awesome', title: 'AI Generate Sequence', description: 'Navigate to the Engage tab → Nurture, then click "AI Generate". Select your target stage, pick channels, and add instructions. The AI creates a multi-step sequence with personalized content, optimal delays, and conditions.' },
             { icon: 'bolt', title: 'Quick Create', description: 'Click "Quick Create" to instantly generate a basic 2-step DM + Email sequence. Customize the content, delays, and conditions afterward.' },
             { icon: 'schedule', title: 'Step Delays', description: 'Configure delay between steps: 30 minutes, 1 hour, 4 hours, 1 day, 3 days, or 7 days. Delays determine when the next step fires after the previous one completes.' },
             { icon: 'rule', title: 'Conditional Logic', description: 'Add conditions to steps: skip if contact has specific tags, score range, status, or source. This ensures leads only receive relevant communications.' },
-            { icon: 'play_arrow', title: 'Activate & Manage', description: 'Toggle sequences on/off with the activate button. Active sequences will trigger when entries enter the linked stage. Monitor delivery, open, click, and reply metrics per step.' },
+            { icon: 'play_arrow', title: 'Activate & Manage', description: 'Toggle sequences on/off with the activate button. Active sequences trigger when entries enter the linked stage. Monitor delivery, open, click, and reply metrics per step.' },
         ]
     },
     {
@@ -2117,12 +2434,12 @@ const HELP_SECTIONS = [
         title: 'Funnel Health & Lead Scoring',
         subtitle: 'AI-powered diagnostics and optimization',
         steps: [
-            { icon: 'health_and_safety', title: 'Health Dashboard', description: 'Click "Health" in the pipeline toolbar. See your funnel\'s overall grade (A–F), based on conversion rate, bottlenecks, stagnation, and stage health.' },
+            { icon: 'health_and_safety', title: 'Health Dashboard', description: 'Navigate to the Intelligence tab → Health. See your funnel\'s overall grade (A–F), based on conversion rate, bottlenecks, stagnation, and stage health.' },
             { icon: 'error', title: 'Bottleneck Detection', description: 'Stages with more than 50% drop-off are flagged as bottlenecks with a 🚨 alert. These are the biggest leaks in your funnel and need immediate attention.' },
             { icon: 'hourglass_bottom', title: 'Stagnation Alerts', description: 'Stages where leads sit for 7+ days on average are flagged as stagnant with a ⏳ alert. Consider adding nurture sequences or reviewing your stage criteria.' },
             { icon: 'tips_and_updates', title: 'AI Recommendations', description: 'The health dashboard generates specific recommendations: add nurture sequences, connect studios, split stages, or add intermediary touchpoints.' },
-            { icon: 'score', title: 'Score Leads', description: 'Click "Score Leads" to run the AI scoring engine. It analyzes each entry\'s touchpoints, recency, source quality, stage progress, and contact completeness to assign a 0-100 score.' },
-            { icon: 'local_fire_department', title: 'Hot / Warm / Cold', description: 'After scoring, leads are categorized: 🔥 Hot (70+), 🌡️ Warm (40-69), ❄️ Cold (<40). Focus your team\'s effort on hot leads first for maximum conversion.' },
+            { icon: 'score', title: 'Score Leads', description: 'Click "Score Leads" in the Intelligence tab sub-nav to run the AI scoring engine. It analyzes each entry\'s touchpoints, recency, source quality, stage progress, and contact completeness to assign a 0-100 score.' },
+            { icon: 'local_fire_department', title: 'Hot / Warm / Cold', description: 'After scoring, leads are categorized: 🔥 Hot (70+), 🌡️ Warm (40-69), ❄️ Cold (<40). Hot leads show a green dot on their Kanban card for instant visual identification.' },
         ]
     },
     {
@@ -2132,7 +2449,7 @@ const HELP_SECTIONS = [
         title: 'Landing Pages & Forms',
         subtitle: 'Capture leads with branded landing pages',
         steps: [
-            { icon: 'web', title: 'Landing Pages', description: 'Click "Pages" in the pipeline toolbar. Create landing pages that feed leads directly into your funnel stages. Each page has customizable sections and a lead capture form.' },
+            { icon: 'web', title: 'Landing Pages', description: 'Navigate to the Engage tab → Pages. Create landing pages that feed leads directly into your funnel stages. Each page has customizable sections and a lead capture form.' },
             { icon: 'auto_awesome', title: 'AI Generate Page', description: 'Click "AI Generate" to create a complete landing page. The AI uses your brand DNA, funnel context, and target stage to generate hero sections, features, testimonials, CTAs, and forms.' },
             { icon: 'description', title: 'Form Builder', description: 'Each landing page includes a configurable form. Fields map directly to your CRM Contact model (name, email, phone). Form submissions automatically create a Contact AND a Funnel Entry.' },
             { icon: 'analytics', title: 'Page Metrics', description: 'Track views, form submissions, and conversion rate for each page. Use these metrics to optimize your landing page copy, design, and form fields.' },
@@ -2146,7 +2463,7 @@ const HELP_SECTIONS = [
         title: 'Automation Engine',
         subtitle: 'Make your funnel self-running with WHEN → THEN rules',
         steps: [
-            { icon: 'bolt', title: 'What Are Automation Rules?', description: 'Rules that automatically take action when events happen in your funnel. Each rule follows a WHEN (trigger) + IF (conditions) → THEN (actions) pattern. No coding required — rules fire in real-time.' },
+            { icon: 'bolt', title: 'What Are Automation Rules?', description: 'Rules that automatically take action when events happen in your funnel. Each rule follows a WHEN (trigger) + IF (conditions) → THEN (actions) pattern. Navigate to the Engage tab → Automations to manage them.' },
             { icon: 'sensors', title: '7 Trigger Types', description: 'Rules can fire on: Entry Created, Stage Changed, Score Threshold (above/below), Inactivity (X days), Status Changed, Form Submitted, and Score Changed. Each trigger monitors real-time funnel events.' },
             { icon: 'checklist', title: 'Conditions (Filters)', description: 'Add optional conditions to ensure rules only apply to the right leads. Filter by score range, specific stage, source type, activity days, contact completeness, tags, and more. All conditions must match.' },
             { icon: 'arrow_forward', title: '10 Action Types', description: 'Actions include: Move to Stage, Change Status, Update Score (+/-), Add/Remove Tag, Start Nurture Sequence, Send Notification, Log Touchpoint, and Trigger Studio (cross-studio orchestration).' },
@@ -2158,16 +2475,18 @@ const HELP_SECTIONS = [
 ]
 
 const PRO_TIPS = [
-    { icon: '🎯', tip: 'Start with a template, then customize stages using the Builder. Templates give you best-practice stage flows.' },
-    { icon: '🤖', tip: 'Use AI Generate to create funnels, nurture sequences, and landing pages — all tailored to your brand voice and industry.' },
-    { icon: '📊', tip: 'Check Funnel Health weekly. Fix bottlenecks first — they have the biggest impact on conversion rates.' },
-    { icon: '🔥', tip: 'Run lead scoring regularly. Your sales team should focus on Hot leads (70+) for maximum ROI.' },
-    { icon: '📧', tip: 'Every stage should have a Nurture Sequence. Leads that receive timely follow-ups convert 2-3x better.' },
-    { icon: '🔗', tip: 'Connect stages to studios (Content, Creative, SEO). This enables cross-studio workflows triggered by funnel events.' },
+    { icon: '🧭', tip: 'Use the 4-tab navigation (Pipeline → Intelligence → Engage → Configure) to access all features without toolbar clutter.' },
+    { icon: '📊', tip: 'Check the Command Center dashboard for quick metrics. The "What To Do Next" cards suggest AI-powered actions based on your funnel data.' },
+    { icon: '🎯', tip: 'Start with a template, then customize stages in the Configure → Stage Builder tab. Templates give you best-practice stage flows.' },
+    { icon: '🤖', tip: 'Use AI Architect to create funnels, then AI Generate for nurture sequences, landing pages, and automation rules — all tailored to your brand.' },
+    { icon: '🔥', tip: 'Look for green dots on Kanban cards — those are hot leads (score 70+). Prioritize them for maximum conversion.' },
+    { icon: '💰', tip: 'Always add a Deal Value when creating leads. The ₹ badge on cards helps you prioritize high-value opportunities at a glance.' },
+    { icon: '📧', tip: 'Every stage should have a Nurture Sequence (Engage tab → Nurture). Leads that receive timely follow-ups convert 2-3x better.' },
+    { icon: '🔗', tip: 'Connect stages to studios in the Configure → Stage Builder. This enables cross-studio workflows triggered by funnel events.' },
     { icon: '📱', tip: 'Use multi-channel nurture (DM + Email + WhatsApp) for 5x higher engagement vs. single-channel sequences.' },
-    { icon: '📄', tip: 'Create a dedicated landing page for your top-of-funnel stage. AI-generated pages convert well right out of the box.' },
-    { icon: '⚡', tip: 'Use AI Auto-Generate to create automation rules instantly. One click sets up smart rules for stage advancement, inactivity detection, and lead scoring.' },
-    { icon: '🔄', tip: 'Automation rules fire in real-time on every event. Set up a "Score > 70 → Move to Decision" rule and watch hot leads advance automatically.' },
+    { icon: '⚡', tip: 'Use AI Auto-Generate automation rules (Engage → Automations). One click sets up smart rules for stage advancement, inactivity detection, and scoring.' },
+    { icon: '⏰', tip: 'Watch the "last activity" timer on Kanban cards. Leads inactive for 3+ days need immediate attention — set up inactivity automation rules.' },
+    { icon: '📈', tip: 'Check Intelligence → Health weekly. Fix bottlenecks first — stages with 50%+ drop-off are the biggest leaks in your funnel.' },
 ]
 
 function HelpDocumentationView({ onBack }) {
@@ -2198,14 +2517,16 @@ function HelpDocumentationView({ onBack }) {
                     <span className="material-symbols-outlined text-primary">info</span> What is Funnel Studio?
                 </h3>
                 <p className="text-slate-400 text-sm leading-relaxed mb-4">
-                    Funnel Studio is your complete sales funnel management system. It lets you <strong className="text-white">build custom funnels</strong> using templates or AI,
-                    <strong className="text-white"> track leads</strong> through a Kanban pipeline, set up <strong className="text-white">automated nurture sequences</strong> across 6 channels,
-                    run <strong className="text-white">automation rules</strong> that auto-move leads based on behavior,
-                    monitor <strong className="text-white">funnel health</strong> with AI diagnostics, <strong className="text-white">score leads</strong> automatically, and create
-                    <strong className="text-white"> landing pages</strong> that capture leads into your funnels — all connected to your Brand DNA.
+                    Funnel Studio is your complete sales funnel management system. Start at the <strong className="text-white">Command Center dashboard</strong> for an intelligence-first overview of all your funnels.
+                    Open any funnel to access the <strong className="text-white">tabbed pipeline view</strong> with 4 organized tabs:
+                    <strong className="text-white"> Pipeline</strong> (Kanban board with enhanced lead cards),
+                    <strong className="text-white"> Intelligence</strong> (health, analytics, forecasts, lead scoring),
+                    <strong className="text-white"> Engage</strong> (automations, nurture, landing pages, activity feed), and
+                    <strong className="text-white"> Configure</strong> (stage builder, webhooks).
+                    Everything is connected to your Brand DNA, with <strong className="text-white">Fidato AI</strong> available at every step.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                    {['Templates', 'AI Generate', 'Kanban Pipeline', 'Automation Rules', 'Nurture Sequences', 'Lead Scoring', 'Health Monitor', 'Landing Pages', 'Studio Links'].map(tag => (
+                    {['Command Center', 'Tabbed Navigation', 'AI Architect', 'Kanban Pipeline', 'Score Rings', 'Deal Values', 'Automation Rules', 'Nurture Sequences', 'Lead Scoring', 'Landing Pages', 'Studio Links', 'Fidato AI'].map(tag => (
                         <span key={tag} className="px-3 py-1 rounded-full text-xs font-bold bg-white/[0.04] border border-white/[0.06] text-slate-400">{tag}</span>
                     ))}
                 </div>
@@ -2218,8 +2539,8 @@ function HelpDocumentationView({ onBack }) {
                 </h3>
                 <div className="flex items-center gap-0 overflow-x-auto pb-2">
                     {[
-                        { label: 'Create Funnel', icon: 'add_circle', color: '#6366f1' },
-                        { label: 'Edit Stages', icon: 'build', color: '#8b5cf6' },
+                        { label: 'Dashboard', icon: 'hub', color: '#6366f1' },
+                        { label: 'Create Funnel', icon: 'add_circle', color: '#8b5cf6' },
                         { label: 'Add Leads', icon: 'person_add', color: '#f59e0b' },
                         { label: 'Set Rules', icon: 'bolt', color: '#f97316' },
                         { label: 'Set Nurture', icon: 'mail', color: '#10b981' },
@@ -2699,6 +3020,9 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
                 </div>
             )}
 
+            {/* #1 Visual Workflow Builder */}
+            <VisualWorkflowBuilder rules={rules} funnel={funnel} />
+
             {/* How It Works */}
             <div className="glass-panel rounded-2xl p-6" style={{ background: 'linear-gradient(135deg, #f59e0b06, #ef444406)' }}>
                 <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
@@ -2722,6 +3046,561 @@ function AutomationView({ funnel, rules, loading, running, generating, onBack, o
                         </div>
                     ))}
                 </div>
+            </div>
+        </div>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// #10 REVENUE FORECAST VIEW
+// ═══════════════════════════════════════════════════════════════
+function RevenueForecastView({ forecast, funnel, onBack }) {
+    if (!forecast) return <div className="text-center py-12 text-slate-500">No forecast data available</div>
+
+    return (
+        <div className="space-y-6">
+            <button onClick={onBack} className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-all cursor-pointer mb-2">
+                <span className="material-symbols-outlined text-sm">arrow_back</span> Back to Pipeline
+            </button>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                    { label: 'Weighted Revenue', value: `$${(forecast.totalWeightedRevenue || 0).toLocaleString()}`, icon: 'account_balance', color: '#10b981' },
+                    { label: 'Potential Revenue', value: `$${(forecast.totalPotentialRevenue || 0).toLocaleString()}`, icon: 'savings', color: '#6366f1' },
+                    { label: '30-Day Projection', value: `$${(forecast.projected30Day || 0).toLocaleString()}`, icon: 'calendar_month', color: '#f59e0b' },
+                    { label: '90-Day Projection', value: `$${(forecast.projected90Day || 0).toLocaleString()}`, icon: 'date_range', color: '#ef4444' },
+                ].map(c => (
+                    <div key={c.label} className="glass-panel rounded-2xl p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                            <div className="size-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${c.color}15` }}>
+                                <span className="material-symbols-outlined text-sm" style={{ color: c.color }}>{c.icon}</span>
+                            </div>
+                            <span className="text-xs text-slate-500">{c.label}</span>
+                        </div>
+                        <p className="text-2xl font-bold text-white">{c.value}</p>
+                    </div>
+                ))}
+            </div>
+
+            {/* Conversion Metrics */}
+            <div className="glass-panel rounded-2xl p-6">
+                <h3 className="text-white font-bold text-sm mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-emerald-400 text-sm">insights</span>
+                    Pipeline Metrics
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div className="text-center p-3 rounded-xl bg-white/[0.02]">
+                        <p className="text-2xl font-bold text-white">{forecast.totalEntries}</p>
+                        <p className="text-xs text-slate-500">Total Entries</p>
+                    </div>
+                    <div className="text-center p-3 rounded-xl bg-white/[0.02]">
+                        <p className="text-2xl font-bold text-emerald-400">{forecast.convertedEntries}</p>
+                        <p className="text-xs text-slate-500">Converted</p>
+                    </div>
+                    <div className="text-center p-3 rounded-xl bg-white/[0.02]">
+                        <p className="text-2xl font-bold text-blue-400">{forecast.activeEntries}</p>
+                        <p className="text-xs text-slate-500">Active</p>
+                    </div>
+                    <div className="text-center p-3 rounded-xl bg-white/[0.02]">
+                        <p className="text-2xl font-bold text-amber-400">{forecast.conversionRate}%</p>
+                        <p className="text-xs text-slate-500">Conversion Rate</p>
+                    </div>
+                    <div className="text-center p-3 rounded-xl bg-white/[0.02]">
+                        <p className="text-2xl font-bold text-slate-300">{forecast.avgConversionDays}d</p>
+                        <p className="text-xs text-slate-500">Avg Time to Convert</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Stage-by-Stage Forecast */}
+            <div className="glass-panel rounded-2xl p-6">
+                <h3 className="text-white font-bold text-sm mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-sm">stacked_bar_chart</span>
+                    Stage-by-Stage Forecast
+                </h3>
+                <div className="space-y-3">
+                    {(forecast.stages || []).map(stage => (
+                        <div key={stage.stage} className="flex items-center gap-4 p-3 rounded-xl bg-white/[0.02]">
+                            <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: stage.color }} />
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <span className="text-sm text-white font-bold truncate">{stage.stage}</span>
+                                    <span className="text-xs text-slate-400">{stage.activeEntries} entries</span>
+                                </div>
+                                <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden">
+                                    <div className="h-full rounded-full transition-all duration-500" style={{
+                                        width: `${stage.probability}%`,
+                                        backgroundColor: stage.color,
+                                        opacity: 0.7,
+                                    }} />
+                                </div>
+                                <div className="flex items-center justify-between mt-1">
+                                    <span className="text-xs text-slate-500">{stage.probability}% close probability</span>
+                                    <span className="text-xs font-bold" style={{ color: stage.color }}>${stage.weightedRevenue.toLocaleString()} weighted</span>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// #12 ACTIVITY FEED VIEW
+// ═══════════════════════════════════════════════════════════════
+function ActivityFeedView({ feed, funnel, onBack, onRefresh }) {
+    const typeIcons = {
+        entry_created: 'person_add', stage_changed: 'swap_horiz', score_changed: 'speed',
+        inactivity: 'schedule', form_submitted: 'assignment', touchpoint: 'touch_app',
+    }
+    const typeColors = {
+        entry_created: '#10b981', stage_changed: '#6366f1', score_changed: '#f59e0b',
+        inactivity: '#ef4444', form_submitted: '#8b5cf6', touchpoint: '#3b82f6',
+    }
+
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center justify-between">
+                <button onClick={onBack} className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-all cursor-pointer">
+                    <span className="material-symbols-outlined text-sm">arrow_back</span> Back to Pipeline
+                </button>
+                <button onClick={onRefresh}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/15 transition-all cursor-pointer flex items-center gap-1">
+                    <span className="material-symbols-outlined text-xs">refresh</span> Refresh
+                </button>
+            </div>
+
+            {feed.length === 0 ? (
+                <div className="text-center py-16">
+                    <span className="material-symbols-outlined text-4xl text-slate-600 mb-2">dynamic_feed</span>
+                    <p className="text-slate-500 text-sm">No activity yet. Actions, automations, and touchpoints will appear here.</p>
+                </div>
+            ) : (
+                <div className="relative">
+                    <div className="absolute left-5 top-0 bottom-0 w-px bg-white/[0.06]" />
+                    <div className="space-y-1">
+                        {feed.map((item, idx) => {
+                            const icon = typeIcons[item.triggerType || item.touchpointType] || 'bolt'
+                            const color = typeColors[item.triggerType || item.touchpointType] || '#64748b'
+                            const time = item.executedAt ? new Date(item.executedAt).toLocaleString() : ''
+                            return (
+                                <div key={idx} className="flex items-start gap-4 pl-2 py-2 rounded-xl hover:bg-white/[0.02] transition-all">
+                                    <div className="relative z-10 size-7 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}20` }}>
+                                        <span className="material-symbols-outlined text-xs" style={{ color }}>{icon}</span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-sm text-white font-bold">{item.entryName || 'System'}</span>
+                                            {item.ruleName && <span className="text-xs px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400">{item.ruleName}</span>}
+                                        </div>
+                                        <p className="text-xs text-slate-400 mt-0.5">
+                                            {item.actions?.join(', ') || item.action || 'Activity logged'}
+                                        </p>
+                                        <p className="text-[10px] text-slate-600 mt-0.5">{time}</p>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// #4 WEBHOOKS VIEW
+// ═══════════════════════════════════════════════════════════════
+function WebhooksView({ webhookData, funnel, onBack }) {
+    const [copied, setCopied] = useState(null)
+    const copyUrl = (key, url) => {
+        const baseUrl = window.location.origin.replace(/:\d+$/, ':5001')
+        navigator.clipboard.writeText(`${baseUrl}${url}`)
+        setCopied(key)
+        setTimeout(() => setCopied(null), 2000)
+    }
+
+    if (!webhookData) return <div className="text-center py-12 text-slate-500">Loading webhook data...</div>
+
+    const endpoints = webhookData.endpoints || {}
+
+    return (
+        <div className="space-y-6">
+            <button onClick={onBack} className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-all cursor-pointer">
+                <span className="material-symbols-outlined text-sm">arrow_back</span> Back to Pipeline
+            </button>
+
+            <div className="glass-panel rounded-2xl p-6" style={{ background: 'linear-gradient(135deg, #6366f106, #8b5cf606)' }}>
+                <h3 className="text-white font-bold text-sm mb-1 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-sm">webhook</span>
+                    Webhook Integration
+                </h3>
+                <p className="text-xs text-slate-500 mb-4">Connect external systems to automatically create funnel entries.</p>
+
+                <div className="space-y-3">
+                    {[
+                        { key: 'generic', label: 'Generic Ingest', desc: 'Accept data from any source (Zapier, Make, custom)', icon: 'input', url: endpoints.generic },
+                        { key: 'shopify', label: 'Shopify Orders', desc: 'Auto-capture orders and create customer entries', icon: 'shopping_cart', url: endpoints.shopify },
+                        { key: 'stripe', label: 'Stripe Payments', desc: 'Track payment events and mark conversions', icon: 'credit_card', url: endpoints.stripe },
+                    ].map(ep => (
+                        <div key={ep.key} className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary text-sm">{ep.icon}</span>
+                                    <span className="text-sm text-white font-bold">{ep.label}</span>
+                                </div>
+                                <button onClick={() => copyUrl(ep.key, ep.url)}
+                                    className="px-3 py-1 rounded-lg text-xs font-bold bg-primary/10 text-primary hover:bg-primary/20 transition-all cursor-pointer">
+                                    {copied === ep.key ? '✓ Copied!' : 'Copy URL'}
+                                </button>
+                            </div>
+                            <p className="text-xs text-slate-500 mb-2">{ep.desc}</p>
+                            <code className="block text-[11px] text-slate-400 bg-black/30 rounded-lg p-2 overflow-x-auto font-mono">{ep.url}</code>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Payload Examples */}
+            <div className="glass-panel rounded-2xl p-6">
+                <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-amber-400 text-sm">code</span>
+                    Payload Examples
+                </h3>
+                <div className="space-y-3">
+                    <div className="p-3 rounded-xl bg-black/30">
+                        <p className="text-xs text-amber-400 font-bold mb-1">POST Generic Ingest</p>
+                        <pre className="text-[11px] text-slate-400 font-mono overflow-x-auto">{`{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "phone": "+1234567890",
+  "source": "referral",
+  "dealValue": 5000,
+  "tags": ["premium", "enterprise"],
+  "metadata": { "event": "webinar_signup" }
+}`}</pre>
+                    </div>
+                    <div className="p-3 rounded-xl bg-black/30">
+                        <p className="text-xs text-emerald-400 font-bold mb-1">Shopify Header: X-Shopify-Topic</p>
+                        <p className="text-[11px] text-slate-400 font-mono">orders/create, orders/paid, orders/fulfilled</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// #11 SHARED TEMPLATES VIEW
+// ═══════════════════════════════════════════════════════════════
+function SharedTemplatesView({ templates, funnels, brandId, onBack, onRefresh, onClone, onShare }) {
+    useEffect(() => { onRefresh() }, [])
+
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <button onClick={onBack} className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-all cursor-pointer">
+                    <span className="material-symbols-outlined text-sm">arrow_back</span> Back to Dashboard
+                </button>
+            </div>
+
+            {/* Share Your Funnels */}
+            {funnels?.length > 0 && (
+                <div className="glass-panel rounded-2xl p-6">
+                    <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-emerald-400 text-sm">share</span>
+                        Share Your Funnels
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {funnels.map(f => (
+                            <div key={f._id} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <span className="material-symbols-outlined text-primary text-sm">{f.icon || 'filter_alt'}</span>
+                                    <span className="text-sm text-white font-bold truncate">{f.name}</span>
+                                </div>
+                                <button onClick={() => onShare(f._id)}
+                                    className="px-2 py-1 rounded text-xs font-bold text-emerald-400 hover:bg-emerald-500/10 transition-all cursor-pointer">
+                                    {f.isShared ? '✓ Shared' : 'Share'}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Browse Templates */}
+            <div className="glass-panel rounded-2xl p-6">
+                <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-sm">storefront</span>
+                    Community Templates
+                </h3>
+                {templates.length === 0 ? (
+                    <div className="text-center py-8">
+                        <span className="material-symbols-outlined text-3xl text-slate-600 mb-2">store</span>
+                        <p className="text-slate-500 text-sm">No shared templates yet. Be the first to share!</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {templates.map(t => (
+                            <div key={t._id} className="glass-panel rounded-xl p-4 hover:border-primary/20 transition-all">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="size-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${t.color || '#6366f1'}20` }}>
+                                        <span className="material-symbols-outlined text-sm" style={{ color: t.color || '#6366f1' }}>{t.icon || 'filter_alt'}</span>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-sm text-white font-bold truncate">{t.name}</p>
+                                        <p className="text-[10px] text-slate-500">by {t.sharedBy} · {t.stages?.length || 0} stages</p>
+                                    </div>
+                                </div>
+                                <p className="text-xs text-slate-400 mb-3 line-clamp-2">{t.shareDescription || t.description || 'No description'}</p>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] text-slate-600">{t.cloneCount || 0} clones</span>
+                                    <button onClick={() => onClone(t._id)}
+                                        className="px-3 py-1 rounded-lg text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 transition-all cursor-pointer">
+                                        Clone
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// #8 FIDATO AI FUNNEL SIDEBAR
+// ═══════════════════════════════════════════════════════════════
+function FidatoFunnelSidebar({ funnel, onClose, onScoreDecay, onPredictiveScore, onRunAutomations }) {
+    const [fidatoInput, setFidatoInput] = useState('')
+    const [fidatoMessages, setFidatoMessages] = useState([
+        { role: 'assistant', text: `Hey! 👋 I'm Fidato, your AI funnel assistant for "${funnel.name}". Ask me anything or use the quick actions below!` }
+    ])
+    const [fidatoLoading, setFidatoLoading] = useState(false)
+
+    const quickActions = [
+        { label: '🔄 Run Score Decay', action: onScoreDecay, desc: 'Apply time-based score reduction to inactive leads' },
+        { label: '🧠 Predictive Scoring', action: onPredictiveScore, desc: 'Re-score leads based on conversion patterns' },
+        { label: '⚡ Run All Automations', action: onRunAutomations, desc: 'Execute all active automation rules now' },
+    ]
+
+    const sendMessage = async () => {
+        if (!fidatoInput.trim()) return
+        const msg = fidatoInput.trim()
+        setFidatoInput('')
+        setFidatoMessages(prev => [...prev, { role: 'user', text: msg }])
+        setFidatoLoading(true)
+
+        // Simple NL command recognition
+        let response = 'I can help with that! Use the quick actions below, or navigate to the relevant tab for more options.'
+        if (msg.toLowerCase().includes('score') && msg.toLowerCase().includes('decay')) {
+            onScoreDecay()
+            response = '✅ Score decay has been triggered! Inactive leads will have their scores adjusted.'
+        } else if (msg.toLowerCase().includes('predictive') || msg.toLowerCase().includes('predict')) {
+            onPredictiveScore()
+            response = '🧠 Predictive scoring is running! Scores will be updated based on your conversion history.'
+        } else if (msg.toLowerCase().includes('automat') || msg.toLowerCase().includes('rule')) {
+            onRunAutomations()
+            response = '⚡ All automation rules have been executed!'
+        } else if (msg.toLowerCase().includes('help')) {
+            response = 'I can help with:\n• Score decay — reduce scores of inactive leads\n• Predictive scoring — AI-powered lead scoring\n• Run automations — execute all rules\n• Revenue forecasting — check the Forecast tab\n• Webhooks — connect external tools\n\nJust ask naturally!'
+        }
+
+        setTimeout(() => {
+            setFidatoMessages(prev => [...prev, { role: 'assistant', text: response }])
+            setFidatoLoading(false)
+        }, 500)
+    }
+
+    return (
+        <div className="fixed right-0 top-0 bottom-0 w-96 bg-[#0a0e1a]/95 backdrop-blur-xl border-l border-white/[0.06] z-50 flex flex-col shadow-2xl"
+            style={{ animation: 'slideInRight 0.3s ease' }}>
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
+                <div className="flex items-center gap-2">
+                    <div className="size-8 rounded-xl bg-gradient-to-br from-primary/30 to-purple-500/30 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-primary text-sm">smart_toy</span>
+                    </div>
+                    <div>
+                        <h3 className="text-white font-bold text-sm">Fidato AI</h3>
+                        <p className="text-[10px] text-slate-500">Funnel Assistant</p>
+                    </div>
+                </div>
+                <button onClick={onClose} className="size-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer">
+                    <span className="material-symbols-outlined text-sm">close</span>
+                </button>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="p-3 border-b border-white/[0.06]">
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-bold">Quick Actions</p>
+                <div className="space-y-1">
+                    {quickActions.map(qa => (
+                        <button key={qa.label} onClick={async () => {
+                            setFidatoMessages(prev => [...prev, { role: 'assistant', text: `Running: ${qa.label}...` }])
+                            await qa.action()
+                            setFidatoMessages(prev => [...prev, { role: 'assistant', text: `✅ ${qa.label} completed!` }])
+                        }}
+                            className="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-300 hover:text-white hover:bg-white/[0.04] transition-all cursor-pointer">
+                            <span className="font-bold">{qa.label}</span>
+                            <p className="text-[10px] text-slate-500 mt-0.5">{qa.desc}</p>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {fidatoMessages.map((msg, idx) => (
+                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[85%] px-3 py-2 rounded-xl text-xs ${msg.role === 'user' ? 'bg-primary/20 text-white' : 'bg-white/[0.04] text-slate-300'}`}
+                            style={{ whiteSpace: 'pre-line' }}>
+                            {msg.text}
+                        </div>
+                    </div>
+                ))}
+                {fidatoLoading && (
+                    <div className="flex justify-start">
+                        <div className="px-3 py-2 rounded-xl text-xs bg-white/[0.04] text-slate-400">Thinking...</div>
+                    </div>
+                )}
+            </div>
+
+            {/* Input */}
+            <div className="p-3 border-t border-white/[0.06]">
+                <div className="flex gap-2">
+                    <input value={fidatoInput} onChange={e => setFidatoInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && sendMessage()}
+                        placeholder="Ask Fidato anything..."
+                        className="flex-1 bg-white/[0.04] border border-white/[0.06] rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 outline-none focus:border-primary/30" />
+                    <button onClick={sendMessage}
+                        className="size-8 rounded-xl bg-primary/20 flex items-center justify-center text-primary hover:bg-primary/30 transition-all cursor-pointer">
+                        <span className="material-symbols-outlined text-sm">send</span>
+                    </button>
+                </div>
+            </div>
+
+            <style>{`@keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`}</style>
+        </div>
+    )
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// #1 VISUAL WORKFLOW BUILDER — Node/Edge view of automation rules
+// ═══════════════════════════════════════════════════════════════
+function VisualWorkflowBuilder({ rules, funnel }) {
+    if (!rules || rules.length === 0) {
+        return (
+            <div className="text-center py-8">
+                <span className="material-symbols-outlined text-3xl text-slate-600 mb-2">account_tree</span>
+                <p className="text-slate-500 text-sm">No automation rules yet. Create rules first to see the visual workflow.</p>
+            </div>
+        )
+    }
+
+    const triggerIcons = {
+        entry_created: 'person_add', stage_changed: 'swap_horiz', score_changed: 'speed',
+        status_changed: 'toggle_on', inactivity: 'schedule', form_submitted: 'assignment',
+    }
+    const actionIcons = {
+        move_stage: 'swap_horiz', update_score: 'speed', change_status: 'toggle_on',
+        add_tag: 'label', remove_tag: 'label_off', send_notification: 'notifications',
+        trigger_nurture: 'mail', trigger_studio: 'dashboard', update_field: 'edit', log_activity: 'history',
+    }
+
+    return (
+        <div className="space-y-6">
+            <h3 className="text-white font-bold text-sm flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-sm">account_tree</span>
+                Visual Workflow
+            </h3>
+
+            <div className="space-y-4">
+                {rules.map(rule => (
+                    <div key={rule._id} className="glass-panel rounded-2xl p-4" style={{ opacity: rule.active ? 1 : 0.5 }}>
+                        <div className="flex items-center gap-2 mb-3">
+                            <div className={`size-2 rounded-full ${rule.active ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+                            <span className="text-sm text-white font-bold">{rule.name}</span>
+                            {!rule.active && <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-400">Disabled</span>}
+                        </div>
+
+                        {/* Node flow: Trigger → Conditions → Actions */}
+                        <div className="flex items-start gap-0 overflow-x-auto pb-2">
+                            {/* Trigger Node */}
+                            <div className="shrink-0 w-40">
+                                <div className="rounded-xl p-3 bg-blue-500/10 border border-blue-500/20">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <span className="material-symbols-outlined text-blue-400 text-xs">{triggerIcons[rule.trigger?.type] || 'sensors'}</span>
+                                        <span className="text-[10px] text-blue-400 font-bold uppercase">Trigger</span>
+                                    </div>
+                                    <p className="text-xs text-white font-bold">{(rule.trigger?.type || '').replace(/_/g, ' ')}</p>
+                                    {rule.trigger?.config?.stage && <p className="text-[10px] text-slate-400">Stage: {rule.trigger.config.stage}</p>}
+                                </div>
+                            </div>
+
+                            {/* Arrow */}
+                            <div className="flex items-center h-16 px-1 shrink-0">
+                                <div className="w-6 h-px bg-white/20" />
+                                <span className="material-symbols-outlined text-white/30 text-xs">arrow_forward</span>
+                            </div>
+
+                            {/* Conditions Node (if any) */}
+                            {rule.conditions?.length > 0 && (
+                                <>
+                                    <div className="shrink-0 w-40">
+                                        <div className="rounded-xl p-3 bg-amber-500/10 border border-amber-500/20">
+                                            <div className="flex items-center gap-1.5 mb-1">
+                                                <span className="material-symbols-outlined text-amber-400 text-xs">checklist</span>
+                                                <span className="text-[10px] text-amber-400 font-bold uppercase">Conditions</span>
+                                            </div>
+                                            {rule.conditions.map((cond, i) => (
+                                                <p key={i} className="text-[10px] text-slate-300">{cond.field} {cond.operator} {cond.value}</p>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center h-16 px-1 shrink-0">
+                                        <div className="w-6 h-px bg-white/20" />
+                                        <span className="material-symbols-outlined text-white/30 text-xs">arrow_forward</span>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* Action Nodes — #6 Multi-Action support */}
+                            <div className="flex gap-2 shrink-0">
+                                {(rule.actions || []).map((action, i) => (
+                                    <div key={i} className="w-40 rounded-xl p-3 bg-emerald-500/10 border border-emerald-500/20">
+                                        <div className="flex items-center gap-1.5 mb-1">
+                                            <span className="material-symbols-outlined text-emerald-400 text-xs">{actionIcons[action.type] || 'bolt'}</span>
+                                            <span className="text-[10px] text-emerald-400 font-bold uppercase">Action {i + 1}</span>
+                                        </div>
+                                        <p className="text-xs text-white font-bold">{(action.type || '').replace(/_/g, ' ')}</p>
+                                        {action.config && Object.entries(action.config).slice(0, 2).map(([k, v]) => (
+                                            <p key={k} className="text-[10px] text-slate-400">{k}: {String(v)}</p>
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Stats */}
+                        {rule.executionCount > 0 && (
+                            <div className="flex items-center gap-3 mt-2 pt-2 border-t border-white/[0.04]">
+                                <span className="text-[10px] text-slate-500">Executed {rule.executionCount} times</span>
+                                {rule.lastExecutedAt && <span className="text-[10px] text-slate-600">Last: {new Date(rule.lastExecutedAt).toLocaleDateString()}</span>}
+                            </div>
+                        )}
+                    </div>
+                ))}
             </div>
         </div>
     )

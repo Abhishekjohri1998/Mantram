@@ -659,6 +659,13 @@ export const funnelIntelligence = {
     updatePage: (id, data) => apiFetch(`/funnel-intelligence/pages/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     deletePage: (id) => apiFetch(`/funnel-intelligence/pages/${id}`, { method: 'DELETE' }),
     aiGeneratePage: (data) => apiFetch('/funnel-intelligence/pages/ai/generate', { method: 'POST', body: JSON.stringify(data) }),
+    // A/B Testing
+    createVariant: (data) => apiFetch('/funnel-intelligence/ab-test/create-variant', { method: 'POST', body: JSON.stringify(data) }),
+    abResults: (pageId) => apiFetch(`/funnel-intelligence/ab-test/${pageId}/results`),
+    chooseWinner: (pageId, data) => apiFetch(`/funnel-intelligence/ab-test/${pageId}/choose-winner`, { method: 'POST', body: JSON.stringify(data) }),
+    // Delivery
+    deliver: (data) => apiFetch('/funnel-intelligence/deliver', { method: 'POST', body: JSON.stringify(data) }),
+    deliverBatch: (data) => apiFetch('/funnel-intelligence/deliver-batch', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ── Funnel Automation Engine ──
@@ -674,4 +681,20 @@ export const funnelAutomation = {
     aiGenerate: (data) => apiFetch('/funnel-automation/ai/generate', { method: 'POST', body: JSON.stringify(data) }),
     executeSuggestion: (data) => apiFetch('/funnel-automation/execute-suggestion', { method: 'POST', body: JSON.stringify(data) }),
     scoreEntry: (data) => apiFetch('/funnel-automation/score-entry', { method: 'POST', body: JSON.stringify(data) }),
+    // Score Decay + Predictive Scoring
+    scoreDecay: (data) => apiFetch('/funnel-automation/score-decay', { method: 'POST', body: JSON.stringify(data) }),
+    predictiveScore: (data) => apiFetch('/funnel-automation/predictive-score', { method: 'POST', body: JSON.stringify(data) }),
+    // Revenue Forecast
+    revenueForecast: (funnelId) => apiFetch(`/funnel-automation/revenue-forecast?funnelId=${funnelId}`),
+    // Activity Feed
+    activityFeed: (funnelId) => apiFetch(`/funnel-automation/activity-feed?funnelId=${funnelId}`),
+};
+
+// ── Funnel Studio Extensions ──
+export const funnelSharing = {
+    share: (id, data) => apiFetch(`/funnel-studio/${id}/share`, { method: 'POST', body: JSON.stringify(data) }),
+    unshare: (id) => apiFetch(`/funnel-studio/${id}/unshare`, { method: 'POST' }),
+    browse: (category) => apiFetch(`/funnel-studio/shared/browse${category ? `?category=${category}` : ''}`),
+    clone: (id, data) => apiFetch(`/funnel-studio/shared/${id}/clone`, { method: 'POST', body: JSON.stringify(data) }),
+    webhookToken: (id) => apiFetch(`/funnel-studio/${id}/webhook-token`),
 };

@@ -47,6 +47,7 @@ import funnelStudioRoutes from './routes/funnel-studio.js';
 import nurtureSequenceRoutes from './routes/nurture-sequences.js';
 import funnelIntelligenceRoutes from './routes/funnel-intelligence.js';
 import funnelAutomationRoutes from './routes/funnel-automation.js';
+import funnelWebhookRoutes from './routes/funnel-webhooks.js';
 
 const app = express();
 
@@ -182,6 +183,7 @@ app.use('/api/funnel-studio', funnelStudioRoutes);
 app.use('/api/nurture-sequences', nurtureSequenceRoutes);
 app.use('/api/funnel-intelligence', funnelIntelligenceRoutes);
 app.use('/api/funnel-automation', funnelAutomationRoutes);
+app.use('/api/funnel-webhooks', funnelWebhookRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
