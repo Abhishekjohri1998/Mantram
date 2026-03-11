@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useBrand } from '../context/BrandContext'
 import SEOHead from '../components/SEOHead'
 import * as fabric from 'fabric'
+import { media as mediaAPI } from '../services/api'
 import './CanvasEditor.css'
 
 // ── Error Boundary to catch render-phase crashes ──
@@ -536,10 +537,16 @@ function CanvasEditorInner() {
             const file = e.target.files?.[0]
             if (!file) return
             const reader = new FileReader()
-            reader.onload = (ev) => {
+            reader.onload = async (ev) => {
                 const fc = fabricRef.current
                 if (!fc) return
-                fabric.FabricImage.fromURL(ev.target.result).then(img => {
+                // Upload to S3 first, fall back to base64
+                let imgUrl = ev.target.result
+                try {
+                    const { url } = await mediaAPI.upload({ imageData: ev.target.result, folder: 'canvas-layers' })
+                    imgUrl = url
+                } catch (e) { console.warn('S3 upload failed for canvas layer, using base64:', e.message) }
+                fabric.FabricImage.fromURL(imgUrl, { crossOrigin: 'anonymous' }).then(img => {
                     const maxSize = fc.width * 0.5
                     const scale = maxSize / Math.max(img.width, img.height)
                     img.set({
@@ -1573,7 +1580,12 @@ function CanvasEditorInner() {
         const file = e.target.files?.[0]
         if (!file) return
         const reader = new FileReader()
-        reader.onload = () => setReplaceImage(reader.result)
+        reader.onload = async () => {
+            try {
+                const { url } = await mediaAPI.upload({ imageData: reader.result, folder: 'canvas-retouch' })
+                setReplaceImage(url)
+            } catch { setReplaceImage(reader.result) }
+        }
         reader.readAsDataURL(file)
     }, [])
 

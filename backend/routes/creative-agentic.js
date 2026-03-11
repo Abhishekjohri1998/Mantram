@@ -25,14 +25,14 @@ import {
 const router = Router();
 
 // ── Helper: generate image from prompt using existing infrastructure ──
-async function generateImage(prompt, brand, type, user) {
+async function generateImage(prompt, brand, type, user, options = {}) {
     const orchestrator = getOrchestrator();
     return orchestrator.generateCreative({
         brand,
         user,
         type,
         prompt,
-        options: {},
+        options,
     });
 }
 
@@ -41,7 +41,7 @@ async function generateImage(prompt, brand, type, user) {
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/start', protect, requireCredits('creative'), async (req, res) => {
     try {
-        const { brandId, brief, format, aspectRatio, style, references, productName } = req.body;
+        const { brandId, brief, format, aspectRatio, style, references, productName, options: clientOptions } = req.body;
         if (!brandId || !brief) return res.status(400).json({ success: false, error: 'brandId and brief are required' });
 
         const brand = await Brand.findById(brandId);
@@ -68,7 +68,11 @@ router.post('/start', protect, requireCredits('creative'), async (req, res) => {
         state = await styleCriticNode(state);
 
         // Step 4: Generate the image using the engineered prompt
-        const result = await generateImage(state.finalPrompt, brand, format || 'instagram-post', req.user);
+        const result = await generateImage(state.finalPrompt, brand, format || 'instagram-post', req.user, {
+            ...clientOptions,
+            aspectRatio: aspectRatio || '1:1',
+            style: style || '',
+        });
 
         // Save creative
         const creative = await Creative.create({

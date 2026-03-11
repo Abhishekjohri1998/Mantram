@@ -71,13 +71,16 @@ function WebsiteScan({ onComplete, onBack, initialUrl = '' }) {
     const [error, setError] = useState('')
 
     const steps = [
-        { label: 'Analyzing your website', icon: 'language', duration: 1200 },
-        { label: 'Extracting brand logo', icon: 'image', duration: 1000 },
-        { label: 'Determining your visual aesthetic', icon: 'palette', duration: 1200 },
+        { label: 'Connecting to website', icon: 'language', duration: 800 },
+        { label: 'Extracting page structure', icon: 'code', duration: 1000 },
+        { label: 'Taking website screenshot', icon: 'screenshot_monitor', duration: 1200 },
+        { label: 'AI Vision — identifying logo', icon: 'visibility', duration: 1500 },
+        { label: 'AI Vision — detecting brand colors', icon: 'palette', duration: 1200 },
         { label: 'Detecting typography', icon: 'text_fields', duration: 800 },
-        { label: 'Collecting homepage images', icon: 'photo_library', duration: 1500 },
+        { label: 'Collecting homepage images', icon: 'photo_library', duration: 1000 },
+        { label: 'Scanning social media profiles', icon: 'share', duration: 1500 },
         { label: 'Analyzing brand voice & tone', icon: 'record_voice_over', duration: 2000 },
-        { label: 'Building your Brand DNA', icon: 'fingerprint', duration: 1500 },
+        { label: 'Building your Brand DNA', icon: 'fingerprint', duration: 1200 },
     ]
 
     const handleScan = async () => {
@@ -700,61 +703,163 @@ function ReviewBrand({ brand, onFinish }) {
     const dna = brand?.dna || {}
     const voice = dna.voice || {}
     const brandImages = dna.brandImages || dna.bannerImages || []
+    const socialLinks = dna.socialLinks || {}
+    const socialVoice = dna.socialVoice || {}
+    const contentStyle = dna.contentStyle || {}
+    const [saving, setSaving] = useState(false)
+    const [saved, setSaved] = useState(false)
+
+    const handleSave = () => {
+        setSaving(true)
+        setTimeout(() => {
+            setSaving(false)
+            setSaved(true)
+            setTimeout(() => onFinish(), 1200)
+        }, 600)
+    }
+
+    // Count how many intelligence features were detected
+    const socialPlatforms = Object.entries(socialLinks).filter(([, v]) => v).length
+    const totalImages = brandImages.length
+    const hasVision = dna.logo?.metadata?.source === 'ai-vision'
+    const hasVoice = !!voice.personality
+
+    // Social platform config
+    const platformConfig = {
+        instagram: { icon: '📸', label: 'Instagram', color: '#E1306C' },
+        facebook: { icon: '📘', label: 'Facebook', color: '#1877F2' },
+        twitter: { icon: '🐦', label: 'Twitter / X', color: '#1DA1F2' },
+        linkedin: { icon: '💼', label: 'LinkedIn', color: '#0A66C2' },
+        youtube: { icon: '▶️', label: 'YouTube', color: '#FF0000' },
+        pinterest: { icon: '📌', label: 'Pinterest', color: '#E60023' },
+    }
+
+    if (saved) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in">
+                <div className="size-24 rounded-full bg-emerald-500/20 flex items-center justify-center mb-6 animate-[pulse_1s_ease-in-out]">
+                    <span className="material-symbols-outlined text-emerald-400 text-5xl">check_circle</span>
+                </div>
+                <h2 className="text-3xl font-extrabold text-white mb-2">Brand DNA Saved!</h2>
+                <p className="text-slate-400 text-sm">Taking you to your dashboard...</p>
+            </div>
+        )
+    }
 
     return (
         <div className="max-w-5xl mx-auto animate-fade-in">
-            {/* ── Pomelli-style header ── */}
-            <div className="text-center mb-8">
+            {/* ── Header ── */}
+            <div className="text-center mb-6">
                 <span className="material-symbols-outlined text-primary text-3xl mb-2 block">fingerprint</span>
                 <h2 className="text-3xl font-extrabold tracking-tight" style={{ fontStyle: 'italic', fontFamily: 'Georgia, serif' }}>
                     Your Business DNA
                 </h2>
                 <p className="text-slate-400 text-sm mt-2">
-                    Here is a snapshot of your business that we'll use to create social media campaigns.<br />
-                    Feel free to edit at anytime.
+                    We've analyzed your brand across {socialPlatforms > 0 ? `${socialPlatforms} social platforms, ` : ''}
+                    {totalImages} images{hasVision ? ', and AI Vision' : ''}. Here's what we found.
                 </p>
             </div>
 
-            {/* ── 2-column layout: Brand Info (left) + Images (right) ── */}
-            <div className="glass-panel rounded-3xl p-8 relative overflow-hidden">
+            {/* ── Intelligence Summary Chips ── */}
+            <div className="flex flex-wrap gap-2 justify-center mb-8">
+                {hasVision && (
+                    <span className="px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">visibility</span> AI Vision Active
+                    </span>
+                )}
+                {socialPlatforms > 0 && (
+                    <span className="px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">share</span> {socialPlatforms} Social Profiles
+                    </span>
+                )}
+                {hasVoice && (
+                    <span className="px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-medium flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">record_voice_over</span> Voice Analyzed
+                    </span>
+                )}
+                <span className="px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-sm">photo_library</span> {totalImages} Images
+                </span>
+            </div>
+
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* SECTION A — Website Snapshot (from AI Vision) */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {dna.websiteSnapshot && (
+                <div className="mb-6 glass-panel rounded-2xl p-4 border border-primary/20">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary text-lg">screenshot_monitor</span>
+                            <p className="text-sm text-slate-400 uppercase tracking-widest">Website Snapshot</p>
+                        </div>
+                        {dna.logo?.metadata?.confidence && (
+                            <div className="flex items-center gap-2">
+                                <span className={`w-2 h-2 rounded-full ${
+                                    dna.logo.metadata.confidence === 'high' ? 'bg-emerald-400' :
+                                    dna.logo.metadata.confidence === 'medium' ? 'bg-yellow-400' : 'bg-red-400'
+                                }`} />
+                                <p className="text-xs text-slate-500">
+                                    {dna.logo.metadata.confidence} confidence
+                                    {dna.logo.metadata.source === 'ai-vision' && ' · AI Vision'}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                    <img src={dna.websiteSnapshot} alt="Website screenshot"
+                        className="w-full rounded-xl border border-white/[0.08] shadow-lg" />
+                </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* SECTION B — Brand Identity */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            <div className="glass-panel rounded-3xl p-8 relative overflow-hidden mb-6">
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.02] to-transparent pointer-events-none" />
                 <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-                    {/* ═══ LEFT COLUMN: Brand Identity ═══ */}
-                    <div className="space-y-6">
-                        {/* Brand Name + URL */}
+                    {/* ═══ LEFT: Identity ═══ */}
+                    <div className="space-y-5">
+                        {/* Brand Name + URL + Tagline */}
                         <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
                             <h3 className="text-2xl font-extrabold text-white mb-1">{brand.name}</h3>
+                            {dna.tagline && (
+                                <p className="text-sm text-primary italic mb-2">"{dna.tagline}"</p>
+                            )}
                             {brand.website && (
                                 <div className="flex items-center gap-2 text-sm text-slate-400">
                                     <span className="material-symbols-outlined text-sm">link</span>
-                                    {brand.website}
+                                    <a href={brand.website} target="_blank" rel="noopener" className="hover:text-primary transition-colors">{brand.website}</a>
                                 </div>
+                            )}
+                            {dna.industry && (
+                                <span className="inline-block mt-2 px-2.5 py-0.5 rounded-lg bg-primary/10 text-primary text-xs font-medium">
+                                    {dna.industry}
+                                </span>
                             )}
                         </div>
 
                         {/* Logo + Fonts side by side */}
                         <div className="grid grid-cols-2 gap-4">
-                            {/* Logo */}
-                            <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center min-h-[100px]">
+                            <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex flex-col items-center justify-center min-h-[100px]">
                                 {dna.logo?.url ? (
-                                    <img src={dna.logo.url} alt="Brand Logo" className="max-w-full max-h-20 object-contain"
-                                        onError={e => e.target.style.display = 'none'} />
+                                    <>
+                                        <img src={dna.logo.url} alt="Brand Logo" className="max-w-full max-h-16 object-contain"
+                                            onError={e => e.target.style.display = 'none'} />
+                                        {dna.logo.metadata?.source === 'ai-vision' && (
+                                            <span className="text-[10px] text-emerald-400/60 mt-2 flex items-center gap-1">
+                                                <span className="material-symbols-outlined text-[10px]">visibility</span> AI detected
+                                            </span>
+                                        )}
+                                    </>
                                 ) : (
-                                    <div className="text-4xl font-black text-white"
-                                        style={{ color: dna.colors?.[0]?.hex || '#2B4BEE' }}>
+                                    <div className="text-4xl font-black" style={{ color: dna.colors?.[0]?.hex || '#2B4BEE' }}>
                                         {brand.name?.charAt(0)?.toUpperCase()}
                                     </div>
                                 )}
                             </div>
-
-                            {/* Fonts */}
                             <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
                                 <p className="text-sm text-slate-500 uppercase tracking-widest mb-2">Fonts</p>
-                                <p className="text-2xl text-white font-bold"
-                                    style={{ fontFamily: dna.fonts?.heading?.family || 'Inter' }}>
-                                    Aa
-                                </p>
+                                <p className="text-2xl text-white font-bold" style={{ fontFamily: dna.fonts?.heading?.family || 'Inter' }}>Aa</p>
                                 <p className="text-sm text-slate-400 mt-1">{dna.fonts?.heading?.family || 'Inter'}</p>
                                 {dna.fonts?.body?.family && dna.fonts.body.family !== dna.fonts?.heading?.family && (
                                     <p className="text-sm text-slate-500 mt-0.5">{dna.fonts.body.family}</p>
@@ -764,14 +869,15 @@ function ReviewBrand({ brand, onFinish }) {
 
                         {/* Colors */}
                         <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
-                            <p className="text-sm text-slate-500 uppercase tracking-widest mb-3">Colors</p>
+                            <p className="text-sm text-slate-500 uppercase tracking-widest mb-3">Brand Colors</p>
                             {dna.colors?.length > 0 ? (
-                                <div className="flex gap-5 flex-wrap">
+                                <div className="flex gap-4 flex-wrap">
                                     {dna.colors.map((c, i) => (
                                         <div key={i} className="text-center">
-                                            <div className="w-16 h-16 rounded-full border-2 border-white/[0.1] shadow-lg"
+                                            <div className="w-14 h-14 rounded-full border-2 border-white/[0.1] shadow-lg"
                                                 style={{ background: c.hex }} />
-                                            <p className="text-sm text-slate-500 font-mono mt-2">{c.hex?.toLowerCase()}</p>
+                                            <p className="text-[10px] text-slate-500 font-mono mt-1.5">{c.hex?.toLowerCase()}</p>
+                                            {c.name && <p className="text-[10px] text-slate-600">{c.name}</p>}
                                         </div>
                                     ))}
                                 </div>
@@ -781,15 +887,14 @@ function ReviewBrand({ brand, onFinish }) {
                         </div>
                     </div>
 
-                    {/* ═══ RIGHT COLUMN: Images ═══ */}
+                    {/* ═══ RIGHT: Images ═══ */}
                     <div>
                         <p className="text-sm text-slate-500 uppercase tracking-widest mb-3">Images</p>
                         {brandImages.length > 0 ? (
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                                {/* Upload placeholder */}
                                 <div className="rounded-xl border-2 border-dashed border-white/[0.08] hover:border-primary/30 flex flex-col items-center justify-center py-6 cursor-pointer transition-colors bg-white/[0.02] aspect-square">
                                     <span className="material-symbols-outlined text-xl text-slate-600 mb-1">cloud_upload</span>
-                                    <span className="text-sm text-slate-500">Upload Images</span>
+                                    <span className="text-sm text-slate-500">Upload</span>
                                 </div>
                                 {brandImages.map((img, i) => (
                                     <div key={i} className="rounded-xl overflow-hidden bg-white/[0.03] border border-white/[0.06] group aspect-square">
@@ -803,34 +908,121 @@ function ReviewBrand({ brand, onFinish }) {
                             <div className="flex flex-col items-center justify-center h-full rounded-xl border-2 border-dashed border-white/[0.08] py-12">
                                 <span className="material-symbols-outlined text-3xl text-slate-600 mb-2">photo_library</span>
                                 <p className="text-slate-500 text-sm">No images found</p>
-                                <p className="text-slate-600 text-xs">Upload images to use in campaigns</p>
                             </div>
                         )}
                     </div>
                 </div>
-
-                {/* Bottom bar */}
-                <div className="flex items-center justify-between mt-8 pt-6 border-t border-white/[0.06]">
-                    <p className="text-sm text-slate-500">
-                        Next we'll use your Business DNA to generate social media campaigns
-                    </p>
-                    <button onClick={onFinish}
-                        className="py-3 px-8 rounded-2xl text-sm font-bold cursor-pointer transition-all"
-                        style={{ background: dna.colors?.[1]?.hex || dna.colors?.[0]?.hex || '#BBF00A', color: '#000' }}>
-                        Looks good
-                    </button>
-                </div>
             </div>
 
-            {/* ── Voice & Content Style (collapsible detail below) ── */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* SECTION C — Social Media Intelligence */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {socialPlatforms > 0 && (
+                <div className="glass-panel rounded-2xl p-6 mb-6">
+                    <h3 className="font-bold text-white flex items-center gap-2 mb-5">
+                        <span className="material-symbols-outlined text-primary">share</span> Social Media Intelligence
+                        <span className="text-xs font-normal text-slate-500 ml-auto">{socialPlatforms} platforms detected</span>
+                    </h3>
+
+                    {/* Social Link Pills */}
+                    <div className="flex flex-wrap gap-2 mb-5">
+                        {Object.entries(socialLinks).filter(([, url]) => url).map(([platform, url]) => {
+                            const cfg = platformConfig[platform] || { icon: '🔗', label: platform, color: '#888' }
+                            return (
+                                <a key={platform} href={url} target="_blank" rel="noopener"
+                                    className="flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all hover:scale-105"
+                                    style={{ borderColor: cfg.color + '30', background: cfg.color + '10' }}>
+                                    <span>{cfg.icon}</span>
+                                    <span className="text-xs font-medium text-white">{cfg.label}</span>
+                                    <span className="material-symbols-outlined text-xs text-slate-500">open_in_new</span>
+                                </a>
+                            )
+                        })}
+                    </div>
+
+                    {/* Social Voice Analysis */}
+                    {(socialVoice.captionStyle || socialVoice.toneInsight) && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            {socialVoice.captionStyle && (
+                                <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                                    <p className="text-xs text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-xs">edit_note</span> Caption Style
+                                    </p>
+                                    <p className="text-sm text-slate-300">{socialVoice.captionStyle}</p>
+                                </div>
+                            )}
+                            {socialVoice.toneInsight && (
+                                <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                                    <p className="text-xs text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-xs">psychology</span> Tone Insight
+                                    </p>
+                                    <p className="text-sm text-slate-300">{socialVoice.toneInsight}</p>
+                                </div>
+                            )}
+                            {socialVoice.hashtagStrategy && (
+                                <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                                    <p className="text-xs text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-xs">tag</span> Hashtag Strategy
+                                    </p>
+                                    <p className="text-sm text-slate-300">{socialVoice.hashtagStrategy}</p>
+                                </div>
+                            )}
+                            {socialVoice.emojiUsage && (
+                                <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                                    <p className="text-xs text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-xs">mood</span> Emoji Usage
+                                    </p>
+                                    <p className="text-sm text-slate-300">{socialVoice.emojiUsage}</p>
+                                </div>
+                            )}
+                            {socialVoice.ctaStyle && (
+                                <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                                    <p className="text-xs text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-xs">ads_click</span> CTA Patterns
+                                    </p>
+                                    <p className="text-sm text-slate-300">{socialVoice.ctaStyle}</p>
+                                </div>
+                            )}
+                            {socialVoice.postingPatterns && (
+                                <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                                    <p className="text-xs text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-xs">schedule</span> Posting Patterns
+                                    </p>
+                                    <p className="text-sm text-slate-300">{socialVoice.postingPatterns}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Sample Captions */}
+                    {socialVoice.sampleCaptions?.length > 0 && (
+                        <div>
+                            <p className="text-xs text-slate-500 uppercase tracking-widest mb-2">Sample Captions from Social</p>
+                            <div className="space-y-2">
+                                {socialVoice.sampleCaptions.slice(0, 3).map((cap, i) => (
+                                    <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] text-sm text-slate-400 italic">
+                                        "{cap}"
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* SECTION D — Voice & Content Style */}
+            {/* ══════════════════════════════════════════════════════════════ */}
             {voice.personality && (
-                <div className="glass-panel rounded-2xl p-6 mt-6">
+                <div className="glass-panel rounded-2xl p-6 mb-6">
                     <h3 className="font-bold text-white flex items-center gap-2 mb-4">
-                        <span className="material-symbols-outlined text-primary">record_voice_over</span> Voice & Tone
+                        <span className="material-symbols-outlined text-primary">record_voice_over</span> Brand Voice & Tone
                     </h3>
                     <p className="text-lg text-primary font-bold mb-2">{voice.personality}</p>
                     {voice.description && <p className="text-sm text-slate-300 mb-4">{voice.description}</p>}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+
+                    {/* Voice Sliders */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-4">
                         {[
                             { label: 'Tone', value: voice.tone },
                             { label: 'Clarity', value: voice.clarity },
@@ -845,30 +1037,56 @@ function ReviewBrand({ brand, onFinish }) {
                             </div>
                         ))}
                     </div>
+
+                    {/* Keywords */}
                     {voice.keywords?.length > 0 && (
-                        <div className="mt-4 flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-2 mb-4">
                             {voice.keywords.map((k, i) => (
                                 <span key={i} className="px-3 py-1 rounded-lg bg-primary/10 text-primary text-xs">{k}</span>
                             ))}
                         </div>
                     )}
+
+                    {/* Photography + Writing Style */}
+                    {(dna.photographyStyle || contentStyle.writingStyle || contentStyle.ctaStyle) && (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 pt-4 border-t border-white/[0.06]">
+                            {dna.photographyStyle && (
+                                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                                    <p className="text-xs text-slate-500 uppercase tracking-widest mb-1">Photography</p>
+                                    <p className="text-sm text-slate-300">{dna.photographyStyle}</p>
+                                </div>
+                            )}
+                            {contentStyle.writingStyle && (
+                                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                                    <p className="text-xs text-slate-500 uppercase tracking-widest mb-1">Writing Style</p>
+                                    <p className="text-sm text-slate-300">{contentStyle.writingStyle}</p>
+                                </div>
+                            )}
+                            {contentStyle.ctaStyle && (
+                                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                                    <p className="text-xs text-slate-500 uppercase tracking-widest mb-1">CTA Style</p>
+                                    <p className="text-sm text-slate-300">{contentStyle.ctaStyle}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
 
-            {/* Content Style — collapsed */}
-            {dna.contentStyle && (dna.contentStyle.dos?.length > 0 || dna.contentStyle.donts?.length > 0) && (
-                <div className="glass-panel rounded-2xl p-6 mt-6">
+            {/* Content Style Do's / Don'ts */}
+            {(contentStyle.dos?.length > 0 || contentStyle.donts?.length > 0) && (
+                <div className="glass-panel rounded-2xl p-6 mb-6">
                     <h3 className="font-bold text-white flex items-center gap-2 mb-4">
                         <span className="material-symbols-outlined text-primary">edit_note</span> Content Style Guide
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {dna.contentStyle.dos?.length > 0 && (
+                        {contentStyle.dos?.length > 0 && (
                             <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/10">
                                 <p className="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-2 flex items-center gap-1">
                                     <span className="material-symbols-outlined text-sm">check_circle</span> Do's
                                 </p>
                                 <ul className="space-y-1.5">
-                                    {dna.contentStyle.dos.map((d, i) => (
+                                    {contentStyle.dos.map((d, i) => (
                                         <li key={i} className="text-sm text-slate-300 flex items-start gap-2">
                                             <span className="text-emerald-400 mt-0.5">✓</span> {d}
                                         </li>
@@ -876,13 +1094,13 @@ function ReviewBrand({ brand, onFinish }) {
                                 </ul>
                             </div>
                         )}
-                        {dna.contentStyle.donts?.length > 0 && (
+                        {contentStyle.donts?.length > 0 && (
                             <div className="bg-red-500/5 rounded-xl p-4 border border-red-500/10">
                                 <p className="text-xs font-bold text-red-400 uppercase tracking-widest mb-2 flex items-center gap-1">
                                     <span className="material-symbols-outlined text-sm">cancel</span> Don'ts
                                 </p>
                                 <ul className="space-y-1.5">
-                                    {dna.contentStyle.donts.map((d, i) => (
+                                    {contentStyle.donts.map((d, i) => (
                                         <li key={i} className="text-sm text-slate-300 flex items-start gap-2">
                                             <span className="text-red-400 mt-0.5">✗</span> {d}
                                         </li>
@@ -891,8 +1109,57 @@ function ReviewBrand({ brand, onFinish }) {
                             </div>
                         )}
                     </div>
+
+                    {/* Content preferences row */}
+                    <div className="flex flex-wrap gap-3 mt-4">
+                        {contentStyle.emojiUsage && contentStyle.emojiUsage !== 'minimal' && (
+                            <span className="px-3 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-slate-400">
+                                Emoji: {contentStyle.emojiUsage}
+                            </span>
+                        )}
+                        {contentStyle.hashtagStyle && contentStyle.hashtagStyle !== 'minimal' && (
+                            <span className="px-3 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-slate-400">
+                                Hashtags: {contentStyle.hashtagStyle}
+                            </span>
+                        )}
+                        {contentStyle.captionLengthPreference && (
+                            <span className="px-3 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-slate-400">
+                                Caption length: {contentStyle.captionLengthPreference}
+                            </span>
+                        )}
+                    </div>
                 </div>
             )}
+
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* STICKY BOTTOM BAR — Save & Navigate */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            <div className="sticky bottom-0 left-0 right-0 z-20 mt-8">
+                <div className="glass-panel rounded-2xl p-5 border border-primary/20 flex items-center justify-between gap-4"
+                    style={{ backdropFilter: 'blur(20px)', background: 'rgba(10, 12, 22, 0.9)' }}>
+                    <div className="flex items-center gap-3">
+                        <span className="material-symbols-outlined text-emerald-400">verified</span>
+                        <div>
+                            <p className="text-sm font-bold text-white">Brand DNA extracted successfully</p>
+                            <p className="text-xs text-slate-500">
+                                {hasVision ? 'AI Vision' : 'Scanner'} detected {dna.colors?.length || 0} colors,
+                                {totalImages} images{socialPlatforms > 0 ? `, ${socialPlatforms} social profiles` : ''}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button onClick={handleSave} disabled={saving}
+                            className="py-3 px-8 rounded-2xl text-sm font-bold cursor-pointer transition-all bg-primary text-white hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-primary/30">
+                            {saving ? (
+                                <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                            ) : (
+                                <span className="material-symbols-outlined text-sm">rocket_launch</span>
+                            )}
+                            {saving ? 'Saving...' : 'Save & Go to Dashboard'}
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     )
 }

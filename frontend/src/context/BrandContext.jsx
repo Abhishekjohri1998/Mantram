@@ -30,16 +30,44 @@ export function BrandProvider({ children }) {
             if (pendingBrandJson) {
                 try {
                     const pendingBrand = JSON.parse(pendingBrandJson);
-                    console.log('📦 Found pending brand from onboarding, saving...', pendingBrand.name);
-                    const saved = await brandsAPI.create({
-                        name: pendingBrand.name,
-                        website: pendingBrand.website,
-                        onboardingMethod: pendingBrand.onboardingMethod || 'website',
-                        dna: pendingBrand.dna,
-                        rawScanData: pendingBrand.rawScanData,
-                    });
-                    if (saved.brand) {
-                        console.log('✅ Pending brand saved:', saved.brand.name);
+                    console.log('📦 Found pending brand from onboarding:', pendingBrand.name);
+
+                    // ── Duplicate check: match by normalized website URL ──
+                    const normalizeUrl = (u) => (u || '').replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '').toLowerCase();
+                    const pendingWebsite = normalizeUrl(pendingBrand.website);
+
+                    // Fetch current brands to check for duplicates
+                    const currentData = await brandsAPI.list();
+                    const currentBrands = (currentData.brands || []).filter(b => b.status !== 'archived');
+                    const existingBrand = pendingWebsite
+                        ? currentBrands.find(b => normalizeUrl(b.website) === pendingWebsite)
+                        : null;
+
+                    if (existingBrand) {
+                        // ── UPDATE existing brand instead of creating duplicate ──
+                        console.log('🔄 Brand with same website found, updating:', existingBrand.name, '→', pendingBrand.name);
+                        const updated = await brandsAPI.update(existingBrand._id, {
+                            name: pendingBrand.name || existingBrand.name,
+                            website: pendingBrand.website || existingBrand.website,
+                            onboardingMethod: pendingBrand.onboardingMethod || existingBrand.onboardingMethod,
+                            dna: { ...existingBrand.dna, ...pendingBrand.dna },
+                            rawScanData: pendingBrand.rawScanData || existingBrand.rawScanData,
+                        });
+                        if (updated.brand) {
+                            console.log('✅ Existing brand updated:', updated.brand.name);
+                        }
+                    } else {
+                        // ── No duplicate — create new brand ──
+                        const saved = await brandsAPI.create({
+                            name: pendingBrand.name,
+                            website: pendingBrand.website,
+                            onboardingMethod: pendingBrand.onboardingMethod || 'website',
+                            dna: pendingBrand.dna,
+                            rawScanData: pendingBrand.rawScanData,
+                        });
+                        if (saved.brand) {
+                            console.log('✅ New brand created:', saved.brand.name);
+                        }
                     }
                 } catch (saveErr) {
                     console.error('Failed to save pending brand:', saveErr);

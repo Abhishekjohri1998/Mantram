@@ -9,6 +9,7 @@ import { getOrchestrator } from '../agents/orchestrator.js';
 import { addWatermark } from '../utils/watermark.js';
 import { getSetting } from '../models/SystemSettings.js';
 import { uploadToS3 } from '../utils/s3.js';
+import { overlayLogo, fetchImageBuffer } from '../utils/logoOverlay.js';
 import { GoogleGenAI } from '@google/genai';
 import { safeErrorMessage } from '../utils/safeError.js';
 
@@ -39,19 +40,17 @@ function buildVisualContext(brand) {
     return parts.join('. ');
 }
 
-// Convert brand colors to a short natural phrase (NO labels like "Teal:", NO lists)
+// Convert brand colors to a direct, enforceable color directive for the AI
+// Weak hints like "green tones" are ignored by Gemini — use hex codes + mandatory language
 function getColorPhrase(brand) {
     const colors = brand.dna?.colors || [];
     if (!colors.length) return '';
-    // Map to simple color words, stripping jargon like "Professional", "Accent"
-    const simpleNames = colors.map(c => {
-        if (!c.name) return '';
-        return c.name.toLowerCase()
-            .replace(/\b(professional|accent|primary|secondary|brand|deep|soft|ocean)\b/gi, '')
-            .trim();
-    }).filter(Boolean).slice(0, 3);
-    if (!simpleNames.length) return '';
-    return simpleNames.join(' and ') + ' color tones';
+    // Include hex codes so the AI has exact targets, plus descriptive names
+    const colorDescs = colors.slice(0, 4).map(c => {
+        const name = c.name || 'brand color';
+        return `${name} (${c.hex})`;
+    });
+    return `MANDATORY COLOR PALETTE — use these exact brand colors throughout the design: ${colorDescs.join(', ')}. The primary color ${colors[0]?.hex || ''} must be the dominant color`;
 }
 
 // ── Helper: extract base64 from data URI ────────────────────────────────
@@ -78,20 +77,32 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
         'gemini-2.0-flash-exp-image-generation',  // Legacy fallback
     ];
 
-    // Build content parts — images first, then prompt text (Gemini works best this way)
+    // Build content parts — OFFICIAL GEMINI FORMAT:
+    // Text prompt FIRST, then reference images as direct inlineData parts.
+    // Do NOT interleave text labels between images — that confuses the model.
+    // Ref: https://ai.google.dev/gemini-api/docs/image-generation#use-up-to-14-reference-images
     const contents = [
-        ...imageParts,
         { text: promptText },
+        ...imageParts.filter(p => p.inlineData),  // Only include actual image parts, strip text labels
     ];
 
     let imageUrl = null;
     let usedModel = '';
     let textResponse = '';
 
-    const imageCount = imageParts.filter(p => p.inlineData).length;
+    const imageCount = contents.filter(p => p.inlineData).length;
     console.log(`\n══════ CREATIVE STUDIO IMAGE GENERATION (SDK) ══════`);
     console.log(`🎨 Models to try: ${models.length}`);
     console.log(`🖼️  Reference images: ${imageCount}`);
+    // Diagnostic: log each content part's type and size
+    contents.forEach((part, i) => {
+        if (part.text) {
+            console.log(`  📄 Part ${i}: TEXT (${part.text.length} chars)`);
+        } else if (part.inlineData) {
+            const dataLen = part.inlineData.data?.length || 0;
+            console.log(`  🖼️  Part ${i}: IMAGE mime=${part.inlineData.mimeType}, base64Size=${Math.round(dataLen / 1024)}KB`);
+        }
+    });
     console.log(`📐 Aspect ratio: ${aspectRatio} | Resolution: ${imageSize}`);
     console.log(`📝 Prompt (first 200 chars): ${promptText.substring(0, 200)}...`);
 
@@ -205,6 +216,29 @@ router.post('/generate', protect, requireCredits('creative'), async (req, res) =
             return res.status(400).json({ success: false, error: 'brandId and prompt are required' });
         }
 
+        // ── DIAGNOSTIC LOGGING — trace what arrives from frontend ──
+        console.log('\n═══════════════════════ CREATIVE GENERATE REQUEST ═══════════════════════');
+        console.log('📋 brandId:', brandId);
+        console.log('📋 type:', type);
+        console.log('📋 prompt (first 100):', prompt?.substring(0, 100));
+        console.log('📋 options keys:', options ? Object.keys(options) : 'NO OPTIONS');
+        if (options) {
+            console.log('  🎨 style:', options.style);
+            console.log('  📐 aspectRatio:', options.aspectRatio);
+            console.log('  📝 textOverlay:', options.textOverlay || '(none)');
+            console.log('  🏷️  addLogo:', options.addLogo);
+            console.log('  📍 logoPosition:', options.logoPosition);
+            console.log('  📏 logoSize:', options.logoSize);
+            console.log('  🖼️  referenceImages:', options.referenceImages ? {
+                style: options.referenceImages.style ? `${typeof options.referenceImages.style} (${options.referenceImages.style.substring(0, 30)}...)` : null,
+                upload: options.referenceImages.upload ? `${typeof options.referenceImages.upload} (${options.referenceImages.upload.substring(0, 30)}...)` : null,
+            } : 'NO REF IMAGES');
+            console.log('  👥 characters:', options.characters?.length || 0, options.characters?.map(c => ({ name: c.name, imageType: c.image ? (c.image.startsWith('data:') ? 'base64' : 'url') : 'none' })));
+            console.log('  📦 productImageUrl:', options.productImageUrl ? options.productImageUrl.substring(0, 60) : '(none)');
+            console.log('  🎯 baseImage:', options.baseImage ? `present (${Math.round(options.baseImage.length / 1024)}KB)` : '(none)');
+        }
+        console.log('═══════════════════════════════════════════════════════════════════════\n');
+
         const brand = await Brand.findById(brandId);
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
 
@@ -265,9 +299,24 @@ router.post('/generate', protect, requireCredits('creative'), async (req, res) =
                     });
                     if (imgResp.ok) {
                         const buf = await imgResp.arrayBuffer();
-                        const ct = (imgResp.headers.get('content-type') || 'image/jpeg').split(';')[0];
-                        console.log(`✅ Ref image (${label}) fetched: ${Math.round(buf.byteLength / 1024)}KB, ${ct}`);
-                        return { part: { mimeType: ct, data: Buffer.from(buf).toString('base64') }, label };
+                        let ct = (imgResp.headers.get('content-type') || 'image/jpeg').split(';')[0];
+                        let imgData = Buffer.from(buf);
+                        
+                        // Convert webp/gif to JPEG — Gemini docs only show jpeg/png examples
+                        // webp may silently fail as a reference image
+                        if (ct === 'image/webp' || ct === 'image/gif') {
+                            try {
+                                const sharp = (await import('sharp')).default;
+                                imgData = await sharp(imgData).jpeg({ quality: 90 }).toBuffer();
+                                ct = 'image/jpeg';
+                                console.log(`🔄 Ref image (${label}): converted from webp/gif to JPEG (${Math.round(imgData.length / 1024)}KB)`);
+                            } catch (convErr) {
+                                console.warn(`⚠️ Ref image (${label}): webp→jpeg conversion failed, using original:`, convErr.message);
+                            }
+                        }
+                        
+                        console.log(`✅ Ref image (${label}) fetched: ${Math.round(imgData.length / 1024)}KB, ${ct}`);
+                        return { part: { mimeType: ct, data: imgData.toString('base64') }, label };
                     } else {
                         console.warn(`⚠️ Ref image (${label}) fetch returned ${imgResp.status}`);
                     }
@@ -302,28 +351,31 @@ router.post('/generate', protect, requireCredits('creative'), async (req, res) =
         // Build image parts — MINIMAL labels, images first, like AI Photoshoot pattern
         // Key insight: the Photoshoot uses [image, prompt] simply. Too many verbose text parts
         // between images confuse the model. Keep labels SHORT.
+        // Add reference images as pure inlineData (NO text labels — Gemini API
+        // treats extra text parts as separate prompts, not labels)
         if (styleRef) {
-            imageParts.push({ text: 'Style reference:' });
             imageParts.push({ inlineData: { mimeType: styleRef.part.mimeType, data: styleRef.part.data } });
-            referenceInstructions.push('Match the visual style, colors, and mood of the attached style reference image.');
+            referenceInstructions.push('Match the visual style, colors, and mood of the provided style reference image.');
         }
 
-        // Character references — simple labels, let the prompt do the heavy lifting
+        // Character references — NATURAL LANGUAGE referencing per official Gemini API docs
+        // Gemini uses deictic references: "this person", "the person in the provided photo"
+        // NOT @tags or Character1 markers (those are ignored by the model)
         for (let i = 0; i < characterRefs.length; i++) {
             const charRef = characterRefs[i];
-            const tagName = charRef.name.replace(/\s/g, '');
-            imageParts.push({ text: `Character "${charRef.name}" (@${tagName}):` });
             imageParts.push({ inlineData: { mimeType: charRef.part.mimeType, data: charRef.part.data } });
         }
         if (characterRefs.length > 0) {
-            const charList = characterRefs.map(c => `"${c.name}" (@${c.name.replace(/\s/g, '')})`).join(', ');
-            referenceInstructions.push(`CHARACTERS: The image must prominently feature these people from the attached photos: ${charList}. Replicate their exact face, skin tone, and hair from the reference images.`);
+            if (characterRefs.length === 1) {
+                referenceInstructions.push('Using the provided reference photo of this person, the generated image must feature this EXACT same person. Replicate their exact face, skin tone, hair, body type, and overall appearance from the reference photo. Do NOT generate a different or generic person.');
+            } else {
+                referenceInstructions.push(`Using the ${characterRefs.length} provided reference photos of these people, the generated image must feature these EXACT same people. Replicate their exact faces, skin tones, hair, body types, and overall appearance from the reference photos.`);
+            }
         }
 
         if (uploadRef) {
-            imageParts.push({ text: 'Reference context:' });
             imageParts.push({ inlineData: { mimeType: uploadRef.part.mimeType, data: uploadRef.part.data } });
-            referenceInstructions.push('Use the attached general reference image as contextual inspiration.');
+            referenceInstructions.push('Use the provided reference image as contextual inspiration for the composition.');
         }
         // ── Template Inpainting Mode ──────────────────────────────────────
         // When templateInpainting is true, the reference image is THE BASE to edit.
@@ -336,13 +388,11 @@ router.post('/generate', protect, requireCredits('creative'), async (req, res) =
             // Resolve the template reference image (always first — it's the base)
             const templateRef = await resolveRefImage(options.templateRefImageUrl, 'template-base');
             if (templateRef) {
-                imageParts.push({ text: 'TEMPLATE BASE IMAGE — this is the layout to preserve exactly:' });
                 imageParts.push({ inlineData: { mimeType: templateRef.part.mimeType, data: templateRef.part.data } });
             }
 
             // If a new product image is provided, add it as the replacement
             if (options?.baseImage && options.baseImage.startsWith('data:image/')) {
-                imageParts.push({ text: 'NEW PRODUCT IMAGE — replace the product in the template with this:' });
                 imageParts.push({ inlineData: extractBase64(options.baseImage) });
                 referenceInstructions.push('INPAINTING: Replace ONLY the product in the template with the new product image. Keep everything else pixel-perfect: same layout, colors, typography, logo placement, background, and content positions.');
             } else if (options?.productImageUrl) {
@@ -355,7 +405,6 @@ router.post('/generate', protect, requireCredits('creative'), async (req, res) =
                     if (prodResp.ok) {
                         const prodBuf = await prodResp.arrayBuffer();
                         const prodCt = (prodResp.headers.get('content-type') || 'image/jpeg').split(';')[0];
-                        imageParts.push({ text: 'NEW PRODUCT IMAGE — replace the product in the template with this:' });
                         imageParts.push({ inlineData: { mimeType: prodCt, data: Buffer.from(prodBuf).toString('base64') } });
                         referenceInstructions.push('INPAINTING: Replace ONLY the product in the template with the new product image. Keep everything else pixel-perfect: same layout, colors, typography, logo placement, background, and content positions.');
                         console.log(`✅ Product image for inpainting loaded (${Math.round(prodBuf.byteLength / 1024)}KB)`);
@@ -369,7 +418,6 @@ router.post('/generate', protect, requireCredits('creative'), async (req, res) =
 
         // Base image from AI Photoshoot (skip if inpainting mode already handled it)
         if (!isInpainting && options?.baseImage && options.baseImage.startsWith('data:image/')) {
-            imageParts.push({ text: 'PRODUCT BASE IMAGE (keep this product exactly as-is, only change background and styling):' });
             imageParts.push({ inlineData: extractBase64(options.baseImage) });
             referenceInstructions.push('PRODUCT IMAGE: Keep this product exactly as-is — same colors, labels, text, shape. Only change background and styling.');
         }
@@ -388,7 +436,6 @@ router.post('/generate', protect, requireCredits('creative'), async (req, res) =
                     const base64 = Buffer.from(imgBuffer).toString('base64');
                     // Must match extractBase64 format: { mimeType, data } — NOT wrapped in inlineData
                     const mimeType = (contentType || 'image/jpeg').split(';')[0];
-                    imageParts.push({ text: 'PRODUCT CATALOG IMAGE (this is the ACTUAL product being promoted — feature it prominently):' });
                     imageParts.push({ inlineData: { mimeType, data: base64 } });
                     referenceInstructions.push('PRODUCT IMAGE: This is the ACTUAL product being promoted. Feature this exact product prominently in the creative — preserve its real appearance, colors, shape, and branding. Place it as the hero element of the design.');
                     console.log(`✅ Product image loaded (${Math.round(imgBuffer.byteLength / 1024)}KB)`);
@@ -406,54 +453,44 @@ router.post('/generate', protect, requireCredits('creative'), async (req, res) =
         // ── Build the full prompt ───────────────────────────────────────
         const hasImages = imageParts.filter(p => p.inlineData).length > 0;
 
-        // Logo overlay instructions — tell AI NOT to draw a logo; client-side compositing adds the real one
-        let logoInstructions = '';
-        if (options?.addLogo && brand.dna?.logo?.url) {
-            logoInstructions = `Do NOT draw or generate any logo, watermark, or brand icon in the image.`;
-        }
+        // NO logo instructions in the prompt. Mentioning "logo" in any way
+        // (even "do NOT draw a logo") causes Gemini to hallucinate logo text.
+        // The real brand logo is composited server-side via Sharp after generation.
 
-        // Compose a concise, focused prompt — keep it SHORT like the AI Photoshoot pattern
-        // Nano Banana 2 produces better quality with simpler, more focused prompts
         const styleWord = options?.style || 'modern';
         const textOverlayPart = options?.textOverlay ? ` Include the text "${options.textOverlay}" in a clean, readable font.` : '';
-        const colorPart = colorPhrase ? ` Colors: ${colorPhrase}.` : '';
+        const colorPart = colorPhrase ? ` ${colorPhrase}.` : '';
         const refPart = referenceInstructions.length > 0 ? '\n' + referenceInstructions.join('\n') : '';
 
-        // Auto-inject character placement if characters are present
-        let characterPlacement = '';
+        // Clean the user's prompt — strip @Character tags, replace with natural language
+        let cleanedPrompt = prompt;
         if (characterRefs.length > 0) {
-            const charNames = characterRefs.map(c => c.name);
-            const charTags = characterRefs.map(c => `@${c.name.replace(/\s/g, '')}`);
-            const userUsedTags = charTags.some(tag => prompt.includes(tag));
-            if (!userUsedTags) {
-                characterPlacement = ` Feature ${charNames.join(' and ')} from the reference photos as the main subjects.`;
-            } else {
-                characterPlacement = ` Draw each @tagged character using their reference photo.`;
-            }
+            // Replace @CharacterN with empty string — the reference instruction handles it
+            cleanedPrompt = prompt.replace(/@Character\d*/gi, '').replace(/\s+/g, ' ').trim();
         }
 
-        // Keep the prompt SHORT and focused — like the Photoshoot's ~50-word prompts
-        // CRITICAL: Avoid the word "design" — Gemini interprets it as "render a mockup presentation"
-        // which creates a picture-in-picture effect (card on blurred background).
+        // ── Build the full prompt following official Gemini API patterns ──
+        // Key principles from docs:
+        // 1. "Describe the scene, don't just list keywords"  
+        // 2. Use ordinal refs: "the person from the provided photo", "the first image"
+        // 3. Keep it narrative and concise — no verbose instruction blocks
+        // 4. NEVER mention logos (causes hallucination)
         let fullPrompt;
         if (isInpainting) {
-            // Inpainting prompt — focused on editing the template image
-            fullPrompt = `Edit this template image for ${brand.name}. ${prompt}
-
+            fullPrompt = `Edit this template image for ${brand.name}. ${cleanedPrompt}
 ${refPart}
-
-CRITICAL INSTRUCTIONS:
-- Keep the EXACT SAME layout, composition, background, color scheme, and content placement as the template image.
-- Keep the logo, brand elements, and typography style exactly where they are.
-- Replace the placeholder text ({{HEADLINE}}, {{SUBTEXT}}, {{CTA}}) with the values from the prompt above.
-- If a new product image is attached, swap ONLY the product — keep everything else identical.
-- The output must be a pixel-perfect recreation of the template layout with updated content.
-- Output must fill the ENTIRE canvas edge-to-edge. No mockups, frames, or borders.`;
+Keep the exact same layout, composition, and content placement. Replace only what is described above. Output must fill the entire canvas edge-to-edge.`;
+        } else if (characterRefs.length > 0) {
+            // Character reference mode — use official "this person" pattern
+            // Per Gemini docs: "A studio portrait of this man..." / "these people making funny faces"
+            fullPrompt = `Using the provided reference photo of this person: ${cleanedPrompt}
+${platformSize} ${styleWord} image for ${brand.name}.${colorPart}${textOverlayPart}
+${refPart}
+The output must fill the entire canvas edge-to-edge. No frames, borders, or mockups.`;
         } else {
-            fullPrompt = `${prompt}${textOverlayPart}${characterPlacement}
-
+            fullPrompt = `${cleanedPrompt}${textOverlayPart}
 ${platformSize} ${styleWord} image for ${brand.name}.${colorPart}${refPart}
-IMPORTANT: The output must fill the ENTIRE canvas edge-to-edge. Do NOT create a mockup, frame, device screen, floating card, or picture-in-picture effect. Do NOT place the image on a blurred background of itself. No borders, no drop shadows around the content. The content itself IS the final image — render it directly, full-bleed.`;
+The output must fill the entire canvas edge-to-edge. No frames, borders, or mockups.`;
         }
 
         console.log('📸 Full prompt (first 300 chars):', fullPrompt.substring(0, 300) + '...');
@@ -512,7 +549,37 @@ IMPORTANT: The output must fill the ENTIRE canvas edge-to-edge. Do NOT create a 
                 console.log(`[S3] Creative uploaded to S3: ${imageUrl}`);
             } catch (s3Err) {
                 console.error('[S3] Failed to upload generated creative to S3:', s3Err.message);
-                // Fallback to base64 if S3 fails, but it might fail on Meta
+            }
+        }
+
+        // ── SERVER-SIDE LOGO OVERLAY (replaces broken client-side CORS approach) ──
+        if (options?.addLogo && imageUrl) {
+            try {
+                const brand = await Brand.findById(brandId).lean();
+                const logoUrl = brand?.dna?.logo?.url;
+                if (logoUrl) {
+                    console.log(`🏷️  Logo overlay: position=${options.logoPosition || 'bottom-right'}, size=${options.logoSize || 'medium'}`);
+                    const imageBuffer = await fetchImageBuffer(imageUrl);
+                    const logoBuffer = await fetchImageBuffer(logoUrl);
+                    if (imageBuffer && logoBuffer) {
+                        const compositedBuffer = await overlayLogo(
+                            imageBuffer, logoBuffer,
+                            options.logoPosition || 'bottom-right',
+                            options.logoSize || 'medium'
+                        );
+                        // Re-upload composited image to S3
+                        const compositedBase64 = `data:image/png;base64,${compositedBuffer.toString('base64')}`;
+                        const compositedS3 = await uploadToS3(compositedBase64, `creatives/${brandId}/${Date.now()}-logo.png`);
+                        imageUrl = compositedS3;
+                        console.log(`✅ Logo composited & re-uploaded: ${imageUrl}`);
+                    } else {
+                        console.warn('⚠️ Failed to fetch image or logo buffers for overlay');
+                    }
+                } else {
+                    console.warn('⚠️ Logo overlay requested but no logo URL in brand DNA');
+                }
+            } catch (logoErr) {
+                console.error('⚠️ Logo overlay failed (keeping original image):', logoErr.message);
             }
         }
 
