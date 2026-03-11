@@ -15,6 +15,9 @@ const brandSchema = new mongoose.Schema({
                 weight: { type: String, default: '' },
                 contrast: { type: String, default: '' },
                 format: { type: String, default: '' },
+                source: { type: String, default: '' },        // 'ai-vision' | 'selector' | 'ai-generated'
+                confidence: { type: String, default: '' },     // 'high' | 'medium' | 'low'
+                visionDescription: { type: String, default: '' }, // AI Vision description of the logo
             },
         },
         colors: [{
@@ -42,10 +45,37 @@ const brandSchema = new mongoose.Schema({
             dos: [String],
             donts: [String],
             keyPhrases: [String],
+            writingStyle: { type: String, default: '' },
+            ctaStyle: { type: String, default: '' },
+            emojiUsage: { type: String, default: 'minimal' },
+            hashtagStyle: { type: String, default: 'minimal' },
+            sentenceLength: { type: String, default: 'mixed' },
+            captionLengthPreference: { type: String, default: 'medium' },
+        },
+        // Social media links detected from the website
+        socialLinks: {
+            instagram: { type: String, default: '' },
+            facebook: { type: String, default: '' },
+            twitter: { type: String, default: '' },
+            linkedin: { type: String, default: '' },
+            youtube: { type: String, default: '' },
+            pinterest: { type: String, default: '' },
+        },
+        // Social media voice analysis — how the brand sounds on social
+        socialVoice: {
+            captionStyle: { type: String, default: '' },
+            hashtagStrategy: { type: String, default: '' },
+            emojiUsage: { type: String, default: '' },
+            ctaStyle: { type: String, default: '' },
+            postingPatterns: { type: String, default: '' },
+            toneInsight: { type: String, default: '' },
+            sampleCaptions: [String],
         },
         industry: { type: String, default: '' },
         targetAudience: { type: String, default: '' },
         brandDescription: { type: String, default: '' },
+        tagline: { type: String, default: '' },
+        photographyStyle: { type: String, default: '' },
         country: { type: String, default: 'India' },
         region: { type: String, default: '' },
         // Target markets — ISO country codes, e.g. ['IN', 'US', 'UK', 'AE']

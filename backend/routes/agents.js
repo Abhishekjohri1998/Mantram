@@ -85,6 +85,10 @@ router.post('/brainstorm/save', protect, async (req, res) => {
             name: brandData.name || 'New Brand',
             onboardingMethod: 'brainstorm',
             dna: {
+                logo: {
+                    url: brandData.logoUrl || '',
+                    metadata: { source: brandData.logoUrl ? 'ai-generated' : '' },
+                },
                 voice: {
                     personality: brandData.personality || '',
                     description: brandData.voiceDescription || '',
@@ -387,7 +391,11 @@ Each caption should be complete, polished, and ready to copy-paste. Do not inclu
 // POST /api/agents/ai-photoshoot — Generate styled product photoshoot
 router.post('/ai-photoshoot', optionalAuth, async (req, res) => {
     try {
-        const { image, scene, keywords, brief, brandName, brandColors, fidelity: rawFidelity } = req.body;
+    const { image, brief, brandName, brandColors, fidelity: rawFidelity, aspectRatio,
+            styleRef, characterRef,
+            cameraAngle, lens, lightingStyle, lightDirection, surface, modelPresence, mood,
+            // Legacy params (backward compat)
+            scene, keywords } = req.body;
         if (!image) return res.status(400).json({ success: false, error: 'Product image is required' });
 
         // Fidelity: 0 = max creative, 100 = exact copy. Default 80.
@@ -429,36 +437,118 @@ router.post('/ai-photoshoot', optionalAuth, async (req, res) => {
             return res.status(400).json({ success: false, error: 'Invalid image format. Send base64 data URL or image URL.' });
         }
 
-        // Build prompt based on fidelity level
-        const sceneDesc = scene || 'professional studio';
-        const keywordList = (keywords || []).join(', ');
+        // ═══════════════════════════════════════════════════════════
+        // PROFESSIONAL PHOTOGRAPHY PROMPT BUILDER
+        // Maps UI selections to specific photographic terminology
+        // that Gemini Nano Banana 2 understands and renders well.
+        // ═══════════════════════════════════════════════════════════
 
+        const ANGLE_MAP = {
+            'eye-level': 'straight-on eye-level shot',
+            'hero': 'low-angle hero shot, looking up at the product dramatically',
+            '45deg': '45-degree three-quarter angle, showing front and top',
+            'overhead': 'directly overhead top-down flat-lay shot',
+            'macro': 'extreme close-up macro shot, tack-sharp detail',
+            'dutch': 'dynamic dutch-angle tilted composition',
+            'tilt-down': 'high-angle tilted down shot, camera looking down at the product from above at 30 degrees',
+            'worms-eye': 'ultra-low worms-eye-view shot, camera on the ground looking straight up at the product',
+            'birds-eye': 'dramatic birds-eye aerial view, high above looking straight down',
+            'profile': 'side-profile silhouette shot, product seen from the exact side at 90 degrees',
+        };
+        const LENS_MAP = {
+            'fisheye': '8mm fish-eye lens, extreme barrel distortion, 180-degree field of view, ultra-wide surreal perspective',
+            'ultra-wide': '14mm ultra-wide-angle lens, dramatic exaggerated perspective, expansive scene',
+            '24mm': '24mm wide-angle lens, expansive environmental scene',
+            '35mm': '35mm street photography lens, documentary natural feel',
+            '50mm': '50mm f/1.8 prime lens, natural perspective, slight background blur',
+            '85mm': '85mm portrait lens, shallow depth of field, beautiful soft bokeh',
+            '105mm': '105mm macro lens, extreme detail, razor-sharp focus on product textures',
+            '200mm': '200mm telephoto lens, heavily compressed perspective, strong background blur',
+            'tilt-shift': 'tilt-shift lens, selective focus plane, miniature effect, architectural precision',
+        };
+        const LIGHT_MAP = {
+            'softbox': 'soft diffused studio lighting from a large softbox, even illumination',
+            'natural': 'soft natural window light with gentle directional shadows',
+            'golden': 'warm golden hour sunlight with long dramatic shadows and amber tones',
+            'dramatic': 'dramatic chiaroscuro lighting, deep shadows, single hard key light',
+            'neon': 'colorful neon lighting with vivid pink/blue/purple ambient glow',
+            'rim': 'edge-lit rim lighting highlighting product silhouette against dark background',
+            'highkey': 'bright high-key lighting, pure white luminous background, minimal shadows',
+        };
+        const DIR_MAP = {
+            'front-left': 'from the front-left at 45 degrees',
+            'front': 'from directly in front',
+            'front-right': 'from the front-right at 45 degrees',
+            'left': 'from the left side',
+            'right': 'from the right side',
+            'top': 'from directly above, top-down',
+            'back': 'from behind the product, creating a backlit silhouette effect',
+        };
+        const SURFACE_MAP = {
+            'white': 'floating on a pure white infinity-curve studio background',
+            'marble': 'resting on a polished white Carrara marble surface with subtle grey veins',
+            'stone': 'placed on a rough natural stone slab with organic texture',
+            'wood': 'on a warm rustic reclaimed wooden surface with visible grain',
+            'concrete': 'on a raw industrial concrete surface with subtle texture',
+            'fabric': 'draped over soft flowing silk fabric',
+            'podium': 'elevated on a clean geometric cylindrical pedestal podium',
+            'glass': 'on a reflective black glass surface creating a mirror effect',
+            'sand': 'nestled in fine natural sand with shells and botanical elements',
+            'foliage': 'surrounded by fresh green leaves, eucalyptus sprigs and botanical elements',
+        };
+        const MODEL_MAP = {
+            'none': '',
+            'hands': 'The product is being elegantly held by well-manicured hands.',
+            'model-woman': 'A stylish woman model is holding/wearing the product in a lifestyle setting.',
+            'model-man': 'A stylish man model is holding/using the product in a lifestyle setting.',
+        };
+        const MOOD_MAP = {
+            'editorial': 'editorial magazine-quality',
+            'commercial': 'clean commercial e-commerce',
+            'lifestyle': 'lifestyle in-context',
+            'luxury': 'luxury premium high-end',
+            'minimal': 'minimalist clean sparse',
+            'moody': 'moody atmospheric dark-toned',
+            'vibrant': 'vibrant saturated energetic',
+            'vintage': 'film-grain vintage retro',
+        };
+
+        const anglePhrase = ANGLE_MAP[cameraAngle] || ANGLE_MAP['eye-level'];
+        const lensPhrase = LENS_MAP[lens] || LENS_MAP['50mm'];
+        const lightPhrase = LIGHT_MAP[lightingStyle] || LIGHT_MAP['softbox'];
+        const dirPhrase = DIR_MAP[lightDirection] || DIR_MAP['front-left'];
+        const surfPhrase = SURFACE_MAP[surface] || SURFACE_MAP['white'];
+        const modelPhrase = MODEL_MAP[modelPresence] || '';
+        const moodPhrase = (mood || ['commercial']).map(m => MOOD_MAP[m] || m).join(', ');
+        const ratioPhrase = aspectRatio ? `Output image aspect ratio: ${aspectRatio}.` : '';
+
+        // Build the prompt based on fidelity
         let photoshootPrompt;
 
         if (fidelity >= 75) {
             // HIGH FIDELITY — strict editing, preserve product exactly
-            photoshootPrompt = `Edit this product photo. Do NOT change the product at all — keep every color, label, text, logo, shape, and texture on the product exactly as it is. Only replace the background and surroundings.
+            photoshootPrompt = `Edit this product photo. Do NOT change the product at all — keep every color, label, text, shape, and texture on the product pixel-perfect.
 
-New background: ${sceneDesc}.${keywordList ? ` Style: ${keywordList}.` : ''}${brief ? ` ${brief}.` : ''}
-${brandColors ? `Background colors: ${brandColors}.` : ''}
-Professional lighting, product sharp, background soft bokeh.`;
+A ${anglePhrase}, captured with a ${lensPhrase}. The product is ${surfPhrase}. ${lightPhrase} ${dirPhrase}. ${modelPhrase}
+${brief ? brief + '.' : ''}${brandColors ? ` Brand accent colors: ${brandColors}.` : ''}
+${moodPhrase} product photography. Photorealistic, magazine-quality, sharp detail. ${ratioPhrase}`;
         } else if (fidelity >= 50) {
-            // BALANCED — preserve product largely but allow some artistic styling
-            photoshootPrompt = `Create a professional product photoshoot. Keep the product's key details, colors, text and branding accurate, but you may enhance the presentation with artistic lighting and styled composition.
+            // BALANCED — preserve product largely but allow artistic styling
+            photoshootPrompt = `Create a professional product photoshoot. Keep the product's key details, colors, and branding accurate but enhance the presentation artistically.
 
-Scene: ${sceneDesc}.${keywordList ? ` Style: ${keywordList}.` : ''}${brief ? ` ${brief}.` : ''}
-${brandColors ? `Accent colors: ${brandColors}.` : ''}
-Commercial-grade, photorealistic, magazine-quality product photography.`;
+A ${anglePhrase}, captured with a ${lensPhrase}. The product is ${surfPhrase}. ${lightPhrase} ${dirPhrase}. ${modelPhrase}
+${brief ? brief + '.' : ''}${brandColors ? ` Accent colors: ${brandColors}.` : ''}
+${moodPhrase} product photography. Photorealistic, magazine-quality. ${ratioPhrase}`;
         } else {
             // CREATIVE — allow significant artistic interpretation
-            photoshootPrompt = `Create an artistic, creative product image inspired by this product. You have creative freedom to reimagine the presentation, but keep the product recognizable.
+            photoshootPrompt = `Create an artistic, creative product image inspired by this product. You have creative freedom to reimagine the presentation but keep the product recognizable.
 
-Scene: ${sceneDesc}.${keywordList ? ` Style: ${keywordList}.` : ''}${brief ? ` ${brief}.` : ''}
-${brandColors ? `Color palette: ${brandColors}.` : ''}
-Bold, creative, eye-catching visual suitable for advertising and social media.`;
+A ${anglePhrase}, captured with a ${lensPhrase}. The product is ${surfPhrase}. ${lightPhrase} ${dirPhrase}. ${modelPhrase}
+${brief ? brief + '.' : ''}${brandColors ? ` Color palette: ${brandColors}.` : ''}
+Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhrase}`;
         }
 
-        console.log(`AI Photoshoot: fidelity=${fidelity}, temperature=${temperature}`);
+        console.log(`📸 AI Photo Studio: angle=${cameraAngle} lens=${lens} light=${lightingStyle}/${lightDirection} surface=${surface} model=${modelPresence} mood=${mood?.join(',')} fidelity=${fidelity} ratio=${aspectRatio}`);
 
         // Models — Nano Banana 2 is the latest/best for image editing
         const models = [
@@ -479,11 +569,48 @@ Bold, creative, eye-catching visual suitable for advertising and social media.`;
 
                 const requestBody = {
                     contents: [{
-                        parts: [
-                            // IMAGE FIRST — model treats it as primary input to edit
-                            { inlineData: { mimeType: mimeType, data: base64Data } },
-                            { text: photoshootPrompt }
-                        ]
+                        parts: await (async () => {
+                            const parts = [
+                                // IMAGE FIRST — model treats it as primary input to edit
+                                { inlineData: { mimeType: mimeType, data: base64Data } },
+                            ];
+                            // Helper: fetch URL image and convert to base64 inline data
+                            const fetchImagePart = async (url, label) => {
+                                try {
+                                    if (url.startsWith('data:')) {
+                                        const commaIdx = url.indexOf(',');
+                                        const header = url.substring(0, commaIdx);
+                                        return { inlineData: { mimeType: header.split(':')[1].split(';')[0], data: url.substring(commaIdx + 1) } };
+                                    }
+                                    const resp = await fetch(url);
+                                    if (!resp.ok) return null;
+                                    const buf = Buffer.from(await resp.arrayBuffer());
+                                    return { inlineData: { mimeType: resp.headers.get('content-type') || 'image/jpeg', data: buf.toString('base64') } };
+                                } catch (e) {
+                                    console.warn(`📸 Could not fetch ${label} ref:`, e.message);
+                                    return null;
+                                }
+                            };
+                            // Add style reference image
+                            if (styleRef) {
+                                const stylePart = await fetchImagePart(styleRef, 'style');
+                                if (stylePart) {
+                                    parts.push(stylePart);
+                                    parts.push({ text: 'This is a style reference image. Match its visual look, color palette, and mood.' });
+                                }
+                            }
+                            // Add character reference image
+                            if (characterRef) {
+                                const charPart = await fetchImagePart(characterRef, 'character');
+                                if (charPart) {
+                                    parts.push(charPart);
+                                    parts.push({ text: 'This is a character/person reference. Include this person or character in the photoshoot scene.' });
+                                }
+                            }
+                            // Prompt text last
+                            parts.push({ text: photoshootPrompt });
+                            return parts;
+                        })()
                     }],
                     generationConfig: {
                         responseModalities: ['TEXT', 'IMAGE'],

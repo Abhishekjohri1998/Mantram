@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import SEOHead from '../components/SEOHead'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
-import { content as contentAPI, agents as agentsAPI, creatives as creativesAPI, products as productsAPI } from '../services/api'
+import { content as contentAPI, agents as agentsAPI, creatives as creativesAPI, products as productsAPI, media as mediaAPI } from '../services/api'
 import { useBrand } from '../context/BrandContext'
 import { stripMarkdown } from '../utils/stripMarkdown'
 import VoiceInput from '../components/VoiceInput'
@@ -503,7 +503,12 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                             if (file && file.type.startsWith('image/')) {
                                 setFiles([file])
                                 const reader = new FileReader()
-                                reader.onload = (ev) => setImagePreview(ev.target.result)
+                                reader.onload = async (ev) => {
+                                    try {
+                                        const { url } = await mediaAPI.upload({ imageData: ev.target.result, folder: 'content-refs' })
+                                        setImagePreview(url)
+                                    } catch { setImagePreview(ev.target.result) }
+                                }
                                 reader.readAsDataURL(file)
                             }
                         }} onDragOver={e => e.preventDefault()}
@@ -518,7 +523,12 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                                     if (file && file.type.startsWith('image/')) {
                                         setFiles([file])
                                         const reader = new FileReader()
-                                        reader.onload = (ev) => setImagePreview(ev.target.result)
+                                        reader.onload = async (ev) => {
+                                            try {
+                                                const { url } = await mediaAPI.upload({ imageData: ev.target.result, folder: 'content-refs' })
+                                                setImagePreview(url)
+                                            } catch { setImagePreview(ev.target.result) }
+                                        }
                                         reader.readAsDataURL(file)
                                     }
                                 }} accept="image/*" />

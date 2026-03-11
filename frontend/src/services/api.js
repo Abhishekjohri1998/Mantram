@@ -698,3 +698,8 @@ export const funnelSharing = {
     clone: (id, data) => apiFetch(`/funnel-studio/shared/${id}/clone`, { method: 'POST', body: JSON.stringify(data) }),
     webhookToken: (id) => apiFetch(`/funnel-studio/${id}/webhook-token`),
 };
+
+// ============ Media Upload API (S3 Upload-First Pattern) ============
+export const media = {
+    upload: (data) => apiFetch('/media/upload', { method: 'POST', body: JSON.stringify(data) }),
+};

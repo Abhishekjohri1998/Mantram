@@ -1,17 +1,7 @@
-/**
- * Brand Scanner Agent
- * Scans a website and extracts comprehensive brand DNA:
- * - Logo (multiple detection strategies + fallbacks)
- * - Color palette (from CSS, inline styles, meta, SVG, buttons, links, backgrounds)
- * - Typography (Google Fonts, @font-face, CSS font-family)
- * - Content samples (for AI voice/tone analysis)
- * - Meta info (title, description, keywords, OG data)
- */
-
 import * as cheerio from 'cheerio';
 
 /**
- * Scan a website and extract brand DNA
+ * Scan a website and extract comprehensive brand DNA using AI Vision + Social Intelligence
  */
 export async function scanWebsite(url, aiRouter) {
     url = url.trim();
@@ -22,42 +12,84 @@ export async function scanWebsite(url, aiRouter) {
     const $ = cheerio.load(html);
 
     // Fetch external CSS stylesheets and inject as inline styles
-    // (many modern sites, especially SPAs, use external CSS only)
     await fetchExternalCSS($, url);
 
-    // Extract all elements
+    // ── Phase 1: Traditional HTML extraction (existing) ─────────────────
     const meta = extractMeta($, url);
-    const logos = extractLogos($, url);
-    const colors = extractColors($, url);
+    const selectorLogos = extractLogos($, url);
+    const cssColors = extractColors($, url);
     const fonts = extractFonts($);
     const contentSamples = extractContentSamples($);
+    const bannerImages = extractBannerImages($, url);
+    const allImages = extractAllImages($, url);
 
-    console.log(`  📸 Logos found: ${logos.length}`);
-    console.log(`  🎨 Colors found: ${colors.length}`);
+    console.log(`  📸 Selector logos found: ${selectorLogos.length}`);
+    console.log(`  🎨 CSS colors found: ${cssColors.length}`);
     console.log(`  🔤 Fonts found: ${fonts.length}`);
     console.log(`  📝 Content samples: ${contentSamples.length}`);
-
-    // Extract banner/hero images for visual style guide
-    const bannerImages = extractBannerImages($, url);
     console.log(`  🖼️  Banner images found: ${bannerImages.length}`);
-
-    // Extract ALL images from the homepage
-    const allImages = extractAllImages($, url);
     console.log(`  📷 Total homepage images found: ${allImages.length}`);
 
-    // Use AI to analyze voice, tone, Content Style Guide, and name colors
+    // ── Phase 1b: AI Vision Analysis (Puppeteer screenshot → Gemini) ────
+    let visionAnalysis = null;
+    try {
+        visionAnalysis = await captureAndAnalyze(url, allImages, selectorLogos);
+        console.log(`  🧠 Vision analysis: logo=${visionAnalysis?.logo ? '✅' : '❌'}, colors=${visionAnalysis?.colors?.length || 0}`);
+    } catch (err) {
+        console.warn('  ⚠️ Vision analysis failed (falling back to selectors):', err.message);
+    }
+
+    // ── Phase 2: Social Media Intelligence ────────────────────────────────
+    const socialLinks = extractSocialLinks($, url);
+    console.log(`  🔗 Social links found: ${Object.values(socialLinks).filter(Boolean).length}`);
+
+    let socialVoice = {};
+    try {
+        if (Object.values(socialLinks).some(Boolean) && aiRouter) {
+            socialVoice = await analyzeSocialMedia(socialLinks, aiRouter);
+            console.log(`  📱 Social voice analysis: ${socialVoice.captionStyle ? '✅' : '❌'}`);
+        }
+    } catch (err) {
+        console.warn('  ⚠️ Social media analysis failed:', err.message);
+    }
+
+    // ── Phase 3: Deeper Content — crawl sub-pages ────────────────────────
+    let subPageContent = [];
+    try {
+        subPageContent = await crawlSubPages($, url);
+        console.log(`  📄 Sub-pages crawled: ${subPageContent.length}`);
+    } catch (err) {
+        console.warn('  ⚠️ Sub-page crawl failed:', err.message);
+    }
+
+    // ── Merge all content samples for richer voice analysis ──────────────
+    const allContentSamples = [
+        ...contentSamples,
+        ...subPageContent,
+        ...(socialVoice.sampleCaptions || []).map(c => `[Social Media] ${c}`),
+    ];
+
+    // ── Enhanced AI Voice/Tone Analysis (with social context) ────────────
     let voiceAnalysis = {};
     try {
-        if (aiRouter && contentSamples.length > 0) {
-            const colorContext = colors.length > 0
-                ? `\nAll colors extracted from website CSS: ${colors.slice(0, 12).map(c => `${c.hex} (score:${c.score}, sources:${c.sources.join(',')})`).join(', ')}`
+        if (aiRouter && allContentSamples.length > 0) {
+            const colorContext = cssColors.length > 0
+                ? `\nAll colors extracted from website CSS: ${cssColors.slice(0, 12).map(c => `${c.hex} (score:${c.score}, sources:${c.sources.join(',')})`).join(', ')}`
                 : '';
             const bannerContext = bannerImages.length > 0
                 ? `\nBanner/hero images found: ${bannerImages.map(b => b.url).join(', ')}`
                 : '';
+            const socialContext = socialVoice.captionStyle
+                ? `\n\nSOCIAL MEDIA ANALYSIS:
+Caption style: ${socialVoice.captionStyle || 'unknown'}
+Hashtag strategy: ${socialVoice.hashtagStrategy || 'unknown'}
+Emoji usage: ${socialVoice.emojiUsage || 'unknown'}
+CTA style: ${socialVoice.ctaStyle || 'unknown'}
+Sample captions: ${(socialVoice.sampleCaptions || []).slice(0, 3).join(' | ')}`
+                : '';
 
             voiceAnalysis = await aiRouter.analyzeText({
-                text: contentSamples.join('\n\n') + colorContext + bannerContext,
+                text: allContentSamples.join('\n\n') + colorContext + bannerContext + socialContext,
                 task: `You are a brand strategist and visual identity expert. Analyze this website's brand identity.
 Return ONLY valid JSON (no markdown, no explanation) with these fields:
 
@@ -73,15 +105,18 @@ Return ONLY valid JSON (no markdown, no explanation) with these fields:
   "sampleQuote": "best example of brand voice from the content",
   "industry": "detected industry",
   "targetAudience": "who the brand targets",
+  "tagline": "brand tagline or slogan if found, else empty string",
+  "photographyStyle": "flat lay / lifestyle / studio / UGC / mixed — based on images",
   "contentStyle": {
     "dos": ["5-8 writing rules to follow"],
     "donts": ["5-8 things to avoid"],
-    "keyPhrases": ["5-10 signature phrases"],
-    "writingStyle": "1-2 sentence description",
-    "ctaStyle": "How CTAs are written",
+    "keyPhrases": ["5-10 signature phrases or brand language"],
+    "writingStyle": "1-2 sentence description of how they write",
+    "ctaStyle": "How CTAs are written — e.g. Shop Now, Learn More, DM Us",
     "emojiUsage": "none/minimal/moderate/heavy",
     "hashtagStyle": "none/minimal/trend-based/branded",
-    "sentenceLength": "short/mixed/long"
+    "sentenceLength": "short/mixed/long",
+    "captionLengthPreference": "short (1-2 lines) / medium (3-5 lines) / long (6+ lines)"
   },
   "brandColors": [
     { "hex": "#000000", "name": "Jet Black", "usage": "primary" },
@@ -91,34 +126,42 @@ Return ONLY valid JSON (no markdown, no explanation) with these fields:
 
 IMPORTANT for brandColors:
 - Pick ONLY 4-5 colors that are the TRUE brand identity colors
-- Include the background/base color if it's intentional (e.g. black for dark-themed brands like Apple, ACwO)
-- Include the primary accent color (the color that stands out most — CTAs, highlights, links)
-- Include white ONLY if it's a deliberate brand color (not just default text)
-- Include any secondary/supporting brand colors  
-- DO NOT include generic CSS framework colors, utility grays, or Tailwind defaults
-- Each color needs: hex (uppercase), name (descriptive like "Royal Blue" not "Brand Color 1"), usage (primary/secondary/accent/background)
-- Order: primary first, then secondary, accent, background`,
+- Include the background/base color if it's intentional
+- Include the primary accent color (the color that stands out most)
+- Each color needs: hex (uppercase), name (descriptive), usage (primary/secondary/accent/background)
+- Order: primary first, then secondary, accent, background
+
+${socialContext ? 'IMPORTANT: Social media data is provided — use it to deeply understand the brand voice and content style. The social captions reveal the TRUE brand personality more than website copy.' : ''}`,
             });
         }
     } catch (err) {
         console.error('Voice analysis failed:', err.message);
     }
 
-    // Use AI-curated brand colors if available, otherwise run a separate focused AI call
+    // ── Merge brand colors: Vision > AI-curated > CSS fallback ───────────
     let namedColors;
-    if (voiceAnalysis.brandColors?.length >= 3) {
+
+    // Priority 1: Vision-detected colors (most accurate — from actual visual appearance)
+    if (visionAnalysis?.colors?.length >= 3) {
+        namedColors = visionAnalysis.colors;
+        console.log(`  🎨 Using Vision-detected colors (${namedColors.length})`);
+    }
+    // Priority 2: AI-curated from CSS analysis
+    else if (voiceAnalysis.brandColors?.length >= 3) {
         namedColors = voiceAnalysis.brandColors.map(c => ({
             hex: (c.hex || '').toUpperCase(),
             name: c.name || 'Brand Color',
             usage: c.usage || 'accent',
         }));
-        console.log(`  \u{1F3A8} AI selected ${namedColors.length} brand colors`);
-    } else if (aiRouter && colors.length > 0) {
-        // Separate focused AI call for brand color curation
+        console.log(`  🎨 AI selected ${namedColors.length} brand colors`);
+    }
+    // Priority 3: Separate focused AI call
+    else if (aiRouter && cssColors.length > 0) {
         try {
+            const brandName = voiceAnalysis.brandName || meta.title || '';
             const colorResult = await aiRouter.analyzeText({
-                text: `Website: ${url}\nBrand: ${brandName || meta.title}\nIndustry: ${voiceAnalysis.industry || 'unknown'}\nCSS Colors found: ${colors.slice(0, 15).map(c => c.hex).join(', ')}`,
-                task: `Pick EXACTLY 4-5 TRUE brand identity colors from the CSS colors list.\nReturn ONLY JSON: {"brandColors": [{"hex": "#000000", "name": "Jet Black", "usage": "primary"}]}\n\nRules:\n- Pick ONLY colors that represent the brand identity (logo, accent, background)\n- Black (#000000) and white (#FFFFFF) ARE valid if used intentionally as brand colors\n- Give descriptive names ("Electric Lime" not "Green")\n- usage: primary/secondary/accent/background\n- Order: primary first\n- EXCLUDE generic UI/framework colors that aren't part of brand identity`,
+                text: `Website: ${url}\nBrand: ${brandName}\nIndustry: ${voiceAnalysis.industry || 'unknown'}\nCSS Colors found: ${cssColors.slice(0, 15).map(c => c.hex).join(', ')}`,
+                task: `Pick EXACTLY 4-5 TRUE brand identity colors from the CSS colors list.\nReturn ONLY JSON: {"brandColors": [{"hex": "#000000", "name": "Jet Black", "usage": "primary"}]}\n\nRules:\n- Pick ONLY colors that represent the brand identity (logo, accent, background)\n- Give descriptive names ("Electric Lime" not "Green")\n- usage: primary/secondary/accent/background\n- Order: primary first\n- EXCLUDE generic UI/framework colors`,
             });
             if (colorResult.brandColors?.length >= 3) {
                 namedColors = colorResult.brandColors.map(c => ({
@@ -126,35 +169,64 @@ IMPORTANT for brandColors:
                     name: c.name || 'Brand Color',
                     usage: c.usage || 'accent',
                 }));
-                console.log(`  \u{1F3A8} Separate AI call selected ${namedColors.length} brand colors`);
+                console.log(`  🎨 Separate AI call selected ${namedColors.length} brand colors`);
             }
         } catch (err) {
             console.error('Brand color curation failed:', err.message);
         }
     }
 
-    // Final fallback: use top 5 from CSS scoring
+    // Final fallback: top 5 from CSS scoring
     if (!namedColors || namedColors.length < 3) {
-        namedColors = colors.slice(0, 5).map((c, i) => ({
+        namedColors = cssColors.slice(0, 5).map((c, i) => ({
             hex: c.hex,
             name: `Brand Color ${i + 1}`,
             usage: i === 0 ? 'primary' : i === 1 ? 'secondary' : 'accent',
         }));
     }
 
-    // Build Content Style Guide
+    // ── Merge logo: Vision > Selector ────────────────────────────────────
+    let finalLogo;
+    if (visionAnalysis?.logo?.url) {
+        finalLogo = {
+            url: visionAnalysis.logo.url,
+            allLogos: [...(visionAnalysis.logo.allLogos || []), ...selectorLogos.slice(0, 3)],
+            metadata: {
+                format: visionAnalysis.logo.format || '',
+                source: 'ai-vision',
+                confidence: 'high',
+                visionDescription: visionAnalysis.logo.description || '',
+            },
+        };
+        console.log(`  ✅ Logo source: AI Vision — ${finalLogo.url.substring(0, 80)}...`);
+    } else {
+        finalLogo = {
+            url: selectorLogos[0]?.url || '',
+            allLogos: selectorLogos.slice(0, 5),
+            metadata: {
+                format: selectorLogos[0]?.format || '',
+                source: selectorLogos[0]?.source || 'selector',
+                confidence: selectorLogos[0] ? 'medium' : 'none',
+            },
+        };
+        if (finalLogo.url) console.log(`  ⚠️ Logo source: CSS selector fallback — ${finalLogo.url.substring(0, 80)}...`);
+        else console.log('  ❌ No logo found by any method');
+    }
+
+    // Build Content Style Guide (enhanced with social context)
     const contentStyle = voiceAnalysis.contentStyle || {
         dos: ['Use clear, concise language', 'Maintain consistent brand voice', 'Include relevant CTAs'],
-        donts: ['Avoid jargon', 'Don\'t use passive voice', 'Avoid overly promotional tone'],
+        donts: ['Avoid jargon', "Don't use passive voice", 'Avoid overly promotional tone'],
         keyPhrases: voiceAnalysis.keywords || [],
         writingStyle: '',
-        ctaStyle: '',
-        emojiUsage: 'minimal',
-        hashtagStyle: 'minimal',
+        ctaStyle: socialVoice.ctaStyle || '',
+        emojiUsage: socialVoice.emojiUsage || 'minimal',
+        hashtagStyle: socialVoice.hashtagStrategy || 'minimal',
         sentenceLength: 'mixed',
+        captionLengthPreference: 'medium',
     };
 
-    // Use AI to extract the actual brand name from page title & URL
+    // Use AI to extract the actual brand name
     let brandName = '';
     try {
         if (aiRouter) {
@@ -169,8 +241,6 @@ OG Image URL: "${meta.ogImage || ''}"
 Rules:
 - Return ONLY the brand/company name (e.g., "Nike", "ACwO", "Apple")
 - Remove taglines, product descriptions, separators (|, -, –)
-- If title is "Buy Best Earbuds | ACwO", return "ACwO"
-- If title is "Nike - Just Do It", return "Nike"
 - If unclear, extract from the domain name
 - Return just the name, nothing else`,
                 temperature: 0.1,
@@ -182,12 +252,11 @@ Rules:
         console.error('Brand name extraction failed:', err.message);
     }
 
-    // Fallback: extract from domain if AI didn't work
+    // Fallback: extract from domain
     if (!brandName) {
         try {
             const hostname = new URL(url).hostname.replace(/^www\./, '');
             brandName = hostname.split('.')[0];
-            // Capitalize first letter
             brandName = brandName.charAt(0).toUpperCase() + brandName.slice(1);
         } catch {
             brandName = meta.title?.split(/[|–\-—]/)[0]?.trim() || '';
@@ -198,14 +267,7 @@ Rules:
         name: brandName,
         website: url,
         dna: {
-            logo: {
-                url: logos[0]?.url || '',
-                allLogos: logos.slice(0, 5),
-                metadata: {
-                    format: logos[0]?.format || '',
-                    source: logos[0]?.source || '',
-                },
-            },
+            logo: finalLogo,
             colors: namedColors,
             fonts: {
                 heading: { family: fonts[0] || 'Inter', weight: '700', style: 'normal' },
@@ -223,14 +285,563 @@ Rules:
                 keywords: voiceAnalysis.keywords || [],
             },
             contentStyle,
+            socialLinks,
+            socialVoice,
             bannerImages: bannerImages.slice(0, 15),
             brandImages: allImages,
             brandDescription: meta.description || '',
             targetAudience: voiceAnalysis.targetAudience || '',
             industry: voiceAnalysis.industry || '',
+            tagline: voiceAnalysis.tagline || '',
+            photographyStyle: voiceAnalysis.photographyStyle || '',
+            websiteSnapshot: visionAnalysis?.screenshot || '',
         },
-        rawScanData: { meta, colors: namedColors, fonts, logos, bannerImages, contentSamples: contentSamples.slice(0, 3) },
+        rawScanData: { meta, colors: namedColors, fonts, logos: selectorLogos, bannerImages, contentSamples: contentSamples.slice(0, 3) },
     };
+}
+
+// ============================================================================
+// ROBUST JSON PARSER — handles common LLM output issues
+// ============================================================================
+
+function repairAndParseJSON(text) {
+    if (!text) return null;
+
+    // Step 1: Strip markdown code blocks
+    let cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+
+    // Step 2: Try direct parse first (fast path)
+    try {
+        return JSON.parse(cleaned);
+    } catch { /* continue to repairs */ }
+
+    // Step 3: Extract the JSON object using brace matching
+    const start = cleaned.indexOf('{');
+    if (start === -1) return null;
+
+    let depth = 0;
+    let end = -1;
+    let inString = false;
+    let escape = false;
+
+    for (let i = start; i < cleaned.length; i++) {
+        const ch = cleaned[i];
+        if (escape) { escape = false; continue; }
+        if (ch === '\\') { escape = true; continue; }
+        if (ch === '"') { inString = !inString; continue; }
+        if (inString) continue;
+        if (ch === '{') depth++;
+        else if (ch === '}') { depth--; if (depth === 0) { end = i; break; } }
+    }
+
+    if (end === -1) {
+        // Truncated JSON — close any open structures
+        cleaned = cleaned.substring(start);
+        const openBrackets = (cleaned.match(/\[/g) || []).length - (cleaned.match(/\]/g) || []).length;
+        const openBraces = (cleaned.match(/\{/g) || []).length - (cleaned.match(/\}/g) || []).length;
+        // Remove any trailing incomplete property (after last comma)
+        const lastComma = cleaned.lastIndexOf(',');
+        const lastClose = Math.max(cleaned.lastIndexOf('}'), cleaned.lastIndexOf(']'));
+        if (lastComma > lastClose) {
+            cleaned = cleaned.substring(0, lastComma);
+        }
+        for (let i = 0; i < openBrackets; i++) cleaned += ']';
+        for (let i = 0; i < openBraces; i++) cleaned += '}';
+    } else {
+        cleaned = cleaned.substring(start, end + 1);
+    }
+
+    // Step 4: Try parsing the extracted JSON
+    try {
+        return JSON.parse(cleaned);
+    } catch { /* continue to more repairs */ }
+
+    // Step 5: Fix trailing commas (most common LLM issue)
+    let repaired = cleaned.replace(/,\s*([}\]])/g, '$1');
+    try {
+        return JSON.parse(repaired);
+    } catch { /* continue */ }
+
+    // Step 6: Fix control characters inside strings
+    repaired = repaired.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+    try {
+        return JSON.parse(repaired);
+    } catch { /* continue */ }
+
+    // Step 7: Nuclear option — try to extract key fields manually
+    try {
+        const logoMatch = repaired.match(/"matchedUrl"\s*:\s*"([^"]+)"/);
+        const descMatch = repaired.match(/"description"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/);
+        const posMatch = repaired.match(/"position"\s*:\s*"([^"]+)"/);
+        const styleMatch = repaired.match(/"visualStyle"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/);
+        const photoMatch = repaired.match(/"photographyStyle"\s*:\s*"([^"]+)"/);
+
+        // Extract colors array
+        const colorsMatch = repaired.match(/"colors"\s*:\s*\[([\s\S]*?)\]/);
+        let colors = [];
+        if (colorsMatch) {
+            const colorEntries = colorsMatch[1].matchAll(/"hex"\s*:\s*"([^"]+)"[\s\S]*?"name"\s*:\s*"([^"]+)"[\s\S]*?"usage"\s*:\s*"([^"]+)"/g);
+            for (const m of colorEntries) {
+                colors.push({ hex: m[1], name: m[2], usage: m[3] });
+            }
+        }
+
+        if (logoMatch || colors.length > 0) {
+            console.log('  🔧 Rebuilt JSON from regex extraction');
+            return {
+                logo: {
+                    matchedUrl: logoMatch?.[1] || '',
+                    description: descMatch?.[1] || '',
+                    position: posMatch?.[1] || '',
+                },
+                colors,
+                visualStyle: styleMatch?.[1] || '',
+                photographyStyle: photoMatch?.[1] || '',
+            };
+        }
+    } catch { /* ignore */ }
+
+    console.error('  ❌ JSON repair failed completely');
+    return null;
+}
+
+// ============================================================================
+// PHASE 1: PUPPETEER SCREENSHOT + GEMINI VISION ANALYSIS
+// ============================================================================
+
+/**
+ * Take a headless browser screenshot → send to Gemini Vision → identify logo, colors, style
+ * Cross-reference with DOM images to find the actual logo URL
+ */
+async function captureAndAnalyze(url, allImages, selectorLogos) {
+    const puppeteer = await import('puppeteer');
+
+    console.log('  🌐 Launching Puppeteer for screenshot...');
+    const browser = await puppeteer.default.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
+    });
+
+    try {
+        const page = await browser.newPage();
+        await page.setViewport({ width: 1440, height: 900 });
+        await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: 25000 });
+
+        // Wait a moment for lazy-loaded images and animations
+        await new Promise(r => setTimeout(r, 2000));
+
+        // Take full-page screenshot
+        const fullScreenshot = await page.screenshot({ type: 'jpeg', quality: 80, fullPage: false });
+        console.log(`  📸 Screenshot captured: ${Math.round(fullScreenshot.length / 1024)}KB`);
+
+        // Take header crop (top 200px) for focused logo detection
+        const headerScreenshot = await page.screenshot({
+            type: 'jpeg', quality: 85,
+            clip: { x: 0, y: 0, width: 1440, height: 200 },
+        });
+        console.log(`  📸 Header crop captured: ${Math.round(headerScreenshot.length / 1024)}KB`);
+
+        await browser.close();
+
+        // ── Send to Gemini Vision ─────────────────────────────────────────
+        const apiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            console.warn('  ⚠️ No Gemini API key — skipping vision analysis');
+            return null;
+        }
+
+        // Build image list for cross-referencing
+        const imageList = [
+            ...selectorLogos.map(l => `[SELECTOR-LOGO] ${l.url} (source: ${l.source})`),
+            ...allImages.slice(0, 15).map(img => `[PAGE-IMAGE] ${img.url} (alt: ${img.alt || 'none'})`),
+        ].join('\n');
+
+        const visionPrompt = `You are a brand identity expert. Analyze these screenshots of a website homepage.
+
+IMAGE 1: Full homepage screenshot (1440x900 viewport)
+IMAGE 2: Header/navigation crop (top 200px — where logos usually are)
+
+TASK 1 — LOGO IDENTIFICATION:
+Look at the header area. Identify the ACTUAL brand logo. It's usually:
+- In the top-left or center of the navigation bar
+- The most prominent brand mark/wordmark in the header
+- NOT a generic icon, social media icon, or navigation element
+
+Describe the logo precisely: what it looks like, its colors, any text in it, and its approximate position.
+
+Then, from this list of images found on the page, identify which URL is the ACTUAL logo:
+${imageList}
+
+Pick the URL that BEST matches what you see as the logo in the screenshot. If none match perfectly, pick the closest one.
+
+TASK 2 — BRAND COLORS:
+Look at the VISUAL appearance of the website. Identify the 4-5 TRUE brand colors:
+- Primary color (headers, buttons, accents)
+- Secondary color (backgrounds, sections)
+- Any accent/highlight colors
+- Base/background color if intentional
+
+TASK 3 — VISUAL STYLE:
+Describe the overall visual style in 2-3 sentences.
+
+Return ONLY valid JSON:
+{
+  "logo": {
+    "matchedUrl": "the URL from the list above that IS the logo, or empty string if none match",
+    "description": "what the logo looks like",
+    "position": "top-left / center / top-right"
+  },
+  "colors": [
+    { "hex": "#RRGGBB", "name": "Descriptive Name", "usage": "primary" }
+  ],
+  "visualStyle": "2-3 sentence description of the visual design style",
+  "photographyStyle": "flat lay / lifestyle / studio / UGC / mixed"
+}`;
+
+        // Use current, working Gemini models for text+image analysis
+        const models = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash-001'];
+        let visionResult = null;
+
+        for (const modelId of models) {
+            try {
+                console.log(`  🔍 Trying Vision model: ${modelId}...`);
+                const response = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{
+                                parts: [
+                                    { text: visionPrompt },
+                                    { inlineData: { mimeType: 'image/jpeg', data: fullScreenshot.toString('base64') } },
+                                    { inlineData: { mimeType: 'image/jpeg', data: headerScreenshot.toString('base64') } },
+                                ],
+                            }],
+                            generationConfig: {
+                                temperature: 0.2,
+                                maxOutputTokens: 4096,
+                                responseMimeType: 'application/json',
+                            },
+                        }),
+                    }
+                );
+
+                const data = await response.json();
+                if (data.error) {
+                    console.warn(`  ⚠️ Vision model ${modelId} failed:`, data.error.message);
+                    // If quota error, skip to next model
+                    if (data.error.message?.includes('quota') || data.error.message?.includes('Quota') || data.error.status === 'RESOURCE_EXHAUSTED') {
+                        continue;
+                    }
+                    continue;
+                }
+
+                const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                if (!rawText) {
+                    console.warn(`  ⚠️ Vision model ${modelId}: empty response`);
+                    continue;
+                }
+
+                console.log(`  📝 Vision raw response (${rawText.length} chars) from ${modelId}`);
+
+                // Robust JSON parsing with repair
+                visionResult = repairAndParseJSON(rawText);
+                if (visionResult) {
+                    console.log(`  🧠 Vision analysis complete (model: ${modelId})`);
+                    break;
+                } else {
+                    console.warn(`  ⚠️ Vision model ${modelId}: could not parse JSON from response`);
+                    console.warn(`  📝 Raw text preview: ${rawText.substring(0, 200)}...`);
+                }
+            } catch (err) {
+                console.warn(`  ⚠️ Vision model ${modelId} error:`, err.message);
+                continue;
+            }
+        }
+
+        if (!visionResult) return null;
+
+        // ── Cross-reference: find the best logo URL ─────────────────────
+        const result = { logo: null, colors: [], visualStyle: visionResult.visualStyle || '' };
+
+        // Logo matching
+        if (visionResult.logo?.matchedUrl) {
+            const matchedUrl = visionResult.logo.matchedUrl;
+            // Verify it's a real URL from our list
+            const isFromList = [...selectorLogos, ...allImages].some(img => img.url === matchedUrl);
+            if (isFromList) {
+                result.logo = {
+                    url: matchedUrl,
+                    description: visionResult.logo.description || '',
+                    format: matchedUrl.split('?')[0].split('.').pop()?.toLowerCase() || 'image',
+                    allLogos: selectorLogos.slice(0, 3).map(l => ({ url: l.url, source: l.source })),
+                };
+            }
+        }
+
+        // If Vision couldn't match to a URL, try fuzzy matching by description
+        if (!result.logo && visionResult.logo?.description) {
+            // Check if any selector logo's alt text or filename matches the vision description
+            for (const logo of selectorLogos) {
+                const urlLower = logo.url.toLowerCase();
+                const descLower = (visionResult.logo.description || '').toLowerCase();
+                // Simple heuristic: if the URL contains words from the description
+                const descWords = descLower.split(/\s+/).filter(w => w.length > 3);
+                const matches = descWords.filter(w => urlLower.includes(w));
+                if (matches.length >= 1) {
+                    result.logo = {
+                        url: logo.url,
+                        description: visionResult.logo.description,
+                        format: logo.format || 'image',
+                        allLogos: selectorLogos.slice(0, 3).map(l => ({ url: l.url, source: l.source })),
+                    };
+                    break;
+                }
+            }
+        }
+
+        // If still no match, use the first selector logo with vision metadata
+        if (!result.logo && selectorLogos.length > 0) {
+            result.logo = {
+                url: selectorLogos[0].url,
+                description: visionResult.logo?.description || '',
+                format: selectorLogos[0].format || 'image',
+                allLogos: selectorLogos.slice(0, 3).map(l => ({ url: l.url, source: l.source })),
+            };
+        }
+
+        // Colors from vision
+        if (visionResult.colors?.length > 0) {
+            result.colors = visionResult.colors.map(c => ({
+                hex: (c.hex || '').toUpperCase(),
+                name: c.name || 'Brand Color',
+                usage: c.usage || 'accent',
+            }));
+        }
+
+        // Include screenshot for frontend display
+        result.screenshot = `data:image/jpeg;base64,${fullScreenshot.toString('base64')}`;
+
+        return result;
+    } catch (err) {
+        await browser.close().catch(() => {});
+        throw err;
+    }
+}
+
+// ============================================================================
+// PHASE 2: SOCIAL MEDIA INTELLIGENCE
+// ============================================================================
+
+/**
+ * Extract social media links from the website HTML
+ */
+function extractSocialLinks($, baseUrl) {
+    const links = {
+        instagram: '',
+        facebook: '',
+        twitter: '',
+        linkedin: '',
+        youtube: '',
+        pinterest: '',
+    };
+
+    const patterns = {
+        instagram: /(?:instagram\.com|instagr\.am)\/([a-zA-Z0-9._]+)/,
+        facebook: /(?:facebook\.com|fb\.com)\/([a-zA-Z0-9.]+)/,
+        twitter: /(?:twitter\.com|x\.com)\/([a-zA-Z0-9_]+)/,
+        linkedin: /linkedin\.com\/(?:company|in)\/([a-zA-Z0-9-]+)/,
+        youtube: /youtube\.com\/(?:c\/|channel\/|@)?([a-zA-Z0-9_-]+)/,
+        pinterest: /pinterest\.com\/([a-zA-Z0-9_]+)/,
+    };
+
+    // Scan all <a> tags for social links
+    $('a[href]').each((_, el) => {
+        const href = $(el).attr('href') || '';
+        for (const [platform, regex] of Object.entries(patterns)) {
+            if (!links[platform] && regex.test(href)) {
+                links[platform] = href.startsWith('http') ? href : `https://${href}`;
+            }
+        }
+    });
+
+    return links;
+}
+
+/**
+ * Analyze social media profiles for content patterns and voice
+ */
+async function analyzeSocialMedia(socialLinks, aiRouter) {
+    const result = {
+        captionStyle: '',
+        hashtagStrategy: '',
+        emojiUsage: '',
+        ctaStyle: '',
+        postingPatterns: '',
+        sampleCaptions: [],
+    };
+
+    // Try to scrape Instagram (most informative for brand voice)
+    const platformsToAnalyze = [];
+
+    if (socialLinks.instagram) platformsToAnalyze.push({ platform: 'Instagram', url: socialLinks.instagram });
+    if (socialLinks.facebook) platformsToAnalyze.push({ platform: 'Facebook', url: socialLinks.facebook });
+    if (socialLinks.twitter) platformsToAnalyze.push({ platform: 'Twitter/X', url: socialLinks.twitter });
+    if (socialLinks.linkedin) platformsToAnalyze.push({ platform: 'LinkedIn', url: socialLinks.linkedin });
+
+    const socialContent = [];
+
+    for (const { platform, url } of platformsToAnalyze.slice(0, 3)) {
+        try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 10000);
+            const resp = await fetch(url, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+                    'Accept': 'text/html,application/xhtml+xml',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                },
+                signal: controller.signal,
+                redirect: 'follow',
+            });
+            clearTimeout(timeout);
+
+            if (resp.ok) {
+                const html = await resp.text();
+                const $ = cheerio.load(html);
+
+                // Extract text content — meta descriptions, visible text, JSON-LD
+                const metaDesc = $('meta[name="description"]').attr('content') || '';
+                const ogDesc = $('meta[property="og:description"]').attr('content') || '';
+                const title = $('title').text() || '';
+
+                // Look for JSON-LD structured data (common on social profiles)
+                let jsonLdContent = '';
+                $('script[type="application/ld+json"]').each((_, el) => {
+                    try {
+                        const data = JSON.parse($(el).text());
+                        if (data.description) jsonLdContent += data.description + '\n';
+                        if (data.articleBody) jsonLdContent += data.articleBody + '\n';
+                    } catch { /* ignore */ }
+                });
+
+                // Extract any visible captions or post text
+                const visibleText = [];
+                $('article, [class*="caption"], [class*="post"], [class*="content"]').each((_, el) => {
+                    const text = $(el).text().trim();
+                    if (text.length > 20 && text.length < 500) visibleText.push(text);
+                });
+
+                const content = [
+                    metaDesc && `[${platform} Bio] ${metaDesc}`,
+                    ogDesc && ogDesc !== metaDesc && `[${platform} OG] ${ogDesc}`,
+                    jsonLdContent && `[${platform} Content] ${jsonLdContent.substring(0, 500)}`,
+                    ...visibleText.slice(0, 5).map(t => `[${platform} Post] ${t}`),
+                ].filter(Boolean);
+
+                if (content.length > 0) {
+                    socialContent.push(...content);
+                    console.log(`    📱 ${platform}: extracted ${content.length} content pieces`);
+                }
+            }
+        } catch (err) {
+            console.warn(`    ⚠️ ${platform} fetch failed:`, err.message);
+        }
+    }
+
+    // Use AI to analyze social content patterns
+    if (socialContent.length > 0 && aiRouter) {
+        try {
+            const analysis = await aiRouter.analyzeText({
+                text: socialContent.join('\n\n'),
+                task: `Analyze these social media content samples from a brand. Return ONLY valid JSON:
+{
+  "captionStyle": "1 sentence describing how captions are written",
+  "hashtagStrategy": "how many hashtags, branded vs trending",
+  "emojiUsage": "none/minimal/moderate/heavy — with examples of commonly used emojis",
+  "ctaStyle": "how the brand asks for action — DM us, Shop Now, Link in bio, etc.",
+  "postingPatterns": "what kind of content they post — product shots, lifestyle, UGC, behind-the-scenes",
+  "sampleCaptions": ["3-5 example captions that capture their style (from the content above)"],
+  "toneInsight": "1-2 sentences about how the brand sounds different on social vs website"
+}`,
+            });
+            Object.assign(result, analysis);
+        } catch (err) {
+            console.warn('    ⚠️ Social voice AI analysis failed:', err.message);
+        }
+    }
+
+    return result;
+}
+
+// ============================================================================
+// PHASE 3: SUB-PAGE CRAWLING
+// ============================================================================
+
+/**
+ * Crawl important sub-pages (About, Products, Services) for richer content
+ */
+async function crawlSubPages($, baseUrl) {
+    const subPageContent = [];
+
+    // Find important links from the navigation
+    const importantPaths = [];
+    const importantKeywords = /about|story|our-story|mission|products|services|what-we-do|who-we-are|philosophy/i;
+
+    $('nav a[href], header a[href], footer a[href]').each((_, el) => {
+        const href = $(el).attr('href') || '';
+        const text = $(el).text().trim().toLowerCase();
+        if (importantKeywords.test(href) || importantKeywords.test(text)) {
+            let fullUrl;
+            try {
+                fullUrl = new URL(href, baseUrl).href;
+            } catch { return; }
+            // Only same-domain
+            try {
+                if (new URL(fullUrl).hostname !== new URL(baseUrl).hostname) return;
+            } catch { return; }
+            if (!importantPaths.some(p => p.url === fullUrl)) {
+                importantPaths.push({ url: fullUrl, label: text || href });
+            }
+        }
+    });
+
+    // Crawl up to 3 sub-pages
+    for (const { url: pageUrl, label } of importantPaths.slice(0, 3)) {
+        try {
+            console.log(`    📄 Crawling sub-page: ${label} (${pageUrl.substring(0, 60)}...)`);
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8000);
+            const resp = await fetch(pageUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+                    'Accept': 'text/html',
+                },
+                signal: controller.signal,
+            });
+            clearTimeout(timeout);
+
+            if (resp.ok) {
+                const html = await resp.text();
+                const sub$ = cheerio.load(html);
+
+                // Extract paragraphs and headings
+                sub$('h1, h2, h3, p').each((_, el) => {
+                    const text = sub$(el).text().trim();
+                    if (text.length > 20 && text.length < 800) {
+                        subPageContent.push(`[${label}] ${text}`);
+                    }
+                });
+            }
+        } catch (err) {
+            console.warn(`    ⚠️ Sub-page crawl failed for ${label}:`, err.message);
+        }
+    }
+
+    return subPageContent.slice(0, 30); // Cap at 30 samples
 }
 
 // ============================================================================

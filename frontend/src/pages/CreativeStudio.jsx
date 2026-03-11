@@ -3,10 +3,24 @@ import SEOHead from '../components/SEOHead'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
-import { creatives as creativesAPI, agents as agentsAPI, products as productsAPI, brands as brandsAPI } from '../services/api'
+import { creatives as creativesAPI, agents as agentsAPI, products as productsAPI, brands as brandsAPI, media as mediaAPI } from '../services/api'
 import { useBrand } from '../context/BrandContext'
 import VoiceInput from '../components/VoiceInput'
 import PublishModal from '../components/PublishModal'
+
+// ── S3 Upload Helper — replaces all base64-in-state patterns ──
+async function uploadToS3(base64DataUri, folder = 'refs') {
+    if (!base64DataUri) return null;
+    // If already a URL, return as-is
+    if (base64DataUri.startsWith('http')) return base64DataUri;
+    try {
+        const { url } = await mediaAPI.upload({ imageData: base64DataUri, folder });
+        return url;
+    } catch (e) {
+        console.warn('S3 upload failed, falling back to base64:', e.message);
+        return base64DataUri; // fallback to base64 if S3 fails
+    }
+}
 
 export default function CreativeStudio() {
     const navigate = useNavigate()
@@ -35,6 +49,9 @@ export default function CreativeStudio() {
     // AI Photoshoot state
     const [productImage, setProductImage] = useState(null)
     const [productFile, setProductFile] = useState(null)
+    const [productPickerOpen, setProductPickerOpen] = useState(false)
+    const [productPickerTab, setProductPickerTab] = useState('brand') // 'brand' | 'upload' | 'link'
+    const [productLinkUrl, setProductLinkUrl] = useState('')
     const [sceneKeywords, setSceneKeywords] = useState([])
     const [photoshootBrief, setPhotoshootBrief] = useState('')
     const [photoshootGenerating, setPhotoshootGenerating] = useState(false)
@@ -42,6 +59,15 @@ export default function CreativeStudio() {
     const [photoshootError, setPhotoshootError] = useState('')
     const [photoshootSaved, setPhotoshootSaved] = useState(false)
     const [fidelity, setFidelity] = useState(80)
+    // Professional Photography Controls
+    const [cameraAngle, setCameraAngle] = useState('eye-level')
+    const [lens, setLens] = useState('50mm')
+    const [lightingStyle, setLightingStyle] = useState('softbox')
+    const [lightDirection, setLightDirection] = useState('front-left')
+    const [surface, setSurface] = useState('white')
+    const [modelPresence, setModelPresence] = useState('none')
+    const [mood, setMood] = useState(['commercial'])
+    const [psTab, setPsTab] = useState('shot')
 
     // ── AI Image Editing (inline in photoshoot) ──
     const [psEditMode, setPsEditMode] = useState(false) // show AI editor panel
@@ -72,11 +98,11 @@ export default function CreativeStudio() {
     const [designBaseImage, setDesignBaseImage] = useState(null)
 
     // ── NEW: Reference Images (style / upload) + multi-character ──
-    const [referenceImages, setReferenceImages] = useState({ style: null, upload: null })
+    const [referenceImages, setReferenceImages] = useState({ style: null, character: null, upload: null })
     const [characters, setCharacters] = useState([]) // [{ name: 'Character 1', image: 'data:...' }]
 
-    // ── NEW: Logo Overlay ──
-    const [addLogo, setAddLogo] = useState(false)
+    // ── NEW: Logo Overlay — auto-enable when brand has a logo ──
+    const [addLogo, setAddLogo] = useState(() => !!activeBrand?.dna?.logo?.url)
     const [logoPosition, setLogoPosition] = useState('bottom-right')
     const [logoSize, setLogoSize] = useState('medium')
 
@@ -168,7 +194,7 @@ export default function CreativeStudio() {
                         { key: 'mood', label: 'Design Mood', type: 'select', options: ['Urgency/Bold', 'Elegant Luxury', 'Minimalist', 'Playful/Fun'] },
                     ],
                     buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.hex).join(', ') || 'brand colors'
+                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
                         return `Create a promotional sale creative for ${brand.name}.\nOFFER: ${vals.offerText || 'SPECIAL OFFER'}\nVALID TILL: ${vals.validTill || 'Limited Time'}\nCTA: "${vals.cta || 'Order Now'}"\nMOOD: ${vals.mood || 'Urgency/Bold'}\nBRAND COLORS: ${colors}\nMake the offer text LARGE and prominent. Eye-catching, bold, impossible to scroll past. Include ${brand.name} branding.`
                     }
                 },
@@ -181,7 +207,7 @@ export default function CreativeStudio() {
                         { key: 'cta', label: 'CTA', type: 'text', placeholder: 'e.g. Shop the Festive Sale', default: 'Shop Now' },
                     ],
                     buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.hex).join(', ') || 'brand colors'
+                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
                         return `Create a Diwali sale creative for ${brand.name}.\nOFFER: ${vals.offerText || 'Diwali Special Offer'}\nPRODUCT: ${vals.productName || ''}\nCTA: "${vals.cta || 'Shop Now'}"\nTHEME: Diwali — diyas, rangoli, lanterns, golden sparkles, warm festive lighting\nBRAND COLORS: ${colors}\nFestive and joyful but still on-brand. Include ${brand.name} logo. Traditional+modern design.`
                     }
                 },
@@ -194,7 +220,7 @@ export default function CreativeStudio() {
                         { key: 'cta', label: 'CTA', type: 'text', placeholder: 'e.g. Celebrate & Save', default: 'Shop Now' },
                     ],
                     buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.hex).join(', ') || 'brand colors'
+                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
                         return `Create a Republic Day sale creative for ${brand.name}.\nOFFER: ${vals.offerText || 'Republic Day Special'}\nPRODUCT: ${vals.productName || ''}\nCTA: "${vals.cta || 'Shop Now'}"\nTHEME: Republic Day — tricolor (saffron, white, green), patriotic, flag elements, Ashoka Chakra subtle\nBRAND COLORS: ${colors}\nPatriotic + brand identity blend. Include ${brand.name} logo.`
                     }
                 },
@@ -215,7 +241,7 @@ export default function CreativeStudio() {
                         { key: 'image', label: 'Product Image', type: 'image', hint: 'Upload product photo' },
                     ],
                     buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.hex).join(', ') || 'brand colors'
+                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
                         const font = brand.dna?.fonts?.heading?.family || 'modern sans-serif'
                         return `Create a premium product showcase for ${brand.name}.\nPRODUCT: ${vals.productName || 'a product'}\nTAGLINE: "${vals.tagline || 'Quality You Deserve'}"\nCTA: "${vals.cta || 'Shop Now'}"\nLAYOUT: ${vals.layout || 'Centered'}\nBRAND COLORS: ${colors}\nFONT: ${font}\nClean background, brand color accents, product as hero element, professional.`
                     }
@@ -229,7 +255,7 @@ export default function CreativeStudio() {
                         { key: 'highlight', label: 'What to Highlight', type: 'text', placeholder: 'e.g. Premium = Best Value' },
                     ],
                     buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.hex).join(', ') || 'brand colors'
+                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
                         return `Create a product comparison visual for ${brand.name}.\nLEFT: ${vals.product1 || 'Option A'}\nRIGHT: ${vals.product2 || 'Option B'}\nHIGHLIGHT: ${vals.highlight || 'Choose the best'}\nBRAND COLORS: ${colors}\nClean split layout, easy to compare, ${brand.name} branding applied.`
                     }
                 },
@@ -248,7 +274,7 @@ export default function CreativeStudio() {
                         { key: 'bgStyle', label: 'Background', type: 'select', options: ['Solid Brand Color', 'Gradient', 'Texture', 'Photo (Blurred)', 'Dark/Moody'] },
                     ],
                     buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.hex).join(', ') || 'brand colors'
+                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
                         return `Create a testimonial card for ${brand.name}.\nQUOTE: "${vals.quote || 'Great experience!'}"\nAUTHOR: ${vals.author || 'Happy Customer'}\nBG: ${vals.bgStyle || 'Solid Brand Color'}\nBRAND COLORS: ${colors}\nElegant, large quotation marks, ${brand.name} logo subtle in corner.`
                     }
                 },
@@ -260,7 +286,7 @@ export default function CreativeStudio() {
                         { key: 'bgStyle', label: 'Background', type: 'select', options: ['Gradient', 'Nature Photo', 'Abstract', 'Minimal', 'Dark'] },
                     ],
                     buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.hex).join(', ') || 'brand colors'
+                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
                         return `Create a motivational quote post for ${brand.name}.\nQUOTE: "${vals.quote || 'Success starts with a single step'}"\nBG: ${vals.bgStyle || 'Gradient'}\nUSE brand colors: ${colors}\nInspirational, visually stunning, ${brand.name} branding.`
                     }
                 },
@@ -279,7 +305,7 @@ export default function CreativeStudio() {
                         { key: 'tone', label: 'Tone', type: 'select', options: ['Exciting', 'Professional', 'Teaser/Mystery', 'Celebratory'] },
                     ],
                     buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.hex).join(', ') || 'brand colors'
+                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
                         return `Create a product launch announcement for ${brand.name}.\nHEADLINE: "${vals.headline || 'Something Big is Coming!'}"\nDETAILS: ${vals.details || ''}\nTONE: ${vals.tone || 'Exciting'}\nBRAND COLORS: ${colors}\nBold, shareable, ${brand.name} branding prominent.`
                     }
                 },
@@ -291,7 +317,7 @@ export default function CreativeStudio() {
                         { key: 'details', label: 'Details', type: 'textarea', placeholder: 'More info...' },
                     ],
                     buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.hex).join(', ') || 'brand colors'
+                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
                         return `Create a news update post for ${brand.name}.\nHEADLINE: "${vals.headline || 'Exciting Update'}"\nDETAILS: ${vals.details || ''}\nBRAND COLORS: ${colors}\nProfessional, newsworthy, ${brand.name} identity applied.`
                     }
                 },
@@ -311,7 +337,7 @@ export default function CreativeStudio() {
                         { key: 'cta', label: 'CTA', type: 'text', placeholder: 'e.g. Register Now', default: 'Register Now' },
                     ],
                     buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.hex).join(', ') || 'brand colors'
+                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
                         return `Create an event promo for ${brand.name}.\nEVENT: ${vals.eventName || 'Event'}\nDATE: ${vals.date || 'Coming Soon'}\nVENUE: ${vals.venue || 'TBA'}\nCTA: "${vals.cta || 'Register Now'}"\nBRAND COLORS: ${colors}\nClear hierarchy: Name > Date > Venue > CTA. ${brand.name} branding prominent.`
                     }
                 },
@@ -324,7 +350,7 @@ export default function CreativeStudio() {
                         { key: 'image', label: 'Photo', type: 'image', hint: 'Upload their photo (optional)' },
                     ],
                     buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.hex).join(', ') || 'brand colors'
+                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
                         return `Create a birthday greeting post for ${brand.name}.\nNAME: ${vals.personName || 'Team Member'}\nMESSAGE: "${vals.message || 'Happy Birthday!'}"\nBRAND COLORS: ${colors}\nFestive, warm, celebration vibes. Cake/balloons/confetti elements. Brand logo included.`
                     }
                 },
@@ -337,7 +363,7 @@ export default function CreativeStudio() {
                         { key: 'message', label: 'Message', type: 'textarea', placeholder: 'e.g. Thank you for your dedication!' },
                     ],
                     buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.hex).join(', ') || 'brand colors'
+                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
                         return `Create a work anniversary celebration post for ${brand.name}.\nNAME: ${vals.personName || 'Team Member'}\nMILESTONE: ${vals.years || 'Anniversary'}\nMESSAGE: "${vals.message || 'Thank you for your incredible journey with us!'}"\nBRAND COLORS: ${colors}\nCelebratory, professional, warm. ${brand.name} branding applied.`
                     }
                 },
@@ -356,7 +382,7 @@ export default function CreativeStudio() {
                         { key: 'style', label: 'Style', type: 'select', options: ['Numbered List', 'Icon Grid', 'Flowchart', 'Statistics'] },
                     ],
                     buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.hex).join(', ') || 'brand colors'
+                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
                         return `Create an infographic for ${brand.name}.\nTOPIC: ${vals.topic || 'Key Facts'}\nPOINTS: ${vals.points || '1. Point one\n2. Point two'}\nSTYLE: ${vals.style || 'Numbered List'}\nBRAND COLORS: ${colors}\nIcons for each point, visually digestible, ${brand.name} branding.`
                     }
                 },
@@ -369,7 +395,7 @@ export default function CreativeStudio() {
                         { key: 'style', label: 'Visual Style', type: 'select', options: ['Corporate Clean', 'Modern Gradient', 'Illustrated', 'Geometric'] },
                     ],
                     buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.hex).join(', ') || 'brand colors'
+                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
                         return `Create a service highlight post for ${brand.name}.\nSERVICE: ${vals.serviceName || 'our service'}\nHEADLINE: "${vals.headline || 'Expert Service'}"\nSTYLE: ${vals.style || 'Corporate Clean'}\nBRAND COLORS: ${colors}\nInformative, visually appealing, ${brand.name} identity.`
                     }
                 },
@@ -382,7 +408,7 @@ export default function CreativeStudio() {
                         { key: 'image', label: 'Photo', type: 'image', hint: 'Upload a BTS photo' },
                     ],
                     buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.hex).join(', ') || 'brand colors'
+                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
                         return `Create a behind-the-scenes story for ${brand.name}.\nSCENE: ${vals.scene || 'Team at work'}\nVIBE: ${vals.vibe || 'Authentic'}\nBRAND COLORS: ${colors} as accent overlays\nAuthentic, warm, ${brand.name} brand identity maintained.`
                     }
                 },
@@ -653,20 +679,9 @@ export default function CreativeStudio() {
 
             let creative = data.creative
 
-            // ── Client-side logo compositing (pixel-perfect) ──
-            if (addLogo && creative?.imageUrl) {
-                const brandLogoUrl = activeBrand?.dna?.logo?.url
-                if (brandLogoUrl) {
-                    try {
-                        const compositedUrl = await compositeLogoOnImage(
-                            creative.imageUrl, brandLogoUrl, logoPosition, logoSize
-                        )
-                        creative = { ...creative, imageUrl: compositedUrl }
-                    } catch (e) {
-                        console.warn('Logo compositing failed, using original:', e)
-                    }
-                }
-            }
+            // Logo overlay is now handled SERVER-SIDE in creatives.js
+            // using sharp (no CORS issues). The addLogo flag in options
+            // triggers server-side compositing after S3 upload.
 
             setResult(creative)
         } catch (err) {
@@ -1942,32 +1957,54 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </h3>
 
                             {!productImage ? (
-                                <div onDrop={(e) => {
-                                    e.preventDefault()
-                                    const file = e.dataTransfer?.files?.[0]
-                                    if (file && file.type.startsWith('image/')) {
-                                        setProductFile(file)
-                                        const reader = new FileReader()
-                                        reader.onload = (ev) => setProductImage(ev.target.result)
-                                        reader.readAsDataURL(file)
-                                    }
-                                }} onDragOver={e => e.preventDefault()}
-                                    className="border-2 border-dashed border-white/[0.1] rounded-2xl p-8 text-center hover:border-primary/40 transition-colors">
-                                    <span className="material-symbols-outlined text-4xl text-slate-600 mb-2 block">add_photo_alternate</span>
-                                    <p className="text-slate-400 text-sm mb-1">Drop your product image here</p>
-                                    <p className="text-xs text-slate-600 mb-3">AI will place it in a professional photoshoot</p>
-                                    <label className="btn-primary py-2 px-5 rounded-xl text-xs cursor-pointer inline-block">
-                                        Choose Image
-                                        <input type="file" className="hidden" onChange={(e) => {
-                                            const file = e.target.files?.[0]
-                                            if (file && file.type.startsWith('image/')) {
-                                                setProductFile(file)
-                                                const reader = new FileReader()
-                                                reader.onload = (ev) => setProductImage(ev.target.result)
-                                                reader.readAsDataURL(file)
+                                <div>
+                                    {/* Clean drop zone */}
+                                    <div onDrop={(e) => {
+                                        e.preventDefault()
+                                        const file = e.dataTransfer?.files?.[0]
+                                        if (file && file.type.startsWith('image/')) {
+                                            setProductFile(file)
+                                            const reader = new FileReader()
+                                            reader.onload = async (ev) => {
+                                                const s3Url = await uploadToS3(ev.target.result, 'products')
+                                                setProductImage(s3Url)
                                             }
-                                        }} accept="image/*" />
-                                    </label>
+                                            reader.readAsDataURL(file)
+                                        }
+                                    }} onDragOver={e => e.preventDefault()}
+                                        className="border-2 border-dashed border-white/[0.1] rounded-2xl p-5 text-center hover:border-primary/40 transition-colors mb-3">
+                                        <span className="material-symbols-outlined text-3xl text-slate-600 mb-1 block">add_photo_alternate</span>
+                                        <p className="text-slate-400 text-xs">Drag & drop product image here</p>
+                                    </div>
+                                    {/* 3 action buttons */}
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <button onClick={() => { setProductPickerTab('brand'); setProductPickerOpen(true) }}
+                                            className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-emerald-400/40 hover:bg-emerald-500/5 transition-all cursor-pointer group">
+                                            <span className="material-symbols-outlined text-base text-emerald-400 group-hover:scale-110 transition-transform">domain</span>
+                                            <span className="text-[10px] text-slate-400 font-medium">Brand Photos</span>
+                                        </button>
+                                        <label className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer group">
+                                            <span className="material-symbols-outlined text-base text-primary group-hover:scale-110 transition-transform">upload</span>
+                                            <span className="text-[10px] text-slate-400 font-medium">Upload</span>
+                                            <input type="file" className="hidden" onChange={(e) => {
+                                                const file = e.target.files?.[0]
+                                                if (file && file.type.startsWith('image/')) {
+                                                    setProductFile(file)
+                                                    const reader = new FileReader()
+                                                    reader.onload = async (ev) => {
+                                                        const s3Url = await uploadToS3(ev.target.result, 'products')
+                                                        setProductImage(s3Url)
+                                                    }
+                                                    reader.readAsDataURL(file)
+                                                }
+                                            }} accept="image/*" />
+                                        </label>
+                                        <button onClick={() => { setProductPickerTab('link'); setProductPickerOpen(true) }}
+                                            className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-violet-400/40 hover:bg-violet-500/5 transition-all cursor-pointer group">
+                                            <span className="material-symbols-outlined text-base text-violet-400 group-hover:scale-110 transition-transform">link</span>
+                                            <span className="text-[10px] text-slate-400 font-medium">Paste Link</span>
+                                        </button>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="relative rounded-2xl overflow-hidden">
@@ -1984,6 +2021,161 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
                             )}
                         </div>
+
+                        {/* ══ Product Image Picker Modal ══ */}
+                        {productPickerOpen && (
+                            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setProductPickerOpen(false)}>
+                                <div className="bg-[#0f1729] border border-white/10 rounded-2xl w-full max-w-lg mx-4 shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+                                    {/* Header */}
+                                    <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-white/[0.06]">
+                                        <h3 className="text-white font-bold text-sm">Select Product Image</h3>
+                                        <button onClick={() => setProductPickerOpen(false)} className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition cursor-pointer">
+                                            <span className="material-symbols-outlined text-lg">close</span>
+                                        </button>
+                                    </div>
+                                    {/* Tabs */}
+                                    <div className="flex border-b border-white/[0.06]">
+                                        {[
+                                            { id: 'brand', icon: 'domain', label: 'Brand Photos', color: 'text-emerald-400' },
+                                            { id: 'upload', icon: 'upload', label: 'Upload', color: 'text-primary' },
+                                            { id: 'link', icon: 'link', label: 'Paste Link', color: 'text-violet-400' },
+                                        ].map(tab => (
+                                            <button key={tab.id} onClick={() => setProductPickerTab(tab.id)}
+                                                className={`flex-1 py-2.5 text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer ${productPickerTab === tab.id ? `${tab.color} border-b-2 border-current bg-white/[0.03]` : 'text-slate-500 hover:text-slate-300'}`}>
+                                                <span className="material-symbols-outlined text-sm">{tab.icon}</span>
+                                                {tab.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {/* Tab Content */}
+                                    <div className="p-5 max-h-[400px] overflow-y-auto custom-scrollbar">
+                                        {/* Brand Photos */}
+                                        {productPickerTab === 'brand' && (() => {
+                                            const imgSet = new Set()
+                                            const allBrandPhotos = []
+                                            if (activeBrand?.dna?.logo?.url) {
+                                                imgSet.add(activeBrand.dna.logo.url)
+                                                allBrandPhotos.push({ url: activeBrand.dna.logo.url, alt: 'Brand Logo' })
+                                            }
+                                            brandImages.forEach(img => {
+                                                if (img?.url && !imgSet.has(img.url)) {
+                                                    imgSet.add(img.url)
+                                                    allBrandPhotos.push(img)
+                                                }
+                                            })
+                                            ;(activeBrand?.dna?.brandImages || []).forEach(img => {
+                                                if (img?.url && !imgSet.has(img.url)) {
+                                                    imgSet.add(img.url)
+                                                    allBrandPhotos.push(img)
+                                                }
+                                            })
+                                            return allBrandPhotos.length > 0 ? (
+                                                <div className="grid grid-cols-4 gap-3">
+                                                    {allBrandPhotos.map((img, i) => (
+                                                        <button key={`bpm-${i}`}
+                                                            onClick={() => {
+                                                                setProductImage(img.url)
+                                                                setProductFile(null)
+                                                                setProductPickerOpen(false)
+                                                            }}
+                                                            className="aspect-square rounded-xl overflow-hidden border-2 border-transparent hover:border-primary/60 cursor-pointer transition-all hover:scale-[1.03] group relative">
+                                                            <img src={img.url} alt={img.alt || `Brand ${i + 1}`} className="w-full h-full object-cover" />
+                                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                                                <span className="material-symbols-outlined text-white text-lg">check_circle</span>
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="text-center py-10">
+                                                    <span className="material-symbols-outlined text-3xl text-slate-600 mb-2 block">photo_library</span>
+                                                    <p className="text-sm text-slate-500">No brand photos available</p>
+                                                    <p className="text-xs text-slate-600 mt-1">Scan a website during onboarding to auto-fetch brand images</p>
+                                                </div>
+                                            )
+                                        })()}
+                                        {/* Upload */}
+                                        {productPickerTab === 'upload' && (
+                                            <div className="text-center py-6">
+                                                <div onDrop={(e) => {
+                                                    e.preventDefault()
+                                                    const file = e.dataTransfer?.files?.[0]
+                                                    if (file && file.type.startsWith('image/')) {
+                                                        setProductFile(file)
+                                                        const reader = new FileReader()
+                                                        reader.onload = async (ev) => {
+                                                            const s3Url = await uploadToS3(ev.target.result, 'products')
+                                                            setProductImage(s3Url)
+                                                            setProductPickerOpen(false)
+                                                        }
+                                                        reader.readAsDataURL(file)
+                                                    }
+                                                }} onDragOver={e => e.preventDefault()}
+                                                    className="border-2 border-dashed border-white/[0.1] rounded-2xl p-10 hover:border-primary/40 transition-colors mb-4">
+                                                    <span className="material-symbols-outlined text-5xl text-slate-600 mb-3 block">cloud_upload</span>
+                                                    <p className="text-slate-400 text-sm mb-1">Drag & drop your image</p>
+                                                    <p className="text-xs text-slate-600">PNG, JPG, WEBP up to 10MB</p>
+                                                </div>
+                                                <label className="btn-primary py-2.5 px-8 rounded-xl text-sm cursor-pointer inline-block">
+                                                    Choose File
+                                                    <input type="file" className="hidden" onChange={(e) => {
+                                                        const file = e.target.files?.[0]
+                                                        if (file && file.type.startsWith('image/')) {
+                                                            setProductFile(file)
+                                                            const reader = new FileReader()
+                                                            reader.onload = async (ev) => {
+                                                                const s3Url = await uploadToS3(ev.target.result, 'products')
+                                                                setProductImage(s3Url)
+                                                                setProductPickerOpen(false)
+                                                            }
+                                                            reader.readAsDataURL(file)
+                                                        }
+                                                    }} accept="image/*" />
+                                                </label>
+                                            </div>
+                                        )}
+                                        {/* Paste Link */}
+                                        {productPickerTab === 'link' && (
+                                            <div className="space-y-4">
+                                                <p className="text-xs text-slate-500">Paste a direct image URL (PNG, JPG, WEBP)</p>
+                                                <div className="flex gap-2">
+                                                    <input type="text" value={productLinkUrl} onChange={e => setProductLinkUrl(e.target.value)}
+                                                        placeholder="https://example.com/product.jpg"
+                                                        className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-600 outline-none focus:border-primary/40"
+                                                        onKeyDown={e => {
+                                                            if (e.key === 'Enter' && productLinkUrl.trim()) {
+                                                                setProductImage(productLinkUrl.trim())
+                                                                setProductFile(null)
+                                                                setProductPickerOpen(false)
+                                                                setProductLinkUrl('')
+                                                            }
+                                                        }} />
+                                                    <button onClick={() => {
+                                                        if (productLinkUrl.trim()) {
+                                                            setProductImage(productLinkUrl.trim())
+                                                            setProductFile(null)
+                                                            setProductPickerOpen(false)
+                                                            setProductLinkUrl('')
+                                                        }
+                                                    }}
+                                                        disabled={!productLinkUrl.trim()}
+                                                        className="px-5 py-2.5 btn-primary rounded-xl text-sm disabled:opacity-30 cursor-pointer">
+                                                        Use
+                                                    </button>
+                                                </div>
+                                                {productLinkUrl.trim() && (
+                                                    <div className="rounded-xl overflow-hidden border border-white/10 max-h-48">
+                                                        <img src={productLinkUrl.trim()} alt="Preview"
+                                                            className="w-full h-full object-contain bg-black/20"
+                                                            onError={e => { e.target.style.display = 'none' }} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* ── Style & Character References (for Photoshoot) ── */}
                         <div className="glass-panel rounded-2xl p-5">
@@ -2026,108 +2218,271 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <p className="text-xs text-slate-600 mt-2">Upload, pick from library, or use brand images to guide the photoshoot look</p>
                         </div>
 
-                        {/* Scene Keywords */}
-                        <div className="glass-panel rounded-2xl p-5">
-                            <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-4">
-                                <span className="material-symbols-outlined text-primary text-lg">landscape</span>
-                                Scene & Setting
-                            </h3>
-                            <div className="flex flex-wrap gap-2 mb-4">
-                                {[
-                                    { id: 'outdoor', icon: 'park', label: 'Outdoor' },
-                                    { id: 'indoor', icon: 'home', label: 'Indoor' },
-                                    { id: 'studio', icon: 'photo_camera', label: 'Studio' },
-                                    { id: 'podium', icon: 'podium', label: 'Podium' },
-                                    { id: 'flat-lay', icon: 'grid_view', label: 'Flat Lay' },
-                                    { id: 'lifestyle', icon: 'coffee', label: 'Lifestyle' },
-                                    { id: 'model', icon: 'person', label: 'With Model' },
-                                    { id: 'minimal', icon: 'format_shapes', label: 'Minimal' },
-                                    { id: 'neon', icon: 'light', label: 'Neon Glow' },
-                                    { id: 'nature', icon: 'eco', label: 'Nature' },
-                                    { id: 'marble', icon: 'counter_1', label: 'Marble' },
-                                    { id: 'wooden', icon: 'deck', label: 'Wooden' },
-                                    { id: 'festive', icon: 'celebration', label: 'Festive' },
-                                    { id: 'luxury', icon: 'diamond', label: 'Luxury' },
-                                ].map(kw => {
-                                    const active = sceneKeywords.includes(kw.id)
-                                    return (
-                                        <button key={kw.id} onClick={() => setSceneKeywords(prev =>
-                                            active ? prev.filter(k => k !== kw.id) : [...prev, kw.id]
-                                        )}
-                                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${active ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white/[0.04] text-slate-400 hover:bg-white/[0.06] border border-white/[0.06]'
-                                                }`}>
-                                            <span className="material-symbols-outlined text-sm">{kw.icon}</span>
-                                            {kw.label}
-                                        </button>
-                                    )
-                                })}
-                            </div>
-                        </div>
+                        {/* ═══════════════ PHOTO STUDIO PRO ═══════════════ */}
 
-                        {/* Product Fidelity Control */}
-                        <div className="glass-panel rounded-2xl p-5">
-                            <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-1">
-                                <span className="material-symbols-outlined text-primary text-lg">tune</span>
-                                Product Fidelity
-                            </h3>
-                            <p className="text-sm text-slate-500 mb-4">How closely should the output match your original product?</p>
-
-                            <div className="relative">
-                                <input
-                                    type="range"
-                                    min={0} max={100} step={5}
-                                    value={fidelity}
-                                    onChange={e => setFidelity(Number(e.target.value))}
-                                    className="w-full h-2 rounded-full appearance-none cursor-pointer"
-                                    style={{
-                                        background: `linear-gradient(to right, #f59e0b ${fidelity}%, rgba(255,255,255,0.06) ${fidelity}%)`,
-                                    }}
-                                />
-                                <div className="flex justify-between mt-2">
+                        {/* ── Aspect Ratio ── */}
+                        <div className="glass-panel rounded-2xl p-3">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[9px] text-slate-500 uppercase tracking-widest font-bold whitespace-nowrap">Ratio</span>
+                                <div className="flex gap-1.5 flex-1 justify-center">
                                     {[
-                                        { val: 0, label: 'Max Creative', icon: '🎨' },
-                                        { val: 25, label: 'Creative', icon: '✨' },
-                                        { val: 50, label: 'Balanced', icon: '⚖️' },
-                                        { val: 75, label: 'Faithful', icon: '🎯' },
-                                        { val: 100, label: 'Exact Copy', icon: '🔒' },
-                                    ].map(p => (
-                                        <button key={p.val} onClick={() => setFidelity(p.val)}
-                                            className={`text-center cursor-pointer transition-all ${Math.abs(fidelity - p.val) < 13 ? 'text-amber-400 scale-110' : 'text-slate-600 hover:text-slate-400'}`}>
-                                            <span className="text-xs block">{p.icon}</span>
-                                            <span className="text-xs block">{p.label}</span>
+                                        { id: '1:1', w: 16, h: 16, label: '1:1' },
+                                        { id: '4:5', w: 13, h: 16, label: '4:5' },
+                                        { id: '3:4', w: 12, h: 16, label: '3:4' },
+                                        { id: '9:16', w: 9, h: 16, label: '9:16' },
+                                        { id: '16:9', w: 16, h: 9, label: '16:9' },
+                                        { id: '3:2', w: 16, h: 11, label: '3:2' },
+                                    ].map(r => (
+                                        <button key={r.id} onClick={() => setAspectRatio(r.id)}
+                                            className={`flex flex-col items-center gap-1 px-2 py-1.5 rounded-lg transition-all cursor-pointer border ${aspectRatio === r.id
+                                                ? 'bg-primary/20 border-primary/50 text-primary'
+                                                : 'bg-transparent border-transparent text-slate-500 hover:text-slate-300'}`}>
+                                            <div className={`rounded-[2px] transition-all ${aspectRatio === r.id ? 'bg-primary' : 'bg-slate-600'}`}
+                                                style={{ width: r.w, height: r.h }} />
+                                            <span className="text-[8px] font-bold">{r.label}</span>
                                         </button>
                                     ))}
                                 </div>
                             </div>
-
-                            <div className="mt-3 p-2 rounded-lg bg-white/[0.03] text-sm text-slate-500">
-                                {fidelity >= 75 ? '🔒 Product will be preserved closely — only background changes' :
-                                    fidelity >= 50 ? '⚖️ Balanced — product preserved with some artistic styling' :
-                                        fidelity >= 25 ? '✨ Creative — product may get minor artistic enhancements' :
-                                            '🎨 Max creative freedom — product may be significantly reimagined'}
-                            </div>
                         </div>
 
-                        {/* Additional Brief */}
-                        <div className="glass-panel rounded-2xl p-5">
-                            <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
-                                <span className="material-symbols-outlined text-primary text-lg">description</span>
-                                Additional Brief
-                            </h3>
-                            <div className="relative">
-                                <textarea
-                                    value={photoshootBrief}
-                                    onChange={e => setPhotoshootBrief(e.target.value)}
-                                    placeholder="e.g., Warm golden hour lighting, bokeh background, premium feel, close-up angle..."
-                                    className="input-glass w-full py-3 pr-12 resize-none"
-                                    rows={3}
-                                />
-                                <div className="absolute right-2 top-2">
-                                    <VoiceInput
-                                        onResult={(text) => setPhotoshootBrief(prev => prev ? prev + ' ' + text : text)}
-                                        size="small"
-                                    />
+                        {/* ── Tab Navigation ── */}
+                        <div className="flex rounded-xl overflow-hidden border border-white/[0.06] bg-white/[0.02]">
+                            {[
+                                { id: 'shot', icon: 'photo_camera', label: 'Shot' },
+                                { id: 'light', icon: 'light_mode', label: 'Light' },
+                                { id: 'scene', icon: 'view_in_ar', label: 'Scene' },
+                                { id: 'style', icon: 'palette', label: 'Style' },
+                            ].map(t => (
+                                <button key={t.id} onClick={() => setPsTab(t.id)}
+                                    className={`flex-1 flex items-center justify-center gap-1 py-2.5 text-[11px] font-bold transition-all cursor-pointer ${psTab === t.id
+                                        ? 'bg-white/[0.08] text-white border-b-2 border-primary'
+                                        : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'}`}>
+                                    <span className="material-symbols-outlined text-sm">{t.icon}</span>
+                                    {t.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* ── Tab Content ── */}
+                        <div className="glass-panel rounded-2xl p-4 min-h-[180px]">
+
+                            {/* 📐 SHOT TAB */}
+                            {psTab === 'shot' && (
+                                <div className="space-y-4">
+                                    <div>
+                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-2">Camera Angle</p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {[
+                                                { id: 'eye-level', label: '👁️ Eye Level' },
+                                                { id: 'hero', label: '⬆ Low Angle' },
+                                                { id: '45deg', label: '📐 3/4 View' },
+                                                { id: 'overhead', label: '⬇ Overhead' },
+                                                { id: 'macro', label: '🔍 Macro' },
+                                                { id: 'dutch', label: '↗ Dutch Tilt' },
+                                                { id: 'tilt-down', label: '↘ Tilt Down' },
+                                                { id: 'worms-eye', label: '🐛 Worm\'s Eye' },
+                                                { id: 'birds-eye', label: '🦅 Bird\'s Eye' },
+                                                { id: 'profile', label: '👤 Profile' },
+                                            ].map(a => (
+                                                <button key={a.id} onClick={() => setCameraAngle(a.id)}
+                                                    className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border ${cameraAngle === a.id
+                                                        ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                                                        : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'
+                                                    }`}>{a.label}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-2">Lens</p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {[
+                                                { id: 'fisheye', label: '🐟 Fish Eye' },
+                                                { id: 'ultra-wide', label: '🌐 14mm' },
+                                                { id: '24mm', label: '📸 24mm' },
+                                                { id: '35mm', label: '🎞️ 35mm' },
+                                                { id: '50mm', label: '⭐ 50mm' },
+                                                { id: '85mm', label: '🌸 85mm' },
+                                                { id: '105mm', label: '🔬 105mm' },
+                                                { id: '200mm', label: '🔭 200mm' },
+                                                { id: 'tilt-shift', label: '🏙️ Tilt-Shift' },
+                                            ].map(l => (
+                                                <button key={l.id} onClick={() => setLens(l.id)}
+                                                    className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border ${lens === l.id
+                                                        ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
+                                                        : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'
+                                                    }`}>{l.label}</button>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
+                            )}
+
+                            {/* 💡 LIGHT TAB */}
+                            {psTab === 'light' && (
+                                <div className="space-y-4">
+                                    <div>
+                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-2">Style</p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {[
+                                                { id: 'softbox', label: '☁️ Softbox' },
+                                                { id: 'natural', label: '🪟 Window' },
+                                                { id: 'golden', label: '🌅 Golden Hour' },
+                                                { id: 'dramatic', label: '🎭 Dramatic' },
+                                                { id: 'neon', label: '💜 Neon' },
+                                                { id: 'rim', label: '✨ Rim' },
+                                                { id: 'highkey', label: '⬜ High Key' },
+                                            ].map(l => (
+                                                <button key={l.id} onClick={() => setLightingStyle(l.id)}
+                                                    className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border ${lightingStyle === l.id
+                                                        ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-300'
+                                                        : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'
+                                                    }`}>{l.label}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-2">Direction</p>
+                                        <div className="inline-grid grid-cols-3 gap-1 p-1 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                                            {[
+                                                { id: 'front-left', label: '↖', pos: '0' },
+                                                { id: 'front', label: '⬆', pos: '1' },
+                                                { id: 'front-right', label: '↗', pos: '2' },
+                                                { id: 'left', label: '←', pos: '3' },
+                                                { id: 'top', label: '●', pos: '4' },
+                                                { id: 'right', label: '→', pos: '5' },
+                                                { id: 'back', label: '', pos: '6' },
+                                                { id: '_label', label: '⬇', pos: '7', isBack: true },
+                                                { id: '_empty', label: '', pos: '8' },
+                                            ].filter(d => d.id !== '_empty' && d.id !== '_label').map(d => (
+                                                <button key={d.id} onClick={() => d.id !== '_empty' && setLightDirection(d.id === '_label' ? 'back' : d.id)}
+                                                    className={`w-9 h-9 rounded-lg text-sm flex items-center justify-center transition-all cursor-pointer ${
+                                                        lightDirection === d.id || (d.isBack && lightDirection === 'back')
+                                                            ? 'bg-yellow-500/25 text-yellow-300 shadow-md shadow-yellow-500/10'
+                                                            : d.id === 'top' ? 'bg-white/[0.04] text-slate-400' : 'text-slate-500 hover:bg-white/[0.05]'
+                                                    }`}>{d.label}</button>
+                                            ))}
+                                        </div>
+                                        <p className="text-[8px] text-slate-600 mt-1.5">
+                                            Light from: {{'front-left':'Front Left','front':'Front','front-right':'Front Right','left':'Left Side','right':'Right Side','top':'Top Down','back':'Backlit'}[lightDirection]}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 🎬 SCENE TAB */}
+                            {psTab === 'scene' && (
+                                <div className="space-y-4">
+                                    <div>
+                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-2">Surface & Placement</p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {[
+                                                { id: 'white', label: '⬜ White' },
+                                                { id: 'marble', label: '🤍 Marble' },
+                                                { id: 'stone', label: '🪨 Stone' },
+                                                { id: 'wood', label: '🪵 Wood' },
+                                                { id: 'concrete', label: '🏗️ Concrete' },
+                                                { id: 'fabric', label: '🧶 Silk' },
+                                                { id: 'podium', label: '🏛️ Podium' },
+                                                { id: 'glass', label: '🪞 Glass' },
+                                                { id: 'sand', label: '🏖️ Sand' },
+                                                { id: 'foliage', label: '🌿 Foliage' },
+                                            ].map(s => (
+                                                <button key={s.id} onClick={() => setSurface(s.id)}
+                                                    className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border ${surface === s.id
+                                                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                                                        : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'
+                                                    }`}>{s.label}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-2">Model</p>
+                                        <div className="flex gap-2">
+                                            {[
+                                                { id: 'none', label: '🚫 None' },
+                                                { id: 'hands', label: '🤲 Hands' },
+                                                { id: 'model-woman', label: '👩 Woman' },
+                                                { id: 'model-man', label: '👨 Man' },
+                                            ].map(m => (
+                                                <button key={m.id} onClick={() => setModelPresence(m.id)}
+                                                    className={`flex-1 py-2 rounded-xl text-[10px] font-medium text-center transition-all cursor-pointer border ${modelPresence === m.id
+                                                        ? 'bg-violet-500/20 border-violet-500/50 text-violet-300'
+                                                        : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'
+                                                    }`}>{m.label}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 🎨 STYLE TAB */}
+                            {psTab === 'style' && (
+                                <div className="space-y-4">
+                                    <div>
+                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-2">Mood <span className="text-slate-600 normal-case">(multi-select)</span></p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {[
+                                                { id: 'editorial', label: '📰 Editorial' },
+                                                { id: 'commercial', label: '🛍️ Commercial' },
+                                                { id: 'lifestyle', label: '☕ Lifestyle' },
+                                                { id: 'luxury', label: '💎 Luxury' },
+                                                { id: 'minimal', label: '◻️ Minimal' },
+                                                { id: 'moody', label: '🌑 Moody' },
+                                                { id: 'vibrant', label: '🌈 Vibrant' },
+                                                { id: 'vintage', label: '📷 Vintage' },
+                                            ].map(m => {
+                                                const active = mood.includes(m.id)
+                                                return (
+                                                    <button key={m.id} onClick={() => setMood(prev => active ? prev.filter(x => x !== m.id) : [...prev, m.id])}
+                                                        className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer border ${active
+                                                            ? 'bg-pink-500/20 border-pink-500/50 text-pink-300'
+                                                            : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.06]'
+                                                        }`}>{m.label}</button>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-2">Fidelity — <span className="text-amber-400">{fidelity}%</span></p>
+                                        <input type="range" min={0} max={100} step={5} value={fidelity}
+                                            onChange={e => setFidelity(Number(e.target.value))}
+                                            className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                                            style={{ background: `linear-gradient(to right, #f59e0b ${fidelity}%, rgba(255,255,255,0.06) ${fidelity}%)` }}
+                                        />
+                                        <div className="flex justify-between mt-1">
+                                            <span className="text-[8px] text-slate-600">🎨 Creative</span>
+                                            <span className="text-[8px] text-slate-600">🔒 Exact</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ── Director's Brief ── always visible */}
+                        <div className="rounded-xl p-2.5 bg-gradient-to-r from-amber-500/[0.04] to-transparent border border-amber-500/10">
+                            <p className="text-[10px] text-slate-400/80 leading-relaxed">
+                                <span className="text-amber-400/60 font-bold">📋</span>{' '}
+                                {(() => {
+                                    const a = {'eye-level':'Eye-level','hero':'Low-angle','45deg':'3/4','overhead':'Overhead','macro':'Macro','dutch':'Dutch tilt','tilt-down':'Tilt-down','worms-eye':"Worm's eye",'birds-eye':"Bird's eye",'profile':'Profile'}
+                                    const l = {'fisheye':'8mm fish-eye','ultra-wide':'14mm','24mm':'24mm','35mm':'35mm','50mm':'50mm','85mm':'85mm','105mm':'105mm','200mm':'200mm','tilt-shift':'tilt-shift'}
+                                    const lt = {'softbox':'softbox','natural':'window','golden':'golden hour','dramatic':'dramatic','neon':'neon','rim':'rim','highkey':'high-key'}
+                                    const s = {'white':'white bg','marble':'marble','stone':'stone','wood':'wood','concrete':'concrete','fabric':'silk','podium':'podium','glass':'glass','sand':'sand','foliage':'foliage'}
+                                    const md = {'none':'','hands':' · hands','model-woman':' · woman model','model-man':' · man model'}
+                                    return `${a[cameraAngle]||cameraAngle} · ${l[lens]||lens} · ${lt[lightingStyle]||lightingStyle} · ${s[surface]||surface}${md[modelPresence]||''} · ${mood.map(m=>m[0].toUpperCase()+m.slice(1)).join('+')} · ${aspectRatio}`
+                                })()}
+                            </p>
+                        </div>
+
+                        {/* ── Extra Notes ── */}
+                        <div className="relative">
+                            <textarea value={photoshootBrief}
+                                onChange={e => setPhotoshootBrief(e.target.value)}
+                                placeholder="Extra details: water droplets, steam, brand packaging, props..."
+                                className="input-glass w-full py-2.5 px-3 pr-10 resize-none text-[11px] rounded-xl" rows={2}
+                            />
+                            <div className="absolute right-1.5 top-1.5">
+                                <VoiceInput onResult={(text) => setPhotoshootBrief(prev => prev ? prev + ' ' + text : text)} size="small" />
                             </div>
                         </div>
 
@@ -2142,18 +2497,25 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     setPhotoshootSaved(false)
                                     try {
                                         const brandColors = activeBrand?.dna?.colors?.map(c => c.hex).join(', ') || ''
-                                        const scene = sceneKeywords.map(k =>
-                                            k.charAt(0).toUpperCase() + k.slice(1).replace('-', ' ')
-                                        ).join(', ') || 'Professional studio'
 
                                         const data = await agentsAPI.aiPhotoshoot({
                                             image: productImage,
-                                            scene,
-                                            keywords: sceneKeywords,
                                             brief: photoshootBrief,
                                             brandName: activeBrand?.name,
                                             brandColors,
                                             fidelity,
+                                            aspectRatio,
+                                            // Reference images
+                                            styleRef: referenceImages.style || null,
+                                            characterRef: referenceImages.character || null,
+                                            // Professional Photography Controls
+                                            cameraAngle,
+                                            lens,
+                                            lightingStyle,
+                                            lightDirection,
+                                            surface,
+                                            modelPresence,
+                                            mood,
                                         })
 
                                         if (data.success) {
@@ -2766,7 +3128,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                         const file = e.target.files?.[0]
                                                         if (file) {
                                                             const reader = new FileReader()
-                                                            reader.onload = ev => handleAnalyzeForTemplate(ev.target.result)
+                                                            reader.onload = async ev => {
+                                                                const s3Url = await uploadToS3(ev.target.result, 'templates')
+                                                                handleAnalyzeForTemplate(s3Url)
+                                                            }
                                                             reader.readAsDataURL(file)
                                                         }
                                                     }} />
@@ -2959,7 +3324,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                 const file = e.target.files?.[0]
                                                                 if (file) {
                                                                     const reader = new FileReader()
-                                                                    reader.onload = ev => handleAnalyzeForCategory(ev.target.result)
+                                                                    reader.onload = async ev => {
+                                                                        const s3Url = await uploadToS3(ev.target.result, 'categories')
+                                                                        handleAnalyzeForCategory(s3Url)
+                                                                    }
                                                                     reader.readAsDataURL(file)
                                                                 }
                                                             }} />
@@ -3165,7 +3533,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                             const file = e.target.files?.[0]
                                                                             if (file) {
                                                                                 const reader = new FileReader()
-                                                                                reader.onload = ev => setTemplateFields(prev => ({ ...prev, [field.key]: ev.target.result }))
+                                                                                reader.onload = async ev => {
+                                                                                    const s3Url = await uploadToS3(ev.target.result, 'template-fields')
+                                                                                    setTemplateFields(prev => ({ ...prev, [field.key]: s3Url }))
+                                                                                }
                                                                                 reader.readAsDataURL(file)
                                                                             }
                                                                         }} />
@@ -3281,7 +3652,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     const file = e.target.files?.[0]
                                                     if (file) {
                                                         const reader = new FileReader()
-                                                        reader.onload = ev => handleReversePrompt(ev.target.result, activeTemplate.id)
+                                                        reader.onload = async ev => {
+                                                            const s3Url = await uploadToS3(ev.target.result, 'reverse-prompt')
+                                                            handleReversePrompt(s3Url, activeTemplate.id)
+                                                        }
                                                         reader.readAsDataURL(file)
                                                     }
                                                 }} />
@@ -4018,11 +4392,12 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         const file = e.target.files?.[0]
                                         if (file) {
                                             const reader = new FileReader()
-                                            reader.onload = ev => {
+                                            reader.onload = async ev => {
+                                                const s3Url = await uploadToS3(ev.target.result, 'refs')
                                                 if (refPickerSlot?.startsWith('character-')) {
-                                                    setCharacters(prev => [...prev, { name: `Character ${prev.length + 1}`, image: ev.target.result }])
+                                                    setCharacters(prev => [...prev, { name: `Character ${prev.length + 1}`, image: s3Url }])
                                                 } else {
-                                                    setReferenceImages(prev => ({ ...prev, [refPickerSlot]: ev.target.result }))
+                                                    setReferenceImages(prev => ({ ...prev, [refPickerSlot]: s3Url }))
                                                 }
                                                 setRefPickerSlot(null)
                                             }
@@ -4062,11 +4437,12 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             const file = e.target.files?.[0]
                                             if (file) {
                                                 const reader = new FileReader()
-                                                reader.onload = ev => {
+                                                reader.onload = async ev => {
+                                                    const s3Url = await uploadToS3(ev.target.result, 'refs')
                                                     if (refPickerSlot?.startsWith('character-')) {
-                                                        setCharacters(prev => [...prev, { name: `Character ${prev.length + 1}`, image: ev.target.result }])
+                                                        setCharacters(prev => [...prev, { name: `Character ${prev.length + 1}`, image: s3Url }])
                                                     } else {
-                                                        setReferenceImages(prev => ({ ...prev, [refPickerSlot]: ev.target.result }))
+                                                        setReferenceImages(prev => ({ ...prev, [refPickerSlot]: s3Url }))
                                                     }
                                                     setRefPickerSlot(null)
                                                 }
