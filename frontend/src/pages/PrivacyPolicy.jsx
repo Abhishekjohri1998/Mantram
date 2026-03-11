@@ -1,8 +1,33 @@
 import { Link } from 'react-router-dom'
+import SEOHead from '../components/SEOHead'
 
 export default function PrivacyPolicy() {
     return (
         <div className="min-h-screen bg-slate-950 text-slate-300 py-12 px-4 sm:px-6 lg:px-8">
+            <SEOHead
+                title="Privacy Policy — Mantram AI"
+                description="Mantram AI privacy policy: how we collect, use & protect your data across 12 AI marketing studios. Covers social media integrations, Google Analytics, Shopify, AI model routing & GDPR compliance."
+                canonical="/privacy-policy"
+                ogTitle="Privacy Policy — Mantram AI"
+                ogDescription="Learn how Mantram AI collects, uses, and protects your data across our AI-powered marketing platform."
+                ogImage="https://mantram.ai/mantram-logo.png"
+                aiSummary="Mantram AI Privacy Policy covering data collection, social media integrations (Meta, Instagram, YouTube), Google Analytics & Search Console data usage, Shopify integration, AI model provider data sharing (Gemini, Claude, Grok), cookies, user rights, data deletion, and GDPR compliance."
+                jsonLd={{
+                    "@context": "https://schema.org",
+                    "@type": "WebPage",
+                    "name": "Privacy Policy — Mantram AI",
+                    "description": "Privacy Policy for Mantram AI — AI-Powered Marketing Operating System",
+                    "url": "https://mantram.ai/privacy-policy",
+                    "isPartOf": { "@type": "WebSite", "name": "Mantram AI", "url": "https://mantram.ai/" },
+                    "breadcrumb": {
+                        "@type": "BreadcrumbList",
+                        "itemListElement": [
+                            { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://mantram.ai/" },
+                            { "@type": "ListItem", "position": 2, "name": "Privacy Policy", "item": "https://mantram.ai/privacy-policy" }
+                        ]
+                    }
+                }}
+            />
             <div className="max-w-3xl mx-auto">
                 <div className="text-center mb-12">
                     <h1 className="text-4xl font-extrabold text-white mb-4">Privacy <span className="text-primary">Policy</span></h1>

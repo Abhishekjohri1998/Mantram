@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
+import SEOHead from '../components/SEOHead'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { useBrand } from '../context/BrandContext'
@@ -179,6 +180,7 @@ export default function SmartCalendar() {
 
     return (
         <DashboardLayout title="Smart Calendar" subtitle="AI-powered content scheduling & planning">
+            <SEOHead title="Smart Calendar — Mantram AI" noIndex={true} />
             <div className="p-8 max-w-[1400px] mx-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
@@ -370,8 +372,8 @@ export default function SmartCalendar() {
                                                 return (
                                                     <div key={post._id}
                                                         className={`group rounded-xl border transition-all duration-200 overflow-hidden ${isExpanded
-                                                                ? 'bg-violet-500/[0.08] border-violet-500/30 shadow-lg shadow-violet-500/5'
-                                                                : `border-white/[0.06] hover:border-violet-500/20 ${post.status === 'published' ? 'bg-cyan-500/[0.04]' : 'bg-white/[0.02]'}`
+                                                            ? 'bg-violet-500/[0.08] border-violet-500/30 shadow-lg shadow-violet-500/5'
+                                                            : `border-white/[0.06] hover:border-violet-500/20 ${post.status === 'published' ? 'bg-cyan-500/[0.04]' : 'bg-white/[0.02]'}`
                                                             }`}>
                                                         {/* Summary row */}
                                                         <button className="w-full p-3 text-left cursor-pointer" onClick={() => setPreviewPost(isExpanded ? null : post)}>

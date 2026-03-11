@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
+import SEOHead from '../components/SEOHead'
 import { superadmin as API } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 
@@ -135,6 +136,7 @@ export default function SuperAdminDashboard() {
 
     return (
         <DashboardLayout>
+            <SEOHead title="Super Admin — Mantram AI" noIndex={true} />
             <div className="p-8 max-w-[1400px] mx-auto">
                 {toast && <div className={`fixed top-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-bold shadow-xl ${toast.type === 'error' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}`}>{toast.msg}</div>}
 

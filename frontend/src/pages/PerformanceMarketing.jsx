@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import SEOHead from '../components/SEOHead'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
@@ -289,6 +290,7 @@ export default function PerformanceMarketing() {
 
     return (
         <DashboardLayout title="Performance Studio" subtitle="AI-powered ad research, strategy & management">
+            <SEOHead title="Performance Studio — Mantram AI" noIndex={true} />
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* ── Error display ── */}
                 {error && (

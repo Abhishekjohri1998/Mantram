@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
+import SEOHead from '../components/SEOHead'
 import { useBrand } from '../context/BrandContext'
 import { content as contentAPI, social } from '../services/api'
 import PublishModal from '../components/PublishModal'
@@ -109,6 +110,7 @@ export default function PublishSchedule() {
 
     return (
         <DashboardLayout title="Publish & Schedule" subtitle="Track, schedule & manage your social posts">
+            <SEOHead title="Publish & Schedule — Mantram AI" noIndex={true} />
             <div className="p-6 lg:p-8 max-w-6xl mx-auto">
 
                 {/* ═══ Hero Stats ═══ */}

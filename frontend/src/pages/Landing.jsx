@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import SEOHead from '../components/SEOHead'
 
 /* ────────────────────────────────────────────── */
 /*  MANTRAM AI — PREMIUM LANDING PAGE            */
@@ -504,6 +505,17 @@ export default function Landing() {
 
     return (
         <div className="relative min-h-screen w-full flex flex-col overflow-x-hidden" style={{ background: '#07070f' }}>
+            <SEOHead
+                title="Mantram AI — AI-Powered Marketing Operating System | 12 Studios, One Platform"
+                description="Mantram AI is an AI-powered marketing operating system with 12 specialized studios — Content, Creative, Video, Performance Ads, SEO, D2C, Conversations, Brainstorm, Calendar, Analytics, Skills Hub & Fidato AI Assistant. Generate brand-aligned content, creatives & videos at scale."
+                canonical="/"
+                ogTitle="Mantram AI — AI-Powered Marketing Operating System | 12 Studios"
+                ogDescription="12 AI studios. One platform. From brand DNA extraction to content creation, video production, ad optimization, SEO intelligence & e-commerce analytics — Mantram AI is your full-stack marketing OS."
+                ogImage="https://mantram.ai/mantram-logo.png"
+                twitterTitle="Mantram AI — 12 AI Studios for Marketing"
+                twitterDescription="AI content, design, video, ads, SEO, D2C intelligence, skills & AI assistant — 12 studios, all brand-aligned, one platform."
+                aiSummary="Mantram AI is a full-stack AI marketing platform with 12 studios: Content Studio (AI copywriting), Creative Studio (AI design & photoshoots), Video Studio (Seedance/Kling/Veo2), Performance Studio (Meta/Google ad strategy), SEO Studio (keyword research & audits), D2C Studio (Shopify intelligence), Conversation Studio (AI DM auto-responder), Brainstorm Studio (brand strategy & ideation), Smart Calendar (festival & trend-based planning), Analytics (traffic intelligence), Skills Hub (custom AI workflows), and Fidato (AI assistant/orchestrator). Built for Indian D2C brands, agencies, and marketers."
+            />
             {/* Ambient background */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
                 <div className="absolute -top-[30%] -left-[15%] w-[70%] h-[70%] bg-violet-600/[0.07] rounded-full blur-[150px]" />

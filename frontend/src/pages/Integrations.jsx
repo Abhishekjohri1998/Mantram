@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
+import SEOHead from '../components/SEOHead'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import { useShopify } from '../context/ShopifyContext'
@@ -214,6 +215,7 @@ export default function Integrations() {
 
     return (
         <DashboardLayout title="Integrations" subtitle="Connect your platforms & tools">
+            <SEOHead title="Integrations — Mantram AI" noIndex={true} />
             {/* Brand Indicator */}
             {activeBrand && (
                 <div className="flex items-center gap-2 mb-5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary/5 to-transparent border border-primary/10">

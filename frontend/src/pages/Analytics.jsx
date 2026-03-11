@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import SEOHead from '../components/SEOHead'
 import DashboardLayout from '../components/DashboardLayout'
 import { useBrand } from '../context/BrandContext'
 import { useAuth } from '../context/AuthContext'
@@ -101,6 +102,7 @@ export default function Analytics() {
 
     return (
         <DashboardLayout title="Analytics" subtitle="Platform-wide performance insights">
+            <SEOHead title="Analytics — Mantram AI" noIndex={true} />
             <style>{`
                 @keyframes radar-sweep { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
                 @keyframes blip-ping { 0%,100% { opacity:0.4; transform: scale(0.8) } 50% { opacity:1; transform: scale(1.3) } }

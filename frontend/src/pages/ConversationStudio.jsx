@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import SEOHead from '../components/SEOHead'
 import { useNavigate, useLocation } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { useBrand } from '../context/BrandContext'
@@ -146,6 +147,7 @@ export default function ConversationStudio() {
 
     return (
         <DashboardLayout title="Conversation Studio" subtitle="AI-powered inbox for Instagram & Facebook">
+            <SEOHead title="Conversation Studio — Mantram AI" noIndex={true} />
             {/* Sub-Navigation */}
             <div className="flex items-center gap-1 mb-6 p-1 glass-panel rounded-xl w-fit">
                 <button className="px-5 py-2 rounded-lg text-sm font-bold bg-primary/10 text-primary flex items-center gap-2 cursor-pointer">

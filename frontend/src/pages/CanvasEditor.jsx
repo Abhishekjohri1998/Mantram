@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, Component } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useBrand } from '../context/BrandContext'
+import SEOHead from '../components/SEOHead'
 import * as fabric from 'fabric'
 import './CanvasEditor.css'
 
@@ -43,7 +44,7 @@ class CanvasErrorBoundary extends Component {
 
 // Wrap the main component with ErrorBoundary
 export default function CanvasEditorWrapper() {
-    return <CanvasErrorBoundary><CanvasEditorInner /></CanvasErrorBoundary>
+    return <CanvasErrorBoundary><SEOHead title="Canvas Editor — Mantram AI" noIndex={true} /><CanvasEditorInner /></CanvasErrorBoundary>
 }
 
 // ── Platform Size Presets ──

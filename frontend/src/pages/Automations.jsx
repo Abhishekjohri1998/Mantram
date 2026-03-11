@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
+import SEOHead from '../components/SEOHead'
 import { useBrand } from '../context/BrandContext'
 import { automations as automationsAPI } from '../services/api'
 
@@ -556,6 +557,7 @@ export default function Automations() {
     // ── List View ──
     return (
         <DashboardLayout title="Conversation Studio" subtitle="Build and manage conversation flows">
+            <SEOHead title="Automations — Mantram AI" noIndex={true} />
             {/* Sub-Navigation */}
             <div className="flex items-center gap-1 mb-6 p-1 glass-panel rounded-xl w-fit">
                 <button onClick={() => navigate('/conversations')}

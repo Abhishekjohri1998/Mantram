@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import SEOHead from '../components/SEOHead'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { content as contentAPI, agents as agentsAPI, creatives as creativesAPI, products as productsAPI } from '../services/api'
@@ -3053,6 +3054,7 @@ SPOKESPERSON QUOTES:`
 
     return (
         <DashboardLayout title="Content Studio" subtitle="AI-powered content for every channel">
+            <SEOHead title="Content Studio — Mantram AI" noIndex={true} />
             {/* Progress Stepper (shown at steps 1-4) */}
             {step > 0 && step < 5 && (
                 <div className="flex items-center gap-2 mb-8 max-w-3xl mx-auto">

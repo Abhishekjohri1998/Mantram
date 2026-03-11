@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import SEOHead from '../components/SEOHead'
 import { useBrand } from '../context/BrandContext'
 import DashboardLayout from '../components/DashboardLayout'
 import { skills as skillsAPI } from '../services/api'
@@ -319,6 +320,7 @@ export default function SkillsHub() {
     // ── RENDER ──
     return (
         <DashboardLayout title="Skills Hub" subtitle="Reusable AI Marketing Skills">
+            <SEOHead title="Skills Hub — Mantram AI" noIndex={true} />
             <div className="max-w-7xl mx-auto">
 
                 {/* Error */}

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import SEOHead from '../components/SEOHead'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
 import { useBrand } from '../context/BrandContext'
 import { useNavigate } from 'react-router-dom'
@@ -234,6 +235,7 @@ export default function SeoStudio() {
     // ── RENDER ────────────────────────────────────────────────────────────
     return (
         <DashboardLayout title="SEO Studio" subtitle="AI-Powered SEO Intelligence">
+            <SEOHead title="SEO Studio — Mantram AI" noIndex={true} />
             <div className="max-w-7xl mx-auto">
 
                 {/* ═══ ASK BAR (always visible) ═══ */}

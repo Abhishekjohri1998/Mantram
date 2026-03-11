@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { auth as authAPI } from '../services/api.js'
+import SEOHead from '../components/SEOHead'
 
 const PLAN_LABELS = {
     starter: 'Starter — Free',
@@ -140,6 +141,12 @@ export default function Auth() {
 
     return (
         <div className="min-h-screen flex items-center justify-center relative" style={{ background: '#0a0c16' }}>
+            <SEOHead
+                title={isLogin ? 'Sign In — Mantram AI' : 'Create Account — Mantram AI'}
+                description="Sign in or create your Mantram AI account to access 12 AI-powered marketing studios — Content, Creative, Video, Ads, SEO, D2C, Conversations, Brainstorm & more."
+                canonical="/auth"
+                noIndex={true}
+            />
             {/* Background */}
             <div className="fixed inset-0 pointer-events-none z-0">
                 <div className="absolute top-[-20%] left-[20%] w-[40%] h-[40%] bg-primary/15 blur-[150px] rounded-full" />

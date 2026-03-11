@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import SEOHead from '../components/SEOHead'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
@@ -485,6 +486,7 @@ export default function BrainstormStudio() {
 
     return (
         <DashboardLayout title="Brainstorm Studio" subtitle="Your agentic strategy partner">
+            <SEOHead title="Brainstorm Studio — Mantram AI" noIndex={true} />
             {/* Progress indicator */}
             {step > 0 && (
                 <div className="flex items-center gap-2 mb-6">

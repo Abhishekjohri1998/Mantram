@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import SEOHead from '../components/SEOHead'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import DashboardLayout from '../components/DashboardLayout'
@@ -367,6 +368,7 @@ export default function VideoStudio() {
     // ══════════════════════════════════════════════════════════════════════════
     return (
         <DashboardLayout title="Video Studio" subtitle="AI-powered video generation & editing">
+            <SEOHead title="Video Studio — Mantram AI" noIndex={true} />
             <div className="max-w-6xl mx-auto">
                 {/* ── Header Actions ── */}
                 <div className="flex items-center justify-end mb-6">

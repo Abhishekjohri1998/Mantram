@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import SEOHead from '../components/SEOHead'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { useAuth } from '../context/AuthContext'
@@ -213,6 +214,7 @@ export default function UserDashboard() {
 
     return (
         <DashboardLayout title="Dashboard" subtitle="Your AI command center">
+            <SEOHead title="Dashboard — Mantram AI" noIndex={true} />
             {/* ═══════ CSS Animations ═══════ */}
             <style>{`
                 @keyframes gradient-shift { 0%,100% { background-position: 0% 50% } 50% { background-position: 100% 50% } }

@@ -1,8 +1,33 @@
 import { Link } from 'react-router-dom'
+import SEOHead from '../components/SEOHead'
 
 export default function TermsOfService() {
     return (
         <div className="min-h-screen bg-slate-950 text-slate-300 py-12 px-4 sm:px-6 lg:px-8">
+            <SEOHead
+                title="Terms of Service — Mantram AI"
+                description="Mantram AI terms of service: AI content ownership, subscriptions & credits, social publishing rules, third-party integrations, intellectual property & acceptable use policy."
+                canonical="/terms"
+                ogTitle="Terms of Service — Mantram AI"
+                ogDescription="Terms governing your use of the Mantram AI platform — 12 AI-powered marketing studios, subscriptions, content ownership & integrations."
+                ogImage="https://mantram.ai/mantram-logo.png"
+                aiSummary="Mantram AI Terms of Service covering account responsibilities, subscription tiers (Free, Professional, Enterprise), AI credit system, AI-generated content ownership, social media publishing rules, third-party integrations (Google, Meta, Shopify), intellectual property, acceptable use, and dispute resolution under Indian law."
+                jsonLd={{
+                    "@context": "https://schema.org",
+                    "@type": "WebPage",
+                    "name": "Terms of Service — Mantram AI",
+                    "description": "Terms of Service for Mantram AI — AI-Powered Marketing Operating System",
+                    "url": "https://mantram.ai/terms",
+                    "isPartOf": { "@type": "WebSite", "name": "Mantram AI", "url": "https://mantram.ai/" },
+                    "breadcrumb": {
+                        "@type": "BreadcrumbList",
+                        "itemListElement": [
+                            { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://mantram.ai/" },
+                            { "@type": "ListItem", "position": 2, "name": "Terms of Service", "item": "https://mantram.ai/terms" }
+                        ]
+                    }
+                }}
+            />
             <div className="max-w-3xl mx-auto">
                 <div className="text-center mb-12">
                     <h1 className="text-4xl font-extrabold text-white mb-4">Terms of <span className="text-primary">Service</span></h1>

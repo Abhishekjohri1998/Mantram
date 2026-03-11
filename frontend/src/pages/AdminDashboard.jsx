@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import DashboardLayout from '../components/DashboardLayout'
+import SEOHead from '../components/SEOHead'
 import { admin as adminAPI } from '../services/api'
 
 export default function AdminDashboard() {
@@ -53,6 +54,7 @@ export default function AdminDashboard() {
 
     return (
         <DashboardLayout>
+            <SEOHead title="Admin Dashboard — Mantram AI" noIndex={true} />
             <div className="mb-6">
                 <h2 className="text-3xl font-extrabold tracking-tight mb-1">Admin <span className="text-primary">Dashboard</span></h2>
                 <p className="text-slate-400 text-sm">Platform-wide statistics and management.</p>
@@ -109,8 +111,8 @@ export default function AdminDashboard() {
                                         </div>
                                         <div className="col-span-2">
                                             <span className={`text-xs font-bold px-2 py-0.5 rounded ${u.role === 'admin' ? 'bg-amber-400/10 text-amber-400' :
-                                                    u.role === 'team-member' ? 'bg-primary/10 text-primary' :
-                                                        'bg-white/[0.06] text-slate-400'
+                                                u.role === 'team-member' ? 'bg-primary/10 text-primary' :
+                                                    'bg-white/[0.06] text-slate-400'
                                                 }`}>{u.role}</span>
                                         </div>
                                         <div className="col-span-2">
@@ -200,7 +202,7 @@ export default function AdminDashboard() {
                             <div className="flex items-center justify-between">
                                 <span className="text-sm text-slate-400">Avg Sentiment</span>
                                 <span className={`text-sm font-bold ${(stats?.avgSentiment || 0) > 0.3 ? 'text-emerald-400' :
-                                        (stats?.avgSentiment || 0) > 0 ? 'text-amber-400' : 'text-slate-400'
+                                    (stats?.avgSentiment || 0) > 0 ? 'text-amber-400' : 'text-slate-400'
                                     }`}>{stats?.avgSentiment ? `${(stats.avgSentiment * 100).toFixed(0)}%` : '—'}</span>
                             </div>
                         </div>

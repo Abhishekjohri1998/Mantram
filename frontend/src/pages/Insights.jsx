@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
+import SEOHead from '../components/SEOHead';
 import { useBrand } from '../context/BrandContext';
 import { conversations as conversationsAPI } from '../services/api';
 
@@ -68,7 +69,7 @@ export default function Insights() {
 
     return (
         <DashboardLayout title="Conversation Studio" subtitle="AI-powered inbox analytics">
-            {/* Sub-Navigation */}
+            <SEOHead title="Insights — Mantram AI" noIndex={true} />
             <div className="flex items-center gap-1 mb-6 p-1 glass-panel rounded-xl w-fit">
                 <button onClick={() => navigate('/conversations')}
                     className="px-5 py-2 rounded-lg text-sm font-bold text-slate-400 hover:text-white hover:bg-white/[0.04] transition-all flex items-center gap-2 cursor-pointer">

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import DashboardLayout from '../components/DashboardLayout'
+import SEOHead from '../components/SEOHead'
 import { credits as creditsAPI, payments as paymentsAPI } from '../services/api'
 
 const ACTION_ICONS = {
@@ -123,6 +124,7 @@ export default function CreditsPage() {
 
     return (
         <DashboardLayout title="Credit Usage" subtitle="Track your AI generation credits">
+            <SEOHead title="Credit Usage — Mantram AI" noIndex={true} />
             {loading ? (
                 <div className="flex items-center justify-center h-64">
                     <div className="size-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />

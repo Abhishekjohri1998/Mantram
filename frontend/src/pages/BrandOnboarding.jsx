@@ -5,6 +5,7 @@ import { useBrand } from '../context/BrandContext'
 import { useAuth } from '../context/AuthContext'
 import VoiceInput from '../components/VoiceInput'
 import { COUNTRIES } from '../data/calendarData'
+import SEOHead from '../components/SEOHead'
 
 // ============= Step Progress Indicator =============
 function ProgressIndicator({ step, total }) {
@@ -944,6 +945,12 @@ export default function BrandOnboarding() {
     const totalSteps = 3
     return (
         <div className="min-h-screen relative" style={{ background: '#0a0c16' }}>
+            <SEOHead
+                title="Brand Setup — Mantram AI"
+                description="Set up your brand DNA on Mantram AI. Extract brand identity from your website in 60 seconds — logo, colors, typography, voice & visual style."
+                canonical="/onboarding"
+                noIndex={true}
+            />
             <div className="fixed inset-0 pointer-events-none z-0">
                 <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/15 blur-[120px] rounded-full" />
                 <div className="absolute bottom-[-10%] right-[-10%] w-[30%] h-[30%] bg-primary/10 blur-[120px] rounded-full" />

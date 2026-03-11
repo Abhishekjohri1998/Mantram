@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
+import SEOHead from '../components/SEOHead'
 import { useBrand } from '../context/BrandContext'
 import { brands as brandsAPI, team as teamAPI } from '../services/api'
 
@@ -146,6 +147,7 @@ export default function BrandManagement() {
 
     return (
         <DashboardLayout title="Brand Management" subtitle="Manage your brand profiles & DNA">
+            <SEOHead title="Brand Management — Mantram AI" noIndex={true} />
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
                 <div>

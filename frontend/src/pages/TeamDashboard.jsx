@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
+import SEOHead from '../components/SEOHead'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import { team as teamAPI } from '../services/api'
@@ -198,6 +199,7 @@ export default function TeamDashboard() {
 
     return (
         <DashboardLayout title="Team Dashboard" subtitle="Team activity & collaboration hub">
+            <SEOHead title="Team Dashboard — Mantram AI" noIndex={true} />
             <div className="flex items-end justify-between mb-6">
                 <div>
                     <p className="text-slate-400 text-sm">

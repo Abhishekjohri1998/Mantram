@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import SEOHead from '../components/SEOHead'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
@@ -1173,6 +1174,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
     return (
         <DashboardLayout title="Creative Studio" subtitle="AI-powered image generation & design">
+            <SEOHead title="Creative Studio — Mantram AI" noIndex={true} />
             <div className="flex items-center justify-end mb-6">
                 <div className="flex items-center gap-2">
                     {/* Image Bank badge */}

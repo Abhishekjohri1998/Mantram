@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
+import SEOHead from '../components/SEOHead'
 import { useBrand } from '../context/BrandContext'
 import { content as contentAPI, creatives as creativesAPI, agents } from '../services/api'
 
@@ -23,6 +24,7 @@ export default function Nexus() {
 
     return (
         <DashboardLayout title="Nexus" subtitle="Cross-studio intelligence hub">
+            <SEOHead title="Nexus — Mantram AI" noIndex={true} />
             {/* Brand Header */}
 
             {!brand ? (

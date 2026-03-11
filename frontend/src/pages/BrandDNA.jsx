@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import ReactDOM from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
+import SEOHead from '../components/SEOHead'
 import { useBrand } from '../context/BrandContext'
 import { brands as brandsAPI, products as productsAPI } from '../services/api'
 
@@ -1219,6 +1220,7 @@ export default function BrandDNA() {
 
     return (
         <DashboardLayout key={brand._id} title="Brand DNA" subtitle="Your brand's intelligence profile">
+            <SEOHead title="Brand DNA — Mantram AI" noIndex={true} />
             {/* Header */}
             <div className="flex items-end justify-between mb-6">
                 <div></div>

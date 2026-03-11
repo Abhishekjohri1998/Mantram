@@ -1,4 +1,5 @@
 import { useSearchParams } from "react-router-dom"
+import SEOHead from '../components/SEOHead'
 
 export default function DataDeletion() {
     const [searchParams] = useSearchParams()
@@ -6,6 +7,15 @@ export default function DataDeletion() {
 
     return (
         <div className="min-h-screen bg-slate-950 text-slate-300 py-12 px-4 sm:px-6 lg:px-8">
+            <SEOHead
+                title="Data Deletion — Mantram AI"
+                description="Request deletion of your Mantram AI account data, brand identities, generated content, and connected social media accounts. We process requests within 48 hours."
+                canonical="/data-deletion"
+                ogTitle="Data Deletion — Mantram AI"
+                ogDescription="Request deletion of your Mantram AI account and all associated data."
+                ogImage="https://mantram.ai/mantram-logo.png"
+                aiSummary="Mantram AI Data Deletion page. Users can request deletion of their account, generated content, brand identities, AI personas, and social media connectivity tokens via dashboard or email. Requests processed within 48 hours."
+            />
             <div className="max-w-3xl mx-auto">
                 <div className="text-center mb-12">
                     <h1 className="text-4xl font-extrabold text-white mb-4">Data <span className="text-rose-500">Deletion</span></h1>

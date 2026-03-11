@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import SEOHead from '../components/SEOHead'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { useBrand } from '../context/BrandContext'
@@ -128,6 +129,7 @@ export default function D2CAnalytics() {
 
     return (
         <DashboardLayout title="D2C Studio" subtitle="Shopify Intelligence Hub">
+            <SEOHead title="D2C Analytics — Mantram AI" noIndex={true} />
             <style>{`
                 @keyframes radar-sweep { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
                 @keyframes blip-ping { 0%,100% { opacity:0.4; transform: scale(0.8) } 50% { opacity:1; transform: scale(1.3) } }

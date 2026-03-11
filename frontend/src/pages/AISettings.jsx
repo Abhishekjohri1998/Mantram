@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
+import SEOHead from '../components/SEOHead';
 import { useBrand } from '../context/BrandContext';
 import { routingRules as routingRulesAPI, brands as brandsAPI } from '../services/api';
 
@@ -147,7 +148,7 @@ export default function AISettings() {
 
     return (
         <DashboardLayout title="Conversation Studio" subtitle="AI-powered routing & settings">
-            {/* Sub-Navigation */}
+            <SEOHead title="AI Settings — Mantram AI" noIndex={true} />
             <div className="flex items-center gap-1 mb-6 p-1 glass-panel rounded-xl w-fit">
                 <button onClick={() => navigate('/conversations')}
                     className="px-5 py-2 rounded-lg text-sm font-bold text-slate-400 hover:text-white hover:bg-white/[0.04] transition-all flex items-center gap-2 cursor-pointer">
