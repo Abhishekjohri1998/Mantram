@@ -40,7 +40,8 @@ router.get('/status', protect, async (req, res) => {
                 status: {
                     connected: integration.status === 'connected',
                     shopDomain: integration.platformData?.shopDomain || '',
-                    shopName: integration.platformData?.shopName || ''
+                    shopName: integration.platformData?.shopName || '',
+                    displayName: integration.displayName || integration.platformData?.shopName || ''
                 }
             });
         } else {
