@@ -224,13 +224,86 @@ export default function SuperAdminDashboard() {
                                                 <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">{u.name?.[0]?.toUpperCase()}</div>
                                                 <div><p className="text-sm font-bold text-white">{u.name}</p><p className="text-xs text-slate-600">{u.email}</p></div>
                                             </div>
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-4">
+                                                <div className="text-right">
+                                                    <p className="text-xs font-bold text-white mb-1">{u.credits?.used || 0} / {u.credits?.total + (u.credits?.bonus || 0)} used</p>
+                                                    <div className="w-24 h-1 rounded-full bg-white/[0.06]">
+                                                        <div
+                                                            className={`h-full rounded-full ${((u.credits?.used || 0) / (u.credits?.total + (u.credits?.bonus || 0))) > 0.9 ? 'bg-rose-500' : 'bg-primary'}`}
+                                                            style={{ width: `${Math.min(100, ((u.credits?.used || 0) / (u.credits?.total + (u.credits?.bonus || 0))) * 100)}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
                                                 <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 'bg-slate-500/15 text-slate-400'}`}>{u.plan}</span>
                                                 <span className="text-xs text-slate-600">{new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
                                             </div>
                                         </div>
                                     ))}</div>
                                 </div>
+
+                                {/* AI Usage Insights */}
+                                {stats.usageAnalytics && (
+                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mt-5">
+                                        <div className="lg:col-span-1 glass-panel rounded-2xl p-5 border border-rose-500/10">
+                                            <h3 className="font-bold text-white text-sm mb-4 flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-rose-500 text-lg">error</span>
+                                                Quota Alerts
+                                            </h3>
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-between p-3 rounded-xl bg-rose-500/5 border border-rose-500/10">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="material-symbols-outlined text-rose-500">block</span>
+                                                        <span className="text-sm font-bold text-white">Full Exhaustion</span>
+                                                    </div>
+                                                    <span className="text-lg font-black text-rose-500">{stats.usageAnalytics.exhaustedCount}</span>
+                                                </div>
+                                                <div className="flex items-center justify-between p-3 rounded-xl bg-amber-500/5 border border-amber-500/10">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="material-symbols-outlined text-amber-500">warning</span>
+                                                        <span className="text-sm font-bold text-white">Near Exhaustion (>90%)</span>
+                                                    </div>
+                                                    <span className="text-lg font-black text-amber-500">{stats.usageAnalytics.nearEmptyCount}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="lg:col-span-2 glass-panel rounded-2xl p-5 border border-primary/10">
+                                            <h3 className="font-bold text-white text-sm mb-4 flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-primary text-lg">leaderboard</span>
+                                                Top AI Consumers (Leaderboard)
+                                            </h3>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-left">
+                                                    <thead>
+                                                        <tr className="text-[10px] text-slate-500 font-bold uppercase tracking-wider border-b border-white/[0.04]">
+                                                            <th className="pb-2">User</th>
+                                                            <th className="pb-2">Plan</th>
+                                                            <th className="pb-2 text-right">Credits Used</th>
+                                                            <th className="pb-2 text-right">Remaining</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-white/[0.04]">
+                                                        {(stats.usageAnalytics.topUsers || []).map(u => (
+                                                            <tr key={u._id} className="text-sm group hover:bg-white/[0.02] transition-all">
+                                                                <td className="py-2.5">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">{u.name?.[0]}</div>
+                                                                        <div><p className="font-bold text-white text-xs">{u.name}</p><p className="text-[10px] text-slate-600">{u.email}</p></div>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="py-2.5"><span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-white/[0.05] text-slate-400 capitalize">{u.plan}</span></td>
+                                                                <td className="py-2.5 text-right font-bold text-white">{u.credits?.used?.toLocaleString()}</td>
+                                                                <td className="py-2.5 text-right font-bold text-emerald-400">
+                                                                    {u.creditBalance?.unlimited ? '∞' : u.creditBalance?.remaining?.toLocaleString()}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </>
                         )}
                     </div>
@@ -263,9 +336,20 @@ export default function SuperAdminDashboard() {
                                             <p className="text-[11px] text-slate-600 truncate">{u.email} {u.company ? `• ${u.company}` : ''}</p>
                                         </div>
                                     </div>
-                                    <div className="text-center mx-4 shrink-0">
-                                        <p className="text-base font-bold text-white">{u.creditBalance?.unlimited ? '∞' : `${u.creditBalance?.remaining || 0}`}</p>
-                                        <p className="text-xs text-slate-600">credits</p>
+                                    <div className="text-center mx-4 shrink-0 flex items-center gap-4">
+                                        <div className="text-right">
+                                            <p className="text-xs font-bold text-white mb-1">{u.credits?.used || 0} / {u.credits?.total + (u.credits?.bonus || 0)} used</p>
+                                            <div className="w-24 h-1.5 rounded-full bg-white/[0.06]">
+                                                <div
+                                                    className={`h-full rounded-full ${u.creditBalance?.remaining <= 5 ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]' : 'bg-primary'}`}
+                                                    style={{ width: `${Math.min(100, ((u.credits?.used || 0) / (u.credits?.total + (u.credits?.bonus || 0))) * 100)}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="w-16">
+                                            <p className="text-base font-bold text-white">{u.creditBalance?.unlimited ? '∞' : `${u.creditBalance?.remaining || 0}`}</p>
+                                            <p className="text-[10px] text-slate-600 uppercase tracking-tighter">remaining</p>
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-1 shrink-0">
                                         <button onClick={() => setCreditModal(u)} title="Add Credits" className="p-2 rounded-lg hover:bg-emerald-500/10 text-slate-500 hover:text-emerald-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">add_circle</span></button>
