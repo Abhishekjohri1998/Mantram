@@ -123,7 +123,7 @@ async function processDuePosts() {
             const post = await SocialPost.findOneAndUpdate(
                 { status: 'scheduled', scheduledFor: { $lte: now } },
                 { $set: { status: 'publishing' } },
-                { new: true }
+                { returnDocument: 'after' }
             );
             if (!post) break;
             duePosts.push(post);

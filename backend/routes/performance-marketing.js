@@ -360,7 +360,7 @@ router.put('/campaigns/:id', protect, async (req, res) => {
         const campaign = await AdCampaign.findOneAndUpdate(
             { _id: req.params.id, user: req.user._id },
             req.body,
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
@@ -699,7 +699,7 @@ router.put('/learnings/:id/status', protect, async (req, res) => {
         const learning = await AdLearning.findOneAndUpdate(
             { _id: req.params.id, user: req.user._id },
             { status },
-            { new: true }
+            { returnDocument: 'after' }
         );
         if (!learning) return res.status(404).json({ success: false, error: 'Learning not found' });
         res.json({ success: true, learning });
@@ -940,7 +940,7 @@ router.put('/campaigns/:id/autopilot', protect, async (req, res) => {
         const campaign = await AdCampaign.findOneAndUpdate(
             { _id: req.params.id, user: req.user._id },
             { autopilot: { enabled, pauseOnRoasDrop, maxDailySpend, autoSwapCreatives } },
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });

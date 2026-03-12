@@ -92,7 +92,7 @@ router.put('/:id', protect, async (req, res) => {
         if (enabled !== undefined) update.enabled = enabled;
 
         const rule = await AutomationRule.findOneAndUpdate(
-            { _id: req.params.id, user: req.user._id }, update, { new: true }
+            { _id: req.params.id, user: req.user._id }, update, { returnDocument: 'after' }
         );
         if (!rule) return res.status(404).json({ success: false, error: 'Rule not found' });
         res.json({ success: true, rule });

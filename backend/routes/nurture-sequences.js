@@ -92,7 +92,7 @@ router.put('/:id', protect, async (req, res) => {
         const sequence = await NurtureSequence.findOneAndUpdate(
             { _id: req.params.id, user: req.user._id },
             update,
-            { new: true }
+            { returnDocument: 'after' }
         );
         if (!sequence) return res.status(404).json({ success: false, error: 'Sequence not found' });
         res.json({ success: true, sequence });

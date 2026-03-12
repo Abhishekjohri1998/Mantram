@@ -123,7 +123,7 @@ export const requireCredits = (actionOrCost = 1) => {
             // Deduct credits immediately
             const updated = await User.findByIdAndUpdate(user._id, {
                 $inc: { 'credits.used': cost },
-            }, { new: true });
+            }, { returnDocument: 'after' });
 
             // Log usage (fire-and-forget)
             const balanceAfter = (updated.credits?.total || 0) + (updated.credits?.bonus || 0) - (updated.credits?.used || 0);

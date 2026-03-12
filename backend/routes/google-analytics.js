@@ -164,7 +164,7 @@ router.get('/callback', async (req, res) => {
                 displayName: userInfo.email || 'Google Analytics',
                 metadata: { email: userInfo.email, scope: tokens.scope },
             },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
 
         // Close popup and notify parent

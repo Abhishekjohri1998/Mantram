@@ -27,7 +27,7 @@ export async function setSetting(key, value, userId = null) {
     return SystemSettings.findOneAndUpdate(
         { key },
         { value, updatedBy: userId },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
     );
 }
 

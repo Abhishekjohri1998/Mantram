@@ -251,7 +251,7 @@ router.put('/:id', protect, async (req, res) => {
         const funnel = await Funnel.findOneAndUpdate(
             { _id: req.params.id, user: req.user._id },
             update,
-            { new: true }
+            { returnDocument: 'after' }
         );
         if (!funnel) return res.status(404).json({ success: false, error: 'Not found' });
         res.json({ success: true, funnel });
@@ -375,7 +375,7 @@ router.put('/:id/entries/:entryId', protect, async (req, res) => {
         const entry = await FunnelEntry.findOneAndUpdate(
             { _id: req.params.entryId, funnel: req.params.id, user: req.user._id },
             update,
-            { new: true }
+            { returnDocument: 'after' }
         );
         if (!entry) return res.status(404).json({ success: false, error: 'Entry not found' });
 

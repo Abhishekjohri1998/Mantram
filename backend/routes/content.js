@@ -147,7 +147,7 @@ router.put('/:id', protect, async (req, res) => {
             });
         }
 
-        const content = await Content.findByIdAndUpdate(req.params.id, updates, { new: true });
+        const content = await Content.findByIdAndUpdate(req.params.id, updates, { returnDocument: 'after' });
         res.json({ success: true, content });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });

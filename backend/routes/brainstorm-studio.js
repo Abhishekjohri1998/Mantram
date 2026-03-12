@@ -1247,7 +1247,7 @@ router.patch('/strategies/:id/status', protect, async (req, res) => {
     const strategy = await BrandStrategy.findOneAndUpdate(
       { _id: req.params.id, user: req.user._id },
       { status },
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (!strategy) return res.status(404).json({ success: false, error: 'Strategy not found' });
     res.json({ success: true, status: strategy.status });

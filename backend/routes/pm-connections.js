@@ -203,7 +203,7 @@ router.get('/connect/meta/callback', async (req, res) => {
                 },
                 lastSyncAt: new Date(),
             },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
 
         console.log(`✅ Meta Ads connected for user ${userId} — ${adAccounts.length} ad accounts found`);
@@ -373,7 +373,7 @@ router.get('/connect/google/callback', async (req, res) => {
                 },
                 lastSyncAt: new Date(),
             },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
 
         console.log(`✅ Google Ads connected for user ${userId} — ${customerIds.length} customer IDs found`);
@@ -407,7 +407,7 @@ router.delete('/connect/:platform', protect, async (req, res) => {
                 refreshToken: '',
                 tokenExpiresAt: null,
             },
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         if (!integration) return res.status(404).json({ success: false, error: 'Connection not found' });

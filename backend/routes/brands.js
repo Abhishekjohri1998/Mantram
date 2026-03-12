@@ -102,7 +102,7 @@ router.put('/:id', protect, async (req, res) => {
         const brand = await Brand.findOneAndUpdate(
             { _id: req.params.id, $or: [{ user: req.user._id }, { sharedWith: req.user._id }] },
             req.body,
-            { new: true, runValidators: true }
+            { returnDocument: 'after', runValidators: true }
         );
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
 
@@ -143,7 +143,7 @@ router.put('/:id/dna', protect, async (req, res) => {
         const brand = await Brand.findOneAndUpdate(
             { _id: req.params.id, $or: [{ user: req.user._id }, { sharedWith: req.user._id }] },
             { $set: updates },
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         // Determine the most specific audit action
@@ -213,7 +213,7 @@ router.put('/:id/knowledge', protect, async (req, res) => {
         const brand = await Brand.findOneAndUpdate(
             { _id: req.params.id },
             { $set: updates },
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         const sectionMap = {
@@ -276,7 +276,7 @@ router.put('/:id/autonomy', protect, async (req, res) => {
         const brand = await Brand.findOneAndUpdate(
             { _id: req.params.id, user: req.user._id },
             { $set: updates },
-            { new: true }
+            { returnDocument: 'after' }
         );
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
         res.json({ success: true, brand });
@@ -339,7 +339,7 @@ router.put('/:id/status', protect, async (req, res) => {
         const brand = await Brand.findOneAndUpdate(
             { _id: req.params.id, user: req.user._id },
             { status },
-            { new: true }
+            { returnDocument: 'after' }
         );
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
 

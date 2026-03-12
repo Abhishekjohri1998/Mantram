@@ -328,7 +328,7 @@ router.post('/:id/resolve', protect, async (req, res) => {
         const conversation = await Conversation.findOneAndUpdate(
             { _id: req.params.id, user: req.user._id },
             { status: 'resolved' },
-            { new: true }
+            { returnDocument: 'after' }
         );
         if (!conversation) return res.status(404).json({ success: false, error: 'Conversation not found' });
 
@@ -351,7 +351,7 @@ router.post('/:id/ai-mode', protect, async (req, res) => {
                 status: enabled ? 'active' : 'handed_off',
                 ...(enabled ? { assignedTo: null } : { assignedTo: req.user._id }),
             },
-            { new: true }
+            { returnDocument: 'after' }
         );
         if (!conversation) return res.status(404).json({ success: false, error: 'Not found' });
 

@@ -149,7 +149,7 @@ router.get('/auth/facebook/callback', async (req, res) => {
             await SocialAccount.findOneAndUpdate(
                 { user: userId, platform: account.platform, accountId: account.accountId },
                 { ...account, user: userId, isActive: true },
-                { upsert: true, new: true }
+                { upsert: true, returnDocument: 'after' }
             );
         }
 
@@ -213,7 +213,7 @@ router.get('/auth/linkedin/callback', async (req, res) => {
                 accessToken: tokenData.access_token,
                 isActive: true
             },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
 
         res.redirect(`${targetFrontend}/integrations?social=success&platform=linkedin`);

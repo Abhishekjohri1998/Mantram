@@ -61,7 +61,7 @@ async function runTest() {
                 platformData: { shopDomain, shopName: 'Test Store' },
                 brand: brand._id
             },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
 
         console.log('📦 Starting test synchronization (Database Model Validation)...');
@@ -81,7 +81,7 @@ async function runTest() {
                 lineItems: [{ productId: 'p1', title: 'Test Item', quantity: 1, price: 100.50 }],
                 shopifyCreatedAt: new Date()
             },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
         console.log(`✅ ShopifyOrder persisted: ${testOrder.orderNumber}`);
 
@@ -100,7 +100,7 @@ async function runTest() {
                 totalSpent: 100.50,
                 shopifyCreatedAt: new Date()
             },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
         console.log(`✅ ShopifyCustomer persisted: ${testCustomer.email}`);
 

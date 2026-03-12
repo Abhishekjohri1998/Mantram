@@ -179,7 +179,7 @@ router.put('/users/:id', async (req, res) => {
             update['credits.total'] = planCredits[plan] || 50;
             update['credits.used'] = 0;
         }
-        const user = await User.findByIdAndUpdate(req.params.id, update, { new: true }).select('-password');
+        const user = await User.findByIdAndUpdate(req.params.id, update, { returnDocument: 'after' }).select('-password');
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
         res.json({ success: true, user: { ...user.toJSON(), creditBalance: getCreditBalance(user) } });
     } catch (error) {
@@ -225,7 +225,7 @@ router.post('/users/:id/add-credits', async (req, res) => {
     try {
         const { amount, reason } = req.body;
         if (!amount || amount <= 0) return res.status(400).json({ success: false, error: 'Amount must be positive' });
-        const user = await User.findByIdAndUpdate(req.params.id, { $inc: { 'credits.bonus': amount } }, { new: true }).select('-password');
+        const user = await User.findByIdAndUpdate(req.params.id, { $inc: { 'credits.bonus': amount } }, { returnDocument: 'after' }).select('-password');
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
         res.json({ success: true, user: { ...user.toJSON(), creditBalance: getCreditBalance(user) } });
     } catch (error) {
@@ -235,7 +235,7 @@ router.post('/users/:id/add-credits', async (req, res) => {
 
 router.post('/users/:id/reset-credits', async (req, res) => {
     try {
-        const user = await User.findByIdAndUpdate(req.params.id, { 'credits.used': 0, 'credits.resetDate': new Date() }, { new: true }).select('-password');
+        const user = await User.findByIdAndUpdate(req.params.id, { 'credits.used': 0, 'credits.resetDate': new Date() }, { returnDocument: 'after' }).select('-password');
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
         res.json({ success: true, user: { ...user.toJSON(), creditBalance: getCreditBalance(user) } });
     } catch (error) {
@@ -323,7 +323,7 @@ router.post('/coupons', async (req, res) => {
 
 router.put('/coupons/:id', async (req, res) => {
     try {
-        const coupon = await Coupon.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const coupon = await Coupon.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
         if (!coupon) return res.status(404).json({ success: false, error: 'Coupon not found' });
         res.json({ success: true, coupon });
     } catch (error) {
@@ -578,7 +578,7 @@ router.post('/packages', async (req, res) => {
 
 router.put('/packages/:id', async (req, res) => {
     try {
-        const pkg = await SubscriptionPackage.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const pkg = await SubscriptionPackage.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
         if (!pkg) return res.status(404).json({ success: false, error: 'Package not found' });
         res.json({ success: true, package: pkg });
     } catch (error) {
@@ -867,7 +867,7 @@ router.put('/credit-costs', async (req, res) => {
         await SystemSettings.findOneAndUpdate(
             { key: 'creditCosts' },
             { key: 'creditCosts', value: costs, updatedBy: req.user._id },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
         invalidateCreditCostCache();
         const updated = await getCreditCosts();

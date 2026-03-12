@@ -190,7 +190,7 @@ router.put('/:id', protect, async (req, res) => {
         const automation = await Automation.findOneAndUpdate(
             { _id: req.params.id, user: req.user._id },
             update,
-            { new: true }
+            { returnDocument: 'after' }
         );
         if (!automation) return res.status(404).json({ success: false, error: 'Not found' });
         res.json({ success: true, automation });

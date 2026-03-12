@@ -72,7 +72,7 @@ router.put('/:id', protect, async (req, res) => {
         const contact = await Contact.findOneAndUpdate(
             { _id: req.params.id, user: req.user._id },
             update,
-            { new: true }
+            { returnDocument: 'after' }
         );
         if (!contact) return res.status(404).json({ success: false, error: 'Not found' });
         res.json({ success: true, contact });

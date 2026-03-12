@@ -85,7 +85,7 @@ router.put('/users/:id', async (req, res) => {
         if (role === 'superadmin') {
             return res.status(403).json({ success: false, error: 'Cannot assign superadmin role' });
         }
-        const user = await User.findByIdAndUpdate(req.params.id, { role, plan }, { new: true }).select('-password');
+        const user = await User.findByIdAndUpdate(req.params.id, { role, plan }, { returnDocument: 'after' }).select('-password');
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
         res.json({ success: true, user });
     } catch (error) {

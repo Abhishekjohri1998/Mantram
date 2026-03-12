@@ -84,7 +84,7 @@ router.post('/connect', protect, async (req, res) => {
                 brand: brandId || undefined,
                 platformData: { shopDomain: cleanDomain },
             },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
 
         console.log(`🔗 Shopify OAuth started for ${cleanDomain} → redirect: ${redirectUri}`);
@@ -126,7 +126,7 @@ router.post('/connect-token', protect, async (req, res) => {
                 profileUrl: `https://${cleanDomain}`,
                 platformData: { shopDomain: cleanDomain, shopName: shopInfo.name },
             },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
 
         console.log(`✅ Shopify connected via token: ${shopInfo.name} (${cleanDomain})`);
@@ -183,7 +183,7 @@ router.get('/callback', async (req, res) => {
                 'platformData.shopDomain': shop,
                 ...(brandId ? { brand: brandId } : {}),
             },
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         if (integration) {

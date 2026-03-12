@@ -85,7 +85,7 @@ router.put('/profile', protect, async (req, res) => {
     const user = await User.findByIdAndUpdate(
         req.user._id,
         { name, company, avatar, preferences },
-        { new: true, runValidators: true }
+        { returnDocument: 'after', runValidators: true }
     );
     res.json({ success: true, user });
 });

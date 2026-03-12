@@ -301,7 +301,7 @@ router.put('/pages/:id', protect, async (req, res) => {
         if (status) update.status = status;
 
         const page = await FunnelPage.findOneAndUpdate(
-            { _id: req.params.id, user: req.user._id }, update, { new: true }
+            { _id: req.params.id, user: req.user._id }, update, { returnDocument: 'after' }
         );
         if (!page) return res.status(404).json({ success: false, error: 'Page not found' });
         res.json({ success: true, page });
@@ -358,7 +358,7 @@ router.post('/pages/:id/submit', async (req, res) => {
             contact = await Contact.findOneAndUpdate(
                 { user: page.user, email: contactData.email },
                 { $set: contactData, $addToSet: { funnelIds: funnel._id } },
-                { upsert: true, new: true }
+                { upsert: true, returnDocument: 'after' }
             );
         }
 
