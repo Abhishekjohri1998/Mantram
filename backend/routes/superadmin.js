@@ -243,6 +243,30 @@ router.delete('/users/:id', async (req, res) => {
         const user = await User.findById(req.params.id);
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
         if (user.role === 'superadmin') return res.status(403).json({ success: false, error: 'Cannot delete super admin' });
+
+        // Block deletion if user has an active plan
+        const activeSub = await Subscription.findOne({ 
+            user: user._id, 
+            status: 'active',
+            endDate: { $gt: new Date() }
+        });
+
+        if (activeSub) {
+            const now = new Date();
+            const end = new Date(activeSub.endDate);
+            const diff = end - now;
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            
+            let remainingText = `${days} days and ${hours} hours`;
+            if (days === 0) remainingText = `${hours} hours`;
+            
+            return res.status(400).json({ 
+                success: false, 
+                error: `Cannot delete user with active plan. Plan expires in ${remainingText} (${end.toLocaleDateString()}).` 
+            });
+        }
+
         await Promise.all([
             Brand.deleteMany({ user: user._id }),
             Content.deleteMany({ user: user._id }),

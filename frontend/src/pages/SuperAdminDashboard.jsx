@@ -118,7 +118,17 @@ export default function SuperAdminDashboard() {
     const handleAddCredits = async () => { if (!creditModal || !creditAmount) return; try { await API.addCredits(creditModal._id, { amount: parseInt(creditAmount), reason: 'Super admin' }); showToast(`+${creditAmount} credits`); setCreditModal(null); setCreditAmount(''); loadUsers() } catch { showToast('Failed', 'error') } }
     const handleResetCredits = async (id) => { if (!confirm('Reset used credits to 0?')) return; try { await API.resetCredits(id); showToast('Reset done'); loadUsers() } catch { showToast('Failed', 'error') } }
     const handleChangePlan = async (id, plan) => { try { await API.updateUser(id, { plan }); showToast(`Plan → ${plan}`); setPlanModal(null); loadUsers(); loadStats() } catch { showToast('Failed', 'error') } }
-    const handleDeleteUser = async (id, name) => { if (!confirm(`DELETE ${name} and ALL data?`)) return; try { await API.deleteUser(id); showToast('Deleted'); loadUsers(); loadStats() } catch { showToast('Failed', 'error') } }
+    const handleDeleteUser = async (id, name) => { 
+        if (!confirm(`DELETE ${name} and ALL data?`)) return; 
+        try { 
+            await API.deleteUser(id); 
+            showToast('User deleted'); 
+            loadUsers(); 
+            loadStats();
+        } catch (e) { 
+            showToast(e.message || 'Deletion failed', 'error');
+        } 
+    }
     
     const handleApproveUser = async (id) => { 
         try { 
