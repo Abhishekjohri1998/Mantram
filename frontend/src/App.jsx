@@ -34,6 +34,7 @@ import FunnelStudio from './pages/FunnelStudio'
 import BrandManagement from './pages/BrandManagement'
 import SkillsHub from './pages/SkillsHub'
 import StudioPreview from './pages/StudioPreview'
+import JoinTeam from './pages/JoinTeam'
 
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
@@ -62,6 +63,7 @@ function App() {
                 <Route path="/data-deletion" element={<DataDeletion />} />
                 <Route path="/data-deletion-status" element={<DataDeletion />} />
                 <Route path="/studio/:slug" element={<StudioPreview />} />
+                <Route path="/join/:token" element={<JoinTeam />} />
 
                 {/* Protected routes — require authentication */}
                 <Route path="/nexus" element={<ProtectedRoute><Nexus /></ProtectedRoute>} />

@@ -547,9 +547,11 @@ router.post('/ai/generate', protect, async (req, res) => {
 
         // Fetch brand context for better AI generation
         let brandContext = '';
+        let brandName = 'Your Brand';
         if (brandId) {
             const brand = await Brand.findById(brandId);
             if (brand) {
+                brandName = brand.name || 'Your Brand';
                 brandContext = `
 Brand: ${brand.name}
 Industry: ${brand.industry || 'General'}
@@ -559,9 +561,13 @@ Products: ${brand.products?.slice(0, 5).map(p => p.name).join(', ') || 'Not spec
             }
         }
 
-        const ai = getRouter();
-        const result = await ai.generateText({
-            prompt: `You are an expert sales funnel architect. Create a detailed sales funnel based on this user request.
+        // Try AI generation with timeout, fall back to rule-based if it fails
+        let funnelStructure;
+        try {
+            const ai = getRouter();
+            const result = await Promise.race([
+                ai.generateText({
+                    prompt: `You are an expert sales funnel architect. Create a detailed sales funnel based on this user request.
 
 ${brandContext ? `BRAND CONTEXT:${brandContext}` : ''}
 
@@ -586,22 +592,105 @@ Respond ONLY with valid JSON in this exact format:
 }
 
 Create 4-6 stages. Make descriptions actionable and specific to the brand context. Use creative stage names that match the business.`,
-            maxTokens: 2000,
-            temperature: 0.7,
-        });
+                    maxTokens: 2000,
+                    temperature: 0.7,
+                }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('AI timeout after 30s')), 30000)),
+            ]);
 
-        // Parse AI response
-        let funnelStructure;
-        try {
+            // Parse AI response
             const jsonMatch = result.text.match(/\{[\s\S]*\}/);
             funnelStructure = JSON.parse(jsonMatch ? jsonMatch[0] : result.text);
-        } catch {
-            return res.status(500).json({ success: false, error: 'AI response was not valid JSON. Please try again.' });
-        }
 
-        // Validate and clean
-        if (!funnelStructure.stages || !Array.isArray(funnelStructure.stages)) {
-            return res.status(500).json({ success: false, error: 'AI did not return valid funnel stages' });
+            if (!funnelStructure.stages || !Array.isArray(funnelStructure.stages)) {
+                throw new Error('AI did not return valid stages');
+            }
+        } catch (aiError) {
+            console.warn('⚠️ Funnel AI generation failed, using smart template:', aiError.message);
+
+            // Rule-based fallback — generate a smart funnel from the prompt
+            const promptLower = prompt.toLowerCase();
+            const isEcommerce = promptLower.match(/e-?commerce|sales|shop|store|product|buy|purchase|d2c/);
+            const isLeadGen = promptLower.match(/lead|signup|register|subscribe|email|contact|form/);
+            const isWebinar = promptLower.match(/webinar|event|workshop|seminar|class|training/);
+            const isLaunch = promptLower.match(/launch|new|release|announce|pre-?order|upcoming/);
+
+            if (isLaunch) {
+                funnelStructure = {
+                    name: `${brandName} Product Launch Funnel`,
+                    description: `AI-generated launch funnel for ${brandName} based on: "${prompt}"`,
+                    type: 'product_launch',
+                    icon: 'rocket_launch',
+                    color: '#8b5cf6',
+                    stages: [
+                        { name: 'Teaser & Buzz', order: 0, type: 'awareness', color: '#6366f1', description: `Build anticipation with teaser content. Use social media, email, and influencers to create buzz around ${brandName}'s upcoming launch.` },
+                        { name: 'Waitlist & Sign-ups', order: 1, type: 'interest', color: '#8b5cf6', description: 'Capture early interest with a waitlist or pre-registration form. Offer early-bird perks to drive sign-ups.' },
+                        { name: 'Pre-Order Window', order: 2, type: 'consideration', color: '#a855f7', description: 'Open pre-orders with exclusive pricing or bundles. Use scarcity and early-access messaging to convert warm leads.' },
+                        { name: 'Launch Day', order: 3, type: 'decision', color: '#c084fc', description: 'Execute the full launch — go live on all channels. Send email blasts, run ads, and activate influencer partnerships.' },
+                        { name: 'Post-Launch & Retention', order: 4, type: 'retention', color: '#e879f9', description: 'Follow up with buyers. Collect reviews, upsell accessories, and nurture for repeat purchases.' },
+                    ],
+                };
+            } else if (isEcommerce) {
+                funnelStructure = {
+                    name: `${brandName} Sales Funnel`,
+                    description: `AI-generated e-commerce funnel for ${brandName} based on: "${prompt}"`,
+                    type: 'e_commerce',
+                    icon: 'shopping_cart',
+                    color: '#06b6d4',
+                    stages: [
+                        { name: 'Discovery', order: 0, type: 'awareness', color: '#22d3ee', description: `Attract potential customers through SEO, social media ads, and content marketing for ${brandName}.` },
+                        { name: 'Product Interest', order: 1, type: 'interest', color: '#06b6d4', description: 'Engage visitors with product pages, reviews, and comparison content. Retarget with display ads.' },
+                        { name: 'Add to Cart', order: 2, type: 'consideration', color: '#0891b2', description: 'Drive cart additions with urgency (limited stock, flash sales). Use exit-intent popups with discount offers.' },
+                        { name: 'Checkout', order: 3, type: 'decision', color: '#0e7490', description: 'Minimize checkout friction. Offer multiple payment options, trust badges, and free shipping thresholds.' },
+                        { name: 'Post-Purchase', order: 4, type: 'retention', color: '#155e75', description: 'Send order confirmation, request reviews, and upsell complementary products. Build loyalty with rewards.' },
+                    ],
+                };
+            } else if (isLeadGen) {
+                funnelStructure = {
+                    name: `${brandName} Lead Generation Funnel`,
+                    description: `AI-generated lead gen funnel for ${brandName} based on: "${prompt}"`,
+                    type: 'lead_gen',
+                    icon: 'person_add',
+                    color: '#10b981',
+                    stages: [
+                        { name: 'Awareness', order: 0, type: 'awareness', color: '#34d399', description: `Attract leads through blog posts, social media, and targeted ads for ${brandName}.` },
+                        { name: 'Lead Capture', order: 1, type: 'interest', color: '#10b981', description: 'Convert visitors into leads with landing pages, lead magnets (ebooks, guides), and email opt-in forms.' },
+                        { name: 'Nurture', order: 2, type: 'consideration', color: '#059669', description: 'Build trust with email sequences, case studies, and personalized content. Score leads based on engagement.' },
+                        { name: 'Qualified Lead', order: 3, type: 'decision', color: '#047857', description: 'Identify sales-ready leads through scoring. Schedule demos or consultations for high-intent prospects.' },
+                        { name: 'Convert & Retain', order: 4, type: 'retention', color: '#065f46', description: 'Close deals with personalized offers. Onboard new customers and set up retention sequences.' },
+                    ],
+                };
+            } else if (isWebinar) {
+                funnelStructure = {
+                    name: `${brandName} Webinar Funnel`,
+                    description: `AI-generated webinar funnel for ${brandName} based on: "${prompt}"`,
+                    type: 'webinar',
+                    icon: 'videocam',
+                    color: '#f59e0b',
+                    stages: [
+                        { name: 'Promotion', order: 0, type: 'awareness', color: '#fbbf24', description: `Promote the webinar through ads, email, and social media for ${brandName}.` },
+                        { name: 'Registration', order: 1, type: 'interest', color: '#f59e0b', description: 'Drive registrations with a compelling landing page. Highlight speakers, agenda, and key takeaways.' },
+                        { name: 'Attendance', order: 2, type: 'consideration', color: '#d97706', description: 'Send reminder emails and calendar invites. Maximize attendance with pre-webinar content.' },
+                        { name: 'Follow-Up', order: 3, type: 'decision', color: '#b45309', description: 'Send recording replays, slides, and exclusive offers to attendees and no-shows alike.' },
+                        { name: 'Conversion', order: 4, type: 'retention', color: '#92400e', description: 'Convert engaged attendees with limited-time offers, personal outreach, and upsell sequences.' },
+                    ],
+                };
+            } else {
+                funnelStructure = {
+                    name: `${brandName} Custom Funnel`,
+                    description: `Smart template funnel for ${brandName} based on: "${prompt}"`,
+                    type: 'custom',
+                    icon: 'auto_awesome',
+                    color: '#6366f1',
+                    stages: [
+                        { name: 'Awareness', order: 0, type: 'awareness', color: '#818cf8', description: `Attract your target audience to ${brandName} through content, ads, and organic reach.` },
+                        { name: 'Interest', order: 1, type: 'interest', color: '#6366f1', description: 'Engage interested prospects with value-driven content, demos, and social proof.' },
+                        { name: 'Consideration', order: 2, type: 'consideration', color: '#4f46e5', description: 'Nurture leads with targeted messaging, case studies, and personalized outreach.' },
+                        { name: 'Decision', order: 3, type: 'decision', color: '#4338ca', description: 'Drive conversions with compelling offers, urgency, and clear calls-to-action.' },
+                        { name: 'Retention', order: 4, type: 'retention', color: '#3730a3', description: 'Keep customers engaged with loyalty programs, follow-ups, and upselling opportunities.' },
+                    ],
+                };
+            }
         }
 
         // Create the funnel
@@ -772,9 +861,17 @@ router.post('/:id/ai-suggestions', protect, async (req, res) => {
             brandContext = `Brand: ${brand.name}, Industry: ${brand.industry || 'General'}`;
         }
 
-        const ai = getRouter();
-        const result = await ai.generateText({
-            prompt: `You are a sales funnel optimization expert. Analyze this funnel and provide actionable suggestions.
+        const conversionRate = totalEntries > 0 ? Math.round((convertedEntries / totalEntries) * 100) : 0;
+        const lostRate = totalEntries > 0 ? Math.round((lostEntries / totalEntries) * 100) : 0;
+
+        // ── Try AI first, fall back to rule-based suggestions ──
+        let suggestions = [];
+        let usedAI = false;
+
+        try {
+            const ai = getRouter();
+            const result = await ai.generateText({
+                prompt: `You are a sales funnel optimization expert. Analyze this funnel and provide actionable suggestions.
 
 ${brandContext}
 
@@ -785,7 +882,7 @@ METRICS:
 - Total entries: ${totalEntries}
 - Converted: ${convertedEntries}
 - Lost: ${lostEntries}
-- Conversion rate: ${totalEntries > 0 ? Math.round((convertedEntries / totalEntries) * 100) : 0}%
+- Conversion rate: ${conversionRate}%
 
 Respond ONLY with valid JSON array of suggestions:
 [
@@ -805,19 +902,101 @@ Provide 3-6 specific, actionable suggestions. Consider:
 - No studio connections (suggest linking automations, content)
 - Low conversion rate fixes
 - Stage-specific improvements`,
-            maxTokens: 1500,
-            temperature: 0.7,
-        });
+                maxTokens: 1500,
+                temperature: 0.7,
+            });
 
-        let suggestions;
-        try {
-            const jsonMatch = result.text.match(/\[[\s\S]*\]/);
-            suggestions = JSON.parse(jsonMatch ? jsonMatch[0] : result.text);
+            try {
+                const jsonMatch = result.text.match(/\[[\s\S]*\]/);
+                suggestions = JSON.parse(jsonMatch ? jsonMatch[0] : result.text);
+            } catch {
+                suggestions = [{ type: 'warning', icon: 'info', title: 'AI Analysis', description: result.text, priority: 'medium' }];
+            }
+            usedAI = true;
         } catch {
-            suggestions = [{ type: 'warning', icon: 'info', title: 'AI Analysis', description: result.text, priority: 'medium' }];
+            // ── Rule-based fallback when AI is unavailable ──
+            // Empty funnel
+            if (totalEntries === 0) {
+                suggestions.push({
+                    type: 'warning', icon: 'person_add', title: 'Your funnel is empty',
+                    description: 'Start by adding leads — import contacts, connect a webhook from your website, or add leads manually.', priority: 'high',
+                });
+            }
+
+            // Empty stages
+            const emptyStages = funnel.stages.filter(s => (stageCounts[s.name] || 0) === 0);
+            if (emptyStages.length > 0 && totalEntries > 0) {
+                suggestions.push({
+                    type: 'warning', icon: 'warning',
+                    title: `${emptyStages.length} empty stage${emptyStages.length > 1 ? 's' : ''} detected`,
+                    description: `${emptyStages.map(s => `"${s.name}"`).join(', ')} ha${emptyStages.length > 1 ? 've' : 's'} no active leads. Check if leads are stuck at an earlier stage or leaking out.`,
+                    priority: 'high',
+                });
+            }
+
+            // Low conversion rate
+            if (conversionRate < 20 && totalEntries >= 5) {
+                suggestions.push({
+                    type: 'opportunity', icon: 'trending_up',
+                    title: `Conversion rate is ${conversionRate}% — below average`,
+                    description: 'Industry average is 20-30%. Try adding nurture sequences, improving your offer at the decision stage, or creating retargeting ads for leads that drop off.',
+                    priority: 'high', studioLink: 'performanceMarketing',
+                });
+            } else if (conversionRate >= 20) {
+                suggestions.push({
+                    type: 'quick_win', icon: 'emoji_events',
+                    title: `Strong ${conversionRate}% conversion rate`,
+                    description: 'Your funnel is performing well. Scale it by driving more top-of-funnel traffic with SEO content and social campaigns.',
+                    priority: 'medium', studioLink: 'seoStudio',
+                });
+            }
+
+            // High lost rate
+            if (lostRate > 25 && lostEntries >= 3) {
+                suggestions.push({
+                    type: 'warning', icon: 'person_off',
+                    title: `${lostRate}% of leads are lost`,
+                    description: `${lostEntries} leads marked as lost. Set up automated win-back sequences with email drips or retargeting ads to re-engage them.`,
+                    priority: 'high', studioLink: 'conversationStudio',
+                });
+            }
+
+            // Stage bottleneck — find stage with most active entries
+            const stageEntries = Object.entries(stageCounts).filter(([_, c]) => c > 0);
+            if (stageEntries.length > 1) {
+                const maxStage = stageEntries.reduce((a, b) => a[1] > b[1] ? a : b);
+                const totalActive = stageEntries.reduce((s, [_, c]) => s + c, 0);
+                const pct = Math.round((maxStage[1] / totalActive) * 100);
+                if (pct > 40) {
+                    suggestions.push({
+                        type: 'opportunity', icon: 'filter_alt',
+                        title: `Bottleneck at "${maxStage[0]}" (${pct}% of leads)`,
+                        description: `Most of your active leads are stuck in "${maxStage[0]}". Create targeted content, offer incentives, or set up automation to push leads to the next stage.`,
+                        priority: 'high', studioLink: 'contentStudio',
+                    });
+                }
+            }
+
+            // Suggest automation
+            suggestions.push({
+                type: 'automation', icon: 'auto_fix_high',
+                title: 'Set up funnel automation',
+                description: 'Automate lead scoring, stage advancement rules, and nurture email sequences so your funnel works 24/7. Use the Configure tab to create automation rules.',
+                priority: 'medium',
+            });
+
+            // Suggest content creation
+            if (totalEntries > 0) {
+                suggestions.push({
+                    type: 'quick_win', icon: 'edit_note',
+                    title: 'Create stage-specific content',
+                    description: 'Each funnel stage needs different content — awareness posts for top, comparison guides for mid, and testimonials for bottom-of-funnel.',
+                    priority: 'medium', studioLink: 'contentStudio',
+                });
+            }
         }
 
-        res.json({ success: true, suggestions });
+        res.json({ success: true, suggestions, source: usedAI ? 'ai' : 'rules' });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }

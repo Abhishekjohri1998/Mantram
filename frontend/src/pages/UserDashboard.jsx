@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
-import { content as contentAPI, creatives as creativesAPI, trends as trendsAPI, dashboardSummary, shopifyAnalytics } from '../services/api'
+import { content as contentAPI, creatives as creativesAPI, trends as trendsAPI, dashboardSummary, shopifyAnalytics, pmStudio, funnelStudio } from '../services/api'
 import { getUpcomingEvents, EVENT_COLORS } from '../data/calendarData'
 import SmartCommandBox from '../components/SmartCommandBox'
 import IntelReportViewer from '../components/IntelReportViewer'
@@ -89,6 +89,12 @@ export default function UserDashboard() {
     const [radarHover, setRadarHover] = useState(null)
     const [d2cSnapshot, setD2cSnapshot] = useState(null)
 
+    // ── Analytics state (Funnel + Performance + ROAS) ──
+    const [funnelData, setFunnelData] = useState(null)
+    const [perfData, setPerfData] = useState(null)
+    const [anomalies, setAnomalies] = useState([])
+    const [blendedRoas, setBlendedRoas] = useState(null)
+
     // Intel state
     const [intelMissions, setIntelMissions] = useState([])
     const [intelReport, setIntelReport] = useState(null) // { mission, findings }
@@ -118,6 +124,31 @@ export default function UserDashboard() {
         finally { setTrendsLoading(false) }
     }, [activeBrand?._id])
 
+    // ── Analytics loader (Funnel + Performance + ROAS) ──
+    const loadAnalytics = useCallback(async () => {
+        if (!activeBrand?._id) return
+        const brandId = activeBrand._id
+        try {
+            const [funnelRes, perfRes, anomalyRes, roasRes] = await Promise.allSettled([
+                funnelStudio.list({ brandId }).then(async (data) => {
+                    const funnels = data.funnels || []
+                    if (funnels.length === 0) return null
+                    // Pick the best funnel (highest entries or first active)
+                    const best = funnels.sort((a, b) => (b.metrics?.totalEntries || 0) - (a.metrics?.totalEntries || 0))[0]
+                    const analyticsRes = await funnelStudio.analytics(best._id)
+                    return { funnel: best, analytics: analyticsRes.analytics }
+                }),
+                pmStudio.dashboard({ brandId }),
+                pmStudio.anomalies({ brandId }),
+                pmStudio.blendedRoas({ brandId }),
+            ])
+            if (funnelRes.status === 'fulfilled' && funnelRes.value) setFunnelData(funnelRes.value)
+            if (perfRes.status === 'fulfilled') setPerfData(perfRes.value?.dashboard || null)
+            if (anomalyRes.status === 'fulfilled') setAnomalies(anomalyRes.value?.anomalies || [])
+            if (roasRes.status === 'fulfilled') setBlendedRoas(roasRes.value || null)
+        } catch { /* silent */ }
+    }, [activeBrand?._id])
+
     // Clear stale data and re-fetch when brand changes
     useEffect(() => {
         setSummary(null)
@@ -143,11 +174,11 @@ export default function UserDashboard() {
     }, [activeBrand?._id])
 
     useEffect(() => {
-        loadSummary(); loadTrends()
+        loadSummary(); loadTrends(); loadAnalytics()
         shopifyAnalytics.snapshot().then(d => setD2cSnapshot(d)).catch(() => { })
-        const interval = setInterval(() => { loadTrends(); loadSummary() }, 30 * 60 * 1000)
+        const interval = setInterval(() => { loadTrends(); loadSummary(); loadAnalytics() }, 30 * 60 * 1000)
         return () => clearInterval(interval)
-    }, [loadSummary, loadTrends])
+    }, [loadSummary, loadTrends, loadAnalytics])
 
     // ── Load intel missions ──
     useEffect(() => {
@@ -311,24 +342,26 @@ export default function UserDashboard() {
             )}
 
             {/* ═══════════════════════════════════════════════════════════════ */}
-            {/* 3. LIVE TICKER BAR                                             */}
+            {/* 3. REVENUE COMMAND STRIP                                       */}
             {/* ═══════════════════════════════════════════════════════════════ */}
             <div className="mb-6 rounded-xl bg-white/[0.02] border border-white/[0.06] overflow-hidden anim-slide-up" style={{ animationDelay: '200ms' }}>
                 <div className="flex overflow-hidden">
                     <div className="flex ticker-track">
                         {[0, 1].map(dup => (
                             <div key={dup} className="flex">
-                                <TickerItem icon="article" value={activity.content?.thisWeek || 0} label="Content this week" color="#8b5cf6" />
+                                <TickerItem icon="payments" value={`₹${(d2cSnapshot?.weeklyRevenue || 0).toLocaleString()}`} label="D2C Revenue" color="#34d399" />
                                 <div className="w-px bg-white/[0.06] my-2" />
-                                <TickerItem icon="image" value={activity.creatives?.thisWeek || 0} label="Creatives this week" color="#06b6d4" />
+                                <TickerItem icon="show_chart" value={`${blendedRoas?.mer?.toFixed(1) || perfData?.stats?.avgRoas || '0'}x`} label="Blended ROAS" color="#f43f5e" />
                                 <div className="w-px bg-white/[0.06] my-2" />
-                                <TickerItem icon="storefront" value={brands.length} label="Active brands" color="#f59e0b" />
+                                <TickerItem icon="account_balance" value={`₹${(perfData?.stats?.totalSpend || 0).toLocaleString()}`} label="Ad Spend" color="#f59e0b" />
                                 <div className="w-px bg-white/[0.06] my-2" />
-                                <TickerItem icon="trending_up" value={grokTrends.length + trendingTopics.length} label="Live trends" color="#f43f5e" />
+                                <TickerItem icon="campaign" value={perfData?.stats?.activeCampaigns || 0} label="Active Campaigns" color="#8b5cf6" />
                                 <div className="w-px bg-white/[0.06] my-2" />
-                                <TickerItem icon="article" value={activity.content?.total || stats.content} label="Total content" color="#8b5cf6" />
+                                <TickerItem icon="filter_alt" value={`${funnelData?.analytics?.overview?.conversionRate || 0}%`} label="Funnel Conversion" color="#6366f1" />
                                 <div className="w-px bg-white/[0.06] my-2" />
-                                <TickerItem icon="image" value={activity.creatives?.total || stats.creatives} label="Total creatives" color="#06b6d4" />
+                                <TickerItem icon="shopping_bag" value={d2cSnapshot?.weeklyOrders || 0} label="Weekly Orders" color="#06b6d4" />
+                                <div className="w-px bg-white/[0.06] my-2" />
+                                <TickerItem icon="trending_up" value={`₹${d2cSnapshot?.aov || 0}`} label="AOV" color="#34d399" />
                                 <div className="w-px bg-white/[0.06] my-2" />
                             </div>
                         ))}
@@ -377,7 +410,345 @@ export default function UserDashboard() {
                         </div>
                     </div>
 
-                    {/* ── 4b. STRIKES RADAR ── */}
+                    {/* ── 4a. FUNNEL VELOCITY — SIDE-BY-SIDE LAYOUT ── */}
+                    {funnelData && (
+                        <div className="glass-panel rounded-2xl p-5 lg:p-6 border border-indigo-500/15 anim-slide-up cursor-pointer group"
+                            style={{ animationDelay: '275ms' }}
+                            onClick={() => navigate('/funnel-studio')}>
+                            <div className="flex items-center justify-between mb-5">
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-indigo-400">filter_alt</span>
+                                    <span className="text-lg font-bold text-white">Funnel Velocity</span>
+                                    <span className="ml-2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                                        {funnelData.funnel?.name || 'Active'}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-1 text-sm text-slate-500 group-hover:text-indigo-400 transition-colors">
+                                    <span>Open Studio</span>
+                                    <span className="material-symbols-outlined text-sm group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
+                                </div>
+                            </div>
+
+                            {/* ── Side-by-side: Funnel left, Stats right ── */}
+                            <div className="flex flex-col lg:flex-row gap-6">
+                                {/* LEFT: Animated SVG Funnel */}
+                                <div className="flex-shrink-0 flex justify-center lg:justify-start">
+                                    {(() => {
+                                        const stages = funnelData.analytics?.stages || []
+                                        if (stages.length === 0) return null
+                                        const svgW = 280, svgH = stages.length * 52 + 36
+                                        const funnelCenter = svgW / 2
+                                        const maxW = svgW - 20
+                                        const topCount = Math.max(stages[0]?.everEntered || stages[0]?.currentCount || 1, 1)
+                                        const stageColors = ['#818cf8', '#6366f1', '#a78bfa', '#8b5cf6', '#7c3aed', '#6d28d9']
+                                        const glowColors = ['#818cf860', '#6366f160', '#a78bfa60', '#8b5cf660', '#7c3aed60', '#6d28d960']
+
+                                        return (
+                                            <svg width={svgW} viewBox={`0 0 ${svgW} ${svgH}`}>
+                                                <defs>
+                                                    {stages.map((_, i) => (
+                                                        <linearGradient key={`fg${i}`} id={`funnelGrad${i}`} x1="0" y1="0" x2="0" y2="1">
+                                                            <stop offset="0%" stopColor={stageColors[i % stageColors.length]} stopOpacity="0.85" />
+                                                            <stop offset="100%" stopColor={stageColors[i % stageColors.length]} stopOpacity="0.35" />
+                                                        </linearGradient>
+                                                    ))}
+                                                    <linearGradient id="funnelShimmer" x1="0" y1="0" x2="1" y2="1">
+                                                        <stop offset="0%" stopColor="white" stopOpacity="0">
+                                                            <animate attributeName="offset" values="-0.5;1.5" dur="3s" repeatCount="indefinite" />
+                                                        </stop>
+                                                        <stop offset="50%" stopColor="white" stopOpacity="0.12">
+                                                            <animate attributeName="offset" values="0;2" dur="3s" repeatCount="indefinite" />
+                                                        </stop>
+                                                        <stop offset="100%" stopColor="white" stopOpacity="0">
+                                                            <animate attributeName="offset" values="0.5;2.5" dur="3s" repeatCount="indefinite" />
+                                                        </stop>
+                                                    </linearGradient>
+                                                    <filter id="funnelGlow">
+                                                        <feGaussianBlur stdDeviation="4" result="blur" />
+                                                        <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                                                    </filter>
+                                                </defs>
+
+                                                {stages.map((stage, i) => {
+                                                    const count = stage.everEntered || stage.currentCount || 0
+                                                    const nextCount = stages[i + 1] ? (stages[i + 1].everEntered || stages[i + 1].currentCount || 0) : count * 0.5
+                                                    const widthPct = Math.max(0.18, count / topCount)
+                                                    const nextWidthPct = Math.max(0.12, nextCount / topCount)
+                                                    const y = i * 52 + 12
+                                                    const h = 40
+                                                    const topHalf = (maxW * widthPct) / 2
+                                                    const botHalf = (maxW * nextWidthPct) / 2
+                                                    const tl = funnelCenter - topHalf, tr = funnelCenter + topHalf
+                                                    const bl = funnelCenter - botHalf, br = funnelCenter + botHalf
+                                                    const dropOff = stage.dropOffRate || 0
+                                                    const color = stageColors[i % stageColors.length]
+
+                                                    return (
+                                                        <g key={i}>
+                                                            <polygon points={`${tl},${y} ${tr},${y} ${br},${y + h} ${bl},${y + h}`}
+                                                                fill={glowColors[i % glowColors.length]} filter="url(#funnelGlow)"
+                                                                style={{ animation: `pulse 3s ease-in-out ${i * 0.4}s infinite` }} />
+                                                            <polygon points={`${tl},${y} ${tr},${y} ${br},${y + h} ${bl},${y + h}`}
+                                                                fill={`url(#funnelGrad${i})`} stroke={color} strokeWidth="1" strokeOpacity="0.4"
+                                                                style={{ animation: `slide-up 0.6s ease-out ${i * 0.12}s both`, cursor: 'pointer' }} />
+                                                            <polygon points={`${tl},${y} ${tr},${y} ${br},${y + h} ${bl},${y + h}`}
+                                                                fill="url(#funnelShimmer)" />
+                                                            {/* Stage name inside trapezoid */}
+                                                            <text x={funnelCenter} y={y + h / 2 - 6} textAnchor="middle" fill="white" fontSize="14" fontWeight="800" dominantBaseline="middle"
+                                                                style={{ animation: `slide-up 0.5s ease-out ${i * 0.15 + 0.2}s both` }}>
+                                                                {count.toLocaleString()}
+                                                            </text>
+                                                            <text x={funnelCenter} y={y + h / 2 + 8} textAnchor="middle" fill="rgba(255,255,255,0.6)" fontSize="9" fontWeight="600" dominantBaseline="middle">
+                                                                {stage.stageName}
+                                                            </text>
+                                                            {/* Drop-off badge */}
+                                                            {dropOff > 0 && i < stages.length - 1 && (
+                                                                <g style={{ animation: `slide-up 0.5s ease-out ${i * 0.15 + 0.3}s both` }}>
+                                                                    <rect x={tr + 4} y={y + h - 6} width={dropOff > 9 ? 38 : 32} height={16} rx="8" fill="#f43f5e" fillOpacity="0.15" stroke="#f43f5e" strokeWidth="0.5" strokeOpacity="0.3" />
+                                                                    <text x={tr + 4 + (dropOff > 9 ? 19 : 16)} y={y + h + 2} textAnchor="middle" fill="#fb7185" fontSize="8" fontWeight="700" dominantBaseline="middle">
+                                                                        −{dropOff}%
+                                                                    </text>
+                                                                </g>
+                                                            )}
+                                                            {/* Animated particles */}
+                                                            {[0, 1, 2].map(p => {
+                                                                const px = funnelCenter + (p - 1) * 14
+                                                                return (
+                                                                    <circle key={p} cx={px} cy={y} r="1.5" fill="white" opacity="0">
+                                                                        <animate attributeName="cy" values={`${y};${y + h}`} dur={`${1.8 + p * 0.3}s`} begin={`${p * 0.5 + i * 0.3}s`} repeatCount="indefinite" />
+                                                                        <animate attributeName="opacity" values="0;0.5;0" dur={`${1.8 + p * 0.3}s`} begin={`${p * 0.5 + i * 0.3}s`} repeatCount="indefinite" />
+                                                                        <animate attributeName="r" values="1;2;1" dur={`${1.8 + p * 0.3}s`} begin={`${p * 0.5 + i * 0.3}s`} repeatCount="indefinite" />
+                                                                    </circle>
+                                                                )
+                                                            })}
+                                                        </g>
+                                                    )
+                                                })}
+
+                                                {/* Conversion drip */}
+                                                {(() => {
+                                                    const lastStage = stages[stages.length - 1]
+                                                    const lastCount = lastStage?.everEntered || lastStage?.currentCount || 0
+                                                    const lastWidthPct = Math.max(0.12, lastCount / topCount)
+                                                    const lastBotHalf = (maxW * lastWidthPct * 0.5) / 2
+                                                    const lastY = stages.length * 52 + 6
+                                                    return (
+                                                        <g style={{ animation: 'slide-up 0.8s ease-out 0.6s both' }}>
+                                                            <polygon points={`${funnelCenter - lastBotHalf},${lastY - 8} ${funnelCenter + lastBotHalf},${lastY - 8} ${funnelCenter},${lastY + 8}`}
+                                                                fill="#34d399" fillOpacity="0.3" stroke="#34d399" strokeWidth="1" strokeOpacity="0.4" />
+                                                            <circle cx={funnelCenter} cy={lastY + 14} r="3" fill="#34d399" opacity="0.8">
+                                                                <animate attributeName="r" values="2;5;2" dur="2s" repeatCount="indefinite" />
+                                                                <animate attributeName="opacity" values="0.8;0.2;0.8" dur="2s" repeatCount="indefinite" />
+                                                            </circle>
+                                                        </g>
+                                                    )
+                                                })()}
+                                            </svg>
+                                        )
+                                    })()}
+                                </div>
+
+                                {/* RIGHT: Stats + Sources */}
+                                <div className="flex-1 flex flex-col justify-between gap-4 min-w-0">
+                                    {/* Conversion Ring + Key Metrics */}
+                                    <div className="flex items-center gap-4 mb-1">
+                                        <div className="shrink-0">
+                                            <svg width="72" height="72" viewBox="0 0 72 72">
+                                                <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
+                                                <circle cx="36" cy="36" r="30" fill="none" stroke="#6366f1" strokeWidth="5" strokeLinecap="round"
+                                                    strokeDasharray={`${(funnelData.analytics?.overview?.conversionRate || 0) / 100 * 188} 188`}
+                                                    transform="rotate(-90 36 36)"
+                                                    style={{ animation: 'slide-up 1s ease-out 0.3s both' }} />
+                                                <text x="36" y="33" textAnchor="middle" fill="white" fontSize="15" fontWeight="800" dominantBaseline="middle">
+                                                    {funnelData.analytics?.overview?.conversionRate || 0}%
+                                                </text>
+                                                <text x="36" y="46" textAnchor="middle" fill="#94a3b8" fontSize="7" fontWeight="600" dominantBaseline="middle">
+                                                    CONVERSION
+                                                </text>
+                                            </svg>
+                                        </div>
+                                        <div className="flex-1 grid grid-cols-2 gap-2">
+                                            <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                                                <p className="text-[10px] text-slate-500 uppercase">Leads</p>
+                                                <p className="text-lg font-extrabold text-white">{funnelData.analytics?.overview?.totalEntries || 0}</p>
+                                            </div>
+                                            <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                                                <p className="text-[10px] text-slate-500 uppercase">Converted</p>
+                                                <p className="text-lg font-extrabold text-emerald-400">{funnelData.analytics?.overview?.convertedEntries || 0}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Stage breakdown list */}
+                                    <div className="space-y-1.5">
+                                        {(funnelData.analytics?.stages || []).map((stage, i) => {
+                                            const maxCount = Math.max(...(funnelData.analytics?.stages || []).map(s => s.everEntered || s.currentCount || 1))
+                                            const pct = Math.round(((stage.everEntered || stage.currentCount || 0) / maxCount) * 100)
+                                            const stageColors = ['#818cf8', '#6366f1', '#a78bfa', '#8b5cf6', '#7c3aed', '#6d28d9']
+                                            return (
+                                                <div key={i} className="flex items-center gap-2">
+                                                    <span className="text-[11px] text-slate-400 w-20 truncate">{stage.stageName}</span>
+                                                    <div className="flex-1 h-2 rounded-full bg-white/[0.04] overflow-hidden">
+                                                        <div className="h-full rounded-full transition-all duration-1000"
+                                                            style={{ width: `${pct}%`, background: stageColors[i % stageColors.length], animation: `slide-up 0.5s ease-out ${i * 0.1}s both` }} />
+                                                    </div>
+                                                    <span className="text-[11px] font-bold text-white w-8 text-right">{stage.everEntered || stage.currentCount || 0}</span>
+                                                    {stage.dropOffRate > 0 && (
+                                                        <span className="text-[9px] font-bold text-rose-400 w-8">−{stage.dropOffRate}%</span>
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+
+                                    {/* Revenue + Source Breakdown */}
+                                    <div className="flex items-center gap-3 flex-wrap mt-1">
+                                        <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/5 border border-amber-500/10">
+                                            <span className="material-symbols-outlined text-sm text-amber-400">payments</span>
+                                            <span className="text-xs text-slate-400">Revenue</span>
+                                            <span className="text-sm font-extrabold text-white">₹{(funnelData.analytics?.overview?.totalRevenue || 0).toLocaleString()}</span>
+                                        </div>
+                                        {(funnelData.analytics?.sourceBreakdown || []).slice(0, 4).map((src, i) => {
+                                            const srcColors = ['#818cf8', '#34d399', '#f59e0b', '#f43f5e']
+                                            return (
+                                                <div key={i} className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                                                    <div className="size-1.5 rounded-full" style={{ background: srcColors[i % srcColors.length] }} />
+                                                    <span className="text-[10px] text-slate-400 capitalize">{src.source}</span>
+                                                    <span className="text-[10px] font-bold text-white">{src.count}</span>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── 4b. PERFORMANCE COCKPIT ── */}
+                    {perfData && (
+                        <div className="glass-panel rounded-2xl p-5 lg:p-6 border border-rose-500/15 anim-slide-up cursor-pointer group"
+                            style={{ animationDelay: '290ms' }}
+                            onClick={() => navigate('/performance-marketing')}>
+                            <div className="flex items-center justify-between mb-5">
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-rose-400">campaign</span>
+                                    <span className="text-lg font-bold text-white">Performance Cockpit</span>
+                                    {anomalies.length > 0 && (
+                                        <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/20 animate-pulse">
+                                            {anomalies.length} Alert{anomalies.length > 1 ? 's' : ''}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-1 text-sm text-slate-500 group-hover:text-rose-400 transition-colors">
+                                    <span>Deep Dive</span>
+                                    <span className="material-symbols-outlined text-sm group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
+                                </div>
+                            </div>
+
+                            {(perfData.stats?.totalCampaigns || 0) > 0 ? (
+                                <>
+                                    {/* Stats Grid */}
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                                        {[
+                                            { label: 'Total Spend', value: `₹${(perfData.stats?.totalSpend || 0).toLocaleString()}`, icon: 'account_balance', color: '#f59e0b' },
+                                            { label: 'ROAS', value: `${perfData.stats?.avgRoas || '0'}x`, icon: 'show_chart', color: parseFloat(perfData.stats?.avgRoas) >= 2 ? '#34d399' : '#f43f5e' },
+                                            { label: 'CTR', value: `${perfData.stats?.avgCtr || '0'}%`, icon: 'ads_click', color: '#06b6d4' },
+                                            { label: 'Conversions', value: perfData.stats?.totalConversions || 0, icon: 'conversion_path', color: '#8b5cf6' },
+                                        ].map((m, i) => (
+                                            <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                                                <div className="flex items-center gap-1.5 mb-1">
+                                                    <span className="material-symbols-outlined text-sm" style={{ color: m.color }}>{m.icon}</span>
+                                                    <span className="text-xs text-slate-500">{m.label}</span>
+                                                </div>
+                                                <p className="text-xl font-extrabold text-white">{m.value}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Campaign List */}
+                                    {perfData.campaigns?.length > 0 && (
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Top Campaigns</p>
+                                            <div className="space-y-2">
+                                                {perfData.campaigns.slice(0, 4).map((c, i) => {
+                                                    const platformColors = { meta: '#e879f9', google: '#60a5fa', tiktok: '#34d399' }
+                                                    const statusColors = { active: 'bg-emerald-500/15 text-emerald-400', paused: 'bg-amber-500/15 text-amber-400', draft: 'bg-slate-500/15 text-slate-400' }
+                                                    return (
+                                                        <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-rose-500/15 transition-all"
+                                                            style={{ animation: `slide-up 0.3s ease-out ${i * 50}ms both` }}>
+                                                            <div className="size-8 rounded-lg flex items-center justify-center shrink-0"
+                                                                style={{ background: `${platformColors[c.platform] || '#8b5cf6'}15` }}>
+                                                                <span className="material-symbols-outlined text-sm" style={{ color: platformColors[c.platform] || '#8b5cf6' }}>
+                                                                    {c.platform === 'meta' ? 'group' : c.platform === 'google' ? 'search' : 'campaign'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-sm font-bold text-white truncate">{c.title}</p>
+                                                                <div className="flex items-center gap-2 mt-0.5">
+                                                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${statusColors[c.status] || statusColors.draft}`}>
+                                                                        {c.status}
+                                                                    </span>
+                                                                    <span className="text-[11px] text-slate-500 capitalize">{c.platform}</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-right shrink-0">
+                                                                <p className="text-sm font-extrabold text-white">{c.roas ? `${c.roas}x` : '—'}</p>
+                                                                <p className="text-[10px] text-slate-500">₹{(c.spend || 0).toLocaleString()}</p>
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Blended ROAS footer */}
+                                    {blendedRoas && (
+                                        <div className="mt-4 pt-3 border-t border-white/[0.04] flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-sm text-amber-400">insights</span>
+                                                <span className="text-xs text-slate-500">Blended MER</span>
+                                                <span className="text-sm font-extrabold text-white">{blendedRoas.mer?.toFixed(2) || '—'}x</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs text-slate-500">Revenue / Spend</span>
+                                                <span className="text-sm font-bold text-emerald-400">₹{(blendedRoas.totalRevenue || 0).toLocaleString()} / ₹{(blendedRoas.totalSpend || 0).toLocaleString()}</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                /* Empty state — no campaigns yet */
+                                <div className="text-center py-6">
+                                    <div className="size-16 rounded-2xl bg-rose-500/10 flex items-center justify-center mx-auto mb-4">
+                                        <span className="material-symbols-outlined text-3xl text-rose-400">ads_click</span>
+                                    </div>
+                                    <p className="text-base font-bold text-white mb-2">Connect Your Ad Platforms</p>
+                                    <p className="text-sm text-slate-400 max-w-sm mx-auto mb-5">
+                                        Link Meta Ads or Google Ads to unlock live ROAS tracking, anomaly detection, and automated campaign insights.
+                                    </p>
+                                    <div className="flex justify-center gap-3">
+                                        {[
+                                            { name: 'Meta Ads', icon: 'group', color: '#e879f9' },
+                                            { name: 'Google Ads', icon: 'search', color: '#60a5fa' },
+                                        ].map((p, i) => (
+                                            <div key={i} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-rose-500/20 transition-all">
+                                                <span className="material-symbols-outlined text-sm" style={{ color: p.color }}>{p.icon}</span>
+                                                <span className="text-sm font-bold text-white">{p.name}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="mt-5 flex items-center justify-center gap-6 text-xs text-slate-500">
+                                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-sm text-emerald-400">bolt</span>Live ROAS</span>
+                                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-sm text-amber-400">warning</span>Anomaly Alerts</span>
+                                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-sm text-indigo-400">auto_fix_high</span>AI Optimization</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ── 4c. STRIKES RADAR ── */}
                     {radar && (
                         <div className="glass-panel rounded-2xl p-5 lg:p-6 border border-white/[0.06] anim-slide-up cursor-pointer group"
                             style={{ animationDelay: '300ms' }}
@@ -913,7 +1284,7 @@ export default function UserDashboard() {
                         </div>
                     </div>
 
-                    {/* ── D2C PULSE ── */}
+                    {/* ── D2C PULSE (Enhanced) ── */}
                     <div className="glass-panel rounded-2xl p-5 lg:p-6 border border-emerald-500/10 anim-slide-up" style={{ animationDelay: '250ms' }}>
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -936,6 +1307,20 @@ export default function UserDashboard() {
                                         </div>
                                     ))}
                                 </div>
+
+                                {/* D2C Health Badge (based on AOV + orders) */}
+                                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04] mb-3">
+                                    <span className="material-symbols-outlined text-sm text-emerald-400">health_and_safety</span>
+                                    <span className="text-xs text-slate-400">D2C Health</span>
+                                    <span className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                        (d2cSnapshot.aov || 0) >= 2000 && (d2cSnapshot.weeklyOrders || 0) > 10 ? 'bg-emerald-500/15 text-emerald-400'
+                                        : (d2cSnapshot.aov || 0) >= 500 ? 'bg-amber-500/15 text-amber-400'
+                                        : 'bg-rose-500/15 text-rose-400'
+                                    }`}>
+                                        {(d2cSnapshot.aov || 0) >= 2000 && (d2cSnapshot.weeklyOrders || 0) > 10 ? '✓ Healthy' : (d2cSnapshot.aov || 0) >= 500 ? '● Average' : '⚠ Low AOV'}
+                                    </span>
+                                </div>
+
                                 {d2cSnapshot.topProducts?.length > 0 && (
                                     <div className="space-y-1.5 mb-3">
                                         <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">🔥 Top Products</p>
@@ -972,6 +1357,64 @@ export default function UserDashboard() {
                             </>
                         )}
                     </div>
+
+                    {/* ── RED FLAGS & ALERTS ── */}
+                    {(() => {
+                        const alerts = []
+                        // PM anomalies
+                        anomalies.forEach(a => alerts.push({ type: 'performance', severity: 'high', icon: 'warning', title: a.title || a.metric || 'Anomaly Detected', desc: a.description || `${a.metric} is ${a.direction || 'abnormal'}`, color: '#f43f5e', path: '/performance-marketing' }))
+                        // Low funnel conversion
+                        if (funnelData?.analytics?.overview?.conversionRate < 15 && funnelData?.analytics?.overview?.totalEntries > 5) {
+                            alerts.push({ type: 'funnel', severity: 'medium', icon: 'filter_alt', title: `Low Funnel Conversion: ${funnelData.analytics.overview.conversionRate}%`, desc: 'Below 15% benchmark. Review bottleneck stages.', color: '#6366f1', path: '/funnel-studio' })
+                        }
+                        // High lost rate in funnel
+                        if (funnelData?.analytics?.overview?.lostEntries > 3) {
+                            const lostPct = Math.round((funnelData.analytics.overview.lostEntries / funnelData.analytics.overview.totalEntries) * 100)
+                            if (lostPct > 25) {
+                                alerts.push({ type: 'funnel', severity: 'medium', icon: 'person_off', title: `${lostPct}% Leads Lost`, desc: `${funnelData.analytics.overview.lostEntries} leads dropped. Set up win-back sequences.`, color: '#f59e0b', path: '/funnel-studio' })
+                            }
+                        }
+                        // Zero ROAS
+                        if (perfData?.stats?.totalSpend > 0 && (perfData?.stats?.avgRoas || 0) < 1) {
+                            alerts.push({ type: 'performance', severity: 'high', icon: 'trending_down', title: 'ROAS Below 1x', desc: 'Ad spend exceeds returns. Review campaign targeting.', color: '#f43f5e', path: '/performance-marketing' })
+                        }
+
+                        return alerts.length > 0 ? (
+                            <div className="glass-panel rounded-2xl p-5 lg:p-6 border border-rose-500/15 anim-slide-up" style={{ animationDelay: '275ms' }}>
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
+                                    <span className="material-symbols-outlined text-rose-400">notifications_active</span>
+                                    Red Flags
+                                    <span className="px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 text-xs font-bold">{alerts.length}</span>
+                                </h3>
+                                <div className="space-y-2.5">
+                                    {alerts.slice(0, 5).map((a, i) => (
+                                        <button key={i} onClick={() => navigate(a.path)}
+                                            className="w-full flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-rose-500/20 transition-all text-left cursor-pointer group"
+                                            style={{ animation: `slide-up 0.3s ease-out ${i * 60}ms both` }}>
+                                            <span className="material-symbols-outlined text-lg mt-0.5 shrink-0" style={{ color: a.color }}>{a.icon}</span>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-white">{a.title}</p>
+                                                <p className="text-xs text-slate-500 mt-0.5">{a.desc}</p>
+                                            </div>
+                                            <span className="material-symbols-outlined text-sm text-slate-600 group-hover:text-rose-400 transition-colors shrink-0 mt-1">arrow_forward</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="glass-panel rounded-2xl p-5 lg:p-6 border border-emerald-500/10 anim-slide-up" style={{ animationDelay: '275ms' }}>
+                                <div className="flex items-center gap-3">
+                                    <div className="size-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-emerald-400">verified</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-white">All Clear</p>
+                                        <p className="text-xs text-slate-500">No red flags detected across your studios</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )
+                    })()}
 
                     {/* ── SEO KEYWORD NUGGETS ── */}
                     {grokSeo?.risingKeywords?.length > 0 && (

@@ -464,9 +464,12 @@ router.post('/ai/generate', protect, async (req, res) => {
             FunnelEntry.countDocuments({ funnel: funnelId, status: 'active' }),
         ]);
 
-        const ai = getRouter();
-        const result = await ai.generateText({
-            prompt: `You are a sales funnel automation expert. Create automation rules for this funnel.
+        let rulesData = [];
+
+        try {
+            const ai = getRouter();
+            const result = await ai.generateText({
+                prompt: `You are a sales funnel automation expert. Create automation rules for this funnel.
 
 ${brandContext}
 
@@ -494,16 +497,87 @@ Respond ONLY with a valid JSON array of rules:
 ]
 
 RULES MUST USE actual stage names from the funnel. Be specific and actionable. Use varied trigger types.`,
-            maxTokens: 2500,
-            temperature: 0.7,
-        });
+                maxTokens: 2500,
+                temperature: 0.7,
+            });
 
-        let rulesData;
-        try {
-            const jsonMatch = result.text.match(/\[[\s\S]*\]/);
-            rulesData = JSON.parse(jsonMatch ? jsonMatch[0] : result.text);
+            try {
+                const jsonMatch = result.text.match(/\[[\s\S]*\]/);
+                rulesData = JSON.parse(jsonMatch ? jsonMatch[0] : result.text);
+            } catch {
+                return res.status(500).json({ success: false, error: 'AI response was not valid JSON. Try again.' });
+            }
         } catch {
-            return res.status(500).json({ success: false, error: 'AI response was not valid JSON. Try again.' });
+            // ── Rule-based fallback when AI is unavailable ──
+            const stages = funnel.stages || [];
+            const stageNames = stages.map(s => s.name);
+            const lastStage = stageNames[stageNames.length - 1] || 'Final';
+            const secondStage = stageNames.length > 1 ? stageNames[1] : stageNames[0];
+
+            // Rule 1: Score boost on new entry
+            rulesData.push({
+                name: 'Welcome Score Boost',
+                description: 'Give new leads an initial score boost when they enter the funnel',
+                icon: 'rocket_launch', color: '#10b981',
+                trigger: { type: 'entry_created' },
+                conditions: [],
+                actions: [
+                    { type: 'update_score', scoreChange: 10 },
+                    { type: 'add_touchpoint', touchpointType: 'custom', touchpointDetails: 'Welcome — entered the funnel' },
+                ],
+            });
+
+            // Rule 2: Flag inactive leads
+            rulesData.push({
+                name: 'Flag Stale Leads',
+                description: 'Tag leads that have been inactive for 7+ days so you can re-engage them',
+                icon: 'schedule', color: '#f59e0b',
+                trigger: { type: 'inactivity', inactivityDays: 7 },
+                conditions: [{ field: 'status', operator: 'equals', value: 'active' }],
+                actions: [
+                    { type: 'add_tag', tagName: 'needs-follow-up' },
+                    { type: 'update_score', scoreChange: -5 },
+                    { type: 'send_notification', notificationMessage: 'Lead inactive for 7+ days — follow up!' },
+                ],
+            });
+
+            // Rule 3: Auto-advance hot leads
+            if (stageNames.length >= 2) {
+                rulesData.push({
+                    name: 'Auto-Advance Hot Leads',
+                    description: `Move high-scoring leads (80+) to "${secondStage}" automatically`,
+                    icon: 'trending_up', color: '#8b5cf6',
+                    trigger: { type: 'score_threshold', scoreThreshold: 80, scoreDirection: 'above' },
+                    conditions: [{ field: 'stage', operator: 'equals', value: stageNames[0] }],
+                    actions: [{ type: 'move_stage', targetStage: secondStage }],
+                });
+            }
+
+            // Rule 4: Convert leads in final stage with high score
+            rulesData.push({
+                name: 'Auto-Convert Winners',
+                description: `Mark leads in "${lastStage}" with score 90+ as converted`,
+                icon: 'emoji_events', color: '#06b6d4',
+                trigger: { type: 'score_threshold', scoreThreshold: 90, scoreDirection: 'above' },
+                conditions: [{ field: 'stage', operator: 'equals', value: lastStage }],
+                actions: [{ type: 'change_status', targetStatus: 'converted' }],
+            });
+
+            // Rule 5: Mark very cold leads as lost
+            rulesData.push({
+                name: 'Mark Cold Leads Lost',
+                description: 'Leads inactive for 30+ days with low score are marked as lost',
+                icon: 'person_off', color: '#ef4444',
+                trigger: { type: 'inactivity', inactivityDays: 30 },
+                conditions: [
+                    { field: 'status', operator: 'equals', value: 'active' },
+                    { field: 'score', operator: 'less_than', value: 20 },
+                ],
+                actions: [
+                    { type: 'change_status', targetStatus: 'lost' },
+                    { type: 'add_tag', tagName: 'auto-closed' },
+                ],
+            });
         }
 
         // Create all rules

@@ -244,22 +244,54 @@ export default function D2CAnalytics() {
                                             {insightsLoading ? 'Analyzing...' : 'AI Insights'}
                                         </button>
                                     </div>
-                                    {/* Mini bar chart */}
-                                    <div className="flex items-end gap-[2px] h-32">
-                                        {(data.dailyRevenue || []).map((d, i) => {
-                                            const maxRev = Math.max(...(data.dailyRevenue || []).map(x => x.revenue), 1)
-                                            const h = Math.max(2, (d.revenue / maxRev) * 100)
-                                            return (
-                                                <div key={i} className="flex-1 group relative cursor-default">
-                                                    <div className="w-full rounded-t-sm transition-all group-hover:opacity-80"
-                                                        style={{ height: `${h}%`, background: 'linear-gradient(180deg, #8b5cf6, #2B4BEE)', minHeight: '2px' }}
-                                                        title={`${d.date}: ₹${d.revenue.toLocaleString()} (${d.orders} orders)`} />
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
+                                    {/* SVG Area Chart */}
+                                    {(() => {
+                                        const dr = data.dailyRevenue || [];
+                                        if (dr.length === 0) return <div className="h-60 flex items-center justify-center text-slate-500 text-sm">No daily data</div>;
+                                        const maxRev = Math.max(...dr.map(x => x.revenue), 1);
+                                        const W = 900, H = 200, PAD = 4;
+                                        const stepX = (W - PAD * 2) / Math.max(dr.length - 1, 1);
+                                        const points = dr.map((d, i) => ({
+                                            x: PAD + i * stepX,
+                                            y: PAD + (1 - d.revenue / maxRev) * (H - PAD * 2),
+                                            ...d,
+                                        }));
+                                        const line = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+                                        const area = `${line} L${points[points.length - 1].x},${H} L${PAD},${H} Z`;
+                                        return (
+                                            <div className="relative">
+                                                <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-60" preserveAspectRatio="none">
+                                                    <defs>
+                                                        <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                                                            <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.5" />
+                                                            <stop offset="100%" stopColor="#2B4BEE" stopOpacity="0.05" />
+                                                        </linearGradient>
+                                                    </defs>
+                                                    {/* Grid lines */}
+                                                    {[0.25, 0.5, 0.75].map(f => (
+                                                        <line key={f} x1={PAD} y1={PAD + (1 - f) * (H - PAD * 2)} x2={W - PAD} y2={PAD + (1 - f) * (H - PAD * 2)} stroke="rgba(255,255,255,0.04)" strokeDasharray="4 6" />
+                                                    ))}
+                                                    <path d={area} fill="url(#revGrad)" />
+                                                    <path d={line} fill="none" stroke="#8b5cf6" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+                                                    {/* Hover dots */}
+                                                    {points.map((p, i) => (
+                                                        <g key={i}>
+                                                            <circle cx={p.x} cy={p.y} r="12" fill="transparent" className="cursor-pointer">
+                                                                <title>{`${p.date}\n₹${p.revenue.toLocaleString()}\n${p.orders} orders`}</title>
+                                                            </circle>
+                                                            <circle cx={p.x} cy={p.y} r="3" fill="#8b5cf6" stroke="#1e1b4b" strokeWidth="1.5" className="pointer-events-none opacity-0 hover:opacity-100" style={{ transition: 'opacity 0.15s' }} />
+                                                        </g>
+                                                    ))}
+                                                </svg>
+                                                {/* Y-axis labels */}
+                                                <div className="absolute top-1 left-2 text-[10px] text-slate-500 font-mono">₹{(maxRev / 1000).toFixed(0)}K</div>
+                                                <div className="absolute bottom-1 left-2 text-[10px] text-slate-500 font-mono">₹0</div>
+                                            </div>
+                                        );
+                                    })()}
                                     <div className="flex justify-between text-[10px] text-slate-600 mt-1">
                                         <span>{data.dailyRevenue?.[0]?.date}</span>
+                                        <span className="text-slate-500 font-mono">{data.dailyRevenue?.length || 0} days · Peak ₹{Math.max(...(data.dailyRevenue || []).map(x => x.revenue), 0).toLocaleString()}</span>
                                         <span>{data.dailyRevenue?.[data.dailyRevenue.length - 1]?.date}</span>
                                     </div>
                                 </div>
