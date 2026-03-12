@@ -433,14 +433,32 @@ export default function Integrations() {
                                         <input type="text" value={shopifyDomain} onChange={e => setShopifyDomain(e.target.value)}
                                             placeholder="my-store.myshopify.com"
                                             className="w-full px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white text-sm placeholder:text-slate-500 focus:border-primary focus:outline-none" />
+
+                                        {shopifyMode === 'oauth' && (
+                                            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex gap-3">
+                                                <span className="material-symbols-outlined text-amber-500 text-xl">warning</span>
+                                                <div className="text-xs text-amber-200/80 leading-relaxed">
+                                                    <p className="font-bold text-amber-400 mb-1">Shopify Review Pending</p>
+                                                    Shopify blocks standard OAuth for new apps on production stores until review is complete.
+                                                    Please use <strong>Access Token (Custom App)</strong> mode instead to connect immediately.
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {shopifyMode === 'token' && (
                                             <>
+                                                <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 space-y-3">
+                                                    <h4 className="text-xs font-bold text-primary uppercase tracking-wider">How to connect using Access Token</h4>
+                                                    <ol className="text-[11px] text-slate-400 space-y-2 list-decimal ml-4">
+                                                        <li>Go to <strong>Shopify Admin</strong> → Settings → Apps and sales channels</li>
+                                                        <li>Click <strong>Develop apps</strong> → <strong>Create an app</strong></li>
+                                                        <li><strong>Configure Admin API scopes</strong>: Select <code>read_products</code>, <code>read_orders</code>, and <code>read_customers</code></li>
+                                                        <li>Click <strong>Install app</strong> and copy the <strong>Admin API access token</strong> (starts with <code>shpat_</code>)</li>
+                                                    </ol>
+                                                </div>
                                                 <input type="password" value={shopifyToken} onChange={e => setShopifyToken(e.target.value)}
                                                     placeholder="Admin API Access Token (shpat_...)"
                                                     className="w-full px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white text-sm placeholder:text-slate-500 focus:border-primary focus:outline-none" />
-                                                <p className="text-[11px] text-slate-500">
-                                                    Go to your Shopify Admin → Settings → Apps and sales channels → Develop apps → Create an app → Configure Admin API scopes (read_products, read_orders, read_customers) → Install → Copy the Access Token
-                                                </p>
                                             </>
                                         )}
                                         <button onClick={connectShopify} disabled={loading.shopify}
