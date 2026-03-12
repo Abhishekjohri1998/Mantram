@@ -7,6 +7,7 @@
 
 import Integration from '../../models/Integration.js';
 import AdCampaign from '../../models/AdCampaign.js';
+import ShopifyOrder from '../../models/ShopifyOrder.js';
 import config from '../../config/env.js';
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -60,6 +61,26 @@ export async function getShopifyRevenueByDateRange(brandId, startDate, endDate) 
     }
 }
 
+/**
+ * Fallback: Get revenue from local ShopifyOrder collection (for demo/seeded data).
+ */
+async function getLocalShopifyRevenue(brandId) {
+    try {
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000);
+        const result = await ShopifyOrder.aggregate([
+            { $match: { brand: new (await import('mongoose')).default.Types.ObjectId(brandId), shopifyCreatedAt: { $gte: thirtyDaysAgo }, financialStatus: { $in: ['paid', 'partially_paid'] } } },
+            { $group: { _id: null, totalRevenue: { $sum: '$totalPrice' }, orderCount: { $sum: 1 } } }
+        ]);
+        if (result.length > 0) {
+            return { revenue: Math.round(result[0].totalRevenue * 100) / 100, orders: result[0].orderCount };
+        }
+        return { revenue: 0, orders: 0 };
+    } catch (e) {
+        console.warn('Local Shopify revenue fallback error:', e.message);
+        return { revenue: 0, orders: 0 };
+    }
+}
+
 
 // ══════════════════════════════════════════════════════════════════════════════
 // BLENDED MER (Marketing Efficiency Ratio)
@@ -84,9 +105,18 @@ export async function calculateBlendedMER(userId, brandId) {
     const platformReportedRevenue = campaigns.reduce((sum, c) => sum + (c.performance?.revenue || 0), 0);
     const platformRoas = totalSpend > 0 ? platformReportedRevenue / totalSpend : 0;
 
-    // Get Shopify revenue for same period
-    const shopifyData = await getShopifyRevenueByDateRange(brandId);
-    const shopifyRevenue = shopifyData.revenue || 0;
+    // Get Shopify revenue for same period (API first, then local DB fallback)
+    let shopifyData = await getShopifyRevenueByDateRange(brandId);
+    let shopifyRevenue = shopifyData.revenue || 0;
+
+    // Fallback to local ShopifyOrder collection if Shopify API returned 0
+    if (shopifyRevenue === 0 && shopifyData.error) {
+        const localData = await getLocalShopifyRevenue(brandId);
+        shopifyRevenue = localData.revenue;
+        if (shopifyRevenue > 0) {
+            shopifyData = { ...shopifyData, revenue: shopifyRevenue, orders: localData.orders, error: null, source: 'local_db' };
+        }
+    }
 
     // Blended MER = Shopify Revenue / Total Ad Spend
     const blendedMER = totalSpend > 0 ? shopifyRevenue / totalSpend : 0;
@@ -97,10 +127,12 @@ export async function calculateBlendedMER(userId, brandId) {
         : 0;
 
     return {
+        mer: Math.round(blendedMER * 100) / 100,
         blendedMER: Math.round(blendedMER * 100) / 100,
         platformRoas: Math.round(platformRoas * 100) / 100,
         attributionGap: `${attributionGap}%`, // How much platforms over-report
         totalSpend: Math.round(totalSpend * 100) / 100,
+        totalRevenue: Math.round(shopifyRevenue * 100) / 100,
         shopifyRevenue: Math.round(shopifyRevenue * 100) / 100,
         platformReportedRevenue: Math.round(platformReportedRevenue * 100) / 100,
         shopifyOrders: shopifyData.orders || 0,

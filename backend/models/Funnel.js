@@ -77,11 +77,10 @@ const funnelSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Auto-generate webhook token on creation
-funnelSchema.pre('save', function (next) {
+funnelSchema.pre('save', function () {
     if (!this.webhookToken) {
         this.webhookToken = [...Array(32)].map(() => Math.random().toString(36)[2]).join('');
     }
-    next();
 });
 
 funnelSchema.index({ user: 1, brand: 1 });

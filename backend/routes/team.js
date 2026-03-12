@@ -196,6 +196,48 @@ router.post('/invite', protect, async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════
+// GET /api/team/invite/:token — Validate invite (public, no auth)
+// ═══════════════════════════════════════════════════════════════
+router.get('/invite/:token', async (req, res) => {
+    try {
+        const invite = await TeamInvite.findOne({ token: req.params.token })
+            .populate('invitedBy', 'name email avatar')
+            .populate('organization', 'name');
+
+        if (!invite) return res.status(404).json({ error: 'Invitation not found or already used' });
+        if (invite.status !== 'pending') return res.status(400).json({ error: `This invitation has already been ${invite.status}` });
+        if (invite.expiresAt < new Date()) {
+            invite.status = 'expired';
+            await invite.save();
+            return res.status(400).json({ error: 'This invitation has expired' });
+        }
+
+        // Check if user already exists
+        const existingUser = await User.findOne({ email: invite.email });
+
+        // Get organization owner name
+        const orgOwner = await User.findById(invite.organization).select('name');
+
+        res.json({
+            success: true,
+            invite: {
+                email: invite.email,
+                name: invite.name,
+                role: invite.role,
+                message: invite.message,
+                invitedBy: invite.invitedBy,
+                teamName: orgOwner?.name ? `${orgOwner.name}'s Team` : 'the team',
+                studioAccess: invite.studioAccess,
+                expiresAt: invite.expiresAt,
+                existingUser: !!existingUser,
+            },
+        });
+    } catch (error) {
+        res.status(500).json({ error: safeErrorMessage(error) });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
 // POST /api/team/accept-invite/:token — Accept invitation
 // ═══════════════════════════════════════════════════════════════
 router.post('/accept-invite/:token', async (req, res) => {

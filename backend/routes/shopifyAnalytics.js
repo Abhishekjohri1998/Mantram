@@ -427,14 +427,18 @@ router.get('/overview', protect, async (req, res) => {
         const redFlags = computeRedFlags(orderAnalytics, products, customerAnalytics);
         const advanced = computeAdvancedAnalytics(orders, products);
 
+        // Extract shop info from integration
+        const shopDomain = integration.platformData?.shopDomain || integration.platformData?.shop || '';
+        const accessToken = integration.accessToken || '';
+
         let shopInfo = null;
-        try { shopInfo = await getShopInfo(accessToken, shopDomain); } catch { /* ok */ }
+        try { if (accessToken && shopDomain) shopInfo = await getShopInfo(accessToken, shopDomain); } catch { /* ok */ }
 
         const result = {
             connected: true,
             shop: {
-                name: shopInfo?.name || integration.platformData.shopName || shopDomain,
-                domain: shopDomain,
+                name: shopInfo?.name || integration.platformData?.shopName || shopDomain || 'Store',
+                domain: shopDomain || '',
                 lastSyncAt: integration.lastSyncAt,
                 currency: shopInfo?.currency || 'INR',
             },
@@ -530,10 +534,10 @@ router.post('/ai-insights', protect, async (req, res) => {
         let brand = null;
         if (brandId) brand = await Brand.findById(brandId).lean();
 
-        if (!isGrokAvailable()) {
-            // Smart fallback
+        // Helper: generate rule-based insights from data (no AI needed)
+        const generateRuleBasedInsights = () => {
             const insights = {
-                summary: `Your ${overview.shop?.name || 'store'} has generated ₹${overview.kpis?.totalRevenue?.toLocaleString()} from ${overview.kpis?.totalOrders} orders.`,
+                summary: `Your ${brand?.name || overview.shop?.name || 'store'} has generated ₹${overview.kpis?.totalRevenue?.toLocaleString()} from ${overview.kpis?.totalOrders} orders with an AOV of ₹${overview.kpis?.avgOrderValue?.toLocaleString()}.`,
                 whatsWorking: [],
                 whatsNot: [],
                 actionPlan: [],
@@ -545,11 +549,17 @@ router.post('/ai-insights', protect, async (req, res) => {
             if (overview.kpis?.revenueGrowth > 0) {
                 insights.whatsWorking.push({ title: `Revenue is growing ${overview.kpis.revenueGrowth}% WoW`, desc: 'Keep the momentum with consistent marketing and fresh content.', icon: 'trending_up' });
             }
+            if (overview.kpis?.repeatRate > 20) {
+                insights.whatsWorking.push({ title: `${overview.kpis.repeatRate}% repeat rate is healthy`, desc: 'Your customers are coming back, which signals strong product-market fit.', icon: 'loyalty' });
+            }
             if (overview.kpis?.refundRate > 5) {
                 insights.whatsNot.push({ title: `Refund rate is ${overview.kpis.refundRate}%`, desc: 'Review product quality, sizing guides, and delivery experience.', icon: 'warning' });
             }
             if (overview.kpis?.repeatRate < 20) {
                 insights.whatsNot.push({ title: `Only ${overview.kpis.repeatRate}% repeat customers`, desc: 'Launch loyalty programs and post-purchase email sequences.', icon: 'person_off' });
+            }
+            if (overview.kpis?.revenueGrowth < 0) {
+                insights.whatsNot.push({ title: `Revenue declined ${overview.kpis.revenueGrowth}% WoW`, desc: 'Investigate drop-off points and consider running a flash sale or re-engagement campaign.', icon: 'trending_down' });
             }
 
             const boostable = (overview.productHealth || []).filter(p => p.needsBoost);
@@ -557,13 +567,20 @@ router.post('/ai-insights', protect, async (req, res) => {
                 insights.actionPlan.push({ title: `Boost ${boostable.length} underperforming products`, desc: `Products like "${boostable[0].title}" have potential but need performance marketing. Run targeted ad campaigns.`, priority: 'high', icon: 'rocket_launch' });
             }
             insights.actionPlan.push({ title: 'Run a this-week flash sale', desc: `Your AOV is ₹${overview.kpis?.avgOrderValue?.toLocaleString()}. Create bundles above this to increase order value.`, priority: 'medium', icon: 'sell' });
-            insights.actionPlan.push({ title: 'Email dormant customers', desc: `${overview.customerAnalytics?.totalCustomers - overview.customerAnalytics?.newCustomers} existing customers haven't ordered recently. Send a win-back campaign.`, priority: 'medium', icon: 'email' });
+            insights.actionPlan.push({ title: 'Email dormant customers', desc: `${(overview.customerAnalytics?.totalCustomers || 0) - (overview.customerAnalytics?.newCustomers || 0)} existing customers haven't ordered recently. Send a win-back campaign.`, priority: 'medium', icon: 'email' });
 
-            return res.json({ insights });
+            return insights;
+        };
+
+        if (!isGrokAvailable()) {
+            return res.json({ insights: generateRuleBasedInsights() });
         }
 
-        const parsed = await callGrok(
-            `You are a D2C e-commerce strategist AI. Analyze the store data and provide actionable insights.
+        // Try AI with a 20-second timeout, fallback to rule-based if it fails
+        try {
+            const parsed = await Promise.race([
+                callGrok(
+                    `You are a D2C e-commerce strategist AI. Analyze the store data and provide actionable insights.
 
 Respond in JSON:
 {
@@ -574,16 +591,22 @@ Respond in JSON:
 }
 
 Be specific — reference product names, actual numbers, and percentages from the data.`,
-            `Brand: ${brand?.name || overview.shop?.name || 'Unknown'}
+                    `Brand: ${brand?.name || overview.shop?.name || 'Unknown'}
 Industry: ${brand?.dna?.industry || 'D2C'}
 KPIs: Revenue ₹${overview.kpis?.totalRevenue}, Orders: ${overview.kpis?.totalOrders}, AOV: ₹${overview.kpis?.avgOrderValue}, Growth: ${overview.kpis?.revenueGrowth}%, Repeat: ${overview.kpis?.repeatRate}%, Refund: ${overview.kpis?.refundRate}%
 Top Products: ${JSON.stringify(overview.productHealth?.slice(0, 5).map(p => ({ title: p.title, revenue: p.revenue, units: p.unitsSold, health: p.healthScore, needsBoost: p.needsBoost })))}
 Red Flags: ${JSON.stringify(overview.redFlags?.map(f => f.title))}
 Customers: Total ${overview.customerAnalytics?.totalCustomers}, New: ${overview.customerAnalytics?.newCustomers}, Top Cities: ${JSON.stringify(overview.customerAnalytics?.topCities?.slice(0, 3))}`,
-            2000
-        );
+                    2000
+                ),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('AI timeout after 20s')), 20000)),
+            ]);
 
-        res.json({ insights: parsed });
+            res.json({ insights: parsed });
+        } catch (aiErr) {
+            console.warn('⚠️ AI insights failed/timed out, using rule-based fallback:', aiErr.message);
+            res.json({ insights: generateRuleBasedInsights() });
+        }
     } catch (error) {
         console.error('AI insights error:', error);
         res.status(500).json({ error: safeErrorMessage(error) });
@@ -820,18 +843,18 @@ router.get('/cohort-ltv', protect, async (req, res) => {
         const integration = await getShopifyIntegration(userId, brandId);
         if (!integration) return res.json({ connected: false });
 
-        const [orders, customers] = await Promise.all([
-            fetchShopifyOrders(integration.accessToken, integration.platformData.shopDomain, { days: 365 }).catch(() => []),
-            fetchShopifyCustomers(integration.accessToken, integration.platformData.shopDomain).catch(() => []),
-        ]);
+        // Query from MongoDB (stored data) instead of live Shopify API
+        const yearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+        const bId = brandId || integration.brand;
+        const orders = await ShopifyOrder.find({ brand: bId, shopifyCreatedAt: { $gte: yearAgo } }).lean();
 
         // Build customer first-purchase date map
         const customerFirstOrder = {};
-        orders.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        orders.sort((a, b) => new Date(a.shopifyCreatedAt) - new Date(b.shopifyCreatedAt));
         orders.forEach(o => {
-            const cId = o.customer?.id || o.email;
+            const cId = o.customer?.shopifyCustomerId || o.customer?.email;
             if (cId && !customerFirstOrder[cId]) {
-                customerFirstOrder[cId] = new Date(o.created_at);
+                customerFirstOrder[cId] = new Date(o.shopifyCreatedAt);
             }
         });
 
@@ -860,11 +883,11 @@ router.get('/cohort-ltv', protect, async (req, res) => {
                 const activeInMonth = new Set();
                 let monthRevenue = 0;
                 orders.forEach(o => {
-                    const cId = o.customer?.id || o.email;
-                    const oDate = new Date(o.created_at);
+                    const cId = o.customer?.shopifyCustomerId || o.customer?.email;
+                    const oDate = new Date(o.shopifyCreatedAt);
                     if (cohortCustomers.includes(cId) && oDate >= retStart && oDate <= retEnd) {
                         activeInMonth.add(cId);
-                        monthRevenue += parseFloat(o.total_price || 0);
+                        monthRevenue += (o.totalPrice || 0);
                     }
                 });
                 retention.push({ month: rm, active: activeInMonth.size, rate: Math.round((activeInMonth.size / size) * 100), revenue: Math.round(monthRevenue) });
@@ -883,10 +906,10 @@ router.get('/cohort-ltv', protect, async (req, res) => {
         // Overall LTV curve (cumulative revenue per customer over months)
         const allCustomerLTV = {};
         orders.forEach(o => {
-            const cId = o.customer?.id || o.email;
+            const cId = o.customer?.shopifyCustomerId || o.customer?.email;
             if (!cId) return;
             if (!allCustomerLTV[cId]) allCustomerLTV[cId] = 0;
-            allCustomerLTV[cId] += parseFloat(o.total_price || 0);
+            allCustomerLTV[cId] += (o.totalPrice || 0);
         });
         const ltvValues = Object.values(allCustomerLTV).sort((a, b) => b - a);
         const avgLTV = ltvValues.length > 0 ? Math.round(ltvValues.reduce((s, v) => s + v, 0) / ltvValues.length) : 0;
@@ -897,11 +920,11 @@ router.get('/cohort-ltv', protect, async (req, res) => {
         let newRevenue = 0, returningRevenue = 0;
         const cOrderCount = {};
         orders.forEach(o => {
-            const cId = o.customer?.id || o.email;
+            const cId = o.customer?.shopifyCustomerId || o.customer?.email;
             if (!cId) return;
             cOrderCount[cId] = (cOrderCount[cId] || 0) + 1;
-            if (cOrderCount[cId] === 1) newRevenue += parseFloat(o.total_price || 0);
-            else returningRevenue += parseFloat(o.total_price || 0);
+            if (cOrderCount[cId] === 1) newRevenue += (o.totalPrice || 0);
+            else returningRevenue += (o.totalPrice || 0);
         });
 
         // Churn: customers who ordered >60 days ago but not in last 30
@@ -909,8 +932,8 @@ router.get('/cohort-ltv', protect, async (req, res) => {
         const activeRecently = new Set();
         const wasPreviouslyActive = new Set();
         orders.forEach(o => {
-            const cId = o.customer?.id || o.email;
-            const age = Date.now() - new Date(o.created_at).getTime();
+            const cId = o.customer?.shopifyCustomerId || o.customer?.email;
+            const age = Date.now() - new Date(o.shopifyCreatedAt).getTime();
             if (age < 30 * msDay) activeRecently.add(cId);
             if (age >= 30 * msDay && age < 120 * msDay) wasPreviouslyActive.add(cId);
         });
@@ -948,33 +971,36 @@ router.get('/profitability', protect, async (req, res) => {
         const integration = await getShopifyIntegration(userId, brandId);
         if (!integration) return res.json({ connected: false });
 
+        // Query from MongoDB (stored data) instead of live Shopify API
+        const dateLimit = new Date(Date.now() - parseInt(days) * 24 * 60 * 60 * 1000);
+        const bId = brandId || integration.brand;
         const [orders, products] = await Promise.all([
-            fetchShopifyOrders(integration.accessToken, integration.platformData.shopDomain, { days: parseInt(days) }).catch(() => []),
-            fetchShopifyProducts(integration.accessToken, integration.platformData.shopDomain).catch(() => []),
+            ShopifyOrder.find({ brand: bId, shopifyCreatedAt: { $gte: dateLimit } }).lean(),
+            Product.find({ brand: bId, source: 'shopify' }).lean(),
         ]);
 
-        // Revenue
-        const totalRevenue = orders.reduce((s, o) => s + parseFloat(o.total_price || 0), 0);
-        const totalDiscounts = orders.reduce((s, o) => s + parseFloat(o.total_discounts || 0), 0);
-        const totalTax = orders.reduce((s, o) => s + parseFloat(o.total_tax || 0), 0);
-        const totalShipping = orders.reduce((s, o) => s + (o.shipping_lines || []).reduce((ss, sl) => ss + parseFloat(sl.price || 0), 0), 0);
+        // Revenue (using stored schema field names)
+        const totalRevenue = orders.reduce((s, o) => s + (o.totalPrice || 0), 0);
+        const totalDiscounts = orders.reduce((s, o) => s + (o.totalDiscounts || 0), 0);
+        // Tax and shipping not stored in our model — estimate from revenue
+        const totalTax = Math.round(totalRevenue * 0.05); // Estimated 5% GST
+        const totalShipping = Math.round(orders.length * 45); // Estimated ₹45/order avg shipping
 
-        // COGS estimate (cost = comparing variant price to compare_at_price, or 40% margin as default)
+        // COGS estimate using Product variants
         let estimatedCOGS = 0;
         const productCostMap = {};
         products.forEach(p => {
             (p.variants || []).forEach(v => {
-                const price = parseFloat(v.price || 0);
-                const cost = v.compare_at_price ? price - (parseFloat(v.compare_at_price) - price) : price * 0.6; // 60% of selling price if no compare
-                productCostMap[String(v.id)] = Math.max(0, price - cost);
+                const price = v.price || p.price?.amount || 0;
+                // Use 60% of selling price as cost if no compare_at_price data
+                productCostMap[String(v.sku || v.title)] = price * 0.6;
             });
         });
         orders.forEach(o => {
-            (o.line_items || []).forEach(item => {
-                const margin = productCostMap[String(item.variant_id)];
+            (o.lineItems || []).forEach(item => {
+                const cost = productCostMap[String(item.sku)] || ((item.price || 0) * 0.6);
                 const qty = item.quantity || 1;
-                const revenue = parseFloat(item.price || 0) * qty;
-                estimatedCOGS += margin !== undefined ? revenue - (margin * qty) : revenue * 0.6;
+                estimatedCOGS += cost * qty;
             });
         });
 
@@ -998,14 +1024,14 @@ router.get('/profitability', protect, async (req, res) => {
         const blendedROAS = totalAdSpend > 0 ? Math.round((totalRevenue / totalAdSpend) * 100) / 100 : 0;
         const cac = totalAdConversions > 0 ? Math.round(totalAdSpend / totalAdConversions) : 0;
 
-        // Per-product profitability
+        // Per-product profitability (using stored lineItems field names)
         const productProfitMap = {};
         orders.forEach(o => {
-            (o.line_items || []).forEach(item => {
-                const key = item.product_id || item.title;
+            (o.lineItems || []).forEach(item => {
+                const key = item.productId || item.title;
                 if (!productProfitMap[key]) productProfitMap[key] = { title: item.title, revenue: 0, estimatedCost: 0, units: 0 };
                 const qty = item.quantity || 1;
-                const rev = parseFloat(item.price || 0) * qty;
+                const rev = (item.price || 0) * qty;
                 productProfitMap[key].revenue += rev;
                 productProfitMap[key].estimatedCost += rev * 0.6; // 60% cost assumption
                 productProfitMap[key].units += qty;
@@ -1101,6 +1127,157 @@ User Question: ${question}`,
         res.json({ ...parsed, aiPowered: true });
     } catch (error) {
         console.error('AI copilot error:', error);
+        res.status(500).json({ error: safeErrorMessage(error) });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TEMPORARY: POST /api/shopify-analytics/seed-demo — Seed ACwO D2C dummy data
+// DELETE /api/shopify-analytics/seed-demo — Remove seeded data
+// ═══════════════════════════════════════════════════════════════════════════
+
+const SEED_TAG = 'acwo-d2c-demo';
+
+const ACWO_PRODUCTS = [
+    { id: 'ACWO-001', title: 'ACwO DwOTS 2.0 True Wireless Earbuds', price: 1299, inventory: 450 },
+    { id: 'ACWO-002', title: 'ACwO Neckband X1 Pro', price: 899, inventory: 320 },
+    { id: 'ACWO-003', title: 'ACwO StudioBass Over-Ear Headphones', price: 1999, inventory: 180 },
+    { id: 'ACWO-004', title: 'ACwO SmartWatch Ultra S1', price: 2499, inventory: 150 },
+    { id: 'ACWO-005', title: 'ACwO PowerBank 10000mAh', price: 799, inventory: 600 },
+    { id: 'ACWO-006', title: 'ACwO SoundBar 60W Bluetooth', price: 3499, inventory: 85 },
+    { id: 'ACWO-007', title: 'ACwO Type-C Fast Charging Cable 2m', price: 299, inventory: 1200 },
+    { id: 'ACWO-008', title: 'ACwO ANC Earbuds Pro Max', price: 2999, inventory: 95 },
+    { id: 'ACWO-009', title: 'ACwO Portable Speaker Boom X', price: 1499, inventory: 210 },
+    { id: 'ACWO-010', title: 'ACwO Gaming TWS G1', price: 1799, inventory: 130 },
+    { id: 'ACWO-011', title: 'ACwO Magnetic Car Mount', price: 499, inventory: 340, deadStock: true },
+    { id: 'ACWO-012', title: 'ACwO Wired Earphones Classic', price: 199, inventory: 800, deadStock: true },
+];
+const FIRST_NAMES = ['Aarav','Priya','Rohan','Ananya','Vikram','Meera','Arjun','Sneha','Karthik','Divya','Aditya','Neha','Rahul','Pooja','Suresh','Kavitha','Manish','Ritu','Deepak','Swati','Amit','Lakshmi','Rajesh','Sonal','Vishal','Anjali','Nikhil','Shruti','Gaurav','Pallavi','Sanjay','Nidhi','Ashish','Isha','Harsh','Tina','Mohit','Riya','Sumit','Komal'];
+const LAST_NAMES = ['Sharma','Patel','Singh','Kumar','Gupta','Joshi','Mehta','Reddy','Nair','Iyer','Das','Verma','Chauhan','Mishra','Agarwal','Rao','Bhat','Saxena','Kapoor','Malhotra'];
+const CITIES = [
+    { city:'Mumbai', province:'Maharashtra', country:'India', zip:'400001', weight:20 },
+    { city:'Delhi', province:'Delhi', country:'India', zip:'110001', weight:18 },
+    { city:'Bangalore', province:'Karnataka', country:'India', zip:'560001', weight:15 },
+    { city:'Hyderabad', province:'Telangana', country:'India', zip:'500001', weight:12 },
+    { city:'Pune', province:'Maharashtra', country:'India', zip:'411001', weight:10 },
+    { city:'Chennai', province:'Tamil Nadu', country:'India', zip:'600001', weight:8 },
+    { city:'Ahmedabad', province:'Gujarat', country:'India', zip:'380001', weight:6 },
+    { city:'Jaipur', province:'Rajasthan', country:'India', zip:'302001', weight:4 },
+    { city:'Kolkata', province:'West Bengal', country:'India', zip:'700001', weight:4 },
+    { city:'Lucknow', province:'Uttar Pradesh', country:'India', zip:'226001', weight:3 },
+];
+const VARIANT_POOL = ['Black','White','Blue','Green','Grey','Red','Navy','Matte Black','Rose Gold','Midnight Blue'];
+function _rPick(a) { return a[Math.floor(Math.random()*a.length)]; }
+function _rBetween(a,b) { return Math.floor(Math.random()*(b-a+1))+a; }
+function _rDate(d) { return new Date(Date.now()-Math.random()*d*864e5); }
+function _wCity() { const tw=CITIES.reduce((s,c)=>s+c.weight,0); let r=Math.random()*tw; for(const c of CITIES){r-=c.weight;if(r<=0)return c;} return CITIES[0]; }
+
+router.post('/seed-demo', protect, async (req, res) => {
+    try {
+        const userId = req.user._id;
+        let brand = await Brand.findOne({ user: userId, name: /acwo/i });
+        if (!brand) {
+            // Auto-create ACwO brand for this user
+            brand = await Brand.create({
+                user: userId,
+                name: 'ACwO',
+                description: 'ACwO — Next-gen audio & gadget brand. Premium earbuds, neckbands, smartwatches & accessories.',
+                dna: {
+                    industry: 'Consumer Electronics',
+                    targetAudience: 'Gen Z & Millennials in India who want premium audio at accessible prices',
+                    brandVoice: 'Bold, youthful, tech-forward',
+                    brandValues: ['Innovation', 'Accessibility', 'Quality Sound'],
+                    competitors: ['boAt', 'Noise', 'Realme', 'OnePlus'],
+                    website: 'https://acwo.in',
+                },
+                status: 'active',
+            });
+            console.log(`🏷️ Created ACwO brand: ${brand._id}`);
+        }
+        const brandId = brand._id;
+
+        // 1. Integration
+        await Integration.findOneAndUpdate(
+            { user: userId, brand: brandId, platform: 'shopify' },
+            { user: userId, brand: brandId, platform: 'shopify', status: 'connected', accessToken: 'shpat_demo_token', platformData: { shopDomain: 'acwo-official.myshopify.com', shopName: 'ACwO Official Store' }, lastSyncAt: new Date(), syncCount: 1, displayName: 'ACwO Official Store', metadata: { _seedTag: SEED_TAG } },
+            { upsert: true, new: true }
+        );
+
+        // 2. Products
+        for (const p of ACWO_PRODUCTS) {
+            const v = _rPick(VARIANT_POOL);
+            await Product.findOneAndUpdate(
+                { brand: brandId, shopifyId: p.id },
+                { user: userId, brand: brandId, source: 'shopify', shopifyId: p.id, title: p.title, description: `Premium ${p.title} by ACwO.`, price: { amount: p.price, currency: 'INR' }, images: [], variants: [{ title: v, price: p.price, inventoryQuantity: p.inventory, sku: p.id }, { title: 'Default Title', price: p.price, inventoryQuantity: Math.floor(p.inventory/3), sku: p.id+'-DEF' }], status: 'active', tags: ['acwo','electronics'], metadata: { _seedTag: SEED_TAG } },
+                { upsert: true, new: true }
+            );
+        }
+
+        // 3. Customers
+        const NUM_CUST = 85;
+        const custIds = [];
+        for (let i = 0; i < NUM_CUST; i++) {
+            const fn = _rPick(FIRST_NAMES), ln = _rPick(LAST_NAMES), ct = _wCity();
+            const oc = i < 8 ? _rBetween(4,12) : i < 25 ? _rBetween(2,4) : 1;
+            const cid = `demo-cust-${i+1}`;
+            await ShopifyCustomer.findOneAndUpdate(
+                { brand: brandId, shopifyCustomerId: cid },
+                { user: userId, brand: brandId, shopifyCustomerId: cid, email: `${fn.toLowerCase()}.${ln.toLowerCase()}${i}@gmail.com`, firstName: fn, lastName: ln, phone: `+91${_rBetween(7e9,1e10-1)}`, ordersCount: oc, totalSpent: oc * _rBetween(800,3000), currency: 'INR', defaultAddress: { city: ct.city, province: ct.province, country: ct.country, zip: ct.zip }, acceptsMarketing: Math.random()>0.35, state: 'enabled', tags: ['demo'], shopifyCreatedAt: _rDate(120), shopifyUpdatedAt: _rDate(30), syncedAt: new Date() },
+                { upsert: true, new: true }
+            );
+            custIds.push(cid);
+        }
+
+        // 4. Orders
+        const sell = ACWO_PRODUCTS.filter(p => !p.deadStock);
+        const NUM_ORD = 210;
+        const bulkOps = [];
+        for (let i = 0; i < NUM_ORD; i++) {
+            const oDate = _rDate(60);
+            const ci = _rBetween(0, NUM_CUST-1);
+            const fn = FIRST_NAMES[ci % FIRST_NAMES.length], ln = LAST_NAMES[ci % LAST_NAMES.length];
+            const ct = _wCity();
+            const nItems = Math.random() > 0.7 ? _rBetween(2,3) : 1;
+            const lineItems = [], used = new Set();
+            for (let j = 0; j < nItems; j++) {
+                let pr = _rPick(sell); while(used.has(pr.id)) pr = _rPick(sell); used.add(pr.id);
+                const q = Math.random() > 0.85 ? 2 : 1;
+                lineItems.push({ shopifyLineItemId: `li-${i}-${j}`, productId: pr.id, variantId: `${pr.id}-v1`, title: pr.title, variantTitle: _rPick(VARIANT_POOL), quantity: q, price: pr.price, sku: pr.id });
+            }
+            const sub = lineItems.reduce((s,l) => s + l.price * l.quantity, 0);
+            const disc = Math.random() > 0.65 ? Math.round(sub * _rBetween(5,20)/100) : 0;
+            let fs = 'paid'; if (Math.random()<0.04) fs='refunded'; else if (Math.random()<0.02) fs='partially_refunded';
+            let ff = 'fulfilled'; if (oDate > new Date(Date.now()-3*864e5)) ff = Math.random()>0.5 ? null : 'fulfilled'; else if (Math.random()<0.08) ff = null;
+            bulkOps.push({ updateOne: { filter: { brand: brandId, shopifyOrderId: `demo-order-${i+1}` }, update: { $set: { user: userId, brand: brandId, shopifyOrderId: `demo-order-${i+1}`, shopifyOrderNumber: `#ACW-${1001+i}`, totalPrice: sub-disc, subtotalPrice: sub, totalDiscounts: disc, currency: 'INR', financialStatus: fs, fulfillmentStatus: ff, customer: { shopifyCustomerId: custIds[ci], email: `${fn.toLowerCase()}.${ln.toLowerCase()}${ci}@gmail.com`, firstName: fn, lastName: ln, city: ct.city, province: ct.province, country: ct.country }, lineItems, shopifyCreatedAt: oDate, shopifyUpdatedAt: oDate, syncedAt: new Date(), rawData: { _seedTag: SEED_TAG } } }, upsert: true } });
+        }
+        await ShopifyOrder.bulkWrite(bulkOps);
+
+        // Clear analytics cache
+        Object.keys(analyticsCache).forEach(k => delete analyticsCache[k]);
+
+        res.json({ success: true, message: `Seeded D2C demo: 12 products, 85 customers, 210 orders for ACwO.` });
+    } catch (error) {
+        console.error('Seed demo error:', error);
+        res.status(500).json({ error: safeErrorMessage(error) });
+    }
+});
+
+router.delete('/seed-demo', protect, async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const brand = await Brand.findOne({ user: userId, name: /acwo/i });
+        if (!brand) return res.status(404).json({ error: 'ACwO brand not found.' });
+        const brandId = brand._id;
+
+        const intR = await Integration.deleteMany({ user: userId, brand: brandId, platform: 'shopify', 'metadata._seedTag': SEED_TAG });
+        const ordR = await ShopifyOrder.deleteMany({ brand: brandId, 'rawData._seedTag': SEED_TAG });
+        const custR = await ShopifyCustomer.deleteMany({ brand: brandId, shopifyCustomerId: /^demo-cust-/ });
+        const prodR = await Product.deleteMany({ brand: brandId, source: 'shopify', 'metadata._seedTag': SEED_TAG });
+        Object.keys(analyticsCache).forEach(k => delete analyticsCache[k]);
+
+        res.json({ success: true, deleted: { integrations: intR.deletedCount, orders: ordR.deletedCount, customers: custR.deletedCount, products: prodR.deletedCount } });
+    } catch (error) {
+        console.error('Delete seed error:', error);
         res.status(500).json({ error: safeErrorMessage(error) });
     }
 });

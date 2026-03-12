@@ -192,6 +192,7 @@ app.use('/api/funnel-intelligence', funnelIntelligenceRoutes);
 app.use('/api/funnel-automation', funnelAutomationRoutes);
 app.use('/api/funnel-webhooks', funnelWebhookRoutes);
 app.use('/api/media', mediaUploadRoutes);
+app.use('/api/intel/missions', intelMissionRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
