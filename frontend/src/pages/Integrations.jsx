@@ -61,7 +61,7 @@ export default function Integrations() {
         try {
             // Social + Shopify
             const [shopifyData, socialData] = await Promise.allSettled([
-                shopifyAPI.status(),
+                shopifyAPI.status(brandId),
                 social.accounts(),
             ])
             const mappedStatus = {
@@ -185,14 +185,14 @@ export default function Integrations() {
             if (!shopifyToken) return alert('Paste your Admin API Access Token')
             setLoading(l => ({ ...l, shopify: true }))
             try {
-                const data = await shopifyAPI.connectToken(shopifyDomain, shopifyToken)
+                const data = await shopifyAPI.connectToken(shopifyDomain, shopifyToken, brandId)
                 alert(`✅ Connected to ${data.shopName}!`); setShopifyToken(''); loadAllStatuses()
             } catch (err) { alert(`Connection failed: ${err.message}`) }
             finally { setLoading(l => ({ ...l, shopify: false })) }
         } else {
             setLoading(l => ({ ...l, shopify: true }))
             try {
-                const data = await shopifyAPI.connect(shopifyDomain)
+                const data = await shopifyAPI.connect(shopifyDomain, brandId)
                 if (data.authUrl) window.open(data.authUrl, '_blank', 'width=600,height=700')
             } catch (err) { alert(`Shopify connection failed: ${err.message}`) }
             finally { setLoading(l => ({ ...l, shopify: false })) }
@@ -403,7 +403,7 @@ export default function Integrations() {
                                                 if (!confirm('Disconnect Shopify for this brand?')) return;
                                                 setLoading(l => ({ ...l, shopify: true }));
                                                 try {
-                                                    await shopifyAPI.disconnect();
+                                                    await shopifyAPI.disconnect(brandId);
                                                     loadAllStatuses();
                                                 } catch (err) {
                                                     alert(err.message);

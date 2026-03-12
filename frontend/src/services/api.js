@@ -161,16 +161,16 @@ export const agents = {
 
 // ============ Shopify API ============
 export const shopify = {
-    connect: (shopDomain) => apiFetch('/shopify/connect', { method: 'POST', body: JSON.stringify({ shopDomain }) }),
-    connectToken: (shopDomain, accessToken) => apiFetch('/shopify/connect-token', { method: 'POST', body: JSON.stringify({ shopDomain, accessToken }) }),
+    connect: (shopDomain, brandId) => apiFetch('/shopify/connect', { method: 'POST', body: JSON.stringify({ shopDomain, brandId }) }),
+    connectToken: (shopDomain, accessToken, brandId) => apiFetch('/shopify/connect-token', { method: 'POST', body: JSON.stringify({ shopDomain, accessToken, brandId }) }),
     sync: (brandId) => apiFetch('/shopify/sync', { method: 'POST', body: JSON.stringify({ brandId }) }),
     products: (params = {}) => {
         const query = new URLSearchParams(params).toString();
         return apiFetch(`/shopify/products?${query}`);
     },
     getProduct: (id) => apiFetch(`/shopify/products/${id}`),
-    disconnect: () => apiFetch('/shopify/disconnect', { method: 'DELETE' }),
-    status: () => apiFetch('/shopify/status'),
+    disconnect: (brandId) => apiFetch(`/shopify/disconnect${brandId ? `?brandId=${brandId}` : ''}`, { method: 'DELETE' }),
+    status: (brandId) => apiFetch(`/shopify/status${brandId ? `?brandId=${brandId}` : ''}`),
 };
 
 // ============ Products API ============

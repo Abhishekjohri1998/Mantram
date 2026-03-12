@@ -39,13 +39,15 @@ router.get('/status', protect, async (req, res) => {
                 success: true,
                 status: {
                     connected: integration.status === 'connected',
+                    status: integration.status, // Added for frontend StatusBadge
                     shopDomain: integration.platformData?.shopDomain || '',
                     shopName: integration.platformData?.shopName || '',
-                    displayName: integration.displayName || integration.platformData?.shopName || ''
+                    displayName: integration.displayName || integration.platformData?.shopName || '',
+                    lastSyncAt: integration.lastSyncAt
                 }
             });
         } else {
-            res.json({ success: true, status: { connected: false } });
+            res.json({ success: true, status: { connected: false, status: 'disconnected' } });
         }
     } catch (error) {
         res.status(500).json({ success: false, error: 'Failed to fetch Shopify status' });
@@ -113,9 +115,15 @@ router.post('/connect-token', protect, async (req, res) => {
             return res.status(400).json({ success: false, error: `Invalid token or domain — Shopify returned: ${err.message}` });
         }
 
+        const query = {
+            user: req.user._id,
+            platform: 'shopify',
+            ...(brandId ? { brand: brandId } : { brand: { $exists: false } })
+        };
+
         // Save or update integration
         await Integration.findOneAndUpdate(
-            { user: req.user._id, platform: 'shopify', 'platformData.shopDomain': cleanDomain },
+            query,
             {
                 user: req.user._id,
                 platform: 'shopify',
@@ -172,9 +180,12 @@ router.get('/callback', async (req, res) => {
             } catch { /* state decode failed, find by shop domain */ }
         }
 
-        // Find the integration — match by shop domain (most reliable)
-        const query = { 'platformData.shopDomain': shop, platform: 'shopify' };
+        // Find the integration — match by shop domain and brand (decoded from state)
+        const query = { platform: 'shopify' };
         if (userId) query.user = userId;
+        if (brandId) query.brand = brandId;
+        else query.brand = { $exists: false };
+
         const integration = await Integration.findOneAndUpdate(
             query,
             {
@@ -232,14 +243,17 @@ router.get('/callback', async (req, res) => {
 router.post('/sync', protect, async (req, res) => {
     try {
         const { brandId } = req.body;
-        const integration = await Integration.findOne({
+        const query = {
             user: req.user._id,
             platform: 'shopify',
             status: 'connected',
-        }).select('+accessToken');
+        };
+        if (brandId) query.brand = brandId;
+
+        const integration = await Integration.findOne(query).select('+accessToken');
 
         if (!integration) {
-            return res.status(400).json({ success: false, error: 'Shopify is not connected. Please connect first.' });
+            return res.status(400).json({ success: false, error: 'Shopify is not connected for this brand.' });
         }
 
         console.log(`📦 Syncing all data from Shopify: ${integration.platformData.shopDomain}`);
