@@ -399,7 +399,18 @@ export default function Integrations() {
                                                 className="px-4 py-2 rounded-xl text-sm bg-white/[0.05] hover:bg-white/[0.1] text-slate-300">
                                                 📦 View Products
                                             </button>
-                                            <button onClick={() => disconnectPlatform('shopify')}
+                                            <button onClick={async () => {
+                                                if (!confirm('Disconnect Shopify for this brand?')) return;
+                                                setLoading(l => ({ ...l, shopify: true }));
+                                                try {
+                                                    await shopifyAPI.disconnect();
+                                                    loadAllStatuses();
+                                                } catch (err) {
+                                                    alert(err.message);
+                                                } finally {
+                                                    setLoading(l => ({ ...l, shopify: false }));
+                                                }
+                                            }}
                                                 className="px-4 py-2 rounded-xl text-sm text-red-400 hover:bg-red-500/10">
                                                 Disconnect
                                             </button>
