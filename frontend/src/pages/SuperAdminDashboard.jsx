@@ -139,14 +139,15 @@ export default function SuperAdminDashboard() {
             else loadUsers();
         } catch (e) { showToast(e.message || 'Rejection failed', 'error') } 
     }
-    const handleDeleteBrand = async (id, name) => { 
-        const brandId = id?._id || id;
+    const handleDeleteBrand = async (brand, name) => { 
+        const brandId = brand?._id || brand?.id || brand;
         if (!brandId || brandId === 'undefined') {
-            console.error('Attempted to delete brand with undefined ID');
-            showToast('Invalid Brand ID', 'error');
+            console.error('Attempted to delete brand with undefined ID', { brand, name });
+            showToast(`Invalid Brand ID (${brandId})`, 'error');
             return;
         }
-        if (!confirm(`Delete brand "${name}" and all data?`)) return; 
+        const brandName = name || brand?.name || 'this brand';
+        if (!confirm(`Delete brand "${brandName}" and all data?`)) return; 
         try { 
             await API.deleteBrand(brandId); 
             showToast('Brand deleted'); 
@@ -157,10 +158,10 @@ export default function SuperAdminDashboard() {
         } 
     }
 
-    const handleDeleteContent = async (id) => { 
-        const contentId = id?._id || id;
+    const handleDeleteContent = async (item) => { 
+        const contentId = item?._id || item?.id || item;
         if (!contentId || contentId === 'undefined') {
-            showToast('Invalid Content ID', 'error');
+            showToast(`Invalid Content ID (${contentId})`, 'error');
             return;
         }
         if (!confirm('Delete this content?')) return; 
@@ -868,7 +869,7 @@ export default function SuperAdminDashboard() {
                                         <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400 text-xs font-bold">{b.name?.[0]?.toUpperCase()}</div>
                                         <div><p className="text-base font-bold text-white">{b.name}</p><p className="text-xs text-slate-600">{b.user?.name} • {b.user?.email}</p></div>
                                     </div>
-                                    <button onClick={() => handleDeleteBrand(b._id || b.id, b.name)} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-slate-600 hover:text-rose-400 cursor-pointer"><span className="material-symbols-outlined text-sm">delete</span></button>
+                                    <button onClick={() => handleDeleteBrand(b, b.name)} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-slate-600 hover:text-rose-400 cursor-pointer"><span className="material-symbols-outlined text-sm">delete</span></button>
                                 </div>
                                 <div className="flex gap-3 text-center">
                                     <div className="flex-1 p-2 rounded-lg bg-white/[0.02]"><p className="text-base font-bold text-white">{b.contentCount}</p><p className="text-xs text-slate-600">Content</p></div>
@@ -889,7 +890,7 @@ export default function SuperAdminDashboard() {
                                 <div className="flex items-center gap-2 shrink-0">
                                     <span className="text-xs text-slate-600">{c.user?.name}</span>
                                     <span className="text-xs text-slate-700">{new Date(c.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
-                                    <button onClick={() => handleDeleteContent(c._id || c.id)} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-slate-600 hover:text-rose-400 cursor-pointer"><span className="material-symbols-outlined text-sm">delete</span></button>
+                                    <button onClick={() => handleDeleteContent(c)} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-slate-600 hover:text-rose-400 cursor-pointer"><span className="material-symbols-outlined text-sm">delete</span></button>
                                 </div>
                             </div>
                         ))}</div>

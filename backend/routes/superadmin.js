@@ -453,7 +453,8 @@ router.get('/brands', async (req, res) => {
             .populate('user', 'name email')
             .sort('-createdAt')
             .limit(parseInt(limit))
-            .skip((parseInt(page) - 1) * parseInt(limit));
+            .skip((parseInt(page) - 1) * parseInt(limit))
+            .lean();
         const total = await Brand.countDocuments(filter);
 
         // Get content/creative counts per brand
@@ -466,10 +467,10 @@ router.get('/brands', async (req, res) => {
 
         const brandsWithCounts = brands.map(b => {
             const bid = String(b._id);
-            const json = b.toJSON();
             return {
-                ...json,
-                id: bid, // Explicitly add id for frontend
+                ...b,
+                id: bid,
+                _id: bid,
                 contentCount: contentCounts.find(c => String(c._id) === bid)?.count || 0,
                 creativeCount: creativeCounts.find(c => String(c._id) === bid)?.count || 0,
                 productCount: productCounts.find(c => String(c._id) === bid)?.count || 0,
@@ -517,11 +518,13 @@ router.get('/content', async (req, res) => {
             .populate('brand', 'name')
             .sort('-createdAt')
             .limit(parseInt(limit))
-            .skip((parseInt(page) - 1) * parseInt(limit));
+            .skip((parseInt(page) - 1) * parseInt(limit))
+            .lean();
         const total = await Content.countDocuments(filter);
         const contentWithIds = content.map(c => ({
-            ...c.toJSON(),
-            id: String(c._id) // Explicitly add id for frontend
+            ...c,
+            id: String(c._id),
+            _id: String(c._id)
         }));
 
         res.json({ success: true, content: contentWithIds, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
