@@ -466,8 +466,10 @@ router.get('/brands', async (req, res) => {
 
         const brandsWithCounts = brands.map(b => {
             const bid = String(b._id);
+            const json = b.toJSON();
             return {
-                ...b.toJSON(),
+                ...json,
+                id: bid, // Explicitly add id for frontend
                 contentCount: contentCounts.find(c => String(c._id) === bid)?.count || 0,
                 creativeCount: creativeCounts.find(c => String(c._id) === bid)?.count || 0,
                 productCount: productCounts.find(c => String(c._id) === bid)?.count || 0,
@@ -482,7 +484,12 @@ router.get('/brands', async (req, res) => {
 
 router.delete('/brands/:id', async (req, res) => {
     try {
-        const brand = await Brand.findById(req.params.id);
+        const { id } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ success: false, error: 'Invalid Brand ID' });
+        }
+
+        const brand = await Brand.findById(id);
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
         await Promise.all([
             Content.deleteMany({ brand: brand._id }),
@@ -512,7 +519,12 @@ router.get('/content', async (req, res) => {
             .limit(parseInt(limit))
             .skip((parseInt(page) - 1) * parseInt(limit));
         const total = await Content.countDocuments(filter);
-        res.json({ success: true, content, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
+        const contentWithIds = content.map(c => ({
+            ...c.toJSON(),
+            id: String(c._id) // Explicitly add id for frontend
+        }));
+
+        res.json({ success: true, content: contentWithIds, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -520,7 +532,13 @@ router.get('/content', async (req, res) => {
 
 router.delete('/content/:id', async (req, res) => {
     try {
-        await Content.findByIdAndDelete(req.params.id);
+        const { id } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ success: false, error: 'Invalid Content ID' });
+        }
+
+        const item = await Content.findByIdAndDelete(id);
+        if (!item) return res.status(404).json({ success: false, error: 'Content not found' });
         res.json({ success: true, message: 'Content deleted' });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });

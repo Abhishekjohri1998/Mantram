@@ -139,8 +139,39 @@ export default function SuperAdminDashboard() {
             else loadUsers();
         } catch (e) { showToast(e.message || 'Rejection failed', 'error') } 
     }
-    const handleDeleteBrand = async (id, name) => { if (!confirm(`Delete brand "${name}" and all data?`)) return; try { await API.deleteBrand(id); showToast('Brand deleted'); loadBrands(); loadStats() } catch { showToast('Failed', 'error') } }
-    const handleDeleteContent = async (id) => { if (!confirm('Delete this content?')) return; try { await API.deleteContent(id); showToast('Deleted'); loadContent() } catch { showToast('Failed', 'error') } }
+    const handleDeleteBrand = async (id, name) => { 
+        const brandId = id?._id || id;
+        if (!brandId || brandId === 'undefined') {
+            console.error('Attempted to delete brand with undefined ID');
+            showToast('Invalid Brand ID', 'error');
+            return;
+        }
+        if (!confirm(`Delete brand "${name}" and all data?`)) return; 
+        try { 
+            await API.deleteBrand(brandId); 
+            showToast('Brand deleted'); 
+            loadBrands(); 
+            loadStats();
+        } catch (e) { 
+            showToast(e.message || 'Failed to delete brand', 'error');
+        } 
+    }
+
+    const handleDeleteContent = async (id) => { 
+        const contentId = id?._id || id;
+        if (!contentId || contentId === 'undefined') {
+            showToast('Invalid Content ID', 'error');
+            return;
+        }
+        if (!confirm('Delete this content?')) return; 
+        try { 
+            await API.deleteContent(contentId); 
+            showToast('Deleted'); 
+            loadContent();
+        } catch (e) { 
+            showToast(e.message || 'Failed to delete content', 'error');
+        } 
+    }
     const handleCreateCoupon = async (e) => { e.preventDefault(); try { await API.createCoupon({ ...couponForm, discountValue: Number(couponForm.discountValue), maxUses: couponForm.maxUses ? Number(couponForm.maxUses) : 0, validUntil: couponForm.validUntil || null }); showToast('Coupon created'); setShowCouponForm(false); setCouponForm({ code: '', discountType: 'credits', discountValue: '', maxUses: '', validUntil: '', description: '' }); loadCoupons() } catch (e) { showToast(e.error || 'Failed', 'error') } }
     const handleToggleCoupon = async (id, isActive) => { try { await API.updateCoupon(id, { isActive: !isActive }); loadCoupons() } catch { showToast('Failed', 'error') } }
     const handleDeleteCoupon = async (id) => { if (!confirm('Delete coupon?')) return; try { await API.deleteCoupon(id); showToast('Deleted'); loadCoupons() } catch { showToast('Failed', 'error') } }
@@ -837,7 +868,7 @@ export default function SuperAdminDashboard() {
                                         <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400 text-xs font-bold">{b.name?.[0]?.toUpperCase()}</div>
                                         <div><p className="text-base font-bold text-white">{b.name}</p><p className="text-xs text-slate-600">{b.user?.name} • {b.user?.email}</p></div>
                                     </div>
-                                    <button onClick={() => handleDeleteBrand(b._id, b.name)} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-slate-600 hover:text-rose-400 cursor-pointer"><span className="material-symbols-outlined text-sm">delete</span></button>
+                                    <button onClick={() => handleDeleteBrand(b._id || b.id, b.name)} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-slate-600 hover:text-rose-400 cursor-pointer"><span className="material-symbols-outlined text-sm">delete</span></button>
                                 </div>
                                 <div className="flex gap-3 text-center">
                                     <div className="flex-1 p-2 rounded-lg bg-white/[0.02]"><p className="text-base font-bold text-white">{b.contentCount}</p><p className="text-xs text-slate-600">Content</p></div>
@@ -858,7 +889,7 @@ export default function SuperAdminDashboard() {
                                 <div className="flex items-center gap-2 shrink-0">
                                     <span className="text-xs text-slate-600">{c.user?.name}</span>
                                     <span className="text-xs text-slate-700">{new Date(c.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
-                                    <button onClick={() => handleDeleteContent(c._id)} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-slate-600 hover:text-rose-400 cursor-pointer"><span className="material-symbols-outlined text-sm">delete</span></button>
+                                    <button onClick={() => handleDeleteContent(c._id || c.id)} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-slate-600 hover:text-rose-400 cursor-pointer"><span className="material-symbols-outlined text-sm">delete</span></button>
                                 </div>
                             </div>
                         ))}</div>
