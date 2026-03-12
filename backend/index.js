@@ -129,10 +129,10 @@ if (config.nodeEnv === 'development') {
     });
 }
 
-// BUG-14 FIX: Rate limiting on sensitive endpoints
+// BUG-14 FIX: Tightened rate limiting on sensitive endpoints
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 15, // 15 attempts per window
+    max: 5, // Tightened to 5 attempts per window for registration/login
     message: { success: false, error: 'Too many attempts. Please try again after 15 minutes.' },
     standardHeaders: true,
     legacyHeaders: false,
@@ -145,8 +145,11 @@ const apiLimiter = rateLimit({
     legacyHeaders: false,
 });
 app.use('/api/', apiLimiter);
+
+// Specific limiters for auth
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/resend-verification', authLimiter);
 
 // API Routes
 app.use('/api/auth', authRoutes);

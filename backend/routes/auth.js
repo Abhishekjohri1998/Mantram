@@ -1,11 +1,20 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
+import crypto from 'crypto';
 import User from '../models/User.js';
 import { protect, generateToken } from '../middleware/auth.js';
 import config from '../config/env.js';
 import { safeErrorMessage } from '../utils/safeError.js';
+import { sendVerificationEmail } from '../utils/email.js';
 
 const router = Router();
+
+// Spam Protection: Domain Blacklist for common "burner" providers
+const BLACKLISTED_DOMAINS = [
+    'mailinator.com', 'yopmail.com', 'temp-mail.org', 'guerrillamail.com',
+    '10minutemail.com', 'discard.email', 'dispostable.com', 'pookmail.com',
+    'sharklasers.com', 'guerrillamailblock.com', 'pokemail.net'
+];
 
 // Helper: check DB is connected before any DB operation
 function requireDB(req, res) {
@@ -21,26 +30,56 @@ router.post('/register', async (req, res) => {
     if (!requireDB(req, res)) return;
     try {
         const { name, email, password, company } = req.body;
-        // BUG-18 FIX: Input validation
+
+        // Input validation
         if (!name || name.trim().length < 2) {
             return res.status(400).json({ success: false, error: 'Name must be at least 2 characters' });
         }
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             return res.status(400).json({ success: false, error: 'Valid email is required' });
         }
+
+        // Spam/Fraud Check: Check domain blacklist
+        const domain = email.split('@')[1].toLowerCase();
+        if (BLACKLISTED_DOMAINS.includes(domain)) {
+            return res.status(400).json({ success: false, error: 'Temporary/Disposable email addresses are not allowed for security reasons.' });
+        }
+
         if (!password || password.length < 6) {
             return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
         }
+
         const exists = await User.findOne({ email });
         if (exists) {
             return res.status(400).json({ success: false, error: 'Email already registered' });
         }
-        const user = await User.create({ name, email, password, company });
-        const token = generateToken(user._id);
+
+        // Generate verification token
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+        const user = await User.create({
+            name,
+            email,
+            password,
+            company,
+            verificationToken,
+            verificationExpires,
+            isVerified: false
+        });
+
+        // Send verification email
+        try {
+            await sendVerificationEmail(user, verificationToken);
+        } catch (emailErr) {
+            console.error('⚠️ Verification email failed to send, but user created:', emailErr.message);
+            // We don't fail registration here, user can request a resend later
+        }
+
         res.status(201).json({
             success: true,
-            token,
-            user: { id: user._id, name: user.name, email: user.email, role: user.role, plan: user.plan },
+            message: 'Registration successful. Please check your email to verify your account before logging in.',
+            verifyEmail: user.email
         });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -55,12 +94,27 @@ router.post('/login', async (req, res) => {
         if (!email || !password) {
             return res.status(400).json({ success: false, error: 'Provide email and password' });
         }
-        const user = await User.findOne({ email }).select('+password');
+
+        // Select verification fields to check status
+        const user = await User.findOne({ email }).select('+password +verificationToken +verificationExpires');
+
         if (!user || !(await user.matchPassword(password))) {
             return res.status(401).json({ success: false, error: 'Invalid credentials' });
         }
+
+        // Verification Check
+        if (!user.isVerified) {
+            return res.status(401).json({
+                success: false,
+                error: 'Please verify your email address to log in.',
+                needsVerification: true,
+                email: user.email
+            });
+        }
+
         user.lastActive = Date.now();
         await user.save();
+
         const token = generateToken(user._id);
         res.json({
             success: true,
@@ -69,6 +123,61 @@ router.post('/login', async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Login Error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// GET /api/auth/verify-email?token=...
+router.get('/verify-email', async (req, res) => {
+    try {
+        const { token } = req.query;
+        if (!token) return res.status(400).json({ success: false, error: 'Verification token is required' });
+
+        const user = await User.findOne({
+            verificationToken: token,
+            verificationExpires: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            return res.status(400).json({ success: false, error: 'Invalid or expired verification token. Please request a new one.' });
+        }
+
+        user.isVerified = true;
+        user.verificationToken = undefined;
+        user.verificationExpires = undefined;
+        await user.save();
+
+        res.json({ success: true, message: 'Email verified successfully! You can now log in.' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// POST /api/auth/resend-verification
+router.post('/resend-verification', async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) return res.status(400).json({ success: false, error: 'Email is required' });
+
+        const user = await User.findOne({ email });
+        if (!user) {
+            // Success response for security (prevents account discovery)
+            return res.json({ success: true, message: 'If an account exists, a new verification link has been sent.' });
+        }
+
+        if (user.isVerified) {
+            return res.status(400).json({ success: false, error: 'Account is already verified' });
+        }
+
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        user.verificationToken = verificationToken;
+        user.verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        await user.save();
+
+        await sendVerificationEmail(user, verificationToken);
+
+        res.json({ success: true, message: 'A new verification link has been sent to your email.' });
+    } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -185,16 +294,21 @@ router.get('/google/callback', async (req, res) => {
                 name: profileData.name || 'Google User',
                 email: profileData.email,
                 avatar: profileData.picture,
-                isGoogleUser: true, // Optional: add this field to your User model if helpful
-                password: Math.random().toString(36).slice(-12), // Placeholder for Google users
+                isGoogleUser: true,
+                isVerified: true, // Google users are pre-verified
+                password: Math.random().toString(36).slice(-12),
             });
             console.log(`✨ New user signed up via Google: ${user.email}`);
         } else {
             console.log(`👋 [GOOGLE AUTH] User found: ${user.email}`);
+            // If user existed but wasn't verified, mark as verified if they successfully OAuthed
+            if (!user.isVerified) {
+                user.isVerified = true;
+                await user.save();
+            }
         }
 
         // 4. Generate JWT
-        // Ultra-robust ID check: handle mongoose doc, POJO, or Array
         let userId = user?._id || user?.id;
 
         if (!userId && Array.isArray(user) && user[0]) {
@@ -202,9 +316,7 @@ router.get('/google/callback', async (req, res) => {
             user = user[0];
         }
 
-        // If still no ID, try a fallback findOne
         if (!userId && profileData.email) {
-            console.warn(`⚠️ [GOOGLE AUTH] ID missing, attempting fallback search for ${profileData.email}`);
             const fallbackUser = await User.findOne({ email: profileData.email });
             if (fallbackUser) {
                 user = fallbackUser;
@@ -213,16 +325,10 @@ router.get('/google/callback', async (req, res) => {
         }
 
         if (!userId) {
-            console.error('❌ [GOOGLE AUTH] User identification failed:', {
-                user_exists: !!user,
-                email: profileData.email
-            });
             throw new Error(`User identification failed after login (Email: ${profileData.email})`);
         }
 
         const stringId = userId.toString();
-        console.log(`✅ [GOOGLE AUTH] Success! User ID: ${stringId} (${user.email})`);
-
         const token = generateToken(stringId);
         const userData = {
             id: stringId,
@@ -233,7 +339,6 @@ router.get('/google/callback', async (req, res) => {
             company: user.company || '',
         };
 
-        // 5. Success! Send token to frontend and close popup
         res.send(closeAuthPopupScript(null, token, userData));
 
     } catch (error) {

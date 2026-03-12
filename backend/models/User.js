@@ -58,6 +58,11 @@ const userSchema = new mongoose.Schema({
     },
 
     lastActive: { type: Date, default: Date.now },
+
+    // Email Verification (Production Security)
+    isVerified: { type: Boolean, default: false },
+    verificationToken: { type: String, select: false },
+    verificationExpires: { type: Date, select: false },
 }, { timestamps: true });
 
 // Virtual: remaining credits

@@ -276,6 +276,7 @@ router.post('/accept-invite/:token', async (req, res) => {
                 teamRole: invite.role,
                 studioAccess: invite.studioAccess,
                 brandAccess: invite.brandAccess,
+                isVerified: true, // Auto-verify as they clicked the invite link in their email
             });
         }
 
