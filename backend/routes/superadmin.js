@@ -53,9 +53,15 @@ router.get('/stats', async (req, res) => {
             { $group: { _id: null, totalRevenue: { $sum: '$price' }, count: { $sum: 1 } } },
         ]);
 
-        const recentUsers = await User.find({ role: { $ne: 'superadmin' } })
+        const recentUsersRaw = await User.find({ role: { $ne: 'superadmin' } })
             .sort('-createdAt').limit(10)
             .select('name email plan role credits createdAt lastActive company');
+
+        // Add credit balance virtualization for frontend
+        const recentUsers = recentUsersRaw.map(u => ({
+            ...u.toJSON(),
+            creditBalance: getCreditBalance(u)
+        }));
 
         const totalCreditsUsed = await User.aggregate([
             { $match: { role: { $ne: 'superadmin' } } },
@@ -80,6 +86,45 @@ router.get('/stats', async (req, res) => {
             { $sort: { _id: 1 } },
         ]);
 
+        // Usage Analytics: Top users, exhausted, and near exhaustion
+        const [topUsersRaw, exhaustedUsersData] = await Promise.all([
+            User.find({ role: { $ne: 'superadmin' } })
+                .sort('-credits.used')
+                .limit(10)
+                .select('name email plan credits.used credits.total credits.bonus lastActive'),
+            User.aggregate([
+                { $match: { role: { $ne: 'superadmin' } } },
+                {
+                    $project: {
+                        isExhausted: {
+                            $lte: [
+                                { $subtract: [{ $add: ['$credits.total', '$credits.bonus'] }, '$credits.used'] },
+                                0
+                            ]
+                        },
+                        isNearExhaustion: {
+                            $and: [
+                                { $gt: [{ $subtract: [{ $add: ['$credits.total', '$credits.bonus'] }, '$credits.used'] }, 0] },
+                                { $lte: [{ $subtract: [{ $add: ['$credits.total', '$credits.bonus'] }, '$credits.used'] }, { $multiply: [{ $add: ['$credits.total', '$credits.bonus'] }, 0.1] }] }
+                            ]
+                        }
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        exhaustedCount: { $sum: { $cond: ['$isExhausted', 1, 0] } },
+                        nearEmptyCount: { $sum: { $cond: ['$isNearExhaustion', 1, 0] } }
+                    }
+                }
+            ])
+        ]);
+
+        const topUsers = topUsersRaw.map(u => ({
+            ...u.toJSON(),
+            creditBalance: getCreditBalance(u)
+        }));
+
         res.json({
             success: true,
             stats: {
@@ -92,6 +137,11 @@ router.get('/stats', async (req, res) => {
                 contentByType,
                 feedbackSentiment,
                 userGrowth,
+                usageAnalytics: {
+                    topUsers,
+                    exhaustedCount: exhaustedUsersData[0]?.exhaustedCount || 0,
+                    nearEmptyCount: exhaustedUsersData[0]?.nearEmptyCount || 0,
+                },
                 creditCosts: CREDIT_COSTS,
             },
         });
