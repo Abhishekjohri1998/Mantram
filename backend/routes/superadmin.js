@@ -3,6 +3,7 @@
  */
 
 import { Router } from 'express';
+import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Brand from '../models/Brand.js';
 import Content from '../models/Content.js';
@@ -486,24 +487,33 @@ router.get('/brands', async (req, res) => {
 router.delete('/brands/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({ success: false, error: 'Invalid Brand ID' });
+        if (!id) return res.status(400).json({ success: false, error: 'Brand ID is required' });
+
+        let brand;
+        try {
+            brand = await Brand.findById(id);
+        } catch (err) {
+            // Support UUIDs by bypassing Mongoose casting
+            brand = await Brand.collection.findOne({ _id: id });
         }
 
-        const brand = await Brand.findById(id);
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
+
+        const brandId = brand._id;
+
         await Promise.all([
-            Content.deleteMany({ brand: brand._id }),
-            Creative.deleteMany({ brand: brand._id }),
-            Product.deleteMany({ brand: brand._id }),
-            Integration.deleteMany({ brand: brand._id }),
-            SeoAudit.deleteMany({ brand: brand._id }),
-            Feedback.deleteMany({ brand: brand._id }),
-            Brand.findByIdAndDelete(brand._id),
+            Content.deleteMany({ brand: brandId }),
+            Creative.deleteMany({ brand: brandId }),
+            Product.deleteMany({ brand: brandId }),
+            Integration.deleteMany({ brand: brandId }),
+            SeoAudit.deleteMany({ brand: brandId }),
+            Feedback.deleteMany({ brand: brandId }),
+            Brand.deleteOne({ _id: brandId }),
         ]);
         res.json({ success: true, message: 'Brand and all associated data deleted' });
     } catch (error) {
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+        console.error('DELETE BRAND ERROR:', error);
+        res.status(500).json({ success: false, error: 'Deletion failed: ' + (error.message || 'Internal error') });
     }
 });
 
@@ -536,15 +546,21 @@ router.get('/content', async (req, res) => {
 router.delete('/content/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({ success: false, error: 'Invalid Content ID' });
+        if (!id) return res.status(400).json({ success: false, error: 'Content ID is required' });
+
+        let item;
+        try {
+            item = await Content.findByIdAndDelete(id);
+        } catch (err) {
+            // Support UUIDs
+            item = await Content.collection.findOneAndDelete({ _id: id });
         }
 
-        const item = await Content.findByIdAndDelete(id);
         if (!item) return res.status(404).json({ success: false, error: 'Content not found' });
         res.json({ success: true, message: 'Content deleted' });
     } catch (error) {
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+        console.error('DELETE CONTENT ERROR:', error);
+        res.status(500).json({ success: false, error: 'Deletion failed: ' + (error.message || 'Internal error') });
     }
 });
 
