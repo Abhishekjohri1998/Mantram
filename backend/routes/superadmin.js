@@ -502,13 +502,13 @@ router.delete('/brands/:id', async (req, res) => {
         const brandId = brand._id;
 
         await Promise.all([
-            Content.deleteMany({ brand: brandId }),
-            Creative.deleteMany({ brand: brandId }),
-            Product.deleteMany({ brand: brandId }),
-            Integration.deleteMany({ brand: brandId }),
-            SeoAudit.deleteMany({ brand: brandId }),
-            Feedback.deleteMany({ brand: brandId }),
-            Brand.deleteOne({ _id: brandId }),
+            Content.collection.deleteMany({ brand: brandId }),
+            Creative.collection.deleteMany({ brand: brandId }),
+            Product.collection.deleteMany({ brand: brandId }),
+            Integration.collection.deleteMany({ brand: brandId }),
+            SeoAudit.collection.deleteMany({ brand: brandId }),
+            Feedback.collection.deleteMany({ brand: brandId }),
+            Brand.collection.deleteOne({ _id: brandId }),
         ]);
         res.json({ success: true, message: 'Brand and all associated data deleted' });
     } catch (error) {
