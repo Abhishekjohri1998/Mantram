@@ -587,10 +587,10 @@ router.post('/feedback', optionalAuth, async (req, res) => {
     const { brandId, ideaTitle, ideaDescription, feedback, intent } = req.body;
     if (!ideaTitle || !feedback) return res.status(400).json({ success: false, error: 'Idea title and feedback required' });
 
-    if (brandId) {
+    if (brandId && req.user) {
       try {
         const Brand = (await import('../models/Brand.js')).default;
-        const brand = await Brand.findById(brandId);
+        const brand = await Brand.findOne({ _id: brandId, $or: [{ user: req.user._id }, { sharedWith: req.user._id }] });
         if (brand) {
           if (!brand.aiContext) brand.aiContext = {};
           if (!brand.aiContext.contentExamples) brand.aiContext.contentExamples = [];

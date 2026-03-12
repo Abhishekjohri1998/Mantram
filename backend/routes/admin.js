@@ -85,6 +85,12 @@ router.put('/users/:id', async (req, res) => {
         if (role === 'superadmin') {
             return res.status(403).json({ success: false, error: 'Cannot assign superadmin role' });
         }
+        const targetUser = await User.findById(req.params.id);
+        if (!targetUser) return res.status(404).json({ success: false, error: 'User not found' });
+        if (targetUser.role === 'superadmin') {
+            return res.status(403).json({ success: false, error: 'Cannot modify superadmin accounts' });
+        }
+
         const user = await User.findByIdAndUpdate(req.params.id, { role, plan }, { returnDocument: 'after' }).select('-password');
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
         res.json({ success: true, user });
@@ -96,6 +102,11 @@ router.put('/users/:id', async (req, res) => {
 // DELETE /api/admin/users/:id
 router.delete('/users/:id', async (req, res) => {
     try {
+        const targetUser = await User.findById(req.params.id);
+        if (!targetUser) return res.status(404).json({ success: false, error: 'User not found' });
+        if (targetUser.role === 'superadmin') {
+            return res.status(403).json({ success: false, error: 'Cannot delete superadmin accounts' });
+        }
         await User.findByIdAndDelete(req.params.id);
         res.json({ success: true, message: 'User deleted' });
     } catch (error) {

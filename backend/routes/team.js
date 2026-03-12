@@ -498,7 +498,7 @@ router.post('/chat/:channelId/send', protect, async (req, res) => {
 router.post('/chat/:channelId/react', protect, async (req, res) => {
     try {
         const { messageId, emoji } = req.body;
-        const msg = await TeamChat.findById(messageId);
+        const msg = await TeamChat.findOne({ _id: messageId, organization: getOrgId(req.user) });
         if (!msg) return res.status(404).json({ error: 'Message not found' });
 
         const existing = msg.reactions.findIndex(r => String(r.user) === String(req.user._id) && r.emoji === emoji);
@@ -600,7 +600,7 @@ router.get('/approvals', protect, async (req, res) => {
 router.put('/approvals/:id', protect, async (req, res) => {
     try {
         const { action, message } = req.body; // action: approve, reject, revision, comment
-        const approval = await ApprovalRequest.findById(req.params.id);
+        const approval = await ApprovalRequest.findOne({ _id: req.params.id, organization: getOrgId(req.user) });
         if (!approval) return res.status(404).json({ error: 'Approval not found' });
 
         if (String(approval.approver) !== String(req.user._id) && isTeamAdmin(req.user) === false) {

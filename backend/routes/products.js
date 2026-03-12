@@ -668,7 +668,7 @@ router.post('/enrich', protect, async (req, res) => {
         if (!brandId) return res.status(400).json({ success: false, error: 'brandId is required' });
 
         // Get products to enrich (either specific ones or all un-enriched)
-        const query = { brand: brandId, status: { $ne: 'archived' } };
+        const query = { user: req.user._id, brand: brandId, status: { $ne: 'archived' } };
         if (productIds && productIds.length > 0) {
             query._id = { $in: productIds };
         } else {
@@ -825,7 +825,7 @@ router.get('/', protect, async (req, res) => {
 // GET /api/products/:id — Single product
 router.get('/:id', protect, async (req, res) => {
     try {
-        const product = await Product.findById(req.params.id);
+        const product = await Product.findOne({ _id: req.params.id, user: req.user._id });
         if (!product) return res.status(404).json({ success: false, error: 'Product not found' });
         res.json({ success: true, product });
     } catch (error) {
@@ -879,10 +879,10 @@ router.delete('/:id', protect, async (req, res) => {
 
 router.post('/:id/ai-enrich', protect, async (req, res) => {
     try {
-        const product = await Product.findById(req.params.id);
+        const product = await Product.findOne({ _id: req.params.id, user: req.user._id });
         if (!product) return res.status(404).json({ success: false, error: 'Product not found' });
 
-        const brand = await Brand.findById(product.brand);
+        const brand = await Brand.findOne({ _id: product.brand, user: req.user._id });
 
         const orchestrator = getOrchestrator();
         const enrichResult = await orchestrator.generateContent({
@@ -944,10 +944,10 @@ Industry: ${brand?.dna?.industry || 'General'}`,
 router.post('/:id/generate-listing', protect, async (req, res) => {
     try {
         const { platform } = req.body;
-        const product = await Product.findById(req.params.id);
+        const product = await Product.findOne({ _id: req.params.id, user: req.user._id });
         if (!product) return res.status(404).json({ success: false, error: 'Product not found' });
 
-        const brand = await Brand.findById(product.brand);
+        const brand = await Brand.findOne({ _id: product.brand, user: req.user._id });
         const platformInfo = PLATFORM_KNOWLEDGE[platform] || PLATFORM_KNOWLEDGE.general_ecommerce;
 
         const orchestrator = getOrchestrator();

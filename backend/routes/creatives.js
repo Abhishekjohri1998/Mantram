@@ -239,7 +239,7 @@ router.post('/generate', protect, requireCredits('creative'), async (req, res) =
         }
         console.log('═══════════════════════════════════════════════════════════════════════\n');
 
-        const brand = await Brand.findById(brandId);
+        const brand = await Brand.findOne({ _id: brandId, $or: [{ user: req.user._id }, { sharedWith: req.user._id }] });
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
 
         // Build natural-language brand description (no labels)
@@ -301,7 +301,7 @@ router.post('/generate', protect, requireCredits('creative'), async (req, res) =
                         const buf = await imgResp.arrayBuffer();
                         let ct = (imgResp.headers.get('content-type') || 'image/jpeg').split(';')[0];
                         let imgData = Buffer.from(buf);
-                        
+
                         // Convert webp/gif to JPEG — Gemini docs only show jpeg/png examples
                         // webp may silently fail as a reference image
                         if (ct === 'image/webp' || ct === 'image/gif') {
@@ -314,7 +314,7 @@ router.post('/generate', protect, requireCredits('creative'), async (req, res) =
                                 console.warn(`⚠️ Ref image (${label}): webp→jpeg conversion failed, using original:`, convErr.message);
                             }
                         }
-                        
+
                         console.log(`✅ Ref image (${label}) fetched: ${Math.round(imgData.length / 1024)}KB, ${ct}`);
                         return { part: { mimeType: ct, data: imgData.toString('base64') }, label };
                     } else {
@@ -670,6 +670,9 @@ router.post('/save-to-bank', protect, async (req, res) => {
         if (!imageUrl || !brandId) {
             return res.status(400).json({ success: false, error: 'imageUrl and brandId are required' });
         }
+
+        const brand = await Brand.findOne({ _id: brandId, $or: [{ user: req.user._id }, { sharedWith: req.user._id }] });
+        if (!brand) return res.status(404).json({ success: false, error: 'Brand not found or access denied' });
 
         let finalImageUrl = imageUrl;
         if (imageUrl && imageUrl.startsWith('data:image/')) {
