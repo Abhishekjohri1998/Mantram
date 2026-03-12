@@ -63,6 +63,14 @@ const userSchema = new mongoose.Schema({
     isVerified: { type: Boolean, default: false },
     verificationToken: { type: String, select: false },
     verificationExpires: { type: Date, select: false },
+
+    // Registration Queue & Approval
+    approvalStatus: { 
+        type: String, 
+        enum: ['pending', 'approved', 'rejected'], 
+        default: 'pending' 
+    },
+    queueNumber: { type: Number },
 }, { timestamps: true });
 
 // Virtual: remaining credits

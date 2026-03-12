@@ -285,9 +285,56 @@ router.post('/users/:id/add-credits', async (req, res) => {
 
 router.post('/users/:id/reset-credits', async (req, res) => {
     try {
-        const user = await User.findByIdAndUpdate(req.params.id, { 'credits.used': 0, 'credits.resetDate': new Date() }, { returnDocument: 'after' }).select('-password');
-        if (!user) return res.status(404).json({ success: false, error: 'User not found' });
         res.json({ success: true, user: { ...user.toJSON(), creditBalance: getCreditBalance(user) } });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+/**
+ * Approve User Registration
+ */
+router.put('/users/:id/approve', async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+        
+        if (user.approvalStatus === 'approved') {
+            return res.status(400).json({ success: false, error: 'User is already approved' });
+        }
+
+        user.approvalStatus = 'approved';
+        // When approved, we also ensure they are verified if they were pre-verified (like Google users)
+        // or just let the normal verification flow continue. 
+        // But per requirements, approval is what unlocks login.
+        await user.save();
+
+        // Send approval email
+        const { sendApprovalEmail } = await import('../utils/email.js');
+        try {
+            await sendApprovalEmail(user);
+        } catch (emailErr) {
+            console.error('⚠️ Approval email failed to send:', emailErr.message);
+        }
+
+        res.json({ success: true, message: `User ${user.name} has been approved and notified.` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+/**
+ * Reject User Registration
+ */
+router.put('/users/:id/reject', async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+        user.approvalStatus = 'rejected';
+        await user.save();
+
+        res.json({ success: true, message: `User ${user.name} registration has been rejected.` });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }

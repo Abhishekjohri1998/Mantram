@@ -5,7 +5,7 @@ import User from '../models/User.js';
 import { protect, generateToken } from '../middleware/auth.js';
 import config from '../config/env.js';
 import { safeErrorMessage } from '../utils/safeError.js';
-import { sendVerificationEmail } from '../utils/email.js';
+import { sendVerificationEmail, sendQueueRegistrationEmails } from '../utils/email.js';
 
 const router = Router();
 
@@ -54,9 +54,9 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Email already registered' });
         }
 
-        // Generate verification token
-        const verificationToken = crypto.randomBytes(32).toString('hex');
-        const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+        // Calculate queue number (total users with role: 'user' + 1)
+        const lastUser = await User.findOne({ role: 'user' }).sort('-queueNumber');
+        const queueNumber = (lastUser?.queueNumber || 0) + 1;
 
         const user = await User.create({
             name,
@@ -65,10 +65,19 @@ router.post('/register', async (req, res) => {
             company,
             verificationToken,
             verificationExpires,
-            isVerified: false
+            isVerified: false,
+            approvalStatus: 'pending',
+            queueNumber
         });
 
-        // Send verification email
+        // Send dual notification emails (User & Admin)
+        try {
+            await sendQueueRegistrationEmails(user, queueNumber);
+        } catch (emailErr) {
+            console.error('⚠️ Queue registration emails failed to send:', emailErr.message);
+        }
+
+        // Send verification email separately (original flow maintained)
         try {
             await sendVerificationEmail(user, verificationToken);
         } catch (emailErr) {
@@ -78,7 +87,8 @@ router.post('/register', async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message: 'Registration successful. Please check your email to verify your account before logging in.',
+            message: `Registration successful. You are at position #${queueNumber} in the queue. Please check your email for confirmation and to verify your account.`,
+            queueNumber,
             verifyEmail: user.email
         });
     } catch (error) {
@@ -102,13 +112,30 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ success: false, error: 'Invalid credentials' });
         }
 
-        // Verification Check
+        // 1. Verification Check
         if (!user.isVerified) {
             return res.status(401).json({
                 success: false,
                 error: 'Please verify your email address to log in.',
                 needsVerification: true,
                 email: user.email
+            });
+        }
+
+        // 2. Approval Check
+        if (user.approvalStatus === 'pending') {
+            return res.status(403).json({
+                success: false,
+                error: `Your account is pending approval. You are currently at position #${user.queueNumber || 'N/A'} in the waitlist. We'll notify you via email once approved.`,
+                isPending: true,
+                queueNumber: user.queueNumber
+            });
+        }
+
+        if (user.approvalStatus === 'rejected') {
+            return res.status(403).json({
+                success: false,
+                error: 'Your registration request was not approved. Please contact support if you believe this is an error.'
             });
         }
 
