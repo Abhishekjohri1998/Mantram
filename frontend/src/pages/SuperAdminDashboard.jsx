@@ -11,6 +11,7 @@ export default function SuperAdminDashboard() {
     const [tab, setTab] = useState('overview')
     const [stats, setStats] = useState(null)
     const [users, setUsers] = useState([])
+    const [pendingUsers, setPendingUsers] = useState([])
     const [totalUsers, setTotalUsers] = useState(0)
     const [coupons, setCoupons] = useState([])
     const [brands, setBrands] = useState([])
@@ -63,6 +64,7 @@ export default function SuperAdminDashboard() {
 
     const tabs = [
         { id: 'overview', label: 'Overview', icon: 'dashboard' },
+        { id: 'approvals', label: 'Approvals', icon: 'how_to_reg' },
         { id: 'users', label: 'Users', icon: 'group' },
         { id: 'packages', label: 'Packages', icon: 'inventory_2' },
         { id: 'subscriptions', label: 'Subscriptions', icon: 'card_membership' },
@@ -75,6 +77,7 @@ export default function SuperAdminDashboard() {
     useEffect(() => { loadStats() }, [])
     useEffect(() => {
         if (tab === 'users') loadUsers()
+        if (tab === 'approvals') loadPendingUsers()
         if (tab === 'coupons') loadCoupons()
         if (tab === 'content') { loadBrands(); loadContent() }
         if (tab === 'subscriptions') loadSubscriptions()
@@ -85,6 +88,7 @@ export default function SuperAdminDashboard() {
 
     const loadStats = async () => { try { const d = await API.getStats(); setStats(d.stats) } catch (e) { console.error(e) } finally { setLoading(false) } }
     const loadUsers = async () => { try { const d = await API.getUsers({ page: userPage, limit: 20, search, plan: planFilter }); setUsers(d.users || []); setTotalUsers(d.total || 0) } catch (e) { console.error(e) } }
+    const loadPendingUsers = async () => { try { const d = await API.getUsers({ approvalStatus: 'pending', limit: 50 }); setPendingUsers(d.users || []) } catch (e) { console.error(e) } }
     const loadCoupons = async () => { try { const d = await API.getCoupons(); setCoupons(d.coupons || []) } catch (e) { console.error(e) } }
     const loadBrands = async () => { try { const d = await API.getBrands({ limit: 50 }); setBrands(d.brands || []); setTotalBrands(d.total || 0) } catch (e) { console.error(e) } }
     const loadContent = async () => { try { const d = await API.getContent({ limit: 50 }); setContent(d.content || []); setTotalContent(d.total || 0) } catch (e) { console.error(e) } }
@@ -115,6 +119,26 @@ export default function SuperAdminDashboard() {
     const handleResetCredits = async (id) => { if (!confirm('Reset used credits to 0?')) return; try { await API.resetCredits(id); showToast('Reset done'); loadUsers() } catch { showToast('Failed', 'error') } }
     const handleChangePlan = async (id, plan) => { try { await API.updateUser(id, { plan }); showToast(`Plan → ${plan}`); setPlanModal(null); loadUsers(); loadStats() } catch { showToast('Failed', 'error') } }
     const handleDeleteUser = async (id, name) => { if (!confirm(`DELETE ${name} and ALL data?`)) return; try { await API.deleteUser(id); showToast('Deleted'); loadUsers(); loadStats() } catch { showToast('Failed', 'error') } }
+    
+    const handleApproveUser = async (id) => { 
+        try { 
+            await API.approveUser(id); 
+            showToast('User approved and notified'); 
+            if (tab === 'approvals') loadPendingUsers();
+            else loadUsers();
+            loadStats();
+        } catch (e) { showToast(e.message || 'Approval failed', 'error') } 
+    }
+
+    const handleRejectUser = async (id) => { 
+        if (!confirm('Reject this user registration?')) return;
+        try { 
+            await API.rejectUser(id); 
+            showToast('User rejected'); 
+            if (tab === 'approvals') loadPendingUsers();
+            else loadUsers();
+        } catch (e) { showToast(e.message || 'Rejection failed', 'error') } 
+    }
     const handleDeleteBrand = async (id, name) => { if (!confirm(`Delete brand "${name}" and all data?`)) return; try { await API.deleteBrand(id); showToast('Brand deleted'); loadBrands(); loadStats() } catch { showToast('Failed', 'error') } }
     const handleDeleteContent = async (id) => { if (!confirm('Delete this content?')) return; try { await API.deleteContent(id); showToast('Deleted'); loadContent() } catch { showToast('Failed', 'error') } }
     const handleCreateCoupon = async (e) => { e.preventDefault(); try { await API.createCoupon({ ...couponForm, discountValue: Number(couponForm.discountValue), maxUses: couponForm.maxUses ? Number(couponForm.maxUses) : 0, validUntil: couponForm.validUntil || null }); showToast('Coupon created'); setShowCouponForm(false); setCouponForm({ code: '', discountType: 'credits', discountValue: '', maxUses: '', validUntil: '', description: '' }); loadCoupons() } catch (e) { showToast(e.error || 'Failed', 'error') } }
@@ -260,7 +284,7 @@ export default function SuperAdminDashboard() {
                                                 <div className="flex items-center justify-between p-3 rounded-xl bg-amber-500/5 border border-amber-500/10">
                                                     <div className="flex items-center gap-2">
                                                         <span className="material-symbols-outlined text-amber-500">warning</span>
-                                                        <span className="text-sm font-bold text-white">Near Exhaustion (>90%)</span>
+                                                        <span className="text-sm font-bold text-white">Near Exhaustion (&gt;90%)</span>
                                                     </div>
                                                     <span className="text-lg font-black text-amber-500">{stats.usageAnalytics.nearEmptyCount}</span>
                                                 </div>
@@ -309,6 +333,58 @@ export default function SuperAdminDashboard() {
                     </div>
                 )}
 
+                {/* ════════════ APPROVALS ════════════ */}
+                {tab === 'approvals' && (
+                    <div>
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-amber-400">how_to_reg</span>
+                                    Pending Approvals ({pendingUsers.length})
+                                </h3>
+                                <p className="text-sm text-slate-500 mt-1">Review and approve new user registrations to grant platform access</p>
+                            </div>
+                            <button onClick={loadPendingUsers} className="p-2 rounded-lg bg-white/[0.04] text-slate-400 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">refresh</span></button>
+                        </div>
+
+                        {pendingUsers.length > 0 ? (
+                            <div className="space-y-3">
+                                {pendingUsers.map(u => (
+                                    <div key={u._id} className="glass-panel rounded-2xl p-5 border border-amber-500/10 hover:border-amber-500/30 transition-all bg-gradient-to-r from-amber-500/[0.02] to-transparent">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-4 flex-1">
+                                                <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 font-bold text-lg">{u.name?.[0]?.toUpperCase()}</div>
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-0.5">
+                                                        <p className="text-base font-bold text-white">{u.name}</p>
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold tracking-wider uppercase">Position #{u.queueNumber}</span>
+                                                    </div>
+                                                    <p className="text-sm text-slate-400">{u.email} • {u.company || 'Individual'}</p>
+                                                    <p className="text-[10px] text-slate-600 mt-1 uppercase tracking-widest">Registered {new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <button onClick={() => handleRejectUser(u._id)} className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-500 text-xs font-bold hover:bg-rose-500/20 transition-all flex items-center gap-1.5 cursor-pointer">
+                                                    <span className="material-symbols-outlined text-sm">close</span>Reject
+                                                </button>
+                                                <button onClick={() => handleApproveUser(u._id)} className="px-6 py-2 rounded-xl bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer">
+                                                    <span className="material-symbols-outlined text-sm font-bold">check</span>Approve User
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-20 glass-panel rounded-2xl border border-dashed border-white/[0.06]">
+                                <span className="material-symbols-outlined text-5xl text-slate-700 mb-3">verified_user</span>
+                                <h3 className="text-lg font-bold text-white mb-1">Queue is Empty</h3>
+                                <p className="text-sm text-slate-500">All users have been processed. Great job!</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* ════════════ USERS ════════════ */}
                 {tab === 'users' && (
                     <div>
@@ -332,6 +408,8 @@ export default function SuperAdminDashboard() {
                                                 <p className="text-base font-bold text-white truncate">{u.name}</p>
                                                 <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 'bg-slate-500/15 text-slate-400'}`}>{u.plan}</span>
                                                 <span className="text-xs px-1.5 py-0.5 rounded font-bold capitalize bg-white/[0.05] text-slate-500">{u.role}</span>
+                                                {u.approvalStatus === 'pending' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-amber-500/20 text-amber-400">PENDING</span>}
+                                                {u.approvalStatus === 'rejected' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-rose-500/20 text-rose-400">REJECTED</span>}
                                             </div>
                                             <p className="text-[11px] text-slate-600 truncate">{u.email} {u.company ? `• ${u.company}` : ''}</p>
                                         </div>
@@ -352,9 +430,12 @@ export default function SuperAdminDashboard() {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1 shrink-0">
-                                        <button onClick={() => setCreditModal(u)} title="Add Credits" className="p-2 rounded-lg hover:bg-emerald-500/10 text-slate-500 hover:text-emerald-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">add_circle</span></button>
+                                         <button onClick={() => setCreditModal(u)} title="Add Credits" className="p-2 rounded-lg hover:bg-emerald-500/10 text-slate-500 hover:text-emerald-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">add_circle</span></button>
                                         <button onClick={() => handleResetCredits(u._id)} title="Reset Credits" className="p-2 rounded-lg hover:bg-cyan-500/10 text-slate-500 hover:text-cyan-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">restart_alt</span></button>
                                         <button onClick={() => setPlanModal(u)} title="Change Plan" className="p-2 rounded-lg hover:bg-blue-500/10 text-slate-500 hover:text-blue-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">upgrade</span></button>
+                                        {u.approvalStatus === 'pending' && (
+                                            <button onClick={() => handleApproveUser(u._id)} title="Approve User" className="p-2 rounded-lg hover:bg-emerald-500/10 text-emerald-500 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">check_circle</span></button>
+                                        )}
                                         <button onClick={() => handleImpersonate(u._id, u.name)} title="Login as User" className="p-2 rounded-lg hover:bg-amber-500/10 text-slate-500 hover:text-amber-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">login</span></button>
                                         <button onClick={() => handleDeleteUser(u._id, u.name)} title="Delete" className="p-2 rounded-lg hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">delete</span></button>
                                     </div>

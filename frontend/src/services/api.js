@@ -330,6 +330,8 @@ export const superadmin = {
     impersonateUser: (id) => apiFetch(`/superadmin/users/${id}/impersonate`, { method: 'POST' }),
     addCredits: (id, data) => apiFetch(`/superadmin/users/${id}/add-credits`, { method: 'POST', body: JSON.stringify(data) }),
     resetCredits: (id) => apiFetch(`/superadmin/users/${id}/reset-credits`, { method: 'POST' }),
+    approveUser: (id) => apiFetch(`/superadmin/users/${id}/approve`, { method: 'PUT' }),
+    rejectUser: (id) => apiFetch(`/superadmin/users/${id}/reject`, { method: 'PUT' }),
     // Subscriptions
     getSubscriptions: (params = {}) => {
         const query = new URLSearchParams(params).toString();
