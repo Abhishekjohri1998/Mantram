@@ -4,7 +4,7 @@
  * to check if a brand is mentioned in their responses.
  */
 
-const PROBE_TIMEOUT = 15000; // 15s per model
+const PROBE_TIMEOUT = 12000; // 12s per model (shorter to ensure overall completion)
 
 // ============================================================================
 // QUERY INDIVIDUAL MODELS
@@ -157,16 +157,17 @@ export async function runRealLLMProbe(prompts, brandName, website, competitors =
   const results = [];
   let totalTokens = 0;
 
-  // Query all prompts across all models in controlled batches
-  for (const prompt of prompts) {
-    // Query all 3 models in parallel for this prompt
-    const [chatgptResult, geminiResult, grokResult] = await Promise.all([
-      queryOpenAI(prompt),
-      queryGemini(prompt),
-      queryGrok(prompt),
-    ]);
+  // Query all prompts across all models in parallel
+  const probeTasks = prompts.flatMap(prompt => [
+    queryOpenAI(prompt).then(res => ({ prompt, ...res })),
+    queryGemini(prompt).then(res => ({ prompt, ...res })),
+    queryGrok(prompt).then(res => ({ prompt, ...res }))
+  ]);
 
-    for (const result of [chatgptResult, geminiResult, grokResult]) {
+  const allResults = await Promise.all(probeTasks);
+
+  for (const result of allResults) {
+    const prompt = result.prompt;
       if (!result.success) {
         results.push({
           prompt,
@@ -283,5 +284,5 @@ export function generateProbePrompts(brandName, industry, targetAudience, websit
     prompts.push(`What ${industry} software is trending in 2026?`);
   }
 
-  return prompts.slice(0, 12); // Cap at 12 prompts (12 × 3 models = 36 API calls)
+  return prompts.slice(0, 6); // Cap at 6 prompts (6 × 3 models = 18 API calls) to ensure completion within 30s
 }
