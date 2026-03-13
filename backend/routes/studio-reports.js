@@ -50,35 +50,46 @@ router.post('/generate', protect, async (req, res) => {
             status: 'generating',
         });
 
-        // Run the report generation pipeline
-        const state = await generateReportNode({
-            reportId: report._id.toString(),
-            userId: req.user._id.toString(),
-            brandId: effectiveBrandId.toString(),
-            studio,
-            reportType,
-            options,
-        });
+        // Run the report generation pipeline in the background (Async)
+        // We don't await this so we can return the placeholder immediately
+        (async () => {
+            try {
+                const state = await generateReportNode({
+                    reportId: report._id.toString(),
+                    userId: req.user._id.toString(),
+                    brandId: effectiveBrandId.toString(),
+                    studio,
+                    reportType,
+                    options,
+                });
 
-        // Save the result
-        const update = {
-            status: state.status || 'complete',
-            title: state.title || report.title,
-            sections: state.sections || [],
-            narrative: state.narrative || {},
-            slides: state.slides || [],
-            branding: state.branding || {},
-            sourceData: state.sourceData || {},
-        };
-        if (state.error) update.error = state.error;
+                // Save the result
+                const update = {
+                    status: state.status || 'complete',
+                    title: state.title || report.title,
+                    sections: state.sections || [],
+                    narrative: state.narrative || {},
+                    slides: state.slides || [],
+                    branding: state.branding || {},
+                    sourceData: state.sourceData || {},
+                };
+                if (state.error) update.error = state.error;
 
-        await StudioReport.findByIdAndUpdate(report._id, update);
+                await StudioReport.findByIdAndUpdate(report._id, update);
+                console.log(`✅ Studio Report ${report._id} generated successfully`);
+            } catch (bgError) {
+                console.error(`❌ Background Report Generation Error (${report._id}):`, bgError);
+                await StudioReport.findByIdAndUpdate(report._id, {
+                    status: 'failed',
+                    error: safeErrorMessage(bgError)
+                });
+            }
+        })();
 
-        const finalReport = await StudioReport.findById(report._id).lean();
-
+        // Return placeholder immediately to prevent timeout
         res.json({
             success: true,
-            report: finalReport,
+            report: report.toObject(),
         });
     } catch (error) {
         console.error('Studio Report generation error:', error);

@@ -53,11 +53,13 @@ export default function StudioReportButton({ studio, brandId, style = {} }) {
                 reportType,
                 brandId,
             });
+            // Receiver handles the 'generating' status via polling
             setCurrentReport(report);
         } catch (err) {
             console.error('Report generation failed:', err);
             alert('Report generation failed: ' + (err.message || 'Unknown error'));
         } finally {
+            // Button is re-enabled immediately as the viewer modal handles the wait
             setGenerating(false);
         }
     }, [studio, brandId]);

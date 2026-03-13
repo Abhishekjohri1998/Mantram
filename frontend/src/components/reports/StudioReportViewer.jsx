@@ -128,13 +128,40 @@ const SECTION_ICONS = {
 
 const PRIORITY_COLORS = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' };
 
-export default function StudioReportViewer({ report, onClose, onUpdate }) {
+export default function StudioReportViewer({ report: initialReport, onClose, onUpdate }) {
+    const [report, setReport] = useState(initialReport);
     const [activeSection, setActiveSection] = useState(null);
     const [editMode, setEditMode] = useState(false);
     const [showSlideshow, setShowSlideshow] = useState(false);
     const [showPDF, setShowPDF] = useState(false);
     const [editedSections, setEditedSections] = useState({});
     const [saving, setSaving] = useState(false);
+
+    // ── Polling logic for background generation ──
+    React.useEffect(() => {
+        setReport(initialReport);
+    }, [initialReport]);
+
+    React.useEffect(() => {
+        if (!report || report.status !== 'generating') return;
+
+        console.log(`⏳ Report ${report._id} is generating, starting poll...`);
+        const pollInterval = setInterval(async () => {
+            try {
+                const { report: updatedReport } = await studioReports.get(report._id);
+                if (updatedReport.status !== 'generating') {
+                    console.log(`✅ Report ${report._id} generation finished with status: ${updatedReport.status}`);
+                    setReport(updatedReport);
+                    onUpdate?.(); // Notify parent
+                    clearInterval(pollInterval);
+                }
+            } catch (err) {
+                console.error('Report poll failed:', err);
+            }
+        }, 3000);
+
+        return () => clearInterval(pollInterval);
+    }, [report?._id, report?.status, onUpdate]);
 
     if (!report) return null;
 
@@ -429,9 +456,46 @@ export default function StudioReportViewer({ report, onClose, onUpdate }) {
                     {/* Report Sections */}
                     {sections.length === 0 && (
                         <div style={s.emptyState}>
-                            <div style={{ fontSize: 40, marginBottom: 12 }}>📊</div>
-                            <div style={{ fontSize: 16, fontWeight: 500 }}>No sections in this report</div>
-                            <div style={{ fontSize: 13, marginTop: 4 }}>The report may still be generating.</div>
+                            {report.status === 'generating' ? (
+                                <>
+                                    <div style={{ fontSize: 48, marginBottom: 20, animation: 'pulse 1.5s infinite ease-in-out' }}>🧠</div>
+                                    <div style={{ fontSize: 20, fontWeight: 600, color: '#f1f5f9' }}>AI is Crafting Your Report...</div>
+                                    <div style={{ fontSize: 13, marginTop: 8, maxWidth: 400, margin: '8px auto 0', lineHeight: 1.6 }}>
+                                        Analyzing SEO audits, performance data, and competitor insights to build a full branded strategy. This usually takes 30-60 seconds.
+                                    </div>
+                                    <div style={{ marginTop: 24, display: 'flex', justifyContent: 'center', gap: 4 }}>
+                                        {[0, 1, 2].map(i => (
+                                            <div key={i} style={{
+                                                width: 8, height: 8, borderRadius: '50%', background: primary,
+                                                animation: `bounce 1s infinite ${i * 0.2}s`
+                                            }} />
+                                        ))}
+                                    </div>
+                                    <style>{`
+                                        @keyframes pulse {
+                                            0% { transform: scale(1); opacity: 0.8; }
+                                            50% { transform: scale(1.1); opacity: 1; }
+                                            100% { transform: scale(1); opacity: 0.8; }
+                                        }
+                                        @keyframes bounce {
+                                            0%, 100% { transform: translateY(0); }
+                                            50% { transform: translateY(-10px); }
+                                        }
+                                    `}</style>
+                                </>
+                            ) : report.status === 'failed' ? (
+                                <>
+                                    <div style={{ fontSize: 40, marginBottom: 12 }}>❌</div>
+                                    <div style={{ fontSize: 16, fontWeight: 600, color: '#ef4444' }}>Generation Failed</div>
+                                    <div style={{ fontSize: 13, marginTop: 4 }}>{report.error || 'An unexpected error occurred during report generation.'}</div>
+                                </>
+                            ) : (
+                                <>
+                                    <div style={{ fontSize: 40, marginBottom: 12 }}>📊</div>
+                                    <div style={{ fontSize: 16, fontWeight: 500 }}>No sections in this report</div>
+                                    <div style={{ fontSize: 13, marginTop: 4 }}>Add some contents via the edit mode.</div>
+                                </>
+                            )}
                         </div>
                     )}
 
