@@ -148,7 +148,7 @@ const authLimiter = rateLimit({
 });
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 300, // 300 requests per 15 minutes per IP
+    max: 3000, // 3000 requests per 15 minutes per IP (studios + background scheduler + dev)
     message: { success: false, error: 'Rate limit exceeded. Please slow down.' },
     standardHeaders: true,
     legacyHeaders: false,
@@ -203,6 +203,10 @@ app.use('/api/nurture-sequences', nurtureSequenceRoutes);
 app.use('/api/funnel-intelligence', funnelIntelligenceRoutes);
 app.use('/api/funnel-automation', funnelAutomationRoutes);
 app.use('/api/funnel-webhooks', funnelWebhookRoutes);
+
+// Funnel Agentic Routes (AI qualifier, smart routing, nurture, CSV import)
+import funnelAgenticRoutes from './routes/funnel-agentic.js';
+app.use('/api/funnel-agentic', funnelAgenticRoutes);
 app.use('/api/media', mediaUploadRoutes);
 app.use('/api/studio-reports', studioReportRoutes);
 app.use('/api/intel', intelMissionRoutes);
@@ -257,6 +261,11 @@ const server = app.listen(config.port, () => {
     import('./services/scheduledPostPublisher.js').then(({ startScheduledPostPublisher }) => {
         startScheduledPostPublisher();
     }).catch(err => console.error('❌ Failed to load scheduledPostPublisher.js:', err));
+
+    // Start funnel scheduler (nurture sequences, automation, score decay)
+    import('./services/funnelScheduler.js').then(({ startFunnelScheduler }) => {
+        startFunnelScheduler();
+    }).catch(err => console.error('❌ Failed to load funnelScheduler.js:', err));
 });
 
 // Configure Keep-Alive timeout to be larger than AWS ALB / CloudFront idle timeout (60s)

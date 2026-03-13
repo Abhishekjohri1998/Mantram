@@ -13,6 +13,7 @@ import Brand from '../models/Brand.js';
 import { getRouter } from '../ai/router.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { runAutomationRules } from './funnel-automation.js';
+import { sendEmail } from '../utils/email.js';
 
 const router = Router();
 
@@ -672,17 +673,38 @@ router.post('/deliver', protect, async (req, res) => {
 
         switch (channel) {
             case 'email': {
-                // Use nodemailer or any transactional email service
-                // For now, we log the delivery intent and mark as "queued"
-                deliveryLog.to = entry.email;
-                deliveryLog.subject = subject || 'Follow-up';
-                deliveryLog.body = body;
-                deliveryLog.status = entry.email ? 'sent' : 'failed';
-                deliveryLog.error = entry.email ? null : 'No email address on entry';
+                if (!entry.email) {
+                    deliveryLog.status = 'failed';
+                    deliveryLog.error = 'No email address on entry';
+                    break;
+                }
+                // Actually send the email via nodemailer
+                const emailHtml = `
+                    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0f0f23; color: #e2e8f0; border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05);">
+                        <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 32px 24px; text-align: center;">
+                            <h2 style="margin: 0; font-size: 22px; color: #fff;">${subject || 'A message for you'}</h2>
+                        </div>
+                        <div style="padding: 32px 24px;">
+                            <div style="font-size: 15px; line-height: 1.7; color: #cbd5e1; white-space: pre-wrap;">${body}</div>
+                        </div>
+                        <div style="padding: 16px 24px; background: rgba(255,255,255,0.02); text-align: center; border-top: 1px solid rgba(255,255,255,0.05);">
+                            <p style="margin: 0; font-size: 11px; color: #475569;">Sent via Mantram AI Funnel Studio</p>
+                        </div>
+                    </div>
+                `;
+                try {
+                    await sendEmail({ to: entry.email, subject: subject || 'Follow-up', html: emailHtml });
+                    deliveryLog.to = entry.email;
+                    deliveryLog.subject = subject || 'Follow-up';
+                    deliveryLog.status = 'sent';
+                } catch (emailErr) {
+                    deliveryLog.to = entry.email;
+                    deliveryLog.status = 'failed';
+                    deliveryLog.error = emailErr.message || 'Email send failed';
+                }
 
-                // Log touchpoint on the entry
                 entry.touchpoints.push({
-                    type: 'dm_sent',
+                    type: 'email_click',
                     details: `📧 Email ${deliveryLog.status}: "${subject || 'Follow-up'}" via nurture sequence`,
                     timestamp: new Date(),
                 });

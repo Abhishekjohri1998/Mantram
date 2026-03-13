@@ -285,10 +285,15 @@ async function executeAction(action, entry, funnel) {
             descriptions.push(`Notification: ${action.notificationMessage || 'sent'}`);
             break;
         }
-        // start_nurture, trigger_studio, assign_team — logged but not fully connected yet
+        // start_nurture — Tag entry for nurture runner pickup. The nurtureRunner.js service
+        // will detect entries in the trigger stage and execute sequence steps automatically.
         case 'start_nurture': {
+            const nurtureTag = `nurture:${action.sequenceId || 'auto'}`;
+            if (!entry.tags.includes(nurtureTag)) {
+                entry.tags.push(nurtureTag);
+            }
             descriptions.push(`Nurture sequence triggered`);
-            entry.touchpoints.push({ type: 'custom', details: 'Nurture sequence auto-triggered', timestamp: new Date() });
+            entry.touchpoints.push({ type: 'custom', details: `🌱 Nurture sequence activated for "${entry.name}"`, timestamp: new Date(), studioRef: 'funnelStudio' });
             break;
         }
         case 'trigger_studio': {
