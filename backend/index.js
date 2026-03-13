@@ -50,6 +50,7 @@ import funnelAutomationRoutes from './routes/funnel-automation.js';
 import funnelWebhookRoutes from './routes/funnel-webhooks.js';
 import mediaUploadRoutes from './routes/mediaUpload.js';
 import studioReportRoutes from './routes/studio-reports.js';
+import funnelAgenticRoutes from './routes/funnel-agentic.js';
 
 const app = express();
 
@@ -211,7 +212,6 @@ app.use('/api/funnel-automation', funnelAutomationRoutes);
 app.use('/api/funnel-webhooks', funnelWebhookRoutes);
 
 // Funnel Agentic Routes (AI qualifier, smart routing, nurture, CSV import)
-import funnelAgenticRoutes from './routes/funnel-agentic.js';
 app.use('/api/funnel-agentic', funnelAgenticRoutes);
 app.use('/api/media', mediaUploadRoutes);
 app.use('/api/studio-reports', studioReportRoutes);
