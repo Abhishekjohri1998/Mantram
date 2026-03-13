@@ -165,11 +165,24 @@ export const requireCredits = (actionOrCost = 1) => {
  */
 export const getCreditBalance = (user) => {
     if (user.role === 'superadmin' || user.plan === 'enterprise') {
-        return { total: Infinity, used: 0, remaining: Infinity, unlimited: true };
+        return { total: Infinity, used: 0, remaining: Infinity, unlimited: true, bonus: 0, bonusUsed: 0 };
     }
-    const total = (user.credits?.total || 50) + (user.credits?.bonus || 0);
+    const bonus = user.credits?.bonus || 0;
+    const bonusUsed = user.credits?.bonusUsed || 0;
+    const planCredits = user.credits?.total || 50;
     const used = user.credits?.used || 0;
-    return { total, used, remaining: Math.max(0, total - used), unlimited: false };
+    
+    // Total is plan credits + bonus credits
+    const total = planCredits + bonus;
+    
+    return { 
+        total, 
+        used, 
+        remaining: Math.max(0, total - used), 
+        unlimited: false,
+        bonus,
+        bonusUsed
+    };
 };
 
 // Export defaults for reference

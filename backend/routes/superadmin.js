@@ -1366,7 +1366,10 @@ creditRouter.get('/summary', protect, async (req, res) => {
 
         res.json({
             success: true,
-            balance,
+            balance: {
+                ...balance,
+                plan: user.plan // Include current plan slug for the UI
+            },
             today: { credits: todayUsage[0]?.total || 0, operations: todayUsage[0]?.count || 0 },
             week: { credits: weekUsage[0]?.total || 0, operations: weekUsage[0]?.count || 0 },
             month: { credits: monthUsage[0]?.total || 0, operations: monthUsage[0]?.count || 0 },

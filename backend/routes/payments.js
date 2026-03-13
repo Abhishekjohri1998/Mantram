@@ -174,16 +174,17 @@ router.post('/verify', protect, async (req, res) => {
  */
 router.post('/create-topup-order', protect, async (req, res) => {
     try {
-        const { creditPackId } = req.body;
+        const { packId } = req.body;
 
-        // Define standard top-up packs
+        // Define standard top-up packs - matching frontend IDs and values
         const topupPacks = {
-            'pack-100': { credits: 100, price: 50, name: '100 Credits Pack' },
-            'pack-500': { credits: 500, price: 200, name: '500 Credits Pack' },
-            'pack-1000': { credits: 1000, price: 350, name: '1000 Credits Pack' },
+            'small': { credits: 100, price: 50, name: '100 Credits Pack' },
+            'medium': { credits: 500, price: 200, name: '500 Credits Pack' },
+            'large': { credits: 1500, price: 500, name: '1500 Credits Pack' },
+            'enterprise': { credits: 5000, price: 1500, name: '5000 Credits Pack' },
         };
 
-        const pack = topupPacks[creditPackId];
+        const pack = topupPacks[packId];
         if (!pack) {
             return res.status(400).json({ success: false, error: 'Invalid credit pack' });
         }

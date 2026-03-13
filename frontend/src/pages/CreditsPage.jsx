@@ -378,47 +378,56 @@ export default function CreditsPage() {
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                    {packages.map((pkg) => (
-                                        <div key={pkg._id} className={`glass-panel p-6 rounded-2xl border transition-all hover:scale-[1.02] flex flex-col ${pkg.slug === balance?.plan ? 'border-primary ring-1 ring-primary/20 bg-primary/5' : 'border-white/[0.08]'}`}>
-                                            <div className="flex-1">
-                                                <div className="flex items-center justify-between mb-4">
-                                                    <h3 className="text-xl font-bold text-white">{pkg.name}</h3>
-                                                    {pkg.slug === balance?.plan && <span className="badge badge-primary scale-75 origin-right">Current</span>}
-                                                </div>
-                                                <p className="text-sm text-slate-500 mb-6">{pkg.description}</p>
-                                                <div className="mb-6">
-                                                    <span className="text-3xl font-black text-white">{pkg.pricing.currency === 'INR' ? '₹' : '$'}{pkg.pricing.monthly}</span>
-                                                    <span className="text-slate-500 text-sm">/mo</span>
-                                                </div>
-                                                <ul className="space-y-3 mb-8">
-                                                    <li className="flex items-center gap-2 text-sm text-slate-300">
-                                                        <span className="material-symbols-outlined text-primary text-lg">check_circle</span>
-                                                        {pkg.credits.monthly} Credits / mo
-                                                    </li>
-                                                    <li className="flex items-center gap-2 text-sm text-slate-300">
-                                                        <span className="material-symbols-outlined text-primary text-lg">check_circle</span>
-                                                        {pkg.limits.brands} Brand Profiles
-                                                    </li>
-                                                    {pkg.features.map((f, j) => (
-                                                        <li key={j} className="flex items-center gap-2 text-sm text-slate-300">
+                                    {packages.map((pkg) => {
+                                        const isCurrent = pkg.slug === balance?.plan;
+                                        const currentTier = packages.find(p => p.slug === balance?.plan)?.tier || 0;
+                                        const isUpgrade = pkg.tier > currentTier;
+                                        const isDowngrade = pkg.tier < currentTier;
+
+                                        return (
+                                            <div key={pkg._id} className={`glass-panel p-6 rounded-2xl border transition-all hover:scale-[1.02] flex flex-col ${isCurrent ? 'border-primary ring-1 ring-primary/20 bg-primary/5' : 'border-white/[0.08]'}`}>
+                                                <div className="flex-1">
+                                                    <div className="flex items-center justify-between mb-4">
+                                                        <h3 className="text-xl font-bold text-white">{pkg.name}</h3>
+                                                        {isCurrent && <span className="px-2 py-0.5 rounded-full bg-primary text-[10px] font-black uppercase text-white tracking-wider">Current Plan</span>}
+                                                    </div>
+                                                    <p className="text-sm text-slate-500 mb-6">{pkg.description}</p>
+                                                    <div className="mb-6">
+                                                        <span className="text-3xl font-black text-white">{pkg.pricing.currency === 'INR' ? '₹' : '$'}{pkg.pricing.monthly}</span>
+                                                        <span className="text-slate-500 text-sm">/mo</span>
+                                                    </div>
+                                                    <ul className="space-y-3 mb-8">
+                                                        <li className="flex items-center gap-2 text-sm text-slate-300">
                                                             <span className="material-symbols-outlined text-primary text-lg">check_circle</span>
-                                                            {typeof f === 'object' ? (f.name || 'Feature') : f}
+                                                            {pkg.credits.monthly} Credits / mo
                                                         </li>
-                                                    ))}
-                                                </ul>
+                                                        <li className="flex items-center gap-2 text-sm text-slate-300">
+                                                            <span className="material-symbols-outlined text-primary text-lg">check_circle</span>
+                                                            {pkg.limits?.brands || 1} Brand Profiles
+                                                        </li>
+                                                        {pkg.features?.map((f, j) => (
+                                                            <li key={j} className="flex items-center gap-2 text-sm text-slate-300">
+                                                                <span className="material-symbols-outlined text-primary text-lg">check_circle</span>
+                                                                {typeof f === 'object' ? (f.name || 'Feature') : f}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                                <button
+                                                    onClick={() => !isCurrent && handleUpgrade(pkg)}
+                                                    disabled={isCurrent}
+                                                    className={`w-full py-3 rounded-xl font-bold text-sm text-center block transition-all cursor-pointer ${isCurrent
+                                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default'
+                                                        : isUpgrade
+                                                            ? 'bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary-light'
+                                                            : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'
+                                                        }`}
+                                                >
+                                                    {isCurrent ? 'Current Plan' : isUpgrade ? `Upgrade to ${pkg.name}` : `Downgrade to ${pkg.name}`}
+                                                </button>
                                             </div>
-                                            <button
-                                                disabled={pkg.slug === balance?.plan}
-                                                onClick={() => handleUpgrade(pkg)}
-                                                className={`w-full py-3 rounded-xl font-bold text-sm text-center block transition-all cursor-pointer ${pkg.slug === balance?.plan
-                                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default'
-                                                    : 'bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary-light'
-                                                    }`}
-                                            >
-                                                {pkg.slug === balance?.plan ? 'Current Plan' : 'Upgrade Now'}
-                                            </button>
-                                        </div>
-                                    ))}
+                                        )
+                                    })}
                                 </div>
                             )}
                         </div>
