@@ -55,6 +55,7 @@ export default function SuperAdminDashboard() {
     // Credit cost management state (must be before early return)
     const [creditCosts, setCreditCosts] = useState(null)
     const [editingCosts, setEditingCosts] = useState(null)
+    const [syncingCredits, setSyncingCredits] = useState(false)
 
     if (user?.role !== 'superadmin') {
         return <DashboardLayout><div className="flex items-center justify-center h-screen"><div className="text-center"><span className="material-symbols-outlined text-6xl text-rose-500 mb-4">shield</span><h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2><p className="text-slate-500">Super Admin access required</p></div></div></DashboardLayout>
@@ -149,6 +150,22 @@ export default function SuperAdminDashboard() {
             else loadUsers();
         } catch (e) { showToast(e.message || 'Rejection failed', 'error') } 
     }
+
+    const handleSyncCredits = async () => {
+        if (!confirm('This will synchronize all user credit data based on usage logs and plans. Proceed?')) return;
+        setSyncingCredits(true);
+        try {
+            const d = await API.syncCredits();
+            showToast(`${d.stats.success} users synced, ${d.stats.failed} failed`);
+            loadUsers();
+            loadStats();
+        } catch (e) {
+            showToast(e.message || 'Sync failed', 'error');
+        } finally {
+            setSyncingCredits(false);
+        }
+    }
+
     const handleDeleteBrand = async (brand, name) => { 
         const brandId = brand?._id || brand?.id || brand;
         if (!brandId || brandId === 'undefined') {
@@ -992,6 +1009,38 @@ export default function SuperAdminDashboard() {
                                                 )}
                                             </div>
                                         ))}
+                                    </div>
+                                </div>
+
+                                <div className="glass-panel rounded-2xl p-6 border border-primary/10">
+                                    <div className="flex items-center justify-between mb-8">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                                                <span className="material-symbols-outlined text-amber-400">sync_problem</span>
+                                            </div>
+                                            <div>
+                                                <p className="text-base font-bold text-white">Credit Integrity Sync</p>
+                                                <p className="text-sm text-slate-500">Repair and synchronize credit data system-wide</p>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={handleSyncCredits} 
+                                            disabled={syncingCredits}
+                                            className="px-6 py-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-sm font-bold border border-amber-500/30 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                                        >
+                                            <span className={`material-symbols-outlined text-base ${syncingCredits ? 'animate-spin' : ''}`}>
+                                                {syncingCredits ? 'progress_activity' : 'database_sync'}
+                                            </span>
+                                            {syncingCredits ? 'Syncing...' : 'Start Integrity Sync'}
+                                        </button>
+                                    </div>
+                                    <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/10">
+                                        <div className="flex gap-2">
+                                            <span className="material-symbols-outlined text-amber-400 text-sm">info</span>
+                                            <p className="text-xs text-amber-400/80 leading-relaxed">
+                                                This utility walks through all users, verifies their active subscription allocation, and matches their `used` credits against the `CreditUsage` logs for the current cycle. Use this if you notice discrepancies between plan limits and actual credit balances.
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

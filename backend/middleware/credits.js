@@ -121,9 +121,17 @@ export const requireCredits = (actionOrCost = 1) => {
             }
 
             // Deduct credits immediately
-            const updated = await User.findByIdAndUpdate(user._id, {
-                $inc: { 'credits.used': cost },
-            }, { returnDocument: 'after' });
+            const updateOps = [
+                User.findByIdAndUpdate(user._id, { $inc: { 'credits.used': cost } }, { returnDocument: 'after' })
+            ];
+
+            // If user has an active subscription, sync deduction there too
+            if (user.activeSubscription) {
+                const Subscription = (await import('../models/Subscription.js')).default;
+                updateOps.push(Subscription.findByIdAndUpdate(user.activeSubscription, { $inc: { 'credits.used': cost } }));
+            }
+
+            const [updated] = await Promise.all(updateOps);
 
             // Log usage (fire-and-forget)
             const balanceAfter = (updated.credits?.total || 0) + (updated.credits?.bonus || 0) - (updated.credits?.used || 0);
@@ -137,6 +145,7 @@ export const requireCredits = (actionOrCost = 1) => {
                     route: req.originalUrl,
                     brandId: req.body?.brandId || req.params?.brandId,
                     brandName: req.body?.brandName,
+                    subscriptionId: user.activeSubscription,
                 },
             }).catch(err => console.warn('Credit usage log failed:', err.message));
 

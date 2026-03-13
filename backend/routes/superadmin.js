@@ -300,8 +300,28 @@ router.post('/users/:id/add-credits', async (req, res) => {
     try {
         const { amount, reason } = req.body;
         if (!amount || amount <= 0) return res.status(400).json({ success: false, error: 'Amount must be positive' });
-        const user = await User.findByIdAndUpdate(req.params.id, { $inc: { 'credits.bonus': amount } }, { returnDocument: 'after' }).select('-password');
+        
+        const user = await User.findById(req.params.id).select('-password');
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+        user.credits.bonus += amount;
+        await user.save();
+
+        // Create audit log
+        const balanceAfter = (user.credits?.total || 0) + (user.credits?.bonus || 0) - (user.credits?.used || 0);
+        await CreditUsage.create({
+            user: user._id,
+            action: 'admin_adjustment',
+            cost: -amount, // Negative cost means addition
+            balanceAfter: Math.max(0, balanceAfter),
+            description: `Admin Adjustment: ${reason || 'Bonus credits added'}`,
+            metadata: {
+                adminId: req.user._id,
+                reason,
+                type: 'bonus'
+            }
+        }).catch(err => console.warn('Credit audit log failed:', err.message));
+
         res.json({ success: true, user: { ...user.toJSON(), creditBalance: getCreditBalance(user) } });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -310,7 +330,65 @@ router.post('/users/:id/add-credits', async (req, res) => {
 
 router.post('/users/:id/reset-credits', async (req, res) => {
     try {
+        const user = await User.findById(req.params.id).select('-password');
+        if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+        const previousUsed = user.credits.used;
+        user.credits.used = 0;
+        await user.save();
+
+        if (user.activeSubscription) {
+            await Subscription.findByIdAndUpdate(user.activeSubscription, { $set: { 'credits.used': 0 } });
+        }
+
+        // Create audit log
+        const balanceAfter = (user.credits?.total || 0) + (user.credits?.bonus || 0);
+        await CreditUsage.create({
+            user: user._id,
+            action: 'admin_adjustment',
+            cost: previousUsed, // Adding back 'used' credits
+            balanceAfter: Math.max(0, balanceAfter),
+            description: 'Admin Adjustment: Manual Credit Reset',
+            metadata: {
+                adminId: req.user._id,
+                type: 'reset',
+                previousUsed
+            }
+        }).catch(err => console.warn('Credit audit log failed:', err.message));
+
         res.json({ success: true, user: { ...user.toJSON(), creditBalance: getCreditBalance(user) } });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+/**
+ * System-Wide Credit Synchronization
+ * Repair tool to ensure all users have correct credit counts based on logs and plans.
+ */
+router.post('/system/sync-all-credits', async (req, res) => {
+    try {
+        const { syncUserCredits } = await import('../utils/credits.js');
+        const users = await User.find({ role: { $ne: 'superadmin' } });
+        
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const user of users) {
+             try {
+                 await syncUserCredits(user._id);
+                 successCount++;
+             } catch (err) {
+                 console.error(`Sync failed for user ${user.email}:`, err.message);
+                 failCount++;
+             }
+        }
+
+        res.json({ 
+            success: true, 
+            message: `Synchronization complete.`, 
+            stats: { total: users.length, success: successCount, failed: failCount } 
+        });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }

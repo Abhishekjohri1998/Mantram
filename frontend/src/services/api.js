@@ -381,6 +381,7 @@ export const superadmin = {
     getCreditCosts: () => apiFetch('/superadmin/credit-costs'),
     updateCreditCosts: (costs) => apiFetch('/superadmin/credit-costs', { method: 'PUT', body: JSON.stringify({ costs }) }),
     resetCreditCosts: () => apiFetch('/superadmin/credit-costs/reset', { method: 'POST' }),
+    syncCredits: () => apiFetch('/superadmin/system/sync-all-credits', { method: 'POST' }),
 };
 
 // ============ Credits API ============
