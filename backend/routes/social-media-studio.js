@@ -1,0 +1,695 @@
+import { Router } from 'express';
+import { protect } from '../middleware/auth.js';
+import { requireStudio } from '../middleware/studioAccess.js';
+import { requireCredits } from '../middleware/credits.js';
+import { safeErrorMessage } from '../utils/safeError.js';
+import SocialStrategy from '../models/SocialStrategy.js';
+
+const router = Router();
+
+// ============================================================================
+// AI HELPER (GPT-4o primary, Gemini fallback — same as brainstorm-studio)
+// ============================================================================
+
+async function aiCall(systemPrompt, userPrompt, options = {}) {
+    const { temperature = 0.7, maxTokens = 4096, json = false } = options;
+
+    if (process.env.OPENAI_API_KEY) {
+        try {
+            const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+                body: JSON.stringify({
+                    model: 'gpt-4o-mini',
+                    messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+                    temperature, max_tokens: maxTokens,
+                    ...(json ? { response_format: { type: 'json_object' } } : {}),
+                }),
+            });
+            const data = await resp.json();
+            if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
+            if (data.error) console.warn('GPT-4o-mini failed:', data.error.message);
+        } catch (e) { console.warn('GPT-4o-mini error:', e.message); }
+    }
+
+    const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
+    if (geminiKey) {
+        for (const model of ['gemini-2.0-flash', 'gemini-2.5-flash-preview-05-20']) {
+            try {
+                const resp = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+                    {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            systemInstruction: { parts: [{ text: systemPrompt }] },
+                            contents: [{ parts: [{ text: userPrompt }] }],
+                            generationConfig: { temperature, maxOutputTokens: maxTokens, ...(json ? { responseMimeType: 'application/json' } : {}) },
+                        }),
+                    }
+                );
+                const data = await resp.json();
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) return text;
+            } catch (e) { console.warn(`Gemini ${model} error:`, e.message); }
+        }
+    }
+    throw new Error('All AI models failed');
+}
+
+function parseJSON(text) {
+    let clean = text.trim();
+    if (clean.startsWith('```')) clean = clean.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+    return JSON.parse(clean);
+}
+
+function buildBrandContext(brand) {
+    if (!brand) return '';
+    const dna = brand.dna || {};
+    return [
+        `Brand: ${brand.name}`,
+        dna.industry ? `Industry: ${dna.industry}` : '',
+        dna.brandDescription ? `Description: ${dna.brandDescription}` : '',
+        dna.targetAudience ? `Target Audience: ${dna.targetAudience}` : '',
+        dna.voice?.personality ? `Voice: ${dna.voice.personality}` : '',
+        dna.voice?.keywords?.length ? `Tone Keywords: ${dna.voice.keywords.join(', ')}` : '',
+        dna.contentStyle?.dos?.length ? `Content Dos: ${dna.contentStyle.dos.join(', ')}` : '',
+        dna.contentStyle?.donts?.length ? `Don'ts: ${dna.contentStyle.donts.join(', ')}` : '',
+        dna.country ? `Country: ${dna.country}` : '',
+        dna.defaultLanguage ? `Language: ${dna.defaultLanguage}` : '',
+        dna.colors?.length ? `Colors: ${dna.colors.map(c => c.hex).join(', ')}` : '',
+    ].filter(Boolean).join('\n');
+}
+
+
+// ════════════════════════════════════════════════════════════════
+//  1. GENERATE STRATEGY — AI Social Media Strategy
+// ════════════════════════════════════════════════════════════════
+
+router.post('/generate-strategy', protect, requireStudio('socialMediaStudio'), requireCredits('socialMedia'), async (req, res) => {
+    try {
+        const { platforms, timeframe, goals, industry, currentMetrics, brand } = req.body;
+        if (!platforms?.length) return res.status(400).json({ success: false, error: 'Select at least one platform' });
+
+        const brandCtx = buildBrandContext(brand);
+        const timeframeLabel = timeframe === 'quarterly' ? '3-month quarterly' : '1-month';
+
+        const systemPrompt = `You are a world-class Social Media Strategist with 15+ years experience managing brands across Instagram, LinkedIn, Facebook, Twitter/X, and YouTube.
+
+BRAND CONTEXT:
+${brandCtx}
+
+Generate a comprehensive ${timeframeLabel} social media strategy for: ${platforms.join(', ')}
+
+Goals: ${goals || 'Brand awareness and engagement growth'}
+Industry: ${industry || brand?.dna?.industry || 'General'}
+Current metrics: ${currentMetrics || 'Starting fresh / not provided'}
+
+YOUR OUTPUT MUST INCLUDE:
+
+1. **Content Pillars** (4-5 themed pillars with % content mix) — educate / entertain / inspire / sell / community
+2. **Platform-specific strategy** for EACH selected platform:
+   - Posting frequency (e.g., 5 reels/week, 3 carousel/week)
+   - Best posting times for the industry
+   - Content format mix (reels %, carousels %, stories %, static %, text %)
+   - Tone and style guide for that platform
+   - Hashtag strategy (branded + niche + trending mix) with 10-15 hashtags per platform
+   - Growth tactics specific to platform algorithm
+3. **Content format ratio** — overall mix of video:image:text:carousel
+4. **Engagement strategy** — community building tactics, reply strategy, DM approach
+5. **Growth projections** — realistic follower/reach/engagement targets with assumptions
+6. **Weekly content quota** — exact number of posts per platform per week
+7. **Tools & automation recommendations**
+
+Respond in STRICT JSON:
+{
+  "overview": "2-3 sentence executive summary",
+  "contentPillars": [
+    { "name": "Pillar name", "percentage": 25, "description": "What this covers", "icon": "emoji", "examples": ["Post idea 1", "Post idea 2"] }
+  ],
+  "platformStrategies": [
+    {
+      "platform": "instagram",
+      "frequency": "5 reels + 3 carousels + daily stories per week",
+      "bestTimes": ["9:00 AM", "12:30 PM", "7:00 PM"],
+      "bestDays": ["Tuesday", "Thursday", "Saturday"],
+      "formatMix": { "reels": 40, "carousels": 25, "stories": 20, "static": 10, "live": 5 },
+      "toneGuide": "How to write for this platform",
+      "hashtags": { "branded": ["#BrandName"], "niche": ["#IndustryTag"], "trending": ["#Trending"] },
+      "growthTactics": ["Tactic 1", "Tactic 2", "Tactic 3"],
+      "doNot": ["Thing to avoid 1", "Thing to avoid 2"]
+    }
+  ],
+  "weeklyQuota": { "totalPosts": 15, "breakdown": { "instagram": 8, "linkedin": 4, "twitter": 3 } },
+  "engagementStrategy": {
+    "replyWindow": "Within 1 hour",
+    "communityTactics": ["Tactic 1", "Tactic 2"],
+    "dmStrategy": "How to handle DMs",
+    "ugcStrategy": "How to encourage user content"
+  },
+  "growthProjections": [
+    { "metric": "Instagram Followers", "current": "X", "target": "Y", "timeframe": "1 month", "assumption": "Based on..." }
+  ],
+  "contentCalendarTemplate": {
+    "monday": { "platform": "instagram", "type": "reel", "pillar": "educate" },
+    "tuesday": { "platform": "linkedin", "type": "text post", "pillar": "authority" }
+  },
+  "toolsRecommended": ["Tool 1 — why", "Tool 2 — why"]
+}`;
+
+        const userPrompt = `Generate a ${timeframeLabel} social media strategy for ${platforms.join(', ')}.\nGoals: ${goals || 'Growth'}\nIndustry: ${industry || 'General'}\nCurrent metrics: ${currentMetrics || 'New account'}`;
+
+        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, maxTokens: 6000 });
+        const strategy = parseJSON(result);
+
+        // Save to DB
+        const saved = await SocialStrategy.create({
+            user: req.user._id,
+            brand: brand?._id || req.body.brandId,
+            type: 'strategy',
+            title: `${platforms.join(' + ')} Strategy — ${timeframeLabel}`,
+            platforms,
+            timeframe: timeframe || 'monthly',
+            data: strategy,
+            inputs: { platforms, timeframe, goals, industry, currentMetrics },
+        });
+
+        res.json({ success: true, strategy, strategyId: saved._id });
+    } catch (error) {
+        console.error('Social strategy error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ════════════════════════════════════════════════════════════════
+//  2. GENERATE CALENDAR — Monthly Content Calendar
+// ════════════════════════════════════════════════════════════════
+
+router.post('/generate-calendar', protect, requireStudio('socialMediaStudio'), requireCredits('socialMedia'), async (req, res) => {
+    try {
+        const { platforms, month, year, brand, themes, postsPerWeek } = req.body;
+        if (!platforms?.length) return res.status(400).json({ success: false, error: 'Select at least one platform' });
+
+        const brandCtx = buildBrandContext(brand);
+        const targetMonth = month || new Date().getMonth() + 1;
+        const targetYear = year || new Date().getFullYear();
+        const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        const monthName = monthNames[targetMonth - 1];
+
+        const systemPrompt = `You are a Social Media Content Calendar expert. Generate a detailed daily content calendar for ${monthName} ${targetYear}.
+
+BRAND CONTEXT:
+${brandCtx}
+
+Platforms: ${platforms.join(', ')}
+Posts per week: ${postsPerWeek || 'recommend optimal'}
+Content themes: ${themes || 'Use brand-appropriate themes'}
+
+Generate a FULL month calendar with specific post ideas for each day. Include:
+- Platform-specific post ideas
+- Content type (reel, carousel, story, post, thread, article)
+- Caption theme/hook (not full caption — just the angle)
+- Hashtag set (3-5 relevant hashtags per post)
+- Content pillar (educate, entertain, inspire, sell, community)
+- Best posting time
+
+Include relevant festivals, trending days, awareness days for the month.
+
+Respond in STRICT JSON:
+{
+  "month": "${monthName}",
+  "year": ${targetYear},
+  "totalPosts": 20,
+  "keyDates": [
+    { "date": "${targetYear}-${String(targetMonth).padStart(2,'0')}-14", "event": "Valentine's Day", "opportunity": "How to leverage" }
+  ],
+  "weeks": [
+    {
+      "weekNumber": 1,
+      "theme": "Week theme",
+      "posts": [
+        {
+          "date": "${targetYear}-${String(targetMonth).padStart(2,'0')}-01",
+          "day": "Monday",
+          "platform": "instagram",
+          "type": "reel",
+          "pillar": "educate",
+          "captionAngle": "The hook or angle for this post",
+          "hashtags": ["#tag1", "#tag2", "#tag3"],
+          "bestTime": "9:00 AM",
+          "estimatedReach": "High / Medium / Low",
+          "notes": "Any special notes"
+        }
+      ]
+    }
+  ],
+  "monthlyGoals": ["Goal 1", "Goal 2"],
+  "contentMixSummary": { "reels": 8, "carousels": 5, "stories": 10, "posts": 4, "threads": 3 }
+}`;
+
+        const userPrompt = `Generate ${monthName} ${targetYear} content calendar for ${platforms.join(', ')}. ${themes ? `Themes: ${themes}` : ''}`;
+
+        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, maxTokens: 8000 });
+        const calendar = parseJSON(result);
+
+        const saved = await SocialStrategy.create({
+            user: req.user._id,
+            brand: brand?._id || req.body.brandId,
+            type: 'calendar',
+            title: `${monthName} ${targetYear} Calendar — ${platforms.join(' + ')}`,
+            platforms,
+            timeframe: 'monthly',
+            data: calendar,
+            inputs: { platforms, month: targetMonth, year: targetYear, themes, postsPerWeek },
+        });
+
+        res.json({ success: true, calendar, calendarId: saved._id });
+    } catch (error) {
+        console.error('Calendar generation error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ════════════════════════════════════════════════════════════════
+//  3. ACCOUNT AUDIT — AI Health Check
+// ════════════════════════════════════════════════════════════════
+
+router.post('/account-audit', protect, requireStudio('socialMediaStudio'), requireCredits('socialMedia'), async (req, res) => {
+    try {
+        const { platform, metrics, brand } = req.body;
+        if (!platform) return res.status(400).json({ success: false, error: 'Platform is required' });
+
+        const brandCtx = buildBrandContext(brand);
+        const metricsText = metrics ? Object.entries(metrics).map(([k, v]) => `${k}: ${v}`).join('\n') : 'No metrics provided — analyze based on industry benchmarks';
+
+        const systemPrompt = `You are a Social Media Audit specialist. Analyze the ${platform} account for this brand and provide a comprehensive health check.
+
+BRAND CONTEXT:
+${brandCtx}
+
+ACCOUNT METRICS:
+${metricsText}
+
+Generate a detailed audit with scoring (0-100) for each dimension. Be HONEST — don't inflate scores. Compare against industry benchmarks.
+
+Respond in STRICT JSON:
+{
+  "overallScore": 65,
+  "grade": "B-",
+  "summary": "2-3 sentence executive summary of account health",
+  "dimensions": [
+    {
+      "name": "Engagement Rate",
+      "score": 70,
+      "benchmark": "Industry avg: 3.5%",
+      "current": "Your rate: 2.8%",
+      "verdict": "Below average — needs improvement",
+      "icon": "emoji"
+    },
+    {
+      "name": "Posting Consistency",
+      "score": 45,
+      "benchmark": "Optimal: 5-7 posts/week",
+      "current": "Your rate: 2-3 posts/week",
+      "verdict": "Inconsistent — major gaps detected",
+      "icon": "emoji"
+    },
+    {
+      "name": "Content Variety",
+      "score": 60,
+      "benchmark": "Mix of 4+ formats",
+      "current": "Mostly static posts",
+      "verdict": "Add reels and carousels",
+      "icon": "emoji"
+    },
+    {
+      "name": "Growth Velocity",
+      "score": 55,
+      "benchmark": "5-10% monthly growth",
+      "current": "2% monthly",
+      "verdict": "Slow — needs paid boost or viral hooks",
+      "icon": "emoji"
+    },
+    {
+      "name": "Profile Optimization",
+      "score": 80,
+      "benchmark": "Complete bio + CTA + highlights",
+      "current": "Good bio, missing CTA",
+      "verdict": "Almost there",
+      "icon": "emoji"
+    },
+    {
+      "name": "Hashtag Effectiveness",
+      "score": 50,
+      "benchmark": "Mix of volume levels",
+      "current": "Using only popular tags",
+      "verdict": "Add niche + branded hashtags",
+      "icon": "emoji"
+    }
+  ],
+  "topStrengths": ["Strength 1", "Strength 2"],
+  "criticalIssues": ["Issue 1", "Issue 2", "Issue 3"],
+  "actionPlan": [
+    { "priority": "high", "action": "What to do", "impact": "Expected result", "timeline": "This week" },
+    { "priority": "medium", "action": "What to do", "impact": "Expected result", "timeline": "This month" },
+    { "priority": "low", "action": "What to do", "impact": "Expected result", "timeline": "Next month" }
+  ],
+  "competitorBenchmark": "How you compare to typical accounts in this industry"
+}`;
+
+        const userPrompt = `Audit ${platform} account for ${brand?.name || 'this brand'}. Metrics: ${metricsText}`;
+
+        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 5000 });
+        const audit = parseJSON(result);
+
+        const saved = await SocialStrategy.create({
+            user: req.user._id,
+            brand: brand?._id || req.body.brandId,
+            type: 'audit',
+            title: `${platform} Audit — Score: ${audit.overallScore}/100`,
+            platforms: [platform],
+            data: audit,
+            inputs: { platform, metrics },
+        });
+
+        res.json({ success: true, audit, auditId: saved._id });
+    } catch (error) {
+        console.error('Account audit error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ════════════════════════════════════════════════════════════════
+//  4. COMPETITOR ANALYSIS — AI Competitor Intelligence
+// ════════════════════════════════════════════════════════════════
+
+router.post('/competitor-analysis', protect, requireStudio('socialMediaStudio'), requireCredits('socialMedia'), async (req, res) => {
+    try {
+        const { competitors, platforms, brand } = req.body;
+        if (!competitors?.length) return res.status(400).json({ success: false, error: 'Add at least one competitor' });
+
+        const brandCtx = buildBrandContext(brand);
+
+        const systemPrompt = `You are a Competitive Intelligence analyst specializing in social media. Analyze the following competitors against the brand.
+
+BRAND CONTEXT:
+${brandCtx}
+
+COMPETITORS TO ANALYZE: ${competitors.map(c => c.name || c).join(', ')}
+PLATFORMS: ${(platforms || ['instagram', 'linkedin']).join(', ')}
+
+Based on your knowledge of these brands/companies, analyze their likely social media strategy. Be specific and actionable.
+
+Respond in STRICT JSON:
+{
+  "overview": "2-3 sentence competitive landscape summary",
+  "competitors": [
+    {
+      "name": "Competitor name",
+      "platforms": {
+        "instagram": {
+          "estimatedFollowers": "Range",
+          "postingFrequency": "X posts/week",
+          "contentStyle": "Description of their style",
+          "topContentTypes": ["Reels", "Carousels"],
+          "engagementLevel": "High / Medium / Low",
+          "strengths": ["Strength 1"],
+          "weaknesses": ["Weakness 1"]
+        }
+      },
+      "overallStrategy": "What they're doing well",
+      "vulnerabilities": ["Gap 1", "Gap 2"]
+    }
+  ],
+  "yourAdvantages": ["What you can do better 1", "What you can do better 2"],
+  "contentGaps": [
+    { "gap": "Content type competitors miss", "opportunity": "How you can fill it", "platform": "Where to post it" }
+  ],
+  "stealablePlaybook": [
+    { "tactic": "What they do that works", "adaptation": "How to make it yours", "difficulty": "Easy / Medium / Hard" }
+  ],
+  "differentiationStrategy": "How to stand out from all competitors",
+  "weeklyBattlePlan": {
+    "outpost": "Beat them here first",
+    "contentWeapons": ["Weapon 1", "Weapon 2"],
+    "engagementTactics": ["Tactic 1"]
+  }
+}`;
+
+        const userPrompt = `Analyze competitors: ${competitors.map(c => c.name || c).join(', ')} vs ${brand?.name || 'our brand'} on ${(platforms || ['instagram']).join(', ')}`;
+
+        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, maxTokens: 6000 });
+        const analysis = parseJSON(result);
+
+        const saved = await SocialStrategy.create({
+            user: req.user._id,
+            brand: brand?._id || req.body.brandId,
+            type: 'competitor',
+            title: `vs ${competitors.map(c => c.name || c).join(', ')}`,
+            platforms: platforms || ['instagram'],
+            data: analysis,
+            inputs: { competitors, platforms },
+        });
+
+        res.json({ success: true, analysis, analysisId: saved._id });
+    } catch (error) {
+        console.error('Competitor analysis error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ════════════════════════════════════════════════════════════════
+//  5. PROFILE SCORE — Platform-Specific Profile Health Score
+// ════════════════════════════════════════════════════════════════
+
+const PLATFORM_RUBRICS = {
+    instagram: {
+        label: 'Instagram',
+        parameters: [
+            { id: 'bio', name: 'Bio Quality', maxScore: 10, benchmark: 'Use all 150 chars, include 1 CTA, 2-3 keywords, line breaks for readability', impactStat: 'Optimized bios increase profile visits by 33%' },
+            { id: 'profilePhoto', name: 'Profile Photo', maxScore: 10, benchmark: 'High-res (320×320px min), consistent with brand, recognizable at small sizes', impactStat: 'Profiles with professional photos get 14x more views' },
+            { id: 'storyHighlights', name: 'Story Highlights', maxScore: 10, benchmark: 'Minimum 5 categorized highlights with branded covers (Services, Reviews, BTS, FAQ, Press)', impactStat: 'Highlights increase profile dwell time by 40%' },
+            { id: 'linkInBio', name: 'Link in Bio', maxScore: 10, benchmark: 'Use Linktree/Beacons with 5+ trackable links, clear CTA', impactStat: 'Multi-link tools boost click-through by 25%' },
+            { id: 'contactCTA', name: 'Contact / Action Button', maxScore: 10, benchmark: 'Business account with active CTA (Shop, Book, Contact)', impactStat: 'Action buttons generate 35% more inquiries' },
+            { id: 'contentTheme', name: 'Feed Aesthetic & Theme', maxScore: 10, benchmark: 'Consistent color palette, visual grid pattern, branded templates', impactStat: 'Cohesive feeds convert 21% more visitors to followers' },
+            { id: 'reelsCovers', name: 'Reels Cover Branding', maxScore: 10, benchmark: 'Custom covers with text overlays matching brand fonts/colors', impactStat: 'Branded reel covers increase save rate by 18%' },
+            { id: 'hashtagStrategy', name: 'Hashtag Strategy', maxScore: 10, benchmark: 'Mix of 3-5 branded + 10-15 niche (10K-500K volume) + 3-5 trending per post', impactStat: 'Optimized hashtag sets boost reach by 40-50%' },
+            { id: 'username', name: 'Username & Handle', maxScore: 10, benchmark: 'Matches brand name, no underscores/numbers, same across platforms', impactStat: 'Consistent handles increase cross-platform discovery by 22%' },
+            { id: 'categoryTag', name: 'Category & Labels', maxScore: 10, benchmark: 'Correct business category selected, location tagged', impactStat: 'Proper categorization improves Explore page visibility by 15%' }
+        ]
+    },
+    linkedin: {
+        label: 'LinkedIn',
+        parameters: [
+            { id: 'headline', name: 'Headline', maxScore: 10, benchmark: '120 chars, include role + value prop + 3-5 industry keywords. Formula: [Role] | Helping [audience] achieve [outcome]', impactStat: 'Keyword-rich headlines get 40% more search appearances' },
+            { id: 'profilePhoto', name: 'Profile Photo', maxScore: 10, benchmark: '400×400px min, professional headshot, face takes 60% of frame, solid/branded background', impactStat: 'Professional photos get 21x more views and 36x more messages' },
+            { id: 'banner', name: 'Banner Image', maxScore: 10, benchmark: '1584×396px, shows brand value prop, clear CTA text, matches brand palette', impactStat: 'Custom banners increase profile credibility score by 25%' },
+            { id: 'aboutSummary', name: 'About / Summary', maxScore: 10, benchmark: 'Use full 2600 chars, structured with hook → story → proof → CTA. Include 5+ keywords', impactStat: 'Complete About sections get 30% more connection requests' },
+            { id: 'experience', name: 'Experience Section', maxScore: 10, benchmark: 'Current role + 3-5 past roles with measurable achievements (numbers, %), rich media attached', impactStat: 'Detailed experience sections boost recruiter/client trust by 45%' },
+            { id: 'skills', name: 'Skills & Endorsements', maxScore: 10, benchmark: '50 skills listed, top 3 relevant to current focus, 10+ endorsements each', impactStat: 'Members with 5+ skills get 17x more profile views' },
+            { id: 'recommendations', name: 'Recommendations', maxScore: 10, benchmark: '5+ received, 3+ given, diverse (clients, colleagues, partners), recency within 12 months', impactStat: 'Profiles with recommendations are 12x more likely to be contacted' },
+            { id: 'customUrl', name: 'Custom URL', maxScore: 10, benchmark: 'linkedin.com/in/firstname-lastname, remove random numbers', impactStat: 'Custom URLs rank higher in Google and look professional in emails' },
+            { id: 'featuredSection', name: 'Featured Section', maxScore: 10, benchmark: '3-6 items: top posts, articles, case studies, portfolio links', impactStat: 'Featured sections increase content engagement by 28%' },
+            { id: 'activitySignals', name: 'Activity & Posting', maxScore: 10, benchmark: 'Post 3-5x/week, engage daily, respond to comments within 1 hour', impactStat: 'Active profiles rank 5x higher in LinkedIn search results' }
+        ]
+    },
+    facebook: {
+        label: 'Facebook',
+        parameters: [
+            { id: 'coverPhoto', name: 'Cover Photo / Video', maxScore: 10, benchmark: '820×312px image or 20-90sec cover video, includes brand message + CTA', impactStat: 'Cover videos increase page engagement by 26%' },
+            { id: 'profilePhoto', name: 'Profile Photo', maxScore: 10, benchmark: '170×170px min, logo for business, consistent with other platforms', impactStat: 'Brand-consistent logos build 23% more trust' },
+            { id: 'aboutSection', name: 'About Section', maxScore: 10, benchmark: 'Complete all fields: story, mission, founding date, products, milestones', impactStat: 'Complete pages get 30% more organic reach' },
+            { id: 'contactInfo', name: 'Contact Information', maxScore: 10, benchmark: 'Phone, email, website, address, hours — all filled and current', impactStat: 'Contact-complete pages get 40% more inquiries' },
+            { id: 'ctaButton', name: 'CTA Button', maxScore: 10, benchmark: 'Active CTA: Shop Now / Book Now / Send Message / Sign Up', impactStat: 'CTA buttons drive 20% of total page clicks' },
+            { id: 'pageCategory', name: 'Page Category & Templates', maxScore: 10, benchmark: 'Correct primary + secondary categories, appropriate page template', impactStat: 'Accurate categorization improves local search ranking' },
+            { id: 'reviews', name: 'Reviews & Ratings', maxScore: 10, benchmark: '4.5+ star rating, 20+ reviews, responses to all reviews within 24hrs', impactStat: '92% of consumers read reviews; 4.5+ stars increases conversion by 28%' },
+            { id: 'pinnedPost', name: 'Pinned Post', maxScore: 10, benchmark: 'Current offer, top testimonial, or brand intro video pinned', impactStat: 'Pinned posts receive 45% more engagement than regular posts' }
+        ]
+    },
+    twitter: {
+        label: 'Twitter / X',
+        parameters: [
+            { id: 'headerImage', name: 'Header / Banner Image', maxScore: 10, benchmark: '1500×500px, current campaign or value prop, includes brand URL', impactStat: 'Custom headers increase follow-back rate by 18%' },
+            { id: 'profilePhoto', name: 'Profile Photo', maxScore: 10, benchmark: '400×400px, consistent with other platforms, recognizable at 48px', impactStat: 'Consistent cross-platform photos increase trust by 20%' },
+            { id: 'bio', name: 'Bio (160 chars)', maxScore: 10, benchmark: 'All 160 chars used, includes role, value, 2-3 relevant hashtags, clear personality', impactStat: 'Optimized bios improve follow rate by 30%' },
+            { id: 'pinnedTweet', name: 'Pinned Tweet / Post', maxScore: 10, benchmark: 'High-performing post, thread, or CTA — updated monthly', impactStat: 'Pinned tweets get 10x impressions of regular tweets' },
+            { id: 'location', name: 'Location', maxScore: 10, benchmark: 'Filled with city/region or "Global" for international brands', impactStat: 'Location-tagged profiles appear in 15% more local searches' },
+            { id: 'websiteLink', name: 'Website Link', maxScore: 10, benchmark: 'Active, trackable link (UTM tagged) to landing page or Linktree', impactStat: 'Website links drive 25% of profile-to-site traffic' },
+            { id: 'verifiedStatus', name: 'Verified / Premium Status', maxScore: 10, benchmark: 'Blue or gold checkmark active, builds immediate trust', impactStat: 'Verified accounts receive 30% more engagement and 50% more clicks' },
+            { id: 'listsCommunities', name: 'Lists & Communities', maxScore: 10, benchmark: 'Active in 3+ communities, curating 2+ public lists', impactStat: 'Community participation boosts reply engagement by 35%' }
+        ]
+    },
+    youtube: {
+        label: 'YouTube',
+        parameters: [
+            { id: 'channelArt', name: 'Channel Banner', maxScore: 10, benchmark: '2560×1440px, includes upload schedule, brand tagline, social links', impactStat: 'Professional banners increase channel subscribe rate by 22%' },
+            { id: 'profilePhoto', name: 'Channel Icon', maxScore: 10, benchmark: '800×800px, recognizable at 98px, consistent with other platforms', impactStat: 'Consistent branding increases recognition by 25%' },
+            { id: 'channelDescription', name: 'Channel Description', maxScore: 10, benchmark: 'Full 1000 chars, explain what viewer gets, upload schedule, 5+ keywords, social links', impactStat: 'SEO-optimized descriptions boost channel search appearances by 35%' },
+            { id: 'playlists', name: 'Playlist Organization', maxScore: 10, benchmark: '5+ themed playlists with keyword-rich titles and descriptions', impactStat: 'Organized playlists increase average session duration by 40%' },
+            { id: 'channelTrailer', name: 'Channel Trailer', maxScore: 10, benchmark: '30-60 sec trailer for non-subscribers, highlights best content, clear CTA', impactStat: 'Channel trailers convert 27% more visitors to subscribers' },
+            { id: 'linksSection', name: 'Links & Socials', maxScore: 10, benchmark: 'Website + all social profiles linked, primary link prominent', impactStat: 'Links drive 20% of cross-platform traffic' },
+            { id: 'aboutTab', name: 'About Tab', maxScore: 10, benchmark: 'Contact email visible, location set, full description, join date proudly shown', impactStat: 'Complete About tabs increase brand inquiry rate by 30%' },
+            { id: 'thumbnailBranding', name: 'Thumbnail Branding', maxScore: 10, benchmark: 'Consistent template, bold text, face close-ups, brand colors, 1280×720px', impactStat: 'Branded thumbnails increase CTR by 30-40%' }
+        ]
+    }
+};
+
+router.post('/profile-score', protect, requireStudio('socialMediaStudio'), requireCredits('socialMedia'), async (req, res) => {
+    try {
+        const { platform, profileData, brand } = req.body;
+        if (!platform) return res.status(400).json({ success: false, error: 'Platform is required' });
+
+        const rubric = PLATFORM_RUBRICS[platform];
+        if (!rubric) return res.status(400).json({ success: false, error: `Unsupported platform: ${platform}` });
+
+        const brandCtx = buildBrandContext(brand);
+        const paramList = rubric.parameters.map((p, i) => `${i + 1}. ${p.name} — Benchmark: ${p.benchmark}`).join('\n');
+
+        const systemPrompt = `You are an expert Social Media Profile Auditor with deep knowledge of ${rubric.label} best practices and algorithm optimization.
+
+BRAND CONTEXT:
+${brandCtx}
+
+You will grade this brand's ${rubric.label} profile on EXACTLY these ${rubric.parameters.length} parameters, each scored 0-10:
+
+${paramList}
+
+CRITICAL RULES:
+- Score HONESTLY. Do NOT inflate scores. A profile with no data for a parameter gets 0-2.
+- For each parameter, provide a SPECIFIC "current" assessment describing what you observe/infer about this brand's profile.
+- The "fix" for each parameter MUST be a concrete, ready-to-use suggestion. For text fields (bio, headline, about), generate the ACTUAL improved text using the Brand DNA above.
+- Every "impact" must include a SPECIFIC NUMBER (percentage improvement, follower increase, click rate change).
+- "quickWins" should be the 3 parameters with the HIGHEST impact-to-effort ratio.
+
+${profileData ? `PROFILE DATA PROVIDED:\n${JSON.stringify(profileData)}` : 'No direct profile data provided. Score based on what a typical account in this industry would look like if newly optimized, and generate ideal content.'}
+
+Respond in STRICT JSON:
+{
+  "platform": "${platform}",
+  "platformLabel": "${rubric.label}",
+  "overallScore": 0,
+  "maxScore": 100,
+  "grade": "A+ / A / B+ / B / C+ / C / D / F",
+  "summary": "2-3 sentence assessment of the profile",
+  "parameters": [
+    {
+      "id": "${rubric.parameters[0].id}",
+      "name": "${rubric.parameters[0].name}",
+      "score": 7,
+      "maxScore": 10,
+      "status": "good | needs_improvement | weak | missing",
+      "current": "What the profile currently has or lacks — be specific",
+      "benchmark": "The specific standard to meet",
+      "impact": "Specific measurable impact with numbers",
+      "fix": "The exact, ready-to-use fix (write the actual headline/bio/description if applicable)"
+    }
+  ],
+  "quickWins": [
+    {
+      "parameter": "Parameter name",
+      "currentScore": 3,
+      "potentialScore": 9,
+      "effort": "5 minutes",
+      "action": "Exact step-by-step action to take",
+      "expectedLift": "Specific percentage or metric improvement"
+    }
+  ],
+  "estimatedImpact": {
+    "profileViews": "+X%",
+    "engagement": "+X%",
+    "followerGrowth": "+X%",
+    "clickThrough": "+X%"
+  },
+  "generatedAssets": {
+    "headline": "If LinkedIn — the optimized headline text",
+    "bio": "If Instagram/Twitter — the optimized bio text",
+    "about": "If applicable — the optimized about/summary text"
+  }
+}`;
+
+        const userPrompt = `Score the ${rubric.label} profile for brand "${brand?.name || 'this brand'}" (Industry: ${brand?.dna?.industry || 'General'}). Grade each of the ${rubric.parameters.length} parameters 0-10 with measurable recommendations.`;
+
+        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6000 });
+        const scoreCard = parseJSON(result);
+
+        // Compute true overall score as average of parameter scores
+        if (scoreCard.parameters?.length) {
+            const totalScore = scoreCard.parameters.reduce((s, p) => s + (p.score || 0), 0);
+            const maxTotal = scoreCard.parameters.length * 10;
+            scoreCard.overallScore = Math.round((totalScore / maxTotal) * 100);
+        }
+
+        const saved = await SocialStrategy.create({
+            user: req.user._id,
+            brand: brand?._id || req.body.brandId,
+            type: 'profile-score',
+            title: `${rubric.label} Profile Score — ${scoreCard.overallScore}/100`,
+            platforms: [platform],
+            data: scoreCard,
+            inputs: { platform, profileData },
+        });
+
+        res.json({ success: true, scoreCard, scoreId: saved._id });
+    } catch (error) {
+        console.error('Profile score error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ════════════════════════════════════════════════════════════════
+//  6. LIST STRATEGIES — Get all saved strategies for a brand
+// ════════════════════════════════════════════════════════════════
+
+router.get('/strategies', protect, async (req, res) => {
+    try {
+        const { brandId, type } = req.query;
+        const filter = { user: req.user._id };
+        if (brandId) filter.brand = brandId;
+        if (type) filter.type = type;
+
+        const strategies = await SocialStrategy.find(filter)
+            .sort({ createdAt: -1 })
+            .limit(50)
+            .select('title type platforms timeframe status createdAt data.overallScore data.overview data.summary');
+
+        res.json({ success: true, strategies });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ════════════════════════════════════════════════════════════════
+//  6. GET STRATEGY — Get a specific saved strategy
+// ════════════════════════════════════════════════════════════════
+
+router.get('/strategies/:id', protect, async (req, res) => {
+    try {
+        const strategy = await SocialStrategy.findOne({ _id: req.params.id, user: req.user._id });
+        if (!strategy) return res.status(404).json({ success: false, error: 'Strategy not found' });
+        res.json({ success: true, strategy });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ════════════════════════════════════════════════════════════════
+//  7. DELETE STRATEGY
+// ════════════════════════════════════════════════════════════════
+
+router.delete('/strategies/:id', protect, async (req, res) => {
+    try {
+        await SocialStrategy.deleteOne({ _id: req.params.id, user: req.user._id });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+export default router;

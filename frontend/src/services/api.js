@@ -761,3 +761,15 @@ export const studioReports = {
     delete: (id) => apiFetch(`/studio-reports/${id}`, { method: 'DELETE' }),
     generateSlides: (id) => apiFetch(`/studio-reports/${id}/slides`, { method: 'POST' }),
 };
+
+// ============ Social Media Studio API ============
+export const socialMediaStudio = {
+    generateStrategy: (data) => apiFetch('/social-media-studio/generate-strategy', { method: 'POST', body: JSON.stringify(data) }),
+    generateCalendar: (data) => apiFetch('/social-media-studio/generate-calendar', { method: 'POST', body: JSON.stringify(data) }),
+    accountAudit: (data) => apiFetch('/social-media-studio/account-audit', { method: 'POST', body: JSON.stringify(data) }),
+    competitorAnalysis: (data) => apiFetch('/social-media-studio/competitor-analysis', { method: 'POST', body: JSON.stringify(data) }),
+    profileScore: (data) => apiFetch('/social-media-studio/profile-score', { method: 'POST', body: JSON.stringify(data) }),
+    list: (params = {}) => apiFetch(`/social-media-studio/strategies?${new URLSearchParams(params)}`),
+    get: (id) => apiFetch(`/social-media-studio/strategies/${id}`),
+    delete: (id) => apiFetch(`/social-media-studio/strategies/${id}`, { method: 'DELETE' }),
+};

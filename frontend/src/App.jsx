@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { BrandProvider } from './context/BrandContext'
 import { CreditProvider } from './context/CreditContext'
@@ -31,6 +31,7 @@ import VideoStudio from './pages/VideoStudio'
 import PerformanceMarketing from './pages/PerformanceMarketing'
 import D2CAnalytics from './pages/D2CAnalytics'
 import FunnelStudio from './pages/FunnelStudio'
+import SocialMediaStudio from './pages/SocialMediaStudio'
 import BrandManagement from './pages/BrandManagement'
 import SkillsHub from './pages/SkillsHub'
 import StudioPreview from './pages/StudioPreview'
@@ -82,8 +83,9 @@ function App() {
                 <Route path="/d2c-analytics" element={<ProtectedRoute><PlanGatedRoute studioKey="d2cAnalytics"><D2CAnalytics /></PlanGatedRoute></ProtectedRoute>} />
                 <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
                 <Route path="/funnel-studio" element={<ProtectedRoute><PlanGatedRoute studioKey="funnelStudio"><FunnelStudio /></PlanGatedRoute></ProtectedRoute>} />
-                <Route path="/smart-calendar" element={<ProtectedRoute><PlanGatedRoute studioKey="smartCalendar"><SmartCalendar /></PlanGatedRoute></ProtectedRoute>} />
-                <Route path="/publish" element={<ProtectedRoute><PublishSchedule /></ProtectedRoute>} />
+                <Route path="/social-media-studio" element={<ProtectedRoute><PlanGatedRoute studioKey="socialMediaStudio"><SocialMediaStudio /></PlanGatedRoute></ProtectedRoute>} />
+                <Route path="/smart-calendar" element={<Navigate to="/social-media-studio" replace />} />
+                <Route path="/publish" element={<Navigate to="/social-media-studio" replace />} />
                 <Route path="/brainstorm" element={<ProtectedRoute><PlanGatedRoute studioKey="brainstormStudio"><BrainstormStudio /></PlanGatedRoute></ProtectedRoute>} />
                 <Route path="/seo-studio" element={<ProtectedRoute><PlanGatedRoute studioKey="seoStudio"><SeoStudio /></PlanGatedRoute></ProtectedRoute>} />
                 <Route path="/conversations" element={<ProtectedRoute><PlanGatedRoute studioKey="conversationStudio"><ConversationStudio /></PlanGatedRoute></ProtectedRoute>} />
