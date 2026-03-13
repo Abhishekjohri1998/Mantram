@@ -82,7 +82,7 @@ export default function SuperAdminDashboard() {
         { id: 'logs', label: 'Audit Logs', icon: 'history' },
     ]
 
-    useEffect(() => { loadStats() }, [])
+    useEffect(() => { loadStats(); loadPackages() }, [])
     useEffect(() => {
         const handler = setTimeout(() => setDebouncedSearch(search), 500);
         return () => clearTimeout(handler);
@@ -354,7 +354,7 @@ export default function SuperAdminDashboard() {
                                                     u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 
                                                     u.plan === 'test' ? 'bg-rose-500/15 text-rose-400' :
                                                     'bg-slate-500/15 text-slate-400'
-                                                }`}>{u.plan}</span>
+                                                }`}>Plan: {u.plan}</span>
                                                 <span className="text-xs text-slate-600">{new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}</span>
                                             </div>
                                         </div>
@@ -455,7 +455,15 @@ export default function SuperAdminDashboard() {
                                                         <p className="text-base font-bold text-white">{u.name}</p>
                                                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold tracking-wider uppercase">Position #{u.queueNumber}</span>
                                                     </div>
-                                                    <p className="text-sm text-slate-400">{u.email} • {u.company || 'Individual'}</p>
+                                                     <p className="text-sm text-slate-400">
+                                                        {u.email} • {u.company || 'Individual'} 
+                                                        <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                                                            u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : 
+                                                            u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 
+                                                            u.plan === 'test' ? 'bg-rose-500/15 text-rose-400' :
+                                                            'bg-slate-500/15 text-slate-400'
+                                                        }`}>Plan: {u.plan}</span>
+                                                     </p>
                                                     <p className="text-[10px] text-slate-600 mt-1 uppercase tracking-widest">Registered {new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                                                 </div>
                                             </div>
@@ -490,7 +498,10 @@ export default function SuperAdminDashboard() {
                                 <input type="text" value={search} onChange={e => { setSearch(e.target.value); setUserPage(1) }} placeholder="Search name, email, company..." className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none focus:border-primary/50" />
                             </div>
                             <select value={planFilter} onChange={e => { setPlanFilter(e.target.value); setUserPage(1) }} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none cursor-pointer">
-                                <option value="">All Plans</option><option value="starter">Starter</option><option value="professional">Professional</option><option value="enterprise">Enterprise</option>
+                                <option value="">All Plans</option>
+                                {packages.map(p => (
+                                    <option key={p._id} value={p.slug}>{p.name}</option>
+                                ))}
                             </select>
                         </div>
                         <p className="text-xs text-slate-600 mb-3">{totalUsers} users</p>
@@ -507,8 +518,8 @@ export default function SuperAdminDashboard() {
                                                     u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 
                                                     u.plan === 'test' ? 'bg-rose-500/15 text-rose-400' :
                                                     'bg-slate-500/15 text-slate-400'
-                                                }`}>{u.plan}</span>
-                                                <span className="text-xs px-1.5 py-0.5 rounded font-bold capitalize bg-white/[0.05] text-slate-500">{u.role}</span>
+                                                }`}>Plan: {u.plan}</span>
+                                                <span className="text-xs px-1.5 py-0.5 rounded font-bold border border-white/10 text-slate-500 uppercase tracking-tighter text-[9px]">{u.role}</span>
                                                 {u.approvalStatus === 'pending' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-amber-500/20 text-amber-400">PENDING</span>}
                                                 {u.approvalStatus === 'rejected' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-rose-500/20 text-rose-400">REJECTED</span>}
                                             </div>
