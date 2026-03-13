@@ -1063,9 +1063,20 @@ function LLMProbeResults({ results }) {
                     <h3 className="text-base font-bold text-white mb-3">📝 Content to Create for AI Citation</h3>
                     <div className="space-y-2">
                         {r.contentToCreate.map((c, i) => (
-                            <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-white/[0.03]">
-                                <span className="text-cyan-400 text-xs mt-0.5">▸</span>
-                                <p className="text-sm text-slate-300">{c}</p>
+                            <div key={i} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-cyan-400 text-xs">▸</span>
+                                    <p className="text-sm text-white font-bold">{typeof c === 'string' ? c : c.title}</p>
+                                    {c.format && <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-400/10 text-cyan-400 font-bold uppercase">{c.format}</span>}
+                                </div>
+                                {c.purpose && <p className="text-xs text-slate-400 mb-2">{c.purpose}</p>}
+                                {c.targetPrompts?.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                        {c.targetPrompts.map((p, pi) => (
+                                            <span key={pi} className="text-[9px] text-slate-500 bg-white/5 px-1.5 py-0.5 rounded italic">"{p}"</span>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
