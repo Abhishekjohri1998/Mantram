@@ -7,6 +7,7 @@
  * Falls back to defaults if DB settings not found.
  */
 
+import mongoose from 'mongoose';
 import User from '../models/User.js';
 import SystemSettings from '../models/SystemSettings.js';
 import CreditUsage from '../models/CreditUsage.js';
@@ -107,7 +108,7 @@ export const requireCredits = (actionOrCost = 1) => {
             if (user.role === 'superadmin' || user.plan === 'enterprise') {
                 // Log usage (fire-and-forget) – don't calculate balanceAfter for bypass users
                 CreditUsage.create({
-                    user: user._id,
+                    user: new mongoose.Types.ObjectId(user._id),
                     action: actionName || 'unknown',
                     cost,
                     balanceAfter: Infinity, // Unlimited users

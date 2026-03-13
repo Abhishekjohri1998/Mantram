@@ -1336,19 +1336,19 @@ creditRouter.get('/summary', protect, async (req, res) => {
 
         const [todayUsage, weekUsage, monthUsage, byAction] = await Promise.all([
             CreditUsage.aggregate([
-                { $match: { user: req.user._id, createdAt: { $gte: todayStart } } },
+                { $match: { user: new mongoose.Types.ObjectId(req.user._id), createdAt: { $gte: todayStart } } },
                 { $group: { _id: null, total: { $sum: '$cost' }, count: { $sum: 1 } } },
             ]),
             CreditUsage.aggregate([
-                { $match: { user: req.user._id, createdAt: { $gte: weekStart } } },
+                { $match: { user: new mongoose.Types.ObjectId(req.user._id), createdAt: { $gte: weekStart } } },
                 { $group: { _id: null, total: { $sum: '$cost' }, count: { $sum: 1 } } },
             ]),
             CreditUsage.aggregate([
-                { $match: { user: req.user._id, createdAt: { $gte: monthStart } } },
+                { $match: { user: new mongoose.Types.ObjectId(req.user._id), createdAt: { $gte: monthStart } } },
                 { $group: { _id: null, total: { $sum: '$cost' }, count: { $sum: 1 } } },
             ]),
             CreditUsage.aggregate([
-                { $match: { user: req.user._id, createdAt: { $gte: monthStart } } },
+                { $match: { user: new mongoose.Types.ObjectId(req.user._id), createdAt: { $gte: monthStart } } },
                 { $group: { _id: '$action', total: { $sum: '$cost' }, count: { $sum: 1 }, description: { $first: '$description' } } },
                 { $sort: { total: -1 } },
             ]),
@@ -1356,7 +1356,7 @@ creditRouter.get('/summary', protect, async (req, res) => {
 
         // Daily trend (last 7 days)
         const dailyTrend = await CreditUsage.aggregate([
-            { $match: { user: req.user._id, createdAt: { $gte: weekStart } } },
+            { $match: { user: new mongoose.Types.ObjectId(req.user._id), createdAt: { $gte: weekStart } } },
             { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, total: { $sum: '$cost' }, count: { $sum: 1 } } },
             { $sort: { _id: 1 } },
         ]);
