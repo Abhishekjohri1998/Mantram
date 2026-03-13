@@ -164,7 +164,7 @@ export const requireCredits = (actionOrCost = 1) => {
  * Get user's credit balance
  */
 export const getCreditBalance = (user) => {
-    if (user.role === 'superadmin' || user.plan === 'enterprise') {
+    if (user.role === 'superadmin' || user.plan === 'enterprise' || (user.credits?.total >= 999999)) {
         return { total: Infinity, used: 0, remaining: Infinity, unlimited: true, bonus: 0, bonusUsed: 0 };
     }
     const bonus = user.credits?.bonus || 0;

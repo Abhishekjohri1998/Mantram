@@ -398,8 +398,8 @@ export default function CreditsPage() {
                                                     </div>
                                                     <ul className="space-y-3 mb-8">
                                                         <li className="flex items-center gap-2 text-sm text-slate-300">
-                                                            <span className="material-symbols-outlined text-primary text-lg">check_circle</span>
-                                                            {pkg.credits.monthly} Credits / mo
+                                                            <span className="material-symbols-outlined text-primary text-lg">{pkg.credits?.monthly >= 999999 ? 'all_inclusive' : 'check_circle'}</span>
+                                                            {pkg.credits?.monthly >= 999999 ? 'Unlimited' : pkg.credits?.monthly} Credits / mo
                                                         </li>
                                                         <li className="flex items-center gap-2 text-sm text-slate-300">
                                                             <span className="material-symbols-outlined text-primary text-lg">check_circle</span>
