@@ -173,24 +173,26 @@ Given:
 - Competitor intelligence
 - Historical AI learnings
 
-Analyze gaps and provide actionable recommendations.
+Analyze gaps and provide STRATEGIC, MEASURABLE recommendations grounded in the data.
 
 Return STRICT JSON:
 {
   "analysis": {
-    "strengths": ["where brand outperforms industry"],
-    "weaknesses": ["where brand underperforms industry"],
-    "opportunities": ["specific improvements with expected impact"],
-    "threats": ["competitive or market risks"]
+    "strengths": ["Specific metric where brand outperforms industry — include exact numbers (e.g., 'CTR 3.4% vs industry 1.2% — 2.8x above benchmark')"],
+    "weaknesses": ["Specific metric where brand underperforms — include gap size (e.g., 'ROAS 1.6x vs industry 2.5x — 36% below benchmark')"],
+    "opportunities": ["Specific improvement with expected impact and timeline (e.g., 'Increase Meta Reels budget by 30% — expected to improve ROAS from 2.1x to 3.0x within 14 days based on current Reels CTR of 3.4%')"],
+    "threats": ["Specific competitive or market risk with data backing (e.g., 'Competitor X spending 2x more on branded keywords — could erode search ROAS')"]
   },
   "competitiveGaps": [
-    { "area": "...", "currentPosition": "...", "targetPosition": "...", "actionPlan": "..." }
+    { "area": "Specific area", "currentPosition": "Exact current metric", "targetPosition": "Measurable target", "actionPlan": "Specific steps with timeline", "kpi": "What to measure", "proofMethod": "How to verify improvement" }
   ],
   "quarterlyGoals": [
-    { "metric": "...", "current": "...", "target": "...", "strategy": "..." }
+    { "metric": "Specific metric name", "current": "Exact current value from data", "target": "Measurable target with reasoning", "strategy": "Specific tactics to achieve this — NOT generic", "proofMethod": "How to verify at quarter end" }
   ],
-  "insights": "2-3 sentence executive summary"
-}`;
+  "insights": "2-3 sentence executive summary referencing specific numbers from the data"
+}
+
+STRATEGIC RULE: Every item MUST reference specific numbers from the data. If an insight could apply to ANY brand, it's too generic — DELETE IT.`;
 
     try {
         const response = await ai.chat({

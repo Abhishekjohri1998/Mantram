@@ -40,7 +40,15 @@ ANALYZE THE COMPETITOR DATA AND PRODUCE:
    - Messaging angles no one is using
    - Creative formats to try
 
-4. **recommendations** — Top 5 actionable recommendations ranked by impact
+4. **recommendations** — Top 5 actionable recommendations ranked by impact. Each MUST include:
+   - title: specific action (NOT generic like 'Increase budget')
+   - kpi: what to measure (e.g., 'Meta Reels CTR')
+   - baseline: current state from data
+   - target: measurable target (e.g., 'Increase CTR from 1.2% to 2.5% within 14 days')
+   - proofMethod: how to verify success
+   - expectedROI: expected business impact
+
+STRATEGIC RULE: If a recommendation could apply to ANY brand in ANY industry, it's too generic. DELETE IT.
 
 Respond in valid JSON with exactly these keys: competitorProfiles, adPatterns, gaps, recommendations.
 `;
@@ -194,9 +202,18 @@ ANALYZE AND PRODUCE:
 4. **underperformers** — Campaigns/ads that need attention
 5. **anomalies** — Unusual patterns or sudden changes
 6. **opportunities** — Quick wins and optimization opportunities
-7. **recommendations** — Ranked list of actions to take (with expected impact)
-8. **budgetRecommendations** — Where to shift budget from/to
-9. **riskAlerts** — Things that could go wrong if not addressed
+7. **recommendations** — Ranked list of actions to take. Each MUST include:
+   - title: specific action referencing campaign names and actual data
+   - kpi: metric to measure (e.g., 'CPA for campaign X')
+   - baseline: current value from data (e.g., 'CPA is ₹45, above ₹30 target')
+   - target: measurable goal (e.g., 'Reduce CPA to ₹28 within 7 days')
+   - timeline: when to measure (e.g., '7 days after implementation')
+   - proofMethod: how to verify (e.g., 'Check campaign manager — CPA should be below ₹30')
+   - expectedROI: expected impact on revenue/ROAS
+8. **budgetRecommendations** — Where to shift budget from/to with specific amounts and expected ROAS impact
+9. **riskAlerts** — Things that could go wrong if not addressed, with specific thresholds
+
+STRATEGIC RULE: Every recommendation MUST reference specific campaign names, metrics, and data. No generic advice.
 
 Respond in valid JSON with these exact keys.
 `;
@@ -220,8 +237,15 @@ GENERATE A REPORT WITH:
 6. **campaignDetails** — Per-campaign breakdown with insights
 7. **audienceInsights** — Which audiences performed best/worst and why
 8. **creativeInsights** — Which ad creatives performed best/worst and why
-9. **nextActions** — Prioritized list of next steps
-10. **budgetRecommendation** — Adjusted budget plan for next period
+9. **nextActions** — Prioritized list of next steps. Each MUST include:
+   - action: specific step referencing campaign/creative names
+   - kpi: what this improves
+   - target: measurable goal
+   - timeline: when to do this and when to measure results
+   - expectedImpact: expected improvement in key metrics
+10. **budgetRecommendation** — Adjusted budget plan with specific reallocation amounts and expected ROAS changes
+
+STRATEGIC RULE: Every nextAction MUST be specific to this brand's campaigns. No generic advice like 'Optimize ads' or 'Test new creatives'.
 
 Respond in valid JSON with these exact keys.
 `;

@@ -3,6 +3,7 @@ import DashboardLayout from '../components/DashboardLayout'
 import SEOHead from '../components/SEOHead'
 import { useBrand } from '../context/BrandContext'
 import { funnelStudio as api, nurtureSequences as nurtureApi, funnelIntelligence as intelApi, funnelAutomation as autoApi, funnelSharing as shareApi } from '../services/api'
+import StudioReportButton from '../components/reports/StudioReportButton'
 
 // ═══════════════════════════════════════════════════════════════
 // FUNNEL STUDIO — Dashboard + Pipeline Kanban + Funnel Builder
@@ -972,6 +973,11 @@ export default function FunnelStudio() {
     return (
         <DashboardLayout title="Funnel Studio" subtitle="Build and manage your sales funnels">
             <SEOHead title="Funnel Studio — Mantram AI" noIndex={true} />
+
+            {/* ═══ Report Button ═══ */}
+            <div className="flex justify-end mb-4">
+                <StudioReportButton studio="funnel" brandId={currentBrand?._id} />
+            </div>
 
             {/* ── Intelligence Hero Banner ── */}
             <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'linear-gradient(135deg, #6366f108, #8b5cf608, #06b6d408)' }}>

@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import { credits as creditsAPI } from '../services/api'
 import NexusBar from './NexusBar'
+import AgentFidatoPanel from './AgentFidatoPanel'
 
 export default function Header({ title, subtitle, onMenuToggle }) {
     const { user, logout } = useAuth()
@@ -12,6 +13,8 @@ export default function Header({ title, subtitle, onMenuToggle }) {
     const [showMenu, setShowMenu] = useState(false)
     const [showBrandMenu, setShowBrandMenu] = useState(false)
     const [creditBalance, setCreditBalance] = useState(null)
+    const [showIntelPanel, setShowIntelPanel] = useState(false)
+    const [intelMissionCount, setIntelMissionCount] = useState(0)
     const menuRef = useRef(null)
     const brandMenuRef = useRef(null)
 
@@ -37,6 +40,24 @@ export default function Header({ title, subtitle, onMenuToggle }) {
         const interval = setInterval(fetchCredits, 60 * 1000)
         return () => clearInterval(interval)
     }, [user])
+
+    // Fetch active mission count for INTEL badge
+    const fetchIntelCount = useCallback(async () => {
+        if (!activeBrand?._id) return
+        try {
+            const token = localStorage.getItem('mantram_token')
+            const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
+            const resp = await fetch(`${API_BASE}/intel/missions?brandId=${activeBrand._id}`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            })
+            if (resp.ok) {
+                const data = await resp.json()
+                setIntelMissionCount((data.missions || []).filter(m => m.status === 'active').length)
+            }
+        } catch { /* silent */ }
+    }, [activeBrand?._id])
+
+    useEffect(() => { fetchIntelCount() }, [fetchIntelCount])
 
     const handleLogout = () => {
         logout()
@@ -155,6 +176,54 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                         <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border-2 border-[#080a14]"></span>
                     </button>
 
+                    {/* Agent Fidato INTEL — Global Competitive Intelligence */}
+                    <button
+                        onClick={() => setShowIntelPanel(true)}
+                        className="relative cursor-pointer group"
+                        title="Agent Fidato — Competitive Intelligence"
+                        style={{ padding: 0, background: 'none', border: 'none' }}
+                    >
+                        {/* Outer glow aura */}
+                        <div className="absolute -inset-1 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                            style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.25) 0%, transparent 70%)', filter: 'blur(8px)' }} />
+                        {/* Animated border container */}
+                        <div className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all duration-300 group-hover:scale-[1.03]"
+                            style={{
+                                background: 'linear-gradient(135deg, rgba(139,92,246,0.12) 0%, rgba(16,185,129,0.08) 100%)',
+                                border: '1px solid rgba(139,92,246,0.35)',
+                                boxShadow: '0 0 12px rgba(139,92,246,0.15), inset 0 1px 0 rgba(255,255,255,0.04)',
+                            }}>
+                            {/* Shield icon with gradient */}
+                            <div className="relative">
+                                <span className="material-symbols-outlined text-lg group-hover:scale-110 transition-transform duration-300"
+                                    style={{ color: '#a78bfa', filter: 'drop-shadow(0 0 4px rgba(139,92,246,0.4))' }}>shield</span>
+                                {/* Live pulse for active missions */}
+                                {intelMissionCount > 0 && (
+                                    <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400 border border-emerald-300" />
+                                    </span>
+                                )}
+                            </div>
+                            {/* INTEL label */}
+                            <span className="text-[10px] font-extrabold tracking-[0.15em] hidden sm:inline"
+                                style={{ color: '#a78bfa', textShadow: '0 0 8px rgba(139,92,246,0.3)' }}>
+                                INTEL
+                            </span>
+                            {/* Mission count badge */}
+                            {intelMissionCount > 0 && (
+                                <span className="text-[9px] font-black rounded-full min-w-[16px] h-[16px] flex items-center justify-center"
+                                    style={{
+                                        background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                                        color: 'white',
+                                        boxShadow: '0 0 8px rgba(139,92,246,0.4)',
+                                    }}>
+                                    {intelMissionCount}
+                                </span>
+                            )}
+                        </div>
+                    </button>
+
                     {/* Help — hidden on small mobile */}
                     <button className="hidden sm:block p-2 text-slate-400 hover:text-white transition-colors rounded-xl hover:bg-white/[0.04]">
                         <span className="material-symbols-outlined text-xl">help</span>
@@ -231,6 +300,15 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                 </div>
             </header>
             <NexusBar />
+
+            {/* Agent Fidato INTEL — Global Side Panel */}
+            {showIntelPanel && (
+                <AgentFidatoPanel
+                    studio="global"
+                    panelOnly
+                    onClose={() => { setShowIntelPanel(false); fetchIntelCount() }}
+                />
+            )}
         </>
     )
 }

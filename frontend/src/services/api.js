@@ -42,10 +42,24 @@ export async function apiFetch(endpoint, options = {}) {
         ...options.headers,
     };
 
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-        ...options,
-        headers,
-    });
+    // Configurable timeout — default 90s, heavy operations can pass longer
+    const { timeout: timeoutMs = 90000, ...fetchOptions } = options;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    let response;
+    try {
+        response = await fetch(`${API_BASE}${endpoint}`, {
+            ...fetchOptions,
+            headers,
+            signal: controller.signal,
+        });
+    } catch (e) {
+        clearTimeout(timer);
+        if (e.name === 'AbortError') throw new Error('Request timed out — the server is still processing. Please try again.');
+        throw new Error(e.message === 'Load failed' ? 'Network error — check your connection and ensure the backend is running.' : e.message);
+    }
+    clearTimeout(timer);
 
     // Handle non-JSON responses (e.g. HTML 404 pages from Vite proxy)
     const contentType = response.headers.get('content-type') || '';
@@ -381,6 +395,8 @@ export const superadmin = {
     getCreditCosts: () => apiFetch('/superadmin/credit-costs'),
     updateCreditCosts: (costs) => apiFetch('/superadmin/credit-costs', { method: 'PUT', body: JSON.stringify({ costs }) }),
     resetCreditCosts: () => apiFetch('/superadmin/credit-costs/reset', { method: 'POST' }),
+    // Token Usage Analytics
+    getTokenUsage: (days = 30) => apiFetch(`/superadmin/stats/token-usage?days=${days}`),
     syncCredits: () => apiFetch('/superadmin/system/sync-all-credits', { method: 'POST' }),
     getSystemLogs: (params = {}) => {
         const query = new URLSearchParams(params).toString();
@@ -479,19 +495,21 @@ export const pmStudio = {
 };
 
 export const seoStudio = {
-    healthCheck: (data) => apiFetch('/seo-studio/health-check', { method: 'POST', body: JSON.stringify(data) }),
-    traffic: (data) => apiFetch('/seo-studio/traffic', { method: 'POST', body: JSON.stringify(data) }),
-    competitors: (data) => apiFetch('/seo-studio/competitors', { method: 'POST', body: JSON.stringify(data) }),
-    aiVisibility: (data) => apiFetch('/seo-studio/ai-visibility', { method: 'POST', body: JSON.stringify(data) }),
-    auditPage: (data) => apiFetch('/seo-studio/audit-page', { method: 'POST', body: JSON.stringify(data) }),
+    healthCheck: (data) => apiFetch('/seo-studio/health-check', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
+    traffic: (data) => apiFetch('/seo-studio/traffic', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
+    competitors: (data) => apiFetch('/seo-studio/competitors', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
+    aiVisibility: (data) => apiFetch('/seo-studio/ai-visibility', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
+    auditPage: (data) => apiFetch('/seo-studio/audit-page', { method: 'POST', body: JSON.stringify(data), timeout: 150000 }),
     ask: (data) => apiFetch('/seo-studio/ask', { method: 'POST', body: JSON.stringify(data) }),
     manageCompetitors: (data) => apiFetch('/seo-studio/competitors/manage', { method: 'POST', body: JSON.stringify(data) }),
     discoverCompetitors: (data) => apiFetch('/seo-studio/competitors/discover', { method: 'POST', body: JSON.stringify(data) }),
-    // New agentic workflows
-    competitorWarRoom: (data) => apiFetch('/seo-studio/competitor-warroom', { method: 'POST', body: JSON.stringify(data) }),
-    llmProbe: (data) => apiFetch('/seo-studio/llm-probe', { method: 'POST', body: JSON.stringify(data) }),
-    autoFix: (data) => apiFetch('/seo-studio/auto-fix', { method: 'POST', body: JSON.stringify(data) }),
-    promptMining: (data) => apiFetch('/seo-studio/prompt-mining', { method: 'POST', body: JSON.stringify(data) }),
+    // Agentic workflows — extended timeouts for heavy AI+crawl operations
+    competitorWarRoom: (data) => apiFetch('/seo-studio/competitor-warroom', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
+    backlinkIntelligence: (data) => apiFetch('/seo-studio/backlinks', { method: 'POST', body: JSON.stringify(data), timeout: 240000 }),
+    getSavedReport: (brandId, type) => apiFetch(`/seo-studio/reports/${type}?brandId=${brandId}`),
+    llmProbe: (data) => apiFetch('/seo-studio/llm-probe', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
+    autoFix: (data) => apiFetch('/seo-studio/auto-fix', { method: 'POST', body: JSON.stringify(data), timeout: 150000 }),
+    promptMining: (data) => apiFetch('/seo-studio/prompt-mining', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
     history: (params = {}) => {
         const query = new URLSearchParams(params).toString();
         return apiFetch(`/seo-studio/history?${query}`);
@@ -720,4 +738,17 @@ export const funnelSharing = {
 // ============ Media Upload API (S3 Upload-First Pattern) ============
 export const media = {
     upload: (data) => apiFetch('/media/upload', { method: 'POST', body: JSON.stringify(data) }),
+};
+
+// ============ Studio Reports API (Unified Branded Reports) ============
+export const studioReports = {
+    generate: (data) => apiFetch('/studio-reports/generate', { method: 'POST', body: JSON.stringify(data) }),
+    list: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/studio-reports?${query}`);
+    },
+    get: (id) => apiFetch(`/studio-reports/${id}`),
+    update: (id, data) => apiFetch(`/studio-reports/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id) => apiFetch(`/studio-reports/${id}`, { method: 'DELETE' }),
+    generateSlides: (id) => apiFetch(`/studio-reports/${id}/slides`, { method: 'POST' }),
 };

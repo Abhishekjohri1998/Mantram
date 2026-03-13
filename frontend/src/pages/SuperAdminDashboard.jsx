@@ -53,6 +53,8 @@ export default function SuperAdminDashboard() {
     // Credit cost management state (must be before early return)
     const [creditCosts, setCreditCosts] = useState(null)
     const [editingCosts, setEditingCosts] = useState(null)
+    const [tokenData, setTokenData] = useState(null)
+    const [tokenDays, setTokenDays] = useState(30)
     const [syncingCredits, setSyncingCredits] = useState(false)
     // Audit Log state
     const [logs, setLogs] = useState([])
@@ -70,6 +72,7 @@ export default function SuperAdminDashboard() {
         { id: 'overview', label: 'Overview', icon: 'dashboard' },
         { id: 'approvals', label: 'Approvals', icon: 'how_to_reg' },
         { id: 'users', label: 'Users', icon: 'group' },
+        { id: 'tokenUsage', label: 'Token Usage', icon: 'monitoring' },
         { id: 'packages', label: 'Packages', icon: 'inventory_2' },
         { id: 'coupons', label: 'Coupons', icon: 'confirmation_number' },
         { id: 'content', label: 'Content & Brands', icon: 'article' },
@@ -92,6 +95,7 @@ export default function SuperAdminDashboard() {
         if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts() }
         if (tab === 'integrations') loadIntegrations()
         if (tab === 'packages') loadPackages()
+        if (tab === 'tokenUsage') loadTokenUsage()
         if (tab === 'logs') loadLogs()
     }, [tab, debouncedSearch, planFilter, userPage, logsPage])
 
@@ -117,7 +121,8 @@ export default function SuperAdminDashboard() {
     const loadCreditCosts = async () => { try { const d = await API.getCreditCosts(); setCreditCosts(d.costs); } catch (e) { console.error(e) } }
     const handleSaveCosts = async () => { try { await API.updateCreditCosts(editingCosts); showToast('Credit costs updated'); setEditingCosts(null); loadCreditCosts() } catch (e) { showToast(e.error || 'Failed', 'error') } }
     const handleResetCosts = async () => { if (!confirm('Reset all credit costs to defaults?')) return; try { await API.resetCreditCosts(); showToast('Reset to defaults'); setEditingCosts(null); loadCreditCosts() } catch { showToast('Failed', 'error') } }
-    const creditCostLabels = { content: 'Content Generate', contentRefine: 'Content Refine/Regen', creative: 'Creative (Image)', photoshoot: 'AI Photoshoot', seoHealthCheck: 'SEO Health Check', seoTraffic: 'SEO Traffic', seoCompetitors: 'SEO Competitors', seoAiVisibility: 'SEO AI Visibility', seoAsk: 'SEO Ask', seoAuditPage: 'SEO Page Audit', seoCompetitorDiscover: 'SEO Discover', brainstorm: 'Brainstorm Generate', brainstormRefine: 'Brainstorm Refine', brainstormChat: 'Brainstorm Chat', brainstormScreenplay: 'Screenplay', trendRefresh: 'Trend Refresh' }
+    const creditCostLabels = { content: 'Content Generate', contentRefine: 'Content Refine/Regen', creative: 'Creative (Image)', photoshoot: 'AI Photoshoot', seoHealthCheck: 'SEO Health Check', seoTraffic: 'SEO Traffic', seoCompetitors: 'SEO Competitors', seoAiVisibility: 'SEO AI Visibility', seoAsk: 'SEO Ask', seoAuditPage: 'SEO Page Audit', seoCompetitorDiscover: 'SEO Discover', seoBacklinks: 'SEO Backlinks', brainstorm: 'Brainstorm Generate', brainstormRefine: 'Brainstorm Refine', brainstormChat: 'Brainstorm Chat', brainstormScreenplay: 'Screenplay', trendRefresh: 'Trend Refresh' }
+    const loadTokenUsage = async () => { try { const d = await API.getTokenUsage(tokenDays); setTokenData(d) } catch (e) { console.error(e) } }
     const addFeature = () => { if (!newFeature.trim()) return; setPkgForm(f => ({ ...f, features: [...f.features, { name: newFeature.trim(), included: true }] })); setNewFeature('') }
     const removeFeature = (i) => setPkgForm(f => ({ ...f, features: f.features.filter((_, idx) => idx !== i) }))
     const studioNames = { contentStudio: 'Content Studio', creativeStudio: 'Creative Studio', seoStudio: 'SEO Studio', brainstormStudio: 'Brainstorm Studio' }
@@ -552,6 +557,209 @@ export default function SuperAdminDashboard() {
                             <span className="px-4 py-2 text-sm text-slate-500">Page {userPage}</span>
                             <button disabled={users.length < 20} onClick={() => setUserPage(p => p + 1)} className="px-4 py-2 rounded-lg bg-white/[0.04] text-sm text-slate-400 disabled:opacity-30 cursor-pointer">Next →</button>
                         </div>}
+                    </div>
+                )}
+
+                {/* ════════════ TOKEN USAGE ════════════ */}
+                {tab === 'tokenUsage' && (
+                    <div>
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-cyan-400">monitoring</span>
+                                    AI Token Usage &amp; Cost Analytics
+                                </h3>
+                                <p className="text-sm text-slate-500 mt-1">Track actual AI API token consumption, costs, and profitability</p>
+                            </div>
+                            <div className="flex gap-2">
+                                {[7, 30, 90].map(d => (
+                                    <button key={d} onClick={() => { setTokenDays(d); setTimeout(() => loadTokenUsage(), 50) }}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${tokenDays === d ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-slate-500 bg-white/[0.03] border border-white/[0.06]'}`}>
+                                        {d}d
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {!tokenData ? (
+                            <div className="flex items-center justify-center py-20 text-slate-500">
+                                <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>Loading token analytics...
+                            </div>
+                        ) : (
+                            <>
+                                {/* Summary Cards */}
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+                                    <div className="glass-panel rounded-2xl p-4">
+                                        <span className="material-symbols-outlined text-cyan-400 text-lg mb-1 block">token</span>
+                                        <p className="text-xl font-extrabold text-white">{(tokenData.totals?.totalTokens || 0).toLocaleString()}</p>
+                                        <p className="text-[10px] text-slate-500">Total Tokens</p>
+                                    </div>
+                                    <div className="glass-panel rounded-2xl p-4">
+                                        <span className="material-symbols-outlined text-blue-400 text-lg mb-1 block">input</span>
+                                        <p className="text-xl font-extrabold text-white">{(tokenData.totals?.inputTokens || 0).toLocaleString()}</p>
+                                        <p className="text-[10px] text-slate-500">Input Tokens</p>
+                                    </div>
+                                    <div className="glass-panel rounded-2xl p-4">
+                                        <span className="material-symbols-outlined text-purple-400 text-lg mb-1 block">output</span>
+                                        <p className="text-xl font-extrabold text-white">{(tokenData.totals?.outputTokens || 0).toLocaleString()}</p>
+                                        <p className="text-[10px] text-slate-500">Output Tokens</p>
+                                    </div>
+                                    <div className="glass-panel rounded-2xl p-4">
+                                        <span className="material-symbols-outlined text-amber-400 text-lg mb-1 block">payments</span>
+                                        <p className="text-xl font-extrabold text-amber-400">${tokenData.totals?.estimatedCostUSD || 0}</p>
+                                        <p className="text-[10px] text-slate-500">Est. Cost (USD)</p>
+                                    </div>
+                                    <div className="glass-panel rounded-2xl p-4">
+                                        <span className="material-symbols-outlined text-emerald-400 text-lg mb-1 block">bolt</span>
+                                        <p className="text-xl font-extrabold text-white">{(tokenData.totals?.totalCalls || 0).toLocaleString()}</p>
+                                        <p className="text-[10px] text-slate-500">AI Calls</p>
+                                    </div>
+                                    <div className="glass-panel rounded-2xl p-4">
+                                        <span className="material-symbols-outlined text-lg mb-1 block" style={{ color: (tokenData.profitability?.margin || 0) > 50 ? '#34d399' : (tokenData.profitability?.margin || 0) > 0 ? '#fbbf24' : '#fb7185' }}>trending_up</span>
+                                        <p className="text-xl font-extrabold" style={{ color: (tokenData.profitability?.margin || 0) > 50 ? '#34d399' : (tokenData.profitability?.margin || 0) > 0 ? '#fbbf24' : '#fb7185' }}>{tokenData.profitability?.margin || 0}%</p>
+                                        <p className="text-[10px] text-slate-500">Profit Margin</p>
+                                    </div>
+                                </div>
+
+                                {/* Profitability Banner */}
+                                <div className="glass-panel rounded-2xl p-5 mb-5 border border-emerald-500/10 bg-gradient-to-r from-emerald-500/[0.03] to-transparent">
+                                    <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-emerald-400 text-lg">account_balance</span>
+                                        Profitability Analysis
+                                    </h4>
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div>
+                                            <p className="text-xs text-slate-500 mb-1">Monthly Revenue</p>
+                                            <p className="text-lg font-extrabold text-emerald-400">₹{(tokenData.profitability?.monthlyRevenue || 0).toLocaleString()}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-slate-500 mb-1">Est. AI Cost (INR)</p>
+                                            <p className="text-lg font-extrabold text-rose-400">₹{(tokenData.profitability?.estimatedCostINR || 0).toLocaleString()}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-slate-500 mb-1">Net Profit</p>
+                                            <p className="text-lg font-extrabold" style={{ color: ((tokenData.profitability?.monthlyRevenue || 0) - (tokenData.profitability?.estimatedCostINR || 0)) > 0 ? '#34d399' : '#fb7185' }}>
+                                                ₹{((tokenData.profitability?.monthlyRevenue || 0) - (tokenData.profitability?.estimatedCostINR || 0)).toLocaleString()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+                                    {/* Per-Studio Breakdown */}
+                                    <div className="glass-panel rounded-2xl p-5">
+                                        <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-indigo-400 text-lg">apps</span>
+                                            Usage by Studio
+                                        </h4>
+                                        {(tokenData.byStudio || []).length > 0 ? (
+                                            <div className="space-y-2">
+                                                {tokenData.byStudio.map(s => {
+                                                    const maxTokens = Math.max(...tokenData.byStudio.map(x => x.totalTokens || 0));
+                                                    const pct = maxTokens > 0 ? ((s.totalTokens || 0) / maxTokens) * 100 : 0;
+                                                    const colors = { seo: '#6366f1', content: '#10b981', creative: '#f472b6', brainstorm: '#f59e0b', video: '#06b6d4', unknown: '#64748b' };
+                                                    return (
+                                                        <div key={s._id || 'unknown'} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                                                            <div className="flex items-center justify-between mb-1.5">
+                                                                <span className="text-sm font-bold text-white capitalize">{s._id || 'Other'}</span>
+                                                                <span className="text-xs text-slate-400">{(s.totalTokens || 0).toLocaleString()} tokens</span>
+                                                            </div>
+                                                            <div className="w-full h-1.5 rounded-full bg-white/[0.06] mb-1">
+                                                                <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: colors[s._id] || colors.unknown }} />
+                                                            </div>
+                                                            <div className="flex items-center justify-between text-[10px] text-slate-600">
+                                                                <span>{s.calls} calls • {s.credits} credits</span>
+                                                                <span className="text-amber-400">${(s.estimatedCost || 0).toFixed(2)}</span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-slate-600 text-center py-8">No token usage data yet. Generate some reports to see studio breakdown.</p>
+                                        )}
+                                    </div>
+
+                                    {/* Per-Model Breakdown */}
+                                    <div className="glass-panel rounded-2xl p-5">
+                                        <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-purple-400 text-lg">smart_toy</span>
+                                            Usage by Model
+                                        </h4>
+                                        {(tokenData.byModel || []).length > 0 ? (
+                                            <div className="space-y-2">
+                                                {tokenData.byModel.map((m, i) => {
+                                                    const provColors = { openai: '#10b981', xai: '#3b82f6', gemini: '#f59e0b' };
+                                                    return (
+                                                        <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                                                            <div className="flex items-center justify-between mb-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="w-2 h-2 rounded-full" style={{ background: provColors[m._id?.provider] || '#64748b' }} />
+                                                                    <span className="text-sm font-bold text-white">{m._id?.model || 'Unknown'}</span>
+                                                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.06] text-slate-500 uppercase">{m._id?.provider}</span>
+                                                                </div>
+                                                                <span className="text-xs font-bold text-amber-400">${(m.estimatedCost || 0).toFixed(2)}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-4 text-[10px] text-slate-500">
+                                                                <span>{(m.totalTokens || 0).toLocaleString()} total</span>
+                                                                <span>↓{(m.inputTokens || 0).toLocaleString()} in</span>
+                                                                <span>↑{(m.outputTokens || 0).toLocaleString()} out</span>
+                                                                <span>{m.calls} calls</span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-slate-600 text-center py-8">No model usage data yet.</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Top Token Consumers */}
+                                <div className="glass-panel rounded-2xl p-5">
+                                    <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-rose-400 text-lg">leaderboard</span>
+                                        Top Token Consumers
+                                    </h4>
+                                    {(tokenData.topUsers || []).length > 0 ? (
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left">
+                                                <thead>
+                                                    <tr className="text-[10px] text-slate-500 font-bold uppercase tracking-wider border-b border-white/[0.04]">
+                                                        <th className="pb-2">User</th>
+                                                        <th className="pb-2">Plan</th>
+                                                        <th className="pb-2 text-right">Tokens Used</th>
+                                                        <th className="pb-2 text-right">AI Calls</th>
+                                                        <th className="pb-2 text-right">Credits Used</th>
+                                                        <th className="pb-2 text-right">Est. Cost</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-white/[0.04]">
+                                                    {tokenData.topUsers.map((u, i) => (
+                                                        <tr key={u._id || i} className="text-sm hover:bg-white/[0.02] transition-all">
+                                                            <td className="py-2.5">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-6 h-6 rounded bg-cyan-500/10 flex items-center justify-center text-[10px] font-bold text-cyan-400">{u.name?.[0] || '?'}</div>
+                                                                    <div><p className="font-bold text-white text-xs">{u.name || 'Unknown'}</p><p className="text-[10px] text-slate-600">{u.email}</p></div>
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-2.5"><span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-white/[0.05] text-slate-400 capitalize">{u.plan}</span></td>
+                                                            <td className="py-2.5 text-right font-bold text-white">{(u.totalTokens || 0).toLocaleString()}</td>
+                                                            <td className="py-2.5 text-right text-slate-400">{u.calls}</td>
+                                                            <td className="py-2.5 text-right text-slate-400">{u.credits}</td>
+                                                            <td className="py-2.5 text-right font-bold text-amber-400">${(u.estimatedCost || 0).toFixed(2)}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-slate-600 text-center py-8">No user token data yet. Users need to generate reports to see their consumption.</p>
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
 

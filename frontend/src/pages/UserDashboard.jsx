@@ -8,7 +8,6 @@ import { content as contentAPI, creatives as creativesAPI, trends as trendsAPI, 
 import { getUpcomingEvents, EVENT_COLORS } from '../data/calendarData'
 import SmartCommandBox from '../components/SmartCommandBox'
 import IntelReportViewer from '../components/IntelReportViewer'
-import AgentFidatoPanel from '../components/AgentFidatoPanel'
 
 // ── Helpers ──
 function getGreeting() {
@@ -99,7 +98,6 @@ export default function UserDashboard() {
     const [intelMissions, setIntelMissions] = useState([])
     const [intelReport, setIntelReport] = useState(null) // { mission, findings }
     const [showIntelReport, setShowIntelReport] = useState(false)
-    const [showFidatoPanel, setShowFidatoPanel] = useState(false)
 
 
     const country = activeBrand?.dna?.country || activeBrand?.country || 'India'
@@ -1153,120 +1151,6 @@ export default function UserDashboard() {
                 {/* ═══════════════════════════════════════════════════════════ */}
                 <div className="col-span-12 lg:col-span-4 space-y-6">
 
-                    {/* ── INTEL CARD ── */}
-                    <div className="glass-panel rounded-2xl p-5 lg:p-6 border border-violet-500/20 anim-slide-up anim-border-glow overflow-hidden relative"
-                        style={{ animationDelay: '150ms' }}>
-                        {/* Background grid effect */}
-                        <div className="absolute inset-0 opacity-[0.03]" style={{
-                            backgroundImage: 'linear-gradient(rgba(139,92,246,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,0.3) 1px, transparent 1px)',
-                            backgroundSize: '20px 20px',
-                        }} />
-                        <div className="relative">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-violet-400">shield</span>
-                                    Agent Fidato
-                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-violet-500/15 text-violet-400 border border-violet-500/20">
-                                        Intel
-                                    </span>
-                                </h3>
-                                {intelMissions.some(m => m.status === 'active') && (
-                                    <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                                        <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Live</span>
-                                    </span>
-                                )}
-                            </div>
-
-                            {intelMissions.length === 0 ? (
-                                /* ── Empty / Onboarding State ── */
-                                <div className="text-center py-4">
-                                    {/* Animated radar */}
-                                    <div className="relative mx-auto mb-4" style={{ width: 100, height: 100 }}>
-                                        <svg width="100" height="100" viewBox="0 0 100 100">
-                                            <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
-                                            <circle cx="50" cy="50" r="28" fill="none" stroke="rgba(139,92,246,0.08)" strokeWidth="1" />
-                                            <circle cx="50" cy="50" r="14" fill="none" stroke="rgba(139,92,246,0.15)" strokeWidth="1" />
-                                            <line x1="50" y1="5" x2="50" y2="95" stroke="rgba(139,92,246,0.06)" strokeWidth="0.5" />
-                                            <line x1="5" y1="50" x2="95" y2="50" stroke="rgba(139,92,246,0.06)" strokeWidth="0.5" />
-                                            <circle cx="50" cy="50" r="3" fill="#8b5cf6" opacity="0.6" />
-                                        </svg>
-                                        <svg width="100" height="100" viewBox="0 0 100 100" className="absolute inset-0" style={{ animation: 'radar-sweep 3s linear infinite' }}>
-                                            <defs>
-                                                <linearGradient id="fidatoSweep" gradientTransform="rotate(90)">
-                                                    <stop offset="0%" stopColor="rgba(139,92,246,0.3)" />
-                                                    <stop offset="100%" stopColor="transparent" />
-                                                </linearGradient>
-                                            </defs>
-                                            <path d="M50,50 L50,8 A42,42 0 0,1 84,32 Z" fill="url(#fidatoSweep)" />
-                                            <line x1="50" y1="50" x2="50" y2="8" stroke="rgba(139,92,246,0.6)" strokeWidth="1" />
-                                        </svg>
-                                    </div>
-                                    <p className="text-sm font-bold text-white mb-1">Competitive Intelligence</p>
-                                    <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                                        Deploy intel missions to track competitor<br />
-                                        pricing, ads, launches & strategy changes
-                                    </p>
-                                    <button onClick={() => setShowFidatoPanel(true)}
-                                        className="px-5 py-2.5 rounded-xl text-sm font-bold cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center gap-2 mx-auto"
-                                        style={{
-                                            background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(16,185,129,0.2))',
-                                            border: '1px solid rgba(139,92,246,0.3)',
-                                            color: '#a78bfa',
-                                        }}>
-                                        <span className="material-symbols-outlined text-sm">rocket_launch</span>
-                                        Deploy First Mission
-                                    </button>
-                                </div>
-                            ) : (
-                                /* ── Active Missions State ── */
-                                <>
-                                    <div className="grid grid-cols-3 gap-2 mb-4">
-                                        <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04] text-center">
-                                            <p className="text-lg font-extrabold text-white">{intelMissions.length}</p>
-                                            <p className="text-[10px] text-slate-500 uppercase">Missions</p>
-                                        </div>
-                                        <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04] text-center">
-                                            <p className="text-lg font-extrabold text-white">{intelMissions.filter(m => m.status === 'active').length}</p>
-                                            <p className="text-[10px] text-slate-500 uppercase">Active</p>
-                                        </div>
-                                        <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04] text-center">
-                                            <p className="text-lg font-extrabold text-white">{intelMissions.reduce((a, m) => a + (m.totalFindings || 0), 0)}</p>
-                                            <p className="text-[10px] text-slate-500 uppercase">Insights</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Recent missions with findings */}
-                                    <div className="space-y-2 mb-4">
-                                        {intelMissions.filter(m => (m.totalFindings || 0) > 0).slice(0, 3).map((m, i) => (
-                                            <button key={m._id} onClick={() => openIntelReport(m)}
-                                                className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-violet-500/30 hover:bg-white/[0.04] transition-all cursor-pointer text-left group"
-                                                style={{ animation: `slide-up 0.4s ease-out ${i * 80}ms both` }}>
-                                                <div className="size-8 rounded-lg bg-gradient-to-br from-violet-500/15 to-emerald-500/10 flex items-center justify-center shrink-0">
-                                                    <span className="material-symbols-outlined text-violet-400 text-sm">visibility</span>
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-bold text-white truncate">{m.title}</p>
-                                                    <p className="text-[11px] text-slate-500">{m.target?.name} · {m.totalFindings} insights</p>
-                                                </div>
-                                                <span className="text-[9px] font-bold font-mono text-violet-400 opacity-0 group-hover:opacity-100 transition-opacity tracking-wider">
-                                                    VIEW
-                                                </span>
-                                            </button>
-                                        ))}
-                                    </div>
-
-                                    <button onClick={() => setShowFidatoPanel(!showFidatoPanel)}
-                                        className="w-full py-2.5 rounded-xl bg-violet-500/5 text-violet-400 text-sm font-bold hover:bg-violet-500/10 transition-all cursor-pointer border border-violet-500/10 flex items-center justify-center gap-2">
-                                        <span className="material-symbols-outlined text-sm">shield</span>
-                                        {showFidatoPanel ? 'Close Panel' : 'Open Agent Fidato'}
-                                    </button>
-                                </>
-                            )}
-                        </div>
-                    </div>
-
-
                     {/* ── STUDIOS GRID ── */}
                     <div className="glass-panel rounded-2xl p-5 lg:p-6 anim-slide-up" style={{ animationDelay: '200ms' }}>
                         <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
@@ -1521,10 +1405,6 @@ export default function UserDashboard() {
                     findings={intelReport.findings}
                     onClose={() => { setShowIntelReport(false); setIntelReport(null) }}
                 />
-            )}
-            {/* Agent Fidato Mission Panel — rendered at root to avoid stacking context issues */}
-            {showFidatoPanel && (
-                <AgentFidatoPanel studio="dashboard" panelOnly onClose={() => setShowFidatoPanel(false)} />
             )}
         </DashboardLayout>
     )

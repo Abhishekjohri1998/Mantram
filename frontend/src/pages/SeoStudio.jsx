@@ -4,32 +4,42 @@ import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
 import { useBrand } from '../context/BrandContext'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
-import AgentFidatoPanel from '../components/AgentFidatoPanel'
 import { seoStudio as seoAPI, googleAnalytics as gaAPI } from '../services/api'
+import StudioReportButton from '../components/reports/StudioReportButton'
+import SeoAdvancedTools from '../components/seo/SeoAdvancedTools'
 
-// ── Constants ──────────────────────────────────────────────────────────────
-const WORKFLOWS = [
-    { id: 'health-check', icon: 'health_and_safety', title: 'Health Check', subtitle: 'Is my website OK?', desc: 'Full SEO + AI visibility audit with fix recommendations', color: 'emerald', creditAction: 'seoHealthCheck' },
-    { id: 'traffic', icon: 'trending_up', title: 'Get Me Traffic', subtitle: 'What should I rank for?', desc: 'Keyword clusters, content gaps & topic suggestions', color: 'blue', creditAction: 'seoTraffic' },
-    { id: 'competitors', icon: 'swords', title: 'Beat Competitors', subtitle: 'Why are they ahead?', desc: 'Competitor gap analysis & outrank plan', color: 'amber', creditAction: 'seoCompetitors' },
-    { id: 'ai-visibility', icon: 'smart_toy', title: 'AI Visibility', subtitle: 'Will AI recommend my brand?', desc: 'AI search optimization & LLM discoverability', color: 'violet', creditAction: 'seoAiVisibility' },
-    { id: 'competitor-warroom', icon: 'shield', title: 'Competitor War Room', subtitle: 'Side-by-side battle analysis', desc: 'Scoring matrix, keyword battles & 90-day playbook', color: 'rose', creditAction: 'seoCompetitors' },
-    { id: 'llm-probe', icon: 'psychology', title: 'LLM Brand Probe', subtitle: 'Do AI models know your brand?', desc: 'Live test: asks AI about your brand & checks if you get mentioned', color: 'cyan', creditAction: 'seoAiVisibility' },
-    { id: 'auto-fix', icon: 'build', title: 'Auto-Fix Issues', subtitle: 'Copy-paste code fixes', desc: 'Generate ready-to-implement fixes from your last audit', color: 'teal', creditAction: 'seoAuditPage' },
-    { id: 'prompt-mining', icon: 'chat_bubble', title: 'AI Prompt Mining', subtitle: 'What prompts should cite you?', desc: 'Discover AI prompts where your brand should be recommended', color: 'orange', creditAction: 'seoAiVisibility' },
+// ── Sidebar Navigation ────────────────────────────────────────────────────
+const SIDEBAR_SECTIONS = [
+    { title: 'Quick Actions', items: [
+        { id: 'health-check', icon: 'health_and_safety', label: 'Health Check', desc: 'Full SEO + AI audit', color: '#10b981', creditAction: 'seoHealthCheck', type: 'workflow' },
+        { id: 'traffic', icon: 'trending_up', label: 'Get Me Traffic', desc: 'Keywords & gaps', color: '#3b82f6', creditAction: 'seoTraffic', type: 'workflow' },
+        { id: 'ai-visibility', icon: 'smart_toy', label: 'AI Visibility', desc: 'AI search opt.', color: '#8b5cf6', creditAction: 'seoAiVisibility', type: 'workflow' },
+    ]},
+    { title: 'Audit & Fix', items: [
+        { id: 'site-audit', icon: 'bug_report', label: 'Site Audit', desc: 'Technical audit', color: '#f43f5e', type: 'advanced' },
+        { id: 'on-page', icon: 'tune', label: 'On-Page Fixer', desc: 'Page-level fixes', color: '#06b6d4', type: 'advanced' },
+        { id: 'auto-fix', icon: 'build', label: 'Auto-Fix Code', desc: 'Copy-paste fixes', color: '#14b8a6', creditAction: 'seoAuditPage', type: 'workflow' },
+    ]},
+    { title: 'Intelligence', items: [
+        { id: 'keywords', icon: 'key', label: 'Keywords', desc: 'Keyword research', color: '#f59e0b', type: 'advanced' },
+        { id: 'content-ops', icon: 'article', label: 'Content Gaps', desc: 'Opportunities', color: '#10b981', type: 'advanced' },
+        { id: 'geo', icon: 'travel_explore', label: 'GEO — AI Search', desc: 'Gen. engine opt.', color: '#6366f1', type: 'advanced' },
+        { id: 'llm-probe', icon: 'psychology', label: 'LLM Probe', desc: 'AI brand check', color: '#06b6d4', creditAction: 'seoAiVisibility', type: 'workflow' },
+        { id: 'prompt-mining', icon: 'chat_bubble', label: 'Prompt Mining', desc: 'AI citation prompts', color: '#f97316', creditAction: 'seoAiVisibility', type: 'workflow' },
+    ]},
+    { title: 'Competitors', items: [
+        { id: 'competitors', icon: 'swords', label: 'Beat Competitors', desc: 'Gap & outrank', color: '#f59e0b', creditAction: 'seoCompetitors', type: 'workflow' },
+        { id: 'competitor-warroom', icon: 'shield', label: 'War Room', desc: '90-day battle plan', color: '#f43f5e', creditAction: 'seoCompetitors', type: 'workflow' },
+        { id: 'competitor-detail', icon: 'groups', label: 'Competitor Intel', desc: 'Deep comparison', color: '#a855f7', type: 'advanced' },
+    ]},
+    { title: 'Link Building', items: [
+        { id: 'backlinks', icon: 'link', label: 'Backlinks', desc: 'Backlink intel', color: '#3b82f6', type: 'advanced' },
+    ]},
+    { title: 'Reports', items: [
+        { id: 'overview', icon: 'space_dashboard', label: 'Overview', desc: 'All SEO metrics', color: '#8b5cf6', type: 'advanced' },
+        { id: 'reports', icon: 'summarize', label: 'Reports & Plans', desc: 'Generated reports', color: '#64748b', type: 'advanced' },
+    ]},
 ]
-
-const ADV_MENU = [
-    { id: 'overview', icon: 'space_dashboard', label: 'Overview Dashboard' },
-    { id: 'site-audit', icon: 'bug_report', label: 'Site Audit' },
-    { id: 'keywords', icon: 'key', label: 'Keyword Intelligence' },
-    { id: 'content-ops', icon: 'article', label: 'Content Opportunities' },
-    { id: 'ai-seo', icon: 'smart_toy', label: 'AI SEO Optimization' },
-    { id: 'competitor-detail', icon: 'groups', label: 'Competitors' },
-    { id: 'on-page', icon: 'tune', label: 'On-Page Fixer' },
-    { id: 'reports', icon: 'summarize', label: 'Reports & Plans' },
-]
-
 const SEVERITY_COLORS = { critical: 'rose', high: 'orange', medium: 'amber', low: 'slate' }
 const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low']
 
@@ -62,17 +72,16 @@ export default function SeoStudio() {
     const { activeBrand } = useBrand()
     const navigate = useNavigate()
 
-    // View management
-    const [view, setView] = useState('home')
-    const [activeWorkflow, setActiveWorkflow] = useState(null)
-    const [advPage, setAdvPage] = useState('overview')
-    const [showAdvMenu, setShowAdvMenu] = useState(false)
+    // Navigation — single active section drives all content
+    const [activeSection, setActiveSection] = useState('overview')
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+    const [showGuide, setShowGuide] = useState(false)
+    const [showSetup, setShowSetup] = useState(false)
 
     // Competitor management
     const [competitors, setCompetitors] = useState(activeBrand?.competitors || [])
     const [newCompUrl, setNewCompUrl] = useState('')
     const [compLoading, setCompLoading] = useState(false)
-    const [showCompetitors, setShowCompetitors] = useState(true)
 
     // Input state
     const [askQuery, setAskQuery] = useState('')
@@ -80,9 +89,12 @@ export default function SeoStudio() {
     // Results state
     const [loading, setLoading] = useState(false)
     const [loadingStage, setLoadingStage] = useState('')
+    const [loadingElapsed, setLoadingElapsed] = useState(0)
     const [results, setResults] = useState(null)
     const [askResult, setAskResult] = useState(null)
     const [error, setError] = useState('')
+    const abortRef = useRef(null)
+    const elapsedTimerRef = useRef(null)
 
     // Google Analytics state
     const [gaConnected, setGaConnected] = useState(false)
@@ -174,14 +186,50 @@ export default function SeoStudio() {
         'prompt-mining': ['Analyzing your industry...', 'Mining AI prompt patterns...', 'Scoring visibility per prompt...', 'Building content calendar...'],
     }
 
+    const cancelWorkflow = () => {
+        if (abortRef.current) abortRef.current.abort()
+        clearInterval(elapsedTimerRef.current)
+        setLoading(false); setLoadingStage(''); setLoadingElapsed(0)
+    }
+
+    // Cleanup on unmount
+    useEffect(() => () => { if (abortRef.current) abortRef.current.abort(); clearInterval(elapsedTimerRef.current) }, [])
+
+    // ── Auto-load saved results when switching to a workflow section ──
+    const [savedAt, setSavedAt] = useState(null)
+    useEffect(() => {
+        const WORKFLOW_IDS = ['health-check', 'traffic', 'competitors', 'ai-visibility', 'competitor-warroom', 'llm-probe', 'auto-fix', 'prompt-mining']
+        if (!activeBrand?._id || !WORKFLOW_IDS.includes(activeSection)) return
+        // Don't overwrite if user literally just generated fresh results
+        if (results && !savedAt) return
+
+        let cancelled = false
+        setResults(null); setSavedAt(null)
+        seoAPI.getSavedReport(activeBrand._id, activeSection)
+            .then(data => {
+                if (cancelled) return
+                if (data?.found && data.report) {
+                    setResults({ success: true, ...data.report })
+                    setSavedAt(data.generatedAt)
+                }
+            })
+            .catch(() => { /* silently fail — just means no saved data */ })
+        return () => { cancelled = true }
+    }, [activeSection, activeBrand?._id])
+
     const runWorkflow = async (workflowId) => {
         if (!website) { setError('No website URL found. Please add a website to your brand.'); return }
-        setError(''); setResults(null); setActiveWorkflow(workflowId); setView('workflow-result'); setLoading(true)
+        // Cancel any running workflow first
+        if (abortRef.current) abortRef.current.abort()
+        clearInterval(elapsedTimerRef.current)
+
+        setError(''); setResults(null); setSavedAt(null); setLoading(true); setLoadingElapsed(0)
 
         const stages = STAGE_MESSAGES[workflowId] || ['Processing...']
         let stageIdx = 0
         setLoadingStage(stages[0])
-        const interval = setInterval(() => { stageIdx = Math.min(stageIdx + 1, stages.length - 1); setLoadingStage(stages[stageIdx]) }, 5000)
+        const stageInterval = setInterval(() => { stageIdx = Math.min(stageIdx + 1, stages.length - 1); setLoadingStage(stages[stageIdx]) }, 5000)
+        elapsedTimerRef.current = setInterval(() => setLoadingElapsed(prev => prev + 1), 1000)
 
         try {
             const payload = { url: website, brand: brandPayload, brandId: activeBrand?._id, country: activeBrand?.dna?.country || 'India', industry: activeBrand?.dna?.industry }
@@ -190,7 +238,7 @@ export default function SeoStudio() {
             // Auto-fix needs previous issues
             if (workflowId === 'auto-fix') {
                 const lastIssues = results?.issues || []
-                if (lastIssues.length === 0) { setError('Run a Health Check first to find issues, then use Auto-Fix.'); setLoading(false); clearInterval(interval); return }
+                if (lastIssues.length === 0) { setError('Run a Health Check first to find issues, then use Auto-Fix.'); setLoading(false); clearInterval(stageInterval); clearInterval(elapsedTimerRef.current); return }
                 payload.issues = lastIssues
             }
 
@@ -205,7 +253,6 @@ export default function SeoStudio() {
                 setResults(data)
                 // Refresh competitors if competitor analysis discovered new ones
                 if (workflowId === 'competitors' && data.discoveredCompetitors?.length) {
-                    // Refresh competitor state from the discovered ones
                     try {
                         const newComps = data.discoveredCompetitors.map(c => ({ name: c.name, url: c.url, addedBy: 'ai' }));
                         setCompetitors(prev => {
@@ -215,8 +262,10 @@ export default function SeoStudio() {
                     } catch { }
                 }
             } else setError(data.error || 'Analysis failed')
-        } catch (e) { setError(e.message) }
-        finally { clearInterval(interval); setLoading(false) }
+        } catch (e) {
+            if (e.name !== 'AbortError') setError(e.message)
+        }
+        finally { clearInterval(stageInterval); clearInterval(elapsedTimerRef.current); setLoading(false); setLoadingElapsed(0) }
     }
 
     const runAsk = async () => {
@@ -230,413 +279,290 @@ export default function SeoStudio() {
         finally { setLoading(false) }
     }
 
-    const goHome = () => { setView('home'); setResults(null); setActiveWorkflow(null); setAskResult(null); setError(''); setShowAdvMenu(false) }
+    // Determine what the content panel should show
+    const WORKFLOW_IDS = ['health-check', 'traffic', 'competitors', 'ai-visibility', 'competitor-warroom', 'llm-probe', 'auto-fix', 'prompt-mining']
+    const isWorkflow = WORKFLOW_IDS.includes(activeSection)
+    const isAdvanced = !isWorkflow
+    const currentItem = SIDEBAR_SECTIONS.flatMap(s => s.items).find(i => i.id === activeSection)
 
     // ── RENDER ────────────────────────────────────────────────────────────
     return (
         <DashboardLayout title="SEO Studio" subtitle="AI-Powered SEO Intelligence">
             <SEOHead title="SEO Studio — Mantram AI" noIndex={true} />
-            <div className="max-w-7xl mx-auto">
 
-                {/* ═══ ASK BAR (always visible) ═══ */}
-                <div className="glass-panel rounded-2xl p-4 mb-6 flex items-center gap-3">
-                    <span className="material-symbols-outlined text-primary text-xl">search</span>
-                    <input type="text" value={askQuery} onChange={e => setAskQuery(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && runAsk()}
-                        placeholder="What do you want to achieve? e.g., 'Find trending keywords for my category'" className="input-glass flex-1 py-2.5 text-sm border-0 bg-transparent focus:ring-0" />
-                    <button onClick={runAsk} disabled={loading || !askQuery.trim()}
-                        className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${askQuery.trim() ? 'bg-primary text-white hover:bg-primary-light' : 'bg-white/5 text-slate-600'}`}>
-                        <span className="material-symbols-outlined text-sm">auto_awesome</span>
-                    </button>
+            {!activeBrand ? (
+                <div className="max-w-7xl mx-auto">
+                    <div className="glass-panel rounded-2xl p-10 mb-8 text-center">
+                        <span className="material-symbols-outlined text-slate-600 text-5xl block mb-3">domain</span>
+                        <h3 className="text-lg font-bold text-white mb-2">Select or Create a Brand</h3>
+                        <p className="text-sm text-slate-400 mb-4">SEO Studio needs a brand with a website to analyze.</p>
+                        <button onClick={() => navigate('/onboarding')} className="btn-primary py-2.5 px-6 rounded-xl text-sm cursor-pointer">Create Brand</button>
+                    </div>
                 </div>
+            ) : (
+                <div className="flex gap-0 max-w-[1400px] mx-auto" style={{ minHeight: 'calc(100vh - 140px)' }}>
 
-                {/* Ask result */}
-                {askResult && (
-                    <div className="glass-panel rounded-2xl p-6 mb-6 animate-fade-in">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-base font-bold text-white flex items-center gap-2"><span className="material-symbols-outlined text-primary text-sm">psychology</span> AI Answer</h3>
-                            <button onClick={() => setAskResult(null)} className="text-slate-500 hover:text-slate-300 cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
-                        </div>
-                        <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap mb-4">{askResult.answer}</div>
-                        {askResult.actionItems?.length > 0 && (
-                            <div className="space-y-2 mb-4">{askResult.actionItems.map((a, i) => (
-                                <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-white/3"><span className="text-primary text-xs mt-0.5">▸</span><div><p className="text-sm font-bold text-white">{a.title}</p><p className="text-[11px] text-slate-400">{a.description}</p></div></div>
-                            ))}</div>
-                        )}
-                        {askResult.followUpQuestions?.length > 0 && (
-                            <div className="flex flex-wrap gap-2">{askResult.followUpQuestions.map((q, i) => (
-                                <button key={i} onClick={() => { setAskQuery(q); setAskResult(null) }}
-                                    className="text-xs px-3 py-1.5 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 cursor-pointer transition-all">{q}</button>
-                            ))}</div>
-                        )}
-                        {askResult.suggestedWorkflow && (
-                            <button onClick={() => runWorkflow(askResult.suggestedWorkflow)}
-                                className="mt-4 px-4 py-2 rounded-xl bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 cursor-pointer transition-all flex items-center gap-2">
-                                <span className="material-symbols-outlined text-sm">play_arrow</span> Run {WORKFLOWS.find(w => w.id === askResult.suggestedWorkflow)?.title || 'Workflow'}
+                    {/* ═══════════ LEFT SIDEBAR ═══════════ */}
+                    <div className={`flex-shrink-0 transition-all duration-300 ${sidebarCollapsed ? 'w-14' : 'w-56'}`}
+                        style={{ background: 'rgba(255,255,255,0.01)', borderRight: '1px solid rgba(255,255,255,0.04)' }}>
+                        <div className="flex items-center justify-between px-3 py-3 border-b border-white/[0.04]">
+                            {!sidebarCollapsed && <span className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">Navigation</span>}
+                            <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                                className="size-7 rounded-lg bg-white/[0.03] flex items-center justify-center hover:bg-white/[0.08] cursor-pointer transition-all ml-auto">
+                                <span className="material-symbols-outlined text-slate-500 text-sm">{sidebarCollapsed ? 'chevron_right' : 'chevron_left'}</span>
                             </button>
-                        )}
-                    </div>
-                )}
+                        </div>
+                        <div className="py-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
+                            {SIDEBAR_SECTIONS.map((section, si) => (
+                                <div key={si} className="mb-1">
+                                    {!sidebarCollapsed && <p className="px-3 pt-3 pb-1 text-[9px] font-bold text-slate-600 uppercase tracking-widest">{section.title}</p>}
+                                    {sidebarCollapsed && si > 0 && <div className="mx-2 my-1 border-t border-white/[0.04]" />}
+                                    {section.items.map(item => {
+                                        const isActive = activeSection === item.id
+                                        return (
+                                            <button key={item.id}
+                                                onClick={() => { setActiveSection(item.id); setError(''); if (item.type === 'workflow') { setResults(null) } }}
+                                                title={sidebarCollapsed ? item.label : undefined}
+                                                className={`w-full flex items-center gap-2.5 px-3 py-2 text-left cursor-pointer transition-all duration-200 group relative ${isActive ? 'text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'}`}
+                                                style={isActive ? { background: `linear-gradient(90deg, ${item.color}12, transparent)` } : {}}>
+                                                {isActive && <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full" style={{ background: item.color }} />}
+                                                <span className="material-symbols-outlined text-lg transition-colors" style={{ color: isActive ? item.color : undefined }}>{item.icon}</span>
+                                                {!sidebarCollapsed && (
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className={`text-xs font-bold leading-tight truncate ${isActive ? 'text-white' : ''}`}>{item.label}</p>
+                                                        <p className="text-[9px] text-slate-600 leading-tight truncate">{item.desc}</p>
+                                                    </div>
+                                                )}
+                                                {!sidebarCollapsed && item.type === 'workflow' && (
+                                                    <span className="text-[8px] px-1 py-0.5 rounded bg-white/[0.04] text-slate-600 font-bold shrink-0">AI</span>
+                                                )}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            ))}
 
-                {/* ═══ HELP VIEW ═══ */}
-                {view === 'help' && (
-                    <div className="animate-fade-in">
-                        <SeoHelpView onBack={goHome} />
-                    </div>
-                )}
-
-                {/* ═══ HOME VIEW ═══ */}
-                {view === 'home' && (
-                    <div className="animate-fade-in">
-                        {/* No brand guard */}
-                        {!activeBrand ? (
-                            <div className="glass-panel rounded-2xl p-10 mb-8 text-center">
-                                <span className="material-symbols-outlined text-slate-600 text-5xl block mb-3">domain</span>
-                                <h3 className="text-lg font-bold text-white mb-2">Select or Create a Brand</h3>
-                                <p className="text-sm text-slate-400 mb-4">SEO Studio needs a brand with a website to analyze. Please select an existing brand or create a new one.</p>
-                                <button onClick={() => navigate('/onboarding')} className="btn-primary py-2.5 px-6 rounded-xl text-sm cursor-pointer">Create Brand</button>
-                            </div>
-                        ) : (
-                            <>
-                                {/* Brand Header Badge */}
-                                <div className="glass-panel rounded-2xl p-5 mb-6 flex items-center justify-between">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
-                                            <span className="material-symbols-outlined text-primary text-2xl">domain</span>
+                            {/* Setup section */}
+                            <div className="mt-2 border-t border-white/[0.04] pt-2">
+                                {!sidebarCollapsed ? (
+                                    <button onClick={() => setShowSetup(!showSetup)}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-left cursor-pointer transition-all hover:bg-white/[0.03]">
+                                        <span className="material-symbols-outlined text-slate-600 text-lg">settings</span>
+                                        <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest flex-1">Setup</span>
+                                        <span className="material-symbols-outlined text-slate-700 text-xs">{showSetup ? 'expand_less' : 'expand_more'}</span>
+                                    </button>
+                                ) : (
+                                    <button onClick={() => { setSidebarCollapsed(false); setShowSetup(true) }} title="Setup"
+                                        className="w-full flex items-center justify-center py-2 cursor-pointer hover:bg-white/[0.03] transition-all">
+                                        <span className="material-symbols-outlined text-slate-600 text-lg">settings</span>
+                                    </button>
+                                )}
+                                {showSetup && !sidebarCollapsed && (
+                                    <div className="px-3 py-2 space-y-3 animate-fade-in">
+                                        <div>
+                                            <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Competitors ({competitors.length})</p>
+                                            <div className="space-y-1 mb-2">
+                                                {competitors.slice(0, 4).map((c, i) => (
+                                                    <div key={i} className="flex items-center justify-between text-[10px] text-slate-400 px-2 py-1 rounded bg-white/[0.02]">
+                                                        <span className="truncate">{c.name || c.url}</span>
+                                                        <button onClick={() => removeCompetitor(c.url)} className="text-slate-600 hover:text-rose-400 cursor-pointer"><span className="material-symbols-outlined text-[10px]">close</span></button>
+                                                    </div>
+                                                ))}
+                                                {competitors.length > 4 && <p className="text-[9px] text-slate-600 px-2">+{competitors.length - 4} more</p>}
+                                            </div>
+                                            <div className="flex gap-1">
+                                                <input type="text" value={newCompUrl} onChange={e => setNewCompUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCompetitor()}
+                                                    placeholder="competitor.com" className="flex-1 px-2 py-1 rounded text-[10px] text-white bg-white/[0.04] border border-white/[0.06] outline-none" />
+                                                <button onClick={addCompetitor} disabled={!newCompUrl.trim()} className="px-1.5 py-1 rounded text-[9px] font-bold bg-white/[0.04] text-slate-500 cursor-pointer disabled:opacity-30">+</button>
+                                            </div>
+                                            <button onClick={discoverCompetitors} disabled={compLoading}
+                                                className="mt-1 w-full flex items-center justify-center gap-1 px-2 py-1 rounded text-[9px] font-bold cursor-pointer transition-all disabled:opacity-30 text-violet-400 bg-violet-500/10 hover:bg-violet-500/15">
+                                                {compLoading ? <span className="material-symbols-outlined text-[10px] animate-spin">sync</span> : <span className="material-symbols-outlined text-[10px]">auto_awesome</span>}
+                                                Auto-Discover
+                                            </button>
                                         </div>
                                         <div>
-                                            <h3 className="text-base font-bold text-white">{activeBrand.name}</h3>
-                                            <p className="text-sm text-slate-400 flex items-center gap-2">
-                                                <span className="material-symbols-outlined text-emerald-400 text-xs">language</span>
-                                                {website || 'No website set'}
-                                                {activeBrand.dna?.industry && <span className="px-2 py-0.5 rounded-full bg-white/5 text-xs">{activeBrand.dna.industry}</span>}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <button onClick={() => setView('help')}
-                                            className="px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-slate-400 text-xs font-bold hover:bg-white/[0.08] cursor-pointer transition-all flex items-center gap-1.5">
-                                            <span className="material-symbols-outlined text-sm">menu_book</span> How It Works
-                                        </button>
-                                        {!website && <button onClick={() => navigate(`/brand-dna`)} className="text-sm text-primary hover:text-primary-light cursor-pointer font-bold">Add Website →</button>}
-                                    </div>
-                                </div>
-
-                                {error && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 mb-4"><p className="text-rose-400 text-xs">{error}</p></div>}
-
-                                {/* Agent Fidato — Competitive Intelligence (placed above competitor management for contextual flow) */}
-                                <AgentFidatoPanel studio="seo" />
-
-                                {/* Competitor Management */}
-                                <div className="glass-panel rounded-2xl p-5 mb-6">
-                                    <button onClick={() => setShowCompetitors(!showCompetitors)} className="flex items-center justify-between w-full cursor-pointer">
-                                        <h3 className="text-base font-bold text-white flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-amber-400 text-lg">swords</span>
-                                            Competitors ({competitors.length})
-                                        </h3>
-                                        <span className="material-symbols-outlined text-slate-500 text-sm">{showCompetitors ? 'expand_less' : 'expand_more'}</span>
-                                    </button>
-                                    {showCompetitors && (
-                                        <div className="mt-4 space-y-3 animate-fade-in">
-                                            {competitors.length > 0 ? (
-                                                <div className="flex flex-wrap gap-2">
-                                                    {competitors.map((c, i) => (
-                                                        <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10">
-                                                            <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${c.addedBy === 'user' ? 'bg-blue-500/10 text-blue-400' : 'bg-violet-500/10 text-violet-400'}`}>{c.addedBy === 'user' ? 'YOU' : 'AI'}</span>
-                                                            <span className="text-sm text-slate-300">{c.name || c.url}</span>
-                                                            <button onClick={(e) => { e.stopPropagation(); removeCompetitor(c.url) }} className="text-slate-600 hover:text-rose-400 cursor-pointer transition-colors">
-                                                                <span className="material-symbols-outlined text-xs">close</span>
-                                                            </button>
-                                                        </div>
-                                                    ))}
+                                            <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Analytics</p>
+                                            {gaConnected ? (
+                                                <div className="text-[10px] text-emerald-400 flex items-center gap-1 px-2 py-1 rounded bg-emerald-500/5 border border-emerald-500/10">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> {gaEmail || 'Connected'}
                                                 </div>
                                             ) : (
-                                                <p className="text-[11px] text-slate-500">No competitors mapped yet. Add manually or let AI discover them.</p>
-                                            )}
-                                            <div className="flex gap-2">
-                                                <input type="text" value={newCompUrl} onChange={e => setNewCompUrl(e.target.value)}
-                                                    onKeyDown={e => e.key === 'Enter' && addCompetitor()}
-                                                    placeholder="Add competitor URL (e.g. competitor.com)" className="input-glass flex-1 py-2 text-xs" />
-                                                <button onClick={addCompetitor} disabled={compLoading || !newCompUrl.trim()}
-                                                    className="px-3 py-2 rounded-xl bg-white/5 text-sm text-slate-400 hover:bg-primary/10 hover:text-primary cursor-pointer transition-all font-bold disabled:opacity-30">Add</button>
-                                                <button onClick={discoverCompetitors} disabled={compLoading}
-                                                    className="px-3 py-2 rounded-xl bg-violet-500/10 text-sm text-violet-400 hover:bg-violet-500/20 cursor-pointer transition-all font-bold flex items-center gap-1 disabled:opacity-30">
-                                                    {compLoading ? <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span> : <span className="material-symbols-outlined text-xs">auto_awesome</span>}
-                                                    Auto-Discover
+                                                <button onClick={() => navigate('/integrations')}
+                                                    className="w-full flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[9px] font-bold cursor-pointer text-blue-400 bg-blue-500/10 hover:bg-blue-500/15 transition-all">
+                                                    <span className="material-symbols-outlined text-[10px]">link</span> Connect GA
                                                 </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* 4 Workflow Cards */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                                    {WORKFLOWS.map(w => (
-                                        <CreditTooltipWrapper key={w.id} action={w.creditAction}>
-                                            <button onClick={() => runWorkflow(w.id)} disabled={!website}
-                                                className={`glass-panel rounded-2xl p-6 text-left hover:bg-white/[0.04] transition-all group cursor-pointer border border-white/[0.06] hover:border-${w.color}-500/20 disabled:opacity-40 disabled:cursor-not-allowed`}>
-                                                <div className="flex items-start gap-4">
-                                                    <div className={`w-12 h-12 rounded-2xl bg-${w.color}-500/10 flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                                                        <span className={`material-symbols-outlined text-${w.color}-400 text-2xl`}>{w.icon}</span>
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <h3 className="text-base font-bold text-white mb-0.5">{w.title}</h3>
-                                                        <p className={`text-xs text-${w.color}-400 font-semibold mb-1`}>{w.subtitle}</p>
-                                                        <p className="text-[11px] text-slate-500">{w.desc}</p>
-                                                        <CreditBadge action={w.creditAction} />
-                                                    </div>
-                                                    <span className="material-symbols-outlined text-slate-600 group-hover:text-slate-300 transition-colors">arrow_forward</span>
-                                                </div>
-                                            </button>
-                                        </CreditTooltipWrapper>
-                                    ))}
-                                </div>
-
-                                {/* ═══ GOOGLE ANALYTICS & SEARCH CONSOLE DASHBOARD ═══ */}
-                                <div className="glass-panel rounded-2xl p-6 mb-8">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h3 className="text-base font-bold text-white flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-blue-400 text-lg">monitoring</span> Analytics & Search Performance
-                                        </h3>
-                                        {gaConnected ? (
-                                            <div className="flex items-center gap-3">
-                                                <span className="text-sm text-emerald-400 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Connected — {gaEmail}</span>
-                                                <button onClick={() => navigate('/integrations')} className="text-xs text-primary hover:text-white cursor-pointer flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-primary/10 transition-all">
-                                                    <span className="material-symbols-outlined text-xs">settings</span> Manage in Integrations
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <button onClick={() => navigate('/integrations')} className="px-4 py-2 rounded-xl bg-blue-500/10 text-blue-400 text-xs font-bold hover:bg-blue-500/20 cursor-pointer transition-all flex items-center gap-2">
-                                                <span className="material-symbols-outlined text-sm">link</span> Connect in Integrations
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    {gaConnected ? (
-                                        <div>
-                                            {/* Property & Site selectors */}
-                                            <div className="flex gap-3 mb-4">
-                                                <div className="flex-1">
-                                                    <label className="text-sm text-slate-500 font-bold mb-1 block">GA4 Property</label>
-                                                    <select value={gaSelectedProp} onChange={e => { setGaSelectedProp(e.target.value); loadGAReport(e.target.value) }}
-                                                        className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:border-primary focus:outline-none cursor-pointer">
-                                                        <option value="">Select property...</option>
-                                                        {gaProperties.map((p, i) => <option key={i} value={p.propertyId}>{p.propertyName} ({p.accountName})</option>)}
-                                                    </select>
-                                                </div>
-                                                <div className="flex-1">
-                                                    <label className="text-sm text-slate-500 font-bold mb-1 block">Search Console Site</label>
-                                                    <select value={gaSelectedSite} onChange={e => { setGaSelectedSite(e.target.value); loadGSCReport(e.target.value) }}
-                                                        className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:border-primary focus:outline-none cursor-pointer">
-                                                        <option value="">Select site...</option>
-                                                        {gaSites.map((s, i) => <option key={i} value={s.siteUrl}>{s.siteUrl}</option>)}
-                                                    </select>
-                                                </div>
-                                            </div>
-
-                                            {gaLoading && <div className="text-center py-8"><span className="material-symbols-outlined text-primary animate-spin text-2xl">progress_activity</span><p className="text-sm text-slate-500 mt-2">Loading analytics...</p></div>}
-
-                                            {/* GA4 Report */}
-                                            {gaReport && !gaLoading && (
-                                                <div className="space-y-4">
-                                                    {/* Summary stats */}
-                                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                                        {[{ label: 'Users', value: gaReport.summary.totalUsers?.toLocaleString(), icon: 'person', color: 'blue' },
-                                                        { label: 'Sessions', value: gaReport.summary.totalSessions?.toLocaleString(), icon: 'browse_activity', color: 'emerald' },
-                                                        { label: 'Page Views', value: gaReport.summary.totalPageViews?.toLocaleString(), icon: 'visibility', color: 'violet' },
-                                                        { label: 'Bounce Rate', value: `${(gaReport.summary.avgBounceRate * 100).toFixed(1)}%`, icon: 'exit_to_app', color: 'amber' },
-                                                        ].map(s => (
-                                                            <div key={s.label} className={`p-3 rounded-xl bg-${s.color}-500/5 border border-${s.color}-500/10`}>
-                                                                <div className="flex items-center gap-2 mb-1">
-                                                                    <span className={`material-symbols-outlined text-${s.color}-400 text-sm`}>{s.icon}</span>
-                                                                    <span className="text-sm text-slate-500 font-bold">{s.label}</span>
-                                                                </div>
-                                                                <p className="text-lg font-black text-white">{s.value}</p>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-
-                                                    {/* Traffic Sparkline */}
-                                                    {gaReport.traffic?.length > 0 && (
-                                                        <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                                                            <h4 className="text-sm text-slate-500 font-bold mb-3">DAILY TRAFFIC (Last 30 days)</h4>
-                                                            <div className="flex items-end gap-0.5 h-16">
-                                                                {gaReport.traffic.map((d, i) => {
-                                                                    const max = Math.max(...gaReport.traffic.map(t => t.sessions || 1))
-                                                                    const h = Math.max(4, (d.sessions / max) * 100)
-                                                                    return <div key={i} className="flex-1 bg-primary/60 rounded-t hover:bg-primary transition-all cursor-pointer" style={{ height: `${h}%` }} title={`${d.date}: ${d.sessions} sessions`} />
-                                                                })}
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-                                                    {/* Channels + Top Pages side by side */}
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        {gaReport.channels?.length > 0 && (
-                                                            <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                                                                <h4 className="text-sm text-slate-500 font-bold mb-2">TRAFFIC CHANNELS</h4>
-                                                                <div className="space-y-1.5">{gaReport.channels.slice(0, 6).map((c, i) => {
-                                                                    const max = gaReport.channels[0]?.sessions || 1
-                                                                    return (<div key={i} className="flex items-center gap-2">
-                                                                        <span className="text-sm text-slate-400 w-24 truncate">{c.channel}</span>
-                                                                        <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"><div className="h-full bg-primary/60 rounded-full" style={{ width: `${(c.sessions / max) * 100}%` }} /></div>
-                                                                        <span className="text-sm text-white font-bold w-10 text-right">{c.sessions}</span>
-                                                                    </div>)
-                                                                })}</div>
-                                                            </div>
-                                                        )}
-                                                        {gaReport.topPages?.length > 0 && (
-                                                            <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                                                                <h4 className="text-sm text-slate-500 font-bold mb-2">TOP PAGES</h4>
-                                                                <div className="space-y-1.5">{gaReport.topPages.slice(0, 6).map((p, i) => (
-                                                                    <div key={i} className="flex items-center justify-between">
-                                                                        <span className="text-sm text-slate-300 truncate flex-1 mr-2">{p.path}</span>
-                                                                        <span className="text-sm text-primary font-bold">{p.views}</span>
-                                                                    </div>
-                                                                ))}</div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Search Console Report */}
-                                            {gscReport && !gaLoading && (
-                                                <div className="space-y-4 mt-4">
-                                                    <h4 className="text-sm font-bold text-white flex items-center gap-2"><span className="material-symbols-outlined text-emerald-400 text-sm">search</span> Search Console — SERP Performance</h4>
-                                                    {/* Summary */}
-                                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                                        {[{ label: 'Clicks', value: gscReport.summary.totalClicks?.toLocaleString(), color: 'blue' },
-                                                        { label: 'Impressions', value: gscReport.summary.totalImpressions?.toLocaleString(), color: 'violet' },
-                                                        { label: 'Avg Position', value: gscReport.summary.avgPosition?.toFixed(1), color: 'amber' },
-                                                        { label: 'Avg CTR', value: `${(gscReport.summary.avgCtr * 100).toFixed(1)}%`, color: 'emerald' },
-                                                        ].map(s => (
-                                                            <div key={s.label} className={`p-3 rounded-xl bg-${s.color}-500/5 border border-${s.color}-500/10`}>
-                                                                <span className="text-sm text-slate-500 font-bold">{s.label}</span>
-                                                                <p className="text-lg font-black text-white">{s.value}</p>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-
-                                                    {/* Keywords and Pages */}
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        {gscReport.keywords?.length > 0 && (
-                                                            <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                                                                <h4 className="text-sm text-slate-500 font-bold mb-2">TOP KEYWORDS (SERP Positions)</h4>
-                                                                <div className="space-y-1.5">{gscReport.keywords.slice(0, 10).map((k, i) => (
-                                                                    <div key={i} className="flex items-center gap-2">
-                                                                        <span className={`text-xs px-1.5 py-0.5 rounded font-bold min-w-[32px] text-center ${k.position <= 3 ? 'bg-emerald-500/10 text-emerald-400' : k.position <= 10 ? 'bg-blue-500/10 text-blue-400' : k.position <= 20 ? 'bg-amber-500/10 text-amber-400' : 'bg-slate-500/10 text-slate-400'}`}>#{k.position.toFixed(0)}</span>
-                                                                        <span className="text-sm text-slate-300 flex-1 truncate">{k.keyword}</span>
-                                                                        <span className="text-sm text-primary font-bold">{k.clicks}</span>
-                                                                    </div>
-                                                                ))}</div>
-                                                            </div>
-                                                        )}
-                                                        {gscReport.pages?.length > 0 && (
-                                                            <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                                                                <h4 className="text-sm text-slate-500 font-bold mb-2">TOP PAGES (by Clicks)</h4>
-                                                                <div className="space-y-1.5">{gscReport.pages.slice(0, 10).map((p, i) => (
-                                                                    <div key={i} className="flex items-center gap-2">
-                                                                        <span className={`text-xs px-1.5 py-0.5 rounded font-bold min-w-[32px] text-center ${p.position <= 10 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>#{p.position.toFixed(0)}</span>
-                                                                        <span className="text-sm text-slate-300 flex-1 truncate">{new URL(p.page).pathname}</span>
-                                                                        <span className="text-sm text-primary font-bold">{p.clicks}</span>
-                                                                    </div>
-                                                                ))}</div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
                                             )}
                                         </div>
-                                    ) : (
-                                        <div className="text-center py-6">
-                                            <span className="material-symbols-outlined text-slate-600 text-4xl block mb-2">monitoring</span>
-                                            <p className="text-sm text-slate-500 mb-1">Connect Google Analytics & Search Console to see real data</p>
-                                            <p className="text-xs text-slate-600 mb-3">Traffic trends, SERP positions, top pages, keyword rankings & more</p>
-                                            <button onClick={() => navigate('/integrations')} className="px-4 py-2 rounded-xl bg-blue-500/10 text-blue-400 text-xs font-bold hover:bg-blue-500/20 cursor-pointer transition-all inline-flex items-center gap-1">
-                                                <span className="material-symbols-outlined text-sm">link</span> Connect in Integrations →
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Advanced menu toggle */}
-                                <button onClick={() => setShowAdvMenu(!showAdvMenu)}
-                                    className="text-sm text-slate-500 hover:text-slate-300 font-bold mb-4 flex items-center gap-1 cursor-pointer transition-all">
-                                    <span className="material-symbols-outlined text-sm">{showAdvMenu ? 'expand_less' : 'expand_more'}</span> Advanced Tools
-                                </button>
-                                {showAdvMenu && (
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 animate-fade-in">
-                                        {ADV_MENU.map(m => (
-                                            <button key={m.id} onClick={() => { setAdvPage(m.id); setView('advanced-page') }}
-                                                className="glass-panel rounded-xl p-4 text-left hover:bg-white/[0.04] cursor-pointer transition-all flex items-center gap-3">
-                                                <span className="material-symbols-outlined text-slate-400 text-lg">{m.icon}</span>
-                                                <span className="text-sm text-slate-300 font-medium">{m.label}</span>
-                                            </button>
-                                        ))}
                                     </div>
                                 )}
-                            </>
-                        )}
-                    </div>
-                )}
-
-                {/* ═══ LOADING STATE ═══ */}
-                {loading && view === 'workflow-result' && (
-                    <div className="flex flex-col items-center justify-center py-32 animate-fade-in">
-                        <div className="relative mb-8">
-                            <div className="w-24 h-24 rounded-full border-4 border-white/5 flex items-center justify-center">
-                                <span className="material-symbols-outlined text-primary text-4xl animate-spin">progress_activity</span>
                             </div>
                         </div>
-                        <h3 className="text-lg font-bold text-white mb-2">Running {WORKFLOWS.find(w => w.id === activeWorkflow)?.title}...</h3>
-                        <p className="text-sm text-primary animate-pulse">{loadingStage}</p>
-                        <div className="flex gap-2 mt-6">{STAGE_MESSAGES[activeWorkflow]?.map((_, i) => (
-                            <div key={i} className={`w-2 h-2 rounded-full transition-all ${STAGE_MESSAGES[activeWorkflow]?.indexOf(loadingStage) >= i ? 'bg-primary' : 'bg-white/10'}`} />
-                        ))}</div>
                     </div>
-                )}
 
-                {/* ═══ WORKFLOW RESULTS ═══ */}
-                {view === 'workflow-result' && !loading && results && (
-                    <div ref={resultRef} className="animate-fade-in">
-                        <button onClick={goHome} className="flex items-center gap-2 text-slate-400 hover:text-white text-sm font-bold mb-6 cursor-pointer transition-all">
-                            <span className="material-symbols-outlined text-sm">arrow_back</span> Back to SEO Studio
-                        </button>
+                    {/* ═══════════ MAIN CONTENT PANEL ═══════════ */}
+                    <div className="flex-1 min-w-0 px-5 py-4 overflow-y-auto">
+                        {/* Compact Brand Header + Ask Bar */}
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                                style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 2px 12px rgba(99,102,241,0.25)' }}>
+                                <span className="material-symbols-outlined text-white text-lg">travel_explore</span>
+                            </div>
+                            <div className="min-w-0 mr-2">
+                                <h2 className="text-sm font-bold text-white truncate">{activeBrand.name}</h2>
+                                <p className="text-[10px] text-slate-500 truncate flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-emerald-400" />{website || 'No website'}</p>
+                            </div>
+                            <div className="flex-1 flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                <span className="material-symbols-outlined text-violet-400 text-sm">auto_awesome</span>
+                                <input type="text" value={askQuery} onChange={e => setAskQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && runAsk()}
+                                    placeholder="Ask anything about SEO..." className="flex-1 text-xs bg-transparent text-white placeholder:text-slate-600 outline-none border-none" />
+                                <button onClick={runAsk} disabled={loading || !askQuery.trim()}
+                                    className="px-3 py-1 rounded-lg text-[10px] font-bold cursor-pointer disabled:opacity-30 transition-all"
+                                    style={{ background: askQuery.trim() ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(255,255,255,0.03)', color: askQuery.trim() ? 'white' : '#475569' }}>Ask</button>
+                            </div>
+                            <StudioReportButton studio="seo" brandId={activeBrand?._id} />
+                            <button onClick={() => setShowGuide(!showGuide)} title="How It Works"
+                                className={`size-9 rounded-xl flex items-center justify-center cursor-pointer transition-all ${showGuide ? 'bg-primary/20 text-primary' : 'bg-white/[0.04] border border-white/[0.06] text-slate-500 hover:text-white hover:bg-white/[0.08]'}`}>
+                                <span className="material-symbols-outlined text-lg">help</span>
+                            </button>
+                        </div>
 
-                        {/* Research Sources Badge */}
-                        {results.researchSources?.length > 0 && (
-                            <div className="glass-panel rounded-xl p-3 mb-4 flex items-start gap-2">
-                                <span className="material-symbols-outlined text-emerald-400 text-sm mt-0.5">verified</span>
-                                <div>
-                                    <p className="text-sm text-emerald-400 font-bold">GROUNDED IN REAL RESEARCH</p>
-                                    <p className="text-sm text-slate-500">{results.researchSources.length} pages crawled: {results.researchSources.slice(0, 4).join(', ')}{results.researchSources.length > 4 ? ` +${results.researchSources.length - 4} more` : ''}</p>
-                                </div>
+                        {/* ─── How It Works Guide ─── */}
+                        {showGuide && (
+                            <div className="animate-fade-in">
+                                <SeoHelpView onBack={() => setShowGuide(false)} />
                             </div>
                         )}
 
-                        {activeWorkflow === 'health-check' && <HealthCheckResults results={results} />}
-                        {activeWorkflow === 'traffic' && <TrafficResults results={results} />}
-                        {activeWorkflow === 'competitors' && <CompetitorResults results={results} />}
-                        {activeWorkflow === 'ai-visibility' && <AIVisibilityResults results={results} />}
-                        {activeWorkflow === 'competitor-warroom' && <WarRoomResults results={results} />}
-                        {activeWorkflow === 'llm-probe' && <LLMProbeResults results={results} />}
-                        {activeWorkflow === 'auto-fix' && <AutoFixResults results={results} />}
-                        {activeWorkflow === 'prompt-mining' && <PromptMiningResults results={results} />}
-                    </div>
-                )}
+                        {/* Ask Result */}
+                        {askResult && (
+                            <div className="glass-panel rounded-2xl p-5 mb-4 animate-fade-in">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-sm font-bold text-white flex items-center gap-2"><span className="material-symbols-outlined text-primary text-sm">psychology</span> AI Answer</h3>
+                                    <button onClick={() => setAskResult(null)} className="text-slate-500 hover:text-slate-300 cursor-pointer"><span className="material-symbols-outlined text-sm">close</span></button>
+                                </div>
+                                <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap mb-3">{askResult.answer}</div>
+                                {askResult.actionItems?.length > 0 && (
+                                    <div className="space-y-1.5 mb-3">{askResult.actionItems.map((a, i) => (
+                                        <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-white/3"><span className="text-primary text-xs mt-0.5">▸</span><div><p className="text-xs font-bold text-white">{a.title}</p><p className="text-[10px] text-slate-400">{a.description}</p></div></div>
+                                    ))}</div>
+                                )}
+                                {askResult.followUpQuestions?.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">{askResult.followUpQuestions.map((q, i) => (
+                                        <button key={i} onClick={() => { setAskQuery(q); setAskResult(null) }}
+                                            className="text-xs px-3 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 cursor-pointer transition-all">{q}</button>
+                                    ))}</div>
+                                )}
+                            </div>
+                        )}
 
-                {error && view === 'workflow-result' && !loading && (
-                    <div className="text-center py-20">
-                        <span className="material-symbols-outlined text-rose-400 text-4xl mb-4 block">error</span>
-                        <p className="text-rose-400 text-sm mb-4">{error}</p>
-                        <button onClick={goHome} className="text-sm text-slate-400 hover:text-white cursor-pointer">← Back</button>
+                        {error && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 mb-4"><p className="text-rose-400 text-xs">{error}</p></div>}
+
+                        {/* ─── Loading State ─── */}
+                        {loading && isWorkflow && (
+                            <div className="flex flex-col items-center justify-center py-24 animate-fade-in">
+                                <div className="w-20 h-20 rounded-full border-4 border-white/5 flex items-center justify-center mb-6">
+                                    <span className="material-symbols-outlined text-primary text-3xl animate-spin">progress_activity</span>
+                                </div>
+                                <h3 className="text-base font-bold text-white mb-2">Running {currentItem?.label}...</h3>
+                                <p className="text-sm text-primary animate-pulse">{loadingStage}</p>
+                                <div className="flex gap-1.5 mt-5">{STAGE_MESSAGES[activeSection]?.map((_, i) => (
+                                    <div key={i} className={`w-1.5 h-1.5 rounded-full transition-all ${STAGE_MESSAGES[activeSection]?.indexOf(loadingStage) >= i ? 'bg-primary' : 'bg-white/10'}`} />
+                                ))}</div>
+                                <p className="text-[10px] text-slate-600 mt-4">
+                                    {loadingElapsed > 0 && `${Math.floor(loadingElapsed / 60)}:${String(loadingElapsed % 60).padStart(2, '0')} elapsed`}
+                                    {loadingElapsed > 15 && ' — AI analysis can take up to 3 minutes for complex sites'}
+                                </p>
+                                <button onClick={cancelWorkflow}
+                                    className="mt-4 px-4 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-white bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] cursor-pointer transition-all flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-xs">close</span> Cancel
+                                </button>
+                            </div>
+                        )}
+
+                        {/* ─── Saved-data indicator ─── */}
+                        {isWorkflow && !loading && results && savedAt && (
+                            <div className="flex items-center justify-between p-3 rounded-xl mb-4 animate-fade-in" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.12)' }}>
+                                <div className="flex items-center gap-2 text-xs text-slate-400">
+                                    <span className="material-symbols-outlined text-primary text-sm">history</span>
+                                    <span>Last generated <strong className="text-white">{new Date(savedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong></span>
+                                </div>
+                                <CreditTooltipWrapper action={currentItem?.creditAction}>
+                                    <button onClick={() => runWorkflow(activeSection)} disabled={loading}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white cursor-pointer hover:brightness-110 transition-all"
+                                        style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+                                        <span className="material-symbols-outlined text-xs">refresh</span> Regenerate
+                                        <CreditBadge action={currentItem?.creditAction} />
+                                    </button>
+                                </CreditTooltipWrapper>
+                            </div>
+                        )}
+
+                        {/* ─── Workflow Results ─── */}
+                        {isWorkflow && !loading && results && (
+                            <div ref={resultRef} className="animate-fade-in">
+                                {results.researchSources?.length > 0 && (
+                                    <div className="glass-panel rounded-xl p-3 mb-4 flex items-start gap-2">
+                                        <span className="material-symbols-outlined text-emerald-400 text-sm mt-0.5">verified</span>
+                                        <div>
+                                            <p className="text-xs text-emerald-400 font-bold">GROUNDED IN REAL RESEARCH</p>
+                                            <p className="text-[10px] text-slate-500">{results.researchSources.length} pages crawled: {results.researchSources.slice(0, 3).join(', ')}{results.researchSources.length > 3 ? ` +${results.researchSources.length - 3} more` : ''}</p>
+                                        </div>
+                                    </div>
+                                )}
+                                {activeSection === 'health-check' && <HealthCheckResults results={results} />}
+                                {activeSection === 'traffic' && <TrafficResults results={results} />}
+                                {activeSection === 'competitors' && <CompetitorResults results={results} />}
+                                {activeSection === 'ai-visibility' && <AIVisibilityResults results={results} />}
+                                {activeSection === 'competitor-warroom' && <WarRoomResults results={results} />}
+                                {activeSection === 'llm-probe' && <LLMProbeResults results={results} />}
+                                {activeSection === 'auto-fix' && <AutoFixResults results={results} />}
+                                {activeSection === 'prompt-mining' && <PromptMiningResults results={results} />}
+                            </div>
+                        )}
+
+                        {/* ─── Workflow empty state ─── */}
+                        {isWorkflow && !loading && !results && !error && (
+                            <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
+                                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: `${currentItem?.color || '#6366f1'}15` }}>
+                                    <span className="material-symbols-outlined text-3xl" style={{ color: currentItem?.color || '#6366f1' }}>{currentItem?.icon || 'search'}</span>
+                                </div>
+                                <h3 className="text-lg font-bold text-white mb-1">{currentItem?.label}</h3>
+                                <p className="text-sm text-slate-500 mb-4 text-center max-w-md">{currentItem?.desc}</p>
+                                <CreditTooltipWrapper action={currentItem?.creditAction}>
+                                    <button onClick={() => runWorkflow(activeSection)} disabled={!website}
+                                        className="px-5 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer disabled:opacity-30 transition-all hover:shadow-lg flex items-center gap-2"
+                                        style={{ background: `linear-gradient(135deg, ${currentItem?.color || '#6366f1'}, ${currentItem?.color || '#8b5cf6'}cc)` }}>
+                                        <span className="material-symbols-outlined text-sm">play_arrow</span> Run {currentItem?.label}
+                                        <CreditBadge action={currentItem?.creditAction} />
+                                    </button>
+                                </CreditTooltipWrapper>
+                            </div>
+                        )}
+
+                        {/* ─── Advanced Tools ─── */}
+                        {isAdvanced && (
+                            <SeoAdvancedTools
+                                advPage={activeSection}
+                                setAdvPage={setActiveSection}
+                                onBack={() => setActiveSection('overview')}
+                                brand={activeBrand}
+                                website={website}
+                                competitors={competitors}
+                                brandPayload={brandPayload}
+                                gaConnected={gaConnected}
+                                gaReport={gaReport}
+                                gscReport={gscReport}
+                                hideNav
+                            />
+                        )}
                     </div>
-                )}
-            </div>
+                </div>
+            )}
         </DashboardLayout>
     )
 }
+
 
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -1226,81 +1152,159 @@ function AutoFixResults({ results }) {
 
 function PromptMiningResults({ results }) {
     const r = results
-    const VIS_COLORS = { 'likely-cited': 'emerald', 'possibly-cited': 'amber', 'unlikely-cited': 'orange', 'definitely-not-cited': 'rose' }
+    const PRIORITY_COLORS = { critical: '#fb7185', high: '#fb923c', medium: '#fbbf24' }
 
     return (
         <div className="space-y-6">
-            {/* Summary Dashboard */}
+            {/* Summary + Citation Score */}
             <div className="glass-panel rounded-2xl p-6">
                 <div className="flex items-center gap-3 mb-4">
                     <span className="material-symbols-outlined text-orange-400 text-2xl">chat_bubble</span>
-                    <h2 className="text-xl font-black text-white">AI Prompt Mining — {r.industry}</h2>
-                </div>
-                {r.visibilitySummary && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div className="text-center p-3 rounded-xl bg-emerald-400/5 border border-emerald-400/10">
-                            <p className="text-2xl font-black text-emerald-400">{r.visibilitySummary.likelyCitedCount}</p>
-                            <p className="text-[10px] text-slate-500 font-bold">LIKELY CITED</p>
-                        </div>
-                        <div className="text-center p-3 rounded-xl bg-amber-400/5 border border-amber-400/10">
-                            <p className="text-2xl font-black text-amber-400">{r.visibilitySummary.possiblyCitedCount}</p>
-                            <p className="text-[10px] text-slate-500 font-bold">POSSIBLY CITED</p>
-                        </div>
-                        <div className="text-center p-3 rounded-xl bg-rose-400/5 border border-rose-400/10">
-                            <p className="text-2xl font-black text-rose-400">{r.visibilitySummary.unlikelyCitedCount}</p>
-                            <p className="text-[10px] text-slate-500 font-bold">UNLIKELY CITED</p>
-                        </div>
-                        <div className="text-center p-3 rounded-xl bg-white/[0.03]">
-                            <p className={`text-lg font-bold ${r.visibilitySummary.overallReadiness === 'ready' ? 'text-emerald-400' : r.visibilitySummary.overallReadiness === 'partially-ready' ? 'text-amber-400' : 'text-rose-400'}`}>{r.visibilitySummary.overallReadiness?.replace('-', ' ').toUpperCase()}</p>
-                            <p className="text-[10px] text-slate-500 font-bold">READINESS</p>
-                        </div>
+                    <div>
+                        <h2 className="text-xl font-black text-white">AI Prompt Mining</h2>
+                        <p className="text-xs text-slate-500">{r.totalPromptsAnalyzed || 0} prompts analyzed</p>
                     </div>
-                )}
+                    {r.citationScore != null && (
+                        <div className="ml-auto text-center">
+                            <p className={`text-3xl font-black ${r.citationScore >= 60 ? 'text-emerald-400' : r.citationScore >= 30 ? 'text-amber-400' : 'text-rose-400'}`}>{r.citationScore}</p>
+                            <p className="text-[10px] text-slate-500 font-bold">CITATION SCORE</p>
+                        </div>
+                    )}
+                </div>
+                {r.summary && <p className="text-sm text-slate-300 leading-relaxed">{r.summary}</p>}
             </div>
 
-            {/* Prompt Categories */}
-            {r.promptCategories?.map((cat, ci) => (
-                <div key={ci} className="glass-panel rounded-2xl p-6">
+            {/* Category Overview Cards */}
+            {r.promptCategories?.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {r.promptCategories.map((cat, ci) => (
+                        <div key={ci} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                            <p className="text-sm font-bold text-white mb-2">{cat.category}</p>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-lg font-black text-orange-400">{cat.totalPrompts || 0}</span>
+                                <span className="text-[10px] text-slate-500">prompts</span>
+                            </div>
+                            <p className="text-[10px] text-slate-500 mt-1">Citation: {cat.currentCitationRate || '0%'}</p>
+                            {cat.opportunity && (
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold mt-2 inline-block ${cat.opportunity === 'high' ? 'bg-emerald-400/10 text-emerald-400' : cat.opportunity === 'medium' ? 'bg-amber-400/10 text-amber-400' : 'bg-slate-400/10 text-slate-400'}`}>
+                                    {cat.opportunity.toUpperCase()} OPP
+                                </span>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Mined Prompts — the actual individual prompts */}
+            {r.minedPrompts?.length > 0 && (
+                <div className="glass-panel rounded-2xl p-6">
                     <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-                        <span className="material-symbols-outlined text-sm text-orange-400">category</span> {cat.category}
+                        <span className="material-symbols-outlined text-sm text-orange-400">mining</span> Mined Prompts ({r.minedPrompts.length})
                     </h3>
                     <div className="space-y-3">
-                        {cat.prompts?.map((p, pi) => {
-                            const visColor = VIS_COLORS[p.currentVisibility] || 'slate'
+                        {r.minedPrompts.map((p, pi) => {
+                            const prColor = PRIORITY_COLORS[p.priority] || '#94a3b8'
                             return (
-                                <div key={pi} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                                    <div className="flex items-center justify-between mb-2">
+                                <div key={pi} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] transition-colors">
+                                    <div className="flex items-start justify-between gap-3 mb-2">
                                         <p className="text-sm text-white font-medium flex-1">"{p.prompt}"</p>
-                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ml-2 whitespace-nowrap bg-${visColor}-400/10 text-${visColor}-400`}>{p.currentVisibility?.replace(/-/g, ' ')}</span>
+                                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap" style={{ background: `${prColor}15`, color: prColor }}>
+                                            {p.priority?.toUpperCase()}
+                                        </span>
                                     </div>
-                                    <p className="text-xs text-slate-500 mb-1">{p.whyOrWhyNot}</p>
-                                    <p className="text-xs text-primary font-medium">→ {p.actionableStrategy}</p>
-                                    {p.competitorsLikelyCited?.length > 0 && <p className="text-[10px] text-amber-400 mt-1">Competitors: {p.competitorsLikelyCited.join(', ')}</p>}
+                                    <div className="flex flex-wrap gap-2 mb-2">
+                                        {p.category && <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-400/10 text-indigo-400 font-bold">{p.category}</span>}
+                                        {p.searchVolume && <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.05] text-slate-400 font-bold">Vol: {p.searchVolume}</span>}
+                                        {p.contentFormat && <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-400/10 text-blue-400 font-bold">{p.contentFormat}</span>}
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${p.currentlyCited ? 'bg-emerald-400/10 text-emerald-400' : 'bg-rose-400/10 text-rose-400'}`}>
+                                            {p.currentlyCited ? '✓ Cited' : '✗ Not Cited'}
+                                        </span>
+                                    </div>
+                                    {p.whyNotCited && <p className="text-xs text-slate-500 mb-1"><span className="text-rose-400 font-bold">Why not cited:</span> {p.whyNotCited}</p>}
+                                    {p.contentNeeded && <p className="text-xs text-primary font-medium mb-1">→ {p.contentNeeded}</p>}
+                                    {p.estimatedImpact && <p className="text-[10px] text-slate-600">Impact: {p.estimatedImpact}</p>}
+                                    {p.competitorsCited?.length > 0 && <p className="text-[10px] text-amber-400 mt-1">Competitors cited: {p.competitorsCited.join(', ')}</p>}
                                 </div>
                             )
                         })}
                     </div>
                 </div>
-            ))}
+            )}
 
-            {/* Priority Actions */}
-            {r.topPriorityActions?.length > 0 && (
-                <ActionBucket title="🎯 Top Priority Actions" items={r.topPriorityActions.map(a => ({
-                    title: `#${a.priority} ${a.action}`,
-                    description: `Covers ${a.promptsCovered} prompts | Effort: ${a.effort} | ${a.expectedOutcome}`
-                }))} color="orange" />
+            {/* Quick Wins */}
+            {r.quickWins?.length > 0 && (
+                <div className="glass-panel rounded-2xl p-6">
+                    <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-sm text-emerald-400">bolt</span> Quick Wins
+                    </h3>
+                    <div className="space-y-3">
+                        {r.quickWins.map((w, i) => (
+                            <div key={i} className="p-3 rounded-xl bg-emerald-400/5 border border-emerald-400/10">
+                                <p className="text-sm text-white font-medium">{w.action}</p>
+                                <p className="text-xs text-slate-500 mt-1">Target: "{w.targetPrompt}" • Effort: {w.effort} • Impact: {w.expectedImpact}</p>
+                                {w.proofMethod && <p className="text-[10px] text-emerald-400/70 mt-1">Verify: {w.proofMethod}</p>}
+                            </div>
+                        ))}
+                    </div>
+                </div>
             )}
 
             {/* Content Calendar */}
             {r.contentCalendar?.length > 0 && (
                 <div className="glass-panel rounded-2xl p-6">
                     <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-sm text-blue-400">event</span> Content Calendar</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {r.contentCalendar.map((w, i) => (
                             <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                                <p className="text-xs text-primary font-bold mb-1">WEEK {w.week}</p>
-                                <p className="text-sm text-white font-bold mb-1">{w.content}</p>
-                                <p className="text-xs text-slate-500">Format: {w.format} | Targets: {w.targetPrompts?.join(', ').substring(0, 80)}</p>
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-xs text-primary font-bold">WEEK {w.week}</p>
+                                    {w.theme && <p className="text-[10px] text-slate-500">{w.theme}</p>}
+                                </div>
+                                {/* Handle both flat and nested content structures */}
+                                {w.contentPieces?.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {w.contentPieces.map((cp, j) => (
+                                            <div key={j} className="pl-3 border-l-2 border-primary/30">
+                                                <p className="text-sm text-white font-medium">{cp.title}</p>
+                                                <p className="text-xs text-slate-500">Format: {cp.format}{cp.publishBy ? ` • By: ${cp.publishBy}` : ''}</p>
+                                                {cp.targetPrompts?.length > 0 && <p className="text-[10px] text-slate-600 mt-0.5">Targets: {cp.targetPrompts.join(', ').substring(0, 120)}</p>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    /* Fallback for flat structure */
+                                    <>
+                                        {w.content && <p className="text-sm text-white font-bold mb-1">{w.content}</p>}
+                                        <p className="text-xs text-slate-500">Format: {w.format || '—'} | Targets: {w.targetPrompts?.join(', ').substring(0, 80) || '—'}</p>
+                                    </>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Optimizations */}
+            {r.optimizations?.length > 0 && (
+                <div className="glass-panel rounded-2xl p-6">
+                    <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-sm text-indigo-400">trending_up</span> Strategic Optimizations
+                    </h3>
+                    <div className="space-y-4">
+                        {r.optimizations.map((opt, i) => (
+                            <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${opt.priority === 'critical' ? 'bg-rose-400/10 text-rose-400' : opt.priority === 'high' ? 'bg-orange-400/10 text-orange-400' : 'bg-amber-400/10 text-amber-400'}`}>{opt.priority?.toUpperCase()}</span>
+                                    <h4 className="text-sm font-bold text-white">{opt.title}</h4>
+                                </div>
+                                <p className="text-xs text-slate-400 mb-2">{opt.description}</p>
+                                <div className="grid grid-cols-2 gap-2 text-[10px]">
+                                    {opt.kpi && <div><span className="text-slate-600">KPI:</span> <span className="text-slate-400">{opt.kpi}</span></div>}
+                                    {opt.baseline && <div><span className="text-slate-600">Baseline:</span> <span className="text-slate-400">{opt.baseline}</span></div>}
+                                    {opt.target && <div><span className="text-slate-600">Target:</span> <span className="text-emerald-400">{opt.target}</span></div>}
+                                    {opt.timeline && <div><span className="text-slate-600">Timeline:</span> <span className="text-slate-400">{opt.timeline}</span></div>}
+                                </div>
+                                {opt.expectedROI && <p className="text-[10px] text-primary mt-1">ROI: {opt.expectedROI}</p>}
                             </div>
                         ))}
                     </div>
@@ -1322,91 +1326,230 @@ const SEO_HELP_SECTIONS = [
         icon: 'rocket_launch',
         color: '#6366f1',
         title: 'Getting Started',
-        subtitle: 'How SEO Studio works',
+        subtitle: 'How SEO Studio works — start here',
         steps: [
-            { icon: 'domain', title: 'Brand & Website', description: 'SEO Studio requires an active brand with a website URL. Select your brand and ensure the website is set in Brand DNA. All workflows analyze your actual website content.' },
-            { icon: 'search', title: 'Ask Bar', description: 'The search bar at the top lets you ask any SEO question in plain English. Example: "Find trending keywords for my category" or "Why am I not ranking for my brand name?" The AI provides answers with action items and follow-up questions.' },
-            { icon: 'dashboard', title: 'Workflow Cards', description: 'The home screen shows 8 AI-powered workflow cards. Click any card to run that workflow. Each one crawls your website, analyzes the data, and returns actionable results.' },
+            { icon: 'domain', title: 'Step 1: Select Your Brand', description: 'SEO Studio analyzes your actual website. Select your brand from the top-right dropdown — the studio reads your website URL from Brand DNA. All workflows crawl your real pages, not hypotheticals. If no website is set, go to Brand DNA first and add one.' },
+            { icon: 'auto_awesome', title: 'Step 2: Ask or Run a Tool', description: 'Two ways to use the studio: (1) Type any SEO question in the Ask Bar — e.g., "Why am I not ranking for my brand name?" — for instant AI answers. (2) Click any tool in the left sidebar to run a full workflow with deep analysis.' },
+            { icon: 'dashboard', title: 'Navigation Sidebar', description: 'The left sidebar organizes 16 tools into categories: Quick Actions (Health Check, Traffic, AI Visibility), Audit & Fix (Site Audit, On-Page, Auto-Fix), Intelligence (Keywords, Content Gaps, GEO, LLM Probe, Prompt Mining), Competitors (Beat Competitors, War Room, Competitor Intel), Link Building (Backlinks), and Reports (Overview, Reports & Plans).' },
+            { icon: 'save', title: 'Auto-Saved Results', description: 'All generated results are automatically saved. When you return to any tool, your previous results are loaded instantly. A "Last generated" timestamp shows when data was created. Click "Regenerate" to run a fresh analysis (uses credits).' },
+            { icon: 'description', title: 'Generate Report', description: 'After running any analysis, click "Generate Report" in the top-right to create a shareable PDF report of your SEO status. Reports are saved and can be accessed from the Reports & Plans section.' },
         ]
     },
     {
-        id: 'workflows',
+        id: 'health-check',
         icon: 'health_and_safety',
         color: '#10b981',
-        title: 'Core Workflows',
-        subtitle: 'The 8 AI-powered SEO workflows',
+        title: '🏥 Health Check',
+        subtitle: 'Full SEO + AI visibility audit — run this first',
         steps: [
-            { icon: 'health_and_safety', title: 'Health Check', description: 'Full SEO + AI visibility audit. Returns 5 scores (SEO Health, AI Visibility, Technical, Content, Authority), categorized issues by severity, and a Fix Now / Create Next / Monitor action board.' },
-            { icon: 'trending_up', title: 'Get Me Traffic', description: 'Keyword cluster discovery and content gap analysis. Returns keyword clusters with difficulty/intent, rising keywords, seasonal peaks, quick wins, and a 30-day traffic plan.' },
-            { icon: 'swords', title: 'Beat Competitors', description: 'Competitor gap analysis with outrank strategies. Analyzes competitor strengths/weaknesses, explains why they win, and provides a content plan to beat them.' },
-            { icon: 'smart_toy', title: 'AI Visibility', description: 'Checks if AI search engines (ChatGPT, Gemini, Perplexity) can find and recommend your brand. Scores your schema, FAQs, structured data, and provides optimization templates.' },
-            { icon: 'shield', title: 'Competitor War Room', description: 'Side-by-side scoring matrix against all your competitors. Includes keyword battles, content comparison, and a 90-day playbook to outperform them.' },
-            { icon: 'psychology', title: 'LLM Brand Probe', description: 'Live test: asks multiple AI models about your brand and checks if they mention you. Scores your visibility, accuracy, and sentiment across AI systems.' },
-            { icon: 'build', title: 'Auto-Fix Issues', description: 'Generates copy-paste code fixes from your last Health Check. Run a Health Check first, then Auto-Fix creates ready-to-implement schema blocks, meta tags, and HTML fixes.' },
-            { icon: 'chat_bubble', title: 'AI Prompt Mining', description: 'Discovers AI prompts where your brand should be recommended. Returns a content calendar to create pages that get cited by AI models.' },
+            { icon: 'info', title: 'What It Does', description: 'Crawls your entire website and runs a comprehensive audit covering 5 dimensions: Technical SEO (page speed, mobile-friendliness, crawlability, SSL, sitemap), Content Quality (heading structure, meta tags, keyword density, content length, readability), Authority Signals (backlink profile, domain age, brand mentions), AI Readiness (schema markup, FAQ blocks, structured data), and overall SEO Health.' },
+            { icon: 'speed', title: 'What You Get', description: '5 scores out of 100: SEO Health, AI Visibility, Technical, Content, and Authority. A strategic summary explaining your position. Categorized issues sorted by severity (Critical → High → Medium → Low), each with a title, description, category, and "why it matters" explanation. A top opportunity recommendation. Industry benchmark comparison. Competitor hints based on your category.' },
+            { icon: 'checklist', title: 'How To Use Results', description: 'Focus on Critical and High severity issues first — these cause the most ranking damage. For each issue, read "why it matters" to understand the business impact. After reviewing issues, immediately run Auto-Fix Code — it generates copy-paste HTML/schema fixes for every issue found. Re-run Health Check every 30 days to track improvement.' },
+            { icon: 'schedule', title: 'When To Run', description: 'Run this FIRST when you set up a new brand. Then re-run monthly, or after making major website changes (redesign, new pages, domain migration). This is your SEO baseline — all other tools build on it.' },
         ]
     },
     {
-        id: 'competitors',
-        icon: 'swords',
-        color: '#f59e0b',
-        title: 'Competitor Management',
-        subtitle: 'Map and manage your SEO competitors',
-        steps: [
-            { icon: 'person_add', title: 'Add Competitors', description: 'Expand the Competitors panel on the home screen. Enter a competitor\'s URL and click Add. Competitors are saved to your brand and used across all competitor-related workflows.' },
-            { icon: 'auto_awesome', title: 'Auto-Discover', description: 'Click "Auto-Discover" to let AI find your top competitors based on your website content and industry. AI-discovered competitors are tagged differently from manual ones.' },
-            { icon: 'close', title: 'Remove Competitors', description: 'Click the X icon on any competitor chip to remove it. You can have up to 8 competitors mapped at a time.' },
-        ]
-    },
-    {
-        id: 'analytics',
-        icon: 'monitoring',
+        id: 'traffic',
+        icon: 'trending_up',
         color: '#3b82f6',
-        title: 'Google Analytics & Search Console',
-        subtitle: 'Real traffic data from your connected accounts',
+        title: '📈 Get Me Traffic',
+        subtitle: 'Keyword discovery, content gaps & 30-day growth plan',
         steps: [
-            { icon: 'link', title: 'Connect', description: 'Connect Google Analytics and Search Console from the Integrations hub. Once connected, SEO Studio reads real data — no separate setup needed.' },
-            { icon: 'bar_chart', title: 'GA4 Dashboard', description: 'Select a GA4 property to see: Users, Sessions, Page Views, Bounce Rate, daily traffic chart, traffic channels breakdown, and top pages.' },
-            { icon: 'search', title: 'Search Console Data', description: 'Select a Search Console site to see: Clicks, Impressions, Avg Position, Avg CTR, top keywords with their SERP positions, and top pages by clicks.' },
-        ]
-    },
-    {
-        id: 'advanced',
-        icon: 'tune',
-        color: '#8b5cf6',
-        title: 'Advanced Tools',
-        subtitle: 'Deep-dive SEO tools for power users',
-        steps: [
-            { icon: 'space_dashboard', title: 'Overview Dashboard', description: 'Consolidated view of all your SEO metrics, recent audits, and quick access to all advanced features.' },
-            { icon: 'bug_report', title: 'Site Audit', description: 'Detailed technical SEO audit with issue categorization, severity badges, and specific fix recommendations.' },
-            { icon: 'key', title: 'Keyword Intelligence', description: 'Deep keyword research with volume, difficulty, intent classification, and opportunity scoring.' },
-            { icon: 'article', title: 'Content Opportunities', description: 'Content gap analysis showing topics your competitors rank for but you don\'t, with content briefs.' },
-            { icon: 'smart_toy', title: 'AI SEO Optimization', description: 'Optimize your pages for AI search engines. Structured data, FAQ schemas, and AI-friendly content patterns.' },
-            { icon: 'tune', title: 'On-Page Fixer', description: 'Page-level optimization with meta tag suggestions, heading structure fixes, and internal linking recommendations.' },
+            { icon: 'info', title: 'What It Does', description: 'Analyzes your website\'s existing content and discovers keyword opportunities you\'re missing. Uses your actual page content to identify topical gaps, finds rising keywords in your industry, spots seasonal trends you can capitalize on, and analyzes your competitors\' ranking keywords to find what you should be targeting.' },
+            { icon: 'key', title: 'What You Get', description: 'Keyword clusters grouped by topic (not individual keywords) with difficulty scores, search intent labels (buy, learn, compare, local), and funnel stage (awareness → decision). Rising keywords showing upward search trends. Quick wins — keywords where you\'re almost ranking and a single blog post could push you to page 1. A strategic 4-week traffic growth plan with specific content pieces to create each week.' },
+            { icon: 'checklist', title: 'How To Use Results', description: 'Start with Quick Wins — these are high-ROI opportunities. Then build content around keyword clusters (Google rewards topical depth over isolated articles). Follow the 30-day plan to systematically grow traffic. For each cluster, prioritize high volume + low difficulty combinations. Use the funnel stage labels to create content matching search intent — don\'t write a buying guide for an "awareness" keyword.' },
+            { icon: 'schedule', title: 'When To Run', description: 'Run after Health Check to know what to write about. Re-run every 60-90 days to catch new trends and rising keywords. Also run when planning a content calendar for the next quarter.' },
         ]
     },
     {
         id: 'ai-visibility',
         icon: 'smart_toy',
         color: '#06b6d4',
-        title: 'AI Search Visibility',
-        subtitle: 'Get recommended by ChatGPT, Gemini & Perplexity',
+        title: '🤖 AI Visibility',
+        subtitle: 'Check if ChatGPT, Gemini & Perplexity can find your brand',
         steps: [
-            { icon: 'psychology', title: 'Why AI SEO Matters', description: 'AI search (ChatGPT, Gemini, Perplexity) is replacing traditional search for many queries. If AI doesn\'t know about your brand, you\'re invisible to a growing segment of users.' },
-            { icon: 'verified', title: 'LLM Brand Probe', description: 'Run the LLM Probe to test if AI models mention your brand. See exactly how they describe you, what they say about your competitors, and where you\'re missing.' },
-            { icon: 'chat_bubble', title: 'Prompt Mining', description: 'Discover the specific prompts where your brand should appear. Create targeted content that gets cited by AI models when users ask relevant questions.' },
-            { icon: 'schema', title: 'Structured Data', description: 'AI models rely heavily on schema.org markup, JSON-LD, and FAQ blocks. Auto-Fix generates ready-to-paste code to improve your AI discoverability.' },
+            { icon: 'info', title: 'What It Does', description: 'Evaluates whether AI search engines (ChatGPT, Gemini, Perplexity, Google AI Overviews) can find, understand, and recommend your brand. Crawls your website to check: schema.org structured data (JSON-LD), FAQ markup, heading hierarchy, entity mentions, answer-first content patterns, and trust signals (reviews, certifications, author info).' },
+            { icon: 'visibility', title: 'What You Get', description: 'An AI Visibility score with breakdown: Schema Readiness score (how well your structured data is set up), Content Clarity score (whether AI can extract clear answers from your pages), Entity Strength score (whether AI recognizes your brand as an entity), and Trust Signals score. AI-ready templates with copy-paste examples. Priority actions ranked by impact. Specific advice for Google AI Overviews, ChatGPT, and Perplexity separately.' },
+            { icon: 'checklist', title: 'How To Use Results', description: 'Implement the suggested schema markup and FAQ blocks on your website — these are the #1 signals AI models use when deciding which brands to mention. Use the priority actions list in order — they\'re ranked by impact. After implementing changes, run Auto-Fix Code to get the exact HTML/JSON-LD code to paste into your website.' },
+            { icon: 'schedule', title: 'When To Run', description: 'Run alongside Health Check as part of your initial audit. Re-run after adding schema markup or FAQ pages to verify improvement. Critical for brands in competitive industries where AI search is growing (e-commerce, SaaS, local services).' },
+        ]
+    },
+    {
+        id: 'site-audit',
+        icon: 'bug_report',
+        color: '#ef4444',
+        title: '🔍 Site Audit',
+        subtitle: 'Deep technical SEO crawl with issue-by-issue analysis',
+        steps: [
+            { icon: 'info', title: 'What It Does', description: 'Deep technical crawl of your website that analyzes every aspect of your technical SEO: broken links (404s), missing/duplicate meta tags, slow-loading pages, mobile usability issues, missing alt tags on images, orphan pages (no internal links), duplicate content, redirect chains, missing canonical tags, and XML sitemap issues.' },
+            { icon: 'bug_report', title: 'What You Get', description: 'A categorized list of technical issues with severity badges (Critical, High, Medium, Low). Each issue includes: what\'s wrong, which page is affected, why it matters for rankings, and exactly how to fix it. Issues are grouped by category (indexability, performance, content, links, mobile, schema) so you can tackle them systematically.' },
+            { icon: 'checklist', title: 'How To Use Results', description: 'Work through issues top-down by severity. Critical issues should be fixed same-day (they actively hurt your rankings). High issues within a week. Medium issues within a month. After fixing, re-run the audit to confirm the issue count dropped. Share the report with your developer — each issue has clear fix instructions.' },
+        ]
+    },
+    {
+        id: 'on-page',
+        icon: 'tune',
+        color: '#06b6d4',
+        title: '🔧 On-Page Fixer',
+        subtitle: 'Page-level optimization for any URL on your site',
+        steps: [
+            { icon: 'info', title: 'What It Does', description: 'Analyzes a specific page URL from your website in deep detail. Checks the page\'s: title tag (length, keyword placement, click-worthiness), meta description (length, call-to-action, keyword inclusion), heading structure (H1-H6 hierarchy, keyword usage), content quality (length, readability, keyword density, uniqueness), internal links (are you linking to this page from other pages?), image optimization (alt tags, file sizes, lazy loading), and schema markup presence.' },
+            { icon: 'tune', title: 'What You Get', description: 'Page-specific optimization recommendations with before/after examples. Suggested title tag rewrites. Meta description improvements. Heading structure recommendations. Internal linking suggestions — which other pages on your site should link to this page. Keyword density analysis showing if you\'re under-optimizing or keyword-stuffing. Content improvement suggestions with specific sections to add or rewrite.' },
+            { icon: 'checklist', title: 'How To Use Results', description: 'Use this for your most important pages — product pages, landing pages, homepage, category pages. Apply the title/meta suggestions first (quickest win). Then improve heading structure and add missing schema. Great for pre-launch auditing of new pages before they go live.' },
+        ]
+    },
+    {
+        id: 'auto-fix',
+        icon: 'build',
+        color: '#14b8a6',
+        title: '⚡ Auto-Fix Code',
+        subtitle: 'Copy-paste code fixes — no coding needed',
+        steps: [
+            { icon: 'info', title: 'What It Does', description: 'Takes the issues found by Health Check or Site Audit and generates ready-to-paste code fixes for each one. Creates: schema.org JSON-LD blocks (Organization, FAQ, Product, Article, LocalBusiness), corrected meta tags, proper heading structure HTML, FAQ page markup, Open Graph tags, and Twitter Card tags. All code is specific to YOUR brand and website.' },
+            { icon: 'code', title: 'What You Get', description: 'For each issue: a code block you can copy and paste directly into your website\'s HTML. The code is production-ready — not templates with placeholders, but actual code with your brand name, URLs, and content pre-filled. Includes instructions on exactly where to paste each block (e.g., "Add this inside <head>" or "Place this before </body>").' },
+            { icon: 'checklist', title: 'How To Use Results', description: 'Copy each code block and paste it into your website. If you use WordPress, paste into your theme\'s header.php or use a plugin like "Insert Headers and Footers." If you use Shopify, paste into theme.liquid. No technical knowledge needed — just copy and paste. Verify the fixes worked by re-running Health Check.' },
+            { icon: 'warning', title: 'Prerequisite', description: 'You must run Health Check or Site Audit first. Auto-Fix uses the issues they found to generate fixes. If you run Auto-Fix without a prior audit, it will tell you to run Health Check first.' },
+        ]
+    },
+    {
+        id: 'keywords',
+        icon: 'key',
+        color: '#f59e0b',
+        title: '🔑 Keyword Intelligence',
+        subtitle: 'Deep keyword research with volume, difficulty & intent',
+        steps: [
+            { icon: 'info', title: 'What It Does', description: 'Performs deep keyword research based on your website\'s content and industry. Goes beyond basic keyword suggestions — clusters keywords by topic theme so you can build topical authority (which Google rewards over targeting isolated keywords). Analyzes search intent to ensure you create the right type of content for each keyword.' },
+            { icon: 'key', title: 'What You Get', description: 'Keyword clusters organized by topic (e.g., "cloud security," "data backup," "compliance"). Each cluster shows: estimated monthly search volume, competition difficulty (easy/medium/hard), search intent (informational, transactional, navigational, commercial), opportunity score combining volume vs. difficulty, and suggested content type (blog post, product page, FAQ, guide). Also shows long-tail variations within each cluster.' },
+            { icon: 'checklist', title: 'How To Use Results', description: 'Pick 3-5 keyword clusters to focus on first. For each cluster, create a "pillar page" (comprehensive guide) and 5-10 supporting articles. This builds topical authority. Target easy/medium difficulty keywords first for quicker wins. Match content type to search intent — a "how to" keyword needs a tutorial, not a product page.' },
+        ]
+    },
+    {
+        id: 'content-gaps',
+        icon: 'article',
+        color: '#10b981',
+        title: '📝 Content Gaps',
+        subtitle: 'Topics competitors rank for that you don\'t',
+        steps: [
+            { icon: 'info', title: 'What It Does', description: 'Compares your website\'s content against your mapped competitors to find topics and keywords they cover but you don\'t. These are your content gaps — opportunities where creating a single piece of content could capture traffic your competitors are already getting. Also identifies thin content on your site that needs improvement.' },
+            { icon: 'article', title: 'What You Get', description: 'A prioritized list of content gaps with: the topic/keyword your competitors rank for, which competitor(s) cover it, estimated traffic you\'re missing out on, a content brief (what to write, what to cover, suggested heading structure, target length), and how to make your version better than the existing top results (10x content strategy).' },
+            { icon: 'checklist', title: 'How To Use Results', description: 'Prioritize gaps by traffic potential — start with the highest-volume topics. Use the content briefs as your writing blueprint. Don\'t just copy competitors — the content brief shows how to add unique value (original data, case studies, expert quotes). Create 2-3 gap-filling articles per month for steady traffic growth.' },
+            { icon: 'warning', title: 'Prerequisite', description: 'Add at least 2-3 competitors in the Setup section first. The more competitors you map, the more gaps will be discovered. Use "Auto-Discover" if you don\'t know your competitors.' },
+        ]
+    },
+    {
+        id: 'geo',
+        icon: 'travel_explore',
+        color: '#6366f1',
+        title: '🌐 GEO — Generative Engine Optimization',
+        subtitle: 'Unified AI search strategy across all AI engines',
+        steps: [
+            { icon: 'info', title: 'What It Does', description: 'GEO (Generative Engine Optimization) is the next-gen version of SEO focused specifically on AI search engines. It combines the insights from AI Visibility, LLM Probe, and Prompt Mining into a single unified dashboard. Shows your brand\'s position across ALL generative AI search engines — Google AI Overviews, ChatGPT, Gemini, Perplexity, Claude — with a coordinated strategy to improve your citation rate across all of them simultaneously.' },
+            { icon: 'travel_explore', title: 'What You Get', description: 'A unified GEO score showing your overall AI search visibility. Breakdown by each AI engine showing where you\'re strong vs. weak. Cross-engine optimization strategies that work across all AI platforms (not just one). Content format recommendations that maximize AI citations. Entity establishment strategies to make AI models recognize your brand as an authority in your space.' },
+            { icon: 'checklist', title: 'How To Use Results', description: 'Focus on cross-engine wins first — optimizations that improve your visibility on ALL AI platforms simultaneously (structured data, FAQ schema, authoritative content). Then address engine-specific gaps. GEO is most valuable for brands in competitive categories where AI search is growing rapidly (e-commerce, SaaS, health, finance, education).' },
+            { icon: 'schedule', title: 'When To Run', description: 'Run after you\'ve done AI Visibility and LLM Probe individually. GEO gives you the big picture and unified strategy. Re-run quarterly to track how your AI search presence is evolving.' },
+        ]
+    },
+    {
+        id: 'llm-probe',
+        icon: 'psychology',
+        color: '#06b6d4',
+        title: '🧠 LLM Brand Probe',
+        subtitle: 'Live test — what do AI models say about your brand?',
+        steps: [
+            { icon: 'info', title: 'What It Does', description: 'Performs a live test by asking multiple AI models (ChatGPT, Gemini, Claude) questions about your brand and industry. It\'s like Googling your brand — but on AI search engines. Checks: Do they mention your brand? How accurately do they describe you? What\'s the sentiment (positive/negative/neutral)? Which competitors do they recommend instead? What information are they missing or getting wrong?' },
+            { icon: 'psychology', title: 'What You Get', description: 'A visibility score showing how well AI models know your brand. Accuracy assessment — is the information AI gives about you correct? Sentiment analysis — are AI models positive, negative, or neutral about your brand. Competitor comparison — who AI recommends instead of you and why. Information gaps — what AI doesn\'t know about you that it should. Specific recommendations for what content to create to improve your AI profile.' },
+            { icon: 'checklist', title: 'How To Use Results', description: 'If AI models don\'t mention you: Focus on entity establishment — create authoritative "About Us" content, get mentioned in industry publications, add comprehensive FAQ pages. If AI mentions you incorrectly: Create clear, factual content that AI can source from. If competitors are mentioned instead: Create comparison content, strengthen your content on topics where competitors dominate.' },
+            { icon: 'schedule', title: 'When To Run', description: 'Run when you first set up your brand to establish a baseline. Then re-run after creating content specifically designed to improve AI visibility (FAQ pages, schema markup, authoritative articles). Expect 60-90 days before changes are reflected in AI model responses.' },
+        ]
+    },
+    {
+        id: 'prompt-mining',
+        icon: 'chat_bubble',
+        color: '#f97316',
+        title: '⛏️ AI Prompt Mining',
+        subtitle: 'Keyword research for AI search — what people ask ChatGPT about you',
+        steps: [
+            { icon: 'info', title: 'What It Does', description: 'Discovers 15-20 real-world questions that users are likely asking AI assistants (ChatGPT, Gemini, Perplexity) about your industry and niche. For each question, it evaluates whether your brand is currently being cited in AI responses, and if not, specifically WHY — missing content, no FAQ page, competitors have better structured data, weak entity signals, etc.' },
+            { icon: 'chat_bubble', title: 'What You Get', description: 'A Citation Score (0-100) showing how visible your brand is across AI-generated answers. Category breakdown (Product Recommendations, How-To Guides, Comparison Queries, Industry Guides) with prompt counts and opportunity levels. Each individual mined prompt with: cited/not-cited status, priority (critical/high/medium), why you\'re not cited, what content to create, which competitors ARE cited. Quick Wins — low-effort actions for fast results. A 4-week Content Calendar with specific content pieces to create each week, including title, format, and target prompts. Strategic Optimizations with KPIs, baselines, targets, and timelines.' },
+            { icon: 'checklist', title: 'How To Use Results', description: 'This is keyword research for AI search. Start with Quick Wins (low effort, high impact). Then follow the 4-week Content Calendar — each week has themed content pieces targeting specific prompts. Create FAQ pages, comparison guides, and how-to articles that directly answer the mined prompts. After creating the content, re-run Prompt Mining in 60-90 days to check if your citation score improved.' },
+            { icon: 'schedule', title: 'When To Run', description: 'Run after LLM Probe to understand WHERE your brand is missing in AI search. Re-run every 60-90 days — as you publish new content, your citation score should increase. This is the most actionable AI SEO tool because it tells you exactly what to create.' },
+        ]
+    },
+    {
+        id: 'competitors',
+        icon: 'swords',
+        color: '#f59e0b',
+        title: '⚔️ Beat Competitors',
+        subtitle: 'Competitor gap analysis with outrank strategies',
+        steps: [
+            { icon: 'person_add', title: 'Prerequisites', description: 'Add competitors first! Go to Setup (gear icon, sidebar bottom) and add competitor URLs. Or click "Auto-Discover" to let AI find your top 3-5 competitors based on your industry. You can have up to 8 competitors mapped. The more you add, the richer the analysis.' },
+            { icon: 'info', title: 'What It Does', description: 'Crawls both your website AND your competitors\' websites. Analyzes each competitor\'s strengths and weaknesses compared to yours. Identifies exactly why they outrank you on specific keywords — is it better content, more backlinks, better schema markup, faster pages, or stronger topical authority?' },
+            { icon: 'swords', title: 'What You Get', description: 'Competitor profiles with strength/weakness analysis. "Why They Win" section explaining specific ranking advantages with evidence from the crawl. Keyword battles showing who ranks for what. Gap opportunities — topics NO competitor covers well (blue ocean opportunities). An outrank plan with prioritized actions, timelines, and expected outcomes. Content ideas that would beat specific competitor pages.' },
+            { icon: 'checklist', title: 'How To Use Results', description: 'Focus on the outrank plan — it\'s prioritized by impact. Start with "quick-fix" items. Use gap opportunities to create content with no competition. For keyword battles, create better content on topics where you\'re close to ranking. The "Why They Win" insights show you what to copy and what to improve upon.' },
+        ]
+    },
+    {
+        id: 'warroom',
+        icon: 'shield',
+        color: '#f43f5e',
+        title: '🛡️ Competitor War Room',
+        subtitle: 'Side-by-side scoring matrix & 90-day battle plan',
+        steps: [
+            { icon: 'info', title: 'What It Does', description: 'Unlike Beat Competitors (which analyzes each competitor individually), War Room puts ALL your competitors side-by-side in a scoring matrix. Compares you against every competitor simultaneously across: keyword coverage, content quality, technical SEO, schema markup, content velocity (how often they publish), backlink authority, and AI readiness.' },
+            { icon: 'shield', title: 'What You Get', description: 'A competitive scoring matrix — see at a glance where you lead and where you trail. Keyword overlap analysis showing shared vs. unique keywords. Content velocity comparison — who publishes most frequently. Technical advantage comparison. A full 90-day battle plan broken into monthly phases with specific actions, targets, and expected outcomes. Defensive strategy (protecting current rankings) and offensive strategy (capturing competitor traffic).' },
+            { icon: 'checklist', title: 'How To Use Results', description: 'Use the scoring matrix to identify your biggest competitive weaknesses. Follow the 90-day battle plan month by month — it\'s structured as Month 1 (foundations), Month 2 (growth), Month 3 (domination). Share War Room results with your content team as a competitive intelligence brief. Re-run quarterly to track competitive position changes.' },
+        ]
+    },
+    {
+        id: 'backlinks',
+        icon: 'link',
+        color: '#3b82f6',
+        title: '🔗 Backlink Intelligence',
+        subtitle: 'Backlink profile analysis & link building opportunities',
+        steps: [
+            { icon: 'info', title: 'What It Does', description: 'Analyzes your website\'s backlink profile and compares it against competitors. Identifies high-quality link building opportunities, toxic links that could hurt your rankings, and gaps where competitors have links but you don\'t.' },
+            { icon: 'link', title: 'What You Get', description: 'Backlink profile overview with estimated domain authority. High-value link opportunities — websites that link to competitors but not to you. Toxic link warnings — low-quality links that could trigger penalties. Link building strategies tailored to your industry (guest posting, resource pages, PR mentions, directory listings). Competitor backlink comparison showing their best link sources.' },
+            { icon: 'checklist', title: 'How To Use Results', description: 'Start with the high-value link opportunities — these are proven link sources since they already link to competitors. Reach out to these sites with better content. Disavow toxic links through Google Search Console. Follow the link building strategy month by month. Quality over quantity — 1 link from a high-authority site is worth more than 100 from low-quality directories.' },
+        ]
+    },
+    {
+        id: 'analytics',
+        icon: 'monitoring',
+        color: '#3b82f6',
+        title: '📊 Google Analytics & Search Console',
+        subtitle: 'Real traffic data from your connected accounts',
+        steps: [
+            { icon: 'link', title: 'How To Connect', description: 'Go to Integrations hub (main sidebar → Integrations) and connect your Google Analytics and Search Console accounts via Google OAuth. Once connected, SEO Studio automatically reads your data — no additional setup needed. The connection is brand-specific.' },
+            { icon: 'bar_chart', title: 'GA4 Dashboard', description: 'Select your GA4 property to see last 30 days of: Users, Sessions, Page Views, Bounce Rate with trend indicators (up/down from last period). A daily traffic chart showing trends. Traffic channel breakdown (organic search, direct, social media, referral, paid). Your top-performing pages ranked by views.' },
+            { icon: 'search', title: 'Search Console Data', description: 'Select your Search Console site to see: Total Clicks, Impressions, Average Position, Average CTR. Your top keywords with their exact SERP positions — this is the most accurate keyword ranking data available. Top pages by click volume. Use this data to validate the AI-generated recommendations — it\'s your ground-truth SEO performance data.' },
+            { icon: 'schedule', title: 'When To Check', description: 'Check weekly to monitor trends. Look for: organic traffic growth after implementing fixes, keyword position improvements, and new keywords you\'re ranking for. This data grounds all AI analysis in reality — much more valuable than estimates.' },
+        ]
+    },
+    {
+        id: 'reports',
+        icon: 'summarize',
+        color: '#64748b',
+        title: '📋 Reports & Overview',
+        subtitle: 'Generated reports, overview dashboard, and saved analyses',
+        steps: [
+            { icon: 'space_dashboard', title: 'Overview Dashboard', description: 'Shows a consolidated view of all your SEO metrics from previous analyses. Quick access cards for each tool showing last-run date and key scores. A bird\'s-eye view of your entire SEO position without re-running individual tools.' },
+            { icon: 'summarize', title: 'Reports & Plans', description: 'Access all previously generated PDF reports. Each report captures a snapshot of your SEO status at a point in time. Use reports to: track progress over months, share with team members or clients, and compare before/after implementing fixes.' },
+            { icon: 'picture_as_pdf', title: 'How To Generate', description: 'After running any workflow, click "Generate Report" in the top-right toolbar. The report is generated as a PDF and saved to this section. You can generate multiple reports over time to track your SEO journey.' },
         ]
     },
 ]
 
 const SEO_PRO_TIPS = [
-    { icon: '📊', tip: 'Run Health Check first — it gives you the baseline scores that all other workflows build upon.' },
-    { icon: '🔍', tip: 'Use the Ask Bar for quick questions before running a full workflow. It often has the answer you need.' },
-    { icon: '⚔️', tip: 'Map at least 3 competitors before running Beat Competitors or War Room for the best results.' },
-    { icon: '🤖', tip: 'AI Visibility is the future of SEO. Run LLM Probe and Prompt Mining to get ahead of competitors.' },
-    { icon: '🔧', tip: 'After Health Check, immediately run Auto-Fix. It generates copy-paste code you can implement instantly.' },
-    { icon: '📊', tip: 'Connect Google Analytics & Search Console to ground your AI analysis in real traffic data.' },
+    { icon: '🏥', tip: 'Day 1 workflow: Health Check → Auto-Fix → implement code → re-run to verify. This alone can boost your SEO score 10-20 points.' },
+    { icon: '🔍', tip: 'Use the Ask Bar for quick questions before running full workflows — it analyzes your site and often has the answer in seconds.' },
+    { icon: '⚔️', tip: 'Map at least 3-5 competitors before running Beat Competitors or War Room. More competitors = richer competitive intelligence.' },
+    { icon: '🤖', tip: 'AI Search is the future: run LLM Probe → see how AI sees you → run Prompt Mining → create content to fix gaps → re-run in 90 days.' },
+    { icon: '🔧', tip: 'Auto-Fix Code turns audit findings into copy-paste HTML. Run Health Check → Auto-Fix → paste code into your site. No developer needed.' },
+    { icon: '📊', tip: 'Connect GA & Search Console to ground AI analysis in real data. Estimates are helpful; real traffic data is the truth.' },
+    { icon: '⛏️', tip: 'Prompt Mining is keyword research for AI search. Re-run every 60-90 days — your citation score should improve as you publish.' },
+    { icon: '📋', tip: 'The optimal sequence: Health Check → Auto-Fix → Map Competitors → Get Traffic → AI Visibility → Prompt Mining → Content Gaps → Repeat.' },
+    { icon: '🎯', tip: 'Keywords tool clusters keywords by topic. Build "pillar pages" for each cluster — Google rewards topical authority over isolated articles.' },
+    { icon: '🌐', tip: 'GEO combines AI Visibility + LLM Probe + Prompt Mining into one view. Use it for the big picture after individual tools give details.' },
 ]
 
 function SeoHelpView({ onBack }) {

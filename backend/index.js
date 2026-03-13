@@ -49,6 +49,7 @@ import funnelIntelligenceRoutes from './routes/funnel-intelligence.js';
 import funnelAutomationRoutes from './routes/funnel-automation.js';
 import funnelWebhookRoutes from './routes/funnel-webhooks.js';
 import mediaUploadRoutes from './routes/mediaUpload.js';
+import studioReportRoutes from './routes/studio-reports.js';
 
 const app = express();
 
@@ -203,6 +204,7 @@ app.use('/api/funnel-intelligence', funnelIntelligenceRoutes);
 app.use('/api/funnel-automation', funnelAutomationRoutes);
 app.use('/api/funnel-webhooks', funnelWebhookRoutes);
 app.use('/api/media', mediaUploadRoutes);
+app.use('/api/studio-reports', studioReportRoutes);
 app.use('/api/intel/missions', intelMissionRoutes);
 
 // Health check

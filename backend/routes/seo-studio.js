@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { protect, optionalAuth } from '../middleware/auth.js';
 import { requireStudio } from '../middleware/studioAccess.js';
-import { requireCredits } from '../middleware/credits.js';
+import { requireCredits, logTokenUsage } from '../middleware/credits.js';
 import Brand from '../models/Brand.js';
+import SeoAudit from '../models/SeoAudit.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import {
   researchDomain, researchCompetitors,
   formatSiteResearch, formatCompetitorResearch,
+  discoverBacklinks, analyzeCompetitorLinkProfile,
 } from '../utils/web-research.js';
 
 const router = Router();
@@ -15,8 +17,13 @@ const router = Router();
 // AI CALL HELPER
 // ============================================================================
 
+// Track last AI call's token usage for downstream logging
+let lastTokenUsage = null;
+export function getLastTokenUsage() { return lastTokenUsage; }
+
 async function aiCall(systemPrompt, userPrompt, options = {}) {
   const { temperature = 0.7, maxTokens = 8192, json = false } = options;
+  lastTokenUsage = null;
 
   // Try OpenAI first
   if (process.env.OPENAI_API_KEY) {
@@ -32,7 +39,10 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
         }),
       });
       const data = await resp.json();
-      if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
+      if (data.choices?.[0]?.message?.content) {
+        lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'gpt-4o-mini', provider: 'openai' };
+        return data.choices[0].message.content;
+      }
       if (data.error) console.warn('GPT-4o-mini failed:', data.error.message);
     } catch (e) { console.warn('GPT-4o-mini error:', e.message); }
   }
@@ -52,7 +62,10 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
         }),
       });
       const data = await resp.json();
-      if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
+      if (data.choices?.[0]?.message?.content) {
+        lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'grok-3-mini-fast', provider: 'xai' };
+        return data.choices[0].message.content;
+      }
       if (data.error) console.warn('Grok failed:', data.error.message);
     } catch (e) { console.warn('Grok error:', e.message); }
   }
@@ -80,7 +93,10 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
         );
         const data = await resp.json();
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return text;
+        if (text) {
+          lastTokenUsage = { inputTokens: data.usageMetadata?.promptTokenCount || 0, outputTokens: data.usageMetadata?.candidatesTokenCount || 0, model, provider: 'gemini' };
+          return text;
+        }
         if (data.error) console.warn(`Gemini ${model}:`, data.error.message);
       } catch (e) { console.warn(`Gemini ${model} error:`, e.message); }
     }
@@ -212,13 +228,14 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
 
     const userPrompt = `Analyze site: ${website}`;
     const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192 });
+    // Log token usage from this AI call
+    if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: req.creditAction || 'seoHealthCheck', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
 
     // Save audit
     if (req.user) {
       try {
-        const SeoAudit = (await import('../models/SeoAudit.js')).default;
         await SeoAudit.create({
           user: req.user._id,
           brand: brand?._id || brandPayload?._id,
@@ -334,6 +351,17 @@ Generate 5-8 keyword clusters. For each, explain WHY it matters strategically. T
     const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192 });
     const parsed = parseJSON(result);
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
+
+    // Save to SeoAudit for persistence
+    if (req.user && brand?._id) {
+      try {
+        await SeoAudit.findOneAndUpdate(
+          { user: req.user._id, brand: brand._id, type: 'traffic' },
+          { results: parsed, url: website, status: 'completed' },
+          { upsert: true, new: true }
+        );
+      } catch (dbErr) { console.warn('Could not save traffic audit:', dbErr.message); }
+    }
 
     res.json({ success: true, ...parsed });
   } catch (error) {
@@ -452,6 +480,17 @@ Be STRATEGIC and SPECIFIC. Every insight must have a WHY and an actionable HOW. 
       ...(siteResearch.pages?.map(p => p.url) || [website]),
       ...allCompetitorUrls,
     ];
+
+    // Save to SeoAudit for persistence
+    if (req.user && brand?._id) {
+      try {
+        await SeoAudit.findOneAndUpdate(
+          { user: req.user._id, brand: brand._id, type: 'competitors' },
+          { results: parsed, url: website, status: 'completed' },
+          { upsert: true, new: true }
+        );
+      } catch (dbErr) { console.warn('Could not save competitors audit:', dbErr.message); }
+    }
 
     // Auto-save discovered competitors to brand if authenticated
     if (brand && parsed.discoveredCompetitors?.length && !storedCompetitors.length) {
@@ -581,6 +620,19 @@ Respond in JSON:
   "priorityActions": [
     { "priority": 1, "action": "What to do", "impact": "high|medium", "effort": "quick-fix|moderate|major", "details": "Step by step", "whyThisOrder": "Why this should be done first", "expectedOutcome": "What will change in AI visibility" }
   ],
+  "optimizations": [
+    {
+      "title": "Specific, actionable optimization — NOT generic advice like 'Improve content'",
+      "description": "Exact steps to implement this optimization with tool/code references",
+      "priority": "critical|high|medium",
+      "kpi": "The exact metric to measure (e.g., 'FAQ schema count', 'AI Overview citation rate', 'Schema validation score')",
+      "baseline": "Current measured value from crawl data (e.g., '0 FAQ schemas found', '2 of 10 pages have JSON-LD')",
+      "target": "Specific measurable target (e.g., 'FAQ schema on top 5 landing pages', '100% pages with Organization schema')",
+      "timeline": "Realistic timeline to implement (e.g., '3 days', '1 week', '2 weeks')",
+      "proofMethod": "How to verify this worked (e.g., 'Re-run AI Visibility scan — schemaReadiness score should increase by 15-25 points', 'Check Google Rich Results Test for FAQ snippets')",
+      "expectedROI": "Business outcome (e.g., '10-20% increase in AI Overview citations within 30 days', 'Rich snippet appearance for 5 target queries')"
+    }
+  ],
   "contentPatterns": [
     { "pattern": "Content pattern name", "description": "How to implement", "example": "Brief example", "aiAdvantage": "Why AI models prefer content formatted this way" }
   ],
@@ -592,12 +644,28 @@ Respond in JSON:
   "crawlFindings": "Summary of what the crawl revealed about AI readiness"
 }
 
-Be STRATEGIC. Every recommendation must explain WHY it matters for AI visibility specifically, not just general SEO.`;
+STRATEGIC RULES (MANDATORY):
+1. NEVER give generic advice like 'Enhance User Engagement' or 'Leverage Influencer Marketing' — these are worthless
+2. Every optimization MUST reference specific crawl data findings
+3. Every optimization MUST have a measurable KPI with a baseline (from crawl) and a target
+4. Every optimization MUST explain HOW TO PROVE it worked after implementation
+5. Think like a consultant billing $500/hour — every recommendation must justify its existence with data`;
 
     const userPrompt = `AI Visibility audit for: ${website}`;
     const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192 });
     const parsed = parseJSON(result);
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
+
+    // Save to SeoAudit for persistence
+    if (req.user && brand?._id) {
+      try {
+        await SeoAudit.findOneAndUpdate(
+          { user: req.user._id, brand: brand._id, type: 'ai-visibility' },
+          { results: parsed, url: website, status: 'completed' },
+          { upsert: true, new: true }
+        );
+      } catch (dbErr) { console.warn('Could not save AI visibility audit:', dbErr.message); }
+    }
 
     res.json({ success: true, ...parsed });
   } catch (error) {
@@ -754,6 +822,712 @@ CRITICAL: Only include REAL existing companies. Do not make up fictional compani
     }
 
     res.json({ success: true, competitors: brand.competitors });
+  } catch (error) {
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+
+// ============================================================================
+// BACKLINK INTELLIGENCE — Agentic multi-phase backlink crawler
+// ============================================================================
+
+router.post('/backlinks', protect, requireCredits('seoBacklinks'), async (req, res) => {
+  try {
+    const { url, brand: brandPayload, brandId } = req.body;
+
+    const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
+    const website = brand?.website || url || brandPayload?.website;
+    if (!website) return res.status(400).json({ success: false, error: 'No website URL available. Please add a website to your brand.' });
+
+    const brandContext = buildBrandContext(brand || brandPayload);
+    let normalizedUrl = website.trim();
+    if (!/^https?:\/\//i.test(normalizedUrl)) normalizedUrl = `https://${normalizedUrl}`;
+    let brandDomain;
+    try { brandDomain = new URL(normalizedUrl).hostname.replace(/^www\./, ''); } catch { brandDomain = website; }
+
+    console.log(`\n🔗 === BACKLINK INTELLIGENCE: ${brandDomain} ===`);
+
+    // ── PHASE 1: Crawl brand site ──
+    console.log(`🔗 Phase 1: Crawling ${normalizedUrl} for link profile...`);
+    const siteResearch = await researchDomain(normalizedUrl);
+    const siteData = formatSiteResearch(siteResearch);
+
+    // Extract outbound link data
+    const si = siteResearch.siteIntelligence || {};
+    const outboundDomains = si.externalDomains || [];
+    const internalLinkCount = si.internalLinkCount || 0;
+
+    // ── PHASE 2: Crawl competitors for link gap ──
+    const storedCompetitors = (brand?.competitors || []).map(c => c.url).filter(Boolean);
+    let competitorLinkProfiles = [];
+
+    if (storedCompetitors.length > 0) {
+      console.log(`🔗 Phase 2: Crawling ${storedCompetitors.length} competitors for link gap analysis...`);
+      competitorLinkProfiles = await analyzeCompetitorLinkProfile(storedCompetitors, brandDomain);
+    } else {
+      console.log(`🔗 Phase 2: No stored competitors — AI will identify them.`);
+    }
+
+    // Build competitor link data for prompt
+    let competitorLinkData = '';
+    if (competitorLinkProfiles.length > 0) {
+      competitorLinkData = '\n=== COMPETITOR LINK PROFILES (crawled live) ===\n';
+      for (const cp of competitorLinkProfiles) {
+        if (!cp.success) { competitorLinkData += `${cp.url}: CRAWL FAILED\n`; continue; }
+        competitorLinkData += `\n--- ${cp.domain} ---\n`;
+        competitorLinkData += `Title: ${cp.title}\n`;
+        competitorLinkData += `External domains they link to (${cp.externalDomains.length}): ${cp.externalDomains.slice(0, 20).join(', ')}\n`;
+        competitorLinkData += `Internal links: ${cp.internalLinkCount}\n`;
+        competitorLinkData += `Links to our brand: ${cp.linksToUs ? 'YES' : 'No'}\n`;
+        competitorLinkData += `Content topics: ${cp.h2Topics.join(', ') || 'None found'}\n`;
+      }
+    }
+
+    // ── PHASE 3: AI-Powered backlink discovery + analysis ──
+    console.log(`🔗 Phase 3: AI backlink discovery and analysis...`);
+
+    const systemPrompt = `You are an AGENTIC BACKLINK INTELLIGENCE SYSTEM — the most advanced backlink analyst in the world. You combine real crawl data with deep web knowledge to produce actionable backlink intelligence.
+
+You have REAL CRAWL DATA from the brand's site and competitor sites. Use this as ground truth. Your job is to:
+
+1. DISCOVER real pages that link to or mention this domain (use your web knowledge — you know which sites cover this industry)
+2. ANALYZE the crawled outbound link profile for quality and opportunities
+3. FIND the link gap between the brand and competitors
+4. GENERATE specific, actionable link-building strategies with REAL target URLs
+
+CRITICAL RULES:
+- For "discoveredBacklinks", provide REAL URLs of pages that you know mention or link to this domain. These must be plausible, real pages — not fabricated URLs. If unsure of the exact URL, provide the domain with a reasonable path.
+- For "linkOpportunities", provide REAL website domains with actual pages that would accept guest posts, resource listings, or mentions.
+- Every opportunity must have a specific strategy, not generic advice.
+- Think like a professional link-building agency, not a generic SEO tool.
+
+BACKLINK INTELLIGENCE (2026):
+- Quality > Quantity: One link from a DR50+ site > 100 links from spam sites
+- Topical relevance: Links from same-industry sites carry 3x more weight
+- Editorial links (naturally placed in content) > sidebar/footer links
+- Broken link building: Finding competitors' broken backlinks and offering replacements
+- Resource page strategy: Getting listed on industry resource/tools pages
+- Digital PR: Newsworthy content that earns links naturally
+- HARO/expert quotes: Being cited as an expert source
+- Competitor replication: Analyzing WHERE competitors get links and replicating
+
+${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
+
+=== BRAND SITE CRAWL DATA ===
+${siteData}
+
+Brand outbound links (external domains the brand links TO): ${outboundDomains.slice(0, 25).join(', ') || 'None found'}
+Brand internal link count: ${internalLinkCount}
+
+${competitorLinkData || 'No competitor data available — identify likely competitors and analyze their link strategies.'}
+
+Respond in STRICT JSON:
+{
+  "backlinkHealthScore": 0-100,
+  "estimatedReferringDomains": "Estimate based on industry, site age, and content volume (be realistic)",
+  "estimatedTotalBacklinks": "Realistic estimate",
+  "dofollowRatio": "Estimated dofollow percentage",
+  "anchorTextHealth": "natural|over-optimized|under-optimized",
+  "summary": "3-4 sentence strategic backlink analysis. What's strong, what's weak, what's the #1 priority.",
+  "strategicBrief": "2-3 paragraph analysis for the brand owner. Explain their backlink situation, competitive position, and the single most impactful link-building strategy to pursue.",
+
+  "discoveredBacklinks": [
+    {
+      "sourceUrl": "Real URL of the page that links to or mentions the brand",
+      "sourceDomain": "domain.com",
+      "anchorText": "Estimated or known anchor text",
+      "linkType": "dofollow|nofollow|mention",
+      "estimatedAuthority": "high|medium|low",
+      "context": "How/why this page links to the brand (e.g., 'Listed in agency directory', 'Mentioned in industry roundup')",
+      "status": "likely-live|unverified",
+      "category": "directory|editorial|resource|social|press|citation|forum"
+    }
+  ],
+
+  "competitorLinkGap": [
+    {
+      "domain": "Domain that links to competitors but NOT to brand",
+      "competitorLinkedFrom": "Which competitor benefits",
+      "pageType": "blog|resource|directory|press|review",
+      "estimatedAuthority": "high|medium|low",
+      "howToGetLink": "Specific action plan to get a link from this domain",
+      "difficulty": "easy|medium|hard",
+      "impactScore": 1-10
+    }
+  ],
+
+  "linkOpportunities": [
+    {
+      "targetUrl": "Real URL or domain to target",
+      "type": "guest-post|resource-page|broken-link|digital-pr|haro|directory|partnership|testimonial|podcast|interview",
+      "title": "Opportunity name",
+      "description": "Why this is a good opportunity and how to approach it",
+      "estimatedAuthority": "high|medium|low",
+      "difficulty": "easy|medium|hard",
+      "impactScore": 1-10,
+      "strategy": "Step-by-step approach to secure this link",
+      "estimatedTimeline": "1 week|2 weeks|1 month|3 months",
+      "suggestedAnchors": ["Anchor text 1", "Anchor text 2"]
+    }
+  ],
+
+  "toxicRisks": [
+    {
+      "concern": "Description of potential toxic link risk",
+      "severity": "high|medium|low",
+      "action": "What to do about it"
+    }
+  ],
+
+  "outreachTemplates": [
+    {
+      "type": "guest-post|broken-link|resource-page|partnership|expert-quote",
+      "subject": "Email subject line",
+      "body": "Complete email template with [BRAND], [SITE], [NAME] placeholders",
+      "whenToUse": "Which opportunities this template targets",
+      "successRate": "Expected response rate (e.g., '5-10%')"
+    }
+  ],
+
+  "internalLinkingIssues": [
+    {
+      "issue": "Internal linking problem found from crawl data",
+      "fix": "How to fix it",
+      "impact": "Why it matters for PageRank distribution"
+    }
+  ],
+
+  "anchorTextStrategy": {
+    "currentState": "Assessment of anchor text diversity from crawl",
+    "recommendations": ["Anchor text diversification recommendations"],
+    "idealDistribution": { "branded": "40-50%", "topical": "20-30%", "naked-url": "10-15%", "generic": "10-15%", "exact-match": "5-10%" }
+  },
+
+  "thirtyDayPlan": [
+    { "week": 1, "focus": "Week theme", "actions": ["Action 1", "Action 2"], "expectedLinks": "How many links to target" },
+    { "week": 2, "focus": "Week theme", "actions": ["Action 1", "Action 2"], "expectedLinks": "Target" },
+    { "week": 3, "focus": "Week theme", "actions": ["Action 1", "Action 2"], "expectedLinks": "Target" },
+    { "week": 4, "focus": "Week theme", "actions": ["Action 1", "Action 2"], "expectedLinks": "Target" }
+  ],
+
+  "quickWins": [
+    { "action": "Quick link-building win", "estimatedTime": "1-2 hours|1 day|1 week", "expectedImpact": "high|medium", "whyQuick": "Why this can be done fast" }
+  ]
+}
+
+Generate 5-15 discovered backlinks (real URLs you know of), 5-10 competitor link gaps, 8-15 link opportunities, 3-4 outreach templates, and 4-week plan. Be STRATEGIC and SPECIFIC — think like a link-building agency, not a checklist tool.`;
+
+    const userPrompt = `Complete backlink intelligence analysis for: ${brandDomain} (${normalizedUrl})`;
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192 });
+    const parsed = parseJSON(result);
+
+    // ── PHASE 4: Try to verify top discovered backlinks ──
+    const discoveredUrls = (parsed.discoveredBacklinks || [])
+      .filter(b => b.sourceUrl && b.sourceUrl.startsWith('http'))
+      .map(b => b.sourceUrl)
+      .slice(0, 5);
+
+    let verificationResults = null;
+    if (discoveredUrls.length > 0) {
+      console.log(`🔗 Phase 4: Verifying ${discoveredUrls.length} discovered backlinks...`);
+      try {
+        verificationResults = await discoverBacklinks(discoveredUrls, brandDomain);
+        // Update discovered backlinks with verification status
+        for (const vb of verificationResults.verified) {
+          const match = parsed.discoveredBacklinks.find(b => 
+            b.sourceUrl === vb.sourceUrl || b.sourceDomain === new URL(vb.sourceUrl).hostname.replace(/^www\./, '')
+          );
+          if (match) {
+            match.status = 'verified-live';
+            match.verifiedAnchorText = vb.anchorText;
+            match.verifiedLinkType = vb.linkType;
+          }
+        }
+      } catch (e) {
+        console.warn('Backlink verification failed:', e.message);
+      }
+    }
+
+    // Add crawl metadata
+    parsed.crawlMetadata = {
+      brandDomain,
+      pagesCrawled: (siteResearch.pages?.length || 0) + competitorLinkProfiles.length + (verificationResults?.crawled || 0),
+      competitorsAnalyzed: competitorLinkProfiles.filter(c => c.success).length,
+      backlinksVerified: verificationResults?.verified?.length || 0,
+      outboundDomains: outboundDomains.length,
+      timestamp: new Date().toISOString(),
+    };
+    parsed.researchSources = [
+      ...(siteResearch.pages?.map(p => p.url) || [normalizedUrl]),
+      ...competitorLinkProfiles.filter(c => c.success).map(c => c.url),
+    ];
+    // Log token usage from the AI call
+    if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: req.creditAction || 'seoBacklinks', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+
+    // Save to SeoAudit for persistence
+    if (req.user && brand?._id) {
+      try {
+        await SeoAudit.findOneAndUpdate(
+          { user: req.user._id, brand: brand._id, type: 'backlinks' },
+          { url: website, scores: { authorityScore: parsed.backlinkHealthScore || 0 }, results: parsed, status: 'completed', creditsUsed: req.creditsDeducted || 4 },
+          { upsert: true, new: true }
+        );
+      } catch (dbErr) { console.warn('Could not save backlink audit:', dbErr.message); }
+    }
+
+    console.log(`🔗 === BACKLINK INTELLIGENCE COMPLETE: ${brandDomain} ===\n`);
+    res.json({ success: true, ...parsed });
+  } catch (error) {
+    console.error('Backlink Intelligence error:', error);
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+
+// ============================================================================
+// COMPETITOR WAR ROOM — 90-day battle plan
+// ============================================================================
+
+router.post('/competitor-warroom', protect, requireCredits('seoWarRoom'), async (req, res) => {
+  try {
+    const { url, brand: brandPayload, brandId, competitorUrls } = req.body;
+
+    const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
+    const website = brand?.website || url || brandPayload?.website;
+    if (!website) return res.status(400).json({ success: false, error: 'No website URL available.' });
+
+    const brandContext = buildBrandContext(brand || brandPayload);
+
+    // Crawl brand site
+    console.log(`⚔️ War Room: crawling ${website}...`);
+    const siteResearch = await researchDomain(website);
+    const siteData = formatSiteResearch(siteResearch);
+
+    // Crawl competitors
+    const storedCompetitors = (brand?.competitors || []).map(c => c.url).filter(Boolean);
+    const providedCompetitors = (competitorUrls || []).filter(u => u.trim());
+    const allCompetitorUrls = [...new Set([...storedCompetitors, ...providedCompetitors])].slice(0, 5);
+
+    let competitorData = '';
+    if (allCompetitorUrls.length > 0) {
+      console.log(`⚔️ Crawling ${allCompetitorUrls.length} competitors...`);
+      const competitorResearch = await researchCompetitors(allCompetitorUrls);
+      competitorData = formatCompetitorResearch(competitorResearch);
+    }
+
+    const systemPrompt = `You are a COMPETITIVE WAR ROOM STRATEGIST — create a 90-day battle plan to systematically outrank competitors. You have REAL CRAWL DATA.
+
+${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
+
+=== BRAND SITE ===
+${siteData}
+
+${competitorData || 'No competitors provided — identify top 3 competitors.'}
+
+Respond in STRICT JSON:
+{
+  "summary": "3-4 sentence strategic war room brief",
+  "competitivePosition": "winning|competitive|behind|far-behind",
+  "threatAssessment": "Top strategic threat to the brand's SEO position",
+  "scoringMatrix": [
+    { "category": "Technical SEO|Content|Authority|AI Visibility|Speed", "yourScore": 0-100, "avgCompetitorScore": 0-100, "verdict": "ahead|tied|behind", "actions": ["Action to maintain/improve"] }
+  ],
+  "keywordBattles": [
+    { "keyword": "keyword", "yourStatus": "ranking|attempting|absent", "competitorStatus": "dominant|present|absent", "battlePlan": "How to win this keyword", "difficulty": "easy|medium|hard", "priority": "critical|high|medium" }
+  ],
+  "ninetyDayPlan": [
+    { "month": 1, "theme": "Foundation", "goals": ["Goal 1"], "weeklyActions": [
+      { "week": 1, "actions": ["Action"], "deliverables": ["Deliverable"] },
+      { "week": 2, "actions": ["Action"], "deliverables": ["Deliverable"] },
+      { "week": 3, "actions": ["Action"], "deliverables": ["Deliverable"] },
+      { "week": 4, "actions": ["Action"], "deliverables": ["Deliverable"] }
+    ], "expectedOutcome": "What to measure" },
+    { "month": 2, "theme": "Expansion", "goals": ["Goal"], "weeklyActions": [{ "week": 5, "actions": ["Action"], "deliverables": ["Deliverable"] }, { "week": 6, "actions": ["Action"], "deliverables": ["Deliverable"] }, { "week": 7, "actions": ["Action"], "deliverables": ["Deliverable"] }, { "week": 8, "actions": ["Action"], "deliverables": ["Deliverable"] }], "expectedOutcome": "What to measure" },
+    { "month": 3, "theme": "Domination", "goals": ["Goal"], "weeklyActions": [{ "week": 9, "actions": ["Action"], "deliverables": ["Deliverable"] }, { "week": 10, "actions": ["Action"], "deliverables": ["Deliverable"] }, { "week": 11, "actions": ["Action"], "deliverables": ["Deliverable"] }, { "week": 12, "actions": ["Action"], "deliverables": ["Deliverable"] }], "expectedOutcome": "What to measure" }
+  ],
+  "quickWins": [{ "action": "Immediate action", "impact": "high|medium", "timeline": "This week" }],
+  "competitors": [{ "name": "Name", "url": "URL", "threatLevel": "high|medium|low", "strengths": ["Strength"], "weaknesses": ["Weakness"], "howToBeat": "Strategy" }],
+  "researchSources": ["URLs crawled"]
+}`;
+
+    const userPrompt = `Build 90-day war room plan for: ${website}`;
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192 });
+    if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoWarRoom', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+    const parsed = parseJSON(result);
+    parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
+
+    if (req.user && brand?._id) {
+      try {
+        await SeoAudit.findOneAndUpdate(
+          { user: req.user._id, brand: brand._id, type: 'competitor-warroom' },
+          { url: website, results: parsed, status: 'completed' },
+          { upsert: true, new: true }
+        );
+      } catch (dbErr) { console.warn('Could not save war room audit:', dbErr.message); }
+    }
+
+    res.json({ success: true, ...parsed });
+  } catch (error) {
+    console.error('War Room error:', error);
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+
+// ============================================================================
+// LLM PROBE — Multi-model brand mention check
+// ============================================================================
+
+router.post('/llm-probe', protect, requireCredits('seoLlmProbe'), async (req, res) => {
+  try {
+    const { url, brand: brandPayload, brandId } = req.body;
+
+    const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
+    const website = brand?.website || url || brandPayload?.website;
+    if (!website) return res.status(400).json({ success: false, error: 'No website URL available.' });
+
+    const brandContext = buildBrandContext(brand || brandPayload);
+    const brandName = brand?.name || brandPayload?.name || website;
+
+    const systemPrompt = `You are an AI VISIBILITY ANALYST who tests how well a brand appears across AI language models. You simulate what happens when users ask AI assistants about this brand or its industry.
+
+${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
+
+Your job: Simulate prompts that real users would ask ChatGPT, Gemini, Perplexity, and Claude about this brand's industry. Then analyze whether AI models would likely mention, recommend, or cite this brand.
+
+Respond in STRICT JSON:
+{
+  "summary": "3-4 sentence strategic summary of the brand's AI visibility across LLMs",
+  "overallVisibilityScore": 0-100,
+  "probeResults": [
+    {
+      "prompt": "The exact question a user would ask an AI",
+      "category": "brand-direct|industry-recommendation|comparison|how-to|best-of",
+      "model": "ChatGPT|Gemini|Perplexity|Claude",
+      "mentioned": true/false,
+      "mentionType": "primary-recommendation|secondary-mention|not-mentioned|competitor-favored",
+      "confidence": "high|medium|low",
+      "response": "Simulated brief response excerpt showing whether brand appears",
+      "competitorsMentioned": ["Competitor names that would likely be mentioned"],
+      "improvementAction": "What to do to get mentioned in this prompt's response"
+    }
+  ],
+  "visibilityByModel": {
+    "chatgpt": { "score": 0-100, "status": "visible|partially-visible|invisible", "topIssue": "Primary reason" },
+    "gemini": { "score": 0-100, "status": "visible|partially-visible|invisible", "topIssue": "Primary reason" },
+    "perplexity": { "score": 0-100, "status": "visible|partially-visible|invisible", "topIssue": "Primary reason" },
+    "claude": { "score": 0-100, "status": "visible|partially-visible|invisible", "topIssue": "Primary reason" }
+  },
+  "brandPerception": {
+    "sentiment": "positive|neutral|negative|unknown",
+    "authorityLevel": "high|medium|low|unknown",
+    "primaryAssociations": ["What AI models associate with this brand"],
+    "missingAssociations": ["What SHOULD be associated but isn't"]
+  },
+  "optimizations": [
+    {
+      "title": "Specific, data-backed action — NOT generic advice",
+      "description": "Exact implementation steps with references to specific AI models and prompts from probe results above",
+      "priority": "critical|high|medium",
+      "kpi": "Measurable metric (e.g., 'Brand mention rate in ChatGPT for comparison queries', 'Number of probe prompts where brand is cited')",
+      "baseline": "Current state from probe results (e.g., 'Mentioned in 2 of 10 probe prompts', 'Not cited in any comparison query')",
+      "target": "Specific target (e.g., 'Mentioned in 6 of 10 probe prompts within 60 days', 'Primary recommendation in 3 comparison queries')",
+      "timeline": "Implementation timeline (e.g., '1 week content creation + 30 days indexing')",
+      "proofMethod": "How to verify (e.g., 'Re-run LLM Probe after 30 days — expect mention rate to increase from 20% to 50%')",
+      "expectedROI": "Business impact (e.g., 'Estimated 500-1000 monthly AI-referred visits from comparison queries')"
+    }
+  ],
+  "contentToCreate": [
+    { "title": "Content piece", "purpose": "Why this helps AI mention the brand", "format": "blog|faq|guide|case-study|data-report", "targetPrompts": ["Which AI prompts this content will help rank for"], "measurableGoal": "What re-probing should show after publishing (e.g., 'Brand mentioned as primary recommendation for this prompt')" }
+  ]
+}
+
+STRATEGIC RULES (MANDATORY):
+1. NEVER give generic advice like 'Improve content quality' or 'Build brand authority' — be SPECIFIC
+2. Every optimization MUST reference specific probe results from above (which prompts, which models)
+3. Every optimization MUST have a measurable KPI with a baseline and target
+4. Every optimization MUST have a proof method: how to verify it worked
+5. Think like a consultant billing $500/hour — every recommendation must justify its existence with data
+
+Generate 8-12 probe results across different models and prompt categories. Be realistic about whether AI models would actually mention this brand.`;
+
+    const userPrompt = `LLM Brand Probe for: ${brandName} (${website})`;
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192 });
+    if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoLlmProbe', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+    const parsed = parseJSON(result);
+    parsed.researchSources = [website];
+
+    if (req.user && brand?._id) {
+      try {
+        await SeoAudit.findOneAndUpdate(
+          { user: req.user._id, brand: brand._id, type: 'llm-probe' },
+          { url: website, results: parsed, status: 'completed' },
+          { upsert: true, new: true }
+        );
+      } catch (dbErr) { console.warn('Could not save LLM probe:', dbErr.message); }
+    }
+
+    res.json({ success: true, ...parsed });
+  } catch (error) {
+    console.error('LLM Probe error:', error);
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+
+// ============================================================================
+// AUTO-FIX — Generate copy-paste code fixes
+// ============================================================================
+
+router.post('/auto-fix', protect, requireCredits('seoAutoFix'), async (req, res) => {
+  try {
+    const { url, brand: brandPayload, brandId, issues } = req.body;
+
+    const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
+    const website = brand?.website || url || brandPayload?.website;
+    if (!website) return res.status(400).json({ success: false, error: 'No website URL available.' });
+
+    if (!issues || issues.length === 0) {
+      return res.status(400).json({ success: false, error: 'Run a Health Check first to find issues, then use Auto-Fix.' });
+    }
+
+    const brandContext = buildBrandContext(brand || brandPayload);
+    const issueList = issues.map((iss, i) => `${i + 1}. [${iss.severity || 'medium'}] ${iss.title || iss.issue}: ${iss.description || iss.fix || ''}`).join('\n');
+
+    const systemPrompt = `You are a TECHNICAL SEO CODE FIXER. Given a list of SEO issues found from a real crawl, generate READY-TO-USE code fixes that developers can copy-paste.
+
+${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
+
+ISSUES FOUND:
+${issueList}
+
+Respond in STRICT JSON:
+{
+  "summary": "Brief summary of fixes generated",
+  "totalIssuesAddressed": ${issues.length},
+  "fixes": [
+    {
+      "issueTitle": "Which issue this fixes",
+      "severity": "critical|high|medium|low",
+      "description": "What this fix does",
+      "code": "Complete ready-to-use code snippet (HTML, JSON-LD, meta tags, .htaccess rules, etc.)",
+      "language": "html|json|javascript|htaccess|nginx|robots",
+      "whereToAdd": "Exact location where to add this code (e.g., '<head> section of every page')",
+      "instructions": "Step-by-step implementation instructions"
+    }
+  ],
+  "schemaFixes": [
+    {
+      "type": "Organization|LocalBusiness|Product|FAQ|BreadcrumbList|WebSite|Article",
+      "description": "What this schema does",
+      "code": "Complete JSON-LD code ready to paste into <head>",
+      "impact": "How this improves SEO/AI visibility"
+    }
+  ],
+  "metaTagFixes": {
+    "title": "Optimized title tag",
+    "description": "Optimized meta description",
+    "ogTags": "Complete Open Graph meta tags",
+    "twitterTags": "Complete Twitter Card meta tags"
+  },
+  "robotsTxt": "Suggested robots.txt content (if issues found)",
+  "quickWins": [
+    { "fix": "Quick fix description", "code": "Code snippet", "effort": "5 min|15 min|30 min|1 hour" }
+  ]
+}
+
+Generate production-ready code. Every fix must be copy-paste ready. Use the brand's actual information in the code.`;
+
+    const userPrompt = `Generate auto-fix code for: ${website}`;
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.4, maxTokens: 8192 });
+    if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoAutoFix', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+    const parsed = parseJSON(result);
+
+    if (req.user && brand?._id) {
+      try {
+        await SeoAudit.findOneAndUpdate(
+          { user: req.user._id, brand: brand._id, type: 'auto-fix' },
+          { url: website, results: parsed, status: 'completed' },
+          { upsert: true, new: true }
+        );
+      } catch (dbErr) { console.warn('Could not save auto-fix audit:', dbErr.message); }
+    }
+
+    res.json({ success: true, ...parsed });
+  } catch (error) {
+    console.error('Auto-Fix error:', error);
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+
+// ============================================================================
+// PROMPT MINING — Discover AI prompts for citation
+// ============================================================================
+
+router.post('/prompt-mining', protect, requireCredits('seoPromptMining'), async (req, res) => {
+  try {
+    const { url, brand: brandPayload, brandId } = req.body;
+
+    const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
+    const website = brand?.website || url || brandPayload?.website;
+    if (!website) return res.status(400).json({ success: false, error: 'No website URL available.' });
+
+    const brandContext = buildBrandContext(brand || brandPayload);
+    const brandName = brand?.name || brandPayload?.name || website;
+
+    const systemPrompt = `You are a PROMPT MINING SPECIALIST — you find the exact AI prompts and queries where a brand SHOULD be cited but currently ISN'T. Your goal: create a content calendar that systematically captures AI citation traffic.
+
+${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
+
+Respond in STRICT JSON:
+{
+  "summary": "3-4 sentence analysis of the brand's AI citation landscape — where they're missing and what to do",
+  "totalPromptsAnalyzed": 30,
+  "citationScore": 0-100,
+  "promptCategories": [
+    {
+      "category": "Product Recommendations|How-To Guides|Industry Best Practices|Comparison Queries|Problem-Solving|Educational|Local Queries",
+      "totalPrompts": 5,
+      "currentCitationRate": "0%|10%|25%|50%|75%",
+      "opportunity": "high|medium|low"
+    }
+  ],
+  "minedPrompts": [
+    {
+      "prompt": "The exact question users ask AI that should cite this brand",
+      "category": "recommendation|how-to|comparison|best-of|problem-solving",
+      "searchVolume": "high|medium|low",
+      "currentlyCited": false,
+      "competitorsCited": ["Competitors who ARE cited for this prompt"],
+      "whyNotCited": "Why the brand isn't currently cited",
+      "contentNeeded": "What content to create to get cited",
+      "contentFormat": "blog|faq|guide|comparison|case-study|data-report|tool",
+      "priority": "critical|high|medium",
+      "estimatedImpact": "How many AI-generated responses this could appear in"
+    }
+  ],
+  "contentCalendar": [
+    {
+      "week": 1,
+      "theme": "Week theme",
+      "contentPieces": [
+        { "title": "Content title", "format": "blog|faq|guide", "targetPrompts": ["Prompts this content targets"], "publishBy": "Date" }
+      ]
+    },
+    { "week": 2, "theme": "Theme", "contentPieces": [{ "title": "Title", "format": "format", "targetPrompts": ["prompt"], "publishBy": "Date" }] },
+    { "week": 3, "theme": "Theme", "contentPieces": [{ "title": "Title", "format": "format", "targetPrompts": ["prompt"], "publishBy": "Date" }] },
+    { "week": 4, "theme": "Theme", "contentPieces": [{ "title": "Title", "format": "format", "targetPrompts": ["prompt"], "publishBy": "Date" }] }
+  ],
+  "quickWins": [
+    { "action": "Quick win to get cited faster", "targetPrompt": "Which prompt this addresses", "effort": "1 hour|1 day|1 week", "expectedImpact": "high|medium", "proofMethod": "How to verify it worked (e.g., 'Re-probe this prompt in 14 days')" }
+  ],
+  "optimizations": [
+    {
+      "title": "Specific optimization tied to mined prompts above — NOT generic",
+      "description": "Exact steps referencing specific mined prompts and content calendar items",
+      "priority": "critical|high|medium",
+      "kpi": "Measurable metric (e.g., 'Citation rate for product-recommendation prompts', 'Number of prompts where brand appears')",
+      "baseline": "Current state from mined data (e.g., 'Brand cited in 0 of 15 mined prompts', 'No FAQ content covering problem-solving queries')",
+      "target": "Specific target (e.g., 'Cited in 8 of 15 prompts within 90 days', 'FAQ page ranking for 5 problem-solving queries')",
+      "timeline": "Realistic timeline (e.g., 'Week 1-2: content creation, Week 3-6: indexing, Week 6-12: re-probe and measure')",
+      "proofMethod": "How to verify (e.g., 'Re-run Prompt Mining after 60 days — citation score should increase from 15 to 55+')",
+      "expectedROI": "Business outcome (e.g., 'Capture 200-400 monthly AI-referred visits from how-to prompts')"
+    }
+  ]
+}
+
+STRATEGIC RULES (MANDATORY):
+1. NEVER give generic advice like 'Create quality content' or 'Build brand awareness' — be SPECIFIC to mined prompts
+2. Every optimization MUST reference specific mined prompts and categories from above
+3. Every optimization MUST have measurable KPI with baseline and target values
+4. Every optimization MUST explain how to PROVE it worked after implementation
+5. Think like a consultant billing $500/hour — if a recommendation could apply to ANY brand, it's too generic. DELETE IT.
+
+Generate 15-20 mined prompts. Be specific to this brand's industry. Think about what real users ask ChatGPT/Gemini/Perplexity about topics this brand should own.`;
+
+    const userPrompt = `Mine AI prompts for: ${brandName} (${website})`;
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192 });
+    if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoPromptMining', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+    const parsed = parseJSON(result);
+    parsed.researchSources = [website];
+
+    if (req.user && brand?._id) {
+      try {
+        await SeoAudit.findOneAndUpdate(
+          { user: req.user._id, brand: brand._id, type: 'prompt-mining' },
+          { url: website, results: parsed, status: 'completed' },
+          { upsert: true, new: true }
+        );
+      } catch (dbErr) { console.warn('Could not save prompt mining:', dbErr.message); }
+    }
+
+    res.json({ success: true, ...parsed });
+  } catch (error) {
+    console.error('Prompt Mining error:', error);
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+
+// ============================================================================
+// HISTORY — List past audits & get individual audit
+// ============================================================================
+
+router.get('/history', protect, async (req, res) => {
+  try {
+    const { brandId, type, limit = 20 } = req.query;
+    const filter = { user: req.user._id };
+    if (brandId) filter.brand = brandId;
+    if (type) filter.type = type;
+
+    const audits = await SeoAudit.find(filter)
+      .sort('-updatedAt')
+      .limit(Number(limit))
+      .select('type url scores status createdAt updatedAt')
+      .lean();
+
+    res.json({ success: true, audits });
+  } catch (error) {
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+router.get('/history/:id', protect, async (req, res) => {
+  try {
+    const audit = await SeoAudit.findOne({ _id: req.params.id, user: req.user._id }).lean();
+    if (!audit) return res.status(404).json({ success: false, error: 'Audit not found' });
+    res.json({ success: true, audit });
+  } catch (error) {
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+
+// ============================================================================
+// SAVED REPORTS — Fetch last generated report per type
+// ============================================================================
+
+router.get('/reports/:type', protect, async (req, res) => {
+  try {
+    const { type } = req.params;
+    const { brandId } = req.query;
+    if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
+
+    const audit = await SeoAudit.findOne(
+      { user: req.user._id, brand: brandId, type, status: 'completed' }
+    ).sort('-updatedAt').lean();
+
+    if (!audit) return res.json({ success: true, found: false });
+
+    res.json({
+      success: true,
+      found: true,
+      report: audit.results,
+      generatedAt: audit.updatedAt || audit.createdAt,
+      scores: audit.scores,
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }

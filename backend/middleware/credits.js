@@ -19,7 +19,9 @@ const ACTION_LABELS = {
     seoHealthCheck: 'SEO Health Check', seoTraffic: 'SEO Traffic Analysis',
     seoCompetitors: 'SEO Competitors', seoAiVisibility: 'SEO AI Visibility',
     seoAsk: 'SEO Ask', seoAuditPage: 'SEO Page Audit',
-    seoCompetitorDiscover: 'SEO Discover Competitors',
+    seoCompetitorDiscover: 'SEO Discover Competitors', seoBacklinks: 'SEO Backlink Intelligence',
+    seoWarRoom: 'SEO War Room', seoLlmProbe: 'SEO LLM Probe',
+    seoAutoFix: 'SEO Auto-Fix', seoPromptMining: 'SEO Prompt Mining',
     brainstorm: 'Brainstorm Generate', brainstormRefine: 'Brainstorm Refine',
     brainstormChat: 'Brainstorm Chat', brainstormScreenplay: 'Screenplay Generation',
     trendRefresh: 'Trend Refresh',
@@ -39,6 +41,11 @@ const DEFAULT_CREDIT_COSTS = {
     seoAsk: 1,
     seoAuditPage: 1,
     seoCompetitorDiscover: 1,
+    seoBacklinks: 4,
+    seoWarRoom: 4,
+    seoLlmProbe: 3,
+    seoAutoFix: 2,
+    seoPromptMining: 3,
     brainstorm: 4,
     brainstormRefine: 2,
     brainstormChat: 2,
@@ -153,12 +160,17 @@ export const requireCredits = (actionOrCost = 1) => {
 
             // Log usage (fire-and-forget)
             const balanceAfter = (updated.credits?.total || 0) + (updated.credits?.bonus || 0) - (updated.credits?.used || 0);
+            // Detect studio from action name
+            const studioMap = { content: 'content', contentRefine: 'content', creative: 'creative', photoshoot: 'creative', brainstorm: 'brainstorm', brainstormRefine: 'brainstorm', brainstormChat: 'brainstorm', brainstormScreenplay: 'brainstorm', trendRefresh: 'brainstorm', videoBrainstorm: 'video', videoGenerate: 'video', videoEdit: 'video' };
+            const studio = studioMap[actionName] || (actionName?.startsWith('seo') ? 'seo' : 'unknown');
+
             CreditUsage.create({
                 user: user._id,
                 action: actionName || 'unknown',
                 cost,
                 balanceAfter: Math.max(0, balanceAfter),
                 description: ACTION_LABELS[actionName] || actionName || 'AI Operation',
+                studio,
                 metadata: {
                     route: req.originalUrl,
                     brandId: req.body?.brandId || req.params?.brandId,
@@ -166,6 +178,10 @@ export const requireCredits = (actionOrCost = 1) => {
                     subscriptionId: user.activeSubscription,
                 },
             }).catch(err => console.warn('Credit usage log failed:', err.message));
+
+            // Store reference for downstream token usage logging
+            req.creditAction = actionName;
+            req.creditStudio = studio;
 
             // Attach info for downstream use
             req.creditsDeducted = cost;
@@ -205,3 +221,52 @@ export const getCreditBalance = (user) => {
 
 // Export defaults for reference
 export const CREDIT_COSTS = DEFAULT_CREDIT_COSTS;
+
+// Per-model cost estimates (USD cents per 1K tokens)
+const MODEL_COSTS = {
+    'gpt-4o-mini': { input: 0.015, output: 0.06 },
+    'gpt-4o': { input: 0.25, output: 1.0 },
+    'grok-3-mini-fast': { input: 0.03, output: 0.10 },
+    'grok-3-mini': { input: 0.03, output: 0.10 },
+    'gemini-2.0-flash': { input: 0.01, output: 0.04 },
+    'gemini-2.5-flash': { input: 0.01, output: 0.04 },
+    'claude-sonnet-4-20250514': { input: 0.3, output: 1.5 },
+};
+
+/**
+ * Log AI token usage — call this after an AI response to track actual consumption
+ * @param {string} userId - User ID
+ * @param {Object} tokenData - { inputTokens, outputTokens, model, provider }
+ * @param {Object} meta - { action, studio, route, brandId }
+ */
+export const logTokenUsage = async (userId, tokenData, meta = {}) => {
+    if (!userId || !tokenData) return;
+    const { inputTokens = 0, outputTokens = 0, model = '', provider = '' } = tokenData;
+    const totalTokens = inputTokens + outputTokens;
+    const modelCost = MODEL_COSTS[model] || { input: 0.05, output: 0.15 };
+    const estimatedCost = Math.round(((inputTokens / 1000) * modelCost.input + (outputTokens / 1000) * modelCost.output) * 100) / 100;
+
+    try {
+        // Update the most recent CreditUsage record if it exists
+        const updated = await CreditUsage.findOneAndUpdate(
+            { user: userId, action: meta.action || 'unknown', 'tokenUsage.inputTokens': 0 },
+            { $set: { 'tokenUsage.inputTokens': inputTokens, 'tokenUsage.outputTokens': outputTokens, 'tokenUsage.totalTokens': totalTokens, 'tokenUsage.model': model, 'tokenUsage.provider': provider, 'tokenUsage.estimatedCost': estimatedCost } },
+            { sort: { createdAt: -1 } }
+        );
+
+        // If no matching unfilled record, create a new token-only log
+        if (!updated) {
+            await CreditUsage.create({
+                user: userId,
+                action: meta.action || 'ai_call',
+                cost: 0, // no credit deduction, just token tracking
+                description: `Token usage: ${model}`,
+                studio: meta.studio || 'unknown',
+                metadata: { route: meta.route || '', brandId: meta.brandId },
+                tokenUsage: { inputTokens, outputTokens, totalTokens, model, provider, estimatedCost },
+            });
+        }
+    } catch (err) {
+        console.warn('Token usage log failed:', err.message);
+    }
+};

@@ -1382,6 +1382,121 @@ creditRouter.get('/summary', protect, async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════
+// TOKEN USAGE ANALYTICS (Super Admin)
+// ══════════════════════════════════════════════════════════════
+
+router.get('/stats/token-usage', async (req, res) => {
+    try {
+        const CreditUsage = (await import('../models/CreditUsage.js')).default;
+        const { days = 30 } = req.query;
+        const since = new Date(Date.now() - parseInt(days) * 24 * 60 * 60 * 1000);
+
+        const [byStudio, byModel, byUser, dailyTrend, totals] = await Promise.all([
+            // Per-studio breakdown
+            CreditUsage.aggregate([
+                { $match: { createdAt: { $gte: since }, 'tokenUsage.totalTokens': { $gt: 0 } } },
+                { $group: {
+                    _id: '$studio',
+                    totalTokens: { $sum: '$tokenUsage.totalTokens' },
+                    inputTokens: { $sum: '$tokenUsage.inputTokens' },
+                    outputTokens: { $sum: '$tokenUsage.outputTokens' },
+                    estimatedCost: { $sum: '$tokenUsage.estimatedCost' },
+                    calls: { $sum: 1 },
+                    credits: { $sum: '$cost' },
+                }},
+                { $sort: { totalTokens: -1 } },
+            ]),
+            // Per-model breakdown
+            CreditUsage.aggregate([
+                { $match: { createdAt: { $gte: since }, 'tokenUsage.totalTokens': { $gt: 0 } } },
+                { $group: {
+                    _id: { model: '$tokenUsage.model', provider: '$tokenUsage.provider' },
+                    totalTokens: { $sum: '$tokenUsage.totalTokens' },
+                    inputTokens: { $sum: '$tokenUsage.inputTokens' },
+                    outputTokens: { $sum: '$tokenUsage.outputTokens' },
+                    estimatedCost: { $sum: '$tokenUsage.estimatedCost' },
+                    calls: { $sum: 1 },
+                }},
+                { $sort: { totalTokens: -1 } },
+            ]),
+            // Top token consumers (users)
+            CreditUsage.aggregate([
+                { $match: { createdAt: { $gte: since }, 'tokenUsage.totalTokens': { $gt: 0 } } },
+                { $group: {
+                    _id: '$user',
+                    totalTokens: { $sum: '$tokenUsage.totalTokens' },
+                    estimatedCost: { $sum: '$tokenUsage.estimatedCost' },
+                    calls: { $sum: 1 },
+                    credits: { $sum: '$cost' },
+                }},
+                { $sort: { totalTokens: -1 } },
+                { $limit: 15 },
+                { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'userInfo' } },
+                { $unwind: { path: '$userInfo', preserveNullAndEmptyArrays: true } },
+                { $project: { totalTokens: 1, estimatedCost: 1, calls: 1, credits: 1, name: '$userInfo.name', email: '$userInfo.email', plan: '$userInfo.plan' } },
+            ]),
+            // Daily trend
+            CreditUsage.aggregate([
+                { $match: { createdAt: { $gte: since }, 'tokenUsage.totalTokens': { $gt: 0 } } },
+                { $group: {
+                    _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+                    totalTokens: { $sum: '$tokenUsage.totalTokens' },
+                    estimatedCost: { $sum: '$tokenUsage.estimatedCost' },
+                    calls: { $sum: 1 },
+                }},
+                { $sort: { _id: 1 } },
+            ]),
+            // Overall totals
+            CreditUsage.aggregate([
+                { $match: { createdAt: { $gte: since }, 'tokenUsage.totalTokens': { $gt: 0 } } },
+                { $group: {
+                    _id: null,
+                    totalTokens: { $sum: '$tokenUsage.totalTokens' },
+                    inputTokens: { $sum: '$tokenUsage.inputTokens' },
+                    outputTokens: { $sum: '$tokenUsage.outputTokens' },
+                    estimatedCost: { $sum: '$tokenUsage.estimatedCost' },
+                    totalCalls: { $sum: 1 },
+                    totalCredits: { $sum: '$cost' },
+                }},
+            ]),
+        ]);
+
+        // Get revenue for profitability
+        const revenue = await Subscription.aggregate([
+            { $match: { status: 'active', price: { $gt: 0 } } },
+            { $group: { _id: null, total: { $sum: '$price' } } },
+        ]);
+
+        const t = totals[0] || {};
+        const monthlyRevenue = revenue[0]?.total || 0;
+
+        res.json({
+            success: true,
+            period: `${days} days`,
+            totals: {
+                totalTokens: t.totalTokens || 0,
+                inputTokens: t.inputTokens || 0,
+                outputTokens: t.outputTokens || 0,
+                estimatedCostUSD: Math.round((t.estimatedCost || 0) * 100) / 100,
+                totalCalls: t.totalCalls || 0,
+                totalCredits: t.totalCredits || 0,
+            },
+            profitability: {
+                monthlyRevenue,
+                estimatedCostINR: Math.round((t.estimatedCost || 0) * 85), // approx USD→INR
+                margin: monthlyRevenue > 0 ? Math.round(((monthlyRevenue - (t.estimatedCost || 0) * 85) / monthlyRevenue) * 100) : 0,
+            },
+            byStudio,
+            byModel,
+            topUsers: byUser,
+            dailyTrend,
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════
 // 10. SYSTEM AUDIT LOGS
 // ══════════════════════════════════════════════════════════════
 
