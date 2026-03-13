@@ -182,7 +182,7 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
     const remainingBudget = Math.max(5000, budget - elapsed);
     console.log(`⏱️ Health Check research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
-    const systemPrompt = `You are a SENIOR SEO STRATEGIST...`;
+    const systemPrompt = `You are a SENIOR SEO STRATEGIST (not just an auditor). You think like a CMO + technical SEO expert combined. You have REAL CRAWL DATA — use it as ground truth. Never guess or contradict the crawl.
 
 ${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
 
