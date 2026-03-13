@@ -202,7 +202,6 @@ export async function runRealLLMProbe(prompts, brandName, website, competitors =
         competitorsMentioned,
       });
     }
-  }
 
   // Calculate aggregate stats
   const successResults = results.filter(r => r.success);
