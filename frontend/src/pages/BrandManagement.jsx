@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import SEOHead from '../components/SEOHead'
+import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
-import { brands as brandsAPI, team as teamAPI } from '../services/api'
+import { brands as brandsAPI } from '../services/api'
 
 // ============================================================================
 // DELETE CONFIRMATION MODAL
@@ -72,13 +73,14 @@ function DeleteBrandModal({ brand, onClose, onConfirm }) {
 // ============================================================================
 export default function BrandManagement() {
     const navigate = useNavigate()
+    const { user } = useAuth()
     const { activeBrand, selectBrand, deleteBrand, fetchBrands } = useBrand()
     const [allBrands, setAllBrands] = useState([])
     const [search, setSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState('all') // 'all', 'active', 'archived'
     const [deleteTarget, setDeleteTarget] = useState(null)
     const [togglingId, setTogglingId] = useState(null)
-    const [planLimits, setPlanLimits] = useState(null)
+    const planLimits = user?.planDetails?.limits
 
     // Fetch ALL brands (including archived) for this management page
     const fetchAllBrands = useCallback(async () => {
@@ -91,11 +93,6 @@ export default function BrandManagement() {
     }, [])
 
     useEffect(() => { fetchAllBrands() }, [fetchAllBrands])
-
-    // Load plan limits once
-    useEffect(() => {
-        teamAPI.getPlanLimits().then(setPlanLimits).catch(() => { })
-    }, [])
 
     // Filter brands (from local state that includes archived)
     const filteredBrands = allBrands.filter(b => {
@@ -224,11 +221,22 @@ export default function BrandManagement() {
                     {filteredBrands.map((brand, i) => {
                         const isActive = activeBrand?._id === brand._id
                         const isArchived = brand.status === 'archived'
+                        
+                        // Determine if Locked (over plan limit)
+                        // To keep it fair, we unlock the oldest N brands (where N = plan limit)
+                        const activeBrandsSorted = allBrands
+                            .filter(b => b.status !== 'archived')
+                            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+                        
+                        const brandIndex = activeBrandsSorted.findIndex(b => b._id === brand._id)
+                        const maxBrands = planLimits?.maxBrands || 1
+                        const isLocked = !isArchived && brandIndex >= maxBrands
+
                         const primaryColor = brand.dna?.colors?.[0]?.hex || '#8b5cf6'
                         const secondaryColor = brand.dna?.colors?.[1]?.hex || '#6366f1'
                         return (
                             <div key={brand._id}
-                                className={`glass-panel rounded-2xl overflow-hidden transition-all animate-fade-in group hover:border-white/[0.12] ${isActive ? 'ring-2 ring-primary/30' : ''} ${isArchived ? 'opacity-60' : ''}`}
+                                className={`glass-panel rounded-2xl overflow-hidden transition-all animate-fade-in group hover:border-white/[0.12] ${isActive ? 'ring-2 ring-primary/30' : ''} ${isArchived ? 'opacity-60' : ''} ${isLocked ? 'opacity-75 grayscale-[0.5]' : ''}`}
                                 style={{ animationDelay: `${i * 50}ms` }}>
 
                                 {/* Color strip header */}
@@ -246,7 +254,10 @@ export default function BrandManagement() {
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-0.5">
                                                 <h3 className="text-lg font-extrabold text-white truncate">{brand.name}</h3>
-                                                {isActive && (
+                                                {isLocked && (
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500 uppercase tracking-wider shrink-0 animate-pulse">Locked</span>
+                                                )}
+                                                {isActive && !isLocked && (
                                                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary uppercase tracking-wider shrink-0">Active</span>
                                                 )}
                                             </div>
@@ -266,8 +277,8 @@ export default function BrandManagement() {
 
                                     {/* Meta info */}
                                     <div className="flex items-center gap-3 mb-4 flex-wrap">
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isArchived ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-400/10 text-emerald-400'}`}>
-                                            {isArchived ? 'Archived' : 'Active'}
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isArchived ? 'bg-amber-500/10 text-amber-400' : (isLocked ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-400/10 text-emerald-400')}`}>
+                                            {isArchived ? 'Archived' : (isLocked ? 'Upgrade Required' : 'Active')}
                                         </span>
                                         <span className="text-[10px] text-slate-600 flex items-center gap-1">
                                             <span className="material-symbols-outlined text-[10px]">calendar_month</span>
@@ -293,16 +304,25 @@ export default function BrandManagement() {
 
                                     {/* Action buttons */}
                                     <div className="flex gap-2 pt-3 border-t border-white/[0.06]">
-                                        {!isActive && !isArchived && (
-                                            <button onClick={() => selectBrand(brand)}
-                                                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold text-primary bg-primary/5 hover:bg-primary/10 border border-primary/10 transition-all cursor-pointer">
-                                                <span className="material-symbols-outlined text-sm">check_circle</span>Set Active
+                                        {isLocked ? (
+                                            <button onClick={() => navigate('/credits')}
+                                                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold text-amber-500 bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/10 transition-all cursor-pointer">
+                                                <span className="material-symbols-outlined text-sm">lock</span>Upgrade to Unlock
                                             </button>
+                                        ) : (
+                                            <>
+                                                {!isActive && !isArchived && (
+                                                    <button onClick={() => selectBrand(brand)}
+                                                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold text-primary bg-primary/5 hover:bg-primary/10 border border-primary/10 transition-all cursor-pointer">
+                                                        <span className="material-symbols-outlined text-sm">check_circle</span>Set Active
+                                                    </button>
+                                                )}
+                                                <button onClick={() => handleViewDNA(brand)}
+                                                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold text-slate-300 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] transition-all cursor-pointer">
+                                                    <span className="material-symbols-outlined text-sm">fingerprint</span>View DNA
+                                                </button>
+                                            </>
                                         )}
-                                        <button onClick={() => handleViewDNA(brand)}
-                                            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold text-slate-300 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] transition-all cursor-pointer">
-                                            <span className="material-symbols-outlined text-sm">fingerprint</span>View DNA
-                                        </button>
                                         <button onClick={() => handleToggleStatus(brand)} disabled={togglingId === brand._id}
                                             className={`flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border disabled:opacity-40 ${isArchived
                                                 ? 'text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 border-emerald-500/10'

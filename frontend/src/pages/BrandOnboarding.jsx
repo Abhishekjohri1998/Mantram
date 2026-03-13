@@ -1168,12 +1168,30 @@ function ReviewBrand({ brand, onFinish }) {
 export default function BrandOnboarding() {
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
-    const { isAuthenticated } = useAuth()
+    const { isAuthenticated, user, loading: authLoading } = useAuth()
     const { addBrand } = useBrand()
     const [step, setStep] = useState(0) // 0=choose, 1=path, 2=review
     const [path, setPath] = useState(null)
     const [brand, setBrand] = useState(null)
+    const [brandCount, setBrandCount] = useState(0)
+    const [loadingCount, setLoadingCount] = useState(true)
     const scanUrlParam = searchParams.get('scanUrl') || ''
+
+    // Fetch current ACTIVE brand count to check against limits
+    useEffect(() => {
+        if (isAuthenticated) {
+            brandsAPI.list({ include: 'active' }).then(data => {
+                setBrandCount(data.brands?.length || 0)
+                setLoadingCount(false)
+            }).catch(() => setLoadingCount(false))
+        } else {
+            setLoadingCount(false)
+        }
+    }, [isAuthenticated])
+
+    // Limit check
+    const maxBrands = user?.planDetails?.limits?.maxBrands || 1
+    const atLimit = isAuthenticated && brandCount >= maxBrands
 
     // If scanUrl param is present, auto-navigate to website scan step
     useEffect(() => {
@@ -1210,6 +1228,40 @@ export default function BrandOnboarding() {
     }
 
     const totalSteps = 3
+
+    if (authLoading || loadingCount) return null;
+
+    if (atLimit) {
+        return (
+            <div className="min-h-screen relative" style={{ background: '#0a0c16' }}>
+                <SEOHead title="Limit Reached — Mantram AI" noIndex={true} />
+                <div className="fixed inset-0 pointer-events-none z-0">
+                    <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/15 blur-[120px] rounded-full" />
+                </div>
+                <div className="relative z-10 max-w-4xl mx-auto px-6 py-12 flex flex-col items-center justify-center min-h-[80vh] text-center animate-fade-in">
+                    <div className="size-20 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-6">
+                        <span className="material-symbols-outlined text-4xl text-amber-500">diamond</span>
+                    </div>
+                    <h2 className="text-3xl font-extrabold text-white mb-3">Plan Limit Reached</h2>
+                    <p className="text-slate-400 mb-8 max-w-md">
+                        Your current <strong>{user?.planDetails?.name || 'Starter'}</strong> plan allows up to {maxBrands} brand{maxBrands !== 1 ? 's' : ''}. 
+                        Upgrade your plan to add more brands to your portfolio.
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-4">
+                        <button onClick={() => navigate('/credits')}
+                            className="bg-primary text-white py-3 px-8 rounded-xl text-sm font-bold cursor-pointer hover:bg-primary-light transition-all shadow-lg shadow-primary/20">
+                            View Upgrade Plans
+                        </button>
+                        <button onClick={() => navigate('/brands')}
+                            className="bg-white/[0.04] border border-white/[0.08] px-8 py-3 rounded-xl text-sm font-bold text-slate-400 hover:text-white transition-all cursor-pointer">
+                            Manage Existing Brands
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="min-h-screen relative" style={{ background: '#0a0c16' }}>
             <SEOHead

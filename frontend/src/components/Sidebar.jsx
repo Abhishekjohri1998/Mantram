@@ -27,10 +27,25 @@ const bottomItems = [
 
 // Filter nav items based on team member's studio access
 function getVisibleNavItems(user) {
-    if (!user?.organization || user.role === 'admin' || user.role === 'superadmin' || user.teamRole === 'owner') {
-        return navItems // owners see everything
+    // 1. Superadmins see everything
+    if (user?.role === 'superadmin') return navItems;
+
+    // 2. Filter by Plan (Applies to everyone else)
+    let filtered = navItems;
+    if (user?.planDetails?.studios) {
+        filtered = filtered.filter(item =>
+            !item.studioKey || user.planDetails.studios[item.studioKey] !== false
+        );
     }
-    return navItems.filter(item => !item.studioKey || user.studioAccess?.[item.studioKey] !== false)
+
+    // 3. Filter by Team Member specific permissions (if applicable)
+    if (user?.organization && user.role !== 'admin' && user.teamRole !== 'owner') {
+        filtered = filtered.filter(item =>
+            !item.studioKey || user.studioAccess?.[item.studioKey] !== false
+        );
+    }
+
+    return filtered;
 }
 
 export default function Sidebar({ mobileOpen, onClose }) {
