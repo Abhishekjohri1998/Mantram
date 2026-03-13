@@ -397,6 +397,12 @@ export const superadmin = {
     resetCreditCosts: () => apiFetch('/superadmin/credit-costs/reset', { method: 'POST' }),
     // Token Usage Analytics
     getTokenUsage: (days = 30) => apiFetch(`/superadmin/stats/token-usage?days=${days}`),
+    syncCredits: () => apiFetch('/superadmin/system/sync-all-credits', { method: 'POST' }),
+    getSystemLogs: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/superadmin/system-logs?${query}`);
+    },
+    impersonateUser: (id) => apiFetch(`/superadmin/users/${id}/impersonate`, { method: 'POST' }),
 };
 
 // ============ Credits API ============
@@ -611,6 +617,16 @@ export const payments = {
         }),
     verify: (paymentData) =>
         apiFetch('/payments/verify', {
+            method: 'POST',
+            body: JSON.stringify(paymentData)
+        }),
+    createTopupOrder: (packId) =>
+        apiFetch('/payments/create-topup-order', {
+            method: 'POST',
+            body: JSON.stringify({ packId })
+        }),
+    verifyTopup: (paymentData) =>
+        apiFetch('/payments/verify-topup', {
             method: 'POST',
             body: JSON.stringify(paymentData)
         }),

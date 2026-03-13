@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { protect, optionalAuth } from '../middleware/auth.js';
+import { requireStudio } from '../middleware/studioAccess.js';
 import { requireCredits, logTokenUsage } from '../middleware/credits.js';
 import Brand from '../models/Brand.js';
 import SeoAudit from '../models/SeoAudit.js';
@@ -144,7 +145,7 @@ async function loadBrand(brandId, userId) {
 // HEALTH CHECK — Real crawl + AI analysis
 // ============================================================================
 
-router.post('/health-check', protect, requireCredits('seoHealthCheck'), async (req, res) => {
+router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits('seoHealthCheck'), async (req, res) => {
   try {
     const { url, brand: brandPayload, brandId } = req.body;
 
@@ -265,7 +266,7 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
 // GET ME TRAFFIC — Real crawl + keyword research
 // ============================================================================
 
-router.post('/traffic', protect, requireCredits('seoTraffic'), async (req, res) => {
+router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seoTraffic'), async (req, res) => {
   try {
     const { url, brand: brandPayload, brandId, industry, country } = req.body;
 
@@ -374,7 +375,7 @@ Generate 5-8 keyword clusters. For each, explain WHY it matters strategically. T
 // BEAT COMPETITORS — Real competitor research
 // ============================================================================
 
-router.post('/competitors', protect, requireCredits('seoCompetitors'), async (req, res) => {
+router.post('/competitors', protect, requireStudio('seoStudio'), requireCredits('seoCompetitors'), async (req, res) => {
   try {
     const { url, brand: brandPayload, brandId, competitorUrls } = req.body;
 
@@ -526,7 +527,7 @@ Be STRATEGIC and SPECIFIC. Every insight must have a WHY and an actionable HOW. 
 // AI VISIBILITY — Real structured data audit
 // ============================================================================
 
-router.post('/ai-visibility', protect, requireCredits('seoAiVisibility'), async (req, res) => {
+router.post('/ai-visibility', protect, requireStudio('seoStudio'), requireCredits('seoAiVisibility'), async (req, res) => {
   try {
     const { url, brand: brandPayload, brandId } = req.body;
 
@@ -678,7 +679,7 @@ STRATEGIC RULES (MANDATORY):
 // ON-PAGE AUDIT
 // ============================================================================
 
-router.post('/audit-page', protect, requireCredits('seoAuditPage'), async (req, res) => {
+router.post('/audit-page', protect, requireStudio('seoStudio'), requireCredits('seoAuditPage'), async (req, res) => {
   try {
     const { pageUrl, brand: brandPayload, brandId, keyword } = req.body;
     if (!pageUrl) return res.status(400).json({ success: false, error: 'Page URL is required' });

@@ -18,12 +18,12 @@ export default function SuperAdminDashboard() {
     const [totalBrands, setTotalBrands] = useState(0)
     const [content, setContent] = useState([])
     const [totalContent, setTotalContent] = useState(0)
-    const [subscriptions, setSubscriptions] = useState([])
     const [integrations, setIntegrations] = useState(null)
     const [aiHealth, setAiHealth] = useState(null)
     const [systemSettings, setSystemSettings] = useState(null)
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
+    const [debouncedSearch, setDebouncedSearch] = useState('')
     const [planFilter, setPlanFilter] = useState('')
     const [userPage, setUserPage] = useState(1)
     const [toast, setToast] = useState(null)
@@ -32,8 +32,6 @@ export default function SuperAdminDashboard() {
     const [creditModal, setCreditModal] = useState(null)
     const [creditAmount, setCreditAmount] = useState('')
     const [planModal, setPlanModal] = useState(null)
-    const [subForm, setSubForm] = useState({ userId: '', plan: 'professional', billingCycle: 'monthly', price: '', credits: '' })
-    const [showSubForm, setShowSubForm] = useState(false)
     // Package Builder state
     const [packages, setPackages] = useState([])
     const [aiSuggestions, setAiSuggestions] = useState(null)
@@ -57,6 +55,12 @@ export default function SuperAdminDashboard() {
     const [editingCosts, setEditingCosts] = useState(null)
     const [tokenData, setTokenData] = useState(null)
     const [tokenDays, setTokenDays] = useState(30)
+    const [syncingCredits, setSyncingCredits] = useState(false)
+    // Audit Log state
+    const [logs, setLogs] = useState([])
+    const [logsPage, setLogsPage] = useState(1)
+    const [totalLogs, setTotalLogs] = useState(0)
+    const [logsLoading, setLogsLoading] = useState(false)
 
     if (user?.role !== 'superadmin') {
         return <DashboardLayout><div className="flex items-center justify-center h-screen"><div className="text-center"><span className="material-symbols-outlined text-6xl text-rose-500 mb-4">shield</span><h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2><p className="text-slate-500">Super Admin access required</p></div></div></DashboardLayout>
@@ -70,33 +74,38 @@ export default function SuperAdminDashboard() {
         { id: 'users', label: 'Users', icon: 'group' },
         { id: 'tokenUsage', label: 'Token Usage', icon: 'monitoring' },
         { id: 'packages', label: 'Packages', icon: 'inventory_2' },
-        { id: 'subscriptions', label: 'Subscriptions', icon: 'card_membership' },
         { id: 'coupons', label: 'Coupons', icon: 'confirmation_number' },
         { id: 'content', label: 'Content & Brands', icon: 'article' },
         { id: 'ai', label: 'AI & System', icon: 'smart_toy' },
         { id: 'integrations', label: 'Integrations', icon: 'hub' },
+        { id: 'logs', label: 'Audit Logs', icon: 'history' },
     ]
 
-    useEffect(() => { loadStats() }, [])
+    useEffect(() => { loadStats(); loadPackages() }, [])
+    useEffect(() => {
+        const handler = setTimeout(() => setDebouncedSearch(search), 500);
+        return () => clearTimeout(handler);
+    }, [search])
+
     useEffect(() => {
         if (tab === 'users') loadUsers()
         if (tab === 'approvals') loadPendingUsers()
         if (tab === 'coupons') loadCoupons()
         if (tab === 'content') { loadBrands(); loadContent() }
-        if (tab === 'subscriptions') loadSubscriptions()
         if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts() }
         if (tab === 'integrations') loadIntegrations()
         if (tab === 'packages') loadPackages()
         if (tab === 'tokenUsage') loadTokenUsage()
-    }, [tab, search, planFilter, userPage])
+        if (tab === 'logs') loadLogs()
+    }, [tab, debouncedSearch, planFilter, userPage, logsPage])
 
     const loadStats = async () => { try { const d = await API.getStats(); setStats(d.stats) } catch (e) { console.error(e) } finally { setLoading(false) } }
-    const loadUsers = async () => { try { const d = await API.getUsers({ page: userPage, limit: 20, search, plan: planFilter }); setUsers(d.users || []); setTotalUsers(d.total || 0) } catch (e) { console.error(e) } }
+    const loadUsers = async () => { try { const d = await API.getUsers({ page: userPage, limit: 20, search: debouncedSearch, plan: planFilter }); setUsers(d.users || []); setTotalUsers(d.total || 0) } catch (e) { console.error(e) } }
+    const loadLogs = async () => { setLogsLoading(true); try { const d = await API.getSystemLogs({ page: logsPage, limit: 50 }); setLogs(d.logs || []); setTotalLogs(d.total || 0) } catch (e) { console.error(e) } finally { setLogsLoading(false) } }
     const loadPendingUsers = async () => { try { const d = await API.getUsers({ approvalStatus: 'pending', limit: 50 }); setPendingUsers(d.users || []) } catch (e) { console.error(e) } }
     const loadCoupons = async () => { try { const d = await API.getCoupons(); setCoupons(d.coupons || []) } catch (e) { console.error(e) } }
     const loadBrands = async () => { try { const d = await API.getBrands({ limit: 50 }); setBrands(d.brands || []); setTotalBrands(d.total || 0) } catch (e) { console.error(e) } }
     const loadContent = async () => { try { const d = await API.getContent({ limit: 50 }); setContent(d.content || []); setTotalContent(d.total || 0) } catch (e) { console.error(e) } }
-    const loadSubscriptions = async () => { try { const d = await API.getSubscriptions(); setSubscriptions(d.subscriptions || []) } catch (e) { console.error(e) } }
     const loadAIHealth = async () => { try { const d = await API.getAIHealth(); setAiHealth(d.aiHealth) } catch (e) { console.error(e) } }
     const loadSettings = async () => { try { const d = await API.getSystemSettings(); setSystemSettings(d.settings) } catch (e) { console.error(e) } }
     const loadIntegrations = async () => { try { const d = await API.getIntegrations(); setIntegrations(d) } catch (e) { console.error(e) } }
@@ -154,6 +163,22 @@ export default function SuperAdminDashboard() {
             else loadUsers();
         } catch (e) { showToast(e.message || 'Rejection failed', 'error') } 
     }
+
+    const handleSyncCredits = async () => {
+        if (!confirm('This will synchronize all user credit data based on usage logs and plans. Proceed?')) return;
+        setSyncingCredits(true);
+        try {
+            const d = await API.syncCredits();
+            showToast(`${d.stats.success} users synced, ${d.stats.failed} failed`);
+            loadUsers();
+            loadStats();
+        } catch (e) {
+            showToast(e.message || 'Sync failed', 'error');
+        } finally {
+            setSyncingCredits(false);
+        }
+    }
+
     const handleDeleteBrand = async (brand, name) => { 
         const brandId = brand?._id || brand?.id || brand;
         if (!brandId || brandId === 'undefined') {
@@ -191,10 +216,8 @@ export default function SuperAdminDashboard() {
     const handleCreateCoupon = async (e) => { e.preventDefault(); try { await API.createCoupon({ ...couponForm, discountValue: Number(couponForm.discountValue), maxUses: couponForm.maxUses ? Number(couponForm.maxUses) : 0, validUntil: couponForm.validUntil || null }); showToast('Coupon created'); setShowCouponForm(false); setCouponForm({ code: '', discountType: 'credits', discountValue: '', maxUses: '', validUntil: '', description: '' }); loadCoupons() } catch (e) { showToast(e.error || 'Failed', 'error') } }
     const handleToggleCoupon = async (id, isActive) => { try { await API.updateCoupon(id, { isActive: !isActive }); loadCoupons() } catch { showToast('Failed', 'error') } }
     const handleDeleteCoupon = async (id) => { if (!confirm('Delete coupon?')) return; try { await API.deleteCoupon(id); showToast('Deleted'); loadCoupons() } catch { showToast('Failed', 'error') } }
-    const handleCreateSub = async (e) => { e.preventDefault(); try { await API.createSubscription({ ...subForm, price: Number(subForm.price || 0), credits: subForm.credits ? Number(subForm.credits) : undefined }); showToast('Subscription created'); setShowSubForm(false); loadSubscriptions(); loadUsers() } catch (e) { showToast(e.error || 'Failed', 'error') } }
     const handleToggleSetting = async (key, val) => { try { await API.updateSystemSettings({ [key]: val }); showToast('Updated'); loadSettings() } catch { showToast('Failed', 'error') } }
 
-    const pc = { starter: { c: 'slate', cr: 50, p: 'Free' }, professional: { c: 'blue', cr: 500, p: '₹999/mo' }, enterprise: { c: 'amber', cr: '∞', p: '₹4,999/mo' } }
     const platformIcons = { instagram: '📸', facebook: '📘', linkedin: '💼', twitter: '🐦', shopify: '🛍️', 'google-analytics': '📊', 'meta-ads': '📱', 'google-ads': '🔍', meta: '📱', google: '🔍' }
 
     const Card = ({ icon, color, value, label }) => (
@@ -220,6 +243,20 @@ export default function SuperAdminDashboard() {
                         <p className="text-slate-500 text-sm mt-1">Complete platform management</p>
                     </div>
                 </div>
+
+                {/* Impersonation Warning Banner */}
+                {user?.isImpersonated && (
+                    <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-amber-500 to-rose-500 shadow-lg shadow-amber-500/20 flex items-center justify-between animate-pulse">
+                        <div className="flex items-center gap-3">
+                            <span className="material-symbols-outlined text-white text-2xl">error</span>
+                            <div>
+                                <p className="text-white font-black text-sm uppercase tracking-wider">Active Impersonation Session</p>
+                                <p className="text-white/80 text-xs">You are currently viewing the platform as <strong>{user.name}</strong>. All actions are logged.</p>
+                            </div>
+                        </div>
+                        <button onClick={() => window.location.reload()} className="px-4 py-2 bg-white text-rose-500 rounded-xl text-xs font-black uppercase hover:bg-slate-100 transition-all cursor-pointer">Exit Session</button>
+                    </div>
+                )}
 
                 {/* Tabs */}
                 <div className="flex gap-1 mb-6 bg-white/[0.03] p-1 rounded-xl border border-white/[0.06] overflow-x-auto">
@@ -263,6 +300,11 @@ export default function SuperAdminDashboard() {
                                         <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-rose-400">rate_review</span><span className="text-sm font-bold text-white">AI Feedback</span></div>
                                         <p className="text-2xl font-extrabold text-rose-400">{stats.totalFeedback}</p>
                                     </div>
+                                    <div className="glass-panel rounded-2xl p-5 border border-indigo-500/10">
+                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-indigo-400">trending_up</span><span className="text-sm font-bold text-white">Retention Rate</span></div>
+                                        <p className="text-2xl font-extrabold text-indigo-400">{stats.usageAnalytics?.retentionRate || '0%'}</p>
+                                        <p className="text-xs text-slate-600 mt-1">{stats.usageAnalytics?.churnedUsersCount || 0} churned (20d+)</p>
+                                    </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 mb-5">
                                     <div className="glass-panel rounded-2xl p-5">
@@ -305,8 +347,13 @@ export default function SuperAdminDashboard() {
                                                         />
                                                     </div>
                                                 </div>
-                                                <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 'bg-slate-500/15 text-slate-400'}`}>{u.plan}</span>
-                                                <span className="text-xs text-slate-600">{new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                                                <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${
+                                                    u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : 
+                                                    u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 
+                                                    u.plan === 'test' ? 'bg-rose-500/15 text-rose-400' :
+                                                    'bg-slate-500/15 text-slate-400'
+                                                }`}>Plan: {u.plan}</span>
+                                                <span className="text-xs text-slate-600">{new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}</span>
                                             </div>
                                         </div>
                                     ))}</div>
@@ -406,7 +453,15 @@ export default function SuperAdminDashboard() {
                                                         <p className="text-base font-bold text-white">{u.name}</p>
                                                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold tracking-wider uppercase">Position #{u.queueNumber}</span>
                                                     </div>
-                                                    <p className="text-sm text-slate-400">{u.email} • {u.company || 'Individual'}</p>
+                                                     <p className="text-sm text-slate-400">
+                                                        {u.email} • {u.company || 'Individual'} 
+                                                        <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                                                            u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : 
+                                                            u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 
+                                                            u.plan === 'test' ? 'bg-rose-500/15 text-rose-400' :
+                                                            'bg-slate-500/15 text-slate-400'
+                                                        }`}>Plan: {u.plan}</span>
+                                                     </p>
                                                     <p className="text-[10px] text-slate-600 mt-1 uppercase tracking-widest">Registered {new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                                                 </div>
                                             </div>
@@ -441,7 +496,10 @@ export default function SuperAdminDashboard() {
                                 <input type="text" value={search} onChange={e => { setSearch(e.target.value); setUserPage(1) }} placeholder="Search name, email, company..." className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none focus:border-primary/50" />
                             </div>
                             <select value={planFilter} onChange={e => { setPlanFilter(e.target.value); setUserPage(1) }} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none cursor-pointer">
-                                <option value="">All Plans</option><option value="starter">Starter</option><option value="professional">Professional</option><option value="enterprise">Enterprise</option>
+                                <option value="">All Plans</option>
+                                {packages.map(p => (
+                                    <option key={p._id} value={p.slug}>{p.name}</option>
+                                ))}
                             </select>
                         </div>
                         <p className="text-xs text-slate-600 mb-3">{totalUsers} users</p>
@@ -453,8 +511,13 @@ export default function SuperAdminDashboard() {
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2">
                                                 <p className="text-base font-bold text-white truncate">{u.name}</p>
-                                                <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 'bg-slate-500/15 text-slate-400'}`}>{u.plan}</span>
-                                                <span className="text-xs px-1.5 py-0.5 rounded font-bold capitalize bg-white/[0.05] text-slate-500">{u.role}</span>
+                                                <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${
+                                                    u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : 
+                                                    u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 
+                                                    u.plan === 'test' ? 'bg-rose-500/15 text-rose-400' :
+                                                    'bg-slate-500/15 text-slate-400'
+                                                }`}>Plan: {u.plan}</span>
+                                                <span className="text-xs px-1.5 py-0.5 rounded font-bold border border-white/10 text-slate-500 uppercase tracking-tighter text-[9px]">{u.role}</span>
                                                 {u.approvalStatus === 'pending' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-amber-500/20 text-amber-400">PENDING</span>}
                                                 {u.approvalStatus === 'rejected' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-rose-500/20 text-rose-400">REJECTED</span>}
                                             </div>
@@ -973,57 +1036,6 @@ export default function SuperAdminDashboard() {
                     </div>
                 )}
 
-                {/* ════════════ SUBSCRIPTIONS ════════════ */}
-                {tab === 'subscriptions' && (
-                    <div>
-                        <div className="flex justify-between items-center mb-5">
-                            <h3 className="text-lg font-bold text-white">{subscriptions.length} Subscriptions</h3>
-                            <button onClick={() => setShowSubForm(!showSubForm)} className="btn-primary py-2.5 px-5 rounded-xl text-sm flex items-center gap-2 cursor-pointer"><span className="material-symbols-outlined text-sm">add</span>Assign Subscription</button>
-                        </div>
-                        {showSubForm && (
-                            <form onSubmit={handleCreateSub} className="glass-panel rounded-2xl p-6 mb-5 border border-primary/20">
-                                <h4 className="font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-primary text-lg">card_membership</span>Assign Subscription</h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    <select value={subForm.userId} onChange={e => setSubForm(f => ({ ...f, userId: e.target.value }))} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" required>
-                                        <option value="">Select User</option>
-                                        {users.map(u => <option key={u._id} value={u._id}>{u.name} ({u.email})</option>)}
-                                    </select>
-                                    <select value={subForm.plan} onChange={e => setSubForm(f => ({ ...f, plan: e.target.value }))} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none">
-                                        <option value="starter">Starter (50 credits)</option><option value="professional">Professional (500 credits)</option><option value="enterprise">Enterprise (Unlimited)</option>
-                                    </select>
-                                    <select value={subForm.billingCycle} onChange={e => setSubForm(f => ({ ...f, billingCycle: e.target.value }))} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none">
-                                        <option value="monthly">Monthly</option><option value="yearly">Yearly</option><option value="lifetime">Lifetime</option>
-                                    </select>
-                                    <input type="number" placeholder="Price (₹)" value={subForm.price} onChange={e => setSubForm(f => ({ ...f, price: e.target.value }))} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" />
-                                    <input type="number" placeholder="Custom credits (optional)" value={subForm.credits} onChange={e => setSubForm(f => ({ ...f, credits: e.target.value }))} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" />
-                                    <div className="flex gap-2 justify-end items-center">
-                                        <button type="button" onClick={() => setShowSubForm(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:bg-white/[0.04] cursor-pointer">Cancel</button>
-                                        <button type="submit" className="btn-primary px-6 py-2 rounded-lg text-sm cursor-pointer">Create</button>
-                                    </div>
-                                </div>
-                            </form>
-                        )}
-                        <div className="space-y-2">{subscriptions.map(s => (
-                            <div key={s._id} className="glass-panel rounded-2xl p-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center"><span className="material-symbols-outlined text-blue-400">card_membership</span></div>
-                                        <div>
-                                            <p className="text-base font-bold text-white">{s.user?.name || 'Unknown'} <span className="text-slate-500 text-xs font-normal">({s.user?.email})</span></p>
-                                            <p className="text-[11px] text-slate-500 capitalize">{s.plan} • {s.billingCycle} • {s.status}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-6">
-                                        <div className="text-center"><p className="text-base font-bold text-white">{s.credits?.used || 0}/{s.credits?.total || 0}</p><p className="text-xs text-slate-600">credits used</p></div>
-                                        <div className="text-center"><p className="text-sm font-bold text-amber-400">₹{(s.price || 0).toLocaleString()}</p><p className="text-xs text-slate-600">paid</p></div>
-                                        <div className="text-center"><p className="text-sm text-slate-400">{s.endDate ? new Date(s.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</p><p className="text-xs text-slate-600">expires</p></div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}</div>
-                        {subscriptions.length === 0 && <div className="text-center py-16 glass-panel rounded-2xl"><span className="material-symbols-outlined text-5xl text-slate-700 mb-3">card_membership</span><h3 className="text-lg font-bold text-white mb-1">No Subscriptions</h3><p className="text-sm text-slate-500">Assign subscriptions to users</p></div>}
-                    </div>
-                )}
 
                 {/* ════════════ COUPONS ════════════ */}
                 {tab === 'coupons' && (
@@ -1202,6 +1214,38 @@ export default function SuperAdminDashboard() {
                                         ))}
                                     </div>
                                 </div>
+
+                                <div className="glass-panel rounded-2xl p-6 border border-primary/10">
+                                    <div className="flex items-center justify-between mb-8">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                                                <span className="material-symbols-outlined text-amber-400">sync_problem</span>
+                                            </div>
+                                            <div>
+                                                <p className="text-base font-bold text-white">Credit Integrity Sync</p>
+                                                <p className="text-sm text-slate-500">Repair and synchronize credit data system-wide</p>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={handleSyncCredits} 
+                                            disabled={syncingCredits}
+                                            className="px-6 py-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-sm font-bold border border-amber-500/30 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                                        >
+                                            <span className={`material-symbols-outlined text-base ${syncingCredits ? 'animate-spin' : ''}`}>
+                                                {syncingCredits ? 'progress_activity' : 'database_sync'}
+                                            </span>
+                                            {syncingCredits ? 'Syncing...' : 'Start Integrity Sync'}
+                                        </button>
+                                    </div>
+                                    <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/10">
+                                        <div className="flex gap-2">
+                                            <span className="material-symbols-outlined text-amber-400 text-sm">info</span>
+                                            <p className="text-xs text-amber-400/80 leading-relaxed">
+                                                This utility walks through all users, verifies their active subscription allocation, and matches their `used` credits against the `CreditUsage` logs for the current cycle. Use this if you notice discrepancies between plan limits and actual credit balances.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -1291,7 +1335,7 @@ export default function SuperAdminDashboard() {
                                             {/* Account */}
                                             <p className="text-xs text-slate-400 truncate">{i.displayName || i.email || '—'}</p>
                                             {/* Last Synced */}
-                                            <span className="text-xs text-slate-600">{i.lastSyncAt ? new Date(i.lastSyncAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' }) : 'Never'}</span>
+                                            <span className="text-xs text-slate-600">{i.lastSyncAt ? new Date(i.lastSyncAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Never'}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -1304,6 +1348,87 @@ export default function SuperAdminDashboard() {
                                     </div>
                                 )}
                             </>
+                        )}
+                    </div>
+                )}
+
+                {/* ════════════ AUDIT LOGS ════════════ */}
+                {tab === 'logs' && (
+                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-indigo-400">history</span>
+                                    System Audit Logs
+                                </h3>
+                                <p className="text-sm text-slate-500 mt-1">Immutable record of all administrative actions performed on the platform</p>
+                            </div>
+                            <button onClick={loadLogs} className="p-2 rounded-lg bg-white/[0.04] text-slate-400 hover:text-white cursor-pointer transition-all"><span className={`${logsLoading ? 'animate-spin' : ''} material-symbols-outlined text-sm`}>refresh</span></button>
+                        </div>
+
+                        <div className="glass-panel rounded-2xl overflow-hidden border border-white/[0.06]">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="text-xs text-slate-500 font-bold uppercase tracking-wider border-b border-white/[0.06] bg-white/[0.02]">
+                                            <th className="px-5 py-4">Action & Target</th>
+                                            <th className="px-5 py-4">Admin</th>
+                                            <th className="px-5 py-4">Severity</th>
+                                            <th className="px-5 py-4">IP Address</th>
+                                            <th className="px-5 py-4 text-right">Timestamp</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/[0.04]">
+                                        {logsLoading ? (
+                                            <tr><td colSpan="5" className="py-20 text-center text-slate-500 capitalize"><span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>Loading Audit Trail...</td></tr>
+                                        ) : logs.length > 0 ? logs.map(log => (
+                                            <tr key={log._id} className="text-sm hover:bg-white/[0.01] transition-all group">
+                                                <td className="px-5 py-4">
+                                                    <div>
+                                                        <span className="font-bold text-white uppercase text-[10px] px-1.5 py-0.5 rounded bg-white/[0.08] mr-2">{log.action?.replace(/_/g, ' ')}</span>
+                                                        <span className="text-slate-400 text-xs">{log.targetModel} ({log.targetId?.slice(-6)})</span>
+                                                        {log.metadata?.reason && <p className="text-[10px] text-slate-600 mt-1 italic">"{log.metadata.reason}"</p>}
+                                                    </div>
+                                                </td>
+                                                <td className="px-5 py-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-6 h-6 rounded bg-indigo-500/10 flex items-center justify-center text-[10px] font-bold text-indigo-400">{log.admin?.name?.[0]}</div>
+                                                        <span className="text-slate-300 font-medium">{log.admin?.name || 'System'}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-5 py-4">
+                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                                                        log.severity === 'high' ? 'bg-rose-500/20 text-rose-400' :
+                                                        log.severity === 'medium' ? 'bg-amber-500/20 text-amber-400' :
+                                                        'bg-emerald-500/20 text-emerald-400'
+                                                    }`}>{log.severity?.toUpperCase()}</span>
+                                                </td>
+                                                <td className="px-5 py-4 font-mono text-xs text-slate-600">{log.ipAddress || '—'}</td>
+                                                <td className="px-5 py-4 text-right text-slate-500 text-xs">
+                                                    {new Date(log.createdAt).toLocaleString('en-IN', { 
+                                                        day: '2-digit', 
+                                                        month: 'short', 
+                                                        year: 'numeric',
+                                                        hour: '2-digit', 
+                                                        minute: '2-digit', 
+                                                        second: '2-digit',
+                                                        hour12: true 
+                                                    })}
+                                                </td>
+                                            </tr>
+                                        )) : (
+                                            <tr><td colSpan="5" className="py-20 text-center text-slate-600">No audit logs found</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {totalLogs > 50 && (
+                            <div className="flex justify-center gap-2 mt-6">
+                                <button disabled={logsPage <= 1} onClick={() => setLogsPage(p => p - 1)} className="px-4 py-2 rounded-lg bg-white/[0.04] text-sm text-slate-400 disabled:opacity-30 cursor-pointer">← Prev</button>
+                                <span className="px-4 py-2 text-sm text-slate-500">Page {logsPage}</span>
+                                <button disabled={logs.length < 50} onClick={() => setLogsPage(p => p + 1)} className="px-4 py-2 rounded-lg bg-white/[0.04] text-sm text-slate-400 disabled:opacity-30 cursor-pointer">Next →</button>
+                            </div>
                         )}
                     </div>
                 )}
@@ -1330,14 +1455,27 @@ export default function SuperAdminDashboard() {
                         <div className="glass-panel rounded-2xl p-6 w-[420px] border border-primary/20" onClick={e => e.stopPropagation()}>
                             <h3 className="font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-blue-400">upgrade</span>Change Plan — {planModal.name}</h3>
                             <p className="text-sm text-slate-500 mb-4">Current: <strong className="text-white capitalize">{planModal.plan}</strong></p>
-                            <div className="space-y-2">{Object.entries(pc).map(([plan, cfg]) => (
-                                <button key={plan} onClick={() => handleChangePlan(planModal._id, plan)} className={`w-full p-4 rounded-xl text-left transition-all cursor-pointer border ${planModal.plan === plan ? 'border-primary/40 bg-primary/10' : 'border-white/[0.06] hover:bg-white/[0.04]'}`}>
-                                    <div className="flex justify-between items-center">
-                                        <div><p className="text-base font-bold text-white capitalize">{plan}</p><p className="text-[11px] text-slate-500">{cfg.cr} credits • {cfg.p}</p></div>
-                                        {planModal.plan === plan && <span className="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary font-bold">CURRENT</span>}
-                                    </div>
-                                </button>
-                            ))}</div>
+                            <div className="space-y-2">
+                                {packages.length > 0 ? packages.map((pkg) => (
+                                    <button 
+                                        key={pkg._id} 
+                                        onClick={() => handleChangePlan(planModal._id, pkg.slug)} 
+                                        className={`w-full p-4 rounded-xl text-left transition-all cursor-pointer border ${planModal.plan === pkg.slug ? 'border-primary/40 bg-primary/10' : 'border-white/[0.06] hover:bg-white/[0.04]'}`}
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <p className="text-base font-bold text-white capitalize">{pkg.name}</p>
+                                                <p className="text-[11px] text-slate-500">
+                                                    {pkg.credits?.monthly} credits • {pkg.pricing?.monthly > 0 ? `₹${pkg.pricing.monthly}/mo` : 'Free'}
+                                                </p>
+                                            </div>
+                                            {planModal.plan === pkg.slug && <span className="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary font-bold">CURRENT</span>}
+                                        </div>
+                                    </button>
+                                )) : (
+                                    <div className="text-center py-4 text-slate-500 text-sm">No packages found. Create one in the Packages tab.</div>
+                                )}
+                            </div>
                             <div className="flex justify-end mt-4"><button onClick={() => setPlanModal(null)} className="px-4 py-2 rounded-lg text-sm text-slate-400 cursor-pointer">Close</button></div>
                         </div>
                     </div>

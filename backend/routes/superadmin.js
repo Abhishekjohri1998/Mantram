@@ -16,14 +16,27 @@ import Subscription from '../models/Subscription.js';
 import Coupon from '../models/Coupon.js';
 import SubscriptionPackage from '../models/SubscriptionPackage.js';
 import SystemSettings, { getSetting, setSetting } from '../models/SystemSettings.js';
+import AuditLog from '../models/AuditLog.js';
 import { CREDIT_COSTS, getCreditCosts, getCreditBalance, invalidateCreditCostCache } from '../middleware/credits.js';
 import { protect, authorize, generateToken } from '../middleware/auth.js';
 import { safeErrorMessage } from '../utils/safeError.js';
+import { logAudit } from '../utils/audit.js';
+import CreditUsage from '../models/CreditUsage.js';
+import rateLimit from 'express-rate-limit';
 
 const router = Router();
 
+// Rate limiting for Super Admin to prevent brute force / DoS on heavy stats
+const adminLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 500, // Limit each IP to 500 requests per window
+    message: { success: false, error: 'Too many administrative requests. Please try again later.' },
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+});
+
 // All routes require superadmin
-router.use(protect, authorize('superadmin'));
+router.use(protect, authorize('superadmin'), adminLimiter);
 
 // ══════════════════════════════════════════════════════════════
 // 1. PLATFORM OVERVIEW
@@ -32,7 +45,7 @@ router.use(protect, authorize('superadmin'));
 router.get('/stats', async (req, res) => {
     try {
         const [totalUsers, totalBrands, totalContent, totalCreatives, totalProducts, totalIntegrations, totalSubscriptions, totalCoupons, totalFeedback, totalSeoAudits] = await Promise.all([
-            User.countDocuments({ role: { $ne: 'superadmin' } }),
+            User.countDocuments(),
             Brand.countDocuments(),
             Content.countDocuments(),
             Creative.countDocuments(),
@@ -45,7 +58,6 @@ router.get('/stats', async (req, res) => {
         ]);
 
         const planDistribution = await User.aggregate([
-            { $match: { role: { $ne: 'superadmin' } } },
             { $group: { _id: '$plan', count: { $sum: 1 } } },
         ]);
 
@@ -54,7 +66,7 @@ router.get('/stats', async (req, res) => {
             { $group: { _id: null, totalRevenue: { $sum: '$price' }, count: { $sum: 1 } } },
         ]);
 
-        const recentUsersRaw = await User.find({ role: { $ne: 'superadmin' } })
+        const recentUsersRaw = await User.find()
             .sort('-createdAt').limit(10)
             .select('name email plan role credits createdAt lastActive company');
 
@@ -65,7 +77,6 @@ router.get('/stats', async (req, res) => {
         }));
 
         const totalCreditsUsed = await User.aggregate([
-            { $match: { role: { $ne: 'superadmin' } } },
             { $group: { _id: null, total: { $sum: '$credits.used' } } },
         ]);
 
@@ -82,29 +93,36 @@ router.get('/stats', async (req, res) => {
 
         // Users created per day (last 30 days)
         const userGrowth = await User.aggregate([
-            { $match: { createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }, role: { $ne: 'superadmin' } } },
+            { $match: { createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } } },
             { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
             { $sort: { _id: 1 } },
         ]);
 
         // Usage Analytics: Top users, exhausted, and near exhaustion
         const [topUsersRaw, exhaustedUsersData] = await Promise.all([
-            User.find({ role: { $ne: 'superadmin' } })
+            User.find()
                 .sort('-credits.used')
                 .limit(10)
                 .select('name email plan credits.used credits.total credits.bonus lastActive'),
             User.aggregate([
-                { $match: { role: { $ne: 'superadmin' } } },
                 {
                     $project: {
                         isExhausted: {
-                            $lte: [
-                                { $subtract: [{ $add: ['$credits.total', '$credits.bonus'] }, '$credits.used'] },
-                                0
+                            $and: [
+                                { $ne: ['$plan', 'enterprise'] },
+                                { $ne: ['$role', 'superadmin'] },
+                                {
+                                    $lte: [
+                                        { $subtract: [{ $add: ['$credits.total', '$credits.bonus'] }, '$credits.used'] },
+                                        0
+                                    ]
+                                }
                             ]
                         },
                         isNearExhaustion: {
                             $and: [
+                                { $ne: ['$plan', 'enterprise'] },
+                                { $ne: ['$role', 'superadmin'] },
                                 { $gt: [{ $subtract: [{ $add: ['$credits.total', '$credits.bonus'] }, '$credits.used'] }, 0] },
                                 { $lte: [{ $subtract: [{ $add: ['$credits.total', '$credits.bonus'] }, '$credits.used'] }, { $multiply: [{ $add: ['$credits.total', '$credits.bonus'] }, 0.1] }] }
                             ]
@@ -121,10 +139,13 @@ router.get('/stats', async (req, res) => {
             ])
         ]);
 
-        const topUsers = topUsersRaw.map(u => ({
-            ...u.toJSON(),
-            creditBalance: getCreditBalance(u)
-        }));
+        const [topUsers, churnedUsersCount, returningUsersCount] = await Promise.all([
+            Promise.resolve(topUsersRaw.map(u => ({ ...u.toJSON(), creditBalance: getCreditBalance(u) }))),
+            User.countDocuments({ lastActive: { $lt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000) }, role: { $ne: 'superadmin' } }),
+            User.countDocuments({ lastActive: { $gt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }, createdAt: { $lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } })
+        ]);
+
+        const retentionRate = totalUsers > 0 ? (returningUsersCount / totalUsers * 100).toFixed(1) : 0;
 
         res.json({
             success: true,
@@ -142,6 +163,8 @@ router.get('/stats', async (req, res) => {
                     topUsers,
                     exhaustedCount: exhaustedUsersData[0]?.exhaustedCount || 0,
                     nearEmptyCount: exhaustedUsersData[0]?.nearEmptyCount || 0,
+                    churnedUsersCount,
+                    retentionRate: `${retentionRate}%`
                 },
                 creditCosts: CREDIT_COSTS,
             },
@@ -158,7 +181,7 @@ router.get('/stats', async (req, res) => {
 router.get('/users', async (req, res) => {
     try {
         const { page = 1, limit = 20, search, plan, role, sort = '-createdAt' } = req.query;
-        const filter = { role: { $ne: 'superadmin' } };
+        const filter = {};
         if (search) {
             const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             filter.$or = [
@@ -168,7 +191,7 @@ router.get('/users', async (req, res) => {
             ];
         }
         if (plan) filter.plan = plan;
-        if (role && role !== 'superadmin') filter.role = role;
+        if (role) filter.role = role;
 
         const users = await User.find(filter)
             .sort(sort)
@@ -226,12 +249,29 @@ router.put('/users/:id', async (req, res) => {
             if (credits.bonus !== undefined) update['credits.bonus'] = credits.bonus;
         }
         if (plan && !credits) {
-            const planCredits = { starter: 50, professional: 500, enterprise: 999999 };
-            update['credits.total'] = planCredits[plan] || 50;
-            update['credits.used'] = 0;
+            const pkg = await SubscriptionPackage.findOne({ slug: plan });
+            if (pkg) {
+                update['credits.total'] = pkg.credits?.monthly || 50;
+                update['credits.used'] = 0;
+            } else {
+                // Fallback for legacy plans if package not found
+                const legacyCredits = { starter: 50, professional: 500, enterprise: 999999 };
+                update['credits.total'] = legacyCredits[plan] || 50;
+                update['credits.used'] = 0;
+            }
         }
+        const previousUser = await User.findById(req.params.id).select('-password');
+        if (!previousUser) return res.status(404).json({ success: false, error: 'User not found' });
+
         const user = await User.findByIdAndUpdate(req.params.id, update, { returnDocument: 'after' }).select('-password');
-        if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+        
+        await logAudit(req, {
+            action: 'UPDATE_USER',
+            targetModel: 'User',
+            targetId: user._id,
+            changes: { before: previousUser.toJSON(), after: user.toJSON() }
+        });
+
         res.json({ success: true, user: { ...user.toJSON(), creditBalance: getCreditBalance(user) } });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -242,7 +282,9 @@ router.delete('/users/:id', async (req, res) => {
     try {
         const user = await User.findById(req.params.id);
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
-        if (user.role === 'superadmin') return res.status(403).json({ success: false, error: 'Cannot delete super admin' });
+        if (user._id.toString() === req.user._id.toString()) {
+            return res.status(403).json({ success: false, error: 'Cannot delete your own account' });
+        }
 
         // Block deletion if user has an active plan
         const activeSub = await Subscription.findOne({ 
@@ -267,18 +309,38 @@ router.delete('/users/:id', async (req, res) => {
             });
         }
 
-        await Promise.all([
-            Brand.deleteMany({ user: user._id }),
-            Content.deleteMany({ user: user._id }),
-            Creative.deleteMany({ user: user._id }),
-            Integration.deleteMany({ user: user._id }),
-            Product.deleteMany({ brand: { $in: await Brand.find({ user: user._id }).distinct('_id') } }),
-            Subscription.deleteMany({ user: user._id }),
-            Feedback.deleteMany({ user: user._id }),
-            SeoAudit.deleteMany({ user: user._id }),
-            User.findByIdAndDelete(user._id),
-        ]);
-        res.json({ success: true, message: 'User and all data deleted' });
+        const session = await mongoose.startSession();
+        session.startTransaction();
+
+        try {
+            await Promise.all([
+                Brand.collection.deleteMany({ user: user._id }, { session }),
+                Content.collection.deleteMany({ user: user._id }, { session }),
+                Creative.collection.deleteMany({ user: user._id }, { session }),
+                Integration.collection.deleteMany({ user: user._id }, { session }),
+                Product.collection.deleteMany({ brand: { $in: await Brand.find({ user: user._id }).distinct('_id') } }, { session }),
+                Subscription.collection.deleteMany({ user: user._id }, { session }),
+                Feedback.collection.deleteMany({ user: user._id }, { session }),
+                SeoAudit.collection.deleteMany({ user: user._id }, { session }),
+                User.findByIdAndDelete(user._id, { session }),
+            ]);
+
+            await logAudit(req, {
+                action: 'DELETE_USER',
+                targetModel: 'User',
+                targetId: user._id,
+                severity: 'critical',
+                metadata: { email: user.email, name: user.name }
+            });
+
+            await session.commitTransaction();
+            res.json({ success: true, message: 'User and all data deleted' });
+        } catch (error) {
+            await session.abortTransaction();
+            throw error;
+        } finally {
+            session.endSession();
+        }
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -289,8 +351,30 @@ router.post('/users/:id/impersonate', async (req, res) => {
         const user = await User.findById(req.params.id).select('-password');
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
         if (user.role === 'superadmin') return res.status(403).json({ success: false, error: 'Cannot impersonate super admin' });
+        
         const token = generateToken(user._id);
-        res.json({ success: true, token, user: { id: user._id, name: user.name, email: user.email, role: user.role, plan: user.plan }, message: `Impersonating ${user.name}` });
+
+        await logAudit(req, {
+            action: 'IMPERSONATE_USER',
+            targetModel: 'User',
+            targetId: user._id,
+            severity: 'medium',
+            metadata: { adminName: req.user.name, userName: user.name }
+        });
+
+        res.json({ 
+            success: true, 
+            token, 
+            user: { 
+                id: user._id, 
+                name: user.name, 
+                email: user.email, 
+                role: user.role, 
+                plan: user.plan,
+                isImpersonated: true 
+            }, 
+            message: `Impersonating ${user.name}` 
+        });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -300,8 +384,28 @@ router.post('/users/:id/add-credits', async (req, res) => {
     try {
         const { amount, reason } = req.body;
         if (!amount || amount <= 0) return res.status(400).json({ success: false, error: 'Amount must be positive' });
-        const user = await User.findByIdAndUpdate(req.params.id, { $inc: { 'credits.bonus': amount } }, { returnDocument: 'after' }).select('-password');
+        
+        const user = await User.findById(req.params.id).select('-password');
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+        user.credits.bonus += amount;
+        await user.save();
+
+        // Create audit log
+        const balanceAfter = (user.credits?.total || 0) + (user.credits?.bonus || 0) - (user.credits?.used || 0);
+        await CreditUsage.create({
+            user: user._id,
+            action: 'admin_adjustment',
+            cost: -amount, // Negative cost means addition
+            balanceAfter: Math.max(0, balanceAfter),
+            description: `Admin Adjustment: ${reason || 'Bonus credits added'}`,
+            metadata: {
+                adminId: req.user._id,
+                reason,
+                type: 'bonus'
+            }
+        }).catch(err => console.warn('Credit audit log failed:', err.message));
+
         res.json({ success: true, user: { ...user.toJSON(), creditBalance: getCreditBalance(user) } });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -310,7 +414,65 @@ router.post('/users/:id/add-credits', async (req, res) => {
 
 router.post('/users/:id/reset-credits', async (req, res) => {
     try {
+        const user = await User.findById(req.params.id).select('-password');
+        if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+        const previousUsed = user.credits.used;
+        user.credits.used = 0;
+        await user.save();
+
+        if (user.activeSubscription) {
+            await Subscription.findByIdAndUpdate(user.activeSubscription, { $set: { 'credits.used': 0 } });
+        }
+
+        // Create audit log
+        const balanceAfter = (user.credits?.total || 0) + (user.credits?.bonus || 0);
+        await CreditUsage.create({
+            user: user._id,
+            action: 'admin_adjustment',
+            cost: previousUsed, // Adding back 'used' credits
+            balanceAfter: Math.max(0, balanceAfter),
+            description: 'Admin Adjustment: Manual Credit Reset',
+            metadata: {
+                adminId: req.user._id,
+                type: 'reset',
+                previousUsed
+            }
+        }).catch(err => console.warn('Credit audit log failed:', err.message));
+
         res.json({ success: true, user: { ...user.toJSON(), creditBalance: getCreditBalance(user) } });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+/**
+ * System-Wide Credit Synchronization
+ * Repair tool to ensure all users have correct credit counts based on logs and plans.
+ */
+router.post('/system/sync-all-credits', async (req, res) => {
+    try {
+        const { syncUserCredits } = await import('../utils/credits.js');
+        const users = await User.find({ role: { $ne: 'superadmin' } });
+        
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const user of users) {
+             try {
+                 await syncUserCredits(user._id);
+                 successCount++;
+             } catch (err) {
+                 console.error(`Sync failed for user ${user.email}:`, err.message);
+                 failCount++;
+             }
+        }
+
+        res.json({ 
+            success: true, 
+            message: `Synchronization complete.`, 
+            stats: { total: users.length, success: successCount, failed: failCount } 
+        });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -655,9 +817,38 @@ router.get('/system-settings', async (req, res) => {
 router.put('/system-settings', async (req, res) => {
     try {
         const { watermarkEnabled, defaultProvider, maintenanceMode } = req.body;
-        if (watermarkEnabled !== undefined) await setSetting('watermark_enabled', !!watermarkEnabled, req.user._id);
-        if (defaultProvider) await setSetting('default_ai_provider', defaultProvider, req.user._id);
-        if (maintenanceMode !== undefined) await setSetting('maintenance_mode', !!maintenanceMode, req.user._id);
+        const before = {};
+        const after = {};
+
+        if (watermarkEnabled !== undefined) {
+            before.watermarkEnabled = await getSetting('watermark_enabled');
+            await setSetting('watermark_enabled', !!watermarkEnabled, req.user._id);
+            after.watermarkEnabled = !!watermarkEnabled;
+        }
+        
+        if (defaultProvider) {
+            // Whitelist validation for AI providers
+            const validProviders = ['gemini', 'openai', 'anthropic', 'mistral'];
+            if (!validProviders.includes(defaultProvider.toLowerCase())) {
+                return res.status(400).json({ success: false, error: `Invalid provider. Must be one of: ${validProviders.join(', ')}` });
+            }
+            before.defaultProvider = await getSetting('default_ai_provider');
+            await setSetting('default_ai_provider', defaultProvider.toLowerCase(), req.user._id);
+            after.defaultProvider = defaultProvider.toLowerCase();
+        }
+
+        if (maintenanceMode !== undefined) {
+            before.maintenanceMode = await getSetting('maintenance_mode');
+            await setSetting('maintenance_mode', !!maintenanceMode, req.user._id);
+            after.maintenanceMode = !!maintenanceMode;
+        }
+
+        await logAudit(req, {
+            action: 'UPDATE_SYSTEM_SETTINGS',
+            targetModel: 'SystemSettings',
+            changes: { before, after }
+        });
+
         res.json({ success: true, message: 'Settings updated' });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -710,10 +901,30 @@ router.get('/products', async (req, res) => {
 // 8. SUBSCRIPTION PACKAGES (AI-Driven Builder)
 // ══════════════════════════════════════════════════════════════
 
+// GET /superadmin/packages — list all with dynamic subscriber counts
 router.get('/packages', async (req, res) => {
     try {
-        const packages = await SubscriptionPackage.find().sort('displayOrder tier').populate('createdBy', 'name email');
-        res.json({ success: true, packages });
+        const packages = await SubscriptionPackage.find()
+            .sort('displayOrder tier')
+            .populate('createdBy', 'name email')
+            .lean();
+
+        // Dynamically calculate user counts per package slug (plan)
+        const userCounts = await User.aggregate([
+            { $group: { _id: '$plan', count: { $sum: 1 } } }
+        ]);
+
+        const countMap = userCounts.reduce((acc, curr) => {
+            acc[curr._id] = curr.count;
+            return acc;
+        }, {});
+
+        const packagesWithCounts = packages.map(pkg => ({
+            ...pkg,
+            subscriberCount: countMap[pkg.slug] || 0
+        }));
+
+        res.json({ success: true, packages: packagesWithCounts });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -728,6 +939,14 @@ router.post('/packages', async (req, res) => {
         const existing = await SubscriptionPackage.findOne({ slug: data.slug });
         if (existing) return res.status(400).json({ success: false, error: 'Package slug already exists' });
         const pkg = await SubscriptionPackage.create(data);
+        
+        await logAudit(req, {
+            action: 'CREATE_PACKAGE',
+            targetModel: 'SubscriptionPackage',
+            targetId: pkg._id,
+            changes: { after: pkg.toJSON() }
+        });
+
         res.status(201).json({ success: true, package: pkg });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -736,8 +955,18 @@ router.post('/packages', async (req, res) => {
 
 router.put('/packages/:id', async (req, res) => {
     try {
+        const previous = await SubscriptionPackage.findById(req.params.id);
+        if (!previous) return res.status(404).json({ success: false, error: 'Package not found' });
+
         const pkg = await SubscriptionPackage.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
-        if (!pkg) return res.status(404).json({ success: false, error: 'Package not found' });
+        
+        await logAudit(req, {
+            action: 'UPDATE_PACKAGE',
+            targetModel: 'SubscriptionPackage',
+            targetId: pkg._id,
+            changes: { before: previous.toJSON(), after: pkg.toJSON() }
+        });
+
         res.json({ success: true, package: pkg });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -746,7 +975,19 @@ router.put('/packages/:id', async (req, res) => {
 
 router.delete('/packages/:id', async (req, res) => {
     try {
+        const pkg = await SubscriptionPackage.findById(req.params.id);
+        if (!pkg) return res.status(404).json({ success: false, error: 'Package not found' });
+
         await SubscriptionPackage.findByIdAndDelete(req.params.id);
+        
+        await logAudit(req, {
+            action: 'DELETE_PACKAGE',
+            targetModel: 'SubscriptionPackage',
+            targetId: pkg._id,
+            severity: 'warning',
+            metadata: { name: pkg.name, slug: pkg.slug }
+        });
+
         res.json({ success: true, message: 'Package deleted' });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -1091,7 +1332,7 @@ creditRouter.get('/summary', protect, async (req, res) => {
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const weekStart = new Date(todayStart); weekStart.setDate(weekStart.getDate() - 7);
-        const monthStart = new Date(todayStart); monthStart.setDate(weekStart.getDate() - 30);
+        const monthStart = new Date(todayStart); monthStart.setDate(monthStart.getDate() - 30);
 
         const [todayUsage, weekUsage, monthUsage, byAction] = await Promise.all([
             CreditUsage.aggregate([
@@ -1125,7 +1366,10 @@ creditRouter.get('/summary', protect, async (req, res) => {
 
         res.json({
             success: true,
-            balance,
+            balance: {
+                ...balance,
+                plan: user.plan // Include current plan slug for the UI
+            },
             today: { credits: todayUsage[0]?.total || 0, operations: todayUsage[0]?.count || 0 },
             week: { credits: weekUsage[0]?.total || 0, operations: weekUsage[0]?.count || 0 },
             month: { credits: monthUsage[0]?.total || 0, operations: monthUsage[0]?.count || 0 },
@@ -1246,6 +1490,41 @@ router.get('/stats/token-usage', async (req, res) => {
             byModel,
             topUsers: byUser,
             dailyTrend,
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════
+// 10. SYSTEM AUDIT LOGS
+// ══════════════════════════════════════════════════════════════
+
+// GET /superadmin/system-logs — paginated audit trails
+router.get('/system-logs', async (req, res) => {
+    try {
+        const { page = 1, limit = 50, action, adminId, severity } = req.query;
+        const query = {};
+        if (action) query.action = action;
+        if (adminId) query.admin = adminId;
+        if (severity) query.severity = severity;
+
+        const [logs, total] = await Promise.all([
+            AuditLog.find(query)
+                .populate('admin', 'name email image')
+                .sort({ createdAt: -1 })
+                .skip((parseInt(page) - 1) * parseInt(limit))
+                .limit(parseInt(limit))
+                .lean(),
+            AuditLog.countDocuments(query)
+        ]);
+
+        res.json({
+            success: true,
+            logs,
+            total,
+            page: parseInt(page),
+            pages: Math.ceil(total / parseInt(limit))
         });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });

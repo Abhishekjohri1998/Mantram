@@ -65,6 +65,12 @@ app.use(helmet({
     contentSecurityPolicy: false, // Disabled for API server — frontend handles CSP
 }));
 
+// Set Permissions Policy to allow Razorpay sensors/payment features
+app.use((req, res, next) => {
+    res.setHeader('Permissions-Policy', 'accelerometer=*, gyroscope=*, magnetometer=*, payment=*');
+    next();
+});
+
 // Middleware
 app.use(cors({
     origin: (origin, callback) => {
@@ -82,7 +88,9 @@ app.use(cors({
             callback(null, false);
         }
     },
-    credentials: true
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-rtb-fingerprint-id'],
+    exposedHeaders: ['x-rtb-fingerprint-id']
 }));
 // Special middleware for Webhooks to ensure raw body capture for HMAC verification
 app.use((req, res, next) => {

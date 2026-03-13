@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { optionalAuth, protect } from '../middleware/auth.js';
+import { requireStudio } from '../middleware/studioAccess.js';
 import { requireCredits } from '../middleware/credits.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import BrandStrategy from '../models/BrandStrategy.js';
@@ -387,7 +388,7 @@ Respond in JSON format:
 });
 
 // POST /api/brainstorm-studio/generate — Generate multi-layer scored ideas (intent-specific)
-router.post('/generate', protect, requireCredits('brainstorm'), async (req, res) => {
+router.post('/generate', protect, requireStudio('brainstormStudio'), requireCredits('brainstorm'), async (req, res) => {
   try {
     const { intent, answers, brand, refinementHint } = req.body;
     if (!intent || !answers) return res.status(400).json({ success: false, error: 'Intent and answers are required' });
@@ -549,7 +550,7 @@ ${outputFormat}`;
 });
 
 // POST /api/brainstorm-studio/refine — Refine existing ideas
-router.post('/refine', protect, requireCredits('brainstormRefine'), async (req, res) => {
+router.post('/refine', protect, requireStudio('brainstormStudio'), requireCredits('brainstormRefine'), async (req, res) => {
   try {
     const { intent, answers, brand, previousIdeas, refinementPrompt } = req.body;
     if (!refinementPrompt) return res.status(400).json({ success: false, error: 'Refinement prompt is required' });
@@ -616,7 +617,7 @@ router.post('/feedback', optionalAuth, async (req, res) => {
 });
 
 // POST /api/brainstorm-studio/screenplay — Generate screenplay from approved film concept
-router.post('/screenplay', protect, requireCredits('brainstormScreenplay'), async (req, res) => {
+router.post('/screenplay', protect, requireStudio('brainstormStudio'), requireCredits('brainstormScreenplay'), async (req, res) => {
   try {
     const { filmConcept, brand } = req.body;
     if (!filmConcept) return res.status(400).json({ success: false, error: 'Film concept is required' });
@@ -692,7 +693,7 @@ ${brandContext}`;
 });
 
 // POST /api/brainstorm-studio/chat — Multi-turn film refinement chat
-router.post('/chat', protect, requireCredits('brainstormChat'), async (req, res) => {
+router.post('/chat', protect, requireStudio('brainstormStudio'), requireCredits('brainstormChat'), async (req, res) => {
   try {
     const { filmConcept, chatHistory, userMessage, brand } = req.body;
     if (!filmConcept || !userMessage) {
@@ -755,7 +756,7 @@ Respond in JSON:
 // ============================================================================
 
 // POST /api/brainstorm-studio/strategy — Generate comprehensive brand strategy
-router.post('/strategy', protect, requireCredits('brainstorm'), async (req, res) => {
+router.post('/strategy', protect, requireStudio('brainstormStudio'), requireCredits('brainstorm'), async (req, res) => {
   try {
     const { answers, brand } = req.body;
     if (!answers) return res.status(400).json({ success: false, error: 'Answers are required' });

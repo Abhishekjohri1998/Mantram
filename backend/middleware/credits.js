@@ -100,11 +100,6 @@ export const requireCredits = (actionOrCost = 1) => {
         try {
             const user = req.user;
 
-            // Superadmin & enterprise bypass credit checks
-            if (user.role === 'superadmin' || user.plan === 'enterprise') {
-                return next();
-            }
-
             // Resolve cost
             let cost;
             const actionName = typeof actionOrCost === 'string' ? actionOrCost : null;
@@ -113,6 +108,28 @@ export const requireCredits = (actionOrCost = 1) => {
             } else {
                 const costs = await getCreditCosts();
                 cost = costs[actionOrCost] || 1;
+            }
+
+            // Superadmin & enterprise bypass credit checks BUT NOT logging
+            if (user.role === 'superadmin' || user.plan === 'enterprise') {
+                // Log usage (fire-and-forget) – don't calculate balanceAfter for bypass users
+                CreditUsage.create({
+                    user: user._id,
+                    action: actionName || 'unknown',
+                    cost,
+                    balanceAfter: Infinity, // Unlimited users
+                    description: ACTION_LABELS[actionName] || actionName || 'AI Operation',
+                    metadata: {
+                        route: req.originalUrl,
+                        brandId: req.body?.brandId || req.params?.brandId,
+                        brandName: req.body?.brandName,
+                        subscriptionId: user.activeSubscription,
+                        bypassed: true
+                    },
+                }).catch(err => console.warn('Credit usage log (bypass) failed:', err.message));
+
+                req.creditsDeducted = cost;
+                return next();
             }
 
             const remaining = (user.credits?.total || 0) + (user.credits?.bonus || 0) - (user.credits?.used || 0);
@@ -128,9 +145,17 @@ export const requireCredits = (actionOrCost = 1) => {
             }
 
             // Deduct credits immediately
-            const updated = await User.findByIdAndUpdate(user._id, {
-                $inc: { 'credits.used': cost },
-            }, { returnDocument: 'after' });
+            const updateOps = [
+                User.findByIdAndUpdate(user._id, { $inc: { 'credits.used': cost } }, { returnDocument: 'after' })
+            ];
+
+            // If user has an active subscription, sync deduction there too
+            if (user.activeSubscription) {
+                const Subscription = (await import('../models/Subscription.js')).default;
+                updateOps.push(Subscription.findByIdAndUpdate(user.activeSubscription, { $inc: { 'credits.used': cost } }));
+            }
+
+            const [updated] = await Promise.all(updateOps);
 
             // Log usage (fire-and-forget)
             const balanceAfter = (updated.credits?.total || 0) + (updated.credits?.bonus || 0) - (updated.credits?.used || 0);
@@ -149,6 +174,7 @@ export const requireCredits = (actionOrCost = 1) => {
                     route: req.originalUrl,
                     brandId: req.body?.brandId || req.params?.brandId,
                     brandName: req.body?.brandName,
+                    subscriptionId: user.activeSubscription,
                 },
             }).catch(err => console.warn('Credit usage log failed:', err.message));
 
@@ -171,12 +197,25 @@ export const requireCredits = (actionOrCost = 1) => {
  * Get user's credit balance
  */
 export const getCreditBalance = (user) => {
-    if (user.role === 'superadmin' || user.plan === 'enterprise') {
-        return { total: Infinity, used: 0, remaining: Infinity, unlimited: true };
+    if (user.role === 'superadmin' || user.plan === 'enterprise' || (user.credits?.total >= 999999)) {
+        return { total: Infinity, used: 0, remaining: Infinity, unlimited: true, bonus: 0, bonusUsed: 0 };
     }
-    const total = (user.credits?.total || 50) + (user.credits?.bonus || 0);
+    const bonus = user.credits?.bonus || 0;
+    const bonusUsed = user.credits?.bonusUsed || 0;
+    const planCredits = user.credits?.total || 50;
     const used = user.credits?.used || 0;
-    return { total, used, remaining: Math.max(0, total - used), unlimited: false };
+    
+    // Total is plan credits + bonus credits
+    const total = planCredits + bonus;
+    
+    return { 
+        total, 
+        used, 
+        remaining: Math.max(0, total - used), 
+        unlimited: false,
+        bonus,
+        bonusUsed
+    };
 };
 
 // Export defaults for reference

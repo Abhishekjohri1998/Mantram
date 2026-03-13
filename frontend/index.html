@@ -80,7 +80,16 @@
   <!-- External Scripts -->
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <meta name="shopify-api-key" content="%VITE_SHOPIFY_API_KEY%" />
-  <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+  <script>
+    (function () {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('shop') && urlParams.get('host')) {
+        const script = document.createElement('script');
+        script.src = "https://cdn.shopify.com/shopifycloud/app-bridge.js";
+        document.head.appendChild(script);
+      }
+    })();
+  </script>
 
   <!-- JSON-LD: Organization (Enhanced for AI) -->
   <script type="application/ld+json">

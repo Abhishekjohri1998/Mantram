@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true, minlength: 6, select: false },
     role: { type: String, enum: ['user', 'admin', 'team-member', 'superadmin'], default: 'user' },
-    plan: { type: String, enum: ['starter', 'professional', 'enterprise'], default: 'starter' },
+    plan: { type: String, default: 'starter' },
     avatar: { type: String, default: '' },
     company: { type: String, default: '' },
 
@@ -75,7 +75,7 @@ const userSchema = new mongoose.Schema({
 
 // Virtual: remaining credits
 userSchema.virtual('creditsRemaining').get(function () {
-    if (this.role === 'superadmin' || this.plan === 'enterprise') return Infinity;
+    if (this.role === 'superadmin' || this.plan === 'enterprise' || (this.credits?.total >= 999999)) return Infinity;
     return Math.max(0, (this.credits.total + this.credits.bonus) - this.credits.used);
 });
 

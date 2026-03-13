@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import Integration from '../models/Integration.js';
 import config from '../config/env.js';
+import { performMonthlyReset } from '../utils/credits.js';
 
 // Protect routes — verify JWT (supports Shopify Session Tokens as fallback)
 export const protect = async (req, res, next) => {
@@ -19,7 +20,8 @@ export const protect = async (req, res, next) => {
         const user = await User.findById(decoded.id);
 
         if (user) {
-            req.user = user;
+            // Lazy credit sync/reset
+            req.user = await performMonthlyReset(user);
             return next();
         }
     } catch (jwtErr) {
@@ -44,7 +46,8 @@ export const protect = async (req, res, next) => {
         });
 
         if (integration) {
-            req.user = await User.findById(integration.user);
+            const user = await User.findById(integration.user);
+            req.user = await performMonthlyReset(user);
             req.activeBrand = integration.brand;
             req.shopifyShop = shopDomain;
             req.shopifyAuth = true;
@@ -69,7 +72,10 @@ export const optionalAuth = async (req, res, next) => {
     if (token) {
         try {
             const decoded = jwt.verify(token, config.jwtSecret);
-            req.user = await User.findById(decoded.id);
+            const user = await User.findById(decoded.id);
+            if (user) {
+                req.user = await performMonthlyReset(user);
+            }
         } catch { /* ignore invalid tokens */ }
     }
     next();
