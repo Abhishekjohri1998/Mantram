@@ -158,7 +158,7 @@ router.get('/stats', async (req, res) => {
 router.get('/users', async (req, res) => {
     try {
         const { page = 1, limit = 20, search, plan, role, sort = '-createdAt' } = req.query;
-        const filter = { role: { $ne: 'superadmin' } };
+        const filter = {};
         if (search) {
             const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             filter.$or = [
@@ -168,7 +168,7 @@ router.get('/users', async (req, res) => {
             ];
         }
         if (plan) filter.plan = plan;
-        if (role && role !== 'superadmin') filter.role = role;
+        if (role) filter.role = role;
 
         const users = await User.find(filter)
             .sort(sort)
