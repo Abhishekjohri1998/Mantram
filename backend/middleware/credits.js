@@ -93,11 +93,6 @@ export const requireCredits = (actionOrCost = 1) => {
         try {
             const user = req.user;
 
-            // Superadmin & enterprise bypass credit checks
-            if (user.role === 'superadmin' || user.plan === 'enterprise') {
-                return next();
-            }
-
             // Resolve cost
             let cost;
             const actionName = typeof actionOrCost === 'string' ? actionOrCost : null;
@@ -106,6 +101,28 @@ export const requireCredits = (actionOrCost = 1) => {
             } else {
                 const costs = await getCreditCosts();
                 cost = costs[actionOrCost] || 1;
+            }
+
+            // Superadmin & enterprise bypass credit checks BUT NOT logging
+            if (user.role === 'superadmin' || user.plan === 'enterprise') {
+                // Log usage (fire-and-forget) – don't calculate balanceAfter for bypass users
+                CreditUsage.create({
+                    user: user._id,
+                    action: actionName || 'unknown',
+                    cost,
+                    balanceAfter: Infinity, // Unlimited users
+                    description: ACTION_LABELS[actionName] || actionName || 'AI Operation',
+                    metadata: {
+                        route: req.originalUrl,
+                        brandId: req.body?.brandId || req.params?.brandId,
+                        brandName: req.body?.brandName,
+                        subscriptionId: user.activeSubscription,
+                        bypassed: true
+                    },
+                }).catch(err => console.warn('Credit usage log (bypass) failed:', err.message));
+
+                req.creditsDeducted = cost;
+                return next();
             }
 
             const remaining = (user.credits?.total || 0) + (user.credits?.bonus || 0) - (user.credits?.used || 0);

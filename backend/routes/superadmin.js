@@ -1332,7 +1332,7 @@ creditRouter.get('/summary', protect, async (req, res) => {
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const weekStart = new Date(todayStart); weekStart.setDate(weekStart.getDate() - 7);
-        const monthStart = new Date(todayStart); monthStart.setDate(weekStart.getDate() - 30);
+        const monthStart = new Date(todayStart); monthStart.setDate(monthStart.getDate() - 30);
 
         const [todayUsage, weekUsage, monthUsage, byAction] = await Promise.all([
             CreditUsage.aggregate([
