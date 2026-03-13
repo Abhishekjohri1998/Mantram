@@ -312,7 +312,7 @@ router.post('/:id/entries', protect, async (req, res) => {
         const funnel = await Funnel.findOne({ _id: req.params.id, user: req.user._id });
         if (!funnel) return res.status(404).json({ success: false, error: 'Funnel not found' });
 
-        const { name, email, phone, company, source, sourceCampaign, score, notes, contactId, stage } = req.body;
+        const { name, email, phone, company, source, sourceCampaign, score, notes, contactId, stage, dealValue, tags } = req.body;
 
         // Determine entry stage (default: first stage)
         const entryStage = stage || funnel.stages[0]?.name || 'Top';
@@ -329,7 +329,9 @@ router.post('/:id/entries', protect, async (req, res) => {
             sourceCampaign: sourceCampaign || '',
             currentStage: entryStage,
             score: score || 0,
+            dealValue: dealValue || 0,
             notes: notes || '',
+            tags: tags || [],
             stageHistory: [{ stage: entryStage, enteredAt: new Date(), movedBy: 'manual' }],
             touchpoints: [{ type: 'custom', details: 'Manually added to funnel', timestamp: new Date() }],
         };
@@ -806,7 +808,15 @@ router.post('/:id/import-contacts', protect, async (req, res) => {
                 phone: contact.phone || '',
                 source: contact.leadSource === 'instagram_dm' ? 'dm'
                     : contact.leadSource === 'instagram_comment' ? 'social'
-                    : contact.platform || 'manual',
+                    : contact.platform === 'instagram' ? 'social'
+                    : contact.platform === 'facebook' ? 'social'
+                    : contact.platform === 'twitter' ? 'social'
+                    : contact.platform === 'linkedin' ? 'linkedin'
+                    : contact.platform === 'whatsapp' ? 'dm'
+                    : contact.platform === 'website' ? 'direct'
+                    : contact.platform === 'email' ? 'email'
+                    : contact.platform === 'telephonic' ? 'direct'
+                    : 'manual',
                 currentStage: entryStage,
                 score: contact.interestScore || 0,
                 stageHistory: [{ stage: entryStage, enteredAt: new Date(), movedBy: 'system' }],
@@ -1120,13 +1130,15 @@ router.get('/:id/webhook-token', protect, async (req, res) => {
             await funnel.save(); // pre-save hook will generate it
         }
 
+        const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+
         res.json({
             success: true,
             webhookToken: funnel.webhookToken,
             endpoints: {
-                generic: `/api/funnel-webhooks/${funnel.webhookToken}/ingest`,
-                shopify: `/api/funnel-webhooks/${funnel.webhookToken}/shopify`,
-                stripe: `/api/funnel-webhooks/${funnel.webhookToken}/stripe`,
+                generic: `${baseUrl}/api/funnel-webhooks/${funnel.webhookToken}/ingest`,
+                shopify: `${baseUrl}/api/funnel-webhooks/${funnel.webhookToken}/shopify`,
+                stripe: `${baseUrl}/api/funnel-webhooks/${funnel.webhookToken}/stripe`,
             },
         });
     } catch (error) {

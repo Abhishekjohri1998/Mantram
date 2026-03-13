@@ -5,7 +5,7 @@ const contactSchema = new mongoose.Schema({
     brand: { type: mongoose.Schema.Types.ObjectId, ref: 'Brand', required: true },
 
     // Platform identity
-    platform: { type: String, enum: ['instagram', 'facebook'], required: true },
+    platform: { type: String, enum: ['instagram', 'facebook', 'linkedin', 'whatsapp', 'website', 'email', 'telephonic', 'twitter', 'other'], required: true },
     platformUserId: { type: String, required: true },
     platformUsername: { type: String, default: '' },
     profilePicture: { type: String, default: '' },

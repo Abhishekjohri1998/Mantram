@@ -30,7 +30,11 @@ router.post('/:webhookToken/ingest', async (req, res) => {
         const funnel = await Funnel.findOne({ webhookToken });
         if (!funnel) return res.status(404).json({ success: false, error: 'Invalid webhook token' });
 
-        const { name, email, phone, company, source, stage, dealValue, tags, metadata } = req.body;
+        const { name, email, phone, company, source: rawSource, stage, dealValue, tags, metadata } = req.body;
+
+        // Validate source against FunnelEntry enum
+        const VALID_SOURCES = ['ad', 'seo', 'social', 'dm', 'direct', 'referral', 'email', 'shopify', 'linkedin', 'website', 'telephonic', 'manual', 'other'];
+        const source = VALID_SOURCES.includes(rawSource) ? rawSource : 'other';
 
         if (!name && !email) {
             return res.status(400).json({ success: false, error: 'At least name or email required' });
@@ -61,19 +65,21 @@ router.post('/:webhookToken/ingest', async (req, res) => {
         // Create contact if it doesn't exist
         let contact = null;
         if (email) {
-            contact = await Contact.findOne({ email: email.toLowerCase(), brand: funnel.brand });
-            if (!contact) {
-                contact = await Contact.create({
-                    name: name || email.split('@')[0],
-                    email: email.toLowerCase(),
-                    phone: phone || '',
-                    company: company || '',
-                    source: source || 'webhook',
-                    user: funnel.user,
-                    brand: funnel.brand,
-                    tags: tags || [],
-                });
-            }
+            // Map source to Contact platform
+            const platformMap = { website: 'website', social: 'instagram', linkedin: 'linkedin', email: 'email', telephonic: 'telephonic', whatsapp: 'whatsapp' };
+            const contactPlatform = platformMap[source] || 'other';
+            contact = await Contact.findOneAndUpdate(
+                { user: funnel.user, brand: funnel.brand, platform: contactPlatform, platformUserId: email.toLowerCase() },
+                {
+                    $set: {
+                        name: name || email.split('@')[0],
+                        email: email.toLowerCase(),
+                        phone: phone || '',
+                    },
+                    $addToSet: { funnelIds: funnel._id, ...(tags?.length ? { tags: { $each: tags } } : {}) },
+                },
+                { upsert: true, new: true }
+            );
         }
 
         // Create funnel entry

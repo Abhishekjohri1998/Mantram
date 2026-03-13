@@ -163,7 +163,7 @@ const INTENT_QUESTIONS = {
     { id: 'objective', q: 'What\'s the ONE big thing you want to achieve? Not vague "grow" — what specific outcome?', placeholder: 'e.g., Go from 5K to 50K Instagram followers and generate 200 qualified leads per month', keywords: ['Brand Awareness', 'Lead Generation', 'Revenue Growth', 'Market Expansion', 'Customer Retention', 'Category Leadership', 'Community Building', 'Launch New Product'] },
     { id: 'duration', q: 'How long should this strategy cover? A focused 1-month sprint or a comprehensive 3-month plan?', placeholder: 'e.g., 3 months — we want a phased approach with clear milestones', keywords: ['1 Month Sprint', '3 Month Plan'] },
     { id: 'currentState', q: 'Where does your brand stand today? Be brutally honest — followers, revenue, website traffic, current marketing efforts.', placeholder: 'e.g., 5K Instagram, 2K website visits/month, ₹3L monthly revenue, no paid ads yet', keywords: ['Just Starting', 'Some Traction', 'Established but Plateaued', 'Growing Fast', 'Rebranding', 'Entering New Market'] },
-    { id: 'channels', q: 'Which marketing channels do you want to focus on? Or should I recommend based on your brand?', placeholder: 'e.g., Social media + influencer marketing + Google Ads — we\'re weak on SEO', keywords: ['Social Media', 'SEO / Content', 'Google Ads (SEM)', 'Meta Ads', 'Influencer Marketing', 'Email Marketing', 'Offline / Events', 'All — Recommend for me'] },
+    { id: 'channels', q: 'Which marketing channels do you want to focus on? Or should I recommend based on your brand?', placeholder: 'e.g., Social media + influencer marketing + Google Ads — we\'re weak on SEO', keywords: ['Social Media', 'LinkedIn Organic', 'SEO / Content', 'Google Ads (SEM)', 'Meta Ads', 'Influencer Marketing', 'Email Marketing', 'Offline / Events', 'All — Recommend for me'] },
     { id: 'budget', q: 'Total marketing budget for this period? This shapes whether we think grassroots or full-scale.', placeholder: 'e.g., ₹5L total for 3 months — open to adjusting split based on recommendation', keywords: ['Under ₹50K', '₹50K–2L', '₹2L–5L', '₹5L–10L', '₹10L–25L', '₹25L+', 'Flexible / TBD'] },
     { id: 'team', q: 'What\'s your team like? This determines whether we plan for a solo founder or an agency team.', placeholder: 'e.g., Founder + 1 social media intern + freelance designer', keywords: ['Solo Founder', 'Small Team (2-3)', 'Marketing Team (4-8)', 'Full Agency Support', 'Mix of In-house + Freelancers'], optional: true },
   ],
@@ -486,7 +486,7 @@ router.post('/generate', protect, requireStudio('brainstormStudio'), requireCred
       "description": "2-3 sentence concept explanation",
       "targetPersona": "Specific audience segment",
       "visualDirection": "Suggested visual style",
-      "platforms": ["Instagram", "YouTube"],
+      "platforms": ["Instagram", "YouTube", "LinkedIn"],
       "scores": { "virality": 8, "salesImpact": 7, "emotionalConnect": 9, "easeOfExecution": 6 }
     }
   ],
@@ -853,11 +853,11 @@ Respond in STRICT JSON format:
   "channels": {
   "social_media": {
     "enabled": true,
-    "platforms": ["Instagram"],
+    "platforms": ["Instagram", "LinkedIn"],
     "why_this_channel": "1-2 sentence rationale for choosing this channel",
     "strategy": "2-3 sentence channel strategy",
     "tactics": ["Specific tactic 1", "Specific tactic 2", "Specific tactic 3"],
-    "content_mix": { "reels": 3, "carousels": 2, "stories": 5 },
+    "content_mix": { "reels": 3, "carousels": 2, "stories": 5, "linkedin_posts": 2 },
     "posting_frequency": "X posts/week per platform",
     "budget_split": "₹X (Y% of total)",
     "budget_rationale": "Why Y% — e.g. 'Social is primary discovery channel for D2C in this category, and organic reach alone limited to X%'",
@@ -939,6 +939,7 @@ Respond in STRICT JSON format:
 
   "channel_synergy": [
   { "flow": "Social content → drives branded search → SEO captures → retargeting converts", "impact": "Reduces overall CPL by ~20-30%" },
+  { "flow": "LinkedIn thought-leadership → builds authority → drives website traffic → SEO reinforces → conversions", "impact": "B2B pipeline creation + brand credibility" },
   { "flow": "Influencer posts → UGC → repurpose as paid ads → lower ad fatigue", "impact": "Extends creative shelf life by 2-3x" }
 ],
 

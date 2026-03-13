@@ -735,6 +735,15 @@ export const funnelSharing = {
     webhookToken: (id) => apiFetch(`/funnel-studio/${id}/webhook-token`),
 };
 
+// ── Funnel Agentic (AI Qualifier, Smart Routing, Nurture, Cross-Studio, CSV Import) ──
+export const funnelAgentic = {
+    aiQualify: (funnelId, data = {}) => apiFetch(`/funnel-agentic/${funnelId}/ai-qualify`, { method: 'POST', body: JSON.stringify(data) }),
+    smartRoute: (funnelId, data = {}) => apiFetch(`/funnel-agentic/${funnelId}/smart-route`, { method: 'POST', body: JSON.stringify(data) }),
+    aiNurture: (funnelId, data) => apiFetch(`/funnel-agentic/${funnelId}/ai-nurture`, { method: 'POST', body: JSON.stringify(data) }),
+    crossStudioSuggest: (funnelId) => apiFetch(`/funnel-agentic/${funnelId}/cross-studio-suggest`, { method: 'POST' }),
+    importCsv: (funnelId, data) => apiFetch(`/funnel-agentic/${funnelId}/import-csv`, { method: 'POST', body: JSON.stringify(data) }),
+};
+
 // ============ Media Upload API (S3 Upload-First Pattern) ============
 export const media = {
     upload: (data) => apiFetch('/media/upload', { method: 'POST', body: JSON.stringify(data) }),

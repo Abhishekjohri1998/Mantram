@@ -20,7 +20,8 @@ const STAGE_TYPE_COLORS = {
 
 const SOURCE_ICONS = {
     ad: 'campaign', seo: 'search', social: 'share', dm: 'chat', direct: 'link',
-    referral: 'group', email: 'email', shopify: 'storefront', manual: 'person_add', other: 'more_horiz',
+    referral: 'group', email: 'email', shopify: 'storefront', manual: 'person_add',
+    linkedin: 'work', website: 'language', telephonic: 'call', other: 'more_horiz',
 }
 
 const STATUS_STYLES = {
@@ -1272,7 +1273,7 @@ function AddEntryModal({ stages, onSubmit, onClose }) {
                             <label className="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">Source</label>
                             <select value={source} onChange={e => setSource(e.target.value)}
                                 className="w-full bg-white/[0.04] border border-white/[0.06] rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-primary/30 transition-all">
-                                {['manual', 'ad', 'seo', 'social', 'dm', 'direct', 'referral', 'email', 'shopify', 'other'].map(s => (
+                                {['manual', 'ad', 'seo', 'social', 'linkedin', 'website', 'telephonic', 'dm', 'direct', 'referral', 'email', 'shopify', 'other'].map(s => (
                                     <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>
                                 ))}
                             </select>
@@ -1355,6 +1356,7 @@ function AIGenerateModal({ brandId, onCreated, onClose }) {
                                 'E-commerce product launch with influencers',
                                 'Course launch with webinar + email nurture',
                                 'B2B lead gen through LinkedIn + content',
+                                'LinkedIn thought-leadership to consulting pipeline',
                                 'App downloads through social ads + referrals',
                             ].map(idea => (
                                 <button key={idea} onClick={() => setPrompt(idea)}
@@ -1632,7 +1634,7 @@ function ImportContactsModal({ stages, onImport, onClose }) {
                         <select value={platform} onChange={e => setPlatform(e.target.value)}
                             style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.55rem 0.7rem', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none' }}>
                             <option value="">All platforms</option>
-                            {['instagram', 'facebook', 'whatsapp', 'email', 'website'].map(p => <option key={p} value={p}>{p[0].toUpperCase() + p.slice(1)}</option>)}
+                            {['instagram', 'facebook', 'linkedin', 'whatsapp', 'email', 'website', 'telephonic', 'twitter', 'other'].map(p => <option key={p} value={p}>{p[0].toUpperCase() + p.slice(1)}</option>)}
                         </select>
                     </div>
                     <div>

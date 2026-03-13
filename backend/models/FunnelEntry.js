@@ -41,7 +41,7 @@ const funnelEntrySchema = new mongoose.Schema({
     // Source tracking
     source: {
         type: String,
-        enum: ['ad', 'seo', 'social', 'dm', 'direct', 'referral', 'email', 'shopify', 'manual', 'other'],
+        enum: ['ad', 'seo', 'social', 'dm', 'direct', 'referral', 'email', 'shopify', 'linkedin', 'website', 'telephonic', 'manual', 'other'],
         default: 'manual',
     },
     sourceCampaign: { type: String, default: '' }, // e.g. campaign name or utm_campaign
