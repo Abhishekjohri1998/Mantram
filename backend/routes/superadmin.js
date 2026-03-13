@@ -239,7 +239,9 @@ router.delete('/users/:id', async (req, res) => {
     try {
         const user = await User.findById(req.params.id);
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
-        if (user.role === 'superadmin') return res.status(403).json({ success: false, error: 'Cannot delete super admin' });
+        if (user._id.toString() === req.user._id.toString()) {
+            return res.status(403).json({ success: false, error: 'Cannot delete your own account' });
+        }
 
         // Block deletion if user has an active plan
         const activeSub = await Subscription.findOne({ 
