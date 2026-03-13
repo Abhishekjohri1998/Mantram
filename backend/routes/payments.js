@@ -195,7 +195,7 @@ router.post('/create-topup-order', protect, async (req, res) => {
             receipt: `topup_${Date.now()}`,
             notes: {
                 userId: req.user._id.toString(),
-                creditPackId,
+                packId,
                 credits: pack.credits,
                 type: 'credit_topup'
             },
