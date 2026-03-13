@@ -71,6 +71,12 @@ app.use((req, res, next) => {
     next();
 });
 
+// Standard baseline for all requests to track performance & prevent timeouts
+app.use((req, res, next) => {
+    req.startTime = Date.now();
+    next();
+});
+
 // Middleware
 app.use(cors({
     origin: (origin, callback) => {

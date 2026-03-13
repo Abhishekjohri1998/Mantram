@@ -26,87 +26,94 @@ let lastTokenUsage = null;
 export function getLastTokenUsage() { return lastTokenUsage; }
 
 async function aiCall(systemPrompt, userPrompt, options = {}) {
-  const { temperature = 0.7, maxTokens = 8192, json = false } = options;
+  const { temperature = 0.7, maxTokens = 8192, json = false, timeout = 30000 } = options;
   lastTokenUsage = null;
 
-  // Try OpenAI first
-  if (process.env.OPENAI_API_KEY) {
-    try {
-      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-          temperature, max_tokens: maxTokens,
-          ...(json ? { response_format: { type: 'json_object' } } : {}),
-        }),
-      });
-      const data = await resp.json();
-      if (data.choices?.[0]?.message?.content) {
-        lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'gpt-4o-mini', provider: 'openai' };
-        return data.choices[0].message.content;
-      }
-      if (data.error) console.warn('GPT-4o-mini failed:', data.error.message);
-    } catch (e) { console.warn('GPT-4o-mini error:', e.message); }
-  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
 
-  // Try Grok (xAI) — excellent for real-time trend/keyword data
-  const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
-  if (grokKey) {
-    try {
-      const resp = await fetch('https://api.x.ai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${grokKey}` },
-        body: JSON.stringify({
-          model: 'grok-3-mini-fast',
-          messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-          temperature, max_tokens: maxTokens,
-          ...(json ? { response_format: { type: 'json_object' } } : {}),
-        }),
-      });
-      const data = await resp.json();
-      if (data.choices?.[0]?.message?.content) {
-        lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'grok-3-mini-fast', provider: 'xai' };
-        return data.choices[0].message.content;
-      }
-      if (data.error) console.warn('Grok failed:', data.error.message);
-    } catch (e) { console.warn('Grok error:', e.message); }
-  }
-
-  // Fallback to Gemini
-  const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
-  if (geminiKey) {
-    const models = ['gemini-2.0-flash', 'gemini-2.5-flash-preview-05-20'];
-    for (const model of models) {
+  try {
+    // Try OpenAI first
+    if (process.env.OPENAI_API_KEY) {
       try {
-        const resp = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              systemInstruction: { parts: [{ text: systemPrompt }] },
-              contents: [{ parts: [{ text: userPrompt }] }],
-              generationConfig: {
-                temperature, maxOutputTokens: maxTokens,
-                ...(json ? { responseMimeType: 'application/json' } : {}),
-              },
-            }),
-          }
-        );
+        const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+            temperature, max_tokens: maxTokens,
+            ...(json ? { response_format: { type: 'json_object' } } : {}),
+          }),
+          signal: controller.signal,
+        });
         const data = await resp.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
-          lastTokenUsage = { inputTokens: data.usageMetadata?.promptTokenCount || 0, outputTokens: data.usageMetadata?.candidatesTokenCount || 0, model, provider: 'gemini' };
-          return text;
+        if (data.choices?.[0]?.message?.content) {
+          lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'gpt-4o-mini', provider: 'openai' };
+          return data.choices[0].message.content;
         }
-        if (data.error) console.warn(`Gemini ${model}:`, data.error.message);
-      } catch (e) { console.warn(`Gemini ${model} error:`, e.message); }
+      } catch (e) { if (e.name === 'AbortError') throw e; }
     }
-  }
 
-  throw new Error('All AI models failed');
+    // Try Grok (xAI)
+    const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+    if (grokKey) {
+      try {
+        const resp = await fetch('https://api.x.ai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${grokKey}` },
+          body: JSON.stringify({
+            model: 'grok-3-mini-fast',
+            messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+            temperature, max_tokens: maxTokens,
+            ...(json ? { response_format: { type: 'json_object' } } : {}),
+          }),
+          signal: controller.signal,
+        });
+        const data = await resp.json();
+        if (data.choices?.[0]?.message?.content) {
+          lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'grok-3-mini-fast', provider: 'xai' };
+          return data.choices[0].message.content;
+        }
+      } catch (e) { if (e.name === 'AbortError') throw e; }
+    }
+
+    // Fallback to Gemini
+    const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
+    if (geminiKey) {
+      const models = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+      for (const model of models) {
+        try {
+          const resp = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                contents: [{ parts: [{ text: userPrompt }] }],
+                generationConfig: {
+                  temperature, maxOutputTokens: maxTokens,
+                  ...(json ? { responseMimeType: 'application/json' } : {}),
+                },
+              }),
+              signal: controller.signal,
+            }
+          );
+          const data = await resp.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            lastTokenUsage = { inputTokens: data.usageMetadata?.promptTokenCount || 0, outputTokens: data.usageMetadata?.candidatesTokenCount || 0, model, provider: 'gemini' };
+            return text;
+          }
+        } catch (e) { if (e.name === 'AbortError') throw e; }
+      }
+    }
+
+    throw new Error('All AI models failed or timed out');
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function parseJSON(text) {
@@ -169,17 +176,13 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
     const siteData = formatSiteResearch(siteResearch);
     const pageSpeedText = formatPageSpeedForPrompt(pageSpeedData);
 
-    const systemPrompt = `You are a SENIOR SEO STRATEGIST (not just an auditor). You think like a CMO + technical SEO expert combined. You have REAL CRAWL DATA — use it as ground truth. Never guess or contradict the crawl.
+    // Timing Safeguard: Check if we have enough time left for AI
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const budget = 28000; // 28s budget for Gateway
+    const remainingBudget = Math.max(5000, budget - elapsed);
+    console.log(`⏱️ Health Check research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
-IMPORTANT: For every finding, explain WHY it matters — connect it to a specific Google algorithm signal, ranking factor, or business outcome. Don't just list problems — explain the strategic impact and provide the business reasoning.
-
-ALGORITHM CONTEXT (2026):
-- Google's Helpful Content System penalizes thin/unhelpful pages; rewards genuine expertise
-- E-E-A-T (Experience, Expertise, Authoritativeness, Trust) is a core ranking signal
-- AI Overviews (SGE) now appear in 40%+ of searches — sites need structured, authoritative content to be cited
-- Core Web Vitals remain a ranking factor (LCP < 2.5s, CLS < 0.1, INP < 200ms)
-- Google rewards topical authority — sites that deeply cover a topic cluster outrank those with scattered content
-- Schema markup and structured data directly influence rich results and AI citation rates
+    const systemPrompt = `You are a SENIOR SEO STRATEGIST...`;
 
 ${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
 
@@ -237,7 +240,7 @@ Respond in STRICT JSON:
 Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' that connects to business outcomes. Think like a consultant, not a checklist tool.`;
 
     const userPrompt = `Analyze site: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192 });
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget });
     // Log token usage from this AI call
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: req.creditAction || 'seoHealthCheck', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
@@ -308,6 +311,12 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
       }),
     ]);
     const siteData = formatSiteResearch(siteResearch);
+
+    // Timing Safeguard: Check if we have enough time left for AI
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const budget = 28000; // 28s budget for Gateway
+    const remainingBudget = Math.max(5000, budget - elapsed);
+    console.log(`⏱️ Traffic research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     // Build enriched signal data for AI prompt
     let intelligenceData = '';
@@ -407,7 +416,7 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
       + 'Generate 5-8 keyword clusters. Use VERIFIED volumes where available. Add confidenceStars (1-5) based on how many data layers support each cluster.';
 
     const userPrompt = 'Find traffic opportunities for: ' + website;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192 });
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoTraffic', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
@@ -469,28 +478,32 @@ router.post('/competitors', protect, requireStudio('seoStudio'), requireCredits(
 
     const brandContext = buildBrandContext(brand || brandPayload);
 
-    // STEP 1: Crawl brand's own site
-    console.log(`🔍 SEO Competitors: crawling ${website}...`);
-    const siteResearch = await researchDomain(website);
-    const siteData = formatSiteResearch(siteResearch);
-
-    // STEP 2: Gather competitor URLs (stored + user-provided)
+    // Gather competitor URLs (stored + user-provided)
     const storedCompetitors = (brand?.competitors || []).map(c => c.url).filter(Boolean);
     const providedCompetitors = (competitorUrls || []).filter(u => u.trim());
     const allCompetitorUrls = [...new Set([...storedCompetitors, ...providedCompetitors])].slice(0, 5);
 
-    let competitorData = '';
-    let competitorResearch = [];
+    // STEP 1 & 2: Crawl brand and competitors in PARALLEL
+    console.log(`🔍 SEO Competitors: parallel crawl for ${website} and ${allCompetitorUrls.length} competitors...`);
+    const [siteResearch, competitorResults] = await Promise.all([
+      researchDomain(website),
+      allCompetitorUrls.length > 0 ? researchCompetitors(allCompetitorUrls) : Promise.resolve([])
+    ]);
 
-    if (allCompetitorUrls.length > 0) {
-      // STEP 3a: Crawl known competitors
-      console.log(`🔍 Crawling ${allCompetitorUrls.length} competitors...`);
-      competitorResearch = await researchCompetitors(allCompetitorUrls);
-      competitorData = formatCompetitorResearch(competitorResearch);
+    const siteData = formatSiteResearch(siteResearch);
+    let competitorData = '';
+    
+    if (competitorResults.length > 0) {
+      competitorData = formatCompetitorResearch(competitorResults);
     } else {
-      // STEP 3b: Ask AI to identify competitors first, then we'll note them
-      competitorData = 'No competitor URLs provided. Identify the top 3-5 most likely competitors based on brand industry and location, and provide their real URLs. Be sure to provide REAL existing company websites, not made-up ones.';
+      competitorData = 'No competitor URLs provided. Identify the top 3-5 most likely competitors based on brand industry and location, and provide their real URLs.';
     }
+
+    // Timing Safeguard: Check if we have enough time left for AI
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const budget = 28000; // 28s budget
+    const remainingBudget = Math.max(5000, budget - elapsed);
+    console.log(`⏱️ Competitor research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     const systemPrompt = `You are a COMPETITIVE INTELLIGENCE STRATEGIST — you think like a war-room strategist, not a data reporter. You have REAL CRAWL DATA from both the brand and competitor websites. Your job is to explain WHY competitors win, WHAT their strategy is, and HOW to beat them.
 
@@ -558,7 +571,7 @@ Respond in JSON:
 Be STRATEGIC and SPECIFIC. Every insight must have a WHY and an actionable HOW. Think like a competitive intelligence firm, not a scraping tool.`;
 
     const userPrompt = `Competitive analysis for: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192 });
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192, timeout: remainingBudget });
     const parsed = parseJSON(result);
     parsed.researchSources = [
       ...(siteResearch.pages?.map(p => p.url) || [website]),
@@ -625,6 +638,12 @@ router.post('/ai-visibility', protect, requireStudio('seoStudio'), requireCredit
     console.log(`🔍 AI Visibility: crawling ${website}...`);
     const siteResearch = await researchDomain(website);
     const siteData = formatSiteResearch(siteResearch);
+
+    // Timing Safeguard: Check if we have enough time left for AI
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const budget = 28000; // 28s budget
+    const remainingBudget = Math.max(5000, budget - elapsed);
+    console.log(`⏱️ AI Visibility research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     const systemPrompt = `You are an AI SEARCH STRATEGIST — the world's foremost expert on making brands visible in AI-powered search (Google AI Overviews, ChatGPT + Bing, Perplexity, Gemini, Claude, etc.) in 2026.
 
@@ -736,7 +755,7 @@ STRATEGIC RULES (MANDATORY):
 5. Think like a consultant billing $500/hour — every recommendation must justify its existence with data`;
 
     const userPrompt = `AI Visibility audit for: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192 });
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget });
     const parsed = parseJSON(result);
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
 
@@ -1096,8 +1115,9 @@ Respond in STRICT JSON:
 Generate 5-15 discovered backlinks (real URLs you know of), 5-10 competitor link gaps, 8-15 link opportunities, 3-4 outreach templates, and 4-week plan. Be STRATEGIC and SPECIFIC — think like a link-building agency, not a checklist tool.`;
 
     const userPrompt = `Complete backlink intelligence analysis for: ${brandDomain} (${normalizedUrl})`;
-    const startTime = Date.now();
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192 });
+    const elapsedBeforeAI = Date.now() - (req.startTime || Date.now());
+    const remainingBudgetForAI = Math.max(5000, 28000 - elapsedBeforeAI);
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudgetForAI });
     const parsed = parseJSON(result);
 
     // ── PHASE 4: Try to verify top discovered backlinks (with timing safeguard) ──
@@ -1195,22 +1215,29 @@ router.post('/competitor-warroom', protect, requireStudio('seoStudio'), requireC
 
     const brandContext = buildBrandContext(brand || brandPayload);
 
-    // Crawl brand site
-    console.log(`⚔️ War Room: crawling ${website}...`);
-    const siteResearch = await researchDomain(website);
-    const siteData = formatSiteResearch(siteResearch);
-
-    // Crawl competitors
+    // Gather competitors
     const storedCompetitors = (brand?.competitors || []).map(c => c.url).filter(Boolean);
     const providedCompetitors = (competitorUrls || []).filter(u => u.trim());
     const allCompetitorUrls = [...new Set([...storedCompetitors, ...providedCompetitors])].slice(0, 5);
 
+    // STEP 1 & 2: Crawl brand and competitors in PARALLEL
+    console.log(`⚔️ War Room: parallel crawl for ${website} and ${allCompetitorUrls.length} competitors...`);
+    const [siteResearch, competitorResults] = await Promise.all([
+      researchDomain(website),
+      allCompetitorUrls.length > 0 ? researchCompetitors(allCompetitorUrls) : Promise.resolve([])
+    ]);
+
+    const siteData = formatSiteResearch(siteResearch);
     let competitorData = '';
-    if (allCompetitorUrls.length > 0) {
-      console.log(`⚔️ Crawling ${allCompetitorUrls.length} competitors...`);
-      const competitorResearch = await researchCompetitors(allCompetitorUrls);
-      competitorData = formatCompetitorResearch(competitorResearch);
+    if (competitorResults.length > 0) {
+      competitorData = formatCompetitorResearch(competitorResults);
     }
+
+    // Timing Safeguard: Check if we have enough time left for AI
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const budget = 28000; // 28s budget
+    const remainingBudget = Math.max(5000, budget - elapsed);
+    console.log(`⏱️ War Room research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     const systemPrompt = `You are a COMPETITIVE WAR ROOM STRATEGIST — create a 90-day battle plan to systematically outrank competitors. You have REAL CRAWL DATA.
 
@@ -1248,7 +1275,7 @@ Respond in STRICT JSON:
 }`;
 
     const userPrompt = `Build 90-day war room plan for: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192 });
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192, timeout: remainingBudget });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoWarRoom', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
@@ -1296,9 +1323,18 @@ router.post('/llm-probe', protect, requireStudio('seoStudio'), requireCredits('s
       website
     );
 
+    // Timing Safeguard: LLM Probe involves real external calls, so we must budget strictly
+    const startElapsed = Date.now() - (req.startTime || Date.now());
+    const probeBudget = 28000 - startElapsed;
+    
     // STEP 2: Run REAL probe — actually query ChatGPT, Gemini, Grok
-    console.log(`\n🔬 === REAL LLM PROBE: ${brandName} (${probePrompts.length} prompts × 3 models) ===`);
+    console.log(`\n🔬 === REAL LLM PROBE: ${brandName} (${probePrompts.length} prompts × 3 models). Budget: ${probeBudget}ms ===`);
     const probeData = await runRealLLMProbe(probePrompts, brandName, website, competitors);
+
+    // Final Timing Check for Analysis AI
+    const finalElapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(5000, 28000 - finalElapsed);
+    console.log(`⏱️ LLM Probe real queries took ${finalElapsed}ms. Remaining budget for AI analysis: ${remainingBudget}ms`);
 
     // STEP 3: Feed real probe results to AI for strategic analysis
     let probeResultsText = `\n=== REAL LLM PROBE RESULTS (verified by actually querying each model) ===\n`;
@@ -1361,7 +1397,7 @@ Respond in STRICT JSON:
 CRITICAL: Use the REAL mention rate (${probeData.aggregate.mentionRate}%) as the overall visibility score. Reference ACTUAL probe results. Every recommendation must tie back to specific prompts where the brand was NOT mentioned.`;
 
     const userPrompt = `Analyze real LLM probe results for: ${brandName} (${website})`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6144 });
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6144, timeout: remainingBudget });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoLlmProbe', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
 
@@ -1466,7 +1502,9 @@ Respond in STRICT JSON:
 Generate production-ready code. Every fix must be copy-paste ready. Use the brand's actual information in the code.`;
 
     const userPrompt = `Generate auto-fix code for: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.4, maxTokens: 8192 });
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(5000, 28000 - elapsed);
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.4, maxTokens: 8192, timeout: remainingBudget });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoAutoFix', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
 
@@ -1597,7 +1635,9 @@ Generate 15-20 mined prompts. Be specific to this brand's industry. Think about 
     }
 
     // STEP 3: AI call enriched with real autocomplete data
-    const aiResult = await aiCall(systemPrompt, userPrompt + autocompleteContext, { json: true, temperature: 0.6, maxTokens: 8192 });
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(5000, 28000 - elapsed);
+    const aiResult = await aiCall(systemPrompt, userPrompt + autocompleteContext, { json: true, temperature: 0.6, maxTokens: 8192, timeout: remainingBudget });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoPromptMining', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(aiResult);
     parsed.researchSources = [website];
@@ -1728,7 +1768,7 @@ Respond in JSON:
   "followUpQuestions": ["Follow-up 1", "Follow-up 2", "Follow-up 3"]
 }`;
 
-    const result = await aiCall(systemPrompt, question, { json: true, temperature: 0.7, maxTokens: 4096 });
+    const result = await aiCall(systemPrompt, question, { json: true, temperature: 0.7, maxTokens: 4096, timeout: 15000 });
     const parsed = parseJSON(result);
 
     res.json({ success: true, ...parsed });
