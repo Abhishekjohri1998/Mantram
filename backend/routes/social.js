@@ -320,18 +320,25 @@ RESPOND IN VALID JSON FORMAT ONLY:
 Do not include any text outside the JSON. Do not wrap in markdown code blocks.`;
 
         // Use Gemini with vision to analyze image + generate captions
-        const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
+        const imageKey = config.ai?.providers?.gemini?.imageApiKey || config.ai?.providers?.gemini?.apiKey;
         if (!imageKey) {
+
             return res.status(500).json({ success: false, error: 'Gemini API key not configured' });
         }
 
         const parts = [];
-
         // If image URL is provided, fetch and include it for vision analysis
-        if (imageUrl && imageUrl.startsWith('http')) {
+        let normalizedImageUrl = imageUrl;
+        if (imageUrl && !imageUrl.startsWith('http')) {
+            const baseUrl = (config.backendUrl || 'https://api.mantram.ai').replace(/\/$/, '');
+            normalizedImageUrl = `${baseUrl}${imageUrl.startsWith('/') ? imageUrl : '/' + imageUrl}`;
+            console.log(`[CAPTION] Normalized relative URL: ${normalizedImageUrl}`);
+        }
+
+        if (normalizedImageUrl && normalizedImageUrl.startsWith('http')) {
             try {
-                console.log(`[CAPTION] Fetching image for vision analysis: ${imageUrl.substring(0, 80)}...`);
-                const imgResp = await fetch(imageUrl, {
+                console.log(`[CAPTION] Fetching image for vision analysis: ${normalizedImageUrl.substring(0, 80)}...`);
+                const imgResp = await fetch(normalizedImageUrl, {
                     headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'image/*' },
                     redirect: 'follow',
                 });
@@ -345,6 +352,8 @@ Do not include any text outside the JSON. Do not wrap in markdown code blocks.`;
                         }
                     });
                     console.log(`[CAPTION] Image loaded for analysis (${Math.round(buf.byteLength / 1024)}KB)`);
+                } else {
+                    console.warn(`[CAPTION] Image fetch failed (${imgResp.status}):`, normalizedImageUrl);
                 }
             } catch (imgErr) {
                 console.warn('[CAPTION] Could not fetch image for analysis:', imgErr.message);
@@ -354,7 +363,7 @@ Do not include any text outside the JSON. Do not wrap in markdown code blocks.`;
         parts.push({ text: systemPrompt });
 
         // Call Gemini for caption generation (text-only response)
-        const models = ['gemini-2.5-flash', 'gemini-2.0-flash-001'];
+        const models = ['gemini-2.0-flash', 'gemini-1.5-flash'];
         let captionsResult = null;
 
         for (const modelId of models) {
