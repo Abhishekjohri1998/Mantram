@@ -433,3 +433,145 @@ export function formatCompetitorResearch(competitors) {
     }
     return text;
 }
+
+
+// ============================================================================
+// EXTRACT LINKS TO A TARGET DOMAIN (for backlink discovery)
+// ============================================================================
+
+/**
+ * Given raw HTML and a target domain, find all <a> tags that link TO that domain.
+ * Returns an array of { href, anchorText, rel, context }.
+ */
+function extractLinksTo(html, targetDomain) {
+    const results = [];
+    const baseDomain = targetDomain.replace(/^www\./, '').toLowerCase();
+    // Match <a> tags with href and inner content
+    const pattern = /<a\s+([^>]*href\s*=\s*["']([^"']+)["'][^>]*)>([\s\S]*?)<\/a>/gi;
+    let m;
+    while ((m = pattern.exec(html)) !== null) {
+        const attrs = m[1];
+        const href = m[2];
+        const anchorText = stripTags(m[3]).trim().substring(0, 150);
+        try {
+            const linkUrl = new URL(href.startsWith('//') ? `https:${href}` : href);
+            const linkDomain = linkUrl.hostname.replace(/^www\./, '').toLowerCase();
+            if (linkDomain === baseDomain || linkDomain.endsWith(`.${baseDomain}`)) {
+                const rel = getAttr(attrs, 'rel') || '';
+                const isNoFollow = rel.toLowerCase().includes('nofollow');
+                results.push({
+                    href: linkUrl.href,
+                    anchorText: anchorText || '[no anchor text]',
+                    rel: isNoFollow ? 'nofollow' : 'dofollow',
+                    targetPath: linkUrl.pathname,
+                });
+            }
+        } catch { /* skip invalid URLs */ }
+    }
+    return results;
+}
+
+
+// ============================================================================
+// DISCOVER BACKLINKS — Crawl pages and verify links to target domain
+// ============================================================================
+
+/**
+ * Given a list of page URLs that potentially link to targetDomain,
+ * crawl each page and verify the actual link presence.
+ * Returns verified backlinks with anchor text, link type, and context.
+ */
+export async function discoverBacklinks(potentialPages, targetDomain) {
+    const verified = [];
+    const maxPages = Math.min(potentialPages.length, 8); // limit concurrent crawls
+
+    const results = await Promise.all(
+        potentialPages.slice(0, maxPages).map(async (pageUrl) => {
+            try {
+                const html = await safeFetch(pageUrl);
+                const meta = extractMeta(html);
+                const linksTo = extractLinksTo(html, targetDomain);
+                const bodyText = getBodyText(html);
+                const wordCount = getWordCount(bodyText);
+                const tech = detectTechSignals(html);
+
+                return {
+                    pageUrl,
+                    pageTitle: meta.title || '',
+                    pageWordCount: wordCount,
+                    pageTech: tech,
+                    success: true,
+                    linksFound: linksTo,
+                };
+            } catch (e) {
+                return { pageUrl, success: false, error: e.message, linksFound: [] };
+            }
+        })
+    );
+
+    for (const r of results) {
+        if (r.success && r.linksFound.length > 0) {
+            for (const link of r.linksFound) {
+                verified.push({
+                    sourceUrl: r.pageUrl,
+                    sourceTitle: r.pageTitle,
+                    targetUrl: link.href,
+                    anchorText: link.anchorText,
+                    linkType: link.rel,
+                    targetPath: link.targetPath,
+                    sourceWordCount: r.pageWordCount,
+                });
+            }
+        }
+    }
+
+    return { verified, crawled: results.length, pagesWithLinks: results.filter(r => r.linksFound.length > 0).length };
+}
+
+
+// ============================================================================
+// ANALYZE COMPETITOR LINK SOURCES — Find who links to competitors
+// ============================================================================
+
+/**
+ * For each competitor, crawl their site and extract all external domains
+ * that they link to. Also extract sites that link to them (from external link patterns).
+ * This helps find link gap opportunities.
+ */
+export async function analyzeCompetitorLinkProfile(competitorUrls, brandDomain) {
+    const profiles = [];
+    const baseBrandDomain = brandDomain.replace(/^www\./, '').replace(/^https?:\/\//, '').toLowerCase();
+
+    for (const compUrl of competitorUrls.slice(0, 3)) { // max 3 competitors
+        try {
+            let normalizedUrl = compUrl.trim();
+            if (!/^https?:\/\//i.test(normalizedUrl)) normalizedUrl = `https://${normalizedUrl}`;
+
+            const html = await safeFetch(normalizedUrl);
+            const meta = extractMeta(html);
+            const links = extractLinks(html, normalizedUrl);
+            const headings = extractHeadings(html);
+            const bodyText = getBodyText(html);
+            const wordCount = getWordCount(bodyText);
+            let compDomain;
+            try { compDomain = new URL(normalizedUrl).hostname.replace(/^www\./, ''); } catch { compDomain = normalizedUrl; }
+
+            profiles.push({
+                url: normalizedUrl,
+                domain: compDomain,
+                title: meta.title || '',
+                wordCount,
+                h2Topics: headings.filter(h => h.level === 2).map(h => h.text).slice(0, 10),
+                externalDomains: links.external, // domains they link TO
+                internalLinkCount: links.internal.length,
+                linksToUs: links.external.some(d => d.replace(/^www\./, '').toLowerCase() === baseBrandDomain),
+                success: true,
+            });
+        } catch (e) {
+            profiles.push({ url: compUrl, success: false, error: e.message });
+        }
+    }
+
+    return profiles;
+}
+

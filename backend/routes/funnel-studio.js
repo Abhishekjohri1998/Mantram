@@ -889,19 +889,30 @@ Respond ONLY with valid JSON array of suggestions:
     {
         "type": "warning|opportunity|quick_win|automation",
         "icon": "material icon name",
-        "title": "Short title",
-        "description": "Detailed actionable suggestion (1-2 sentences)",
+        "title": "Short specific title referencing actual data — NOT generic like 'Improve conversion'",
+        "description": "Detailed actionable suggestion referencing specific stage names, entry counts, and conversion metrics from the data above",
         "priority": "high|medium|low",
+        "kpi": "What to measure (e.g., 'Drop-off rate at Nurture stage', 'Conversion rate from Interest to Decision')",
+        "baseline": "Current value from the metrics (e.g., '65% drop-off at Nurture stage', 'Only 12% conversion rate')",
+        "target": "Measurable goal (e.g., 'Reduce drop-off to 35% within 30 days', 'Increase conversion to 25%')",
+        "proofMethod": "How to verify (e.g., 'Re-run funnel health check — drop-off should decrease by 20+ points')",
+        "expectedImpact": "Business outcome (e.g., 'Recover 15 additional leads per month from the Nurture stage')",
         "studioLink": "optional — which Mantram studio can help (contentStudio, creativeStudio, conversationStudio, seoStudio, performanceMarketing)"
     }
 ]
+
+STRATEGIC RULES (MANDATORY):
+1. NEVER give generic advice like 'Improve conversion' or 'Add automation' — be SPECIFIC with stage names and numbers
+2. Every suggestion MUST reference specific metrics from the data above (entry counts, conversion rates, stage names)
+3. Every suggestion MUST have a measurable KPI with a baseline from the data and a target
+4. If a suggestion could apply to ANY funnel, it's too generic. DELETE IT.
 
 Provide 3-6 specific, actionable suggestions. Consider:
 - Missing stages (e.g. no nurture between awareness and decision)
 - Empty stages (no entries)
 - No studio connections (suggest linking automations, content)
-- Low conversion rate fixes
-- Stage-specific improvements`,
+- Low conversion rate fixes specific to this funnel's data
+- Stage-specific improvements based on actual drop-off patterns`,
                 maxTokens: 1500,
                 temperature: 0.7,
             });

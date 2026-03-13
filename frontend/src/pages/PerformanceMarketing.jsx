@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import DashboardLayout from '../components/DashboardLayout'
-import AgentFidatoPanel from '../components/AgentFidatoPanel'
+import StudioReportButton from '../components/reports/StudioReportButton'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -302,6 +302,11 @@ export default function PerformanceMarketing() {
                     </div>
                 )}
 
+                {/* ═══ Report Button ═══ */}
+                <div className="flex justify-end">
+                    <StudioReportButton studio="pm" brandId={activeBrand?._id} />
+                </div>
+
                 {/* ════════════════════════════════════════════════════════════ */}
                 {/* TAB NAVIGATION                                             */}
                 {/* ════════════════════════════════════════════════════════════ */}
@@ -325,9 +330,6 @@ export default function PerformanceMarketing() {
                         How It Works
                     </button>
                 </div>
-
-                {/* Agent Fidato — Competitive Intelligence */}
-                <AgentFidatoPanel studio="performance" />
 
                 {/* ════════════════════════════════════════════════════════════ */}
                 {/* TAB: HELP                                                   */}

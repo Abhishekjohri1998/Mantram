@@ -3,8 +3,8 @@ import SEOHead from '../components/SEOHead'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { useBrand } from '../context/BrandContext'
-import AgentFidatoPanel from '../components/AgentFidatoPanel'
 import { shopifyAnalytics } from '../services/api'
+import StudioReportButton from '../components/reports/StudioReportButton'
 
 export default function D2CAnalytics() {
     const { activeBrand } = useBrand()
@@ -141,6 +141,7 @@ export default function D2CAnalytics() {
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-6 gap-3">
                 <div></div>
                 <div className="flex items-center gap-2">
+                    <StudioReportButton studio="d2c" brandId={activeBrand?._id} />
                     <button onClick={() => setActiveTab('help')}
                         className="px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-slate-400 text-xs font-bold hover:bg-white/[0.08] cursor-pointer transition-all flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-sm">menu_book</span> How It Works
@@ -161,9 +162,6 @@ export default function D2CAnalytics() {
                     )}
                 </div>
             </div>
-
-            {/* Agent Fidato — Competitive Intelligence */}
-            <AgentFidatoPanel studio="d2c" />
 
             {/* Help View */}
             {activeTab === 'help' ? (

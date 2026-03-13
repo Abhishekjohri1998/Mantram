@@ -148,12 +148,12 @@ router.get('/:funnelId/health', protect, async (req, res) => {
             if (isBottleneck) {
                 overallScore -= 15;
                 issues.push({ type: 'bottleneck', stage: stage.name, message: `${dropOffRate}% drop-off at "${stage.name}" — major bottleneck`, severity: 'high' });
-                recommendations.push({ stage: stage.name, action: 'Add nurture sequence', description: `Create automated follow-ups for leads stuck in "${stage.name}" to reduce the ${dropOffRate}% drop-off rate` });
+                recommendations.push({ stage: stage.name, action: 'Add nurture sequence', description: `Create automated follow-ups for leads stuck in "${stage.name}" to reduce the ${dropOffRate}% drop-off rate`, kpi: `Drop-off rate at "${stage.name}"`, baseline: `${dropOffRate}% drop-off`, target: `Below 30% drop-off within 30 days`, proofMethod: `Re-run funnel health check — "${stage.name}" drop-off rate should decrease by ${Math.round(dropOffRate * 0.4)}+ points` });
             }
             if (isStagnant) {
                 overallScore -= 10;
                 issues.push({ type: 'stagnant', stage: stage.name, message: `${activeEntries} leads stuck in "${stage.name}" for 7+ days average`, severity: 'medium' });
-                recommendations.push({ stage: stage.name, action: 'Review stage criteria', description: `Consider splitting "${stage.name}" or adding intermediate touchpoints` });
+                recommendations.push({ stage: stage.name, action: 'Review stage criteria', description: `Consider splitting "${stage.name}" or adding intermediate touchpoints`, kpi: `Avg time in "${stage.name}"`, baseline: `${avgTimeHrs} hours (${Math.round(avgTimeHrs / 24)} days)`, target: `Below 72 hours (3 days) avg dwell time`, proofMethod: `Re-check health monitor — avg time should decrease by 50%+ after adding touchpoints` });
             }
             if (hasLostLeads) {
                 overallScore -= 5;
@@ -162,7 +162,7 @@ router.get('/:funnelId/health', protect, async (req, res) => {
 
             // Check studio links
             if (!stage.studioLinks?.length && i < stages.length - 1) {
-                recommendations.push({ stage: stage.name, action: 'Connect studios', description: `Link "${stage.name}" to Content or Conversation Studio for automated touchpoints` });
+                recommendations.push({ stage: stage.name, action: 'Connect studios', description: `Link "${stage.name}" to Content or Conversation Studio for automated touchpoints`, kpi: `Studio connections for "${stage.name}"`, baseline: '0 studio links', target: `At least 2 studio connections (e.g., Content + Conversation) within 1 week`, proofMethod: `Re-run health check — stage should show studioLinksCount ≥ 2` });
             }
 
             stageHealth.push({

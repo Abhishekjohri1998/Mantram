@@ -580,15 +580,33 @@ router.post('/ai-insights', protect, async (req, res) => {
         try {
             const parsed = await Promise.race([
                 callGrok(
-                    `You are a D2C e-commerce strategist AI. Analyze the store data and provide actionable insights.
+                    `You are a D2C e-commerce strategist AI — a CMO-level advisor billing ₹50,000/hour. Analyze the store data and provide STRATEGIC, MEASURABLE insights that reference specific products, numbers, and percentages from the data.
 
 Respond in JSON:
 {
-  "summary": "One-paragraph executive summary of the store's health",
-  "whatsWorking": [{ "title": "...", "desc": "...", "icon": "material_icon" }],
-  "whatsNot": [{ "title": "...", "desc": "...", "icon": "material_icon" }],
-  "actionPlan": [{ "title": "...", "desc": "2-3 sentence specific recommendation", "priority": "high|medium|low", "icon": "material_icon" }]
+  "summary": "One-paragraph executive summary referencing specific KPIs and their strategic implications",
+  "whatsWorking": [{ "title": "Specific finding with numbers", "desc": "Why this matters strategically and how to scale it — reference actual data", "icon": "material_icon", "kpi": "The metric proving this (e.g., '₹12,500 AOV from repeat buyers')", "scaleAction": "Exact next step to scale this win (e.g., 'Create lookalike audience from top 50 buyers and run ₹2,000/day campaign')" }],
+  "whatsNot": [{ "title": "Specific problem with data", "desc": "Root cause analysis — not just what's wrong but WHY", "icon": "material_icon", "kpi": "Current metric (e.g., '4.2% refund rate, industry avg is 2%')", "targetKpi": "Where this should be (e.g., 'Below 2.5% within 30 days')", "fixAction": "The one specific thing to change first" }],
+  "actionPlan": [{
+    "title": "Specific action — NOT generic advice like 'Run ads' or 'Improve marketing'",
+    "desc": "2-3 sentence strategic recommendation referencing specific products and data",
+    "priority": "high|medium|low",
+    "icon": "material_icon",
+    "kpi": "What to measure (e.g., 'Weekly revenue from product X')",
+    "baseline": "Current value from data (e.g., '₹45,000/week, 23 units')",
+    "target": "Measurable target (e.g., '₹75,000/week, 40 units within 21 days')",
+    "timeline": "Implementation timeline (e.g., '3 days to set up, measure after 14 days')",
+    "proofMethod": "How to verify success (e.g., 'Compare weekly revenue before/after in Shopify analytics')",
+    "expectedROI": "Expected business impact (e.g., '₹30,000 additional weekly revenue at ₹5,000 ad spend = 6x ROAS')"
+  }]
 }
+
+STRATEGIC RULES (MANDATORY):
+1. NEVER give generic advice like 'Run marketing campaigns' or 'Improve customer experience' — be SPECIFIC with product names and numbers
+2. Every actionPlan item MUST have a measurable KPI with baseline from the data and a specific target
+3. Every recommendation MUST reference actual products, revenue figures, or customer metrics from the data
+4. Think like a consultant billing ₹50,000/hour — if a recommendation could apply to ANY D2C store, it's too generic. DELETE IT.
+5. Reference specific products by name, specific revenue figures, and specific customer segments
 
 Be specific — reference product names, actual numbers, and percentages from the data.`,
                     `Brand: ${brand?.name || overview.shop?.name || 'Unknown'}
@@ -670,16 +688,38 @@ router.post('/boost-plan', protect, async (req, res) => {
         }
 
         const parsed = await callGrok(
-            `You are a D2C performance marketing strategist. Create a growth /boost campaign plan for the product.
+            `You are a D2C performance marketing strategist — the kind who manages ₹10L+/month ad budgets. Create a SPECIFIC, DATA-BACKED growth campaign plan for this product.
 
 Respond in JSON:
 {
   "product": "product name",
   "status": "health status",
-  "campaigns": [{ "channel": "Meta Ads|Google Ads|Instagram Reels", "type": "campaign type", "budget": "daily budget range in INR", "targeting": "targeting strategy", "creative": "creative direction", "expectedROAS": "expected return" }],
-  "estimatedImpact": { "additionalSales": "units/week", "additionalRevenue": "INR/week" },
-  "quickWins": ["action1", "action2", "action3"]
-}`,
+  "diagnosis": "2-3 sentence analysis of WHY this product needs boosting based on its health score, sales velocity, and inventory levels",
+  "campaigns": [{
+    "channel": "Meta Ads|Google Ads|Instagram Reels|YouTube Shorts",
+    "type": "campaign type",
+    "budget": "daily budget range in INR — calculated from product price and margin",
+    "targeting": "SPECIFIC targeting strategy referencing the product's actual buyer persona",
+    "creative": "SPECIFIC creative direction — not generic 'product showcase' but exact format and messaging angle",
+    "expectedROAS": "expected return with reasoning (e.g., '4-6x based on ₹X price point and industry benchmarks')",
+    "kpi": "Primary metric to track (e.g., 'Cost per purchase under ₹200')",
+    "proofMethod": "How to verify after 7 days (e.g., 'Check Meta Ads Manager — CPA should be below ₹X')"
+  }],
+  "estimatedImpact": {
+    "additionalSales": "units/week — calculated from current sales rate",
+    "additionalRevenue": "INR/week — calculated from price × units",
+    "breakEvenDays": "Days to recover ad spend at projected ROAS"
+  },
+  "quickWins": [{
+    "action": "Specific action — NOT generic like 'Update images'",
+    "kpi": "What this improves (e.g., 'Product page conversion rate')",
+    "baseline": "Current state (e.g., 'No reviews on product page')",
+    "target": "Goal (e.g., '5+ reviews within 7 days by emailing past buyers')",
+    "timeline": "How long (e.g., '2 hours setup + 7 days collection')"
+  }]
+}
+
+STRATEGIC RULES: Every recommendation MUST reference this product's actual data. No generic advice.`,
             `Brand: ${brand?.name || 'Unknown'}, Industry: ${brand?.dna?.industry || 'D2C'}
 Product: ${product.title}, Price: ₹${product.price}, Units Sold: ${product.unitsSold}, Revenue: ₹${product.revenue}
 Health Score: ${product.healthScore}/100, Status: ${product.healthBadge}, Inventory: ${product.inventory}
@@ -1103,19 +1143,25 @@ router.post('/ai-copilot', protect, async (req, res) => {
         }
 
         const parsed = await callGrok(
-            `You are an AI co-pilot for D2C e-commerce brands, similar to Triple Whale's Moby AI. Answer questions using the store's data.
+            `You are an AI co-pilot for D2C e-commerce brands — a data-driven strategist who answers with SPECIFIC numbers and MEASURABLE recommendations.
 
 Rules:
-- Be specific: use actual product names, numbers, and percentages
-- Be actionable: every answer should include a recommendation
-- Be concise: 3-5 sentences max
+- Be SPECIFIC: use actual product names, exact numbers, and percentages from the data
+- Be STRATEGIC: every answer must include a measurable recommendation with a target metric
+- Be CONCISE: 3-5 sentences max
 - Reference data sources when citing numbers
+- NEVER give generic advice — every recommendation must reference specific data from this store
 
 Respond in JSON:
 {
-  "answer": "Your concise, actionable answer",
+  "answer": "Your concise, data-backed answer with specific numbers and product names",
   "sources": ["list of data sources used like 'Orders Data', 'Product Health', 'Customer Analytics'"],
-  "actions": ["optional list of specific actions the user should take"]
+  "actions": [{
+    "action": "Specific measurable action — NOT generic like 'Improve marketing'",
+    "kpi": "What to measure (e.g., 'Repeat purchase rate')",
+    "target": "Measurable goal (e.g., 'Increase from 12% to 20% within 30 days')",
+    "proofMethod": "How to verify (e.g., 'Compare repeat rate in D2C analytics next month')"
+  }]
 }`,
             `Store Data Context:
 ${JSON.stringify(context, null, 0)}
