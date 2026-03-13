@@ -32,7 +32,7 @@ router.use(protect, authorize('superadmin'));
 router.get('/stats', async (req, res) => {
     try {
         const [totalUsers, totalBrands, totalContent, totalCreatives, totalProducts, totalIntegrations, totalSubscriptions, totalCoupons, totalFeedback, totalSeoAudits] = await Promise.all([
-            User.countDocuments({ role: { $ne: 'superadmin' } }),
+            User.countDocuments(),
             Brand.countDocuments(),
             Content.countDocuments(),
             Creative.countDocuments(),
@@ -45,7 +45,6 @@ router.get('/stats', async (req, res) => {
         ]);
 
         const planDistribution = await User.aggregate([
-            { $match: { role: { $ne: 'superadmin' } } },
             { $group: { _id: '$plan', count: { $sum: 1 } } },
         ]);
 
@@ -54,7 +53,7 @@ router.get('/stats', async (req, res) => {
             { $group: { _id: null, totalRevenue: { $sum: '$price' }, count: { $sum: 1 } } },
         ]);
 
-        const recentUsersRaw = await User.find({ role: { $ne: 'superadmin' } })
+        const recentUsersRaw = await User.find()
             .sort('-createdAt').limit(10)
             .select('name email plan role credits createdAt lastActive company');
 
@@ -65,7 +64,6 @@ router.get('/stats', async (req, res) => {
         }));
 
         const totalCreditsUsed = await User.aggregate([
-            { $match: { role: { $ne: 'superadmin' } } },
             { $group: { _id: null, total: { $sum: '$credits.used' } } },
         ]);
 
@@ -82,19 +80,18 @@ router.get('/stats', async (req, res) => {
 
         // Users created per day (last 30 days)
         const userGrowth = await User.aggregate([
-            { $match: { createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }, role: { $ne: 'superadmin' } } },
+            { $match: { createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } } },
             { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
             { $sort: { _id: 1 } },
         ]);
 
         // Usage Analytics: Top users, exhausted, and near exhaustion
         const [topUsersRaw, exhaustedUsersData] = await Promise.all([
-            User.find({ role: { $ne: 'superadmin' } })
+            User.find()
                 .sort('-credits.used')
                 .limit(10)
                 .select('name email plan credits.used credits.total credits.bonus lastActive'),
             User.aggregate([
-                { $match: { role: { $ne: 'superadmin' } } },
                 {
                     $project: {
                         isExhausted: {
