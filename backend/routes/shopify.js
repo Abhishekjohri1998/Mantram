@@ -370,11 +370,23 @@ router.post('/webhooks/customers-data-request', verifyShopifyWebhook, async (req
  */
 // Topic: customers/redact
 router.post('/webhooks/customers-redact', verifyShopifyWebhook, async (req, res) => {
-    res.status(200).json({ received: true }); // Respond immediately
+    res.status(200).json({ received: true });
     try {
-        const { shop_domain, customer, orders_to_redact } = req.body;
-        console.log(`🗑️ GDPR: Customer redact request from ${shop_domain} for customer ${customer?.id}`);
-        // ... (Cleanup logic)
+        const { shop_domain, customer } = req.body;
+        if (!customer?.id) return;
+        
+        console.log(`🗑️ GDPR: Redacting customer ${customer.id} for shop ${shop_domain}`);
+        
+        // Find integration to scope deletions
+        const integration = await Integration.findOne({ 'platformData.shopDomain': shop_domain, platform: 'shopify' });
+        if (!integration) return;
+
+        // Delete any PII related to this specific Shopify customer
+        await Promise.all([
+            ShopifyCustomer.deleteMany({ shopifyId: String(customer.id), user: integration.user }),
+            ShopifyOrder.deleteMany({ customerEmail: customer.email, user: integration.user }),
+            // Any other collection containing customer PII...
+        ]);
     } catch (error) {
         console.error('GDPR customers/redact error:', error);
     }
@@ -391,10 +403,23 @@ router.post('/webhooks/customers-redact', verifyShopifyWebhook, async (req, res)
 router.post('/webhooks/shop-redact', verifyShopifyWebhook, async (req, res) => {
     res.status(200).json({ received: true });
     try {
-        const { shop_id, shop_domain } = req.body;
-        console.log(`🏪 GDPR: Shop redact request for ${shop_domain} (ID: ${shop_id})`);
-        Integration.deleteMany({ 'platformData.shopDomain': shop_domain, platform: 'shopify' }).catch(e => console.error(e));
-        Product.deleteMany({ source: 'shopify', shopifyDomain: shop_domain }).catch(e => console.error(e));
+        const { shop_domain } = req.body;
+        console.log(`🏪 GDPR: Complete Shop redact request for ${shop_domain}`);
+        
+        // Find all integrations for this shop
+        const integrations = await Integration.find({ 'platformData.shopDomain': shop_domain, platform: 'shopify' });
+        const userIds = integrations.map(i => i.user);
+        const brandIds = integrations.map(i => i.brand).filter(Boolean);
+
+        // Perform cascading deletion of all shop-related data
+        await Promise.all([
+            Integration.deleteMany({ 'platformData.shopDomain': shop_domain, platform: 'shopify' }),
+            Product.deleteMany({ brand: { $in: brandIds } }),
+            ShopifyOrder.deleteMany({ brand: { $in: brandIds } }),
+            ShopifyCustomer.deleteMany({ brand: { $in: brandIds } }),
+        ]);
+
+        console.log(`✅ GDPR: Data purged for ${shop_domain}`);
     } catch (error) {
         console.error('GDPR shop/redact error:', error);
     }

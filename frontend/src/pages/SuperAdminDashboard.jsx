@@ -24,6 +24,7 @@ export default function SuperAdminDashboard() {
     const [systemSettings, setSystemSettings] = useState(null)
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
+    const [debouncedSearch, setDebouncedSearch] = useState('')
     const [planFilter, setPlanFilter] = useState('')
     const [userPage, setUserPage] = useState(1)
     const [toast, setToast] = useState(null)
@@ -56,6 +57,11 @@ export default function SuperAdminDashboard() {
     const [creditCosts, setCreditCosts] = useState(null)
     const [editingCosts, setEditingCosts] = useState(null)
     const [syncingCredits, setSyncingCredits] = useState(false)
+    // Audit Log state
+    const [logs, setLogs] = useState([])
+    const [logsPage, setLogsPage] = useState(1)
+    const [totalLogs, setTotalLogs] = useState(0)
+    const [logsLoading, setLogsLoading] = useState(false)
 
     if (user?.role !== 'superadmin') {
         return <DashboardLayout><div className="flex items-center justify-center h-screen"><div className="text-center"><span className="material-symbols-outlined text-6xl text-rose-500 mb-4">shield</span><h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2><p className="text-slate-500">Super Admin access required</p></div></div></DashboardLayout>
@@ -73,9 +79,15 @@ export default function SuperAdminDashboard() {
         { id: 'content', label: 'Content & Brands', icon: 'article' },
         { id: 'ai', label: 'AI & System', icon: 'smart_toy' },
         { id: 'integrations', label: 'Integrations', icon: 'hub' },
+        { id: 'logs', label: 'Audit Logs', icon: 'history' },
     ]
 
     useEffect(() => { loadStats() }, [])
+    useEffect(() => {
+        const handler = setTimeout(() => setDebouncedSearch(search), 500);
+        return () => clearTimeout(handler);
+    }, [search])
+
     useEffect(() => {
         if (tab === 'users') loadUsers()
         if (tab === 'approvals') loadPendingUsers()
@@ -85,10 +97,12 @@ export default function SuperAdminDashboard() {
         if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts() }
         if (tab === 'integrations') loadIntegrations()
         if (tab === 'packages') loadPackages()
-    }, [tab, search, planFilter, userPage])
+        if (tab === 'logs') loadLogs()
+    }, [tab, debouncedSearch, planFilter, userPage, logsPage])
 
     const loadStats = async () => { try { const d = await API.getStats(); setStats(d.stats) } catch (e) { console.error(e) } finally { setLoading(false) } }
-    const loadUsers = async () => { try { const d = await API.getUsers({ page: userPage, limit: 20, search, plan: planFilter }); setUsers(d.users || []); setTotalUsers(d.total || 0) } catch (e) { console.error(e) } }
+    const loadUsers = async () => { try { const d = await API.getUsers({ page: userPage, limit: 20, search: debouncedSearch, plan: planFilter }); setUsers(d.users || []); setTotalUsers(d.total || 0) } catch (e) { console.error(e) } }
+    const loadLogs = async () => { setLogsLoading(true); try { const d = await API.getSystemLogs({ page: logsPage, limit: 50 }); setLogs(d.logs || []); setTotalLogs(d.total || 0) } catch (e) { console.error(e) } finally { setLogsLoading(false) } }
     const loadPendingUsers = async () => { try { const d = await API.getUsers({ approvalStatus: 'pending', limit: 50 }); setPendingUsers(d.users || []) } catch (e) { console.error(e) } }
     const loadCoupons = async () => { try { const d = await API.getCoupons(); setCoupons(d.coupons || []) } catch (e) { console.error(e) } }
     const loadBrands = async () => { try { const d = await API.getBrands({ limit: 50 }); setBrands(d.brands || []); setTotalBrands(d.total || 0) } catch (e) { console.error(e) } }
@@ -233,6 +247,20 @@ export default function SuperAdminDashboard() {
                     </div>
                 </div>
 
+                {/* Impersonation Warning Banner */}
+                {user?.isImpersonated && (
+                    <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-amber-500 to-rose-500 shadow-lg shadow-amber-500/20 flex items-center justify-between animate-pulse">
+                        <div className="flex items-center gap-3">
+                            <span className="material-symbols-outlined text-white text-2xl">error</span>
+                            <div>
+                                <p className="text-white font-black text-sm uppercase tracking-wider">Active Impersonation Session</p>
+                                <p className="text-white/80 text-xs">You are currently viewing the platform as <strong>{user.name}</strong>. All actions are logged.</p>
+                            </div>
+                        </div>
+                        <button onClick={() => window.location.reload()} className="px-4 py-2 bg-white text-rose-500 rounded-xl text-xs font-black uppercase hover:bg-slate-100 transition-all cursor-pointer">Exit Session</button>
+                    </div>
+                )}
+
                 {/* Tabs */}
                 <div className="flex gap-1 mb-6 bg-white/[0.03] p-1 rounded-xl border border-white/[0.06] overflow-x-auto">
                     {tabs.map(t => (
@@ -274,6 +302,11 @@ export default function SuperAdminDashboard() {
                                     <div className="glass-panel rounded-2xl p-5">
                                         <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-rose-400">rate_review</span><span className="text-sm font-bold text-white">AI Feedback</span></div>
                                         <p className="text-2xl font-extrabold text-rose-400">{stats.totalFeedback}</p>
+                                    </div>
+                                    <div className="glass-panel rounded-2xl p-5 border border-indigo-500/10">
+                                        <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-indigo-400">trending_up</span><span className="text-sm font-bold text-white">Retention Rate</span></div>
+                                        <p className="text-2xl font-extrabold text-indigo-400">{stats.usageAnalytics?.retentionRate || '0%'}</p>
+                                        <p className="text-xs text-slate-600 mt-1">{stats.usageAnalytics?.churnedUsersCount || 0} churned (20d+)</p>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 mb-5">
@@ -1145,6 +1178,79 @@ export default function SuperAdminDashboard() {
                                     </div>
                                 )}
                             </>
+                        )}
+                    </div>
+                )}
+
+                {/* ════════════ AUDIT LOGS ════════════ */}
+                {tab === 'logs' && (
+                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-indigo-400">history</span>
+                                    System Audit Logs
+                                </h3>
+                                <p className="text-sm text-slate-500 mt-1">Immutable record of all administrative actions performed on the platform</p>
+                            </div>
+                            <button onClick={loadLogs} className="p-2 rounded-lg bg-white/[0.04] text-slate-400 hover:text-white cursor-pointer transition-all"><span className={`${logsLoading ? 'animate-spin' : ''} material-symbols-outlined text-sm`}>refresh</span></button>
+                        </div>
+
+                        <div className="glass-panel rounded-2xl overflow-hidden border border-white/[0.06]">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="text-xs text-slate-500 font-bold uppercase tracking-wider border-b border-white/[0.06] bg-white/[0.02]">
+                                            <th className="px-5 py-4">Action & Target</th>
+                                            <th className="px-5 py-4">Admin</th>
+                                            <th className="px-5 py-4">Severity</th>
+                                            <th className="px-5 py-4">IP Address</th>
+                                            <th className="px-5 py-4 text-right">Timestamp</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/[0.04]">
+                                        {logsLoading ? (
+                                            <tr><td colSpan="5" className="py-20 text-center text-slate-500 capitalize"><span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>Loading Audit Trail...</td></tr>
+                                        ) : logs.length > 0 ? logs.map(log => (
+                                            <tr key={log._id} className="text-sm hover:bg-white/[0.01] transition-all group">
+                                                <td className="px-5 py-4">
+                                                    <div>
+                                                        <span className="font-bold text-white uppercase text-[10px] px-1.5 py-0.5 rounded bg-white/[0.08] mr-2">{log.action?.replace(/_/g, ' ')}</span>
+                                                        <span className="text-slate-400 text-xs">{log.targetModel} ({log.targetId?.slice(-6)})</span>
+                                                        {log.metadata?.reason && <p className="text-[10px] text-slate-600 mt-1 italic">"{log.metadata.reason}"</p>}
+                                                    </div>
+                                                </td>
+                                                <td className="px-5 py-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-6 h-6 rounded bg-indigo-500/10 flex items-center justify-center text-[10px] font-bold text-indigo-400">{log.admin?.name?.[0]}</div>
+                                                        <span className="text-slate-300 font-medium">{log.admin?.name || 'System'}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-5 py-4">
+                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                                                        log.severity === 'high' ? 'bg-rose-500/20 text-rose-400' :
+                                                        log.severity === 'medium' ? 'bg-amber-500/20 text-amber-400' :
+                                                        'bg-emerald-500/20 text-emerald-400'
+                                                    }`}>{log.severity?.toUpperCase()}</span>
+                                                </td>
+                                                <td className="px-5 py-4 font-mono text-xs text-slate-600">{log.ipAddress || '—'}</td>
+                                                <td className="px-5 py-4 text-right text-slate-500 text-xs">
+                                                    {new Date(log.createdAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                </td>
+                                            </tr>
+                                        )) : (
+                                            <tr><td colSpan="5" className="py-20 text-center text-slate-600">No audit logs found</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {totalLogs > 50 && (
+                            <div className="flex justify-center gap-2 mt-6">
+                                <button disabled={logsPage <= 1} onClick={() => setLogsPage(p => p - 1)} className="px-4 py-2 rounded-lg bg-white/[0.04] text-sm text-slate-400 disabled:opacity-30 cursor-pointer">← Prev</button>
+                                <span className="px-4 py-2 text-sm text-slate-500">Page {logsPage}</span>
+                                <button disabled={logs.length < 50} onClick={() => setLogsPage(p => p + 1)} className="px-4 py-2 rounded-lg bg-white/[0.04] text-sm text-slate-400 disabled:opacity-30 cursor-pointer">Next →</button>
+                            </div>
                         )}
                     </div>
                 )}

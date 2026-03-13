@@ -16,14 +16,27 @@ import Subscription from '../models/Subscription.js';
 import Coupon from '../models/Coupon.js';
 import SubscriptionPackage from '../models/SubscriptionPackage.js';
 import SystemSettings, { getSetting, setSetting } from '../models/SystemSettings.js';
+import AuditLog from '../models/AuditLog.js';
 import { CREDIT_COSTS, getCreditCosts, getCreditBalance, invalidateCreditCostCache } from '../middleware/credits.js';
 import { protect, authorize, generateToken } from '../middleware/auth.js';
 import { safeErrorMessage } from '../utils/safeError.js';
+import { logAudit } from '../utils/audit.js';
+import CreditUsage from '../models/CreditUsage.js';
+import rateLimit from 'express-rate-limit';
 
 const router = Router();
 
+// Rate limiting for Super Admin to prevent brute force / DoS on heavy stats
+const adminLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 500, // Limit each IP to 500 requests per window
+    message: { success: false, error: 'Too many administrative requests. Please try again later.' },
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+});
+
 // All routes require superadmin
-router.use(protect, authorize('superadmin'));
+router.use(protect, authorize('superadmin'), adminLimiter);
 
 // ══════════════════════════════════════════════════════════════
 // 1. PLATFORM OVERVIEW
@@ -95,13 +108,21 @@ router.get('/stats', async (req, res) => {
                 {
                     $project: {
                         isExhausted: {
-                            $lte: [
-                                { $subtract: [{ $add: ['$credits.total', '$credits.bonus'] }, '$credits.used'] },
-                                0
+                            $and: [
+                                { $ne: ['$plan', 'enterprise'] },
+                                { $ne: ['$role', 'superadmin'] },
+                                {
+                                    $lte: [
+                                        { $subtract: [{ $add: ['$credits.total', '$credits.bonus'] }, '$credits.used'] },
+                                        0
+                                    ]
+                                }
                             ]
                         },
                         isNearExhaustion: {
                             $and: [
+                                { $ne: ['$plan', 'enterprise'] },
+                                { $ne: ['$role', 'superadmin'] },
                                 { $gt: [{ $subtract: [{ $add: ['$credits.total', '$credits.bonus'] }, '$credits.used'] }, 0] },
                                 { $lte: [{ $subtract: [{ $add: ['$credits.total', '$credits.bonus'] }, '$credits.used'] }, { $multiply: [{ $add: ['$credits.total', '$credits.bonus'] }, 0.1] }] }
                             ]
@@ -118,10 +139,13 @@ router.get('/stats', async (req, res) => {
             ])
         ]);
 
-        const topUsers = topUsersRaw.map(u => ({
-            ...u.toJSON(),
-            creditBalance: getCreditBalance(u)
-        }));
+        const [topUsers, churnedUsersCount, returningUsersCount] = await Promise.all([
+            Promise.resolve(topUsersRaw.map(u => ({ ...u.toJSON(), creditBalance: getCreditBalance(u) }))),
+            User.countDocuments({ lastActive: { $lt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000) }, role: { $ne: 'superadmin' } }),
+            User.countDocuments({ lastActive: { $gt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }, createdAt: { $lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } })
+        ]);
+
+        const retentionRate = totalUsers > 0 ? (returningUsersCount / totalUsers * 100).toFixed(1) : 0;
 
         res.json({
             success: true,
@@ -139,6 +163,8 @@ router.get('/stats', async (req, res) => {
                     topUsers,
                     exhaustedCount: exhaustedUsersData[0]?.exhaustedCount || 0,
                     nearEmptyCount: exhaustedUsersData[0]?.nearEmptyCount || 0,
+                    churnedUsersCount,
+                    retentionRate: `${retentionRate}%`
                 },
                 creditCosts: CREDIT_COSTS,
             },
@@ -227,8 +253,18 @@ router.put('/users/:id', async (req, res) => {
             update['credits.total'] = planCredits[plan] || 50;
             update['credits.used'] = 0;
         }
+        const previousUser = await User.findById(req.params.id).select('-password');
+        if (!previousUser) return res.status(404).json({ success: false, error: 'User not found' });
+
         const user = await User.findByIdAndUpdate(req.params.id, update, { returnDocument: 'after' }).select('-password');
-        if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+        
+        await logAudit(req, {
+            action: 'UPDATE_USER',
+            targetModel: 'User',
+            targetId: user._id,
+            changes: { before: previousUser.toJSON(), after: user.toJSON() }
+        });
+
         res.json({ success: true, user: { ...user.toJSON(), creditBalance: getCreditBalance(user) } });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -266,18 +302,38 @@ router.delete('/users/:id', async (req, res) => {
             });
         }
 
-        await Promise.all([
-            Brand.deleteMany({ user: user._id }),
-            Content.deleteMany({ user: user._id }),
-            Creative.deleteMany({ user: user._id }),
-            Integration.deleteMany({ user: user._id }),
-            Product.deleteMany({ brand: { $in: await Brand.find({ user: user._id }).distinct('_id') } }),
-            Subscription.deleteMany({ user: user._id }),
-            Feedback.deleteMany({ user: user._id }),
-            SeoAudit.deleteMany({ user: user._id }),
-            User.findByIdAndDelete(user._id),
-        ]);
-        res.json({ success: true, message: 'User and all data deleted' });
+        const session = await mongoose.startSession();
+        session.startTransaction();
+
+        try {
+            await Promise.all([
+                Brand.collection.deleteMany({ user: user._id }, { session }),
+                Content.collection.deleteMany({ user: user._id }, { session }),
+                Creative.collection.deleteMany({ user: user._id }, { session }),
+                Integration.collection.deleteMany({ user: user._id }, { session }),
+                Product.collection.deleteMany({ brand: { $in: await Brand.find({ user: user._id }).distinct('_id') } }, { session }),
+                Subscription.collection.deleteMany({ user: user._id }, { session }),
+                Feedback.collection.deleteMany({ user: user._id }, { session }),
+                SeoAudit.collection.deleteMany({ user: user._id }, { session }),
+                User.findByIdAndDelete(user._id, { session }),
+            ]);
+
+            await logAudit(req, {
+                action: 'DELETE_USER',
+                targetModel: 'User',
+                targetId: user._id,
+                severity: 'critical',
+                metadata: { email: user.email, name: user.name }
+            });
+
+            await session.commitTransaction();
+            res.json({ success: true, message: 'User and all data deleted' });
+        } catch (error) {
+            await session.abortTransaction();
+            throw error;
+        } finally {
+            session.endSession();
+        }
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -288,8 +344,30 @@ router.post('/users/:id/impersonate', async (req, res) => {
         const user = await User.findById(req.params.id).select('-password');
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
         if (user.role === 'superadmin') return res.status(403).json({ success: false, error: 'Cannot impersonate super admin' });
+        
         const token = generateToken(user._id);
-        res.json({ success: true, token, user: { id: user._id, name: user.name, email: user.email, role: user.role, plan: user.plan }, message: `Impersonating ${user.name}` });
+
+        await logAudit(req, {
+            action: 'IMPERSONATE_USER',
+            targetModel: 'User',
+            targetId: user._id,
+            severity: 'medium',
+            metadata: { adminName: req.user.name, userName: user.name }
+        });
+
+        res.json({ 
+            success: true, 
+            token, 
+            user: { 
+                id: user._id, 
+                name: user.name, 
+                email: user.email, 
+                role: user.role, 
+                plan: user.plan,
+                isImpersonated: true 
+            }, 
+            message: `Impersonating ${user.name}` 
+        });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -732,9 +810,38 @@ router.get('/system-settings', async (req, res) => {
 router.put('/system-settings', async (req, res) => {
     try {
         const { watermarkEnabled, defaultProvider, maintenanceMode } = req.body;
-        if (watermarkEnabled !== undefined) await setSetting('watermark_enabled', !!watermarkEnabled, req.user._id);
-        if (defaultProvider) await setSetting('default_ai_provider', defaultProvider, req.user._id);
-        if (maintenanceMode !== undefined) await setSetting('maintenance_mode', !!maintenanceMode, req.user._id);
+        const before = {};
+        const after = {};
+
+        if (watermarkEnabled !== undefined) {
+            before.watermarkEnabled = await getSetting('watermark_enabled');
+            await setSetting('watermark_enabled', !!watermarkEnabled, req.user._id);
+            after.watermarkEnabled = !!watermarkEnabled;
+        }
+        
+        if (defaultProvider) {
+            // Whitelist validation for AI providers
+            const validProviders = ['gemini', 'openai', 'anthropic', 'mistral'];
+            if (!validProviders.includes(defaultProvider.toLowerCase())) {
+                return res.status(400).json({ success: false, error: `Invalid provider. Must be one of: ${validProviders.join(', ')}` });
+            }
+            before.defaultProvider = await getSetting('default_ai_provider');
+            await setSetting('default_ai_provider', defaultProvider.toLowerCase(), req.user._id);
+            after.defaultProvider = defaultProvider.toLowerCase();
+        }
+
+        if (maintenanceMode !== undefined) {
+            before.maintenanceMode = await getSetting('maintenance_mode');
+            await setSetting('maintenance_mode', !!maintenanceMode, req.user._id);
+            after.maintenanceMode = !!maintenanceMode;
+        }
+
+        await logAudit(req, {
+            action: 'UPDATE_SYSTEM_SETTINGS',
+            targetModel: 'SystemSettings',
+            changes: { before, after }
+        });
+
         res.json({ success: true, message: 'Settings updated' });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -805,6 +912,14 @@ router.post('/packages', async (req, res) => {
         const existing = await SubscriptionPackage.findOne({ slug: data.slug });
         if (existing) return res.status(400).json({ success: false, error: 'Package slug already exists' });
         const pkg = await SubscriptionPackage.create(data);
+        
+        await logAudit(req, {
+            action: 'CREATE_PACKAGE',
+            targetModel: 'SubscriptionPackage',
+            targetId: pkg._id,
+            changes: { after: pkg.toJSON() }
+        });
+
         res.status(201).json({ success: true, package: pkg });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -813,8 +928,18 @@ router.post('/packages', async (req, res) => {
 
 router.put('/packages/:id', async (req, res) => {
     try {
+        const previous = await SubscriptionPackage.findById(req.params.id);
+        if (!previous) return res.status(404).json({ success: false, error: 'Package not found' });
+
         const pkg = await SubscriptionPackage.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
-        if (!pkg) return res.status(404).json({ success: false, error: 'Package not found' });
+        
+        await logAudit(req, {
+            action: 'UPDATE_PACKAGE',
+            targetModel: 'SubscriptionPackage',
+            targetId: pkg._id,
+            changes: { before: previous.toJSON(), after: pkg.toJSON() }
+        });
+
         res.json({ success: true, package: pkg });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -823,7 +948,19 @@ router.put('/packages/:id', async (req, res) => {
 
 router.delete('/packages/:id', async (req, res) => {
     try {
+        const pkg = await SubscriptionPackage.findById(req.params.id);
+        if (!pkg) return res.status(404).json({ success: false, error: 'Package not found' });
+
         await SubscriptionPackage.findByIdAndDelete(req.params.id);
+        
+        await logAudit(req, {
+            action: 'DELETE_PACKAGE',
+            targetModel: 'SubscriptionPackage',
+            targetId: pkg._id,
+            severity: 'warning',
+            metadata: { name: pkg.name, slug: pkg.slug }
+        });
+
         res.json({ success: true, message: 'Package deleted' });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -1208,6 +1345,41 @@ creditRouter.get('/summary', protect, async (req, res) => {
             month: { credits: monthUsage[0]?.total || 0, operations: monthUsage[0]?.count || 0 },
             byAction,
             dailyTrend,
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════
+// 10. SYSTEM AUDIT LOGS
+// ══════════════════════════════════════════════════════════════
+
+// GET /superadmin/system-logs — paginated audit trails
+router.get('/system-logs', async (req, res) => {
+    try {
+        const { page = 1, limit = 50, action, adminId, severity } = req.query;
+        const query = {};
+        if (action) query.action = action;
+        if (adminId) query.admin = adminId;
+        if (severity) query.severity = severity;
+
+        const [logs, total] = await Promise.all([
+            AuditLog.find(query)
+                .populate('admin', 'name email image')
+                .sort({ createdAt: -1 })
+                .skip((parseInt(page) - 1) * parseInt(limit))
+                .limit(parseInt(limit))
+                .lean(),
+            AuditLog.countDocuments(query)
+        ]);
+
+        res.json({
+            success: true,
+            logs,
+            total,
+            page: parseInt(page),
+            pages: Math.ceil(total / parseInt(limit))
         });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });

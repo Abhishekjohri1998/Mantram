@@ -382,6 +382,11 @@ export const superadmin = {
     updateCreditCosts: (costs) => apiFetch('/superadmin/credit-costs', { method: 'PUT', body: JSON.stringify({ costs }) }),
     resetCreditCosts: () => apiFetch('/superadmin/credit-costs/reset', { method: 'POST' }),
     syncCredits: () => apiFetch('/superadmin/system/sync-all-credits', { method: 'POST' }),
+    getSystemLogs: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/superadmin/system-logs?${query}`);
+    },
+    impersonateUser: (id) => apiFetch(`/superadmin/users/${id}/impersonate`, { method: 'POST' }),
 };
 
 // ============ Credits API ============
