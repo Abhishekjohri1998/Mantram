@@ -602,6 +602,16 @@ export const payments = {
             method: 'POST',
             body: JSON.stringify(paymentData)
         }),
+    createTopupOrder: (packId) =>
+        apiFetch('/payments/create-topup-order', {
+            method: 'POST',
+            body: JSON.stringify({ packId })
+        }),
+    verifyTopup: (paymentData) =>
+        apiFetch('/payments/verify-topup', {
+            method: 'POST',
+            body: JSON.stringify(paymentData)
+        }),
 };
 
 // ============ Funnel Studio API ============

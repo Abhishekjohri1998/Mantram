@@ -107,6 +107,50 @@ export default function CreditsPage() {
         }
     }
 
+    const handleTopup = async (pack) => {
+        try {
+            const { orderId, amount, currency } = await paymentsAPI.createTopupOrder(pack.id)
+
+            const options = {
+                key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+                amount,
+                currency,
+                name: 'Mantram AI',
+                description: `Buy ${pack.credits} AI Credits`,
+                order_id: orderId,
+                handler: async (response) => {
+                    try {
+                        await paymentsAPI.verifyTopup({
+                            ...response,
+                            packId: pack.id
+                        })
+                        alert(`Successfully added ${pack.credits} credits to your account!`)
+                        window.location.reload()
+                    } catch (e) {
+                        alert('Top-up verification failed: ' + e.message)
+                    }
+                },
+                prefill: {
+                    name: summary?.userName,
+                    email: summary?.userEmail,
+                },
+                theme: { color: '#2b4bee' }
+            }
+
+            const rzp = new window.Razorpay(options)
+            rzp.open()
+        } catch (e) {
+            alert('Failed to initialize top-up: ' + e.message)
+        }
+    }
+
+    const TOPUP_PACKS = [
+        { id: 'small', credits: 100, price: 50, priceUSD: 1, popular: false },
+        { id: 'medium', credits: 500, price: 200, priceUSD: 4, popular: true },
+        { id: 'large', credits: 1500, price: 500, priceUSD: 9, popular: false },
+        { id: 'enterprise', credits: 5000, price: 1500, priceUSD: 25, popular: false },
+    ]
+
     const balance = summary?.balance
     const creditPercent = balance && !balance.unlimited ? Math.min(100, (balance.remaining / balance.total) * 100) : 100
     const creditColor = creditPercent > 50 ? 'emerald' : creditPercent > 20 ? 'amber' : 'rose'
@@ -144,10 +188,17 @@ export default function CreditsPage() {
                                     </div>
                                 ) : (
                                     <>
-                                        <div className="flex items-baseline gap-2">
-                                            <span className={`text-4xl font-black text-${creditColor}-400`}>{balance?.remaining || 0}</span>
-                                            <span className="text-lg text-slate-600 font-medium">/ {balance?.total || 0}</span>
-                                            <span className="text-sm text-slate-600">credits remaining</span>
+                                        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+                                            <div className="flex items-baseline gap-2">
+                                                <span className={`text-4xl font-black text-${creditColor}-400`}>{balance?.remaining || 0}</span>
+                                                <span className="text-lg text-slate-600 font-medium">/ {balance?.total || 0}</span>
+                                                <span className="text-sm text-slate-600">Total Credits</span>
+                                            </div>
+                                            {balance?.bonus > 0 && (
+                                                <div className="px-2 py-0.5 rounded-md bg-amber-400/10 border border-amber-400/20">
+                                                    <span className="text-xs font-bold text-amber-400">+{balance.bonus} Bonus</span>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="mt-3 w-full max-w-md h-2.5 rounded-full bg-white/[0.06] overflow-hidden">
                                             <div
@@ -156,7 +207,7 @@ export default function CreditsPage() {
                                             />
                                         </div>
                                         <p className="mt-1 text-xs text-slate-600">
-                                            {balance?.used || 0} credits used this cycle • {balance?.total ? Math.round(((balance.used || 0) / balance.total) * 100) : 0}% consumed
+                                            {balance?.bonusUsed || 0} / {balance?.bonus || 0} bonus used • {balance?.used || 0} used this cycle
                                         </p>
                                     </>
                                 )}
@@ -182,7 +233,7 @@ export default function CreditsPage() {
 
                     {/* Tabs */}
                     <div className="flex gap-2">
-                        {['overview', 'plans', 'history'].map(t => (
+                        {['overview', 'plans', 'topup', 'history'].map(t => (
                             <button
                                 key={t}
                                 onClick={() => setTab(t)}
@@ -191,7 +242,7 @@ export default function CreditsPage() {
                                     : 'text-slate-400 hover:bg-white/[0.04] border border-transparent'
                                     }`}
                             >
-                                {t === 'overview' ? '📊 Usage Breakdown' : t === 'plans' ? '💎 Upgrade Plans' : '📋 Transaction History'}
+                                {t === 'overview' ? '📊 Usage Breakdown' : t === 'plans' ? '💎 Upgrade Plans' : t === 'topup' ? '⚡ Quick Top-up' : '📋 Transaction History'}
                             </button>
                         ))}
                     </div>
@@ -274,6 +325,49 @@ export default function CreditsPage() {
                                         })()}
                                     </div>
                                 )}
+                            </div>
+                        </div>
+                    ) : tab === 'topup' ? (
+                        <div className="space-y-6">
+                            <div className="bg-gradient-to-br from-amber-500/10 to-amber-600/5 border border-amber-500/20 p-6 rounded-2xl">
+                                <h3 className="text-lg font-bold text-amber-400 flex items-center gap-2 mb-2">
+                                    <span className="material-symbols-outlined text-xl">bolt</span>
+                                    Low on credits? Get a Quick Top-up
+                                </h3>
+                                <p className="text-sm text-slate-400">Purchased credits never expire and are used only after your plan credits are exhausted.</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                {TOPUP_PACKS.map(pack => (
+                                    <div key={pack.id} className={`glass-panel p-6 rounded-2xl border transition-all hover:scale-[1.02] flex flex-col ${pack.popular ? 'border-amber-400 ring-1 ring-amber-400/20' : 'border-white/[0.08]'}`}>
+                                        <div className="flex-1">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-xl font-bold text-white">{pack.credits} Credits</h3>
+                                                {pack.popular && <span className="px-2 py-0.5 rounded-full bg-amber-400 text-[10px] font-black uppercase text-slate-900 tracking-wider">Popular</span>}
+                                            </div>
+                                            <div className="mb-6">
+                                                <span className="text-3xl font-black text-white">₹{pack.price}</span>
+                                                <span className="text-slate-500 text-sm ml-1">/ pack</span>
+                                            </div>
+                                            <ul className="space-y-3 mb-8">
+                                                <li className="flex items-center gap-2 text-sm text-slate-400">
+                                                    <span className="material-symbols-outlined text-amber-400 text-lg">schedule</span>
+                                                    Never expires
+                                                </li>
+                                                <li className="flex items-center gap-2 text-sm text-slate-400">
+                                                    <span className="material-symbols-outlined text-amber-400 text-lg">rocket</span>
+                                                    Instant activation
+                                                </li>
+                                            </ul>
+                                        </div>
+                                        <button
+                                            onClick={() => handleTopup(pack)}
+                                            className="w-full py-3 rounded-xl font-bold text-sm bg-white text-slate-900 shadow-lg hover:bg-slate-100 transition-all"
+                                        >
+                                            Buy for ₹{pack.price}
+                                        </button>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     ) : tab === 'plans' ? (

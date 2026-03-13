@@ -167,4 +167,96 @@ router.post('/verify', protect, async (req, res) => {
     }
 });
 
+/**
+ * @desc    Create Razorpay Order for Credit Top-up
+ * @route   POST /api/payments/create-topup-order
+ * @access  Private
+ */
+router.post('/create-topup-order', protect, async (req, res) => {
+    try {
+        const { creditPackId } = req.body;
+
+        // Define standard top-up packs
+        const topupPacks = {
+            'pack-100': { credits: 100, price: 50, name: '100 Credits Pack' },
+            'pack-500': { credits: 500, price: 200, name: '500 Credits Pack' },
+            'pack-1000': { credits: 1000, price: 350, name: '1000 Credits Pack' },
+        };
+
+        const pack = topupPacks[creditPackId];
+        if (!pack) {
+            return res.status(400).json({ success: false, error: 'Invalid credit pack' });
+        }
+
+        const options = {
+            amount: pack.price * 100, // paise
+            currency: 'INR',
+            receipt: `topup_${Date.now()}`,
+            notes: {
+                userId: req.user._id.toString(),
+                creditPackId,
+                credits: pack.credits,
+                type: 'credit_topup'
+            },
+        };
+
+        const order = await getRazorpay().orders.create(options);
+
+        res.json({
+            success: true,
+            orderId: order.id,
+            amount: order.amount,
+            currency: order.currency,
+            packName: pack.name
+        });
+    } catch (error) {
+        console.error('❌ Topup Order Error:', error);
+        res.status(500).json({ success: false, error: 'Top-up initialization failed' });
+    }
+});
+
+/**
+ * @desc    Verify Razorpay Payment for Top-up
+ * @route   POST /api/payments/verify-topup
+ * @access  Private
+ */
+router.post('/verify-topup', protect, async (req, res) => {
+    try {
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+        const expectedSignature = crypto
+            .createHmac('sha256', config.razorpay.keySecret)
+            .update(razorpay_order_id + "|" + razorpay_payment_id)
+            .digest('hex');
+
+        if (expectedSignature !== razorpay_signature) {
+            return res.status(400).json({ success: false, error: 'Invalid payment signature' });
+        }
+
+        const order = await getRazorpay().orders.fetch(razorpay_order_id);
+        if (order.notes?.type !== 'credit_topup') {
+            return res.status(400).json({ success: false, error: 'Not a top-up order' });
+        }
+
+        const credits = parseInt(order.notes.credits);
+        
+        // Update user: Increment bonus credits
+        const user = await User.findByIdAndUpdate(
+            req.user._id,
+            { $inc: { 'credits.bonus': credits } },
+            { new: true }
+        );
+
+        res.json({
+            success: true,
+            message: `Successfully added ${credits} credits to your account.`,
+            newBalance: user.credits.total + user.credits.bonus - user.credits.used,
+            creditsAdded: credits
+        });
+    } catch (error) {
+        console.error('❌ Topup Verification Error:', error);
+        res.status(500).json({ success: false, error: 'Top-up verification failed' });
+    }
+});
+
 export default router;

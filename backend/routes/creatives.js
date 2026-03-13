@@ -4,6 +4,7 @@ import Creative from '../models/Creative.js';
 import Feedback from '../models/Feedback.js';
 import Brand from '../models/Brand.js';
 import { protect } from '../middleware/auth.js';
+import { requireStudio } from '../middleware/studioAccess.js';
 import { requireCredits } from '../middleware/credits.js';
 import { getOrchestrator } from '../agents/orchestrator.js';
 import { addWatermark } from '../utils/watermark.js';
@@ -209,7 +210,7 @@ RESPOND WITH ONLY THE ENHANCED PROMPT TEXT. Nothing else.`;
 });
 
 // POST /api/creatives/generate
-router.post('/generate', protect, requireCredits('creative'), async (req, res) => {
+router.post('/generate', protect, requireStudio('creativeStudio'), requireCredits('creative'), async (req, res) => {
     try {
         const { brandId, type, prompt, options } = req.body;
         if (!brandId || !prompt) {

@@ -18,7 +18,6 @@ export default function SuperAdminDashboard() {
     const [totalBrands, setTotalBrands] = useState(0)
     const [content, setContent] = useState([])
     const [totalContent, setTotalContent] = useState(0)
-    const [subscriptions, setSubscriptions] = useState([])
     const [integrations, setIntegrations] = useState(null)
     const [aiHealth, setAiHealth] = useState(null)
     const [systemSettings, setSystemSettings] = useState(null)
@@ -33,8 +32,6 @@ export default function SuperAdminDashboard() {
     const [creditModal, setCreditModal] = useState(null)
     const [creditAmount, setCreditAmount] = useState('')
     const [planModal, setPlanModal] = useState(null)
-    const [subForm, setSubForm] = useState({ userId: '', plan: 'professional', billingCycle: 'monthly', price: '', credits: '' })
-    const [showSubForm, setShowSubForm] = useState(false)
     // Package Builder state
     const [packages, setPackages] = useState([])
     const [aiSuggestions, setAiSuggestions] = useState(null)
@@ -74,7 +71,6 @@ export default function SuperAdminDashboard() {
         { id: 'approvals', label: 'Approvals', icon: 'how_to_reg' },
         { id: 'users', label: 'Users', icon: 'group' },
         { id: 'packages', label: 'Packages', icon: 'inventory_2' },
-        { id: 'subscriptions', label: 'Subscriptions', icon: 'card_membership' },
         { id: 'coupons', label: 'Coupons', icon: 'confirmation_number' },
         { id: 'content', label: 'Content & Brands', icon: 'article' },
         { id: 'ai', label: 'AI & System', icon: 'smart_toy' },
@@ -93,7 +89,6 @@ export default function SuperAdminDashboard() {
         if (tab === 'approvals') loadPendingUsers()
         if (tab === 'coupons') loadCoupons()
         if (tab === 'content') { loadBrands(); loadContent() }
-        if (tab === 'subscriptions') loadSubscriptions()
         if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts() }
         if (tab === 'integrations') loadIntegrations()
         if (tab === 'packages') loadPackages()
@@ -107,7 +102,6 @@ export default function SuperAdminDashboard() {
     const loadCoupons = async () => { try { const d = await API.getCoupons(); setCoupons(d.coupons || []) } catch (e) { console.error(e) } }
     const loadBrands = async () => { try { const d = await API.getBrands({ limit: 50 }); setBrands(d.brands || []); setTotalBrands(d.total || 0) } catch (e) { console.error(e) } }
     const loadContent = async () => { try { const d = await API.getContent({ limit: 50 }); setContent(d.content || []); setTotalContent(d.total || 0) } catch (e) { console.error(e) } }
-    const loadSubscriptions = async () => { try { const d = await API.getSubscriptions(); setSubscriptions(d.subscriptions || []) } catch (e) { console.error(e) } }
     const loadAIHealth = async () => { try { const d = await API.getAIHealth(); setAiHealth(d.aiHealth) } catch (e) { console.error(e) } }
     const loadSettings = async () => { try { const d = await API.getSystemSettings(); setSystemSettings(d.settings) } catch (e) { console.error(e) } }
     const loadIntegrations = async () => { try { const d = await API.getIntegrations(); setIntegrations(d) } catch (e) { console.error(e) } }
@@ -217,7 +211,6 @@ export default function SuperAdminDashboard() {
     const handleCreateCoupon = async (e) => { e.preventDefault(); try { await API.createCoupon({ ...couponForm, discountValue: Number(couponForm.discountValue), maxUses: couponForm.maxUses ? Number(couponForm.maxUses) : 0, validUntil: couponForm.validUntil || null }); showToast('Coupon created'); setShowCouponForm(false); setCouponForm({ code: '', discountType: 'credits', discountValue: '', maxUses: '', validUntil: '', description: '' }); loadCoupons() } catch (e) { showToast(e.error || 'Failed', 'error') } }
     const handleToggleCoupon = async (id, isActive) => { try { await API.updateCoupon(id, { isActive: !isActive }); loadCoupons() } catch { showToast('Failed', 'error') } }
     const handleDeleteCoupon = async (id) => { if (!confirm('Delete coupon?')) return; try { await API.deleteCoupon(id); showToast('Deleted'); loadCoupons() } catch { showToast('Failed', 'error') } }
-    const handleCreateSub = async (e) => { e.preventDefault(); try { await API.createSubscription({ ...subForm, price: Number(subForm.price || 0), credits: subForm.credits ? Number(subForm.credits) : undefined }); showToast('Subscription created'); setShowSubForm(false); loadSubscriptions(); loadUsers() } catch (e) { showToast(e.error || 'Failed', 'error') } }
     const handleToggleSetting = async (key, val) => { try { await API.updateSystemSettings({ [key]: val }); showToast('Updated'); loadSettings() } catch { showToast('Failed', 'error') } }
 
     const platformIcons = { instagram: '📸', facebook: '📘', linkedin: '💼', twitter: '🐦', shopify: '🛍️', 'google-analytics': '📊', 'meta-ads': '📱', 'google-ads': '🔍', meta: '📱', google: '🔍' }
@@ -835,57 +828,6 @@ export default function SuperAdminDashboard() {
                     </div>
                 )}
 
-                {/* ════════════ SUBSCRIPTIONS ════════════ */}
-                {tab === 'subscriptions' && (
-                    <div>
-                        <div className="flex justify-between items-center mb-5">
-                            <h3 className="text-lg font-bold text-white">{subscriptions.length} Subscriptions</h3>
-                            <button onClick={() => setShowSubForm(!showSubForm)} className="btn-primary py-2.5 px-5 rounded-xl text-sm flex items-center gap-2 cursor-pointer"><span className="material-symbols-outlined text-sm">add</span>Assign Subscription</button>
-                        </div>
-                        {showSubForm && (
-                            <form onSubmit={handleCreateSub} className="glass-panel rounded-2xl p-6 mb-5 border border-primary/20">
-                                <h4 className="font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-primary text-lg">card_membership</span>Assign Subscription</h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    <select value={subForm.userId} onChange={e => setSubForm(f => ({ ...f, userId: e.target.value }))} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" required>
-                                        <option value="">Select User</option>
-                                        {users.map(u => <option key={u._id} value={u._id}>{u.name} ({u.email})</option>)}
-                                    </select>
-                                    <select value={subForm.plan} onChange={e => setSubForm(f => ({ ...f, plan: e.target.value }))} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none">
-                                        <option value="starter">Starter (50 credits)</option><option value="professional">Professional (500 credits)</option><option value="enterprise">Enterprise (Unlimited)</option>
-                                    </select>
-                                    <select value={subForm.billingCycle} onChange={e => setSubForm(f => ({ ...f, billingCycle: e.target.value }))} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none">
-                                        <option value="monthly">Monthly</option><option value="yearly">Yearly</option><option value="lifetime">Lifetime</option>
-                                    </select>
-                                    <input type="number" placeholder="Price (₹)" value={subForm.price} onChange={e => setSubForm(f => ({ ...f, price: e.target.value }))} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" />
-                                    <input type="number" placeholder="Custom credits (optional)" value={subForm.credits} onChange={e => setSubForm(f => ({ ...f, credits: e.target.value }))} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none" />
-                                    <div className="flex gap-2 justify-end items-center">
-                                        <button type="button" onClick={() => setShowSubForm(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:bg-white/[0.04] cursor-pointer">Cancel</button>
-                                        <button type="submit" className="btn-primary px-6 py-2 rounded-lg text-sm cursor-pointer">Create</button>
-                                    </div>
-                                </div>
-                            </form>
-                        )}
-                        <div className="space-y-2">{subscriptions.map(s => (
-                            <div key={s._id} className="glass-panel rounded-2xl p-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center"><span className="material-symbols-outlined text-blue-400">card_membership</span></div>
-                                        <div>
-                                            <p className="text-base font-bold text-white">{s.user?.name || 'Unknown'} <span className="text-slate-500 text-xs font-normal">({s.user?.email})</span></p>
-                                            <p className="text-[11px] text-slate-500 capitalize">{s.plan} • {s.billingCycle} • {s.status}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-6">
-                                        <div className="text-center"><p className="text-base font-bold text-white">{s.credits?.used || 0}/{s.credits?.total || 0}</p><p className="text-xs text-slate-600">credits used</p></div>
-                                        <div className="text-center"><p className="text-sm font-bold text-amber-400">₹{(s.price || 0).toLocaleString()}</p><p className="text-xs text-slate-600">paid</p></div>
-                                        <div className="text-center"><p className="text-sm text-slate-400">{s.endDate ? new Date(s.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</p><p className="text-xs text-slate-600">expires</p></div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}</div>
-                        {subscriptions.length === 0 && <div className="text-center py-16 glass-panel rounded-2xl"><span className="material-symbols-outlined text-5xl text-slate-700 mb-3">card_membership</span><h3 className="text-lg font-bold text-white mb-1">No Subscriptions</h3><p className="text-sm text-slate-500">Assign subscriptions to users</p></div>}
-                    </div>
-                )}
 
                 {/* ════════════ COUPONS ════════════ */}
                 {tab === 'coupons' && (

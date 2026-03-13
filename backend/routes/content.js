@@ -3,6 +3,7 @@ import Content from '../models/Content.js';
 import Feedback from '../models/Feedback.js';
 import Brand from '../models/Brand.js';
 import { protect, optionalAuth } from '../middleware/auth.js';
+import { requireStudio } from '../middleware/studioAccess.js';
 import { getOrchestrator } from '../agents/orchestrator.js';
 import { requireCredits } from '../middleware/credits.js';
 import { safeErrorMessage } from '../utils/safeError.js';
@@ -21,7 +22,7 @@ router.get('/providers', optionalAuth, async (req, res) => {
 });
 
 // POST /api/content/generate — AI content generation (credits deducted)
-router.post('/generate', protect, requireCredits('content'), async (req, res) => {
+router.post('/generate', protect, requireStudio('contentStudio'), requireCredits('content'), async (req, res) => {
     try {
         const { brandId, type, prompt, platform, options, subType, toneSettings } = req.body;
         if (!prompt) {
