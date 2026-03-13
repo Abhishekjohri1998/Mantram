@@ -14,21 +14,24 @@ const styles = {
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
         zIndex: 99999, display: 'flex', flexDirection: 'column',
         fontFamily: 'Inter, system-ui, sans-serif',
+        background: '#0f172a', // Solid base color to prevent ghosting
     },
     slideContainer: {
         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '40px 80px', position: 'relative', overflow: 'hidden',
+        padding: '100px 80px 60px', position: 'relative', overflow: 'hidden',
     },
     slideContent: {
         maxWidth: 1100, width: '100%', animation: 'slideIn 0.4s ease-out',
+        maxHeight: '100%', overflow: 'auto',
     },
     slideTitle: {
-        fontSize: 36, fontWeight: 700, marginBottom: 32, letterSpacing: '-0.02em',
-        lineHeight: 1.2,
+        fontSize: 32, fontWeight: 700, marginBottom: 28, letterSpacing: '-0.02em',
+        lineHeight: 1.2, color: '#fff',
     },
     nav: {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '16px 40px', borderTop: '1px solid rgba(255,255,255,0.1)',
+        background: '#0f172a', // Opaque nav
     },
     navBtn: {
         background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff',
@@ -98,7 +101,7 @@ export default function SlideshowMode({ report, onClose }) {
     const primaryColor = branding.primaryColor || '#6366f1';
     const secondaryColor = branding.secondaryColor || '#8b5cf6';
 
-    const bgGradient = `linear-gradient(135deg, ${primaryColor}18 0%, #0f172a 30%, #0f172a 70%, ${secondaryColor}18 100%)`;
+    const bgGradient = `linear-gradient(135deg, ${primaryColor}25 0%, #0f172a 40%, #0f172a 60%, ${secondaryColor}25 100%)`;
 
     const goNext = useCallback(() => {
         if (currentSlide < slides.length - 1) setCurrentSlide(c => c + 1);

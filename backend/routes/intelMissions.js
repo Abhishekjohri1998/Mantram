@@ -14,7 +14,7 @@ const router = Router();
 // ============================================================================
 // GET /api/intel/missions — List missions for current brand
 // ============================================================================
-router.get('/missions', protect, async (req, res) => {
+router.get('/', protect, async (req, res) => {
     try {
         const { brandId, studio, status } = req.query;
         if (!brandId) return res.status(400).json({ error: 'brandId is required' });
@@ -38,7 +38,7 @@ router.get('/missions', protect, async (req, res) => {
 // ============================================================================
 // POST /api/intel/missions — Create a new intel mission
 // ============================================================================
-router.post('/missions', protect, async (req, res) => {
+router.post('/', protect, async (req, res) => {
     try {
         const { brandId, title, type, target, instructions, frequency, studio, notifyVia } = req.body;
 
@@ -83,7 +83,7 @@ router.post('/missions', protect, async (req, res) => {
 // ============================================================================
 // PUT /api/intel/missions/:id — Update mission (pause/resume/edit)
 // ============================================================================
-router.put('/missions/:id', protect, async (req, res) => {
+router.put('/:id', protect, async (req, res) => {
     try {
         const mission = await IntelMission.findOne({ _id: req.params.id, user: req.user._id });
         if (!mission) return res.status(404).json({ error: 'Mission not found' });
@@ -113,7 +113,7 @@ router.put('/missions/:id', protect, async (req, res) => {
 // ============================================================================
 // DELETE /api/intel/missions/:id — Delete a mission
 // ============================================================================
-router.delete('/missions/:id', protect, async (req, res) => {
+router.delete('/:id', protect, async (req, res) => {
     try {
         const result = await IntelMission.findOneAndDelete({ _id: req.params.id, user: req.user._id });
         if (!result) return res.status(404).json({ error: 'Mission not found' });
@@ -128,7 +128,7 @@ router.delete('/missions/:id', protect, async (req, res) => {
 // ============================================================================
 // GET /api/intel/missions/:id/findings — Get detailed findings history
 // ============================================================================
-router.get('/missions/:id/findings', protect, async (req, res) => {
+router.get('/:id/findings', protect, async (req, res) => {
     try {
         const mission = await IntelMission.findOne({ _id: req.params.id, user: req.user._id })
             .select('title type target findings totalChecks totalFindings lastCheckedAt lastFindingAt');
@@ -167,7 +167,7 @@ router.get('/missions/:id/findings', protect, async (req, res) => {
 // ============================================================================
 // POST /api/intel/missions/:id/run — Force-run a mission immediately
 // ============================================================================
-router.post('/missions/:id/run', protect, async (req, res) => {
+router.post('/:id/run', protect, async (req, res) => {
     try {
         const mission = await IntelMission.findOne({ _id: req.params.id, user: req.user._id });
         if (!mission) return res.status(404).json({ error: 'Mission not found' });
