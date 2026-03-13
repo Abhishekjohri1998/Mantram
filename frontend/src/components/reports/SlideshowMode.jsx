@@ -18,15 +18,15 @@ const styles = {
     },
     slideContainer: {
         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '100px 80px 60px', position: 'relative', overflow: 'hidden',
+        padding: '120px 80px 80px', position: 'relative', overflow: 'hidden',
     },
     slideContent: {
         maxWidth: 1100, width: '100%', animation: 'slideIn 0.4s ease-out',
         maxHeight: '100%', overflow: 'auto',
     },
     slideTitle: {
-        fontSize: 32, fontWeight: 700, marginBottom: 28, letterSpacing: '-0.02em',
-        lineHeight: 1.2, color: '#fff',
+        fontSize: 36, fontWeight: 700, marginBottom: 40, letterSpacing: '-0.02em',
+        lineHeight: 1.2, color: '#fff', textAlign: 'center',
     },
     nav: {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',

@@ -129,12 +129,12 @@ export default function NexusBar() {
         if (!brandId) return
         try {
             const token = localStorage.getItem('mantram_token')
-            const resp = await fetch(`${API_BASE}/intel/missions/alerts?brandId=${brandId}`, {
+            const resp = await fetch(`${API_BASE}/intel/alerts?brandId=${brandId}`, {
                 headers: { Authorization: `Bearer ${token}` },
             })
             if (resp.ok) {
                 const data = await resp.json()
-                setIntelAlertCount(data.unreadCount || 0)
+                setIntelAlertCount(data.totalAlerts || 0)
             }
         } catch { /* silent */ }
     }, [brandId])

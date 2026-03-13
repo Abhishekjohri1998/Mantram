@@ -19,7 +19,7 @@ export default function DashboardLayout({ children, title, subtitle }) {
                     <div className="fixed bottom-0 left-64 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[100px] -mb-32 pointer-events-none" />
 
                     <Header title={title} subtitle={subtitle} onMenuToggle={() => setMobileOpen(true)} />
-                    <div className="p-4 sm:p-5 md:p-6 lg:p-8 relative">
+                    <div className="p-4 pt-6 sm:p-5 sm:pt-8 md:p-6 md:pt-10 lg:p-8 lg:pt-12 relative">
                         {children}
                     </div>
                 </main>

@@ -205,7 +205,7 @@ app.use('/api/funnel-automation', funnelAutomationRoutes);
 app.use('/api/funnel-webhooks', funnelWebhookRoutes);
 app.use('/api/media', mediaUploadRoutes);
 app.use('/api/studio-reports', studioReportRoutes);
-app.use('/api/intel/missions', intelMissionRoutes);
+app.use('/api/intel', intelMissionRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
