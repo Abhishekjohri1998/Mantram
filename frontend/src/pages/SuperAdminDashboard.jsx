@@ -351,7 +351,7 @@ export default function SuperAdminDashboard() {
                                                     </div>
                                                 </div>
                                                 <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 'bg-slate-500/15 text-slate-400'}`}>{u.plan}</span>
-                                                <span className="text-xs text-slate-600">{new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                                                <span className="text-xs text-slate-600">{new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}</span>
                                             </div>
                                         </div>
                                     ))}</div>
@@ -1165,7 +1165,7 @@ export default function SuperAdminDashboard() {
                                             {/* Account */}
                                             <p className="text-xs text-slate-400 truncate">{i.displayName || i.email || '—'}</p>
                                             {/* Last Synced */}
-                                            <span className="text-xs text-slate-600">{i.lastSyncAt ? new Date(i.lastSyncAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' }) : 'Never'}</span>
+                                            <span className="text-xs text-slate-600">{i.lastSyncAt ? new Date(i.lastSyncAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Never'}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -1235,7 +1235,15 @@ export default function SuperAdminDashboard() {
                                                 </td>
                                                 <td className="px-5 py-4 font-mono text-xs text-slate-600">{log.ipAddress || '—'}</td>
                                                 <td className="px-5 py-4 text-right text-slate-500 text-xs">
-                                                    {new Date(log.createdAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                    {new Date(log.createdAt).toLocaleString('en-IN', { 
+                                                        day: '2-digit', 
+                                                        month: 'short', 
+                                                        year: 'numeric',
+                                                        hour: '2-digit', 
+                                                        minute: '2-digit', 
+                                                        second: '2-digit',
+                                                        hour12: true 
+                                                    })}
                                                 </td>
                                             </tr>
                                         )) : (
