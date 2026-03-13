@@ -932,26 +932,19 @@ router.post('/backlinks', protect, requireStudio('seoStudio'), requireCredits('s
 
     console.log(`\n🔗 === BACKLINK INTELLIGENCE: ${brandDomain} ===`);
 
-    // ── PHASE 1: Crawl brand site ──
-    console.log(`🔗 Phase 1: Crawling ${normalizedUrl} for link profile...`);
-    const siteResearch = await researchDomain(normalizedUrl);
-    const siteData = formatSiteResearch(siteResearch);
+    // ── PHASE 1 & 2: Parallel Research (Brand Site + Competitors) ──
+    const storedCompetitors = (brand?.competitors || []).map(c => c.url).filter(Boolean);
+    console.log(`🔗 Phase 1 & 2: Start parallel research for ${brandDomain} and ${storedCompetitors.length} competitors...`);
+    
+    const [siteResearch, competitorLinkProfiles] = await Promise.all([
+      researchDomain(normalizedUrl),
+      storedCompetitors.length > 0 ? analyzeCompetitorLinkProfile(storedCompetitors, brandDomain) : Promise.resolve([])
+    ]);
 
-    // Extract outbound link data
+    const siteData = formatSiteResearch(siteResearch);
     const si = siteResearch.siteIntelligence || {};
     const outboundDomains = si.externalDomains || [];
     const internalLinkCount = si.internalLinkCount || 0;
-
-    // ── PHASE 2: Crawl competitors for link gap ──
-    const storedCompetitors = (brand?.competitors || []).map(c => c.url).filter(Boolean);
-    let competitorLinkProfiles = [];
-
-    if (storedCompetitors.length > 0) {
-      console.log(`🔗 Phase 2: Crawling ${storedCompetitors.length} competitors for link gap analysis...`);
-      competitorLinkProfiles = await analyzeCompetitorLinkProfile(storedCompetitors, brandDomain);
-    } else {
-      console.log(`🔗 Phase 2: No stored competitors — AI will identify them.`);
-    }
 
     // Build competitor link data for prompt
     let competitorLinkData = '';
@@ -1103,20 +1096,39 @@ Respond in STRICT JSON:
 Generate 5-15 discovered backlinks (real URLs you know of), 5-10 competitor link gaps, 8-15 link opportunities, 3-4 outreach templates, and 4-week plan. Be STRATEGIC and SPECIFIC — think like a link-building agency, not a checklist tool.`;
 
     const userPrompt = `Complete backlink intelligence analysis for: ${brandDomain} (${normalizedUrl})`;
+    const startTime = Date.now();
     const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192 });
     const parsed = parseJSON(result);
 
-    // ── PHASE 4: Try to verify top discovered backlinks ──
-    const discoveredUrls = (parsed.discoveredBacklinks || [])
+    // ── PHASE 4: Try to verify top discovered backlinks (with timing safeguard) ──
+    const elapsed = Date.now() - startTime;
+    const remainingBudget = 28000 - (Date.now() - req.startTime || startTime); // Aim for 28s total
+    
+    let discoveredUrls = (parsed.discoveredBacklinks || [])
       .filter(b => b.sourceUrl && b.sourceUrl.startsWith('http'))
-      .map(b => b.sourceUrl)
-      .slice(0, 5);
+      .map(b => b.sourceUrl);
+
+    // If we're low on time (less than 8s left), verify fewer or skip
+    if (remainingBudget < 5000) {
+      console.log(`⚠️ Low on time (${remainingBudget}ms left), skipping backlink verification.`);
+      discoveredUrls = [];
+    } else if (remainingBudget < 12000) {
+      console.log(`⚠️ Moderate time (${remainingBudget}ms left), verifying only top 2 backlinks.`);
+      discoveredUrls = discoveredUrls.slice(0, 2);
+    } else {
+      discoveredUrls = discoveredUrls.slice(0, 5);
+    }
 
     let verificationResults = null;
     if (discoveredUrls.length > 0) {
       console.log(`🔗 Phase 4: Verifying ${discoveredUrls.length} discovered backlinks...`);
       try {
-        verificationResults = await discoverBacklinks(discoveredUrls, brandDomain);
+        // Wrap verification in a race with the remaining budget - 2s buffer
+        const verificationPromise = discoverBacklinks(discoveredUrls, brandDomain);
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Verification Timeout')), Math.max(remainingBudget - 2000, 3000)));
+        
+        verificationResults = await Promise.race([verificationPromise, timeoutPromise]);
+        
         // Update discovered backlinks with verification status
         for (const vb of verificationResults.verified) {
           const match = parsed.discoveredBacklinks.find(b => 
