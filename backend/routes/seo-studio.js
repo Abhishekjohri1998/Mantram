@@ -10,6 +10,10 @@ import {
   formatSiteResearch, formatCompetitorResearch,
   discoverBacklinks, analyzeCompetitorLinkProfile,
 } from '../utils/web-research.js';
+import { runRealLLMProbe, generateProbePrompts } from '../utils/llm-probe.js';
+import { getPageSpeed, formatPageSpeedForPrompt } from '../utils/pagespeed.js';
+import { mineAutocomplete, formatAutocompleteForPrompt } from '../utils/autocomplete.js';
+import { runKeywordIntelligence } from '../utils/keyword-intelligence.js';
 
 const router = Router();
 
@@ -156,10 +160,14 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
 
     const brandContext = buildBrandContext(brand || brandPayload);
 
-    // STEP 1: Real website research
-    console.log(`🔍 SEO Health Check: crawling ${website}...`);
-    const siteResearch = await researchDomain(website);
+    // STEP 1: Real website research + Real PageSpeed (in parallel)
+    console.log(`🔍 SEO Health Check: crawling ${website} + fetching PageSpeed...`);
+    const [siteResearch, pageSpeedData] = await Promise.all([
+      researchDomain(website),
+      getPageSpeed(website, 'mobile').catch(e => ({ success: false, error: e.message })),
+    ]);
     const siteData = formatSiteResearch(siteResearch);
+    const pageSpeedText = formatPageSpeedForPrompt(pageSpeedData);
 
     const systemPrompt = `You are a SENIOR SEO STRATEGIST (not just an auditor). You think like a CMO + technical SEO expert combined. You have REAL CRAWL DATA — use it as ground truth. Never guess or contradict the crawl.
 
@@ -176,6 +184,8 @@ ALGORITHM CONTEXT (2026):
 ${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
 
 ${siteData}
+
+${pageSpeedText}
 
 Respond in STRICT JSON:
 {
@@ -232,6 +242,16 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: req.creditAction || 'seoHealthCheck', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
+    // Attach real PageSpeed data to response
+    if (pageSpeedData?.success) {
+      parsed.realPageSpeed = {
+        scores: pageSpeedData.scores,
+        coreWebVitals: pageSpeedData.coreWebVitals,
+        overallFieldAssessment: pageSpeedData.overallFieldAssessment,
+        failedAudits: pageSpeedData.failedAudits,
+        dataSource: pageSpeedData.dataSource,
+      };
+    }
 
     // Save audit
     if (req.user) {
@@ -275,82 +295,146 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
     if (!website) return res.status(400).json({ success: false, error: 'No website URL available.' });
 
     const brandContext = buildBrandContext(brand || brandPayload);
+    const brandObj = brand || brandPayload || {};
+    const dna = brandObj.dna || {};
 
-    // Real crawl to understand existing content
-    console.log(`🔍 SEO Traffic: crawling ${website}...`);
-    const siteResearch = await researchDomain(website);
+    // Run site crawl + Keyword Intelligence Engine in parallel
+    console.log(`\n🧠 SEO Traffic: Running Intelligence Engine + crawl for ${website}...`);
+    const [siteResearch, keywordIntel] = await Promise.all([
+      researchDomain(website),
+      runKeywordIntelligence(brandObj, { seedKeywords: [] }).catch(e => {
+        console.warn('Keyword Intelligence Engine error:', e.message);
+        return { success: false, error: e.message };
+      }),
+    ]);
     const siteData = formatSiteResearch(siteResearch);
 
-    const systemPrompt = `You are a STRATEGIC SEO GROWTH ADVISOR — not just a keyword tool. You combine keyword research with business strategy to create a growth playbook. You have REAL CRAWL DATA showing actual content on the site.
-
-CRITICAL: For every recommendation, explain WHY — connect keywords to business outcomes, search intent to buyer journey stages, and content gaps to revenue opportunities.
-
-STRATEGIC FRAMEWORK (2026):
-- Google rewards "topical authority" — sites must build depth in topic clusters, not just target isolated keywords
-- "Information Gain Score" — Google now measures whether content adds unique value beyond what already exists
-- AI Overviews pull from authoritative, well-structured content — FAQ schemas, how-to markup, and entity establishment increase citation rates 3x
-- E-E-A-T: First-hand experience signals (case studies, original data, reviews) outperform generic content
-- Zero-click searches are 60%+ — content must be optimized for both clicks AND brand visibility in search results
-
-${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
-
-Country focus: ${country || brand?.dna?.country || brandPayload?.dna?.country || 'India'}
-Industry: ${industry || brand?.dna?.industry || brandPayload?.dna?.industry || 'General'}
-
-${siteData}
-
-Respond in JSON:
-{
-  "summary": "Strategic 3-4 sentence analysis of the brand's content position, biggest growth lever, and what competitors likely dominate",
-  "strategicInsight": "A 2-3 paragraph strategic brief for the brand owner. Explain their content market position, where the biggest untapped audience is, and what content strategy will move the needle most. Be specific to their industry.",
-  "keywordClusters": [
-    {
-      "clusterName": "Topic cluster theme",
-      "whyThisCluster": "Strategic reason — why this cluster matters for THIS brand. Connect to business goals, audience needs, or competitive gaps.",
-      "funnelStage": "awareness|consideration|decision|retention",
-      "intent": "buy|learn|compare|local|navigate",
-      "opportunityScore": 0-100,
-      "difficulty": "easy|medium|hard",
-      "estimatedMonthlySearches": "total estimated monthly search volume across all keywords in this cluster",
-      "keywords": [
-        { "keyword": "keyword phrase", "volume": "high|medium|low", "intent": "buy|learn|compare", "difficulty": "easy|medium|hard", "whyItMatters": "Why this keyword connects to business outcomes" }
-      ],
-      "recommendedPageType": "blog|landing|category|faq|guide|tool|comparison|case-study",
-      "suggestedTitle": "SEO-optimized page title",
-      "suggestedOutline": ["H2 point 1", "H2 point 2", "H2 point 3"],
-      "contentAngle": "What unique angle should this content take to outperform existing results (original data, case studies, expert interviews, etc.)"
+    // Build enriched signal data for AI prompt
+    let intelligenceData = '';
+    if (keywordIntel && keywordIntel.success) {
+      intelligenceData = keywordIntel.signalPrompt || '';
+      const strat = keywordIntel.strategist;
+      if (strat) {
+        if (strat.strategicVerdict) {
+          intelligenceData += '\n=== CMO STRATEGIC ANALYSIS ===\n' + strat.strategicVerdict + '\n';
+        }
+        if (strat.mustTarget && strat.mustTarget.length) {
+          intelligenceData += '\nMust-Target Keywords:\n';
+          for (const kw of strat.mustTarget.slice(0, 10)) {
+            intelligenceData += '  - "' + kw.keyword + '" (est. ' + kw.volume + '/mo) — ' + kw.why + '\n';
+          }
+        }
+        if (strat.hiddenGems && strat.hiddenGems.length) {
+          intelligenceData += '\nHidden Gems (low volume, high value):\n';
+          for (const kw of strat.hiddenGems.slice(0, 5)) {
+            intelligenceData += '  - "' + kw.keyword + '" (est. ' + kw.volume + '/mo) — ' + kw.why + '\n';
+          }
+        }
+        if (strat.vernacularOpportunities && strat.vernacularOpportunities.length) {
+          intelligenceData += '\nVernacular Language Opportunities:\n';
+          for (const kw of strat.vernacularOpportunities.slice(0, 5)) {
+            intelligenceData += '  - "' + kw.keyword + '" [' + kw.language + '] (est. ' + kw.volume + '/mo, competition: ' + kw.competition + ')\n';
+          }
+        }
+        if (strat.avoid && strat.avoid.length) {
+          intelligenceData += '\nKeywords to AVOID:\n';
+          for (const kw of strat.avoid.slice(0, 5)) {
+            intelligenceData += '  - "' + kw.keyword + '" (' + kw.volume + '/mo) — ' + kw.why + '\n';
+          }
+        }
+      }
     }
-  ],
-  "existingContentStrengths": [
-    { "page": "Page found in crawl", "strength": "What it does well", "improvement": "How to rank higher", "whyImprove": "Why improving this specific page has the highest ROI" }
-  ],
-  "risingKeywords": [
-    { "keyword": "trending keyword", "trend": "rising|breakout|seasonal", "reason": "Why trending in this industry", "actionDeadline": "When to publish by" }
-  ],
-  "seasonalPeaks": [
-    { "keyword": "keyword", "peakMonth": "Month", "prepareBy": "Date", "reason": "Festival/event", "contentSuggestion": "What content to prepare" }
-  ],
-  "contentGaps": [
-    { "topic": "Missing content topic", "competitorsCovering": 3, "priority": "high|medium", "suggestedFormat": "blog|video|guide", "whyMissing": "What this gap costs the brand in terms of lost visibility or leads", "revenueImpact": "How filling this gap can drive conversions" }
-  ],
-  "quickWins": [
-    { "action": "What to do", "keyword": "Target keyword", "expectedImpact": "Expected traffic gain", "effort": "quick-fix|moderate", "whyQuick": "Why this will show results fastest" }
-  ],
-  "thirtyDayPlan": [
-    { "week": 1, "theme": "Focus area", "actions": ["Action 1", "Action 2"], "expectedOutcome": "What to expect" },
-    { "week": 2, "theme": "Focus area", "actions": ["Action 1", "Action 2"], "expectedOutcome": "What to expect" },
-    { "week": 3, "theme": "Focus area", "actions": ["Action 1", "Action 2"], "expectedOutcome": "What to expect" },
-    { "week": 4, "theme": "Focus area", "actions": ["Action 1", "Action 2"], "expectedOutcome": "What to expect" }
-  ],
-  "competitorContentAnalysis": "Brief analysis of what competitors likely rank for and where the brand can differentiate"
-}
 
-Generate 5-8 keyword clusters. For each, explain WHY it matters strategically. Think like a growth consultant, not a keyword database.`;
+    const countryFocus = country || dna.country || 'India';
+    const industryFocus = industry || dna.industry || 'General';
 
-    const userPrompt = `Find traffic opportunities for: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192 });
+    const systemPrompt = 'You are a STRATEGIC SEO GROWTH ADVISOR. You have REAL DATA from multiple intelligence sources.\n\n'
+      + 'You have:\n'
+      + '1. REAL CRAWL DATA from the brand\'s website\n'
+      + '2. REAL Google Trends data with verified interest scores\n'
+      + '3. REAL Google SERP sampling with difficulty scores\n'
+      + '4. REAL suggestions from Google, YouTube, Amazon, and Bing\n'
+      + '5. Multi-agent AI analysis (Scout, Analyst, Strategist)\n\n'
+      + 'CRITICAL: Use the VERIFIED signals. Do NOT override real data with guesses. When volume estimates come from Google Trends or multi-agent consensus, use those numbers.\n\n'
+      + (brandContext ? 'BRAND CONTEXT:\n' + brandContext + '\n\n' : '')
+      + 'Country: ' + countryFocus + '\nIndustry: ' + industryFocus + '\n\n'
+      + siteData + '\n\n'
+      + intelligenceData + '\n\n'
+      + 'Respond in JSON:\n'
+      + '{\n'
+      + '  "summary": "3-4 sentence strategic analysis grounded in REAL data",\n'
+      + '  "strategicInsight": "2-3 paragraph brief referencing verified data",\n'
+      + '  "dataConfidence": "How much is based on verified data vs AI estimation",\n'
+      + '  "keywordClusters": [\n'
+      + '    {\n'
+      + '      "clusterName": "Topic cluster",\n'
+      + '      "whyThisCluster": "Strategic reason with data backing",\n'
+      + '      "funnelStage": "awareness|consideration|decision|retention",\n'
+      + '      "intent": "buy|learn|compare|local|navigate",\n'
+      + '      "opportunityScore": "0-100",\n'
+      + '      "difficulty": "easy|medium|hard",\n'
+      + '      "difficultyScore": "0-100",\n'
+      + '      "estimatedMonthlySearches": "Use verified numbers",\n'
+      + '      "confidenceStars": "1-5",\n'
+      + '      "keywords": [\n'
+      + '        { "keyword": "kw", "volume": 5000, "intent": "type", "difficulty": "level", "difficultyScore": 50, "source": "trends|autocomplete|serp|agent", "whyItMatters": "reason" }\n'
+      + '      ],\n'
+      + '      "recommendedPageType": "blog|landing|faq|guide|case-study",\n'
+      + '      "suggestedTitle": "SEO-optimized title",\n'
+      + '      "suggestedOutline": ["H2 1", "H2 2", "H2 3"],\n'
+      + '      "contentAngle": "Unique angle"\n'
+      + '    }\n'
+      + '  ],\n'
+      + '  "existingContentStrengths": [\n'
+      + '    { "page": "Page from crawl", "strength": "What it does well", "improvement": "How to rank higher", "whyImprove": "ROI reason" }\n'
+      + '  ],\n'
+      + '  "risingKeywords": [\n'
+      + '    { "keyword": "kw", "volume": 1000, "trend": "rising|breakout|seasonal", "reason": "Why", "source": "trends|scout", "actionDeadline": "When" }\n'
+      + '  ],\n'
+      + '  "contentGaps": [\n'
+      + '    { "topic": "Missing topic", "competitorsCovering": 3, "priority": "high|medium", "suggestedFormat": "format", "revenueImpact": "Impact" }\n'
+      + '  ],\n'
+      + '  "quickWins": [\n'
+      + '    { "action": "What to do", "keyword": "kw", "expectedImpact": "Impact", "effort": "quick-fix|moderate", "whyQuick": "Reason" }\n'
+      + '  ],\n'
+      + '  "thirtyDayPlan": [\n'
+      + '    { "week": 1, "theme": "Focus", "actions": ["Action 1"], "expectedOutcome": "Outcome" },\n'
+      + '    { "week": 2, "theme": "Focus", "actions": ["Action 1"], "expectedOutcome": "Outcome" },\n'
+      + '    { "week": 3, "theme": "Focus", "actions": ["Action 1"], "expectedOutcome": "Outcome" },\n'
+      + '    { "week": 4, "theme": "Focus", "actions": ["Action 1"], "expectedOutcome": "Outcome" }\n'
+      + '  ]\n'
+      + '}\n\n'
+      + 'Generate 5-8 keyword clusters. Use VERIFIED volumes where available. Add confidenceStars (1-5) based on how many data layers support each cluster.';
+
+    const userPrompt = 'Find traffic opportunities for: ' + website;
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192 });
+    if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoTraffic', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
+
+    // Attach real intelligence metadata
+    if (keywordIntel && keywordIntel.success) {
+      parsed.intelligenceEngine = {
+        dataLayers: keywordIntel.meta.dataLayers,
+        totalKeywordsDiscovered: keywordIntel.meta.totalKeywordsDiscovered,
+        elapsedSeconds: keywordIntel.meta.elapsedSeconds,
+        tokensUsed: keywordIntel.meta.tokensUsed,
+        strategistModel: keywordIntel.meta.dataLayers.strategistModel,
+      };
+      parsed.realSignals = {
+        trendsData: keywordIntel.signals.trendsData,
+        serpData: keywordIntel.signals.serpData,
+        scoutInsights: keywordIntel.signals.scoutInsights,
+        discoveredKeywords: (keywordIntel.signals.allDiscoveredKeywords || []).slice(0, 50),
+      };
+      parsed.agentAnalysis = {
+        analyst: keywordIntel.analyst,
+        strategist: keywordIntel.strategist,
+      };
+      parsed.dataSource = 'keyword-intelligence-engine';
+    } else {
+      parsed.dataSource = 'ai-only';
+    }
 
     // Save to SeoAudit for persistence
     if (req.user && brand?._id) {
@@ -832,7 +916,7 @@ CRITICAL: Only include REAL existing companies. Do not make up fictional compani
 // BACKLINK INTELLIGENCE — Agentic multi-phase backlink crawler
 // ============================================================================
 
-router.post('/backlinks', protect, requireCredits('seoBacklinks'), async (req, res) => {
+router.post('/backlinks', protect, requireStudio('seoStudio'), requireCredits('seoBacklinks'), async (req, res) => {
   try {
     const { url, brand: brandPayload, brandId } = req.body;
 
@@ -1089,7 +1173,7 @@ Generate 5-15 discovered backlinks (real URLs you know of), 5-10 competitor link
 // COMPETITOR WAR ROOM — 90-day battle plan
 // ============================================================================
 
-router.post('/competitor-warroom', protect, requireCredits('seoWarRoom'), async (req, res) => {
+router.post('/competitor-warroom', protect, requireStudio('seoStudio'), requireCredits('seoWarRoom'), async (req, res) => {
   try {
     const { url, brand: brandPayload, brandId, competitorUrls } = req.body;
 
@@ -1179,7 +1263,7 @@ Respond in STRICT JSON:
 // LLM PROBE — Multi-model brand mention check
 // ============================================================================
 
-router.post('/llm-probe', protect, requireCredits('seoLlmProbe'), async (req, res) => {
+router.post('/llm-probe', protect, requireStudio('seoStudio'), requireCredits('seoLlmProbe'), async (req, res) => {
   try {
     const { url, brand: brandPayload, brandId } = req.body;
 
@@ -1189,73 +1273,103 @@ router.post('/llm-probe', protect, requireCredits('seoLlmProbe'), async (req, re
 
     const brandContext = buildBrandContext(brand || brandPayload);
     const brandName = brand?.name || brandPayload?.name || website;
+    const dna = brand?.dna || brandPayload?.dna || {};
+    const competitors = brand?.competitors || [];
 
-    const systemPrompt = `You are an AI VISIBILITY ANALYST who tests how well a brand appears across AI language models. You simulate what happens when users ask AI assistants about this brand or its industry.
+    // STEP 1: Generate probe prompts
+    const probePrompts = generateProbePrompts(
+      brandName,
+      dna.industry || '',
+      dna.targetAudience || '',
+      website
+    );
+
+    // STEP 2: Run REAL probe — actually query ChatGPT, Gemini, Grok
+    console.log(`\n🔬 === REAL LLM PROBE: ${brandName} (${probePrompts.length} prompts × 3 models) ===`);
+    const probeData = await runRealLLMProbe(probePrompts, brandName, website, competitors);
+
+    // STEP 3: Feed real probe results to AI for strategic analysis
+    let probeResultsText = `\n=== REAL LLM PROBE RESULTS (verified by actually querying each model) ===\n`;
+    probeResultsText += `Total probes: ${probeData.aggregate.totalProbes}\n`;
+    probeResultsText += `Brand mentioned: ${probeData.aggregate.mentionCount}/${probeData.aggregate.totalProbes} (${probeData.aggregate.mentionRate}%)\n\n`;
+
+    for (const [model, data] of Object.entries(probeData.byModel)) {
+      probeResultsText += `${model}: ${data.mentioned}/${data.total} mentions (${data.score}%) — ${data.status}\n`;
+    }
+
+    probeResultsText += `\nDetailed Results:\n`;
+    for (const r of probeData.results) {
+      if (!r.success) { probeResultsText += `- [${r.model}] "${r.prompt}" → ERROR: ${r.error}\n`; continue; }
+      probeResultsText += `- [${r.model}] "${r.prompt}" → ${r.mentioned ? `MENTIONED (${r.mentionType})` : 'NOT MENTIONED'}`;
+      if (r.competitorsMentioned.length > 0) probeResultsText += ` | Competitors: ${r.competitorsMentioned.join(', ')}`;
+      probeResultsText += `\n  Snippet: ${r.responseSnippet.substring(0, 150)}\n`;
+    }
+
+    const systemPrompt = `You are an AI VISIBILITY STRATEGIST. You have REAL probe data — we ACTUALLY queried ChatGPT, Gemini, and Grok with real prompts and checked if they mention this brand. This is NOT simulated — this is ground truth.
 
 ${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
 
-Your job: Simulate prompts that real users would ask ChatGPT, Gemini, Perplexity, and Claude about this brand's industry. Then analyze whether AI models would likely mention, recommend, or cite this brand.
+${probeResultsText}
+
+Analyze the REAL probe results above and provide strategic recommendations.
 
 Respond in STRICT JSON:
 {
-  "summary": "3-4 sentence strategic summary of the brand's AI visibility across LLMs",
-  "overallVisibilityScore": 0-100,
-  "probeResults": [
-    {
-      "prompt": "The exact question a user would ask an AI",
-      "category": "brand-direct|industry-recommendation|comparison|how-to|best-of",
-      "model": "ChatGPT|Gemini|Perplexity|Claude",
-      "mentioned": true/false,
-      "mentionType": "primary-recommendation|secondary-mention|not-mentioned|competitor-favored",
-      "confidence": "high|medium|low",
-      "response": "Simulated brief response excerpt showing whether brand appears",
-      "competitorsMentioned": ["Competitor names that would likely be mentioned"],
-      "improvementAction": "What to do to get mentioned in this prompt's response"
-    }
-  ],
+  "summary": "3-4 sentence strategic summary based on REAL probe data — mention actual mention rate and which models mention/don't mention the brand",
+  "overallVisibilityScore": ${probeData.aggregate.mentionRate},
   "visibilityByModel": {
-    "chatgpt": { "score": 0-100, "status": "visible|partially-visible|invisible", "topIssue": "Primary reason" },
-    "gemini": { "score": 0-100, "status": "visible|partially-visible|invisible", "topIssue": "Primary reason" },
-    "perplexity": { "score": 0-100, "status": "visible|partially-visible|invisible", "topIssue": "Primary reason" },
-    "claude": { "score": 0-100, "status": "visible|partially-visible|invisible", "topIssue": "Primary reason" }
+    "ChatGPT": { "score": 0-100, "status": "visible|partially-visible|invisible", "topIssue": "Based on actual probe responses" },
+    "Gemini": { "score": 0-100, "status": "visible|partially-visible|invisible", "topIssue": "Based on actual probe responses" },
+    "Grok": { "score": 0-100, "status": "visible|partially-visible|invisible", "topIssue": "Based on actual probe responses" }
   },
   "brandPerception": {
     "sentiment": "positive|neutral|negative|unknown",
     "authorityLevel": "high|medium|low|unknown",
-    "primaryAssociations": ["What AI models associate with this brand"],
+    "primaryAssociations": ["What models associate with this brand — from REAL responses"],
     "missingAssociations": ["What SHOULD be associated but isn't"]
   },
   "optimizations": [
     {
-      "title": "Specific, data-backed action — NOT generic advice",
-      "description": "Exact implementation steps with references to specific AI models and prompts from probe results above",
+      "title": "Specific action tied to REAL probe results",
+      "description": "Reference specific prompts where brand was NOT mentioned",
       "priority": "critical|high|medium",
-      "kpi": "Measurable metric (e.g., 'Brand mention rate in ChatGPT for comparison queries', 'Number of probe prompts where brand is cited')",
-      "baseline": "Current state from probe results (e.g., 'Mentioned in 2 of 10 probe prompts', 'Not cited in any comparison query')",
-      "target": "Specific target (e.g., 'Mentioned in 6 of 10 probe prompts within 60 days', 'Primary recommendation in 3 comparison queries')",
-      "timeline": "Implementation timeline (e.g., '1 week content creation + 30 days indexing')",
-      "proofMethod": "How to verify (e.g., 'Re-run LLM Probe after 30 days — expect mention rate to increase from 20% to 50%')",
-      "expectedROI": "Business impact (e.g., 'Estimated 500-1000 monthly AI-referred visits from comparison queries')"
+      "kpi": "Brand mention rate in re-probe",
+      "baseline": "Current state from real data (e.g., 'Mentioned in X of Y probes')",
+      "target": "Specific target",
+      "timeline": "Implementation timeline",
+      "proofMethod": "Re-run LLM Probe",
+      "expectedROI": "Business impact"
     }
   ],
   "contentToCreate": [
-    { "title": "Content piece", "purpose": "Why this helps AI mention the brand", "format": "blog|faq|guide|case-study|data-report", "targetPrompts": ["Which AI prompts this content will help rank for"], "measurableGoal": "What re-probing should show after publishing (e.g., 'Brand mentioned as primary recommendation for this prompt')" }
+    { "title": "Content piece", "purpose": "Why this helps", "format": "blog|faq|guide|case-study", "targetPrompts": ["Which prompts this content targets"], "measurableGoal": "Expected re-probe result" }
   ]
 }
 
-STRATEGIC RULES (MANDATORY):
-1. NEVER give generic advice like 'Improve content quality' or 'Build brand authority' — be SPECIFIC
-2. Every optimization MUST reference specific probe results from above (which prompts, which models)
-3. Every optimization MUST have a measurable KPI with a baseline and target
-4. Every optimization MUST have a proof method: how to verify it worked
-5. Think like a consultant billing $500/hour — every recommendation must justify its existence with data
+CRITICAL: Use the REAL mention rate (${probeData.aggregate.mentionRate}%) as the overall visibility score. Reference ACTUAL probe results. Every recommendation must tie back to specific prompts where the brand was NOT mentioned.`;
 
-Generate 8-12 probe results across different models and prompt categories. Be realistic about whether AI models would actually mention this brand.`;
-
-    const userPrompt = `LLM Brand Probe for: ${brandName} (${website})`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192 });
+    const userPrompt = `Analyze real LLM probe results for: ${brandName} (${website})`;
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6144 });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoLlmProbe', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
+
+    // Merge real probe data into response
+    parsed.realProbeData = {
+      probeResults: probeData.results.map(r => ({
+        prompt: r.prompt,
+        model: r.model,
+        mentioned: r.mentioned,
+        mentionType: r.mentionType,
+        confidence: r.confidence,
+        responseSnippet: r.responseSnippet,
+        competitorsMentioned: r.competitorsMentioned,
+        success: r.success,
+      })),
+      aggregate: probeData.aggregate,
+      byModel: probeData.byModel,
+    };
+    parsed.overallVisibilityScore = probeData.aggregate.mentionRate;
+    parsed.dataSource = 'real-queries';
     parsed.researchSources = [website];
 
     if (req.user && brand?._id) {
@@ -1280,7 +1394,7 @@ Generate 8-12 probe results across different models and prompt categories. Be re
 // AUTO-FIX — Generate copy-paste code fixes
 // ============================================================================
 
-router.post('/auto-fix', protect, requireCredits('seoAutoFix'), async (req, res) => {
+router.post('/auto-fix', protect, requireStudio('seoStudio'), requireCredits('seoAutoFix'), async (req, res) => {
   try {
     const { url, brand: brandPayload, brandId, issues } = req.body;
 
@@ -1366,7 +1480,7 @@ Generate production-ready code. Every fix must be copy-paste ready. Use the bran
 // PROMPT MINING — Discover AI prompts for citation
 // ============================================================================
 
-router.post('/prompt-mining', protect, requireCredits('seoPromptMining'), async (req, res) => {
+router.post('/prompt-mining', protect, requireStudio('seoStudio'), requireCredits('seoPromptMining'), async (req, res) => {
   try {
     const { url, brand: brandPayload, brandId } = req.body;
 
@@ -1448,10 +1562,46 @@ STRATEGIC RULES (MANDATORY):
 Generate 15-20 mined prompts. Be specific to this brand's industry. Think about what real users ask ChatGPT/Gemini/Perplexity about topics this brand should own.`;
 
     const userPrompt = `Mine AI prompts for: ${brandName} (${website})`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192 });
+
+    // STEP 2: Get real Google Autocomplete data first, then enrich AI call
+    const dna = brand?.dna || brandPayload?.dna || {};
+    console.log(`🔎 Prompt Mining: fetching real autocomplete data for ${brandName}...`);
+    let autocompleteData = null;
+    let autocompleteContext = '';
+    try {
+      autocompleteData = await mineAutocomplete(
+        brandName,
+        dna.industry || '',
+        dna.targetAudience || '',
+        dna.country || '',
+        dna.defaultLanguage ? dna.defaultLanguage.substring(0, 2) : 'en'
+      );
+      if (autocompleteData?.totalSuggestions > 0) {
+        const autocompleteText = formatAutocompleteForPrompt(autocompleteData);
+        autocompleteContext = `\n\nIMPORTANT — use the following REAL Google Autocomplete data to inform your prompt mining. These are verified queries people actually search for:\n${autocompleteText}`;
+      }
+    } catch (e) {
+      console.warn('Autocomplete mining failed:', e.message);
+    }
+
+    // STEP 3: AI call enriched with real autocomplete data
+    const aiResult = await aiCall(systemPrompt, userPrompt + autocompleteContext, { json: true, temperature: 0.6, maxTokens: 8192 });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoPromptMining', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
-    const parsed = parseJSON(result);
+    const parsed = parseJSON(aiResult);
     parsed.researchSources = [website];
+
+    // Attach real autocomplete data to response
+    if (autocompleteData?.totalSuggestions > 0) {
+      parsed.realAutocompleteData = {
+        totalSeeds: autocompleteData.totalSeeds,
+        totalSuggestions: autocompleteData.totalSuggestions,
+        categorized: autocompleteData.categorized,
+        allSuggestions: autocompleteData.allSuggestions?.slice(0, 50),
+      };
+      parsed.dataSource = 'ai+autocomplete';
+    } else {
+      parsed.dataSource = 'ai-only';
+    }
 
     if (req.user && brand?._id) {
       try {

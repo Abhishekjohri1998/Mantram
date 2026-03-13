@@ -594,10 +594,10 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
 
             // ── BACKLINKS & OUTREACH — Agentic Intelligence ──
             case 'backlinks': {
-                const buildPayload = () => ({ url: website, brand: brandPayload, brandId });
+                const backlinkPayload = () => buildPayload({ competitorUrls: competitors.map(c => c.url).filter(Boolean) });
                 if (!hasData) return (
                     <EmptyState icon="link" title="Backlink Intelligence" desc="Our agent crawls your site, your competitors, and the web to discover real backlinks, find link gaps, and generate outreach strategies.">
-                        <RunButton onClick={() => runAnalysis('backlinks', seoAPI.backlinkIntelligence, buildPayload(), 'Agent is crawling the web for backlinks...', 'backlinks-run')} label="Run Backlink Intelligence" icon="link" actionId="backlinks-run" />
+                        <RunButton onClick={() => runAnalysis('backlinks', seoAPI.backlinkIntelligence, backlinkPayload(), 'Agent is crawling the web for backlinks...', 'backlinks-run')} label="Run Backlink Intelligence" icon="link" actionId="backlinks-run" />
                     </EmptyState>
                 );
                 return (
@@ -818,7 +818,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                             </SectionCard>
                         )}
 
-                        <RunButton onClick={() => runAnalysis('backlinks', seoAPI.backlinkIntelligence, buildPayload(), 'Re-crawling the web for backlinks...', 'backlinks-run')} label="Re-Run Intelligence" icon="refresh" actionId="backlinks-run" />
+                        <RunButton onClick={() => runAnalysis('backlinks', seoAPI.backlinkIntelligence, backlinkPayload(), 'Re-crawling the web for backlinks...', 'backlinks-run')} label="Re-Run Intelligence" icon="refresh" actionId="backlinks-run" />
                     </div>
                 );
             }
