@@ -38,6 +38,8 @@ import { estimateCost, getModelsInfo, MODEL_CAPABILITIES } from '../agents/video
 import { submitPiApiImageToVideo, submitPiApiVideoExtend } from '../agents/videoStudio/piApiClient.js';
 import { saveLearnings, getStylePreferences } from '../agents/videoStudio/selfLearning.js';
 import { getRouter as getAIRouter } from '../ai/router.js';
+import { uploadToS3 } from '../utils/s3.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
 
@@ -1095,11 +1097,8 @@ router.delete('/:id', protect, async (req, res) => {
     }
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
 // VIDEO CACHING — Download ephemeral CDN videos → Upload to S3
 // ══════════════════════════════════════════════════════════════════════════════
-import { uploadToS3 } from '../utils/s3.js';
-import { safeErrorMessage } from '../utils/safeError.js';
 
 /**
  * Download a video from an ephemeral CDN URL and upload to S3.

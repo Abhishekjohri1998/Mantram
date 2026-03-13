@@ -5,6 +5,10 @@ import Product from '../models/Product.js';
 import Integration from '../models/Integration.js';
 import User from '../models/User.js';
 import { protect } from '../middleware/auth.js';
+import multer from 'multer';
+import crypto from 'crypto';
+import { safeErrorMessage } from '../utils/safeError.js';
+
 
 const router = Router();
 
@@ -464,9 +468,6 @@ router.delete('/:id/categories/:categoryId', protect, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 // BRAND KNOWLEDGE INGESTION
 // ═══════════════════════════════════════════════════════════════
-import multer from 'multer';
-import crypto from 'crypto';
-import { safeErrorMessage } from '../utils/safeError.js';
 
 const knowledgeUpload = multer({
     storage: multer.memoryStorage(),
