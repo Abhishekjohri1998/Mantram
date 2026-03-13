@@ -220,7 +220,6 @@ export default function SuperAdminDashboard() {
     const handleCreateSub = async (e) => { e.preventDefault(); try { await API.createSubscription({ ...subForm, price: Number(subForm.price || 0), credits: subForm.credits ? Number(subForm.credits) : undefined }); showToast('Subscription created'); setShowSubForm(false); loadSubscriptions(); loadUsers() } catch (e) { showToast(e.error || 'Failed', 'error') } }
     const handleToggleSetting = async (key, val) => { try { await API.updateSystemSettings({ [key]: val }); showToast('Updated'); loadSettings() } catch { showToast('Failed', 'error') } }
 
-    const pc = { starter: { c: 'slate', cr: 50, p: 'Free' }, professional: { c: 'blue', cr: 500, p: '₹999/mo' }, enterprise: { c: 'amber', cr: '∞', p: '₹4,999/mo' } }
     const platformIcons = { instagram: '📸', facebook: '📘', linkedin: '💼', twitter: '🐦', shopify: '🛍️', 'google-analytics': '📊', 'meta-ads': '📱', 'google-ads': '🔍', meta: '📱', google: '🔍' }
 
     const Card = ({ icon, color, value, label }) => (
@@ -350,7 +349,12 @@ export default function SuperAdminDashboard() {
                                                         />
                                                     </div>
                                                 </div>
-                                                <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 'bg-slate-500/15 text-slate-400'}`}>{u.plan}</span>
+                                                <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${
+                                                    u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : 
+                                                    u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 
+                                                    u.plan === 'test' ? 'bg-rose-500/15 text-rose-400' :
+                                                    'bg-slate-500/15 text-slate-400'
+                                                }`}>{u.plan}</span>
                                                 <span className="text-xs text-slate-600">{new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}</span>
                                             </div>
                                         </div>
@@ -498,7 +502,12 @@ export default function SuperAdminDashboard() {
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2">
                                                 <p className="text-base font-bold text-white truncate">{u.name}</p>
-                                                <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 'bg-slate-500/15 text-slate-400'}`}>{u.plan}</span>
+                                                <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${
+                                                    u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : 
+                                                    u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 
+                                                    u.plan === 'test' ? 'bg-rose-500/15 text-rose-400' :
+                                                    'bg-slate-500/15 text-slate-400'
+                                                }`}>{u.plan}</span>
                                                 <span className="text-xs px-1.5 py-0.5 rounded font-bold capitalize bg-white/[0.05] text-slate-500">{u.role}</span>
                                                 {u.approvalStatus === 'pending' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-amber-500/20 text-amber-400">PENDING</span>}
                                                 {u.approvalStatus === 'rejected' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-rose-500/20 text-rose-400">REJECTED</span>}
@@ -1285,14 +1294,27 @@ export default function SuperAdminDashboard() {
                         <div className="glass-panel rounded-2xl p-6 w-[420px] border border-primary/20" onClick={e => e.stopPropagation()}>
                             <h3 className="font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-blue-400">upgrade</span>Change Plan — {planModal.name}</h3>
                             <p className="text-sm text-slate-500 mb-4">Current: <strong className="text-white capitalize">{planModal.plan}</strong></p>
-                            <div className="space-y-2">{Object.entries(pc).map(([plan, cfg]) => (
-                                <button key={plan} onClick={() => handleChangePlan(planModal._id, plan)} className={`w-full p-4 rounded-xl text-left transition-all cursor-pointer border ${planModal.plan === plan ? 'border-primary/40 bg-primary/10' : 'border-white/[0.06] hover:bg-white/[0.04]'}`}>
-                                    <div className="flex justify-between items-center">
-                                        <div><p className="text-base font-bold text-white capitalize">{plan}</p><p className="text-[11px] text-slate-500">{cfg.cr} credits • {cfg.p}</p></div>
-                                        {planModal.plan === plan && <span className="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary font-bold">CURRENT</span>}
-                                    </div>
-                                </button>
-                            ))}</div>
+                            <div className="space-y-2">
+                                {packages.length > 0 ? packages.map((pkg) => (
+                                    <button 
+                                        key={pkg._id} 
+                                        onClick={() => handleChangePlan(planModal._id, pkg.slug)} 
+                                        className={`w-full p-4 rounded-xl text-left transition-all cursor-pointer border ${planModal.plan === pkg.slug ? 'border-primary/40 bg-primary/10' : 'border-white/[0.06] hover:bg-white/[0.04]'}`}
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <p className="text-base font-bold text-white capitalize">{pkg.name}</p>
+                                                <p className="text-[11px] text-slate-500">
+                                                    {pkg.credits?.monthly} credits • {pkg.pricing?.monthly > 0 ? `₹${pkg.pricing.monthly}/mo` : 'Free'}
+                                                </p>
+                                            </div>
+                                            {planModal.plan === pkg.slug && <span className="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary font-bold">CURRENT</span>}
+                                        </div>
+                                    </button>
+                                )) : (
+                                    <div className="text-center py-4 text-slate-500 text-sm">No packages found. Create one in the Packages tab.</div>
+                                )}
+                            </div>
                             <div className="flex justify-end mt-4"><button onClick={() => setPlanModal(null)} className="px-4 py-2 rounded-lg text-sm text-slate-400 cursor-pointer">Close</button></div>
                         </div>
                     </div>

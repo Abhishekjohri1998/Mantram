@@ -249,9 +249,16 @@ router.put('/users/:id', async (req, res) => {
             if (credits.bonus !== undefined) update['credits.bonus'] = credits.bonus;
         }
         if (plan && !credits) {
-            const planCredits = { starter: 50, professional: 500, enterprise: 999999 };
-            update['credits.total'] = planCredits[plan] || 50;
-            update['credits.used'] = 0;
+            const pkg = await SubscriptionPackage.findOne({ slug: plan });
+            if (pkg) {
+                update['credits.total'] = pkg.credits?.monthly || 50;
+                update['credits.used'] = 0;
+            } else {
+                // Fallback for legacy plans if package not found
+                const legacyCredits = { starter: 50, professional: 500, enterprise: 999999 };
+                update['credits.total'] = legacyCredits[plan] || 50;
+                update['credits.used'] = 0;
+            }
         }
         const previousUser = await User.findById(req.params.id).select('-password');
         if (!previousUser) return res.status(404).json({ success: false, error: 'User not found' });
@@ -894,10 +901,30 @@ router.get('/products', async (req, res) => {
 // 8. SUBSCRIPTION PACKAGES (AI-Driven Builder)
 // ══════════════════════════════════════════════════════════════
 
+// GET /superadmin/packages — list all with dynamic subscriber counts
 router.get('/packages', async (req, res) => {
     try {
-        const packages = await SubscriptionPackage.find().sort('displayOrder tier').populate('createdBy', 'name email');
-        res.json({ success: true, packages });
+        const packages = await SubscriptionPackage.find()
+            .sort('displayOrder tier')
+            .populate('createdBy', 'name email')
+            .lean();
+
+        // Dynamically calculate user counts per package slug (plan)
+        const userCounts = await User.aggregate([
+            { $group: { _id: '$plan', count: { $sum: 1 } } }
+        ]);
+
+        const countMap = userCounts.reduce((acc, curr) => {
+            acc[curr._id] = curr.count;
+            return acc;
+        }, {});
+
+        const packagesWithCounts = packages.map(pkg => ({
+            ...pkg,
+            subscriberCount: countMap[pkg.slug] || 0
+        }));
+
+        res.json({ success: true, packages: packagesWithCounts });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
