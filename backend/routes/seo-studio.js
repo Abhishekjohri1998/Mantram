@@ -36,8 +36,8 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
     // 1. Try OpenAI (Fastest, but sometimes throttles)
     if (process.env.OPENAI_API_KEY) {
       const providerController = new AbortController();
-      // Give OpenAI up to 25s OR 90% of remaining budget
-      const providerTimeout = Math.min(25000, timeout * 0.9);
+      // Give OpenAI up to 20s
+      const providerTimeout = 20000;
       const pTimer = setTimeout(() => providerController.abort(), providerTimeout);
       
       try {
@@ -56,6 +56,8 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
         if (data.choices?.[0]?.message?.content) {
           lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'gpt-4o-mini', provider: 'openai' };
           return data.choices[0].message.content;
+        } else if (data.error) {
+          console.warn(`OpenAI API error: ${data.error.message} (${data.error.code})`);
         }
       } catch (e) { 
         console.warn(`OpenAI failed/timed out: ${e.message}`);
@@ -70,7 +72,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
     const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
     if (grokKey && !overallController.signal.aborted) {
       const providerController = new AbortController();
-      const pTimer = setTimeout(() => providerController.abort(), 12000); // 12s for Grok
+      const pTimer = setTimeout(() => providerController.abort(), 20000); // 20s for Grok
       try {
         const resp = await fetch('https://api.x.ai/v1/chat/completions', {
           method: 'POST',
@@ -1128,9 +1130,9 @@ Respond in STRICT JSON:
 
 Generate 5-15 discovered backlinks, 5-10 competitor link gaps, 8-15 link opportunities (with domains), and outreach templates. Be SPECIFIC.`;
 
-    const userPrompt = `Complete backlink intelligence analysis for: ${brandDomain} (${normalizedUrl})`;
+    const userPrompt = `Brand Site Research: ${JSON.stringify(siteResearch).substring(0, 4000)}\n\nCompetitor Backlink Profiles: ${JSON.stringify(competitorLinkProfiles).substring(0, 4000)}\n\nComplete backlink intelligence analysis for: ${brandDomain} (${normalizedUrl})`;
     const elapsedBeforeAI = Date.now() - (req.startTime || Date.now());
-    const remainingBudgetForAI = Math.max(8000, 28000 - elapsedBeforeAI);
+    const remainingBudgetForAI = Math.max(15000, 85000 - elapsedBeforeAI); // 85s total budget
     // Use 4096 tokens instead of 8192 to speed up generation
     const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 4096, timeout: remainingBudgetForAI });
     if (!result) throw new Error('AI analysis returned empty result');
@@ -1148,7 +1150,7 @@ Generate 5-15 discovered backlinks, 5-10 competitor link gaps, 8-15 link opportu
 
     // ── PHASE 4: Try to verify top discovered backlinks (with timing safeguard) ──
     const totalElapsed = Date.now() - (req.startTime || Date.now());
-    const remainingBudget = Math.max(0, 28000 - totalElapsed); // Aim for 28s total
+    const remainingBudget = Math.max(0, 85000 - totalElapsed); // Aim for 85s total
     
     let discoveredUrls = (parsed.discoveredBacklinks || [])
       .filter(b => b.sourceUrl && b.sourceUrl.startsWith('http'))
