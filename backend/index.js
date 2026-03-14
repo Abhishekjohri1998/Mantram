@@ -88,8 +88,11 @@ app.use(cors({
         // Standardize origin for matching (lowercase, no trailing slash)
         const cleanOrigin = origin.toLowerCase().replace(/\/$/, '');
         const allowedOrigins = config.frontendUrl.map(url => url.toLowerCase().replace(/\/$/, ''));
-
-        if (allowedOrigins.includes(cleanOrigin)) {
+        
+        // Ensure production domains are allowed even if not in .env (fail-safe for live URL)
+        const productionOrigins = ['https://mantram.ai', 'https://www.mantram.ai'];
+        
+        if (allowedOrigins.includes(cleanOrigin) || productionOrigins.includes(cleanOrigin)) {
             callback(null, true);
         } else {
             console.warn(`⚠️ CORS Blocked: Origin "${origin}" (cleaned: "${cleanOrigin}") not in allowed list:`, allowedOrigins);
@@ -149,7 +152,7 @@ if (config.nodeEnv === 'development') {
 // BUG-14 FIX: Tightened rate limiting on sensitive endpoints
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // Tightened to 5 attempts per window for registration/login
+    max: 10, // Relaxed from 5 to 10 to prevent lockout from UI input quirks
     message: { success: false, error: 'Too many attempts. Please try again after 15 minutes.' },
     standardHeaders: true,
     legacyHeaders: false,

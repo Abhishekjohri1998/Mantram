@@ -5,20 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import DashboardLayout from '../components/DashboardLayout'
 import StudioReportButton from '../components/reports/StudioReportButton'
-
-const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
-
-// ── API helper ──
-async function api(path, opts = {}) {
-    const token = localStorage.getItem('mantram_token')
-    const res = await fetch(`${API_BASE}${path}`, {
-        ...opts,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...opts.headers },
-    })
-    const data = await res.json()
-    if (!data.success) throw new Error(data.error || 'Request failed')
-    return data
-}
+import { apiFetch } from '../services/api'
 
 // ── Tab config ──
 const TABS = [
@@ -307,6 +294,26 @@ export default function PerformanceMarketing() {
         } finally {
             setGeneratingImage(false)
         }
+    }
+
+    if (!activeBrand) {
+        return (
+            <DashboardLayout title="Performance Studio" subtitle="AI-powered ad research, strategy & management">
+                <SEOHead title="Performance Studio — Mantram AI" noIndex={true} />
+                <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+                    <div className="w-20 h-20 rounded-full bg-violet-500/10 flex items-center justify-center mb-4">
+                        <span className="material-symbols-outlined text-4xl text-violet-400">brand_awareness</span>
+                    </div>
+                    <h2 className="text-2xl font-bold text-white">Select a Brand to Continue</h2>
+                    <p className="text-slate-400 max-w-md mx-auto">
+                        Performance marketing insights and strategies are brand-specific. Please select or create a brand to access the Performance Studio.
+                    </p>
+                    <button onClick={() => navigate('/dashboard')} className="px-6 py-3 rounded-xl bg-primary text-white font-bold hover:shadow-lg transition-all cursor-pointer">
+                        Go to Dashboard
+                    </button>
+                </div>
+            </DashboardLayout>
+        )
     }
 
     return (

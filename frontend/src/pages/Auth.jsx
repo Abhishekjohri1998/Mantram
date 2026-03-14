@@ -207,8 +207,13 @@ export default function Auth() {
                                     <div className="relative">
                                         <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-lg">person</span>
                                         <input
-                                            type="text" value={form.name} onChange={e => update('name', e.target.value)}
-                                            placeholder="John Doe" required
+                                            type="text" 
+                                            name="name"
+                                            id="auth-name"
+                                            value={form.name} 
+                                            onChange={e => update('name', e.target.value)}
+                                            placeholder="John Doe" 
+                                            required
                                             className="input-glass w-full pl-10 py-3"
                                         />
                                     </div>
@@ -218,7 +223,11 @@ export default function Auth() {
                                     <div className="relative">
                                         <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-lg">business</span>
                                         <input
-                                            type="text" value={form.company} onChange={e => update('company', e.target.value)}
+                                            type="text" 
+                                            name="company"
+                                            id="auth-company"
+                                            value={form.company} 
+                                            onChange={e => update('company', e.target.value)}
                                             placeholder="Your Company (optional)"
                                             className="input-glass w-full pl-10 py-3"
                                         />
@@ -232,8 +241,14 @@ export default function Auth() {
                             <div className="relative">
                                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-lg">mail</span>
                                 <input
-                                    type="email" value={form.email} onChange={e => update('email', e.target.value)}
-                                    placeholder="you@company.com" required autoFocus
+                                    type="email" 
+                                    name="email"
+                                    id="auth-email"
+                                    value={form.email} 
+                                    onChange={e => update('email', e.target.value)}
+                                    placeholder="you@company.com" 
+                                    required 
+                                    autoFocus
                                     className="input-glass w-full pl-10 py-3"
                                 />
                             </div>
@@ -244,8 +259,14 @@ export default function Auth() {
                             <div className="relative">
                                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-lg">lock</span>
                                 <input
-                                    type="password" value={form.password} onChange={e => update('password', e.target.value)}
-                                    placeholder="••••••••" required minLength={6}
+                                    type="password" 
+                                    name="password"
+                                    id="auth-password"
+                                    value={form.password} 
+                                    onChange={e => update('password', e.target.value)}
+                                    placeholder="••••••••" 
+                                    required 
+                                    minLength={6}
                                     className="input-glass w-full pl-10 py-3"
                                 />
                             </div>
