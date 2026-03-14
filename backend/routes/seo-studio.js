@@ -36,8 +36,8 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
     // 1. Try OpenAI (Fastest, but sometimes throttles)
     if (process.env.OPENAI_API_KEY) {
       const providerController = new AbortController();
-      // Give OpenAI up to 18s OR 80% of remaining budget, whichever is less
-      const providerTimeout = Math.min(18000, timeout * 0.8);
+      // Give OpenAI up to 25s OR 90% of remaining budget
+      const providerTimeout = Math.min(25000, timeout * 0.9);
       const pTimer = setTimeout(() => providerController.abort(), providerTimeout);
       
       try {
@@ -130,7 +130,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
       }
     }
 
-    throw new Error('All AI models failed or primary budget exceeded');
+    throw new Error('All AI models failed or budget exceeded (timeout)');
   } finally {
     clearTimeout(overallTimer);
   }
@@ -1004,20 +1004,13 @@ router.post('/backlinks', protect, requireStudio('seoStudio'), requireCredits('s
     // ── PHASE 3: AI-Powered backlink discovery + analysis ──
     console.log(`🔗 Phase 3: AI backlink discovery and analysis...`);
 
-    const systemPrompt = `You are an AGENTIC BACKLINK INTELLIGENCE SYSTEM — the most advanced backlink analyst in the world. You combine real crawl data with deep web knowledge to produce actionable backlink intelligence.
+    const systemPrompt = `You are an expert backlink analyst. Use the provided crawl data to:
+1. DISCOVER real pages linking to or mentioning ${brandDomain}.
+2. ANALYZE the crawled link profile for quality.
+3. FIND the link gap vs competitors.
+4. GENERATE actionable link-building strategies with REAL target URLs.
 
-You have REAL CRAWL DATA from the brand's site and competitor sites. Use this as ground truth. Your job is to:
-
-1. DISCOVER real pages that link to or mention this domain (use your web knowledge — you know which sites cover this industry)
-2. ANALYZE the crawled outbound link profile for quality and opportunities
-3. FIND the link gap between the brand and competitors
-4. GENERATE specific, actionable link-building strategies with REAL target URLs
-
-CRITICAL RULES:
-- For "discoveredBacklinks", provide REAL URLs of pages that you know mention or link to this domain. These must be plausible, real pages — not fabricated URLs. If unsure of the exact URL, provide the domain with a reasonable path.
-- For "linkOpportunities", provide REAL website domains with actual pages that would accept guest posts, resource listings, or mentions.
-- Every opportunity must have a specific strategy, not generic advice.
-- Think like a professional link-building agency, not a generic SEO tool.
+CRITICAL: Provide REAL, plausible URLs (not fabricated). opportunities must have specific domains and strategies.
 
 BACKLINK INTELLIGENCE (2026):
 - Quality > Quantity: One link from a DR50+ site > 100 links from spam sites
@@ -1133,7 +1126,7 @@ Respond in STRICT JSON:
   ]
 }
 
-Generate 5-15 discovered backlinks (real URLs you know of), 5-10 competitor link gaps, 8-15 link opportunities, 3-4 outreach templates, and 4-week plan. Be STRATEGIC and SPECIFIC — think like a link-building agency, not a checklist tool.`;
+Generate 5-15 discovered backlinks, 5-10 competitor link gaps, 8-15 link opportunities (with domains), and outreach templates. Be SPECIFIC.`;
 
     const userPrompt = `Complete backlink intelligence analysis for: ${brandDomain} (${normalizedUrl})`;
     const elapsedBeforeAI = Date.now() - (req.startTime || Date.now());
@@ -1235,7 +1228,12 @@ Generate 5-15 discovered backlinks (real URLs you know of), 5-10 competitor link
     console.error(`Backlink Intelligence error [${brandDomain || 'unknown'}]:`, error.stack || error);
     
     // Specific handling for AbortError/Timeout
-    if (error.name === 'AbortError' || error.message.includes('timeout') || error.message.includes('aborted')) {
+    const isTimeout = error.name === 'AbortError' || 
+                      error.message.toLowerCase().includes('timeout') || 
+                      error.message.toLowerCase().includes('aborted') ||
+                      error.message.toLowerCase().includes('budget exceeded');
+
+    if (isTimeout) {
       return res.status(504).json({
         success: false,
         error: 'Analysis timed out. The website might be too complex or the AI provider is slow. Please try again in 1 minute.',
