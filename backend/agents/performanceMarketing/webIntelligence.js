@@ -32,7 +32,11 @@ export async function getKeywordTrends(keywords, geo = 'IN', timeRange = 'now 3-
                 startTime: getStartTime(timeRange),
             });
 
-            const parsed = JSON.parse(data);
+            const parsed = safeJSON(data);
+            if (!parsed) {
+                results.push({ keyword, error: 'Invalid response from Google Trends', trend: 'unknown' });
+                continue;
+            }
             const timeline = parsed?.default?.timelineData || [];
 
             if (timeline.length > 0) {
@@ -73,7 +77,9 @@ export async function getRelatedQueries(keyword, geo = 'IN') {
             startTime: getStartTime('now 3-m'),
         });
 
-        const parsed = JSON.parse(data);
+        const parsed = safeJSON(data);
+        if (!parsed) return { keyword, topQueries: [], risingQueries: [], error: 'Invalid response' };
+        
         const topQueries = parsed?.default?.rankedList?.[0]?.rankedKeyword || [];
         const risingQueries = parsed?.default?.rankedList?.[1]?.rankedKeyword || [];
 
@@ -105,7 +111,9 @@ export async function getRelatedTopics(keyword, geo = 'IN') {
             startTime: getStartTime('now 3-m'),
         });
 
-        const parsed = JSON.parse(data);
+        const parsed = safeJSON(data);
+        if (!parsed) return { keyword, topTopics: [], risingTopics: [], error: 'Invalid response' };
+
         const topTopics = parsed?.default?.rankedList?.[0]?.rankedKeyword || [];
         const risingTopics = parsed?.default?.rankedList?.[1]?.rankedKeyword || [];
 
@@ -254,5 +262,23 @@ function getStartTime(range) {
         case 'now 3-m': return new Date(now - 90 * 24 * 60 * 60 * 1000);
         case 'now 12-m': return new Date(now - 365 * 24 * 60 * 60 * 1000);
         default: return new Date(now - 90 * 24 * 60 * 60 * 1000);
+    }
+}
+
+/**
+ * Safe JSON parser for Google Trends responses
+ */
+function safeJSON(data) {
+    if (!data) return null;
+    try {
+        // google-trends-api sometimes returns a string that starts with ")]}',\n"
+        let clean = data;
+        if (clean.includes(")]}',")) {
+            clean = clean.substring(clean.indexOf('\n') + 1);
+        }
+        return JSON.parse(clean);
+    } catch (e) {
+        console.warn('[WebIntel] Google Trends JSON Parse failed:', e.message);
+        return null;
     }
 }

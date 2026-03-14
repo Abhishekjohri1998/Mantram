@@ -61,9 +61,26 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
 }
 
 function parseJSON(text) {
-    let clean = text.trim();
-    if (clean.startsWith('```')) clean = clean.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
-    return JSON.parse(clean);
+    if (!text) return {};
+    try {
+        let clean = text.trim();
+        if (clean.startsWith('```')) {
+            clean = clean.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+        }
+        return JSON.parse(clean);
+    } catch (e) {
+        console.warn('[SocialStudio] JSON Parse failed:', e.message, 'Text snippet:', text.substring(0, 100));
+        // Try to extract JSON if it was wrapped in other text
+        const match = text.match(/\{[\s\S]*\}/);
+        if (match) {
+            try {
+                return JSON.parse(match[0]);
+            } catch {
+                return {};
+            }
+        }
+        return {};
+    }
 }
 
 function buildBrandContext(brand) {

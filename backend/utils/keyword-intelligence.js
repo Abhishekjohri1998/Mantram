@@ -85,7 +85,7 @@ Be SPECIFIC to this industry. Think about what's happening RIGHT NOW — new pro
       agent: 'scout',
       model: 'grok',
       success: true,
-      data: JSON.parse(text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')),
+      data: safeParseJSON(text),
       tokens: data.usage?.total_tokens || 0,
     };
   } catch (e) {
@@ -170,7 +170,7 @@ Analyze 25-35 keywords total. Be precise with volume estimates — use your know
       agent: 'analyst',
       model: 'gemini',
       success: true,
-      data: JSON.parse(text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')),
+      data: safeParseJSON(text),
       tokens: data.usageMetadata?.totalTokenCount || 0,
     };
   } catch (e) {
@@ -243,7 +243,7 @@ Respond in JSON:
         agent: 'strategist',
         model: 'claude',
         success: true,
-        data: JSON.parse(text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')),
+        data: safeParseJSON(text),
         tokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
       };
     } catch (e) {
@@ -279,7 +279,7 @@ Respond in JSON:
       agent: 'strategist',
       model: 'gpt-fallback',
       success: true,
-      data: JSON.parse(data.choices?.[0]?.message?.content || '{}'),
+      data: safeParseJSON(data.choices?.[0]?.message?.content || '{}'),
       tokens: data.usage?.total_tokens || 0,
     };
   } catch (e) {
@@ -407,8 +407,8 @@ export async function runKeywordIntelligence(brand, options = {}) {
   console.log(`🧠 Phase 2: Running Analyst + Strategist agents...`);
 
   const [analystData, strategistData] = await Promise.all([
-    analystAgent(brandContext, industry, country, signalSummary),
-    strategistAgent(brandContext, industry, signalSummary),
+    analystAgent(brandContext, industry, country, signalSummary).catch(e => ({ agent: 'analyst', success: false, error: e.message })),
+    strategistAgent(brandContext, industry, signalSummary).catch(e => ({ agent: 'strategist', success: false, error: e.message })),
   ]);
 
   console.log(`🧠 Scout: ${scoutData.success ? '✅' : '❌'} | Analyst: ${analystData.success ? '✅' : '❌'} | Strategist: ${strategistData.success ? '✅' : '❌'}`);
@@ -530,4 +530,30 @@ function mapCountryCode(country) {
     'japan': 'jp', 'brazil': 'br', 'singapore': 'sg', 'uae': 'ae',
   };
   return map[country.toLowerCase()] || country.substring(0, 2).toLowerCase();
+}
+
+/**
+ * Safe JSON parser for LLM responses
+ */
+function safeParseJSON(text) {
+  if (!text) return {};
+  try {
+    let clean = text.trim();
+    if (clean.startsWith('```')) {
+      clean = clean.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+    }
+    return JSON.parse(clean);
+  } catch (e) {
+    console.warn('[KeywordIntel] JSON Parse failed:', e.message, 'Text snippet:', text.substring(0, 100));
+    // Try to extract JSON if it was wrapped in other text
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        return JSON.parse(match[0]);
+      } catch {
+        return {};
+      }
+    }
+    return {};
+  }
 }

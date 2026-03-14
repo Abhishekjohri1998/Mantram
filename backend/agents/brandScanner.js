@@ -867,14 +867,15 @@ async function fetchPage(url) {
         clearTimeout(timeout);
 
         if (!response.ok) {
-            throw new Error(`Website returned ${response.status}: ${response.statusText}`);
+            return `<!-- Error: Website returned ${response.status} -->`;
         }
         return await response.text();
     } catch (error) {
+        console.warn(`[fetchPage] Failed to reach ${url}:`, error.message);
         if (error.name === 'AbortError') {
-            throw new Error(`Website took too long to respond. Please check the URL and try again.`);
+            return `<!-- Error: Website took too long to respond -->`;
         }
-        throw new Error(`Failed to reach ${url}. ${error.message}`);
+        return `<!-- Error: Failed to reach website ${error.message} -->`;
     }
 }
 
