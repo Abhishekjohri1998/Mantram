@@ -87,15 +87,25 @@ export default function SocialMediaStudio() {
         fetchAccounts()
     }, [fetchAccounts])
 
-    // Listen for OAuth success message from popup
+    // Listen for OAuth success message from popup and broadcasts
     useEffect(() => {
+        const syncChannel = new BroadcastChannel('mantram_sync')
         const handleMessage = (event) => {
             if (event.data?.type === 'SOCIAL_PLATFORM_CONNECTED' || event.data?.type === 'SOCIAL_CONNECTED') {
                 fetchAccounts()
+                // If this tab received a postMessage (e.g. from a popup), broadcast it to other tabs
+                if (event.source) {
+                    syncChannel.postMessage(event.data)
+                }
             }
         }
         window.addEventListener('message', handleMessage)
-        return () => window.removeEventListener('message', handleMessage)
+        syncChannel.addEventListener('message', handleMessage)
+        return () => {
+            window.removeEventListener('message', handleMessage)
+            syncChannel.removeEventListener('message', handleMessage)
+            syncChannel.close()
+        }
     }, [fetchAccounts])
 
     // AGENTIC: Auto-fill from Brand DNA

@@ -99,19 +99,25 @@ export default function Integrations() {
 
     // Listen for OAuth popup messages (Social + GA + PM platforms)
     useEffect(() => {
+        const syncChannel = new BroadcastChannel('mantram_sync')
         const handler = (e) => {
             if (e.data?.type === 'GOOGLE_ANALYTICS_CONNECTED') {
                 setGaConnected(true); setGaEmail(e.data.email || ''); loadAllStatuses()
             }
             if (e.data?.type === 'PM_PLATFORM_CONNECTED') {
                 setConnectingPlatform(null); loadAllStatuses()
+                syncChannel.postMessage(e.data) // Notify other tabs
             }
             if (e.data?.type === 'SOCIAL_PLATFORM_CONNECTED') {
                 loadAllStatuses()
+                syncChannel.postMessage(e.data) // Notify other tabs
             }
         }
         window.addEventListener('message', handler)
-        return () => window.removeEventListener('message', handler)
+        return () => {
+            window.removeEventListener('message', handler)
+            syncChannel.close()
+        }
     }, [loadAllStatuses])
 
     // Detect if this window is an OAuth popup and should close itself

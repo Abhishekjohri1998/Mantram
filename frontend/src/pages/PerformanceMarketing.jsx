@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import DashboardLayout from '../components/DashboardLayout'
 import StudioReportButton from '../components/reports/StudioReportButton'
-import { apiFetch } from '../services/api'
+import { apiFetch as api } from '../services/api'
 
 // ── Tab config ──
 const TABS = [
@@ -160,16 +160,26 @@ export default function PerformanceMarketing() {
         } catch (e) { /* strategy health is optional */ }
     }, [activeBrand])
 
-    // ── Listen for OAuth popup messages ──
+    // ── Listen for OAuth popup messages & Broadcasts ──
     useEffect(() => {
+        const syncChannel = new BroadcastChannel('mantram_sync')
         const handler = (event) => {
             if (event.data?.type === 'PM_PLATFORM_CONNECTED') {
                 setConnectingPlatform(null)
                 loadConnections()
+                // If this tab received a postMessage (e.g. from a popup), broadcast it to other tabs
+                if (event.source) {
+                    syncChannel.postMessage(event.data)
+                }
             }
         }
         window.addEventListener('message', handler)
-        return () => window.removeEventListener('message', handler)
+        syncChannel.addEventListener('message', handler)
+        return () => {
+            window.removeEventListener('message', handler)
+            syncChannel.removeEventListener('message', handler)
+            syncChannel.close()
+        }
     }, [loadConnections])
 
     // ── Run Competitor Research ──
