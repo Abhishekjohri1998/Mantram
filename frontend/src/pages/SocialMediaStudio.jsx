@@ -68,7 +68,7 @@ export default function SocialMediaStudio() {
         setAccountsLoading(true)
         try {
             const data = await social.accounts()
-            const raw = data?.accounts || data || []
+            const raw = data?.data || data?.accounts || []
             const accts = Array.isArray(raw) ? raw : []
             setConnectedAccounts(accts)
             const detected = [...new Set(accts.map(a => a.platform).filter(Boolean))]
@@ -90,7 +90,7 @@ export default function SocialMediaStudio() {
     // Listen for OAuth success message from popup
     useEffect(() => {
         const handleMessage = (event) => {
-            if (event.data?.type === 'SOCIAL_CONNECTED') {
+            if (event.data?.type === 'SOCIAL_PLATFORM_CONNECTED' || event.data?.type === 'SOCIAL_CONNECTED') {
                 fetchAccounts()
             }
         }
