@@ -64,22 +64,39 @@ export default function SocialMediaStudio() {
     const [fullAnalysisRunning, setFullAnalysisRunning] = useState(false)
     const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
+    const fetchAccounts = useCallback(async () => {
+        setAccountsLoading(true)
+        try {
+            const data = await social.accounts()
+            const raw = data?.accounts || data || []
+            const accts = Array.isArray(raw) ? raw : []
+            setConnectedAccounts(accts)
+            const detected = [...new Set(accts.map(a => a.platform).filter(Boolean))]
+            if (detected.length > 0) setSelectedPlatforms(detected)
+            if (detected[0]) setAuditPlatform(detected[0])
+        } catch (e) {
+            console.warn('Auto-sync:', e)
+            setConnectedAccounts([])
+        } finally {
+            setAccountsLoading(false)
+        }
+    }, [])
+
     // AGENTIC: Auto-sync connected accounts
     useEffect(() => {
-        (async () => {
-            setAccountsLoading(true)
-            try {
-                const data = await social.accounts()
-                const raw = data?.accounts || data || []
-                const accts = Array.isArray(raw) ? raw : []
-                setConnectedAccounts(accts)
-                const detected = [...new Set(accts.map(a => a.platform).filter(Boolean))]
-                if (detected.length > 0) setSelectedPlatforms(detected)
-                if (detected[0]) setAuditPlatform(detected[0])
-            } catch (e) { console.warn('Auto-sync:', e); setConnectedAccounts([]) }
-            finally { setAccountsLoading(false) }
-        })()
-    }, [])
+        fetchAccounts()
+    }, [fetchAccounts])
+
+    // Listen for OAuth success message from popup
+    useEffect(() => {
+        const handleMessage = (event) => {
+            if (event.data?.type === 'SOCIAL_CONNECTED') {
+                fetchAccounts()
+            }
+        }
+        window.addEventListener('message', handleMessage)
+        return () => window.removeEventListener('message', handleMessage)
+    }, [fetchAccounts])
 
     // AGENTIC: Auto-fill from Brand DNA
     useEffect(() => {
@@ -202,6 +219,20 @@ export default function SocialMediaStudio() {
         try { await social.cancelScheduled(id); setSocialPosts(p => p.map(x => x._id === id ? { ...x, status: 'cancelled' } : x)) }
         catch (e) { alert(e.message || 'Failed') }
         finally { setCancellingId(null) }
+    }
+
+    const handleConnect = async (platform) => {
+        try {
+            const d = await social.connect(platform)
+            if (d.authUrl) {
+                const width = 600, height = 700
+                const left = window.screenX + (window.outerWidth - width) / 2
+                const top = window.screenY + (window.outerHeight - height) / 2
+                window.open(d.authUrl, `Connect ${platform}`, `width=${width},height=${height},left=${left},top=${top}`)
+            }
+        } catch (e) {
+            setError(e.message)
+        }
     }
 
     const PlatformSelector = ({ auto }) => (
@@ -789,7 +820,7 @@ export default function SocialMediaStudio() {
                                                 {accts.length > 0 ? (
                                                     <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" /><span className="text-xs text-emerald-400 font-bold">Active</span></div>
                                                 ) : (
-                                                    <button onClick={async () => { try { const d = await social.connect(p.id); if (d.url) window.location.href = d.url } catch (e) { setError(e.message) } }}
+                                                    <button onClick={() => handleConnect(p.id)}
                                                         className="px-4 py-2 rounded-xl bg-gradient-to-r from-primary to-violet-500 text-white text-xs font-bold hover:opacity-90 cursor-pointer">Connect</button>
                                                 )}
                                             </div>
