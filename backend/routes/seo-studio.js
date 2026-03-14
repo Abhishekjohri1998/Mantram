@@ -1118,7 +1118,18 @@ Generate 5-15 discovered backlinks (real URLs you know of), 5-10 competitor link
     const elapsedBeforeAI = Date.now() - (req.startTime || Date.now());
     const remainingBudgetForAI = Math.max(5000, 28000 - elapsedBeforeAI);
     const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudgetForAI });
-    const parsed = parseJSON(result);
+    if (!result) throw new Error('AI analysis returned empty result');
+    let parsed;
+    try {
+      parsed = parseJSON(result);
+    } catch (e) {
+      console.error('Failed to parse AI response for backlinks:', e.message, result.substring(0, 200));
+      throw new Error('AI analysis returned invalid data format');
+    }
+    
+    if (!parsed || typeof parsed !== 'object') {
+      throw new Error('AI analysis returned malformed object');
+    }
 
     // ── PHASE 4: Try to verify top discovered backlinks (with timing safeguard) ──
     const totalElapsed = Date.now() - (req.startTime || Date.now());
@@ -1143,11 +1154,15 @@ Generate 5-15 discovered backlinks (real URLs you know of), 5-10 competitor link
     if (discoveredUrls.length > 0) {
       console.log(`🔗 Phase 4: Verifying ${discoveredUrls.length} discovered backlinks...`);
       try {
-        // Wrap verification in a race with the remaining budget - 2s buffer
+        // Wrap verification in a race with the remaining budget - 3s buffer
         const verificationPromise = discoverBacklinks(discoveredUrls, brandDomain);
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Verification Timeout')), Math.max(remainingBudget - 2000, 3000)));
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Verification Timeout')), Math.max(remainingBudget - 3000, 3000)));
         
         verificationResults = await Promise.race([verificationPromise, timeoutPromise]);
+        
+        if (!verificationResults || !Array.isArray(verificationResults.verified)) {
+          throw new Error('Verification returned invalid result format');
+        }
         
         // Update discovered backlinks with verification status
         for (const vb of verificationResults.verified) {
@@ -1195,8 +1210,12 @@ Generate 5-15 discovered backlinks (real URLs you know of), 5-10 competitor link
     console.log(`🔗 === BACKLINK INTELLIGENCE COMPLETE: ${brandDomain} ===\n`);
     res.json({ success: true, ...parsed });
   } catch (error) {
-    console.error('Backlink Intelligence error:', error);
-    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    console.error(`Backlink Intelligence error [${brandDomain || 'unknown'}]:`, error.stack || error);
+    res.status(500).json({ 
+      success: false, 
+      error: safeErrorMessage(error),
+      debug: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    });
   }
 });
 
