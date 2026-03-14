@@ -956,6 +956,7 @@ CRITICAL: Only include REAL existing companies. Do not make up fictional compani
 // ============================================================================
 
 router.post('/backlinks', protect, requireStudio('seoStudio'), requireCredits('seoBacklinks'), async (req, res) => {
+  let brandDomain;
   try {
     const { url, brand: brandPayload, brandId } = req.body;
 
@@ -966,8 +967,8 @@ router.post('/backlinks', protect, requireStudio('seoStudio'), requireCredits('s
     const brandContext = buildBrandContext(brand || brandPayload);
     let normalizedUrl = website.trim();
     if (!/^https?:\/\//i.test(normalizedUrl)) normalizedUrl = `https://${normalizedUrl}`;
-    let brandDomain;
-    try { brandDomain = new URL(normalizedUrl).hostname.replace(/^www\./, ''); } catch { brandDomain = website; }
+    brandDomain = website;
+    try { brandDomain = new URL(normalizedUrl).hostname.replace(/^www\./, ''); } catch (e) { /* ignore */ }
 
     console.log(`\n🔗 === BACKLINK INTELLIGENCE: ${brandDomain} ===`);
 
