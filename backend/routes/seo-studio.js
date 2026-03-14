@@ -29,12 +29,17 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
   const { temperature = 0.7, maxTokens = 8192, json = false, timeout = 30000 } = options;
   lastTokenUsage = null;
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout);
+  const overallController = new AbortController();
+  const overallTimer = setTimeout(() => overallController.abort(), timeout);
 
   try {
-    // Try OpenAI first
+    // 1. Try OpenAI (Fastest, but sometimes throttles)
     if (process.env.OPENAI_API_KEY) {
+      const providerController = new AbortController();
+      // Give OpenAI up to 18s OR 80% of remaining budget, whichever is less
+      const providerTimeout = Math.min(18000, timeout * 0.8);
+      const pTimer = setTimeout(() => providerController.abort(), providerTimeout);
+      
       try {
         const resp = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -45,19 +50,27 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
             temperature, max_tokens: maxTokens,
             ...(json ? { response_format: { type: 'json_object' } } : {}),
           }),
-          signal: controller.signal,
+          signal: providerController.signal,
         });
         const data = await resp.json();
         if (data.choices?.[0]?.message?.content) {
           lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'gpt-4o-mini', provider: 'openai' };
           return data.choices[0].message.content;
         }
-      } catch (e) { if (e.name === 'AbortError') throw e; }
+      } catch (e) { 
+        console.warn(`OpenAI failed/timed out: ${e.message}`);
+        // If overall controller is aborted, stop everything
+        if (overallController.signal.aborted) throw e;
+      } finally {
+        clearTimeout(pTimer);
+      }
     }
 
-    // Try Grok (xAI)
+    // 2. Try Grok (Alternative)
     const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
-    if (grokKey) {
+    if (grokKey && !overallController.signal.aborted) {
+      const providerController = new AbortController();
+      const pTimer = setTimeout(() => providerController.abort(), 12000); // 12s for Grok
       try {
         const resp = await fetch('https://api.x.ai/v1/chat/completions', {
           method: 'POST',
@@ -68,19 +81,24 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
             temperature, max_tokens: maxTokens,
             ...(json ? { response_format: { type: 'json_object' } } : {}),
           }),
-          signal: controller.signal,
+          signal: providerController.signal,
         });
         const data = await resp.json();
         if (data.choices?.[0]?.message?.content) {
           lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'grok-3-mini-fast', provider: 'xai' };
           return data.choices[0].message.content;
         }
-      } catch (e) { if (e.name === 'AbortError') throw e; }
+      } catch (e) { 
+        console.warn(`Grok failed/timed out: ${e.message}`);
+        if (overallController.signal.aborted) throw e;
+      } finally {
+        clearTimeout(pTimer);
+      }
     }
 
-    // Fallback to Gemini
+    // 3. Fallback to Gemini (Most reliable, but slower)
     const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
-    if (geminiKey) {
+    if (geminiKey && !overallController.signal.aborted) {
       const models = ['gemini-2.0-flash', 'gemini-1.5-flash'];
       for (const model of models) {
         try {
@@ -97,7 +115,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
                   ...(json ? { responseMimeType: 'application/json' } : {}),
                 },
               }),
-              signal: controller.signal,
+              signal: overallController.signal,
             }
           );
           const data = await resp.json();
@@ -106,13 +124,15 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
             lastTokenUsage = { inputTokens: data.usageMetadata?.promptTokenCount || 0, outputTokens: data.usageMetadata?.candidatesTokenCount || 0, model, provider: 'gemini' };
             return text;
           }
-        } catch (e) { if (e.name === 'AbortError') throw e; }
+        } catch (e) { 
+          if (overallController.signal.aborted) throw e;
+        }
       }
     }
 
-    throw new Error('All AI models failed or timed out');
+    throw new Error('All AI models failed or primary budget exceeded');
   } finally {
-    clearTimeout(timer);
+    clearTimeout(overallTimer);
   }
 }
 
@@ -1116,8 +1136,9 @@ Generate 5-15 discovered backlinks (real URLs you know of), 5-10 competitor link
 
     const userPrompt = `Complete backlink intelligence analysis for: ${brandDomain} (${normalizedUrl})`;
     const elapsedBeforeAI = Date.now() - (req.startTime || Date.now());
-    const remainingBudgetForAI = Math.max(5000, 28000 - elapsedBeforeAI);
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudgetForAI });
+    const remainingBudgetForAI = Math.max(8000, 28000 - elapsedBeforeAI);
+    // Use 4096 tokens instead of 8192 to speed up generation
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 4096, timeout: remainingBudgetForAI });
     if (!result) throw new Error('AI analysis returned empty result');
     let parsed;
     try {
@@ -1211,6 +1232,16 @@ Generate 5-15 discovered backlinks (real URLs you know of), 5-10 competitor link
     res.json({ success: true, ...parsed });
   } catch (error) {
     console.error(`Backlink Intelligence error [${brandDomain || 'unknown'}]:`, error.stack || error);
+    
+    // Specific handling for AbortError/Timeout
+    if (error.name === 'AbortError' || error.message.includes('timeout') || error.message.includes('aborted')) {
+      return res.status(504).json({
+        success: false,
+        error: 'Analysis timed out. The website might be too complex or the AI provider is slow. Please try again in 1 minute.',
+        code: 'TIMEOUT_ERROR'
+      });
+    }
+
     res.status(500).json({ 
       success: false, 
       error: safeErrorMessage(error),
