@@ -1121,8 +1121,8 @@ Generate 5-15 discovered backlinks (real URLs you know of), 5-10 competitor link
     const parsed = parseJSON(result);
 
     // ── PHASE 4: Try to verify top discovered backlinks (with timing safeguard) ──
-    const elapsed = Date.now() - startTime;
-    const remainingBudget = 28000 - (Date.now() - req.startTime || startTime); // Aim for 28s total
+    const totalElapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(0, 28000 - totalElapsed); // Aim for 28s total
     
     let discoveredUrls = (parsed.discoveredBacklinks || [])
       .filter(b => b.sourceUrl && b.sourceUrl.startsWith('http'))
