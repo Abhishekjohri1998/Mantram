@@ -44,62 +44,19 @@ const adReportSchema = new mongoose.Schema({
     },
 
     // ── Research Data (from APIs) ──
-    researchData: {
-        competitorAds: [{
-            advertiser: { type: String },
-            platform: { type: String },
-            adType: { type: String },
-            headline: { type: String },
-            bodyText: { type: String },
-            imageUrl: { type: String },
-            cta: { type: String },
-            estimatedSpend: { type: String },
-            startDate: { type: Date },
-            impressionRange: { type: String },
-            landingUrl: { type: String },
-        }],
-        marketTrends: [String],
-        keyInsights: [String],
-    },
+    // Uses Mixed type to support varied competitor research data: competitorAds,
+    // competitorProfiles, adPatterns, gaps, marketTrends, etc.
+    researchData: { type: mongoose.Schema.Types.Mixed, default: {} },
 
     // ── AI Analysis ──
-    aiAnalysis: {
-        summary: { type: String, default: '' },
-        keyFindings: [String],
-        opportunities: [String],
-        threats: [String],
-        recommendations: [{
-            title: { type: String },
-            description: { type: String },
-            priority: { type: String, enum: ['high', 'medium', 'low'], default: 'medium' },
-            estimatedImpact: { type: String },
-        }],
-        actionItems: [{
-            action: { type: String },
-            deadline: { type: String },
-            platform: { type: String },
-        }],
-    },
+    // Uses Mixed type to support rich analysis: summary, keyFindings, recommendations,
+    // competitorProfiles, adPatterns, gaps, etc.
+    aiAnalysis: { type: mongoose.Schema.Types.Mixed, default: {} },
 
     // ── Strategy Plan (for strategy type) ──
-    strategyPlan: {
-        goals: [String],
-        channelAllocation: [{
-            channel: { type: String },           // meta-feed, meta-reels, google-search, google-display, youtube
-            budgetPercent: { type: Number },
-            rationale: { type: String },
-        }],
-        timeline: [{
-            phase: { type: String },
-            duration: { type: String },
-            activities: [String],
-        }],
-        kpis: [{
-            metric: { type: String },
-            target: { type: String },
-            current: { type: String },
-        }],
-    },
+    // Uses Mixed type to support rich nested data: platformBreakout, keywordStrategy,
+    // competitiveEdge, locationStrategy, achievabilityAudit, goals-as-objects etc.
+    strategyPlan: { type: mongoose.Schema.Types.Mixed, default: {} },
 
     // ── Budget Plan (for budget-plan type) ──
     budgetPlan: {

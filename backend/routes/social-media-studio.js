@@ -1,9 +1,13 @@
 import { Router } from 'express';
+import mongoose from 'mongoose';
 import { protect } from '../middleware/auth.js';
 import { requireStudio } from '../middleware/studioAccess.js';
 import { requireCredits } from '../middleware/credits.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import SocialStrategy from '../models/SocialStrategy.js';
+import SocialAccount from '../models/SocialAccount.js';
+import SocialPost from '../models/SocialPost.js';
+import { fetchRecentPosts } from '../services/socialService.js';
 
 const router = Router();
 
@@ -65,24 +69,352 @@ function parseJSON(text) {
 function buildBrandContext(brand) {
     if (!brand) return '';
     const dna = brand.dna || {};
-    return [
+    const lines = [
         `Brand: ${brand.name}`,
         dna.industry ? `Industry: ${dna.industry}` : '',
         dna.brandDescription ? `Description: ${dna.brandDescription}` : '',
         dna.targetAudience ? `Target Audience: ${dna.targetAudience}` : '',
+        dna.tagline ? `Tagline: ${dna.tagline}` : '',
         dna.voice?.personality ? `Voice: ${dna.voice.personality}` : '',
+        dna.voice?.description ? `Voice Description: ${dna.voice.description}` : '',
         dna.voice?.keywords?.length ? `Tone Keywords: ${dna.voice.keywords.join(', ')}` : '',
         dna.contentStyle?.dos?.length ? `Content Dos: ${dna.contentStyle.dos.join(', ')}` : '',
         dna.contentStyle?.donts?.length ? `Don'ts: ${dna.contentStyle.donts.join(', ')}` : '',
+        dna.contentStyle?.writingStyle ? `Writing Style: ${dna.contentStyle.writingStyle}` : '',
+        dna.contentStyle?.ctaStyle ? `CTA Style: ${dna.contentStyle.ctaStyle}` : '',
+        dna.contentStyle?.emojiUsage ? `Emoji Usage: ${dna.contentStyle.emojiUsage}` : '',
+        dna.contentStyle?.hashtagStyle ? `Hashtag Style: ${dna.contentStyle.hashtagStyle}` : '',
         dna.country ? `Country: ${dna.country}` : '',
+        dna.region ? `Region: ${dna.region}` : '',
+        dna.targetMarkets?.length ? `Target Markets: ${dna.targetMarkets.join(', ')}` : '',
         dna.defaultLanguage ? `Language: ${dna.defaultLanguage}` : '',
-        dna.colors?.length ? `Colors: ${dna.colors.map(c => c.hex).join(', ')}` : '',
-    ].filter(Boolean).join('\n');
+        dna.colors?.length ? `Brand Colors: ${dna.colors.map(c => `${c.name || ''} ${c.hex}`).join(', ')}` : '',
+        dna.photographyStyle ? `Photography Style: ${dna.photographyStyle}` : '',
+    ];
+    // Social Voice analysis (if scraped)
+    const sv = dna.socialVoice || {};
+    if (sv.captionStyle || sv.toneInsight) {
+        lines.push('--- Social Voice Analysis ---');
+        if (sv.captionStyle) lines.push(`Caption Style: ${sv.captionStyle}`);
+        if (sv.hashtagStrategy) lines.push(`Hashtag Strategy: ${sv.hashtagStrategy}`);
+        if (sv.emojiUsage) lines.push(`Social Emoji Usage: ${sv.emojiUsage}`);
+        if (sv.ctaStyle) lines.push(`Social CTA Style: ${sv.ctaStyle}`);
+        if (sv.postingPatterns) lines.push(`Posting Patterns: ${sv.postingPatterns}`);
+        if (sv.toneInsight) lines.push(`Tone Insight: ${sv.toneInsight}`);
+        if (sv.sampleCaptions?.length) lines.push(`Sample Captions: ${sv.sampleCaptions.slice(0, 3).join(' | ')}`);
+    }
+    // Known competitors
+    if (brand.competitors?.length) {
+        lines.push(`Known Competitors: ${brand.competitors.map(c => c.name + (c.url ? ` (${c.url})` : '')).join(', ')}`);
+    }
+    // Knowledge bank summary
+    if (brand.knowledge?.entries?.length) {
+        lines.push(`Knowledge Bank: ${brand.knowledge.entries.length} entries (${brand.knowledge.entries.map(e => e.title || e.sourceType).join(', ')})`);
+    }
+    return lines.filter(Boolean).join('\n');
 }
 
 
 // ════════════════════════════════════════════════════════════════
-//  1. GENERATE STRATEGY — AI Social Media Strategy
+//  DATA INTELLIGENCE COLLECTOR — Parallel fetch of all data sources
+// ════════════════════════════════════════════════════════════════
+
+async function collectStrategyIntelligence(userId, brand, platforms) {
+    const intel = {
+        connectedAccounts: [],
+        recentPlatformPosts: [],
+        postHistory: { published: [], scheduled: [], totalPublished: 0, totalScheduled: 0 },
+        previousStrategies: [],
+        brandKnowledge: [],
+    };
+
+    try {
+        // Parallel data fetches from DB
+        const [accounts, publishedPosts, scheduledPosts, prevStrategies] = await Promise.all([
+            SocialAccount.find({ user: userId, isActive: true }).select('+accessToken').catch(() => []),
+            SocialPost.find({ user: userId, status: 'published', ...(brand?._id ? { brand: brand._id } : {}) })
+                .sort({ publishedAt: -1 }).limit(50).catch(() => []),
+            SocialPost.find({ user: userId, status: 'scheduled', ...(brand?._id ? { brand: brand._id } : {}) })
+                .sort({ scheduledFor: 1 }).limit(20).catch(() => []),
+            SocialStrategy.find({ user: userId, type: 'strategy', ...(brand?._id ? { brand: brand._id } : {}) })
+                .sort({ createdAt: -1 }).limit(3).select('title platforms timeframe data.overview data.contentPillars createdAt').catch(() => []),
+        ]);
+
+        // Connected accounts summary
+        intel.connectedAccounts = accounts.map(a => ({
+            platform: a.platform,
+            name: a.accountName,
+            id: a.accountId,
+            hasToken: !!a.accessToken,
+        }));
+
+        // Fetch recent posts from LIVE platforms (only for connected accounts matching selected platforms)
+        const relevantAccounts = accounts.filter(a => platforms.includes(a.platform) && a.accessToken);
+        const livePostPromises = relevantAccounts.map(async (account) => {
+            try {
+                const posts = await fetchRecentPosts(account.accountId, account.accessToken, account.platform);
+                return posts.map(p => ({ ...p, accountName: account.accountName }));
+            } catch (e) {
+                console.warn(`[STRATEGY-INTEL] Failed to fetch live posts for ${account.platform}:`, e.message);
+                return [];
+            }
+        });
+        const liveResults = await Promise.allSettled(livePostPromises);
+        for (const r of liveResults) {
+            if (r.status === 'fulfilled') intel.recentPlatformPosts.push(...r.value);
+        }
+
+        // Post history summary
+        intel.postHistory.published = publishedPosts.map(p => ({
+            platform: p.platform,
+            caption: (p.caption || '').substring(0, 120),
+            publishedAt: p.publishedAt || p.createdAt,
+            hasImage: !!p.imageUrl,
+        }));
+        intel.postHistory.scheduled = scheduledPosts.map(p => ({
+            platform: p.platform,
+            caption: (p.caption || '').substring(0, 120),
+            scheduledFor: p.scheduledFor,
+        }));
+        intel.postHistory.totalPublished = publishedPosts.length;
+        intel.postHistory.totalScheduled = scheduledPosts.length;
+
+        // Previous strategies (summaries only)
+        intel.previousStrategies = prevStrategies.map(s => ({
+            title: s.title,
+            platforms: s.platforms,
+            timeframe: s.timeframe,
+            overview: s.data?.overview || '',
+            pillars: (s.data?.contentPillars || []).map(p => p.name).join(', '),
+            createdAt: s.createdAt,
+        }));
+
+        // Brand knowledge entries
+        if (brand?.knowledge?.entries?.length) {
+            intel.brandKnowledge = brand.knowledge.entries.slice(0, 5).map(e => ({
+                title: e.title || e.sourceType,
+                type: e.sourceType,
+                snippet: (e.content || '').substring(0, 200),
+            }));
+        }
+
+    } catch (e) {
+        console.warn('[STRATEGY-INTEL] Data collection failed (non-fatal):', e.message);
+    }
+
+    return intel;
+}
+
+
+// ════════════════════════════════════════════════════════════════
+//  VERIFIED FESTIVAL REFERENCE DATA (annually updated)
+//  Source: drikpanchang.com, publicholidays.in, timeanddate.com
+//  Indian festivals follow tithi/lunar calendar — dates CHANGE every year
+// ════════════════════════════════════════════════════════════════
+
+const VERIFIED_FESTIVALS_2026 = [
+    { date: '2026-01-14', name: 'Makar Sankranti / Pongal', type: 'festival' },
+    { date: '2026-01-26', name: 'Republic Day', type: 'national_holiday' },
+    { date: '2026-02-14', name: "Valentine's Day", type: 'cultural_moment' },
+    { date: '2026-02-17', name: 'Maha Shivaratri', type: 'festival' },
+    { date: '2026-03-03', name: 'Holika Dahan', type: 'festival' },
+    { date: '2026-03-04', name: 'Holi (Rangwali)', type: 'festival' },
+    { date: '2026-03-08', name: "International Women's Day", type: 'awareness_day' },
+    { date: '2026-03-19', name: 'Chaitra Navratri begins', type: 'festival' },
+    { date: '2026-03-20', name: 'Eid al-Fitr (subject to moon sighting)', type: 'festival' },
+    { date: '2026-03-26', name: 'Ram Navami', type: 'festival' },
+    { date: '2026-03-27', name: 'Chaitra Navratri ends', type: 'festival' },
+    { date: '2026-04-02', name: 'Good Friday', type: 'holiday' },
+    { date: '2026-04-05', name: 'Easter Sunday', type: 'festival' },
+    { date: '2026-04-14', name: 'Baisakhi / Ambedkar Jayanti', type: 'festival' },
+    { date: '2026-05-01', name: 'May Day / Labour Day', type: 'national_holiday' },
+    { date: '2026-05-04', name: "Mother's Day", type: 'cultural_moment' },
+    { date: '2026-05-27', name: 'Eid al-Adha (Bakrid)', type: 'festival' },
+    { date: '2026-06-05', name: 'World Environment Day', type: 'awareness_day' },
+    { date: '2026-06-21', name: 'Father\'s Day / International Yoga Day', type: 'awareness_day' },
+    { date: '2026-07-17', name: 'Muharram', type: 'festival' },
+    { date: '2026-08-05', name: 'Friendship Day', type: 'cultural_moment' },
+    { date: '2026-08-11', name: 'Raksha Bandhan', type: 'festival' },
+    { date: '2026-08-13', name: 'Janmashtami', type: 'festival' },
+    { date: '2026-08-15', name: 'Independence Day', type: 'national_holiday' },
+    { date: '2026-09-05', name: 'Teacher\'s Day', type: 'awareness_day' },
+    { date: '2026-09-14', name: 'Ganesh Chaturthi', type: 'festival' },
+    { date: '2026-09-16', name: 'Milad-un-Nabi (Prophet\'s Birthday)', type: 'festival' },
+    { date: '2026-10-02', name: 'Gandhi Jayanti', type: 'national_holiday' },
+    { date: '2026-10-10', name: 'Sharad Navratri begins', type: 'festival' },
+    { date: '2026-10-18', name: 'Sharad Navratri ends', type: 'festival' },
+    { date: '2026-10-21', name: 'Dussehra (Vijayadashami)', type: 'festival' },
+    { date: '2026-11-07', name: 'Dhanteras', type: 'festival' },
+    { date: '2026-11-08', name: 'Diwali (Lakshmi Puja)', type: 'festival' },
+    { date: '2026-11-10', name: 'Bhai Dooj', type: 'festival' },
+    { date: '2026-11-14', name: "Children's Day", type: 'awareness_day' },
+    { date: '2026-11-24', name: 'Guru Nanak Jayanti', type: 'festival' },
+    { date: '2026-12-25', name: 'Christmas Day', type: 'festival' },
+    { date: '2026-12-31', name: "New Year's Eve", type: 'cultural_moment' },
+];
+
+
+// ════════════════════════════════════════════════════════════════
+//  SMART CALENDAR — Verified dates + LLM for content ideas
+//  Uses verified festival dates as ground truth, LLM enriches with
+//  content ideas, relevance scoring, and seasonal context
+// ════════════════════════════════════════════════════════════════
+
+async function generateSmartCalendar(country, targetMarkets, industry, timeframe, startDate) {
+    const start = startDate || new Date();
+    const endDate = new Date(start);
+    endDate.setMonth(endDate.getMonth() + (timeframe === 'quarterly' ? 3 : 1));
+
+    const dateRange = `${start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} to ${endDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
+    const markets = [country, ...(targetMarkets || [])].filter(Boolean).join(', ');
+    const isD2C = /d2c|ecommerce|e-commerce|retail|fashion|beauty|fmcg|consumer/i.test(industry || '');
+
+    // Filter verified festivals to the target date range
+    const startISO = start.toISOString().split('T')[0];
+    const endISO = endDate.toISOString().split('T')[0];
+    const relevantFestivals = VERIFIED_FESTIVALS_2026.filter(f => f.date >= startISO && f.date <= endISO);
+    const festivalReference = relevantFestivals.map(f => `${f.date}: ${f.name} [${f.type}]`).join('\n');
+
+    const calendarPrompt = `You are a cultural intelligence engine for social media brands. Given the VERIFIED festival dates below, enrich them with content ideas and relevance scoring. Also add any additional events specific to these markets: ${markets}.
+
+════ VERIFIED FESTIVAL DATES (MANDATORY — use these EXACT dates, do NOT change them) ════
+${festivalReference || 'No verified festivals in this date range.'}
+
+Date range: ${dateRange}
+Industry: ${industry || 'General'}
+
+ADDITIONAL RULES:
+- Keep ALL verified dates exactly as given above — DO NOT modify any date
+- Add content ideas and relevance scoring for each verified event
+- Add any ADDITIONAL events not in the verified list: awareness days, social media trending days, global campaigns
+${isD2C ? '- For D2C brands: add sale event WINDOWS (Republic Day Sale, Summer Sale, Flipkart Big Billion Days, Amazon Great Indian Festival, Myntra EORS, etc.) with their typical timing. Mark these as "type": "sale_event" and note that exact dates are announced closer to the event.' : ''}
+- Add seasonal context (wedding season, monsoon, summer, back-to-school, etc.)
+
+Respond in strict JSON:
+{
+  "events": [
+    {
+      "date": "2026-03-04",
+      "name": "Holi (Rangwali)",
+      "type": "festival",
+      "relevance": "high",
+      "contentIdeas": ["Colorful brand reel with Holi theme", "Festival offer announcement"],
+      "platformBest": ["instagram", "facebook"]
+    }
+  ],
+  "seasons": [
+    {
+      "name": "Wedding Season",
+      "period": "March–June",
+      "contentAngle": "How to leverage this season"
+    }
+  ]
+}`;
+
+    try {
+        const result = await aiCall(
+            'You are a cultural intelligence engine. You MUST use the verified dates provided — never change or guess festival dates. Only add additional events that are not in the verified list.',
+            calendarPrompt,
+            { json: true, temperature: 0.3, maxTokens: 3000 }
+        );
+        return parseJSON(result);
+    } catch (e) {
+        console.warn('[SMART-CALENDAR] Calendar generation failed, using verified fallback:', e.message);
+        // Fallback: return verified festivals without LLM enrichment
+        return {
+            events: relevantFestivals.map(f => ({
+                date: f.date, name: f.name, type: f.type,
+                relevance: 'medium', contentIdeas: [], platformBest: [],
+            })),
+            seasons: [],
+        };
+    }
+}
+
+
+// ════════════════════════════════════════════════════════════════
+//  FORMAT INTELLIGENCE INTO PROMPT CONTEXT
+// ════════════════════════════════════════════════════════════════
+
+function formatIntelligenceContext(intel, calendar) {
+    const sections = [];
+
+    // 1. Connected Accounts — with explicit data availability markers
+    if (intel.connectedAccounts.length) {
+        sections.push(`📊 CONNECTED ACCOUNTS:\n${intel.connectedAccounts.map(a => `- ${a.platform}: ${a.name}`).join('\n')}\n⚠️ NOTE: Follower counts and engagement metrics are NOT available from the API. Do NOT guess or fabricate these numbers.`);
+    } else {
+        sections.push('📊 CONNECTED ACCOUNTS: None connected. Follower counts, engagement rates, and reach data are NOT AVAILABLE. Do NOT invent metrics.');
+    }
+
+    // 2. Recent Live Posts (from platform APIs)
+    if (intel.recentPlatformPosts.length) {
+        const postSummary = intel.recentPlatformPosts.slice(0, 10).map(p =>
+            `- [${p.platform}] "${(p.content || '').substring(0, 80)}..." (${new Date(p.createdAt).toLocaleDateString()})`
+        ).join('\n');
+        sections.push(`📱 RECENT LIVE POSTS (from platform — real data):\n${postSummary}\n⚠️ NOTE: Like/comment/share counts for these posts are NOT available. Only captions and dates are real.`);
+    } else {
+        sections.push('📱 RECENT LIVE POSTS: No live post data available. Do NOT fabricate post performance numbers.');
+    }
+
+    // 3. Post History from DB
+    if (intel.postHistory.totalPublished > 0) {
+        const lastPosts = intel.postHistory.published.slice(0, 10).map(p =>
+            `- [${p.platform}] "${p.caption}" (${new Date(p.publishedAt).toLocaleDateString()}, ${p.hasImage ? 'with image' : 'text only'})`
+        ).join('\n');
+        sections.push(`📈 PUBLISH HISTORY (${intel.postHistory.totalPublished} posts — real data):\n${lastPosts}`);
+
+        // Posting frequency analysis
+        const platforms = {};
+        intel.postHistory.published.forEach(p => {
+            platforms[p.platform] = (platforms[p.platform] || 0) + 1;
+        });
+        sections.push(`📊 POSTING FREQUENCY (last ${intel.postHistory.totalPublished} posts — real): ${Object.entries(platforms).map(([p, c]) => `${p}: ${c}`).join(', ')}`);
+    } else {
+        sections.push('📈 PUBLISH HISTORY: No posts published through this platform yet. Posting frequency is UNKNOWN.');
+    }
+
+    // 4. Scheduled Content
+    if (intel.postHistory.totalScheduled > 0) {
+        const scheduled = intel.postHistory.scheduled.slice(0, 5).map(p =>
+            `- [${p.platform}] "${p.caption}" → scheduled for ${new Date(p.scheduledFor).toLocaleDateString()}`
+        ).join('\n');
+        sections.push(`📅 ALREADY SCHEDULED (${intel.postHistory.totalScheduled} posts):\n${scheduled}`);
+    }
+
+    // 5. Previous Strategies
+    if (intel.previousStrategies.length) {
+        const prev = intel.previousStrategies.map(s =>
+            `- "${s.title}" (${new Date(s.createdAt).toLocaleDateString()}) — Pillars: ${s.pillars || 'N/A'}\n  Overview: ${s.overview || 'N/A'}`
+        ).join('\n');
+        sections.push(`🔄 PREVIOUS STRATEGIES (build on these, don't repeat):\n${prev}`);
+    }
+
+    // 6. Smart Calendar Events (verified dates)
+    if (calendar?.events?.length) {
+        const events = calendar.events.slice(0, 20).map(e =>
+            `- ${e.date}: ${e.name} [${e.type}] (relevance: ${e.relevance}) — ${(e.contentIdeas || []).join(', ')}`
+        ).join('\n');
+        sections.push(`🗓️ UPCOMING EVENTS & MOMENTS (VERIFIED dates — use exactly as listed):\n${events}`);
+    }
+    if (calendar?.seasons?.length) {
+        const seasons = calendar.seasons.map(s =>
+            `- ${s.name} (${s.period}): ${s.contentAngle}`
+        ).join('\n');
+        sections.push(`🌦️ SEASONAL CONTEXT:\n${seasons}`);
+    }
+
+    // 7. Brand Knowledge
+    if (intel.brandKnowledge.length) {
+        const kb = intel.brandKnowledge.map(k => `- [${k.type}] ${k.title}: ${k.snippet}`).join('\n');
+        sections.push(`📚 BRAND KNOWLEDGE BANK:\n${kb}`);
+    }
+
+    return sections.length > 0 ? sections.join('\n\n') : 'No additional data available — generate strategy based on brand context alone.';
+}
+
+
+// ════════════════════════════════════════════════════════════════
+//  1. GENERATE STRATEGY — Data-Driven AI Social Media Strategy
 // ════════════════════════════════════════════════════════════════
 
 router.post('/generate-strategy', protect, requireStudio('socialMediaStudio'), requireCredits('socialMedia'), async (req, res) => {
@@ -90,54 +422,107 @@ router.post('/generate-strategy', protect, requireStudio('socialMediaStudio'), r
         const { platforms, timeframe, goals, industry, currentMetrics, brand } = req.body;
         if (!platforms?.length) return res.status(400).json({ success: false, error: 'Select at least one platform' });
 
-        const brandCtx = buildBrandContext(brand);
+        // Load full brand from DB for deep DNA access
+        const Brand = mongoose.model('Brand');
+        const fullBrand = brand?._id ? await Brand.findById(brand._id).catch(() => null) : null;
+        const brandToUse = fullBrand || brand;
+
+        const brandCtx = buildBrandContext(brandToUse);
         const timeframeLabel = timeframe === 'quarterly' ? '3-month quarterly' : '1-month';
+        const dna = brandToUse?.dna || {};
+        const isD2C = /d2c|ecommerce|e-commerce|retail|fashion|beauty|fmcg|consumer|shopify/i.test(industry || dna.industry || '');
 
-        const systemPrompt = `You are a world-class Social Media Strategist with 15+ years experience managing brands across Instagram, LinkedIn, Facebook, Twitter/X, and YouTube.
+        console.log(`[STRATEGY] Collecting intelligence for ${platforms.join(', ')} — D2C: ${isD2C}`);
 
-BRAND CONTEXT:
+        // Parallel: collect live data + generate smart calendar
+        const [intel, calendar] = await Promise.all([
+            collectStrategyIntelligence(req.user._id, brandToUse, platforms),
+            generateSmartCalendar(dna.country, dna.targetMarkets, industry || dna.industry, timeframe),
+        ]);
+
+        const intelligenceContext = formatIntelligenceContext(intel, calendar);
+        console.log(`[STRATEGY] Intelligence collected: ${intel.connectedAccounts.length} accounts, ${intel.recentPlatformPosts.length} live posts, ${intel.postHistory.totalPublished} published, ${calendar?.events?.length || 0} events`);
+
+        const systemPrompt = `You are a world-class Social Media Strategist and CMO with 15+ years experience. You think like a growth strategist — every recommendation must be backed by the DATA provided below.
+
+═══════════════ BRAND CONTEXT ═══════════════
 ${brandCtx}
 
-Generate a comprehensive ${timeframeLabel} social media strategy for: ${platforms.join(', ')}
+═══════════════ LIVE DATA & ANALYTICS ═══════════════
+${intelligenceContext}
+
+═══════════════ YOUR MISSION ═══════════════
+Generate a comprehensive, DATA-DRIVEN ${timeframeLabel} social media strategy for: ${platforms.join(', ')}
 
 Goals: ${goals || 'Brand awareness and engagement growth'}
-Industry: ${industry || brand?.dna?.industry || 'General'}
-Current metrics: ${currentMetrics || 'Starting fresh / not provided'}
+Industry: ${industry || dna.industry || 'General'}
+Current metrics: ${currentMetrics || 'See live data above'}
+
+🚨 ANTI-HALLUCINATION RULES (MANDATORY — VIOLATION = FAILURE):
+- NEVER fabricate, guess, or invent follower counts, engagement rates, impressions, reach, or any numerical metric
+- If the LIVE DATA section says "NOT AVAILABLE" for any metric, you MUST say "Not available" or "Baseline to be measured" in your output — DO NOT make up a number
+- Only reference numbers that appear EXPLICITLY in the LIVE DATA section above
+- For growth projections: if current metrics are unknown, state "Current: To be measured" and give percentage-based targets instead of absolute numbers
+- For data insights: only cite patterns from ACTUAL post history data provided. If no posts exist, say "No historical data available — recommendations based on industry benchmarks"
+- Festival and event dates in the calendar section are VERIFIED — use them exactly as listed, do not change any date
+
+CRITICAL RULES FOR A DATA-DRIVEN STRATEGY:
+1. **Reference ONLY real data**: Cite specific posts, dates, and patterns from the data above. NEVER invent engagement numbers.
+2. **Calendar-driven content**: Tie content pillars and specific posts to upcoming events/festivals/moments from the VERIFIED calendar data above.
+3. **Build on history, don't repeat**: If previous strategies exist, evolve them — don't regenerate the same pillars.
+4. **Avoid scheduled conflicts**: If content is already scheduled, factor that into your calendar.
+5. **Posting frequency from data**: If we see actual posting data, reference it. If NOT available, recommend industry-standard frequency.
+6. **Platform-specific insights**: Use the live post data to identify patterns. If no data, recommend based on industry best practices and say so.
+${isD2C ? `7. **D2C INTELLIGENCE**: This is a D2C/retail brand. Factor in:
+   - Upcoming sale events and shopping festivals from the calendar
+   - Seasonal collection launches and refreshes
+   - Product-led content (lookbooks, new arrivals, restocks)
+   - FOMO-driven campaigns (limited editions, flash sales, early access)
+   - Customer loyalty and retention content
+   - UGC and review-driven social proof campaigns` : ''}
 
 YOUR OUTPUT MUST INCLUDE:
 
-1. **Content Pillars** (4-5 themed pillars with % content mix) — educate / entertain / inspire / sell / community
-2. **Platform-specific strategy** for EACH selected platform:
-   - Posting frequency (e.g., 5 reels/week, 3 carousel/week)
-   - Best posting times for the industry
-   - Content format mix (reels %, carousels %, stories %, static %, text %)
-   - Tone and style guide for that platform
-   - Hashtag strategy (branded + niche + trending mix) with 10-15 hashtags per platform
-   - Growth tactics specific to platform algorithm
-3. **Content format ratio** — overall mix of video:image:text:carousel
-4. **Engagement strategy** — community building tactics, reply strategy, DM approach
-5. **Growth projections** — realistic follower/reach/engagement targets with assumptions
-6. **Weekly content quota** — exact number of posts per platform per week
-7. **Tools & automation recommendations**
+1. **Data Insights** — What the current data tells us (top patterns, gaps, opportunities)
+2. **Content Pillars** (4-5 themed pillars with % content mix) — tied to brand DNA and data patterns
+3. **Platform-specific strategy** for EACH selected platform:
+   - Posting frequency (realistic, based on current cadence — incremental growth)
+   - Best posting times (based on industry + existing data patterns)
+   - Content format mix (tied to what's working from the data)
+   - Tone and style guide (aligned with brand voice DNA)
+   - Hashtag strategy (branded + niche + trending mix) with 10-15 hashtags
+   - Growth tactics specific to platform algorithm (2026 latest)
+4. **Calendar Hooks** — Specific upcoming events/festivals/moments to leverage with content ideas
+5. **Weekly content quota** — exact number of posts per platform per week
+6. **Engagement strategy** — community building, reply strategy, DM approach
+7. **Growth projections** — targets based on REAL current metrics, not wishful thinking
+${isD2C ? '8. **D2C Strategy** — Sale event calendar, collection drop timeline, seasonal campaign plan' : ''}
 
 Respond in STRICT JSON:
 {
-  "overview": "2-3 sentence executive summary",
+  "overview": "2-3 sentence executive summary referencing real data points",
+  "dataInsights": [
+    { "insight": "Your reels get 3x more engagement than static posts", "recommendation": "Shift to 60% reel content", "impact": "Expected 40% engagement lift", "icon": "📊" }
+  ],
   "contentPillars": [
-    { "name": "Pillar name", "percentage": 25, "description": "What this covers", "icon": "emoji", "examples": ["Post idea 1", "Post idea 2"] }
+    { "name": "Pillar name", "percentage": 25, "description": "What this covers — tied to data", "icon": "emoji", "examples": ["Post idea 1 tied to upcoming event", "Post idea 2"] }
   ],
   "platformStrategies": [
     {
       "platform": "instagram",
       "frequency": "5 reels + 3 carousels + daily stories per week",
+      "currentCadence": "Currently posting 2x/week",
       "bestTimes": ["9:00 AM", "12:30 PM", "7:00 PM"],
       "bestDays": ["Tuesday", "Thursday", "Saturday"],
       "formatMix": { "reels": 40, "carousels": 25, "stories": 20, "static": 10, "live": 5 },
-      "toneGuide": "How to write for this platform",
+      "toneGuide": "How to write for this platform — aligned with brand voice",
       "hashtags": { "branded": ["#BrandName"], "niche": ["#IndustryTag"], "trending": ["#Trending"] },
-      "growthTactics": ["Tactic 1", "Tactic 2", "Tactic 3"],
+      "growthTactics": ["Tactic 1 — specific to 2026 algorithm", "Tactic 2", "Tactic 3"],
       "doNot": ["Thing to avoid 1", "Thing to avoid 2"]
     }
+  ],
+  "calendarHooks": [
+    { "date": "2026-03-14", "event": "Holi", "contentIdea": "Behind-the-scenes festival celebration reel", "platforms": ["instagram", "facebook"], "type": "festival", "priority": "high" }
   ],
   "weeklyQuota": { "totalPosts": 15, "breakdown": { "instagram": 8, "linkedin": 4, "twitter": 3 } },
   "engagementStrategy": {
@@ -147,30 +532,43 @@ Respond in STRICT JSON:
     "ugcStrategy": "How to encourage user content"
   },
   "growthProjections": [
-    { "metric": "Instagram Followers", "current": "X", "target": "Y", "timeframe": "1 month", "assumption": "Based on..." }
+    { "metric": "Instagram Followers", "current": "from real data", "target": "realistic target", "timeframe": "1 month", "assumption": "Based on current growth rate + strategy improvements" }
   ],
   "contentCalendarTemplate": {
-    "monday": { "platform": "instagram", "type": "reel", "pillar": "educate" },
+    "monday": { "platform": "instagram", "type": "reel", "pillar": "educate", "hook": "Tie to upcoming event if applicable" },
     "tuesday": { "platform": "linkedin", "type": "text post", "pillar": "authority" }
   },
+  ${isD2C ? `"d2cStrategy": {
+    "saleCalendar": [{ "event": "Summer Sale", "timing": "May 15-25", "prepDays": 7, "contentPlan": "Teaser → Launch → Last chance" }],
+    "collectionDrops": ["Spring/Summer launch — early March", "Festive Collection — pre-Navratri"],
+    "loyaltyTactics": ["VIP early access", "UGC contests"],
+    "retentionContent": ["Re-order reminders", "Styling tips", "Customer spotlight"]
+  },` : ''}
   "toolsRecommended": ["Tool 1 — why", "Tool 2 — why"]
 }`;
 
-        const userPrompt = `Generate a ${timeframeLabel} social media strategy for ${platforms.join(', ')}.\nGoals: ${goals || 'Growth'}\nIndustry: ${industry || 'General'}\nCurrent metrics: ${currentMetrics || 'New account'}`;
+        const userPrompt = `Generate a ${timeframeLabel} social media strategy for ${platforms.join(', ')}.\nGoals: ${goals || 'Growth'}\nIndustry: ${industry || dna.industry || 'General'}\nCurrent metrics: ${currentMetrics || 'See live data in context above'}\nToday's date: ${new Date().toISOString().split('T')[0]}`;
 
-        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, maxTokens: 6000 });
+        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, maxTokens: 8000 });
         const strategy = parseJSON(result);
 
         // Save to DB
         const saved = await SocialStrategy.create({
             user: req.user._id,
-            brand: brand?._id || req.body.brandId,
+            brand: brandToUse?._id || req.body.brandId,
             type: 'strategy',
             title: `${platforms.join(' + ')} Strategy — ${timeframeLabel}`,
             platforms,
             timeframe: timeframe || 'monthly',
             data: strategy,
-            inputs: { platforms, timeframe, goals, industry, currentMetrics },
+            inputs: { platforms, timeframe, goals, industry, currentMetrics, dataSourcesUsed: {
+                connectedAccounts: intel.connectedAccounts.length,
+                livePosts: intel.recentPlatformPosts.length,
+                publishedPosts: intel.postHistory.totalPublished,
+                scheduledPosts: intel.postHistory.totalScheduled,
+                calendarEvents: calendar?.events?.length || 0,
+                previousStrategies: intel.previousStrategies.length,
+            }},
         });
 
         res.json({ success: true, strategy, strategyId: saved._id });

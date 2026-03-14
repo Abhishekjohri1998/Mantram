@@ -63,10 +63,17 @@ export default function PerformanceMarketing() {
     const [competitors, setCompetitors] = useState('')
     const [researchResult, setResearchResult] = useState(null)
     // Strategy state
-    const [strategyObjective, setStrategyObjective] = useState('traffic')
+    const [strategyGoals, setStrategyGoals] = useState(['traffic'])
     const [strategyBudget, setStrategyBudget] = useState('')
     const [strategyDuration, setStrategyDuration] = useState('30 days')
+    const [strategyTargetAudience, setStrategyTargetAudience] = useState('')
+    const [strategyTargetGeo, setStrategyTargetGeo] = useState('')
+    const [strategyCurrency, setStrategyCurrency] = useState('INR')
+    const [strategyCustomKeywords, setStrategyCustomKeywords] = useState('')
+    const [showStrategyPresentation, setShowStrategyPresentation] = useState(false)
     const [strategyResult, setStrategyResult] = useState(null)
+    // Strategy health
+    const [strategyHealth, setStrategyHealth] = useState(null)
     // Campaigns state
     const [campaigns, setCampaigns] = useState([])
     // Reports state
@@ -155,7 +162,16 @@ export default function PerformanceMarketing() {
         loadLearnings()
         loadConnections()
         loadGrokTrends()
+        loadStrategyHealth()
     }, [loadDashboard, loadCampaigns, loadReports, loadLearnings, loadConnections, loadGrokTrends])
+
+    // ── Load strategy health ──
+    const loadStrategyHealth = useCallback(async () => {
+        try {
+            const data = await api(`/pm-studio/strategy-health${activeBrand ? `?brandId=${activeBrand._id}` : ''}`)
+            if (data.health !== null && data.health !== undefined) setStrategyHealth(data)
+        } catch (e) { /* strategy health is optional */ }
+    }, [activeBrand])
 
     // ── Listen for OAuth popup messages ──
     useEffect(() => {
@@ -203,11 +219,16 @@ export default function PerformanceMarketing() {
                 method: 'POST',
                 body: JSON.stringify({
                     reportId: researchResult?._id,
-                    objective: strategyObjective,
+                    goals: strategyGoals,
+                    objective: strategyGoals[0] || 'traffic',
                     budget: Number(strategyBudget) || 50000,
+                    currency: strategyCurrency,
                     duration: strategyDuration,
                     platforms: ['meta', 'google'],
                     brandId: activeBrand?._id,
+                    targetAudience: strategyTargetAudience || undefined,
+                    targetGeo: strategyTargetGeo || undefined,
+                    customKeywords: strategyCustomKeywords ? strategyCustomKeywords.split(',').map(k => k.trim()).filter(Boolean) : undefined,
                 }),
             })
             setStrategyResult(data.report)
@@ -230,7 +251,7 @@ export default function PerformanceMarketing() {
                     budget: Number(strategyBudget) || 50000,
                     currency: 'INR',
                     duration: strategyDuration,
-                    objective: strategyObjective,
+                    objective: strategyGoals[0] || 'traffic',
                     brandId: activeBrand?._id,
                 }),
             })
@@ -250,7 +271,7 @@ export default function PerformanceMarketing() {
             const data = await api('/pm-studio/generate-creatives', {
                 method: 'POST',
                 body: JSON.stringify({
-                    objective: strategyObjective,
+                    objective: strategyGoals[0] || 'traffic',
                     platforms: ['meta', 'google'],
                     reportId: strategyResult?._id || researchResult?._id,
                     brandId: activeBrand?._id,
@@ -798,31 +819,112 @@ export default function PerformanceMarketing() {
                 {/* ════════════════════════════════════════════════════════════ */}
                 {tab === 'strategy' && (
                     <div className="space-y-6">
+                        {/* Strategy Health Banner */}
+                        {strategyHealth && strategyHealth.health !== null && (
+                            <div className={`glass-panel rounded-2xl p-5 border ${
+                                strategyHealth.alertLevel === 'excellent' ? 'border-emerald-500/30 bg-emerald-500/[0.04]' :
+                                strategyHealth.alertLevel === 'critical' ? 'border-rose-500/30 bg-rose-500/[0.04]' :
+                                strategyHealth.alertLevel === 'warning' ? 'border-amber-500/30 bg-amber-500/[0.04]' :
+                                'border-cyan-500/20'
+                            }`}>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black ${
+                                            strategyHealth.health >= 80 ? 'bg-emerald-500/15 text-emerald-400' :
+                                            strategyHealth.health >= 50 ? 'bg-amber-500/15 text-amber-400' :
+                                            'bg-rose-500/15 text-rose-400'
+                                        }`}>
+                                            {strategyHealth.health}
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                                Strategy Health
+                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                                                    strategyHealth.alertLevel === 'excellent' ? 'bg-emerald-500/15 text-emerald-400' :
+                                                    strategyHealth.alertLevel === 'healthy' ? 'bg-cyan-500/15 text-cyan-400' :
+                                                    strategyHealth.alertLevel === 'warning' ? 'bg-amber-500/15 text-amber-400' :
+                                                    'bg-rose-500/15 text-rose-400'
+                                                }`}>
+                                                    {strategyHealth.alertLevel?.toUpperCase()}
+                                                </span>
+                                            </h3>
+                                            <p className="text-xs text-slate-400">{strategyHealth.strategyTitle} • Running {strategyHealth.strategyAge} days • {strategyHealth.campaignsAnalyzed} campaigns</p>
+                                        </div>
+                                    </div>
+                                    {strategyHealth.message && (
+                                        <p className="text-xs text-slate-400 max-w-md text-right">{strategyHealth.message}</p>
+                                    )}
+                                </div>
+                                {/* KPI Results */}
+                                {strategyHealth.kpiResults?.length > 0 && (
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
+                                        {strategyHealth.kpiResults.map((kpi, i) => (
+                                            <div key={i} className={`p-2.5 rounded-xl text-center border ${
+                                                kpi.status === 'on-track' ? 'border-emerald-500/15 bg-emerald-500/[0.03]' :
+                                                kpi.status === 'warning' ? 'border-amber-500/15 bg-amber-500/[0.03]' :
+                                                'border-rose-500/15 bg-rose-500/[0.03]'
+                                            }`}>
+                                                <p className="text-[10px] text-slate-500 uppercase">{kpi.metric}</p>
+                                                <p className="text-sm font-bold text-white">{kpi.actual}</p>
+                                                <p className="text-[10px] text-slate-500">Target: {kpi.target}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         <div className="glass-panel rounded-2xl p-6 border border-cyan-500/20">
                             <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
                                 <span className="material-symbols-outlined text-cyan-400">strategy</span>
                                 AI Strategy Builder
                             </h2>
-                            <p className="text-sm text-slate-400 mb-6">Generate a data-driven performance marketing strategy</p>
+                            <p className="text-sm text-slate-400 mb-6">Generate a data-driven performance marketing strategy with Meta vs Google breakout</p>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                <div>
-                                    <label className="text-sm text-slate-300 font-medium mb-2 block">Campaign Objective</label>
-                                    <select
-                                        value={strategyObjective}
-                                        onChange={e => setStrategyObjective(e.target.value)}
-                                        className="w-full px-4 py-3 rounded-xl bg-black/30 border border-cyan-500/20 text-white text-sm outline-none focus:border-cyan-400/50 cursor-pointer"
-                                    >
-                                        <option value="awareness">Brand Awareness</option>
-                                        <option value="traffic">Website Traffic</option>
-                                        <option value="engagement">Engagement</option>
-                                        <option value="leads">Lead Generation</option>
-                                        <option value="conversions">Conversions</option>
-                                        <option value="sales">Sales / ROAS</option>
-                                    </select>
+                            {/* Multi-Goal Selection */}
+                            <div className="mb-5">
+                                <label className="text-sm text-slate-300 font-medium mb-2 block">Campaign Goals (select multiple)</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {[
+                                        { id: 'awareness', label: 'Brand Awareness', icon: 'visibility' },
+                                        { id: 'traffic', label: 'Website Traffic', icon: 'web' },
+                                        { id: 'engagement', label: 'Engagement', icon: 'thumb_up' },
+                                        { id: 'leads', label: 'Lead Generation', icon: 'contacts' },
+                                        { id: 'conversions', label: 'Conversions', icon: 'shopping_cart' },
+                                        { id: 'sales', label: 'Sales / ROAS', icon: 'payments' },
+                                        { id: 'app_installs', label: 'App Installs', icon: 'install_mobile' },
+                                    ].map(goal => {
+                                        const isSelected = strategyGoals.includes(goal.id)
+                                        return (
+                                            <button
+                                                key={goal.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    setStrategyGoals(prev =>
+                                                        isSelected
+                                                            ? prev.filter(g => g !== goal.id)
+                                                            : [...prev, goal.id]
+                                                    )
+                                                }}
+                                                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer border ${
+                                                    isSelected
+                                                        ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300'
+                                                        : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:border-white/[0.12] hover:text-slate-300'
+                                                }`}
+                                            >
+                                                <span className="material-symbols-outlined text-sm">{goal.icon}</span>
+                                                {goal.label}
+                                                {isSelected && <span className="material-symbols-outlined text-sm text-cyan-400">check_circle</span>}
+                                            </button>
+                                        )
+                                    })}
                                 </div>
+                                {strategyGoals.length === 0 && <p className="text-xs text-rose-400 mt-1">Select at least one goal</p>}
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-5">
                                 <div>
-                                    <label className="text-sm text-slate-300 font-medium mb-2 block">Total Budget (₹)</label>
+                                    <label className="text-sm text-slate-300 font-medium mb-2 block">Total Budget</label>
                                     <input
                                         type="number"
                                         value={strategyBudget}
@@ -830,6 +932,23 @@ export default function PerformanceMarketing() {
                                         placeholder="50000"
                                         className="w-full px-4 py-3 rounded-xl bg-black/30 border border-cyan-500/20 text-white placeholder-slate-600 text-sm outline-none focus:border-cyan-400/50"
                                     />
+                                </div>
+                                <div>
+                                    <label className="text-sm text-slate-300 font-medium mb-2 block">Currency</label>
+                                    <select
+                                        value={strategyCurrency}
+                                        onChange={e => setStrategyCurrency(e.target.value)}
+                                        className="w-full px-4 py-3 rounded-xl bg-black/30 border border-cyan-500/20 text-white text-sm outline-none focus:border-cyan-400/50 cursor-pointer"
+                                    >
+                                        <option value="INR">₹ INR (India)</option>
+                                        <option value="AED">د.إ AED (UAE)</option>
+                                        <option value="USD">$ USD (US)</option>
+                                        <option value="EUR">€ EUR (Europe)</option>
+                                        <option value="GBP">£ GBP (UK)</option>
+                                        <option value="SAR">﷼ SAR (Saudi)</option>
+                                        <option value="SGD">S$ SGD (Singapore)</option>
+                                        <option value="AUD">A$ AUD (Australia)</option>
+                                    </select>
                                 </div>
                                 <div>
                                     <label className="text-sm text-slate-300 font-medium mb-2 block">Duration</label>
@@ -845,18 +964,52 @@ export default function PerformanceMarketing() {
                                         <option value="90 days">90 Days</option>
                                     </select>
                                 </div>
+                                <div>
+                                    <label className="text-sm text-slate-300 font-medium mb-2 block">Target Location</label>
+                                    <input
+                                        value={strategyTargetGeo}
+                                        onChange={e => setStrategyTargetGeo(e.target.value)}
+                                        placeholder="e.g. Dubai, Abu Dhabi"
+                                        className="w-full px-4 py-3 rounded-xl bg-black/30 border border-cyan-500/20 text-white placeholder-slate-600 text-sm outline-none focus:border-cyan-400/50"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Custom Keywords */}
+                            <div className="mb-4">
+                                <label className="text-sm text-slate-300 font-medium mb-2 block flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-sm text-amber-400">key</span>
+                                    Keywords to Research (optional)
+                                </label>
+                                <input
+                                    value={strategyCustomKeywords}
+                                    onChange={e => setStrategyCustomKeywords(e.target.value)}
+                                    placeholder="e.g. bluetooth speakers, wireless earbuds, premium headphones, noise cancelling, audio equipment"
+                                    className="w-full px-4 py-3 rounded-xl bg-black/30 border border-amber-500/20 text-white placeholder-slate-600 text-sm outline-none focus:border-amber-400/50"
+                                />
+                                <p className="text-[10px] text-slate-500 mt-1">Comma-separated keywords you want included in the strategy. AI will also discover additional keywords.</p>
+                            </div>
+
+                            <div className="mb-6">
+                                <label className="text-sm text-slate-300 font-medium mb-2 block">Target Audience (optional)</label>
+                                <input
+                                    value={strategyTargetAudience}
+                                    onChange={e => setStrategyTargetAudience(e.target.value)}
+                                    placeholder="e.g. Men 25-35, tech enthusiasts, metro cities, HNI"
+                                    className="w-full px-4 py-3 rounded-xl bg-black/30 border border-cyan-500/20 text-white placeholder-slate-600 text-sm outline-none focus:border-cyan-400/50"
+                                />
                             </div>
 
                             <div className="flex gap-3">
                                 <button
                                     onClick={handleStrategy}
-                                    disabled={loading}
+                                    disabled={loading || strategyGoals.length === 0}
                                     className="flex-1 py-4 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold text-sm hover:shadow-xl hover:shadow-cyan-500/20 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
                                 >
                                     {loading ? (
-                                        <><span className="material-symbols-outlined animate-spin">progress_activity</span>AI is building strategy...</>
+                                        <><span className="material-symbols-outlined animate-spin">progress_activity</span>AI is building expert strategy...</>
                                     ) : (
-                                        <><span className="material-symbols-outlined">auto_awesome</span>Generate Strategy</>
+                                        <><span className="material-symbols-outlined">auto_awesome</span>Generate Expert Strategy</>
                                     )}
                                 </button>
                                 <button
@@ -873,20 +1026,189 @@ export default function PerformanceMarketing() {
                         {/* Strategy Results */}
                         {strategyResult?.strategyPlan && (
                             <div className="space-y-4">
-                                {/* Goals */}
+                                {/* Strategy Action Bar */}
+                                <div className="flex items-center justify-between">
+                                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-cyan-400">strategy</span>
+                                        Your Strategy Blueprint
+                                    </h2>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => {
+                                                const printWindow = window.open('', '_blank')
+                                                const sp = strategyResult.strategyPlan
+                                                const curr = strategyCurrency || 'INR'
+                                                const sym = { INR: '₹', AED: 'د.إ', USD: '$', EUR: '€', GBP: '£', SAR: '﷼', SGD: 'S$', AUD: 'A$' }[curr] || curr
+                                                
+                                                // Build keyword table rows
+                                                const kwRows = (sp.keywordStrategy?.keywordTable || []).map(kw =>
+                                                    `<tr><td>${kw.keyword}</td><td><span class="cat-badge">${kw.category || '-'}</span></td><td class="mono">${kw.cpc || 'N/A'}</td><td class="mono">${kw.volume || 'N/A'}</td><td>${kw.intent || '-'}</td><td>${kw.matchType || '-'}</td><td>${kw.geoRelevance || '-'}</td><td class="pri-${(kw.priority||'').toLowerCase()}">${kw.priority || '-'}</td></tr>`
+                                                ).join('')
+                                                
+                                                // Build competitor rows
+                                                const compRows = (sp.competitiveEdge?.competitorAnalysis || []).map(c =>
+                                                    `<div class="comp-card"><div><h4>${c.competitor}</h4><p>${c.whatTheyDo}</p></div><div class="weakness"><h5>Weakness</h5><p>${c.theirWeakness}</p></div><div class="advantage"><h5>Our Advantage</h5><p>${c.ourAdvantage}</p>${c.actionItem ? `<p class="action">→ ${c.actionItem}</p>` : ''}</div></div>`
+                                                ).join('')
+                                                
+                                                // Build location cards
+                                                const locCards = (sp.locationStrategy?.locationBreakdown || []).map(l =>
+                                                    `<div class="loc-card"><h4>${l.location} — ${l.budgetPercent}%</h4><p class="amount">${l.budgetAmount}</p>${l.cpcAdjustment ? `<p class="adj">${l.cpcAdjustment}</p>` : ''}<p class="rationale">${l.rationale}</p></div>`
+                                                ).join('')
+                                                
+                                                const html = `<!DOCTYPE html><html><head><title>Strategy - ${strategyResult.title || 'Performance Marketing'}</title>
+                                                <style>
+                                                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                                                    body { font-family: 'Segoe UI', system-ui, sans-serif; color: #1a1a2e; padding: 40px; line-height: 1.6; }
+                                                    h1 { font-size: 28px; margin-bottom: 5px; color: #0f0e17; }
+                                                    h2 { font-size: 20px; color: #0f0e17; margin: 30px 0 12px; padding-bottom: 6px; border-bottom: 2px solid #e0e0e0; }
+                                                    h3 { font-size: 16px; color: #333; margin: 18px 0 8px; }
+                                                    h4 { font-size: 14px; color: #444; margin: 0 0 4px; }
+                                                    h5 { font-size: 11px; text-transform: uppercase; color: #888; margin-bottom: 3px; }
+                                                    p { font-size: 13px; color: #555; }
+                                                    .subtitle { color: #777; font-size: 14px; margin-bottom: 30px; }
+                                                    .meta-bar { display: flex; gap: 20px; margin-bottom: 25px; padding: 12px 16px; background: #f5f5f5; border-radius: 8px; }
+                                                    .meta-bar span { font-size: 12px; color: #666; }
+                                                    .meta-bar strong { color: #222; }
+                                                    .goal-card { padding: 12px 16px; border-left: 3px solid #10b981; background: #f0fdf4; margin-bottom: 8px; border-radius: 0 6px 6px 0; }
+                                                    .goal-card .conf { float: right; font-weight: 800; }
+                                                    .goal-card .conf.high { color: #10b981; }
+                                                    .goal-card .conf.med { color: #f59e0b; }
+                                                    .goal-card .conf.low { color: #ef4444; }
+                                                    .goal-card .baseline { font-size: 11px; color: #888; }
+                                                    .goal-card .planb { font-size: 11px; color: #b45309; background: #fffbeb; padding: 4px 8px; margin-top: 6px; border-radius: 4px; }
+                                                    table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 10px 0 20px; }
+                                                    th { background: #f5f5f5; padding: 8px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #ddd; }
+                                                    td { padding: 6px 10px; border-bottom: 1px solid #eee; }
+                                                    td.mono { font-family: monospace; }
+                                                    .cat-badge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px; background: #e2e8f0; }
+                                                    .pri-critical { color: #ef4444; font-weight: 700; }
+                                                    .pri-high { color: #f59e0b; font-weight: 700; }
+                                                    .pri-medium { color: #06b6d4; }
+                                                    .pri-test { color: #94a3b8; }
+                                                    .comp-card { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; padding: 14px; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 10px; }
+                                                    .comp-card .weakness h5 { color: #ef4444; }
+                                                    .comp-card .advantage h5 { color: #10b981; }
+                                                    .comp-card .action { color: #06b6d4; font-size: 11px; margin-top: 4px; }
+                                                    .loc-card { display: inline-block; width: 30%; padding: 12px; border: 1px solid #e0e0e0; border-radius: 8px; margin: 0 1.5% 10px 0; vertical-align: top; }
+                                                    .loc-card .amount { font-family: monospace; color: #10b981; font-weight: 700; }
+                                                    .loc-card .adj { font-size: 11px; color: #f59e0b; }
+                                                    .loc-card .rationale { font-size: 11px; color: #888; }
+                                                    .audit-score { display: inline-flex; align-items: center; justify-content: center; width: 60px; height: 60px; border-radius: 12px; font-size: 22px; font-weight: 900; margin-right: 16px; }
+                                                    .audit-score.high { background: #d1fae5; color: #10b981; }
+                                                    .audit-score.med { background: #fef3c7; color: #f59e0b; }
+                                                    .audit-score.low { background: #fee2e2; color: #ef4444; }
+                                                    .platform-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+                                                    .platform-card { padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px; }
+                                                    .platform-card h3 { margin-top: 0; }
+                                                    .footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 11px; color: #aaa; text-align: center; }
+                                                    @media print { body { padding: 20px; } .no-print { display: none; } }
+                                                </style></head><body>
+                                                <div class="no-print" style="margin-bottom:20px"><button onclick="window.print()" style="padding:10px 24px;background:#0ea5e9;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">📥 Download as PDF</button></div>
+                                                <h1>${strategyResult.title || 'Performance Marketing Strategy'}</h1>
+                                                <p class="subtitle">Generated by Mantram AI • ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                                                <div class="meta-bar">
+                                                    <span>Budget: <strong>${sym}${strategyResult.strategyPlan.platformBreakout?.meta?.budgetAmount ? (Number(String(strategyResult.strategyPlan.platformBreakout.meta.budgetAmount).replace(/[^\d]/g,'')) + Number(String(strategyResult.strategyPlan.platformBreakout.google?.budgetAmount || '0').replace(/[^\d]/g,''))).toLocaleString() : (strategyBudget || '50,000')}</strong></span>
+                                                    <span>Currency: <strong>${curr}</strong></span>
+                                                    <span>Duration: <strong>${strategyDuration}</strong></span>
+                                                    <span>Location: <strong>${strategyTargetGeo || 'Not specified'}</strong></span>
+                                                </div>
+                                                
+                                                <h2>🎯 Campaign Goals</h2>
+                                                ${(sp.goals || []).map(g => {
+                                                    const goal = typeof g === 'string' ? { goal: g } : g
+                                                    const c = goal.confidenceScore || 5
+                                                    return `<div class="goal-card"><span class="conf ${c >= 7 ? 'high' : c >= 5 ? 'med' : 'low'}">${c}/10</span><strong>${goal.goal}</strong>${goal.currentBaseline || goal.target ? `<br/><span class="baseline">${goal.currentBaseline || ''} → ${goal.target || ''} (${goal.timeframe || ''})</span>` : ''}${goal.planB ? `<div class="planb">Plan B: ${goal.planB}</div>` : ''}</div>`
+                                                }).join('')}
+                                                
+                                                ${sp.platformBreakout ? `<h2>📊 Platform Breakout</h2><div class="platform-grid">${sp.platformBreakout.meta ? `<div class="platform-card"><h3>Meta (${sp.platformBreakout.meta.budgetPercent || 0}% — ${sp.platformBreakout.meta.budgetAmount || ''})</h3><p>${sp.platformBreakout.meta.rationale || ''}</p>` + (sp.platformBreakout.meta.campaigns || []).map(c => `<p>• <strong>${c.name}</strong>: ${c.objective} — ${c.dailyBudget}/day</p>`).join('') + '</div>' : ''}${sp.platformBreakout.google ? `<div class="platform-card"><h3>Google (${sp.platformBreakout.google.budgetPercent || 0}% — ${sp.platformBreakout.google.budgetAmount || ''})</h3><p>${sp.platformBreakout.google.rationale || ''}</p>` + (sp.platformBreakout.google.campaigns || []).map(c => `<p>• <strong>${c.name}</strong>: ${c.objective} — ${c.dailyBudget}/day</p>`).join('') + '</div>' : ''}</div>` : ''}
+                                                
+                                                ${kwRows ? `<h2>🔑 Keyword Strategy (${(sp.keywordStrategy?.keywordTable || []).length} keywords)</h2><table><thead><tr><th>Keyword</th><th>Category</th><th>CPC</th><th>Volume</th><th>Intent</th><th>Match</th><th>Geo</th><th>Priority</th></tr></thead><tbody>${kwRows}</tbody></table>` : ''}
+                                                
+                                                ${compRows ? `<h2>⚔️ Competitive Edge</h2>${compRows}` : ''}
+                                                
+                                                ${locCards ? `<h2>📍 Location Strategy</h2>${locCards}` : ''}
+                                                
+                                                ${sp.achievabilityAudit ? `<h2>✅ Achievability Audit</h2><div style="display:flex;align-items:center;margin-bottom:16px"><div class="audit-score ${sp.achievabilityAudit.overallScore >= 7 ? 'high' : sp.achievabilityAudit.overallScore >= 5 ? 'med' : 'low'}">${sp.achievabilityAudit.overallScore}/10</div><div><strong>Implementation Confidence</strong><br/><span style="font-size:12px;color:#666">${sp.achievabilityAudit.overallAssessment || ''}</span></div></div>` : ''}
+                                                
+                                                <div class="footer">Generated by Mantram AI — Performance Marketing Studio</div>
+                                                </body></html>`
+                                                printWindow.document.write(html)
+                                                printWindow.document.close()
+                                            }}
+                                            className="px-4 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-slate-300 text-xs font-medium hover:bg-white/[0.1] transition-all flex items-center gap-1.5 cursor-pointer"
+                                        >
+                                            <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
+                                            Download PDF
+                                        </button>
+                                        <button
+                                            onClick={() => setShowStrategyPresentation(true)}
+                                            className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600/80 to-indigo-600/80 text-white text-xs font-medium hover:shadow-lg hover:shadow-violet-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                                        >
+                                            <span className="material-symbols-outlined text-sm">slideshow</span>
+                                            Present Strategy
+                                        </button>
+                                    </div>
+                                </div>
+                                {/* Goals with Confidence Scores */}
                                 {strategyResult.strategyPlan.goals?.length > 0 && (
                                     <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
                                         <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
                                             <span className="material-symbols-outlined text-emerald-400">flag</span>
                                             Campaign Goals
                                         </h3>
-                                        <div className="space-y-2">
-                                            {strategyResult.strategyPlan.goals.map((g, i) => (
-                                                <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
-                                                    <span className="text-emerald-400 font-bold text-sm mt-0.5">{i + 1}</span>
-                                                    <p className="text-sm text-slate-300">{typeof g === 'string' ? g : g.goal || JSON.stringify(g)}</p>
-                                                </div>
-                                            ))}
+                                        <div className="space-y-3">
+                                            {strategyResult.strategyPlan.goals.map((g, i) => {
+                                                const goal = typeof g === 'string' ? { goal: g } : g
+                                                const conf = goal.confidenceScore || 5
+                                                return (
+                                                    <div key={i} className="p-4 rounded-xl bg-emerald-500/[0.03] border border-emerald-500/10">
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div className="flex-1">
+                                                                <div className="flex items-center gap-2 mb-1">
+                                                                    <span className="text-emerald-400 font-bold text-sm">{i + 1}</span>
+                                                                    <p className="text-sm font-medium text-white">{goal.goal}</p>
+                                                                </div>
+                                                                {(goal.currentBaseline || goal.target) && (
+                                                                    <p className="text-xs text-slate-400 ml-6">
+                                                                        {goal.currentBaseline && <span>Baseline: {goal.currentBaseline}</span>}
+                                                                        {goal.target && <span> → Target: <span className="text-emerald-300 font-medium">{goal.target}</span></span>}
+                                                                        {goal.timeframe && <span className="text-slate-500"> ({goal.timeframe})</span>}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                            {/* Confidence Score */}
+                                                            <div className="text-center min-w-[50px]">
+                                                                <div className={`text-lg font-black ${
+                                                                    conf >= 7 ? 'text-emerald-400' : conf >= 5 ? 'text-amber-400' : 'text-rose-400'
+                                                                }`}>{conf}/10</div>
+                                                                <p className="text-[9px] text-slate-500 uppercase">Confidence</p>
+                                                            </div>
+                                                        </div>
+                                                        {/* Confidence Bar */}
+                                                        <div className="mt-2 ml-6">
+                                                            <div className="w-full h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                                                                <div className={`h-full rounded-full transition-all ${
+                                                                    conf >= 7 ? 'bg-emerald-500' : conf >= 5 ? 'bg-amber-500' : 'bg-rose-500'
+                                                                }`} style={{ width: `${conf * 10}%` }} />
+                                                            </div>
+                                                        </div>
+                                                        {goal.confidenceReason && <p className="text-[11px] text-slate-500 mt-1.5 ml-6">{goal.confidenceReason}</p>}
+                                                        {goal.riskFactors?.length > 0 && (
+                                                            <div className="mt-2 ml-6 flex flex-wrap gap-1.5">
+                                                                {goal.riskFactors.map((r, j) => (
+                                                                    <span key={j} className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/15">⚠ {r}</span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        {goal.planB && (
+                                                            <div className="mt-2 ml-6 p-2 rounded-lg bg-amber-500/5 border border-amber-500/10">
+                                                                <p className="text-[10px] text-amber-500 uppercase font-medium">Plan B</p>
+                                                                <p className="text-xs text-slate-400">{goal.planB}</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )
+                                            })}
                                         </div>
                                     </div>
                                 )}
@@ -913,6 +1235,446 @@ export default function PerformanceMarketing() {
                                                     </div>
                                                 </div>
                                             ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* ═══ PLATFORM BREAKOUT: Meta vs Google ═══ */}
+                                {strategyResult.strategyPlan.platformBreakout && (strategyResult.strategyPlan.platformBreakout.meta || strategyResult.strategyPlan.platformBreakout.google) && (
+                                    <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
+                                        <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-orange-400">compare</span>
+                                            Platform Spend Breakout — Meta vs Google
+                                        </h3>
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                            {/* Meta Card */}
+                                            {strategyResult.strategyPlan.platformBreakout.meta && (() => {
+                                                const meta = strategyResult.strategyPlan.platformBreakout.meta
+                                                return (
+                                                    <div className="rounded-xl border border-blue-500/20 bg-blue-500/[0.04] p-5">
+                                                        <div className="flex items-center gap-2 mb-3">
+                                                            <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                                                                <span className="material-symbols-outlined text-blue-400 text-lg">campaign</span>
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="text-sm font-bold text-white">Meta Ads</h4>
+                                                                <p className="text-xs text-blue-400">{meta.budgetPercent}% of budget • {meta.budgetAmount || ''}</p>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Expected Metrics */}
+                                                        {meta.expectedMetrics && (
+                                                            <div className="grid grid-cols-2 gap-2 mb-3">
+                                                                {Object.entries(meta.expectedMetrics).map(([key, val]) => (
+                                                                    <div key={key} className="p-2 rounded-lg bg-black/20 text-center">
+                                                                        <p className="text-[10px] text-slate-500 uppercase">{key}</p>
+                                                                        <p className="text-sm font-bold text-white">{typeof val === 'object' ? JSON.stringify(val) : val}</p>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Projections */}
+                                                        {meta.projections && Object.keys(meta.projections).length > 0 && (
+                                                            <div className="mb-3">
+                                                                <p className="text-xs text-slate-400 font-medium mb-1.5">📊 Projections (math-backed)</p>
+                                                                <div className="grid grid-cols-2 gap-1.5">
+                                                                    {Object.entries(meta.projections).map(([key, val]) => (
+                                                                        <div key={key} className="flex justify-between text-xs p-1.5 rounded bg-black/10">
+                                                                            <span className="text-slate-500">{key}</span>
+                                                                            <span className="text-blue-300 font-medium">{typeof val === 'object' ? JSON.stringify(val) : val}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Campaigns */}
+                                                        {meta.campaigns?.length > 0 && (
+                                                            <div className="mb-3">
+                                                                <p className="text-xs text-slate-400 font-medium mb-1.5">📋 Campaigns</p>
+                                                                {meta.campaigns.map((c, i) => (
+                                                                    <div key={i} className="flex justify-between text-xs py-1.5 border-b border-white/[0.04] last:border-0">
+                                                                        <span className="text-white font-medium">{c.name}</span>
+                                                                        <span className="text-slate-400">{c.dailyBudget || c.format || ''}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Creative Formats */}
+                                                        {meta.creativeFormats?.length > 0 && (
+                                                            <div className="flex flex-wrap gap-1.5 mb-2">
+                                                                {meta.creativeFormats.map((f, i) => (
+                                                                    <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20">{f}</span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+
+                                                        {meta.rationale && <p className="text-xs text-slate-500 italic">{meta.rationale}</p>}
+                                                    </div>
+                                                )
+                                            })()}
+
+                                            {/* Google Card */}
+                                            {strategyResult.strategyPlan.platformBreakout.google && (() => {
+                                                const google = strategyResult.strategyPlan.platformBreakout.google
+                                                return (
+                                                    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-5">
+                                                        <div className="flex items-center gap-2 mb-3">
+                                                            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                                                                <span className="material-symbols-outlined text-emerald-400 text-lg">search</span>
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="text-sm font-bold text-white">Google Ads</h4>
+                                                                <p className="text-xs text-emerald-400">{google.budgetPercent}% of budget • {google.budgetAmount || ''}</p>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Expected Metrics */}
+                                                        {google.expectedMetrics && (
+                                                            <div className="grid grid-cols-2 gap-2 mb-3">
+                                                                {Object.entries(google.expectedMetrics).map(([key, val]) => (
+                                                                    <div key={key} className="p-2 rounded-lg bg-black/20 text-center">
+                                                                        <p className="text-[10px] text-slate-500 uppercase">{key}</p>
+                                                                        <p className="text-sm font-bold text-white">{typeof val === 'object' ? JSON.stringify(val) : val}</p>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Projections */}
+                                                        {google.projections && Object.keys(google.projections).length > 0 && (
+                                                            <div className="mb-3">
+                                                                <p className="text-xs text-slate-400 font-medium mb-1.5">📊 Projections (math-backed)</p>
+                                                                <div className="grid grid-cols-2 gap-1.5">
+                                                                    {Object.entries(google.projections).map(([key, val]) => (
+                                                                        <div key={key} className="flex justify-between text-xs p-1.5 rounded bg-black/10">
+                                                                            <span className="text-slate-500">{key}</span>
+                                                                            <span className="text-emerald-300 font-medium">{typeof val === 'object' ? JSON.stringify(val) : val}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Campaigns */}
+                                                        {google.campaigns?.length > 0 && (
+                                                            <div className="mb-3">
+                                                                <p className="text-xs text-slate-400 font-medium mb-1.5">📋 Campaigns</p>
+                                                                {google.campaigns.map((c, i) => (
+                                                                    <div key={i} className="flex justify-between text-xs py-1.5 border-b border-white/[0.04] last:border-0">
+                                                                        <span className="text-white font-medium">{c.name}</span>
+                                                                        <span className="text-slate-400">{c.dailyBudget || c.campaignType || ''}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Keyword Plan */}
+                                                        {google.keywordPlan?.length > 0 && (
+                                                            <div className="mb-3">
+                                                                <p className="text-xs text-slate-400 font-medium mb-1.5">🔑 Keyword Plan</p>
+                                                                <div className="space-y-1">
+                                                                    {google.keywordPlan.slice(0, 6).map((kw, i) => (
+                                                                        <div key={i} className="flex items-center justify-between text-xs py-1.5 border-b border-white/[0.04] last:border-0">
+                                                                            <span className="text-white font-medium flex-1 truncate">{kw.keyword}</span>
+                                                                            <span className="text-emerald-300 ml-2">CPC: {kw.estimatedCpc || kw.cpc || 'N/A'}</span>
+                                                                            <span className="text-slate-400 ml-2">{kw.monthlyVolume || kw.volume || ''}/mo</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {google.biddingStrategy && (
+                                                            <div className="p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/10 mb-2">
+                                                                <p className="text-[10px] text-slate-500 uppercase mb-0.5">Bidding Strategy</p>
+                                                                <p className="text-xs text-emerald-300">{google.biddingStrategy}</p>
+                                                            </div>
+                                                        )}
+
+                                                        {google.rationale && <p className="text-xs text-slate-500 italic">{google.rationale}</p>}
+                                                    </div>
+                                                )
+                                            })()}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* ═══ KEYWORD STRATEGY (Detailed Table) ═══ */}
+                                {strategyResult.strategyPlan.keywordStrategy && (
+                                    <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
+                                        <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-amber-400">key</span>
+                                            Keyword Strategy
+                                        </h3>
+
+                                        {/* Keyword Table */}
+                                        {strategyResult.strategyPlan.keywordStrategy.keywordTable?.length > 0 && (
+                                            <div className="overflow-x-auto mb-4">
+                                                <table className="w-full text-xs">
+                                                    <thead>
+                                                        <tr className="border-b border-white/[0.08]">
+                                                            <th className="text-left py-2 pr-3 text-slate-400 font-medium">Keyword</th>
+                                                            <th className="text-left py-2 px-2 text-slate-400 font-medium">Category</th>
+                                                            <th className="text-right py-2 px-2 text-slate-400 font-medium">CPC</th>
+                                                            <th className="text-right py-2 px-2 text-slate-400 font-medium">Volume</th>
+                                                            <th className="text-center py-2 px-2 text-slate-400 font-medium">Intent</th>
+                                                            <th className="text-center py-2 px-2 text-slate-400 font-medium">Match</th>
+                                                            <th className="text-left py-2 px-2 text-slate-400 font-medium">Geo</th>
+                                                            <th className="text-center py-2 pl-2 text-slate-400 font-medium">Priority</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {strategyResult.strategyPlan.keywordStrategy.keywordTable.map((kw, i) => {
+                                                            const catColor = {
+                                                                'Branded': 'bg-violet-500/15 text-violet-400',
+                                                                'Generic-High Intent': 'bg-cyan-500/15 text-cyan-400',
+                                                                'Long-tail': 'bg-teal-500/15 text-teal-400',
+                                                                'Competitor': 'bg-rose-500/15 text-rose-400',
+                                                                'Vernacular': 'bg-amber-500/15 text-amber-400',
+                                                            }[kw.category] || 'bg-white/[0.06] text-slate-400'
+                                                            const priColor = {
+                                                                'Critical': 'text-rose-400',
+                                                                'High': 'text-amber-400',
+                                                                'Medium': 'text-cyan-400',
+                                                                'Test': 'text-slate-500',
+                                                            }[kw.priority] || 'text-slate-400'
+                                                            return (
+                                                                <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
+                                                                    <td className="py-2 pr-3 text-white font-medium">{kw.keyword}</td>
+                                                                    <td className="py-2 px-2"><span className={`px-1.5 py-0.5 rounded-full text-[10px] ${catColor}`}>{kw.category}</span></td>
+                                                                    <td className="py-2 px-2 text-right text-emerald-300 font-mono">{kw.cpc || 'N/A'}</td>
+                                                                    <td className="py-2 px-2 text-right text-slate-300 font-mono">{kw.volume || 'N/A'}</td>
+                                                                    <td className="py-2 px-2 text-center"><span className="text-[10px] text-slate-400">{kw.intent || '-'}</span></td>
+                                                                    <td className="py-2 px-2 text-center"><span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.04] text-slate-300">{kw.matchType || '-'}</span></td>
+                                                                    <td className="py-2 px-2 text-slate-400 text-[10px]">{kw.geoRelevance || '-'}</td>
+                                                                    <td className={`py-2 pl-2 text-center font-medium ${priColor}`}>{kw.priority || '-'}</td>
+                                                                </tr>
+                                                            )
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+
+                                        {/* Category Breakdown */}
+                                        {strategyResult.strategyPlan.keywordStrategy.categoryBreakdown && (
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+                                                {Object.entries(strategyResult.strategyPlan.keywordStrategy.categoryBreakdown).map(([cat, data]) => (
+                                                    <div key={cat} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                                                        <p className="text-[10px] text-slate-500 uppercase mb-1">{cat.replace(/([A-Z])/g, ' $1')}</p>
+                                                        <p className="text-sm font-bold text-white">{typeof data === 'object' ? data.totalBudget || data.count : data}</p>
+                                                        {data.expectedClicks && <p className="text-[10px] text-slate-400">{data.expectedClicks} expected clicks</p>}
+                                                        {data.strategy && <p className="text-[10px] text-cyan-400/60 mt-1">{data.strategy}</p>}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Legacy: mustTarget/avoid fallback */}
+                                        {!strategyResult.strategyPlan.keywordStrategy.keywordTable && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {strategyResult.strategyPlan.keywordStrategy.mustTarget?.length > 0 && (
+                                                    <div>
+                                                        <p className="text-xs font-medium text-emerald-400 mb-2">Must Target</p>
+                                                        <div className="space-y-1.5">
+                                                            {strategyResult.strategyPlan.keywordStrategy.mustTarget.map((kw, i) => (
+                                                                <div key={i} className="p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
+                                                                    <div className="flex justify-between">
+                                                                        <span className="text-xs text-white font-medium">{kw.keyword}</span>
+                                                                        <span className="text-xs text-emerald-300">CPC: {kw.cpc || 'N/A'}</span>
+                                                                    </div>
+                                                                    {kw.reason && <p className="text-[10px] text-slate-500 mt-0.5">{kw.reason}</p>}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {strategyResult.strategyPlan.keywordStrategy.avoid?.length > 0 && (
+                                                    <div>
+                                                        <p className="text-xs font-medium text-rose-400 mb-2">Avoid</p>
+                                                        <div className="space-y-1.5">
+                                                            {strategyResult.strategyPlan.keywordStrategy.avoid.map((kw, i) => (
+                                                                <div key={i} className="p-2 rounded-lg bg-rose-500/5 border border-rose-500/10">
+                                                                    <span className="text-xs text-white font-medium">{kw.keyword}</span>
+                                                                    {kw.reason && <p className="text-[10px] text-slate-500 mt-0.5">{kw.reason}</p>}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Negative Keywords */}
+                                        {strategyResult.strategyPlan.keywordStrategy.negativeKeywords?.length > 0 && (
+                                            <div className="mt-3">
+                                                <p className="text-xs font-medium text-slate-400 mb-1.5">Negative Keywords</p>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {strategyResult.strategyPlan.keywordStrategy.negativeKeywords.map((kw, i) => (
+                                                        <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-slate-400 border border-white/[0.06]">-{kw}</span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {(strategyResult.strategyPlan.keywordStrategy.matchTypes || strategyResult.strategyPlan.keywordStrategy.matchTypeStrategy) && (
+                                            <p className="text-xs text-slate-500 mt-3 italic">{strategyResult.strategyPlan.keywordStrategy.matchTypeStrategy || strategyResult.strategyPlan.keywordStrategy.matchTypes}</p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* ═══ COMPETITIVE EDGE ═══ */}
+                                {strategyResult.strategyPlan.competitiveEdge && (
+                                    <div className="glass-panel rounded-2xl p-6 border border-rose-500/15">
+                                        <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-rose-400">swords</span>
+                                            Competitive Edge Analysis
+                                        </h3>
+                                        {/* Competitor Cards */}
+                                        {strategyResult.strategyPlan.competitiveEdge.competitorAnalysis?.length > 0 && (
+                                            <div className="space-y-3 mb-4">
+                                                {strategyResult.strategyPlan.competitiveEdge.competitorAnalysis.map((comp, i) => (
+                                                    <div key={i} className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                                                        <div>
+                                                            <p className="text-[10px] text-slate-500 uppercase mb-1">🏢 {comp.competitor}</p>
+                                                            <p className="text-xs text-slate-300">{comp.whatTheyDo}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[10px] text-rose-400 uppercase mb-1">Their Weakness</p>
+                                                            <p className="text-xs text-slate-300">{comp.theirWeakness}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[10px] text-emerald-400 uppercase mb-1">Our Advantage</p>
+                                                            <p className="text-xs text-white font-medium">{comp.ourAdvantage}</p>
+                                                            {comp.actionItem && <p className="text-[10px] text-cyan-400 mt-1">→ {comp.actionItem}</p>}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {/* Market Gaps & Differentiators */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {strategyResult.strategyPlan.competitiveEdge.uniqueAngles?.length > 0 && (
+                                                <div className="p-3 rounded-xl bg-white/[0.02]">
+                                                    <p className="text-[10px] text-violet-400 uppercase mb-1.5">Unique Angles</p>
+                                                    {strategyResult.strategyPlan.competitiveEdge.uniqueAngles.map((a, i) => (
+                                                        <p key={i} className="text-xs text-slate-300 mb-1">• {a}</p>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {strategyResult.strategyPlan.competitiveEdge.marketGaps?.length > 0 && (
+                                                <div className="p-3 rounded-xl bg-white/[0.02]">
+                                                    <p className="text-[10px] text-amber-400 uppercase mb-1.5">Market Gaps</p>
+                                                    {strategyResult.strategyPlan.competitiveEdge.marketGaps.map((g, i) => (
+                                                        <p key={i} className="text-xs text-slate-300 mb-1">• {g}</p>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* ═══ LOCATION STRATEGY ═══ */}
+                                {strategyResult.strategyPlan.locationStrategy && (
+                                    <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
+                                        <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-teal-400">location_on</span>
+                                            Location Strategy
+                                        </h3>
+                                        {strategyResult.strategyPlan.locationStrategy.locationBreakdown?.length > 0 && (
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                                                {strategyResult.strategyPlan.locationStrategy.locationBreakdown.map((loc, i) => (
+                                                    <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-teal-500/10">
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <span className="text-sm font-bold text-white">{loc.location}</span>
+                                                            <span className="text-sm font-bold text-teal-400">{loc.budgetPercent}%</span>
+                                                        </div>
+                                                        <p className="text-xs text-emerald-300 font-mono mb-1">{loc.budgetAmount}</p>
+                                                        {loc.cpcAdjustment && <p className="text-[10px] text-amber-400 mb-1">{loc.cpcAdjustment}</p>}
+                                                        <p className="text-[10px] text-slate-500">{loc.rationale}</p>
+                                                        {loc.keywordsForLocation?.length > 0 && (
+                                                            <div className="flex flex-wrap gap-1 mt-2">
+                                                                {loc.keywordsForLocation.map((kw, j) => (
+                                                                    <span key={j} className="text-[9px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400">{kw}</span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {strategyResult.strategyPlan.locationStrategy.geoTargetingStrategy && (
+                                            <p className="text-xs text-slate-400 italic">{strategyResult.strategyPlan.locationStrategy.geoTargetingStrategy}</p>
+                                        )}
+                                        {strategyResult.strategyPlan.locationStrategy.exclusions?.length > 0 && (
+                                            <div className="mt-2 flex flex-wrap gap-1.5">
+                                                <span className="text-[10px] text-rose-400 mr-1">Exclude:</span>
+                                                {strategyResult.strategyPlan.locationStrategy.exclusions.map((e, i) => (
+                                                    <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400">{e}</span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* ═══ ACHIEVABILITY AUDIT ═══ */}
+                                {strategyResult.strategyPlan.achievabilityAudit && (
+                                    <div className="glass-panel rounded-2xl p-6 border border-violet-500/15">
+                                        <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-violet-400">verified</span>
+                                            Achievability Audit
+                                        </h3>
+                                        {/* Overall Score */}
+                                        <div className="flex items-center gap-4 mb-4">
+                                            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-black ${
+                                                strategyResult.strategyPlan.achievabilityAudit.overallScore >= 7 ? 'bg-emerald-500/15 text-emerald-400' :
+                                                strategyResult.strategyPlan.achievabilityAudit.overallScore >= 5 ? 'bg-amber-500/15 text-amber-400' :
+                                                'bg-rose-500/15 text-rose-400'
+                                            }`}>
+                                                {strategyResult.strategyPlan.achievabilityAudit.overallScore}/10
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="text-sm font-medium text-white">Implementation Confidence</p>
+                                                <p className="text-xs text-slate-400">{strategyResult.strategyPlan.achievabilityAudit.overallAssessment}</p>
+                                            </div>
+                                        </div>
+                                        {/* Per-Goal Confidence */}
+                                        {strategyResult.strategyPlan.achievabilityAudit.perGoalConfidence?.length > 0 && (
+                                            <div className="space-y-2 mb-4">
+                                                {strategyResult.strategyPlan.achievabilityAudit.perGoalConfidence.map((pgc, i) => (
+                                                    <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-white/[0.02]">
+                                                        <div className={`text-sm font-bold min-w-[35px] text-center ${
+                                                            pgc.score >= 7 ? 'text-emerald-400' : pgc.score >= 5 ? 'text-amber-400' : 'text-rose-400'
+                                                        }`}>{pgc.score}/10</div>
+                                                        <div className="flex-1">
+                                                            <p className="text-xs text-white">{pgc.goal}</p>
+                                                            <p className="text-[10px] text-slate-500">{pgc.reasoning}</p>
+                                                        </div>
+                                                        {pgc.risk && <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 whitespace-nowrap">⚠ {pgc.risk}</span>}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {/* Assumptions & Prerequisites */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {strategyResult.strategyPlan.achievabilityAudit.assumptions?.length > 0 && (
+                                                <div className="p-3 rounded-xl bg-white/[0.02]">
+                                                    <p className="text-[10px] text-amber-400 uppercase mb-1.5">Key Assumptions</p>
+                                                    {strategyResult.strategyPlan.achievabilityAudit.assumptions.map((a, i) => (
+                                                        <p key={i} className="text-xs text-slate-300 mb-1">• {a}</p>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {strategyResult.strategyPlan.achievabilityAudit.prerequisites?.length > 0 && (
+                                                <div className="p-3 rounded-xl bg-white/[0.02]">
+                                                    <p className="text-[10px] text-violet-400 uppercase mb-1.5">Prerequisites</p>
+                                                    {strategyResult.strategyPlan.achievabilityAudit.prerequisites.map((p, i) => (
+                                                        <p key={i} className="text-xs text-slate-300 mb-1">• {p}</p>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}

@@ -182,7 +182,10 @@ router.get('/reports/:id', protect, async (req, res) => {
  */
 router.post('/strategy', protect, async (req, res) => {
     try {
-        const { reportId, query, objective, budget, duration, platforms, brandId } = req.body;
+        const { reportId, query, objective, goals, budget, currency, duration, platforms, brandId, targetAudience, targetGeo, customKeywords } = req.body;
+
+        // Support both single objective (backward compat) and multi-goals
+        const campaignGoals = Array.isArray(goals) && goals.length > 0 ? goals : (objective ? [objective] : ['traffic']);
 
         let report;
         if (reportId) {
@@ -192,7 +195,7 @@ router.post('/strategy', protect, async (req, res) => {
             report = await AdReport.create({
                 user: req.user._id,
                 brand: brandId || req.user.activeBrand,
-                title: `Strategy: ${objective || 'Performance Marketing'}`,
+                title: `Strategy: ${campaignGoals.join(' + ') || 'Performance Marketing'}`,
                 type: 'strategy',
                 status: 'analyzing',
                 input: { query, platforms: platforms || ['meta', 'google'] },
@@ -200,8 +203,9 @@ router.post('/strategy', protect, async (req, res) => {
         }
 
         const state = await runStep(report._id, 'strategy', strategyNode, {
-            input: { query, objective, budget, duration, platforms },
+            input: { query, objective, goals: campaignGoals, budget, currency: currency || 'INR', duration, platforms, targetAudience, targetGeo, customKeywords: Array.isArray(customKeywords) ? customKeywords : [] },
             brandId: report.brand || req.user.activeBrand,
+            userId: req.user._id,
             researchData: report.researchData || {},
             aiAnalysis: report.aiAnalysis || {},
         });
@@ -910,6 +914,23 @@ router.post('/optimize', protect, async (req, res) => {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
+
+/**
+ * GET /api/pm-studio/strategy-health
+ * Check if current strategy KPIs are being met by actual campaigns
+ */
+router.get('/strategy-health', protect, async (req, res) => {
+    try {
+        const brandId = req.query.brandId || req.user.activeBrand;
+        const { checkStrategyHealth } = await import('../agents/performanceMarketing/autoOptimizer.js');
+        const result = await checkStrategyHealth(req.user._id, brandId);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Strategy health error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 
 /**
  * GET /api/pm-studio/optimization-log

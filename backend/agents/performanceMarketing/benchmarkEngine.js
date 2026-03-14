@@ -20,7 +20,7 @@ import { getRouter } from '../../ai/router.js';
 // INDUSTRY BENCHMARK DATA (2024-2025 Averages)
 // ══════════════════════════════════════════════════════════════════════════════
 
-const INDUSTRY_BENCHMARKS = {
+export const INDUSTRY_BENCHMARKS = {
     'ecommerce': {
         meta: { ctr: 1.20, cpc: 8.50, cpm: 75, roas: 2.5, conversionRate: 1.8 },
         google: { ctr: 2.80, cpc: 12.0, cpm: 45, roas: 3.2, conversionRate: 2.4 },
@@ -219,7 +219,7 @@ STRATEGIC RULE: Every item MUST reference specific numbers from the data. If an 
 // HELPERS
 // ══════════════════════════════════════════════════════════════════════════════
 
-function detectIndustry(brand) {
+export function detectIndustry(brand) {
     const industry = (brand?.dna?.industry || brand?.industry || '').toLowerCase();
     const map = {
         'fashion': 'fashion', 'apparel': 'fashion', 'clothing': 'fashion',

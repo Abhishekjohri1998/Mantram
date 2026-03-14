@@ -336,3 +336,182 @@ Return STRICT JSON:
         };
     }
 }
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// STRATEGY HEALTH MONITOR — Compare actuals vs strategy KPI targets
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Check if a strategy's KPI targets are being met.
+ * Returns a health score (0-100) and flags underperformance.
+ *
+ * Flow:
+ * 1. Load the latest strategy's KPI targets from AdReport
+ * 2. Load actual campaign performance from AdCampaign
+ * 3. Compare actuals vs targets → generate health score
+ * 4. If health < 60 → trigger alert, if < 40 → suggest strategy revision
+ */
+export async function checkStrategyHealth(userId, brandId) {
+    const AdReport = (await import('../../models/AdReport.js')).default;
+
+    // 1. Find the latest strategy report
+    const latestStrategy = await AdReport.findOne({
+        user: userId,
+        brand: brandId,
+        type: 'strategy',
+        status: { $in: ['strategy', 'complete'] },
+    }).sort({ createdAt: -1 }).lean();
+
+    if (!latestStrategy?.strategyPlan?.kpis?.length) {
+        return { health: null, message: 'No strategy with KPI targets found.' };
+    }
+
+    const strategyAge = Math.floor((Date.now() - new Date(latestStrategy.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+
+    // 2. Load actual campaign performance
+    const campaigns = await AdCampaign.find({
+        user: userId,
+        brand: brandId,
+        status: { $in: ['active', 'completed'] },
+        'performance.spend': { $gt: 0 },
+    }).lean();
+
+    if (campaigns.length === 0) {
+        return { health: null, message: 'No active campaigns with spend data to compare against strategy.', strategyAge };
+    }
+
+    // 3. Aggregate actual performance
+    const totals = campaigns.reduce((acc, c) => {
+        const p = c.performance || {};
+        acc.spend += p.spend || 0;
+        acc.clicks += p.clicks || 0;
+        acc.impressions += p.impressions || 0;
+        acc.conversions += p.conversions || 0;
+        acc.revenue += p.revenue || 0;
+        acc.count++;
+        return acc;
+    }, { spend: 0, clicks: 0, impressions: 0, conversions: 0, revenue: 0, count: 0 });
+
+    const actuals = {
+        ctr: totals.impressions > 0 ? ((totals.clicks / totals.impressions) * 100) : 0,
+        cpc: totals.clicks > 0 ? (totals.spend / totals.clicks) : 0,
+        roas: totals.spend > 0 ? (totals.revenue / totals.spend) : 0,
+        cpa: totals.conversions > 0 ? (totals.spend / totals.conversions) : 0,
+        conversionRate: totals.clicks > 0 ? ((totals.conversions / totals.clicks) * 100) : 0,
+        totalSpend: totals.spend,
+        totalConversions: totals.conversions,
+    };
+
+    // 4. Score each KPI
+    const kpiResults = [];
+    let totalScore = 0;
+    let scoredKPIs = 0;
+
+    for (const kpi of latestStrategy.strategyPlan.kpis) {
+        const metric = (kpi.metric || '').toLowerCase();
+        const targetStr = String(kpi.target || '');
+        const targetNum = parseFloat(targetStr.replace(/[₹,%x]/g, ''));
+
+        if (isNaN(targetNum)) continue;
+
+        let actualValue = null;
+        let kpiScore = 50; // neutral
+
+        if (metric.includes('ctr')) {
+            actualValue = actuals.ctr;
+            kpiScore = actualValue >= targetNum ? 100 : Math.max(0, 100 * (actualValue / targetNum));
+        } else if (metric.includes('cpc')) {
+            actualValue = actuals.cpc;
+            kpiScore = actualValue <= targetNum ? 100 : Math.max(0, 100 * (targetNum / actualValue)); // lower is better
+        } else if (metric.includes('roas')) {
+            actualValue = actuals.roas;
+            kpiScore = actualValue >= targetNum ? 100 : Math.max(0, 100 * (actualValue / targetNum));
+        } else if (metric.includes('cpa') || metric.includes('cost per')) {
+            actualValue = actuals.cpa;
+            kpiScore = actualValue <= targetNum ? 100 : Math.max(0, 100 * (targetNum / actualValue)); // lower is better
+        } else if (metric.includes('conversion')) {
+            actualValue = actuals.conversionRate;
+            kpiScore = actualValue >= targetNum ? 100 : Math.max(0, 100 * (actualValue / targetNum));
+        }
+
+        if (actualValue !== null) {
+            kpiResults.push({
+                metric: kpi.metric,
+                target: kpi.target,
+                actual: Math.round(actualValue * 100) / 100,
+                score: Math.round(kpiScore),
+                status: kpiScore >= 80 ? 'on-track' : kpiScore >= 50 ? 'warning' : 'underperforming',
+            });
+            totalScore += kpiScore;
+            scoredKPIs++;
+        }
+    }
+
+    const healthScore = scoredKPIs > 0 ? Math.round(totalScore / scoredKPIs) : 50;
+
+    // 5. Determine alert level
+    let alertLevel = 'healthy';
+    let alertMessage = '';
+
+    if (healthScore < 40) {
+        alertLevel = 'critical';
+        alertMessage = `Strategy health is CRITICAL (${healthScore}/100). ${kpiResults.filter(k => k.status === 'underperforming').length} KPIs underperforming. Consider revising strategy.`;
+    } else if (healthScore < 60) {
+        alertLevel = 'warning';
+        alertMessage = `Strategy health WARNING (${healthScore}/100). Some KPIs below target after ${strategyAge} days.`;
+    } else if (healthScore >= 80) {
+        alertLevel = 'excellent';
+        alertMessage = `Strategy performing well (${healthScore}/100). All KPIs on track.`;
+    }
+
+    // 6. Send alert if underperforming (import alertEngine dynamically)
+    if (alertLevel === 'critical' || alertLevel === 'warning') {
+        try {
+            const { sendAlert } = await import('./alertEngine.js');
+            await sendAlert(userId, brandId, alertLevel === 'critical' ? 'anomaly' : 'budget-warning', {
+                title: `Strategy Health: ${alertLevel.toUpperCase()}`,
+                summary: alertMessage,
+                metrics: Object.fromEntries(kpiResults.map(k => [`${k.metric}`, `Target: ${k.target} → Actual: ${k.actual} (${k.status})`])),
+                actions: kpiResults
+                    .filter(k => k.status === 'underperforming')
+                    .map(k => `Review ${k.metric}: target was ${k.target}, actual is ${k.actual}`),
+            });
+        } catch (e) {
+            console.warn('Strategy health alert failed:', e.message);
+        }
+
+        // Log to learnings
+        try {
+            await AdLearning.create({
+                user: userId,
+                brand: brandId,
+                type: 'campaign-result',
+                title: `Strategy Health Check — ${alertLevel} (${healthScore}/100)`,
+                insight: {
+                    summary: alertMessage,
+                    details: JSON.stringify(kpiResults),
+                    actionable: alertLevel === 'critical'
+                        ? 'Generate a revised strategy with updated goals and budget allocation.'
+                        : 'Monitor closely and consider minor adjustments to underperforming campaigns.',
+                    confidence: 'high',
+                },
+                platform: 'both',
+                source: { agentGenerated: true },
+                status: 'active',
+            });
+        } catch (e) { console.warn('Failed to log strategy health:', e.message); }
+    }
+
+    return {
+        health: healthScore,
+        alertLevel,
+        message: alertMessage,
+        strategyTitle: latestStrategy.title,
+        strategyAge,
+        strategyCreated: latestStrategy.createdAt,
+        kpiResults,
+        actuals,
+        campaignsAnalyzed: campaigns.length,
+    };
+}

@@ -56,49 +56,192 @@ Respond in valid JSON with exactly these keys: competitorProfiles, adPatterns, g
 /**
  * Strategy Agent — Builds a multi-platform performance marketing strategy
  */
-export const STRATEGY_PROMPT = (brandContext) => `
-You are a senior performance marketing strategist at a top-tier agency.
-Build a comprehensive, data-driven performance marketing strategy.
+export const STRATEGY_PROMPT = (brandContext, currency = 'INR') => {
+const currencySymbol = { INR: '₹', AED: 'د.إ', USD: '$', EUR: '€', GBP: '£', SAR: '﷼', SGD: 'S$', AUD: 'A$' }[currency] || currency;
+return `
+You are a WAR ROOM of 5 senior performance marketing experts — a Media Strategist, a Google Ads Specialist, a Meta Ads Specialist, a Data Analyst, and a Creative Director — at a tier-1 agency billing $500/hr.
+
+Your task: Build the most detailed, data-backed, IMPLEMENTABLE performance marketing strategy that a brand can execute TOMORROW. Think like you're presenting to a CMO who will reject generic advice.
 
 ${brandContext}
 
-CREATE A STRATEGY WITH:
+CURRENCY: ${currency} (${currencySymbol}). Use ${currencySymbol} for ALL monetary values. Do NOT use ₹ unless currency is INR.
 
-1. **goals** — 3-5 measurable goals (e.g., "Reduce CPA by 20% in 30 days")
+The user may have MULTIPLE campaign goals. Address ALL of them across BOTH platforms.
 
+CREATE A STRATEGY WITH THESE EXACT JSON KEYS:
+
+═══════════════════════════════════════════════════
+1. **goals** — Array of OBJECTS (not strings):
+═══════════════════════════════════════════════════
+[{
+  "goal": "Reduce CPA from ₹X to ₹Y" (specific, measurable),
+  "metric": "CPA" (the KPI),
+  "currentBaseline": "₹X (from benchmarks/live data)",
+  "target": "₹Y",
+  "timeframe": "30 days",
+  "confidenceScore": 7 (1-10, how achievable based on data),
+  "confidenceReason": "Why this score — reference specific data points",
+  "riskFactors": ["Factor 1", "Factor 2"],
+  "planB": "If primary approach fails, do THIS instead"
+}]
+
+═══════════════════════════════════════════════════
 2. **channelAllocation** — For each channel:
-   - channel name (meta-feed, meta-stories, meta-reels, google-search, google-display, google-shopping, youtube)
-   - budgetPercent (% of total budget)
-   - rationale (why this channel, what it achieves)
-   - expectedMetrics (estimated CPC, CPM, CTR for this channel)
+═══════════════════════════════════════════════════
+[{ channel, budgetPercent, rationale (reference data), expectedMetrics: { cpc, cpm, ctr, roas } }]
 
-3. **audiences** — 3-5 target audience segments:
-   - name, description, size estimate
-   - interests, behaviors, demographics
-   - which channels to reach them on
-   - messaging approach for each
+═══════════════════════════════════════════════════
+3. **platformBreakout** — CRITICAL: Meta vs Google deep-dive:
+═══════════════════════════════════════════════════
 
-4. **timeline** — 3-phase launch plan:
-   - Phase 1: Testing (week 1-2)
-   - Phase 2: Scaling (week 3-4)
-   - Phase 3: Optimization (week 5+)
+   **meta** (object):
+   - budgetPercent, budgetAmount ("₹XX,XXX")
+   - campaigns: [{ name, objective, dailyBudget, format, placement, rationale }] — 3-5 campaigns
+   - expectedMetrics: { cpc, cpm, ctr, roas, conversionRate } — FROM benchmarks
+   - projections: { reach, impressions, clicks, conversions } — SHOW MATH
+   - audienceTargeting: [{ name, interests, demographics, estimatedSize, lookalike: true/false }]
+   - creativeFormats: ["Reels", "Feed", "Stories"]
+   - adCopyAngles: [{ angle: "Pain point → Solution", headline: "...", cta: "..." }] — 3 angles
+   - rationale: "Why this split — with data"
 
-5. **kpis** — Key performance indicators with targets:
-   - metric, target value, measurement method
+   **google** (object):
+   - budgetPercent, budgetAmount ("₹XX,XXX")
+   - campaigns: [{ name, objective, dailyBudget, campaignType, matchType, rationale }] — 3-5 campaigns
+   - expectedMetrics: { cpc, cpm, ctr, roas, conversionRate } — FROM benchmarks
+   - projections: { impressions, clicks, conversions } — SHOW MATH (budget ÷ CPC = clicks)
+   - keywordPlan: MUST use provided keyword data — [{ keyword, category, estimatedCpc, monthlyVolume, intent, matchType, bidStrategy, geoRelevance }]
+   - biddingStrategy: "Specific ₹ targets — e.g., Target CPA ₹250"
+   - adExtensions: ["Sitelinks", "Callouts", "Structured Snippets", etc.]
+   - rationale: "Why this split — with data"
 
-6. **creativeStrategy** — What types of ads to create:
-   - formats, messaging angles, hooks, CTAs
-   - A/B testing recommendations
+═══════════════════════════════════════════════════
+4. **keywordStrategy** — DETAILED keyword plan by CATEGORY:
+═══════════════════════════════════════════════════
+CRITICAL: You MUST include AT LEAST 15 keywords total, with MINIMUM 5 high-priority keywords.
+If the user provided specific keywords, ALL of them MUST appear in the keywordTable.
+{
+  "keywordTable": [
+    {
+      "keyword": "exact keyword from data",
+      "category": "Branded | Generic-High Intent | Long-tail | Competitor | Vernacular",
+      "cpc": "₹XX from data",
+      "volume": "XXXX/mo from data",
+      "difficulty": "XX/100",
+      "intent": "transactional | commercial | informational",
+      "matchType": "exact | phrase | broad",
+      "geoRelevance": "Mumbai, Delhi NCR, Pan India",
+      "expectedCTR": "X.X%",
+      "priority": "Critical | High | Medium | Test"
+    }
+  ] — 15-25 keywords organized by category,
+  "categoryBreakdown": {
+    "branded": { count: X, totalBudget: "₹X", expectedClicks: X, strategy: "..." },
+    "genericHighIntent": { count: X, totalBudget: "₹X", expectedClicks: X, strategy: "..." },
+    "longTail": { count: X, totalBudget: "₹X", expectedClicks: X, strategy: "..." },
+    "competitor": { count: X, totalBudget: "₹X", expectedClicks: X, strategy: "..." }
+  },
+  "negativeKeywords": ["exclude these"],
+  "matchTypeStrategy": "Detailed explanation of match type approach per category"
+}
 
-Respond in valid JSON with keys: goals, channelAllocation, audiences, timeline, kpis, creativeStrategy.
-`;
+═══════════════════════════════════════════════════
+5. **competitiveEdge** — How we BEAT competitors:
+═══════════════════════════════════════════════════
+{
+  "competitorAnalysis": [
+    {
+      "competitor": "Name",
+      "whatTheyDo": "Their ad strategy, formats, messaging, estimated spend",
+      "theirWeakness": "Specific gap or miss",
+      "ourAdvantage": "How we exploit this gap",
+      "actionItem": "Specific tactic to outperform them"
+    }
+  ] — analyze top 3 competitors,
+  "uniqueAngles": ["Messaging angles NO competitor is using"],
+  "marketGaps": ["Untapped audiences or placements"],
+  "differentiators": ["What makes our strategy superior"]
+}
+
+═══════════════════════════════════════════════════
+6. **locationStrategy** — Geo-specific budget & targeting:
+═══════════════════════════════════════════════════
+{
+  "locationBreakdown": [
+    {
+      "location": "City/Region name",
+      "budgetPercent": X,
+      "budgetAmount": "₹X",
+      "rationale": "Why this location — search volume, competition, audience density",
+      "cpcAdjustment": "+10% above national avg because...",
+      "keywordsForLocation": ["location-specific keywords"]
+    }
+  ],
+  "geoTargetingStrategy": "How to set up geo targeting in Meta and Google",
+  "exclusions": ["Locations to exclude and why"]
+}
+
+═══════════════════════════════════════════════════
+7. **audiences** — 3-5 audience segments per platform
+═══════════════════════════════════════════════════
+
+═══════════════════════════════════════════════════
+8. **timeline** — 3-phase with platform-specific actions
+═══════════════════════════════════════════════════
+
+═══════════════════════════════════════════════════
+9. **kpis** — With targets, sources, and monitoring plan
+═══════════════════════════════════════════════════
+[{ metric, target, source, monitoringFrequency: "daily/weekly", alertThreshold: "trigger review if X" }]
+
+═══════════════════════════════════════════════════
+10. **creativeStrategy** — Per-platform creative plan
+═══════════════════════════════════════════════════
+
+═══════════════════════════════════════════════════
+11. **achievabilityAudit** — Implementation confidence:
+═══════════════════════════════════════════════════
+{
+  "overallScore": 8 (1-10),
+  "overallAssessment": "Why this strategy will work — reference data",
+  "perGoalConfidence": [
+    { "goal": "...", "score": 8, "reasoning": "...", "risk": "...", "mitigation": "..." }
+  ],
+  "assumptions": ["Key assumptions this strategy relies on"],
+  "prerequisites": ["What must be in place before launching"]
+}
+
+═══ ANTI-HALLUCINATION RULES ═══
+1. ALL metrics MUST come from INDUSTRY BENCHMARKS provided. Do NOT invent numbers.
+2. Google keyword CPCs MUST come from the KEYWORD RESEARCH data provided.
+3. Budget math MUST be shown: "${currencySymbol}30,000 ÷ ${currencySymbol}85 CPM × 1000 = ~352,941 impressions"
+4. Competitor insights MUST reference the COMPETITOR INTELLIGENCE data provided.
+5. Location CPCs should reference the geo context and keyword data.
+6. If data is unavailable, state "No data available — using industry benchmark: X"
+7. Every claim MUST have a data source citation.
+8. ALL monetary values MUST use ${currencySymbol} (${currency}) — NEVER use ₹ unless currency is INR.
+
+═══ QUALITY CHECK ═══
+Before responding, verify:
+- [ ] keywordTable has AT LEAST 15 keywords (minimum 5 high-priority)
+- [ ] ALL user-specified keywords are included in keywordTable
+- [ ] Every keyword has a CPC estimate in ${currencySymbol}
+- [ ] Every goal has a confidence score and Plan B
+- [ ] Competitor analysis references actual competitor data provided
+- [ ] Location strategy includes at least 3 locations
+- [ ] Budget math adds up (Meta % + Google % = 100%)
+- [ ] Every projection shows calculations in ${currencySymbol}
+- [ ] ALL monetary values use ${currencySymbol} not ₹ (unless INR)
+
+Respond in valid JSON with keys: goals, channelAllocation, platformBreakout, keywordStrategy, competitiveEdge, locationStrategy, audiences, timeline, kpis, creativeStrategy, achievabilityAudit.
+`; };
 
 /**
  * Budget Planner Agent — Allocates budget across platforms and campaigns
  */
 export const BUDGET_PLANNER_PROMPT = (brandContext) => `
 You are a performance marketing budget optimization specialist.
-Create a detailed budget allocation plan based on the strategy.
+Create a detailed, MATH-BACKED budget allocation plan using the provided benchmark data.
 
 ${brandContext}
 
@@ -108,22 +251,31 @@ CREATE A BUDGET PLAN WITH:
    - platform (meta / google)
    - campaign name and objective
    - daily budget and total budget
-   - expected ROI / ROAS
+   - expected ROI / ROAS — USE the industry benchmark ROAS provided
    - rationale for this amount
 
-2. **projections** — Expected results:
-   - estimatedReach, estimatedClicks, estimatedConversions
-   - estimatedCPA, estimatedRoas
-   - confidence level (high/medium/low)
+2. **projections** — Expected results CALCULATED from benchmark data:
+   - estimatedReach: total budget ÷ CPM × 1000
+   - estimatedClicks: total budget ÷ CPC
+   - estimatedConversions: clicks × conversion rate
+   - estimatedCPA: total budget ÷ estimated conversions
+   - estimatedRoas: use industry benchmark ROAS
+   - Show your math for each projection
 
 3. **optimizationRules** — Budget shift rules:
-   - When to increase spend (ROAS > X)
-   - When to decrease spend (CPA > Y)
+   - When to increase spend (ROAS > X — reference benchmark)
+   - When to decrease spend (CPA > Y — calculate from benchmarks)
    - When to pause (spend > Z with no conversions)
 
 4. **scenarioAnalysis** — 3 budget scenarios:
    - Conservative, Moderate, Aggressive
-   - For each: total spend, expected results, risk level
+   - For each: total spend, expected results (calculated from benchmarks), risk level
+
+═══ ANTI-HALLUCINATION RULES ═══
+1. ALL projections MUST be calculated from the INDUSTRY BENCHMARK data provided.
+2. Show math: "₹30,000 Meta budget ÷ ₹12 CPC = 2,500 clicks × 1.2% conv rate = 30 conversions"
+3. Do NOT invent CPC, CPM, or ROAS numbers — use the benchmarks provided.
+4. CPA = Budget ÷ Expected Conversions. ROAS = use industry benchmark as baseline.
 
 Respond in valid JSON with keys: allocation, projections, optimizationRules, scenarioAnalysis.
 `;
