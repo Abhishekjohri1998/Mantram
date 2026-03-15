@@ -539,22 +539,33 @@ export default function BrainstormStudio() {
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-                        {INTENTS.map((item, i) => (
-                            <button key={item.id} onClick={() => selectIntent(item.id)} disabled={loading}
-                                className="glass-panel rounded-2xl p-5 text-left hover:border-primary/30 hover:scale-[1.02] transition-all cursor-pointer group animate-fade-in"
-                                style={{ animationDelay: `${i * 60}ms` }}>
-                                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
-                                    <span className="material-symbols-outlined text-white text-lg">{item.icon}</span>
-                                </div>
-                                <h3 className="text-base font-bold text-white mb-1">{item.label}</h3>
-                                <p className="text-sm text-slate-500 leading-relaxed">{item.desc}</p>
-                            </button>
-                        ))}
+                        {INTENTS.map((item, i) => {
+                            const isSelected = intent === item.id && loading;
+                            const isDimmed = loading && intent !== item.id;
+
+                            return (
+                                <button key={item.id} onClick={() => selectIntent(item.id)} disabled={loading}
+                                    className={`glass-panel rounded-2xl p-5 text-left hover:border-primary/30 hover:scale-[1.02] transition-all cursor-pointer group animate-fade-in ${isDimmed ? 'opacity-40 grayscale pointer-events-none' : ''}`}
+                                    style={{ animationDelay: `${i * 60}ms` }}>
+                                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+                                        {isSelected ? (
+                                            <span className="material-symbols-outlined text-white text-lg animate-spin">progress_activity</span>
+                                        ) : (
+                                            <span className="material-symbols-outlined text-white text-lg">{item.icon}</span>
+                                        )}
+                                    </div>
+                                    <h3 className="text-base font-bold text-white mb-1">
+                                        {isSelected ? 'Processing...' : item.label}
+                                    </h3>
+                                    <p className="text-sm text-slate-500 leading-relaxed">{item.desc}</p>
+                                </button>
+                            );
+                        })}
                     </div>
 
                     {loading && (
                         <div className="text-center mt-8">
-                            <span className="material-symbols-outlined text-3xl text-primary animate-spin block mb-2">progress_activity</span>
+                            {step !== 0 && <span className="material-symbols-outlined text-3xl text-primary animate-spin block mb-2">progress_activity</span>}
                             <p className="text-sm text-slate-400">{loadingMsg}</p>
                         </div>
                     )}
