@@ -140,7 +140,7 @@ router.get('/missions/:id/findings', protect, async (req, res) => {
         for (const f of mission.findings) {
             if (!f.notified) {
                 f.notified = true;
-                f.isNew = false;
+                f.isNewlyDiscovered = false;
                 needsSave = true;
             }
         }

@@ -15,7 +15,7 @@ const competitorSnapshotSchema = new mongoose.Schema({
         metaDesc: String,
         wordCount: Number,
         h1: String,
-        isNew: { type: Boolean, default: false },    // New page since last snapshot
+        isNewPage: { type: Boolean, default: false },    // New page since last snapshot
         isChanged: { type: Boolean, default: false }, // Content changed since last snapshot
     }],
 

@@ -6,7 +6,7 @@ const findingSchema = new mongoose.Schema({
     severity: { type: String, enum: ['critical', 'notable', 'info'], default: 'info' },
     category: { type: String }, // e.g., 'price_change', 'new_product', 'new_ad', etc.
     rawData: { type: String }, // raw search results for reference
-    isNew: { type: Boolean, default: true },
+    isNewlyDiscovered: { type: Boolean, default: true },
     notified: { type: Boolean, default: false },
 }, { timestamps: true });
 

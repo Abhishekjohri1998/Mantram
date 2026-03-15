@@ -38,6 +38,12 @@ export async function getTrendsInterest(keyword, geo = '', timeRange = 'today 12
     });
 
     const exploreText = await exploreResp.text();
+    
+    // Check if we got HTML (rate limited or redirected)
+    if (exploreText.trim().startsWith('<!DOCTYPE') || exploreText.trim().startsWith('<html')) {
+        throw new Error('Google Trends returned HTML (likely rate-limited)');
+    }
+
     // Google Trends API returns ")]}',\n" prefix — strip it
     const cleanText = exploreText.replace(/^\)\]\}',?\n/, '');
     const exploreData = JSON.parse(cleanText);
@@ -155,9 +161,9 @@ export async function batchTrends(keywords, geo = '') {
   for (const keyword of keywords.slice(0, 10)) { // Cap at 10 to avoid rate limits
     const result = await getTrendsInterest(keyword, geo);
     results.push(result);
-    // Small delay to avoid rate limiting
+    // Incremented delay to avoid rate limiting
     if (keywords.indexOf(keyword) < keywords.length - 1) {
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 1000));
     }
   }
   return results;

@@ -255,7 +255,7 @@ export async function runIntelMissions() {
                         severity: result.severity,
                         category: mission.type,
                         rawData: report,
-                        isNew: true,
+                        isNewlyDiscovered: true,
                         notified: false,
                     };
 
@@ -312,7 +312,7 @@ export async function forceRunMission(missionId) {
             severity: result.severity,
             category: mission.type,
             rawData: report,
-            isNew: true,
+            isNewlyDiscovered: true,
             notified: false,
         };
         mission.findings.push(finding);

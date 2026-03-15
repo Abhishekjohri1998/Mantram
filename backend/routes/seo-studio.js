@@ -43,15 +43,20 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
   const overallController = new AbortController();
   const overallTimer = setTimeout(() => overallController.abort(), timeout);
 
+  // Helper to check if model failed due to quota
+  const isQuotaError = (status, data) => {
+    if (status === 429) return true;
+    const errText = JSON.stringify(data || {}).toLowerCase();
+    return errText.includes('quota') || errText.includes('rate limit') || errText.includes('limit exceeded');
+  };
+
   try {
     // 1. Try OpenAI (Fastest, but sometimes throttles)
     if (process.env.OPENAI_API_KEY) {
-      const providerController = new AbortController();
-      // Give OpenAI up to 20s
-      const providerTimeout = 20000;
-      const pTimer = setTimeout(() => providerController.abort(), providerTimeout);
-      
       try {
+        const providerController = new AbortController();
+        const pTimer = setTimeout(() => providerController.abort(), 20000); // 20s for OpenAI
+
         const resp = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
@@ -63,28 +68,31 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
           }),
           signal: providerController.signal,
         });
+
+        clearTimeout(pTimer);
         const data = await resp.json();
-        if (data.choices?.[0]?.message?.content) {
+
+        if (resp.ok && data.choices?.[0]?.message?.content) {
           lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'gpt-4o-mini', provider: 'openai' };
           return data.choices[0].message.content;
-        } else if (data.error) {
-          console.warn(`OpenAI API error: ${data.error.message} (${data.error.code})`);
+        } else if (isQuotaError(resp.status, data)) {
+          console.warn('⚠️ OpenAI quota hit, trying fallback...');
+        } else {
+          console.warn(`OpenAI error (${resp.status}):`, data.error?.message || 'Unknown error');
         }
-      } catch (e) { 
+      } catch (e) {
         console.warn(`OpenAI failed/timed out: ${e.message}`);
-        // If overall controller is aborted, stop everything
         if (overallController.signal.aborted) throw e;
-      } finally {
-        clearTimeout(pTimer);
       }
     }
 
     // 2. Try Grok (Alternative)
     const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
     if (grokKey && !overallController.signal.aborted) {
-      const providerController = new AbortController();
-      const pTimer = setTimeout(() => providerController.abort(), 20000); // 20s for Grok
       try {
+        const providerController = new AbortController();
+        const pTimer = setTimeout(() => providerController.abort(), 20000);
+
         const resp = await fetch('https://api.x.ai/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${grokKey}` },
@@ -96,16 +104,19 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
           }),
           signal: providerController.signal,
         });
+
+        clearTimeout(pTimer);
         const data = await resp.json();
-        if (data.choices?.[0]?.message?.content) {
+
+        if (resp.ok && data.choices?.[0]?.message?.content) {
           lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'grok-3-mini-fast', provider: 'xai' };
           return data.choices[0].message.content;
+        } else if (isQuotaError(resp.status, data)) {
+          console.warn('⚠️ Grok quota hit, trying fallback...');
         }
-      } catch (e) { 
+      } catch (e) {
         console.warn(`Grok failed/timed out: ${e.message}`);
         if (overallController.signal.aborted) throw e;
-      } finally {
-        clearTimeout(pTimer);
       }
     }
 
@@ -114,6 +125,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
     if (geminiKey && !overallController.signal.aborted) {
       const models = ['gemini-2.0-flash', 'gemini-1.5-flash'];
       for (const model of models) {
+        if (overallController.signal.aborted) break;
         try {
           const resp = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
@@ -131,19 +143,25 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
               signal: overallController.signal,
             }
           );
+
           const data = await resp.json();
-          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) {
+          if (resp.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+            const text = data.candidates[0].content.parts[0].text;
             lastTokenUsage = { inputTokens: data.usageMetadata?.promptTokenCount || 0, outputTokens: data.usageMetadata?.candidatesTokenCount || 0, model, provider: 'gemini' };
             return text;
+          } else if (isQuotaError(resp.status, data)) {
+            console.warn(`⚠️ Gemini ${model} quota hit, trying fallback...`);
+          } else {
+            console.warn(`Gemini ${model} error:`, JSON.stringify(data.error || data));
           }
-        } catch (e) { 
+        } catch (e) {
           if (overallController.signal.aborted) throw e;
+          console.warn(`Gemini ${model} request failed: ${e.message}`);
         }
       }
     }
 
-    throw new Error('All AI models failed or budget exceeded (timeout)');
+    throw new Error('All AI models failed, or quotas exceeded, or timeout reached');
   } finally {
     clearTimeout(overallTimer);
   }
