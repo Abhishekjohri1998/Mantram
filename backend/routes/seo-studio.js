@@ -37,11 +37,11 @@ let lastTokenUsage = null;
 export function getLastTokenUsage() { return lastTokenUsage; }
 
 async function aiCall(systemPrompt, userPrompt, options = {}) {
-  const { temperature = 0.7, maxTokens = 8192, json = false, timeout = 30000 } = options;
+  const { temperature = 0.7, maxTokens = 8192, json = false, timeout = 35000 } = options;
   lastTokenUsage = null;
 
   const overallController = new AbortController();
-  const overallTimer = setTimeout(() => overallController.abort(), timeout);
+  const overallTimer = setTimeout(() => overallController.abort(), Math.max(timeout, 60000));
 
   const defaultProvider = process.env.DEFAULT_TEXT_PROVIDER || 'anthropic';
   const defaultModel = process.env.DEFAULT_TEXT_MODEL;
@@ -61,7 +61,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
   const isQuotaError = (status, data) => {
     if (status === 429) return true;
     const errText = JSON.stringify(data || {}).toLowerCase();
-    return errText.includes('quota') || errText.includes('rate limit') || errText.includes('limit exceeded') || errText.includes('throttled') || errText.includes('credit balance');
+    return errText.includes('quota') || errText.includes('rate limit') || errText.includes('limit exceeded') || errText.includes('throttled') || errText.includes('credit balance') || errText.includes('resource_exhausted');
   };
 
   try {
@@ -72,9 +72,8 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
 
       try {
         const providerController = new AbortController();
-        // Give each provider 20s or remaining budget, but leave 5s for overhead/other providers
-        const providerTimeout = Math.min(20000, timeout - 5000); 
-        const pTimer = setTimeout(() => providerController.abort(), Math.max(5000, providerTimeout));
+        const providerTimeout = Math.min(35000, timeout); 
+        const pTimer = setTimeout(() => providerController.abort(), providerTimeout);
 
         if (provider.name === 'anthropic') {
           const modelId = (defaultProvider === 'anthropic' && defaultModel) ? defaultModel : 'claude-3-5-sonnet-20240620';
