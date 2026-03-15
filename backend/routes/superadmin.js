@@ -1459,7 +1459,24 @@ router.get('/stats/token-usage', async (req, res) => {
                     totalCredits: { $sum: '$cost' },
                 }},
             ]),
+            // Lifetime Provider consumption for budget tracking
+            CreditUsage.aggregate([
+                { $match: { 'tokenUsage.totalTokens': { $gt: 0 } } },
+                { $group: {
+                    _id: '$tokenUsage.provider',
+                    totalConsumed: { $sum: '$tokenUsage.estimatedCost' }
+                }}
+            ])
         ]);
+
+        // Get budgets from settings
+        const providerBudgets = await getSetting('ai_provider_budgets', {
+          anthropic: 0,
+          openai: 0,
+          gemini: 0,
+          xai: 0,
+          sarvam: 0
+        });
 
         // Get revenue for profitability
         const revenue = await Subscription.aggregate([
@@ -1486,11 +1503,30 @@ router.get('/stats/token-usage', async (req, res) => {
                 estimatedCostINR: Math.round((t.estimatedCost || 0) * 85), // approx USD→INR
                 margin: monthlyRevenue > 0 ? Math.round(((monthlyRevenue - (t.estimatedCost || 0) * 85) / monthlyRevenue) * 100) : 0,
             },
+            providerWallets: (totals[1] || []).map(p => ({
+              provider: p._id || 'unknown',
+              consumed: Math.round((p.totalConsumed || 0) * 100) / 100,
+              budget: providerBudgets[p._id] || 0
+            })),
             byStudio,
             byModel,
             topUsers: byUser,
             dailyTrend,
         });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// 9.5 UPDATE PROVIDER BUDGETS
+router.put('/settings/provider-budgets', async (req, res) => {
+    try {
+        const { budgets } = req.body;
+        if (!budgets || typeof budgets !== 'object') {
+            return res.status(400).json({ success: false, error: 'budgets object required' });
+        }
+        await setSetting('ai_provider_budgets', budgets, req.user._id);
+        res.json({ success: true, message: 'Provider budgets updated' });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }

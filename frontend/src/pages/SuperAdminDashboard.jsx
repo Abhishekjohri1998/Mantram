@@ -61,6 +61,8 @@ export default function SuperAdminDashboard() {
     const [logsPage, setLogsPage] = useState(1)
     const [totalLogs, setTotalLogs] = useState(0)
     const [logsLoading, setLogsLoading] = useState(false)
+    const [showBudgetModal, setShowBudgetModal] = useState(false)
+    const [budgetForm, setBudgetForm] = useState({ anthropic: 0, openai: 0, gemini: 0, xai: 0, sarvam: 0 })
 
     if (user?.role !== 'superadmin') {
         return <DashboardLayout><div className="flex items-center justify-center h-screen"><div className="text-center"><span className="material-symbols-outlined text-6xl text-rose-500 mb-4">shield</span><h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2><p className="text-slate-500">Super Admin access required</p></div></div></DashboardLayout>
@@ -123,7 +125,8 @@ export default function SuperAdminDashboard() {
     const handleSaveCosts = async () => { try { await API.updateCreditCosts(editingCosts); showToast('Credit costs updated'); setEditingCosts(null); loadCreditCosts() } catch (e) { showToast(e.error || 'Failed', 'error') } }
     const handleResetCosts = async () => { if (!confirm('Reset all credit costs to defaults?')) return; try { await API.resetCreditCosts(); showToast('Reset to defaults'); setEditingCosts(null); loadCreditCosts() } catch { showToast('Failed', 'error') } }
     const creditCostLabels = { content: 'Content Generate', contentRefine: 'Content Refine/Regen', creative: 'Creative (Image)', photoshoot: 'AI Photoshoot', seoHealthCheck: 'SEO Health Check', seoTraffic: 'SEO Traffic', seoCompetitors: 'SEO Competitors', seoAiVisibility: 'SEO AI Visibility', seoAsk: 'SEO Ask', seoAuditPage: 'SEO Page Audit', seoCompetitorDiscover: 'SEO Discover', seoBacklinks: 'SEO Backlinks', brainstorm: 'Brainstorm Generate', brainstormRefine: 'Brainstorm Refine', brainstormChat: 'Brainstorm Chat', brainstormScreenplay: 'Screenplay', trendRefresh: 'Trend Refresh' }
-    const loadTokenUsage = async () => { try { const d = await API.getTokenUsage(tokenDays); setTokenData(d) } catch (e) { console.error(e) } }
+    const loadTokenUsage = async () => { try { const d = await API.getTokenUsage(tokenDays); setTokenData(d); if (d.providerWallets) { const b = {}; d.providerWallets.forEach(w => b[w.provider] = w.budget); setBudgetForm(b) } } catch (e) { console.error(e) } }
+    const handleSaveBudgets = async (e) => { e.preventDefault(); try { await API.updateProviderBudgets(budgetForm); showToast('Provider budgets updated'); setShowBudgetModal(false); loadTokenUsage() } catch (e) { showToast(e.error || 'Failed', 'error') } }
     const addFeature = () => { if (!newFeature.trim()) return; setPkgForm(f => ({ ...f, features: [...f.features, { name: newFeature.trim(), included: true }] })); setNewFeature('') }
     const removeFeature = (i) => setPkgForm(f => ({ ...f, features: f.features.filter((_, idx) => idx !== i) }))
     const studioNames = { contentStudio: 'Content Studio', creativeStudio: 'Creative Studio', seoStudio: 'SEO Studio', brainstormStudio: 'Brainstorm Studio' }
@@ -854,6 +857,59 @@ export default function SuperAdminDashboard() {
                                         <span className="material-symbols-outlined text-lg mb-1 block" style={{ color: (tokenData.profitability?.margin || 0) > 50 ? '#34d399' : (tokenData.profitability?.margin || 0) > 0 ? '#fbbf24' : '#fb7185' }}>trending_up</span>
                                         <p className="text-xl font-extrabold" style={{ color: (tokenData.profitability?.margin || 0) > 50 ? '#34d399' : (tokenData.profitability?.margin || 0) > 0 ? '#fbbf24' : '#fb7185' }}>{tokenData.profitability?.margin || 0}%</p>
                                         <p className="text-[10px] text-slate-500">Profit Margin</p>
+                                    </div>
+                                </div>
+
+                                {/* Provider Portfolio Section */}
+                                <div className="mb-6">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-amber-400 text-lg">account_balance_wallet</span>
+                                            Provider Portfolio (Prepaid Balances)
+                                        </h4>
+                                        <button onClick={() => setShowBudgetModal(true)} className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-slate-400 text-[10px] font-bold hover:bg-white/[0.06] transition-all flex items-center gap-1.5 cursor-pointer">
+                                            <span className="material-symbols-outlined text-sm">settings</span>
+                                            Configure Budgets
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                        {tokenData.providerWallets?.length > 0 ? tokenData.providerWallets.map(w => {
+                                            const pct = w.budget > 0 ? Math.min(100, (w.consumed / w.budget) * 100) : 0;
+                                            const remaining = Math.max(0, w.budget - w.consumed);
+                                            const isLow = w.budget > 0 && (remaining / w.budget) < 0.15;
+                                            const colors = { anthropic: 'text-orange-400', openai: 'text-emerald-400', gemini: 'text-blue-400', xai: 'text-slate-200', sarvam: 'text-rose-400' };
+                                            const bgColors = { anthropic: 'bg-orange-500', openai: 'bg-emerald-500', gemini: 'bg-blue-500', xai: 'bg-slate-500', sarvam: 'bg-rose-500' };
+                                            
+                                            return (
+                                                <div key={w.provider} className={`glass-panel rounded-2xl p-5 border transition-all ${isLow ? 'border-amber-500/30' : 'border-white/[0.06]'}`}>
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <p className={`text-xs font-black uppercase tracking-widest ${colors[w.provider] || 'text-slate-400'}`}>{w.provider}</p>
+                                                        {isLow && <span className="material-symbols-outlined text-amber-500 text-sm animate-pulse">warning</span>}
+                                                    </div>
+                                                    <div className="flex items-baseline gap-1 mb-1">
+                                                        <span className="text-2xl font-black text-white">${remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                        <span className="text-[10px] text-slate-500 font-bold tracking-tighter uppercase">Left</span>
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-600 mb-4 font-medium">of ${w.budget?.toLocaleString()} purchased</p>
+                                                    <div className="space-y-1.5">
+                                                        <div className="flex justify-between text-[9px] font-bold uppercase tracking-tighter">
+                                                            <span className="text-slate-600">Consumed: ${w.consumed?.toLocaleString()}</span>
+                                                            <span className={pct > 90 ? 'text-rose-400' : pct > 75 ? 'text-amber-400' : 'text-slate-600'}>{Math.round(pct)}%</span>
+                                                        </div>
+                                                        <div className="h-1.5 w-full bg-white/[0.04] rounded-full overflow-hidden">
+                                                            <div 
+                                                                className={`h-full rounded-full transition-all duration-1000 ${pct > 90 ? 'bg-rose-500' : pct > 75 ? 'bg-amber-500' : bgColors[w.provider] || 'bg-primary'}`} 
+                                                                style={{ width: `${pct}%` }} 
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }) : (
+                                            <div className="col-span-full py-8 text-center glass-panel rounded-2xl border border-white/[0.04] text-slate-600 text-xs">
+                                                No provider budgets configured yet. Click "Configure Budgets" to start tracking.
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -1713,6 +1769,43 @@ export default function SuperAdminDashboard() {
                                 )}
                             </div>
                             <div className="flex justify-end mt-4"><button onClick={() => setPlanModal(null)} className="px-4 py-2 rounded-lg text-sm text-slate-400 cursor-pointer">Close</button></div>
+                        </div>
+                    </div>
+                )}
+                {/* Provider Budgets Modal */}
+                {showBudgetModal && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
+                        <div className="glass-panel rounded-3xl w-full max-w-md border border-white/10 shadow-2xl p-6">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-xl font-black text-white flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-amber-400">account_balance_wallet</span>
+                                    Configure Provider Budgets
+                                </h3>
+                                <button onClick={() => setShowBudgetModal(false)} className="text-slate-600 hover:text-white cursor-pointer transition-all"><span className="material-symbols-outlined">close</span></button>
+                            </div>
+                            <p className="text-xs text-slate-500 mb-6 font-medium leading-relaxed">Enter the total dollar amount you have recharged for each provider. We'll track your platform's consumption against these limits.</p>
+                            
+                            <form onSubmit={handleSaveBudgets} className="space-y-4">
+                                {Object.keys(budgetForm).map(provider => (
+                                    <div key={provider}>
+                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">{provider}</label>
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-bold">$</span>
+                                            <input 
+                                                type="number" 
+                                                value={budgetForm[provider]} 
+                                                onChange={e => setBudgetForm(f => ({ ...f, [provider]: Number(e.target.value) }))}
+                                                className="w-full pl-8 pr-4 py-3 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none focus:border-amber-500/50 transition-all"
+                                                placeholder="0.00"
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                                <div className="pt-4 flex gap-3">
+                                    <button type="button" onClick={() => setShowBudgetModal(false)} className="flex-1 py-3 bg-white/[0.04] text-white text-xs font-black uppercase tracking-wider rounded-2xl hover:bg-white/[0.08] transition-all border border-white/[0.06] cursor-pointer">Cancel</button>
+                                    <button type="submit" className="flex-1 py-3 bg-amber-500 text-slate-950 text-xs font-black uppercase tracking-wider rounded-2xl hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/20 cursor-pointer">Save Budgets</button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 )}
