@@ -258,6 +258,14 @@ app.get('/api/health', (req, res) => {
 // Error handler
 app.use((err, req, res, next) => {
     console.error('Server Error:', err.stack);
+
+    // Ensure CORS headers are present even on errors
+    const origin = req.headers.origin;
+    if (origin) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+
     res.status(err.statusCode || 500).json({
         success: false,
         error: config.nodeEnv === 'development' ? err.message : 'Server Error',

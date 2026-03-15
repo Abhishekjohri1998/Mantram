@@ -99,13 +99,18 @@ class ModelRouter {
      * Generate text with automatic provider selection and fallback
      */
     async generateText(params, preferences = {}) {
-        const provider = this.getTextProvider(preferences);
+        let provider = this.getTextProvider(preferences);
 
-        // Skip if provider is in cooldown
+        // If primary is in cooldown, find next best available
         if (provider.cooldownUntil && Date.now() < provider.cooldownUntil) {
+            console.warn(`⏳ Primary provider ${provider.name} is in cooldown, searching for alternative...`);
             const fallback = this._getFallback(provider.name, 'text');
-            if (fallback) return await fallback.generateText(params);
+            if (fallback) {
+                provider = fallback;
+            }
         }
+
+        const triedProviders = new Set([provider.name]);
 
         try {
             const result = await provider.generateText(params);
@@ -114,32 +119,31 @@ class ModelRouter {
         } catch (error) {
             const isQuotaError = error.message?.toLowerCase().includes('quota') ||
                 error.message?.toLowerCase().includes('rate limit') ||
+                error.message?.toLowerCase().includes('429') ||
                 error.message?.toLowerCase().includes('credit') ||
-                error.message?.toLowerCase().includes('balance') ||
-                error.message?.toLowerCase().includes('429');
+                error.message?.toLowerCase().includes('balance');
 
             if (isQuotaError) {
-                // Cool down for 5 minutes
                 provider.cooldownUntil = Date.now() + (5 * 60 * 1000);
                 console.warn(`⏳ Provider ${provider.name} hit quota/credit limits. Cooling down for 5 mins.`);
             }
 
-            // Try ALL other available providers in order
             console.error(`Provider ${provider.name} failed, searching for fallback:`, error.message);
             
+            // Try ALL other available providers in order
             const remainingProviders = Object.entries(this.providers)
-                .filter(([name, p]) => name !== provider.name && p.isAvailable() && !(p.cooldownUntil && Date.now() < p.cooldownUntil))
+                .filter(([name, p]) => !triedProviders.has(name) && p.isAvailable() && !(p.cooldownUntil && Date.now() < p.cooldownUntil))
                 .map(([_, p]) => p);
 
             for (const fallback of remainingProviders) {
                 try {
+                    triedProviders.add(fallback.name);
                     console.log(`Trying fallback provider: ${fallback.name}`);
                     const result = await fallback.generateText(params);
                     this._logUsage('text', fallback.name, result.tokensUsed);
                     return result;
                 } catch (fallbackError) {
                     console.error(`Fallback ${fallback.name} also failed:`, fallbackError.message);
-                    // Continue to next fallback
                 }
             }
             

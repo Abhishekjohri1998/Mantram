@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getAIRouter } from '../ai/router.js';
+import { getSmartRouter } from '../ai/smartRouter.js';
 import { optionalAuth, protect } from '../middleware/auth.js';
 import { requireStudio } from '../middleware/studioAccess.js';
 import { requireCredits } from '../middleware/credits.js';
@@ -12,18 +12,16 @@ const router = Router();
 // HELPERS
 // ============================================================================
 
-// AI call with unified router (handles fallbacks)
+// AI call with smart router (handles language/task intelligence and fallbacks)
 async function aiCall(systemPrompt, userPrompt, options = {}) {
-  const { temperature = 0.7, maxTokens = 4096, json = false } = options;
-  const router = getAIRouter();
+  const { temperature = 0.7, maxTokens = 4096, taskType = 'blog' } = options;
+  const router = getSmartRouter();
 
   try {
-    const result = await router.generateText({
-      systemPrompt,
-      userPrompt,
-      temperature,
-      maxTokens,
-    });
+    const result = await router.generateText(
+      { systemPrompt, userPrompt, temperature, maxTokens },
+      { taskType }
+    );
     return result.text;
   } catch (e) {
     console.error('Brainstorm AI Call Error:', e.message);
