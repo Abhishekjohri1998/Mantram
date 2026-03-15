@@ -119,7 +119,7 @@ app.use(cors({
 }));
 
 // Preflight OPTIONS handling
-app.options('*', cors());
+app.options(/.*/, cors());
 // Special middleware for Webhooks to ensure raw body capture for HMAC verification
 app.use((req, res, next) => {
     if (req.originalUrl && (req.originalUrl.includes('/api/shopify/webhooks') || req.originalUrl.includes('/api/funnel-webhooks') || req.originalUrl.includes('/api/webhooks'))) {
