@@ -224,57 +224,336 @@ export async function crawlPage(url) {
 
 
 // ============================================================================
-// RESEARCH DOMAIN — Crawl multiple pages for full site intelligence
+// REDIRECT-AWARE FETCH
+// ============================================================================
+
+async function safeFetchWithRedirects(url) {
+    const chain = [];
+    let currentUrl = url;
+    let maxHops = 5;
+    let finalHtml = '';
+
+    while (maxHops-- > 0) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+        try {
+            const resp = await fetch(currentUrl, {
+                signal: controller.signal,
+                headers: { 'User-Agent': USER_AGENT, 'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8' },
+                redirect: 'manual', // Don't auto-follow — we want to track the chain
+            });
+            clearTimeout(timer);
+
+            if ([301, 302, 303, 307, 308].includes(resp.status)) {
+                const location = resp.headers.get('location');
+                if (!location) break;
+                const resolved = new URL(location, currentUrl).href;
+                chain.push({ from: currentUrl, to: resolved, status: resp.status });
+                currentUrl = resolved;
+                continue;
+            }
+
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            finalHtml = await resp.text();
+            break;
+        } catch (e) {
+            clearTimeout(timer);
+            // Fallback to regular fetch if manual redirect fails
+            if (chain.length === 0) {
+                try {
+                    finalHtml = await safeFetch(url);
+                } catch (e2) { throw e2; }
+            } else {
+                throw e;
+            }
+            break;
+        }
+    }
+
+    return { html: finalHtml, redirectChain: chain, finalUrl: currentUrl };
+}
+
+
+// ============================================================================
+// SITEMAP.XML PARSER
+// ============================================================================
+
+async function fetchSitemap(baseUrl) {
+    const urls = [];
+    const sitemapUrls = [`${baseUrl}/sitemap.xml`, `${baseUrl}/sitemap_index.xml`];
+
+    for (const smUrl of sitemapUrls) {
+        try {
+            const xml = await safeFetch(smUrl);
+            if (!xml || xml.length < 50) continue;
+
+            // Check if it's a sitemap index (contains <sitemap> tags)
+            const isIndex = xml.includes('<sitemap>');
+
+            if (isIndex) {
+                // Parse sitemap index — extract child sitemap URLs
+                const locPattern = /<sitemap>\s*<loc>([^<]+)<\/loc>/gi;
+                let m;
+                const childSitemaps = [];
+                while ((m = locPattern.exec(xml)) !== null && childSitemaps.length < 3) {
+                    childSitemaps.push(m[1].trim());
+                }
+                // Fetch first 2 child sitemaps
+                for (const childUrl of childSitemaps.slice(0, 2)) {
+                    try {
+                        const childXml = await safeFetch(childUrl);
+                        const childLocPattern = /<url>\s*<loc>([^<]+)<\/loc>/gi;
+                        let cm;
+                        while ((cm = childLocPattern.exec(childXml)) !== null && urls.length < 50) {
+                            urls.push(cm[1].trim());
+                        }
+                    } catch { /* skip failed child sitemap */ }
+                }
+            } else {
+                // Standard sitemap — extract URLs
+                const locPattern = /<url>\s*<loc>([^<]+)<\/loc>/gi;
+                let m;
+                while ((m = locPattern.exec(xml)) !== null && urls.length < 50) {
+                    urls.push(m[1].trim());
+                }
+            }
+
+            if (urls.length > 0) break; // Found URLs, stop trying
+        } catch { /* sitemap not found, continue */ }
+    }
+
+    return { urls, found: urls.length > 0, count: urls.length };
+}
+
+
+// ============================================================================
+// ROBOTS.TXT PARSER
+// ============================================================================
+
+async function fetchRobotsTxt(baseUrl) {
+    try {
+        const text = await safeFetch(`${baseUrl}/robots.txt`);
+        if (!text || text.length < 10 || text.includes('<html')) {
+            return { found: false, rules: [], sitemapUrls: [], raw: '' };
+        }
+
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+        const disallowRules = [];
+        const allowRules = [];
+        const sitemapUrls = [];
+        let currentAgent = '*';
+
+        for (const line of lines) {
+            const lower = line.toLowerCase();
+            if (lower.startsWith('user-agent:')) {
+                currentAgent = line.split(':').slice(1).join(':').trim();
+            } else if (lower.startsWith('disallow:')) {
+                const path = line.split(':').slice(1).join(':').trim();
+                if (path) disallowRules.push({ agent: currentAgent, path });
+            } else if (lower.startsWith('allow:')) {
+                const path = line.split(':').slice(1).join(':').trim();
+                if (path) allowRules.push({ agent: currentAgent, path });
+            } else if (lower.startsWith('sitemap:')) {
+                const url = line.split(':').slice(1).join(':').trim();
+                if (url) sitemapUrls.push(url);
+            }
+        }
+
+        return {
+            found: true,
+            disallowRules,
+            allowRules,
+            sitemapUrls,
+            crawlDelay: lines.find(l => l.toLowerCase().startsWith('crawl-delay:'))?.split(':')?.[1]?.trim() || null,
+            raw: text.substring(0, 2000),
+        };
+    } catch {
+        return { found: false, rules: [], sitemapUrls: [], raw: '' };
+    }
+}
+
+
+// ============================================================================
+// DUPLICATE CONTENT DETECTION (3-gram shingling + Jaccard)
+// ============================================================================
+
+function contentFingerprint(text) {
+    // Create n-gram shingles from text
+    const words = text.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2);
+    if (words.length < 10) return new Set();
+    const shingles = new Set();
+    for (let i = 0; i < words.length - 2; i++) {
+        shingles.add(`${words[i]} ${words[i+1]} ${words[i+2]}`);
+    }
+    return shingles;
+}
+
+function jaccardSimilarity(setA, setB) {
+    if (setA.size === 0 || setB.size === 0) return 0;
+    let intersection = 0;
+    for (const item of setA) { if (setB.has(item)) intersection++; }
+    return intersection / (setA.size + setB.size - intersection);
+}
+
+function computeDuplicates(pages) {
+    const fingerprints = pages.map(p => ({
+        url: p.url,
+        fp: contentFingerprint(p.contentSnippet || p.bodyTextFull || ''),
+    }));
+
+    const duplicates = [];
+    for (let i = 0; i < fingerprints.length; i++) {
+        for (let j = i + 1; j < fingerprints.length; j++) {
+            const sim = jaccardSimilarity(fingerprints[i].fp, fingerprints[j].fp);
+            if (sim > 0.6) { // 60%+ similarity = near-duplicate
+                duplicates.push({
+                    page1: fingerprints[i].url,
+                    page2: fingerprints[j].url,
+                    similarity: Math.round(sim * 100),
+                    level: sim > 0.85 ? 'duplicate' : 'near-duplicate',
+                });
+            }
+        }
+    }
+    return duplicates;
+}
+
+
+// ============================================================================
+// RESEARCH DOMAIN — Deep crawl: sitemap + robots.txt + 20+ pages
 // ============================================================================
 
 export async function researchDomain(baseUrl) {
     // Normalize URL
     let normalizedUrl = baseUrl.trim();
     if (!/^https?:\/\//i.test(normalizedUrl)) normalizedUrl = `https://${normalizedUrl}`;
+    // Strip trailing slash for consistency
+    const cleanBase = normalizedUrl.replace(/\/+$/, '');
 
-    // 1. Crawl homepage
-    const homepage = await crawlPage(normalizedUrl);
-    if (!homepage.success) {
-        return { url: normalizedUrl, pages: [homepage], summary: null, error: homepage.error };
+    console.log(`🕷️  Deep crawl starting: ${cleanBase}`);
+
+    // PHASE 1: Fetch homepage + robots.txt + sitemap.xml in parallel
+    const [homepageResult, robotsTxt, sitemap] = await Promise.all([
+        (async () => {
+            const { html, redirectChain, finalUrl } = await safeFetchWithRedirects(cleanBase);
+            if (!html) return { success: false, error: 'Empty response', redirectChain };
+            const meta = extractMeta(html);
+            const headings = extractHeadings(html);
+            const jsonLd = extractJsonLd(html);
+            const links = extractLinks(html, finalUrl);
+            const images = extractImages(html);
+            const canonical = extractCanonical(html);
+            const tech = detectTechSignals(html);
+            const bodyText = getBodyText(html);
+            const wordCount = getWordCount(bodyText);
+            return {
+                url: finalUrl,
+                success: true,
+                title: meta.title || '',
+                metaDescription: meta.description || '',
+                ogTitle: meta['og:title'] || '',
+                ogDescription: meta['og:description'] || '',
+                ogImage: meta['og:image'] || '',
+                canonical,
+                headings,
+                h1: headings.filter(h => h.level === 1).map(h => h.text),
+                h2: headings.filter(h => h.level === 2).map(h => h.text),
+                h3: headings.filter(h => h.level === 3).map(h => h.text),
+                jsonLd,
+                hasSchemaOrg: jsonLd.length > 0,
+                schemaTypes: jsonLd.map(s => s['@type']).filter(Boolean),
+                links,
+                internalLinkCount: links.internal.length,
+                externalLinkCount: links.external.length,
+                images,
+                tech,
+                wordCount,
+                contentSnippet: bodyText.substring(0, 500),
+                bodyTextFull: bodyText.substring(0, 2000), // More text for duplicate detection
+                robots: meta.robots || '',
+                viewport: meta.viewport || '',
+                redirectChain,
+            };
+        })(),
+        fetchRobotsTxt(cleanBase),
+        fetchSitemap(cleanBase),
+    ]);
+
+    if (!homepageResult.success) {
+        return { url: cleanBase, pages: [homepageResult], summary: null, error: homepageResult.error, robotsTxt, sitemap };
     }
 
-    // 2. Identify key internal pages to crawl (about, contact, services, blog)
-    const keyPaths = ['/about', '/about-us', '/services', '/contact', '/blog', '/faq', '/pricing'];
+    const homepage = homepageResult;
     const internalLinks = homepage.links?.internal || [];
 
-    // Find matching internal pages
-    const pagesToCrawl = [];
-    for (const path of keyPaths) {
-        const match = internalLinks.find(l => l.toLowerCase().includes(path));
-        if (match) pagesToCrawl.push(match);
-        if (pagesToCrawl.length >= 4) break;
-    }
+    // PHASE 2: Build priority crawl queue (sitemap URLs first, then key paths, then discovery)
+    const crawled = new Set([cleanBase, homepage.url]);
+    const toCrawl = [];
 
-    // If we didn't find enough, add first few internal links
-    if (pagesToCrawl.length < 3) {
-        for (const link of internalLinks) {
-            if (link !== '/' && !pagesToCrawl.includes(link) && !link.includes('#')) {
-                pagesToCrawl.push(link);
-                if (pagesToCrawl.length >= 4) break;
-            }
+    // Priority 1: Sitemap URLs (up to 15)
+    if (sitemap.found) {
+        for (const sUrl of sitemap.urls.slice(0, 15)) {
+            try {
+                const resolved = new URL(sUrl).href;
+                if (!crawled.has(resolved)) {
+                    toCrawl.push(resolved);
+                    crawled.add(resolved);
+                }
+            } catch { /* skip invalid */ }
         }
     }
 
-    // 3. Crawl sub-pages in parallel
-    const subPages = await Promise.all(
-        pagesToCrawl.map(path => {
+    // Priority 2: Key structural pages
+    const keyPaths = ['/about', '/about-us', '/services', '/products', '/contact', '/blog', '/faq', '/pricing', '/team', '/case-studies', '/portfolio', '/news', '/careers', '/features'];
+    for (const path of keyPaths) {
+        if (toCrawl.length >= 25) break;
+        const match = internalLinks.find(l => l.toLowerCase().includes(path));
+        if (match) {
             try {
-                const fullUrl = new URL(path, normalizedUrl).href;
-                return crawlPage(fullUrl);
-            } catch {
-                return Promise.resolve({ url: path, success: false, error: 'Invalid URL' });
+                const fullUrl = new URL(match, cleanBase).href;
+                if (!crawled.has(fullUrl)) {
+                    toCrawl.push(fullUrl);
+                    crawled.add(fullUrl);
+                }
+            } catch { /* skip */ }
+        }
+    }
+
+    // Priority 3: Discovery from internal links (fill up to 20)
+    for (const link of internalLinks) {
+        if (toCrawl.length >= 20) break;
+        if (link === '/' || link.includes('#') || link.includes('?') || link.endsWith('.pdf') || link.endsWith('.jpg') || link.endsWith('.png')) continue;
+        try {
+            const fullUrl = new URL(link, cleanBase).href;
+            if (!crawled.has(fullUrl)) {
+                toCrawl.push(fullUrl);
+                crawled.add(fullUrl);
             }
-        })
-    );
+        } catch { /* skip */ }
+    }
 
-    const allPages = [homepage, ...subPages.filter(p => p.success)];
+    console.log(`🕷️  Crawl queue: ${toCrawl.length} pages (sitemap: ${sitemap.found ? sitemap.count : 0}, robots: ${robotsTxt.found})`);
 
-    // 4. Build site summary
+    // PHASE 3: Crawl in batches of 5 to avoid overwhelming the server
+    const allSubPages = [];
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < toCrawl.length; i += BATCH_SIZE) {
+        const batch = toCrawl.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(
+            batch.map(url => crawlPage(url).catch(e => ({ url, success: false, error: e.message })))
+        );
+        allSubPages.push(...batchResults.filter(p => p.success));
+        // Stop if we've taken too long (keep total under 15s for sub-crawl)
+        if (i + BATCH_SIZE >= 15 && allSubPages.length >= 10) break;
+    }
+
+    const allPages = [homepage, ...allSubPages];
+    console.log(`🕷️  Crawl complete: ${allPages.length} pages successfully crawled`);
+
+    // PHASE 4: Compute duplicate content
+    const duplicateContent = computeDuplicates(allPages);
+
+    // PHASE 5: Build comprehensive site intelligence
     const allHeadings = allPages.flatMap(p => p.headings || []);
     const allSchemaTypes = [...new Set(allPages.flatMap(p => p.schemaTypes || []))];
     const allTech = [...new Set(allPages.flatMap(p => p.tech || []))];
@@ -285,6 +564,23 @@ export async function researchDomain(baseUrl) {
     const hasViewport = allPages.every(p => p.viewport);
     const hasFAQ = allHeadings.some(h => h.text.toLowerCase().includes('faq') || h.text.toLowerCase().includes('frequently'));
     const hasRobots = homepage.robots;
+    const avgWordCount = Math.round(totalWordCount / allPages.length);
+    const thinPages = allPages.filter(p => (p.wordCount || 0) < 300);
+    const missingMeta = allPages.filter(p => !p.metaDescription);
+    const missingH1 = allPages.filter(p => !p.h1?.length);
+    const pagesWithRedirects = allPages.filter(p => p.redirectChain?.length > 0);
+
+    // Compute click depth (how many clicks from homepage)
+    const clickDepthMap = {};
+    clickDepthMap[homepage.url] = 0;
+    for (const page of allSubPages) {
+        // If page appears in homepage internal links, depth = 1
+        const matchPath = internalLinks.find(l => {
+            try { return new URL(l, cleanBase).href === page.url; } catch { return false; }
+        });
+        clickDepthMap[page.url] = matchPath ? 1 : 2; // Simple heuristic
+    }
+    const deepPages = allSubPages.filter(p => clickDepthMap[p.url] >= 2);
 
     return {
         url: normalizedUrl,
@@ -296,6 +592,7 @@ export async function researchDomain(baseUrl) {
             h2: p.h2,
             wordCount: p.wordCount,
             contentSnippet: p.contentSnippet,
+            redirectChain: p.redirectChain,
         })),
         homepage: {
             title: homepage.title,
@@ -307,10 +604,25 @@ export async function researchDomain(baseUrl) {
             h2: homepage.h2,
             h3: homepage.h3,
             contentSnippet: homepage.contentSnippet,
+            redirectChain: homepage.redirectChain,
+        },
+        robotsTxt: {
+            found: robotsTxt.found,
+            disallowCount: robotsTxt.disallowRules?.length || 0,
+            disallowRules: (robotsTxt.disallowRules || []).slice(0, 20),
+            sitemapUrls: robotsTxt.sitemapUrls || [],
+            crawlDelay: robotsTxt.crawlDelay,
+            raw: robotsTxt.raw?.substring(0, 500) || '',
+        },
+        sitemap: {
+            found: sitemap.found,
+            urlCount: sitemap.count,
+            sampleUrls: sitemap.urls.slice(0, 10),
         },
         siteIntelligence: {
             totalPages: allPages.length,
             totalWordCount,
+            avgWordCount,
             totalImages,
             imagesWithoutAlt,
             schemaTypes: allSchemaTypes,
@@ -320,9 +632,23 @@ export async function researchDomain(baseUrl) {
             hasViewport,
             hasFAQ,
             hasRobots: !!hasRobots,
+            hasRobotsTxt: robotsTxt.found,
+            hasSitemap: sitemap.found,
+            sitemapUrlCount: sitemap.count,
             internalLinkCount: homepage.internalLinkCount || 0,
             externalLinkCount: homepage.externalLinkCount || 0,
             externalDomains: homepage.links?.external || [],
+            // New deep crawl metrics
+            thinPages: thinPages.map(p => ({ url: p.url, wordCount: p.wordCount })),
+            thinPageCount: thinPages.length,
+            missingMetaDescriptions: missingMeta.map(p => p.url),
+            missingH1Tags: missingH1.map(p => p.url),
+            redirectChains: pagesWithRedirects.map(p => ({ url: p.url, chain: p.redirectChain })),
+            redirectChainCount: pagesWithRedirects.length,
+            duplicateContent,
+            duplicateContentCount: duplicateContent.length,
+            deepPages: deepPages.map(p => p.url),
+            clickDepthIssues: deepPages.length,
         },
     };
 }
@@ -379,7 +705,7 @@ export function formatSiteResearch(research) {
     const si = research.siteIntelligence;
     const hp = research.homepage;
 
-    let text = `=== REAL SITE DATA (crawled live) ===\n`;
+    let text = `=== REAL SITE DATA (deep crawl — ${si.totalPages} pages) ===\n`;
     text += `URL: ${research.url}\n`;
     text += `Title: ${hp.title}\n`;
     text += `Meta Description: ${hp.metaDescription || 'MISSING'}\n`;
@@ -387,11 +713,15 @@ export function formatSiteResearch(research) {
     text += `H2 tags: ${hp.h2?.slice(0, 10).join(', ') || 'None found'}\n`;
     text += `OG Title: ${hp.ogTitle || 'MISSING'}\n`;
     text += `OG Description: ${hp.ogDescription || 'MISSING'}\n`;
-    text += `Content preview: ${hp.contentSnippet || 'N/A'}\n\n`;
+    text += `Content preview: ${hp.contentSnippet || 'N/A'}\n`;
+    if (hp.redirectChain?.length > 0) {
+        text += `⚠️ HOMEPAGE REDIRECT CHAIN: ${hp.redirectChain.map(r => `${r.status}: ${r.from} → ${r.to}`).join(' → ')}\n`;
+    }
+    text += `\n`;
 
     text += `Site Stats:\n`;
     text += `- Pages crawled: ${si.totalPages}\n`;
-    text += `- Total word count: ${si.totalWordCount}\n`;
+    text += `- Total word count: ${si.totalWordCount} (avg ${si.avgWordCount || 0} per page)\n`;
     text += `- Total images: ${si.totalImages} (${si.imagesWithoutAlt} missing alt text)\n`;
     text += `- Internal links: ${si.internalLinkCount}, External links: ${si.externalLinkCount}\n`;
     text += `- Schema/JSON-LD: ${si.hasSchemaOrg ? `Yes (${si.schemaTypes.join(', ')})` : 'NONE FOUND'}\n`;
@@ -399,14 +729,60 @@ export function formatSiteResearch(research) {
     text += `- Canonical: ${si.hasCanonical ? 'Yes' : 'MISSING'}\n`;
     text += `- Mobile viewport: ${si.hasViewport ? 'Yes' : 'MISSING'}\n`;
     text += `- FAQ section: ${si.hasFAQ ? 'Yes' : 'Not found'}\n`;
-    text += `- Robots meta: ${si.hasRobots ? 'Yes' : 'Not found'}\n\n`;
+    text += `- Robots meta: ${si.hasRobots ? 'Yes' : 'Not found'}\n`;
+
+    // NEW: Robots.txt + Sitemap intelligence
+    if (research.robotsTxt) {
+        text += `\n--- robots.txt ---\n`;
+        text += `- robots.txt found: ${research.robotsTxt.found ? 'YES' : 'MISSING ⚠️'}\n`;
+        if (research.robotsTxt.found) {
+            text += `- Disallow rules: ${research.robotsTxt.disallowCount}\n`;
+            if (research.robotsTxt.disallowRules?.length > 0) {
+                text += `- Key rules: ${research.robotsTxt.disallowRules.slice(0, 5).map(r => `${r.path} (${r.agent})`).join(', ')}\n`;
+            }
+            if (research.robotsTxt.crawlDelay) text += `- Crawl-delay: ${research.robotsTxt.crawlDelay}\n`;
+            if (research.robotsTxt.sitemapUrls?.length > 0) text += `- Sitemaps referenced: ${research.robotsTxt.sitemapUrls.join(', ')}\n`;
+        }
+    }
+
+    if (research.sitemap) {
+        text += `\n--- Sitemap ---\n`;
+        text += `- sitemap.xml found: ${research.sitemap.found ? 'YES' : 'MISSING ⚠️'}\n`;
+        if (research.sitemap.found) {
+            text += `- URLs in sitemap: ${research.sitemap.urlCount}\n`;
+        }
+    }
+
+    // NEW: Issues detected
+    const issues = [];
+    if (si.thinPageCount > 0) issues.push(`${si.thinPageCount} THIN PAGES (<300 words): ${si.thinPages.slice(0, 3).map(p => p.url).join(', ')}`);
+    if (si.missingMetaDescriptions?.length > 0) issues.push(`${si.missingMetaDescriptions.length} pages MISSING meta descriptions: ${si.missingMetaDescriptions.slice(0, 3).join(', ')}`);
+    if (si.missingH1Tags?.length > 0) issues.push(`${si.missingH1Tags.length} pages MISSING H1 tags: ${si.missingH1Tags.slice(0, 3).join(', ')}`);
+    if (si.redirectChainCount > 0) issues.push(`${si.redirectChainCount} pages have REDIRECT CHAINS: ${si.redirectChains.slice(0, 2).map(r => `${r.url} (${r.chain.length} hops)`).join(', ')}`);
+    if (si.duplicateContentCount > 0) issues.push(`${si.duplicateContentCount} DUPLICATE/NEAR-DUPLICATE content pairs: ${si.duplicateContent.slice(0, 2).map(d => `${d.page1} ↔ ${d.page2} (${d.similarity}% ${d.level})`).join(', ')}`);
+    if (si.clickDepthIssues > 0) issues.push(`${si.clickDepthIssues} pages have DEEP CLICK DEPTH (not directly linked from homepage)`);
+
+    if (issues.length > 0) {
+        text += `\n--- ISSUES DETECTED ---\n`;
+        for (const issue of issues) {
+            text += `⚠️ ${issue}\n`;
+        }
+    }
+
+    text += `\n`;
 
     // Sub-pages
     if (research.pages.length > 1) {
         text += `Sub-pages crawled:\n`;
-        for (const p of research.pages.slice(1)) {
-            text += `- ${p.url}: "${p.title}" (${p.wordCount} words)\n`;
-            if (p.h1?.length) text += `  H1: ${p.h1.join(', ')}\n`;
+        for (const p of research.pages.slice(1, 15)) { // Show up to 15
+            text += `- ${p.url}: "${p.title}" (${p.wordCount} words)`;
+            if (p.h1?.length) text += ` | H1: ${p.h1.join(', ')}`;
+            if (!p.metaDescription) text += ` | ⚠️ no meta desc`;
+            if (p.redirectChain?.length > 0) text += ` | ⚠️ ${p.redirectChain.length} redirects`;
+            text += `\n`;
+        }
+        if (research.pages.length > 15) {
+            text += `  ... and ${research.pages.length - 15} more pages crawled\n`;
         }
     }
 

@@ -285,6 +285,107 @@ export default function SeoStudio() {
     const isAdvanced = !isWorkflow
     const currentItem = SIDEBAR_SECTIONS.flatMap(s => s.items).find(i => i.id === activeSection)
 
+    // ── PDF Download ───────────────────────────────────────────────────────
+    const downloadSeoPdf = (type, data, brand) => {
+        const title = { 'health-check': 'SEO Health Check', 'traffic': 'Traffic Strategy', 'competitors': 'Competitor Analysis', 'ai-visibility': 'AI Visibility Audit', 'competitor-warroom': 'Competitor War Room', 'llm-probe': 'LLM Brand Probe', 'auto-fix': 'Auto-Fix Report', 'prompt-mining': 'Prompt Mining' }[type] || 'SEO Report'
+        const date = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+        const brandName = brand?.name || 'Brand'
+
+        let body = `<h1>${title}</h1><p class="meta">${brandName} • ${date} • ${brand?.website || ''}</p>`
+        body += `<div class="summary">${data.summary || ''}</div>`
+
+        // Scores for health-check
+        if (type === 'health-check') {
+            body += `<div class="scores">`
+            ;[['SEO Health', data.seoHealthScore], ['AI Visibility', data.aiVisibilityScore], ['Technical', data.technicalScore], ['Content', data.contentScore], ['Authority', data.authorityScore]].forEach(([l, s]) => {
+                if (s) body += `<div class="score-card"><div class="score-value">${s}</div><div class="score-label">${l}</div></div>`
+            })
+            body += `</div>`
+            if (data.issues?.length) {
+                body += `<h2>Issues (${data.issues.length})</h2><table><tr><th>Severity</th><th>Title</th><th>Fix</th></tr>`
+                data.issues.forEach(i => { body += `<tr><td class="sev-${i.severity}">${i.severity}</td><td>${i.title}<br><small>${i.description || ''}</small></td><td>${i.fix || ''}</td></tr>` })
+                body += `</table>`
+            }
+        }
+
+        // Keywords for traffic
+        if (type === 'traffic') {
+            if (data.quickWins?.length) {
+                body += `<h2>Quick Wins</h2><table><tr><th>Action</th><th>Keyword</th><th>Impact</th></tr>`
+                data.quickWins.forEach(w => { body += `<tr><td>${w.action}</td><td>${w.keyword || ''}</td><td>${w.expectedImpact}</td></tr>` })
+                body += `</table>`
+            }
+            if (data.keywordClusters?.length) {
+                body += `<h2>Keyword Clusters</h2>`
+                data.keywordClusters.forEach(c => {
+                    body += `<div class="cluster"><h3>${c.clusterName} <span class="badge">${c.difficulty}</span> <span class="badge">${c.intent}</span></h3>`
+                    body += `<p>Keywords: ${(c.keywords || []).map(k => typeof k === 'string' ? k : k.keyword).join(', ')}</p>`
+                    if (c.suggestedTitle) body += `<p>📝 ${c.suggestedTitle} (${c.recommendedPageType})</p>`
+                    body += `</div>`
+                })
+            }
+            if (data.peopleAlsoAsk?.length) {
+                body += `<h2>People Also Ask</h2><ul>`
+                data.peopleAlsoAsk.forEach(q => { body += `<li>${q}</li>` })
+                body += `</ul>`
+            }
+        }
+
+        // Competitors
+        if (type === 'competitors' || type === 'competitor-warroom') {
+            if (data.competitors?.length) {
+                body += `<h2>Competitors</h2>`
+                data.competitors.forEach(c => {
+                    body += `<div class="comp"><h3>${c.name} — ${c.url}</h3>`
+                    body += `<p><strong>Strengths:</strong> ${(c.strengths || []).join(', ')}</p>`
+                    body += `<p><strong>Weaknesses:</strong> ${(c.weaknesses || []).join(', ')}</p></div>`
+                })
+            }
+            if (data.outrankPlan?.length) {
+                body += `<h2>Outrank Plan</h2><ol>`
+                data.outrankPlan.forEach(p => { body += `<li><strong>${p.action}</strong> — ${p.timeline} (${p.effort})</li>` })
+                body += `</ol>`
+            }
+        }
+
+        // AI Visibility
+        if (type === 'ai-visibility') {
+            body += `<div class="scores"><div class="score-card"><div class="score-value">${data.aiVisibilityScore || 0}</div><div class="score-label">AI Visibility Score</div></div></div>`
+            const bd = data.breakdown || {}
+            ;['schemaReadiness', 'qnaPresence', 'entityCoverage', 'snippetStructure', 'trustSignals'].forEach(k => {
+                if (bd[k]) body += `<div class="section"><h3>${k} — ${bd[k].score}/100</h3><p>${bd[k].currentState || ''}</p></div>`
+            })
+        }
+
+        // 30-day plan
+        if (data.thirtyDayPlan?.length) {
+            body += `<h2>30-Day Plan</h2>`
+            data.thirtyDayPlan.forEach(w => {
+                body += `<div class="week"><h3>Week ${w.week}</h3><ul>${(w.actions || []).map(a => `<li>${a}</li>`).join('')}</ul></div>`
+            })
+        }
+
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title} — ${brandName}</title><style>
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter','Segoe UI',sans-serif;color:#1e293b;padding:40px;max-width:900px;margin:0 auto;font-size:13px;line-height:1.6}
+h1{font-size:24px;margin-bottom:4px;color:#0f172a}h2{font-size:16px;margin:24px 0 12px;color:#1e293b;border-bottom:2px solid #e2e8f0;padding-bottom:6px}h3{font-size:14px;margin:8px 0;color:#334155}
+.meta{color:#64748b;margin-bottom:16px;font-size:12px}.summary{background:#f8fafc;border-left:4px solid #6366f1;padding:12px 16px;margin-bottom:24px;border-radius:0 8px 8px 0}
+.scores{display:flex;gap:16px;margin:16px 0;flex-wrap:wrap}.score-card{background:#f1f5f9;border-radius:12px;padding:16px 24px;text-align:center;min-width:100px}
+.score-value{font-size:32px;font-weight:900;color:#6366f1}.score-label{font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase}
+table{width:100%;border-collapse:collapse;margin:12px 0}th{background:#f1f5f9;padding:8px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#475569}
+td{padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:12px}small{color:#94a3b8}
+.sev-critical{color:#e11d48;font-weight:700}.sev-high{color:#f97316;font-weight:700}.sev-medium{color:#f59e0b}.sev-low{color:#64748b}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#f1f5f9;color:#475569;margin-left:6px}
+.cluster,.comp,.section,.week{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin:8px 0}
+ul,ol{padding-left:20px}li{margin:4px 0}
+@media print{body{padding:20px}h1{font-size:20px}}
+</style></head><body>${body}<div style="margin-top:40px;padding-top:16px;border-top:2px solid #e2e8f0;text-align:center"><p style="color:#94a3b8;font-size:10px">Generated by Mantram AI SEO Studio • ${date}</p></div></body></html>`
+
+        const w = window.open('', '_blank')
+        w.document.write(html)
+        w.document.close()
+        setTimeout(() => { w.print() }, 500)
+    }
+
     // ── RENDER ────────────────────────────────────────────────────────────
     return (
         <DashboardLayout title="SEO Studio" subtitle="AI-Powered SEO Intelligence">
@@ -501,15 +602,74 @@ export default function SeoStudio() {
                         {/* ─── Workflow Results ─── */}
                         {isWorkflow && !loading && results && (
                             <div ref={resultRef} className="animate-fade-in">
-                                {results.researchSources?.length > 0 && (
-                                    <div className="glass-panel rounded-xl p-3 mb-4 flex items-start gap-2">
-                                        <span className="material-symbols-outlined text-emerald-400 text-sm mt-0.5">verified</span>
-                                        <div>
-                                            <p className="text-xs text-emerald-400 font-bold">GROUNDED IN REAL RESEARCH</p>
-                                            <p className="text-[10px] text-slate-500">{results.researchSources.length} pages crawled: {results.researchSources.slice(0, 3).join(', ')}{results.researchSources.length > 3 ? ` +${results.researchSources.length - 3} more` : ''}</p>
+                                {/* Action Bar — PDF Download + Crawl Intelligence */}
+                                <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        {results.researchSources?.length > 0 && (
+                                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/8 border border-emerald-500/12">
+                                                <span className="material-symbols-outlined text-emerald-400 text-xs">verified</span>
+                                                <span className="text-[10px] text-emerald-400 font-bold">{results.researchSources.length} pages crawled</span>
+                                            </div>
+                                        )}
+                                        {results.crawlIntelligence && (
+                                            <>
+                                                <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${results.crawlIntelligence.hasSitemap ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                                    {results.crawlIntelligence.hasSitemap ? '✓ Sitemap' : '✗ No Sitemap'}
+                                                </span>
+                                                <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${results.crawlIntelligence.hasRobotsTxt ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                                    {results.crawlIntelligence.hasRobotsTxt ? '✓ Robots.txt' : '✗ No Robots.txt'}
+                                                </span>
+                                                {results.crawlIntelligence.thinPageCount > 0 && (
+                                                    <span className="text-[10px] px-2 py-1 rounded-full font-bold bg-amber-500/10 text-amber-400">
+                                                        {results.crawlIntelligence.thinPageCount} thin pages
+                                                    </span>
+                                                )}
+                                                {results.crawlIntelligence.duplicateContentCount > 0 && (
+                                                    <span className="text-[10px] px-2 py-1 rounded-full font-bold bg-rose-500/10 text-rose-400">
+                                                        {results.crawlIntelligence.duplicateContentCount} duplicates
+                                                    </span>
+                                                )}
+                                            </>
+                                        )}
+                                        {results.peopleAlsoAsk?.length > 0 && (
+                                            <span className="text-[10px] px-2 py-1 rounded-full font-bold bg-blue-500/10 text-blue-400">
+                                                {results.peopleAlsoAsk.length} PAA questions
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={() => downloadSeoPdf(activeSection, results, activeBrand)}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white cursor-pointer hover:brightness-110 transition-all"
+                                            style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                                            <span className="material-symbols-outlined text-xs">download</span> Download PDF
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* PAA Questions Panel */}
+                                {results.peopleAlsoAsk?.length > 0 && (
+                                    <div className="glass-panel rounded-xl p-4 mb-4">
+                                        <h4 className="text-xs font-bold text-blue-400 mb-2 flex items-center gap-1.5">
+                                            <span className="material-symbols-outlined text-sm">quiz</span> People Also Ask (from Google)
+                                        </h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {results.peopleAlsoAsk.map((q, i) => (
+                                                <span key={i} className="text-[11px] px-3 py-1 rounded-full bg-blue-500/8 border border-blue-500/12 text-slate-300">{q}</span>
+                                            ))}
                                         </div>
+                                        {results.relatedSearches?.length > 0 && (
+                                            <div className="mt-3 pt-2 border-t border-white/[0.04]">
+                                                <p className="text-[10px] text-slate-500 font-bold mb-1.5">Related Searches</p>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {results.relatedSearches.map((r, i) => (
+                                                        <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-slate-400">{r}</span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
+
                                 {activeSection === 'health-check' && <HealthCheckResults results={results} />}
                                 {activeSection === 'traffic' && <TrafficResults results={results} />}
                                 {activeSection === 'competitors' && <CompetitorResults results={results} />}
