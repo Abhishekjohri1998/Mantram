@@ -72,7 +72,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
 
       try {
         const providerController = new AbortController();
-        const providerTimeout = Math.min(35000, timeout); 
+        const providerTimeout = Math.min(50000, timeout); 
         const pTimer = setTimeout(() => providerController.abort(), providerTimeout);
 
         if (provider.name === 'anthropic') {
@@ -152,11 +152,10 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
         }
 
         if (provider.name === 'gemini') {
-          const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'];
+          const models = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-2.0-flash'];
           for (const modelId of models) {
             if (overallController.signal.aborted || providerController.signal.aborted) break;
             try {
-              // Concatenate for maximum compatibility (some models fail on system_instruction in v1beta)
               const resp = await fetch(
                 `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${provider.key}`,
                 {
@@ -181,7 +180,8 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
                 return text;
               } else {
                 console.warn(`Gemini ${modelId} error (${resp.status}):`, JSON.stringify(data.error || data));
-                if (isQuotaError(resp.status, data)) break;
+                // If limit is 0 or quota exceeded, try next Gemini model
+                if (isQuotaError(resp.status, data)) continue;
               }
             } catch (e) {
               console.warn(`Gemini ${modelId} request fail: ${e.message}`);
