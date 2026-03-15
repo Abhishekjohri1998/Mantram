@@ -199,6 +199,11 @@ export default function BrainstormStudio() {
     const inputRef = useRef(null)
     const bottomRef = useRef(null)
     const chatBottomRef = useRef(null)
+    const activeBrandIdRef = useRef(activeBrand?._id)
+
+    useEffect(() => {
+        activeBrandIdRef.current = activeBrand?._id
+    }, [activeBrand?._id])
 
     useEffect(() => {
         if (inputRef.current) inputRef.current.focus()
@@ -223,6 +228,7 @@ export default function BrainstormStudio() {
     // ========== HANDLERS ==========
 
     const selectIntent = async (intentId) => {
+        const brandIdAtStart = activeBrand?._id
         setIntent(intentId)
         setError('')
         setLoading(true)
@@ -235,6 +241,7 @@ export default function BrainstormStudio() {
                     dna: activeBrand.dna,
                 } : null,
             })
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success) {
                 setQuestions(data.questions)
                 setBrandInsight(data.brandInsight || null)
@@ -245,9 +252,12 @@ export default function BrainstormStudio() {
                 setError(data.error || 'Failed to start')
             }
         } catch (e) {
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             setError(e.message)
         } finally {
-            setLoading(false)
+            if (activeBrandIdRef.current === brandIdAtStart) {
+                setLoading(false)
+            }
         }
     }
 
@@ -267,6 +277,7 @@ export default function BrainstormStudio() {
     }
 
     const confirmUnderstanding = async (ans) => {
+        const brandIdAtStart = activeBrand?._id
         setLoading(true)
         setLoadingMsg('Analyzing your brief...')
         setStep(2)
@@ -276,19 +287,24 @@ export default function BrainstormStudio() {
                 answers: ans,
                 brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna } : null,
             })
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success) {
                 setConfirmation(data)
             } else {
                 setError(data.error || 'Confirmation failed')
             }
         } catch (e) {
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             setError(e.message)
         } finally {
-            setLoading(false)
+            if (activeBrandIdRef.current === brandIdAtStart) {
+                setLoading(false)
+            }
         }
     }
 
     const generateIdeas = async (refinementHint) => {
+        const brandIdAtStart = activeBrand?._id
         setLoading(true)
         setLoadingMsg(refinementHint ? 'Refining ideas...' : 'Generating multi-layer strategy...')
         setStep(3)
@@ -301,15 +317,19 @@ export default function BrainstormStudio() {
                 brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna } : null,
                 ...(refinementHint ? { refinementPrompt: refinementHint, previousIdeas: ideas } : {}),
             })
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success && data.ideas) {
                 setIdeas(data.ideas)
             } else {
                 setError(data.error || 'Generation failed')
             }
         } catch (e) {
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             setError(e.message)
         } finally {
-            setLoading(false)
+            if (activeBrandIdRef.current === brandIdAtStart) {
+                setLoading(false)
+            }
         }
     }
 
@@ -342,6 +362,7 @@ export default function BrainstormStudio() {
     }
 
     const generateScreenplay = async (filmConcept) => {
+        const brandIdAtStart = activeBrand?._id
         setScreenplayLoading(true)
         setScreenplay(null)
         try {
@@ -349,10 +370,18 @@ export default function BrainstormStudio() {
                 filmConcept,
                 brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna } : null,
             })
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success) setScreenplay(data.screenplay)
             else setError(data.error || 'Screenplay generation failed')
-        } catch (e) { setError(e.message) }
-        finally { setScreenplayLoading(false) }
+        } catch (e) {
+            if (activeBrandIdRef.current !== brandIdAtStart) return
+            setError(e.message)
+        }
+        finally {
+            if (activeBrandIdRef.current === brandIdAtStart) {
+                setScreenplayLoading(false)
+            }
+        }
     }
 
     // Open interactive chat for a film concept
@@ -366,6 +395,7 @@ export default function BrainstormStudio() {
 
     // Send chat message for film refinement
     const sendChatMessage = async (msg) => {
+        const brandIdAtStart = activeBrand?._id
         const text = msg || chatMessage.trim()
         if (!text || chatLoading) return
         setChatMessage('')
@@ -379,6 +409,7 @@ export default function BrainstormStudio() {
                 userMessage: text,
                 brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna } : null,
             })
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success !== false) {
                 const aiMsg = { role: 'ai', text: data.message, suggestions: data.suggestions || [] }
                 setChatHistory(prev => [...prev, aiMsg])
@@ -389,9 +420,12 @@ export default function BrainstormStudio() {
                 setChatHistory(prev => [...prev, { role: 'ai', text: data.error || 'Sorry, I couldn\'t process that. Try again.' }])
             }
         } catch (e) {
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             setChatHistory(prev => [...prev, { role: 'ai', text: `Error: ${e.message}` }])
         } finally {
-            setChatLoading(false)
+            if (activeBrandIdRef.current === brandIdAtStart) {
+                setChatLoading(false)
+            }
         }
     }
 
@@ -407,6 +441,7 @@ export default function BrainstormStudio() {
     // ========== STRATEGY HANDLERS ==========
 
     const generateStrategy = async () => {
+        const brandIdAtStart = activeBrand?._id
         setLoading(true)
         setLoadingMsg('Building your comprehensive brand strategy...')
         setStep(6)
@@ -416,6 +451,7 @@ export default function BrainstormStudio() {
                 answers,
                 brand: activeBrand ? { _id: activeBrand._id, name: activeBrand.name, dna: activeBrand.dna } : null,
             })
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success && data.strategy) {
                 setStrategyData(data.strategy)
                 setStrategyId(data.strategyId)
@@ -424,11 +460,19 @@ export default function BrainstormStudio() {
             } else {
                 setError(data.error || 'Strategy generation failed')
             }
-        } catch (e) { setError(e.message) }
-        finally { setLoading(false) }
+        } catch (e) {
+            if (activeBrandIdRef.current !== brandIdAtStart) return
+            setError(e.message)
+        }
+        finally {
+            if (activeBrandIdRef.current === brandIdAtStart) {
+                setLoading(false)
+            }
+        }
     }
 
     const generateSlides = async () => {
+        const brandIdAtStart = activeBrand?._id
         setSlidesLoading(true)
         setSlides(null)
         try {
@@ -437,13 +481,21 @@ export default function BrainstormStudio() {
                 strategy: strategyData,
                 brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna } : null,
             })
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success && data.slides) {
                 setSlides(data.slides)
                 setSlideIndex(0)
                 setStep(7)
             } else { setError(data.error || 'Slides generation failed') }
-        } catch (e) { setError(e.message) }
-        finally { setSlidesLoading(false) }
+        } catch (e) {
+            if (activeBrandIdRef.current !== brandIdAtStart) return
+            setError(e.message)
+        }
+        finally {
+            if (activeBrandIdRef.current === brandIdAtStart) {
+                setSlidesLoading(false)
+            }
+        }
     }
 
     const updateKpiValue = async (kpiName, value) => {
@@ -470,9 +522,11 @@ export default function BrainstormStudio() {
     }
 
     const openSavedStrategy = async (id) => {
+        const brandIdAtStart = activeBrand?._id
         setLoading(true); setLoadingMsg('Loading strategy...')
         try {
             const data = await bsAPI.getStrategy(id)
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success && data.strategy) {
                 const s = data.strategy
                 setStrategyData(s.strategy)
@@ -482,8 +536,15 @@ export default function BrainstormStudio() {
                 setIntent('brand-strategy')
                 setStep(6)
             }
-        } catch (e) { setError(e.message) }
-        finally { setLoading(false) }
+        } catch (e) {
+            if (activeBrandIdRef.current !== brandIdAtStart) return
+            setError(e.message)
+        }
+        finally {
+            if (activeBrandIdRef.current === brandIdAtStart) {
+                setLoading(false)
+            }
+        }
     }
 
     useEffect(() => { loadSavedStrategies() }, [])
