@@ -1068,7 +1068,7 @@ ${brandContext ? '- IMPORTANT: Align the visual style, colors, mood, and tone wi
             userPrompt: `Enhance this video prompt:\n\n"${prompt.trim()}"`,
             temperature: 0.5,
             maxTokens: 1024,
-        }, { provider: 'anthropic' });
+        }); // Use best available provider
 
         let parsed;
         try {

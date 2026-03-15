@@ -114,22 +114,35 @@ class ModelRouter {
         } catch (error) {
             const isQuotaError = error.message?.toLowerCase().includes('quota') ||
                 error.message?.toLowerCase().includes('rate limit') ||
+                error.message?.toLowerCase().includes('credit') ||
+                error.message?.toLowerCase().includes('balance') ||
                 error.message?.toLowerCase().includes('429');
 
             if (isQuotaError) {
                 // Cool down for 5 minutes
                 provider.cooldownUntil = Date.now() + (5 * 60 * 1000);
-                console.warn(`⏳ Provider ${provider.name} hit quota limits. Cooling down for 5 mins.`);
+                console.warn(`⏳ Provider ${provider.name} hit quota/credit limits. Cooling down for 5 mins.`);
             }
 
-            // Try fallback provider
-            console.error(`Provider ${provider.name} failed, trying fallback:`, error.message);
-            const fallback = this._getFallback(provider.name, 'text');
-            if (fallback) {
-                const result = await fallback.generateText(params);
-                this._logUsage('text', fallback.name, result.tokensUsed);
-                return result;
+            // Try ALL other available providers in order
+            console.error(`Provider ${provider.name} failed, searching for fallback:`, error.message);
+            
+            const remainingProviders = Object.entries(this.providers)
+                .filter(([name, p]) => name !== provider.name && p.isAvailable() && !(p.cooldownUntil && Date.now() < p.cooldownUntil))
+                .map(([_, p]) => p);
+
+            for (const fallback of remainingProviders) {
+                try {
+                    console.log(`Trying fallback provider: ${fallback.name}`);
+                    const result = await fallback.generateText(params);
+                    this._logUsage('text', fallback.name, result.tokensUsed);
+                    return result;
+                } catch (fallbackError) {
+                    console.error(`Fallback ${fallback.name} also failed:`, fallbackError.message);
+                    // Continue to next fallback
+                }
             }
+            
             throw error;
         }
     }
@@ -155,6 +168,8 @@ class ModelRouter {
         } catch (error) {
             const isQuotaError = error.message?.toLowerCase().includes('quota') ||
                 error.message?.toLowerCase().includes('rate limit') ||
+                error.message?.toLowerCase().includes('credit') ||
+                error.message?.toLowerCase().includes('balance') ||
                 error.message?.toLowerCase().includes('429');
 
             if (isQuotaError) {
@@ -212,7 +227,7 @@ class ModelRouter {
 
 // Singleton
 let routerInstance = null;
-export const getRouter = () => {
+export const getAIRouter = () => {
     if (!routerInstance) routerInstance = new ModelRouter();
     return routerInstance;
 };

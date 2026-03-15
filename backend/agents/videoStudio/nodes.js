@@ -48,7 +48,7 @@ async function callAgent(systemPrompt, userPrompt, temperature = 0.7) {
         userPrompt,
         temperature,
         maxTokens: 4096,
-    }, { provider: 'anthropic' }); // Claude Sonnet for quality writing
+    }, { provider: 'anthropic' }); // Preferred, but router will fallback if quota hit
     return parseAgentJSON(result.text || '');
 }
 
@@ -56,25 +56,13 @@ async function callAgent(systemPrompt, userPrompt, temperature = 0.7) {
 // ~10x faster than Claude, great for structured JSON tasks
 async function callFastAgent(systemPrompt, userPrompt, temperature = 0.3, maxTokens = 1024) {
     const router = getRouter();
-    try {
-        const result = await router.generateText({
-            systemPrompt,
-            userPrompt,
-            temperature,
-            maxTokens,
-        }, { provider: 'gemini' }); // Gemini Flash for speed
-        return parseAgentJSON(result.text || '');
-    } catch (e) {
-        // Fallback to Claude if Gemini fails
-        console.warn('⚡ Gemini Flash failed, falling back to Claude:', e.message);
-        const result = await router.generateText({
-            systemPrompt,
-            userPrompt,
-            temperature,
-            maxTokens,
-        }, { provider: 'anthropic' });
-        return parseAgentJSON(result.text || '');
-    }
+    const result = await router.generateText({
+        systemPrompt,
+        userPrompt,
+        temperature,
+        maxTokens,
+    }, { provider: 'gemini' }); // Gemini Flash for speed, router handles fallback
+    return parseAgentJSON(result.text || '');
 }
 
 // ── Helper: Load brand + past projects for context injection ──
@@ -258,7 +246,7 @@ export async function modelRouterNode(state) {
         512
     );
 
-    const model = result.selectedModel || 'kling-3.0';
+    const model = result.selectedModel || 'seedance-2.0'; // Default to Seedance 2.0 as requested
     const resolution = result.resolution || '1080p';
     const mode = result.mode || 'fast';
 

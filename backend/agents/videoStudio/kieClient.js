@@ -40,8 +40,7 @@ const KIE_MODELS = {
  */
 function getKieApiKey() {
     const key = config.kie?.apiKey || process.env.KIE_API_KEY;
-    if (!key) throw new Error('KIE_API_KEY not configured. Add it to .env');
-    return key;
+    return key || null;
 }
 
 /**
@@ -50,6 +49,8 @@ function getKieApiKey() {
  */
 export async function submitKieVideoGeneration({ model, prompt, imageUrl, duration, aspectRatio }) {
     const apiKey = getKieApiKey();
+    if (!apiKey) throw new Error('KIE_API_KEY not configured. Please add it to .env to use Veo 3.1 Fast.');
+    
     const modelConfig = KIE_MODELS[model];
     if (!modelConfig) throw new Error(`Unknown kie.ai model: ${model}`);
 
