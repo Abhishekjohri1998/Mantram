@@ -43,19 +43,19 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
   const overallController = new AbortController();
   const overallTimer = setTimeout(() => overallController.abort(), timeout);
 
-  // Helper to check if model failed due to quota
+  // Helper to check if model failed due to quota or rate limit
   const isQuotaError = (status, data) => {
     if (status === 429) return true;
     const errText = JSON.stringify(data || {}).toLowerCase();
-    return errText.includes('quota') || errText.includes('rate limit') || errText.includes('limit exceeded');
+    return errText.includes('quota') || errText.includes('rate limit') || errText.includes('limit exceeded') || errText.includes('throttled');
   };
 
   try {
-    // 1. Try OpenAI (Fastest, but sometimes throttles)
-    if (process.env.OPENAI_API_KEY) {
+    // 1. Try OpenAI (Fastest)
+    if (process.env.OPENAI_API_KEY && !overallController.signal.aborted) {
       try {
         const providerController = new AbortController();
-        const pTimer = setTimeout(() => providerController.abort(), 20000); // 20s for OpenAI
+        const pTimer = setTimeout(() => providerController.abort(), Math.min(timeout, 30000)); // Max 30s for OpenAI
 
         const resp = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -86,12 +86,53 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
       }
     }
 
-    // 2. Try Grok (Alternative)
+    // 2. Try Anthropic (Claude) — Very reliable for structured data
+    const anthropicKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY;
+    if (anthropicKey && !overallController.signal.aborted) {
+      try {
+        const providerController = new AbortController();
+        const pTimer = setTimeout(() => providerController.abort(), Math.min(timeout, 30000));
+
+        const resp = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': anthropicKey,
+            'anthropic-version': '2023-06-01'
+          },
+          body: JSON.stringify({
+            model: 'claude-3-5-sonnet-20240620',
+            max_tokens: maxTokens,
+            system: systemPrompt,
+            messages: [{ role: 'user', content: userPrompt }],
+            temperature,
+          }),
+          signal: providerController.signal,
+        });
+
+        clearTimeout(pTimer);
+        const data = await resp.json();
+
+        if (resp.ok && data.content?.[0]?.text) {
+          lastTokenUsage = { inputTokens: data.usage?.input_tokens || 0, outputTokens: data.usage?.output_tokens || 0, model: 'claude-3-5-sonnet', provider: 'anthropic' };
+          return data.content[0].text;
+        } else if (isQuotaError(resp.status, data)) {
+          console.warn('⚠️ Claude quota hit, trying fallback...');
+        } else {
+          console.warn(`Claude error (${resp.status}):`, data.error?.message || 'Unknown error');
+        }
+      } catch (e) {
+        console.warn(`Claude failed/timed out: ${e.message}`);
+        if (overallController.signal.aborted) throw e;
+      }
+    }
+
+    // 3. Try Grok (Alternative)
     const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
     if (grokKey && !overallController.signal.aborted) {
       try {
         const providerController = new AbortController();
-        const pTimer = setTimeout(() => providerController.abort(), 20000);
+        const pTimer = setTimeout(() => providerController.abort(), Math.min(timeout, 30000));
 
         const resp = await fetch('https://api.x.ai/v1/chat/completions', {
           method: 'POST',
@@ -120,15 +161,15 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
       }
     }
 
-    // 3. Fallback to Gemini (Most reliable, but slower)
-    const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
+    // 4. Fallback to Gemini
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GEMINI_IMAGE_API_KEY;
     if (geminiKey && !overallController.signal.aborted) {
-      const models = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+      const models = ['gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-2.0-flash-exp'];
       for (const model of models) {
         if (overallController.signal.aborted) break;
         try {
           const resp = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+            `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${geminiKey}`,
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
