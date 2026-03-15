@@ -43,7 +43,22 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
   const overallController = new AbortController();
   const overallTimer = setTimeout(() => overallController.abort(), timeout);
 
-  // Helper to check if model failed due to quota or rate limit
+  const defaultProvider = process.env.DEFAULT_TEXT_PROVIDER || 'anthropic';
+  
+  // Define providers in order, prioritizing the default one
+  const providers = [
+    { name: 'anthropic', key: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY },
+    { name: 'openai', key: process.env.OPENAI_API_KEY },
+    { name: 'xai', key: process.env.GROK_API_KEY || process.env.XAI_API_KEY },
+    { name: 'gemini', key: process.env.GEMINI_API_KEY || process.env.GEMINI_IMAGE_API_KEY },
+  ];
+
+  // Reorder to put default first
+  const sortedProviders = [
+    ...providers.filter(p => p.name === defaultProvider),
+    ...providers.filter(p => p.name !== defaultProvider)
+  ];
+
   const isQuotaError = (status, data) => {
     if (status === 429) return true;
     const errText = JSON.stringify(data || {}).toLowerCase();
@@ -51,158 +66,135 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
   };
 
   try {
-    // 1. Try OpenAI (Fastest)
-    if (process.env.OPENAI_API_KEY && !overallController.signal.aborted) {
+    for (const provider of sortedProviders) {
+      if (!provider.key || overallController.signal.aborted) continue;
+
+      console.log(`🤖 aiCall: Trying ${provider.name}...`);
+
       try {
         const providerController = new AbortController();
-        const pTimer = setTimeout(() => providerController.abort(), Math.min(timeout, 30000)); // Max 30s for OpenAI
+        // Cap each provider to 12s or remaining budget
+        const providerTimeout = Math.min(12000, timeout); 
+        const pTimer = setTimeout(() => providerController.abort(), providerTimeout);
 
-        const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-            temperature, max_tokens: maxTokens,
-            ...(json ? { response_format: { type: 'json_object' } } : {}),
-          }),
-          signal: providerController.signal,
-        });
-
-        clearTimeout(pTimer);
-        const data = await resp.json();
-
-        if (resp.ok && data.choices?.[0]?.message?.content) {
-          lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'gpt-4o-mini', provider: 'openai' };
-          return data.choices[0].message.content;
-        } else if (isQuotaError(resp.status, data)) {
-          console.warn('⚠️ OpenAI quota hit, trying fallback...');
-        } else {
-          console.warn(`OpenAI error (${resp.status}):`, data.error?.message || 'Unknown error');
-        }
-      } catch (e) {
-        console.warn(`OpenAI failed/timed out: ${e.message}`);
-        if (overallController.signal.aborted) throw e;
-      }
-    }
-
-    // 2. Try Anthropic (Claude) — Very reliable for structured data
-    const anthropicKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY;
-    if (anthropicKey && !overallController.signal.aborted) {
-      try {
-        const providerController = new AbortController();
-        const pTimer = setTimeout(() => providerController.abort(), Math.min(timeout, 30000));
-
-        const resp = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': anthropicKey,
-            'anthropic-version': '2023-06-01'
-          },
-          body: JSON.stringify({
-            model: 'claude-3-5-sonnet-20240620',
-            max_tokens: maxTokens,
-            system: systemPrompt,
-            messages: [{ role: 'user', content: userPrompt }],
-            temperature,
-          }),
-          signal: providerController.signal,
-        });
-
-        clearTimeout(pTimer);
-        const data = await resp.json();
-
-        if (resp.ok && data.content?.[0]?.text) {
-          lastTokenUsage = { inputTokens: data.usage?.input_tokens || 0, outputTokens: data.usage?.output_tokens || 0, model: 'claude-3-5-sonnet', provider: 'anthropic' };
-          return data.content[0].text;
-        } else if (isQuotaError(resp.status, data)) {
-          console.warn('⚠️ Claude quota hit, trying fallback...');
-        } else {
-          console.warn(`Claude error (${resp.status}):`, data.error?.message || 'Unknown error');
-        }
-      } catch (e) {
-        console.warn(`Claude failed/timed out: ${e.message}`);
-        if (overallController.signal.aborted) throw e;
-      }
-    }
-
-    // 3. Try Grok (Alternative)
-    const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
-    if (grokKey && !overallController.signal.aborted) {
-      try {
-        const providerController = new AbortController();
-        const pTimer = setTimeout(() => providerController.abort(), Math.min(timeout, 30000));
-
-        const resp = await fetch('https://api.x.ai/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${grokKey}` },
-          body: JSON.stringify({
-            model: 'grok-3-mini-fast',
-            messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-            temperature, max_tokens: maxTokens,
-            ...(json ? { response_format: { type: 'json_object' } } : {}),
-          }),
-          signal: providerController.signal,
-        });
-
-        clearTimeout(pTimer);
-        const data = await resp.json();
-
-        if (resp.ok && data.choices?.[0]?.message?.content) {
-          lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'grok-3-mini-fast', provider: 'xai' };
-          return data.choices[0].message.content;
-        } else if (isQuotaError(resp.status, data)) {
-          console.warn('⚠️ Grok quota hit, trying fallback...');
-        }
-      } catch (e) {
-        console.warn(`Grok failed/timed out: ${e.message}`);
-        if (overallController.signal.aborted) throw e;
-      }
-    }
-
-    // 4. Fallback to Gemini
-    const geminiKey = process.env.GEMINI_API_KEY || process.env.GEMINI_IMAGE_API_KEY;
-    if (geminiKey && !overallController.signal.aborted) {
-      const models = ['gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-2.0-flash-exp'];
-      for (const model of models) {
-        if (overallController.signal.aborted) break;
-        try {
-          const resp = await fetch(
-            `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${geminiKey}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                systemInstruction: { parts: [{ text: systemPrompt }] },
-                contents: [{ parts: [{ text: userPrompt }] }],
-                generationConfig: {
-                  temperature, maxOutputTokens: maxTokens,
-                  ...(json ? { responseMimeType: 'application/json' } : {}),
-                },
-              }),
-              signal: overallController.signal,
-            }
-          );
-
+        if (provider.name === 'anthropic') {
+          const resp = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': provider.key,
+              'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify({
+              model: 'claude-3-5-sonnet-20240620',
+              max_tokens: maxTokens,
+              system: systemPrompt,
+              messages: [{ role: 'user', content: userPrompt }],
+              temperature,
+            }),
+            signal: providerController.signal,
+          });
+          clearTimeout(pTimer);
           const data = await resp.json();
-          if (resp.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-            const text = data.candidates[0].content.parts[0].text;
-            lastTokenUsage = { inputTokens: data.usageMetadata?.promptTokenCount || 0, outputTokens: data.usageMetadata?.candidatesTokenCount || 0, model, provider: 'gemini' };
-            return text;
+          if (resp.ok && data.content?.[0]?.text) {
+            lastTokenUsage = { inputTokens: data.usage?.input_tokens || 0, outputTokens: data.usage?.output_tokens || 0, model: 'claude-3-5-sonnet', provider: 'anthropic' };
+            return data.content[0].text;
           } else if (isQuotaError(resp.status, data)) {
-            console.warn(`⚠️ Gemini ${model} quota hit, trying fallback...`);
+            console.warn('⚠️ Claude quota hit, trying fallback...');
           } else {
-            console.warn(`Gemini ${model} error:`, JSON.stringify(data.error || data));
+            console.warn(`Claude error (${resp.status}):`, data.error?.message || 'Unknown error');
           }
-        } catch (e) {
-          if (overallController.signal.aborted) throw e;
-          console.warn(`Gemini ${model} request failed: ${e.message}`);
         }
+
+        if (provider.name === 'openai') {
+          const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${provider.key}` },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+              temperature, max_tokens: maxTokens,
+              ...(json ? { response_format: { type: 'json_object' } } : {}),
+            }),
+            signal: providerController.signal,
+          });
+          clearTimeout(pTimer);
+          const data = await resp.json();
+          if (resp.ok && data.choices?.[0]?.message?.content) {
+            lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'gpt-4o-mini', provider: 'openai' };
+            return data.choices[0].message.content;
+          } else if (isQuotaError(resp.status, data)) {
+            console.warn('⚠️ OpenAI quota hit, trying fallback...');
+          } else {
+            console.warn(`OpenAI error (${resp.status}):`, data.error?.message || 'Unknown error');
+          }
+        }
+
+        if (provider.name === 'xai') {
+          const resp = await fetch('https://api.x.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${provider.key}` },
+            body: JSON.stringify({
+              model: 'grok-3-mini-fast',
+              messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+              temperature, max_tokens: maxTokens,
+              ...(json ? { response_format: { type: 'json_object' } } : {}),
+            }),
+            signal: providerController.signal,
+          });
+          clearTimeout(pTimer);
+          const data = await resp.json();
+          if (resp.ok && data.choices?.[0]?.message?.content) {
+            lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'grok-3-mini-fast', provider: 'xai' };
+            return data.choices[0].message.content;
+          } else if (isQuotaError(resp.status, data)) {
+            console.warn('⚠️ Grok quota hit, trying fallback...');
+          }
+        }
+
+        if (provider.name === 'gemini') {
+          const models = ['gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-2.0-flash-exp'];
+          for (const model of models) {
+            if (overallController.signal.aborted || providerController.signal.aborted) break;
+            try {
+              const resp = await fetch(
+                `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${provider.key}`,
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                    contents: [{ parts: [{ text: userPrompt }] }],
+                    generationConfig: {
+                      temperature, maxOutputTokens: maxTokens,
+                      ...(json ? { responseMimeType: 'application/json' } : {}),
+                    },
+                  }),
+                  signal: providerController.signal,
+                }
+              );
+              const data = await resp.json();
+              if (resp.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                clearTimeout(pTimer);
+                const text = data.candidates[0].content.parts[0].text;
+                lastTokenUsage = { inputTokens: data.usageMetadata?.promptTokenCount || 0, outputTokens: data.usageMetadata?.candidatesTokenCount || 0, model, provider: 'gemini' };
+                return text;
+              } else if (isQuotaError(resp.status, data)) {
+                console.warn(`⚠️ Gemini ${model} quota hit...`);
+              }
+            } catch (e) {
+              console.warn(`Gemini ${model} fail: ${e.message}`);
+            }
+          }
+          clearTimeout(pTimer);
+        }
+      } catch (e) {
+        console.warn(`${provider.name} provider error: ${e.message}`);
+        if (overallController.signal.aborted) throw e;
       }
     }
 
-    throw new Error('All AI models failed, or quotas exceeded, or timeout reached');
+    throw new Error('All AI models failed, quotas exceeded, or total timeout reached');
   } finally {
     clearTimeout(overallTimer);
   }
