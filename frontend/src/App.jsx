@@ -5,6 +5,7 @@ import { CreditProvider } from './context/CreditContext'
 import { ShopifyProvider } from './context/ShopifyContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Auth from './pages/Auth'
+import VerifyEmail from './pages/VerifyEmail'
 import Landing from './pages/Landing'
 import BrandOnboarding from './pages/BrandOnboarding'
 import Nexus from './pages/Nexus'
@@ -60,6 +61,7 @@ function App() {
                 <Route path="/" element={<Landing />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/signup" element={<Auth />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/onboarding" element={<BrandOnboarding />} />
                 <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                 <Route path="/terms" element={<TermsOfService />} />

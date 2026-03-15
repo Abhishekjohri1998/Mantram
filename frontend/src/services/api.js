@@ -88,6 +88,8 @@ export const auth = {
     getProfile: () => apiFetch('/auth/me'),
     updateProfile: (data) => apiFetch('/auth/profile', { method: 'PUT', body: JSON.stringify(data) }),
     google: () => apiFetch('/auth/google'),
+    verifyEmail: (token) => apiFetch(`/auth/verify-email?token=${token}`),
+    resendVerification: (email) => apiFetch('/auth/resend-verification', { method: 'POST', body: JSON.stringify({ email }) }),
 };
 
 // ============ Brands API ============
