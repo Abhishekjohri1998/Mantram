@@ -72,6 +72,7 @@ export default function SuperAdminDashboard() {
         { id: 'overview', label: 'Overview', icon: 'dashboard' },
         { id: 'approvals', label: 'Approvals', icon: 'how_to_reg' },
         { id: 'users', label: 'Users', icon: 'group' },
+        { id: 'ai-credits', label: 'AI Usage', icon: 'token' },
         { id: 'tokenUsage', label: 'Token Usage', icon: 'monitoring' },
         { id: 'packages', label: 'Packages', icon: 'inventory_2' },
         { id: 'coupons', label: 'Coupons', icon: 'confirmation_number' },
@@ -88,7 +89,7 @@ export default function SuperAdminDashboard() {
     }, [search])
 
     useEffect(() => {
-        if (tab === 'users') loadUsers()
+        if (tab === 'users' || tab === 'ai-credits') loadUsers()
         if (tab === 'approvals') loadPendingUsers()
         if (tab === 'coupons') loadCoupons()
         if (tab === 'content') { loadBrands(); loadContent() }
@@ -559,6 +560,241 @@ export default function SuperAdminDashboard() {
                         </div>}
                     </div>
                 )}
+
+                {/* ════════════ AI USAGE & CREDITS ════════════ */}
+                {tab === 'ai-credits' && (
+                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                        {/* Summary Section */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                            <div className="glass-panel rounded-2xl p-5 border border-primary/10">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-primary">token</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">System Credits Used</p>
+                                        <h4 className="text-2xl font-black text-white">
+                                            {stats?.totalCreditsUsed?.toLocaleString() || '—'}
+                                        </h4>
+                                    </div>
+                                </div>
+                                <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                                     <div className="h-full bg-primary" style={{ width: '65%' }} />
+                                </div>
+                            </div>
+
+                            <div className="glass-panel rounded-2xl p-5 border border-rose-500/10">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-rose-400">battery_alert</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Exhausted Accounts</p>
+                                        <h4 className="text-2xl font-black text-white">
+                                            {stats?.usageAnalytics?.exhaustedCount || 0}
+                                        </h4>
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-rose-400/60 font-medium">Require immediate recharge or plan upgrade</p>
+                            </div>
+
+                            <div className="glass-panel rounded-2xl p-5 border border-amber-500/10">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-amber-400">warning</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Low Balance (&lt;10%)</p>
+                                        <h4 className="text-2xl font-black text-white">
+                                            {stats?.usageAnalytics?.nearEmptyCount || 0}
+                                        </h4>
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-amber-400/60 font-medium">Approaching credit limits</p>
+                            </div>
+
+                            <div className="glass-panel rounded-2xl p-5 border border-emerald-500/10">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-emerald-400">trending_up</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Top Consumers</p>
+                                        <h4 className="text-2xl font-black text-white">
+                                            {stats?.usageAnalytics?.topUsers?.length || 0}
+                                        </h4>
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-emerald-400/60 font-medium">Power users with high generation volume</p>
+                            </div>
+                        </div>
+
+                        {/* Search & Utility Bar */}
+                        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                            <div className="flex-1 relative">
+                                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-lg">search</span>
+                                <input 
+                                    type="text" 
+                                    value={search} 
+                                    onChange={e => { setSearch(e.target.value); setUserPage(1) }} 
+                                    placeholder="Search users to manage credits..." 
+                                    className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none focus:border-primary/50 transition-all shadow-inner" 
+                                />
+                            </div>
+                            <div className="flex gap-2">
+                                <button 
+                                    onClick={() => { setPlanFilter('exhausted'); setUserPage(1) }}
+                                    className={`px-4 py-3 rounded-2xl text-xs font-bold border transition-all flex items-center gap-2 ${planFilter === 'exhausted' ? 'bg-rose-500/15 border-rose-500/30 text-rose-400' : 'bg-white/[0.04] border-white/[0.08] text-slate-400 hover:bg-white/[0.08]'}`}
+                                >
+                                    <span className="material-symbols-outlined text-sm">error</span>
+                                    Exhausted
+                                </button>
+                                <button 
+                                    onClick={() => { setPlanFilter('low'); setUserPage(1) }}
+                                    className={`px-4 py-3 rounded-2xl text-xs font-bold border transition-all flex items-center gap-2 ${planFilter === 'low' ? 'bg-amber-500/15 border-amber-500/30 text-amber-400' : 'bg-white/[0.04] border-white/[0.08] text-slate-400 hover:bg-white/[0.08]'}`}
+                                >
+                                    <span className="material-symbols-outlined text-sm">warning</span>
+                                    Low Balance
+                                </button>
+                                <button 
+                                    onClick={() => { setPlanFilter(''); setSearch(''); setUserPage(1) }}
+                                    className="px-4 py-3 rounded-2xl text-xs font-bold bg-white/[0.04] border border-white/[0.08] text-slate-400 hover:bg-white/[0.08] transition-all"
+                                >
+                                    Reset
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Detailed Usage Table */}
+                        <div className="glass-panel rounded-2xl overflow-hidden border border-white/[0.06] shadow-2xl">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="text-[10px] text-slate-500 font-black uppercase tracking-[0.1em] border-b border-white/[0.06] bg-white/[0.02]">
+                                            <th className="px-6 py-4">User Identity</th>
+                                            <th className="px-6 py-4">Subscription Plan</th>
+                                            <th className="px-6 py-4">AI Usage (Used/Total)</th>
+                                            <th className="px-6 py-4">Remaining</th>
+                                            <th className="px-6 py-4">Status</th>
+                                            <th className="px-6 py-4 text-right">Credit Control</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/[0.04]">
+                                        {users.length > 0 ? users.map(u => {
+                                            const total = (u.credits?.total || 0) + (u.credits?.bonus || 0);
+                                            const used = u.credits?.used || 0;
+                                            const remaining = u.creditBalance?.remaining || 0;
+                                            const percent = Math.min(100, (used / total) * 100);
+                                            const isLow = remaining <= 5 || percent >= 90;
+                                            const isExhausted = remaining <= 0;
+
+                                            return (
+                                                <tr key={u._id} className="text-sm group hover:bg-white/[0.01] transition-all">
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-indigo-500/10 flex items-center justify-center text-primary font-black shadow-lg">
+                                                                {u.name?.[0]?.toUpperCase()}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="font-bold text-white truncate">{u.name}</p>
+                                                                <p className="text-[10px] text-slate-600 truncate">{u.email}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`text-[9px] px-2 py-1 rounded-lg font-black uppercase tracking-wider border ${
+                                                            u.plan === 'enterprise' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 
+                                                            u.plan === 'professional' ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' : 
+                                                            u.plan === 'test' ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' :
+                                                            'bg-slate-500/10 border-white/10 text-slate-400'
+                                                        }`}>
+                                                            {u.plan}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="w-32">
+                                                            <div className="flex justify-between items-center mb-1.5">
+                                                                <p className="text-[10px] font-bold text-white">{used} / {total}</p>
+                                                                <p className="text-[9px] text-slate-600 font-bold">{Math.round(percent)}%</p>
+                                                            </div>
+                                                            <div className="h-1.5 w-full bg-white/[0.06] rounded-full overflow-hidden">
+                                                                <div 
+                                                                    className={`h-full rounded-full transition-all duration-700 ${
+                                                                        isExhausted ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]' : 
+                                                                        isLow ? 'bg-amber-500' : 
+                                                                        'bg-primary'
+                                                                    }`}
+                                                                    style={{ width: `${percent}%` }}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`text-base font-black ${isExhausted ? 'text-rose-500' : isLow ? 'text-amber-500' : 'text-emerald-400'}`}>
+                                                            {u.creditBalance?.unlimited ? '∞' : remaining}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        {isExhausted ? (
+                                                            <div className="flex items-center gap-1 text-rose-500">
+                                                                <span className="material-symbols-outlined text-sm">cancel</span>
+                                                                <span className="text-[10px] font-black uppercase tracking-tighter">Expired</span>
+                                                            </div>
+                                                        ) : isLow ? (
+                                                            <div className="flex items-center gap-1 text-amber-500">
+                                                                <span className="material-symbols-outlined text-sm">history_toggle_off</span>
+                                                                <span className="text-[10px] font-black uppercase tracking-tighter">Low Balance</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center gap-1 text-emerald-500">
+                                                                <span className="material-symbols-outlined text-sm">check_circle</span>
+                                                                <span className="text-[10px] font-black uppercase tracking-tighter">Healthy</span>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <button 
+                                                            onClick={() => setCreditModal(u)}
+                                                            className="px-4 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white text-xs font-black transition-all border border-emerald-500/20 flex items-center gap-2 ml-auto cursor-pointer"
+                                                        >
+                                                            <span className="material-symbols-outlined text-sm">add_card</span>
+                                                            Recharge
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }) : (
+                                            <tr><td colSpan="6" className="py-20 text-center text-slate-600 font-medium tracking-wide">No users matching current filters</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {totalUsers > 20 && (
+                            <div className="flex justify-center gap-4 mt-8">
+                                <button 
+                                    disabled={userPage <= 1} 
+                                    onClick={() => setUserPage(p => p - 1)} 
+                                    className="px-6 py-3 rounded-2xl bg-white/[0.04] text-xs font-bold text-slate-400 disabled:opacity-30 border border-white/[0.08] hover:border-white/[0.2] transition-all cursor-pointer"
+                                >
+                                    ← Previous Page
+                                </button>
+                                <div className="px-6 py-3 rounded-2xl bg-primary/10 border border-primary/20 text-xs font-black text-primary">
+                                    Page {userPage}
+                                </div>
+                                <button 
+                                    disabled={users.length < 20} 
+                                    onClick={() => setUserPage(p => p + 1)} 
+                                    className="px-6 py-3 rounded-2xl bg-white/[0.04] text-xs font-bold text-slate-400 disabled:opacity-30 border border-white/[0.08] hover:border-white/[0.2] transition-all cursor-pointer"
+                                >
+                                    Next Page →
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
+
 
                 {/* ════════════ TOKEN USAGE ════════════ */}
                 {tab === 'tokenUsage' && (
