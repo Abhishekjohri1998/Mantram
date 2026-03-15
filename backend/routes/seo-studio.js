@@ -646,7 +646,7 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
         await SeoAudit.findOneAndUpdate(
           { user: req.user._id, brand: brand._id, type: 'traffic' },
           { results: parsed, url: website, status: 'completed' },
-          { upsert: true, new: true }
+          { upsert: true, returnDocument: 'after' }
         );
       } catch (dbErr) { console.warn('Could not save traffic audit:', dbErr.message); }
     }
@@ -779,7 +779,7 @@ Be STRATEGIC and SPECIFIC. Every insight must have a WHY and an actionable HOW. 
         await SeoAudit.findOneAndUpdate(
           { user: req.user._id, brand: brand._id, type: 'competitors' },
           { results: parsed, url: website, status: 'completed' },
-          { upsert: true, new: true }
+          { upsert: true, returnDocument: 'after' }
         );
       } catch (dbErr) { console.warn('Could not save competitors audit:', dbErr.message); }
     }
@@ -960,8 +960,9 @@ STRATEGIC RULES (MANDATORY):
         await SeoAudit.findOneAndUpdate(
           { user: req.user._id, brand: brand._id, type: 'ai-visibility' },
           { results: parsed, url: website, status: 'completed' },
-          { upsert: true, new: true }
+          { upsert: true, returnDocument: 'after' }
         );
+        console.log(`✅ AI Visibility Successful: ${website}`);
       } catch (dbErr) { console.warn('Could not save AI visibility audit:', dbErr.message); }
     }
 
@@ -1392,7 +1393,7 @@ Generate 5-15 discovered backlinks, 5-10 competitor link gaps, 8-15 link opportu
         await SeoAudit.findOneAndUpdate(
           { user: req.user._id, brand: brand._id, type: 'backlinks' },
           { url: website, scores: { authorityScore: parsed.backlinkHealthScore || 0 }, results: parsed, status: 'completed', creditsUsed: req.creditsDeducted || 4 },
-          { upsert: true, new: true }
+          { upsert: true, returnDocument: 'after' }
         );
       } catch (dbErr) { console.warn('Could not save backlink audit:', dbErr.message); }
     }
@@ -1509,8 +1510,9 @@ Respond in STRICT JSON:
         await SeoAudit.findOneAndUpdate(
           { user: req.user._id, brand: brand._id, type: 'competitor-warroom' },
           { url: website, results: parsed, status: 'completed' },
-          { upsert: true, new: true }
+          { upsert: true, returnDocument: 'after' }
         );
+        console.log(`✅ SEO War Room Plan Successful: ${website}`);
       } catch (dbErr) { console.warn('Could not save war room audit:', dbErr.message); }
     }
 
@@ -1649,7 +1651,7 @@ CRITICAL: Use the REAL mention rate (${probeData.aggregate.mentionRate}%) as the
         await SeoAudit.findOneAndUpdate(
           { user: req.user._id, brand: brand._id, type: 'llm-probe' },
           { url: website, results: parsed, status: 'completed' },
-          { upsert: true, new: true }
+          { upsert: true, returnDocument: 'after' }
         );
       } catch (dbErr) { console.warn('Could not save LLM probe:', dbErr.message); }
     }
@@ -1737,7 +1739,7 @@ Generate production-ready code. Every fix must be copy-paste ready. Use the bran
         await SeoAudit.findOneAndUpdate(
           { user: req.user._id, brand: brand._id, type: 'auto-fix' },
           { url: website, results: parsed, status: 'completed' },
-          { upsert: true, new: true }
+          { upsert: true, returnDocument: 'after' }
         );
       } catch (dbErr) { console.warn('Could not save auto-fix audit:', dbErr.message); }
     }
@@ -1884,7 +1886,7 @@ Generate 15-20 mined prompts. Be specific to this brand's industry. Think about 
         await SeoAudit.findOneAndUpdate(
           { user: req.user._id, brand: brand._id, type: 'prompt-mining' },
           { url: website, results: parsed, status: 'completed' },
-          { upsert: true, new: true }
+          { upsert: true, returnDocument: 'after' }
         );
       } catch (dbErr) { console.warn('Could not save prompt mining:', dbErr.message); }
     }
