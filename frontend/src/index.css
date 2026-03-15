@@ -90,9 +90,10 @@
 @layer components {
   .glass-panel {
     background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
   .glass-panel-hover:hover {
@@ -102,8 +103,77 @@
 
   .glass-primary {
     background: rgba(43, 75, 238, 0.1);
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(20px);
     border: 1px solid rgba(43, 75, 238, 0.2);
+  }
+
+  /* ── 2026 Studio Card — premium glassmorphism ── */
+  .studio-card {
+    background: rgba(255, 255, 255, 0.025);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    border-radius: 1.25rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .studio-card:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transform: translateY(-2px);
+  }
+
+  /* ── Studio Navigation Pill (active tab) ── */
+  .studio-nav-pill {
+    background: linear-gradient(135deg, rgba(43, 75, 238, 0.15), rgba(139, 92, 246, 0.1));
+    border: 1px solid rgba(43, 75, 238, 0.3);
+    box-shadow: 0 0 20px rgba(43, 75, 238, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    color: white;
+  }
+
+  /* ── Glow Border — animated gradient for premium feel ── */
+  .glow-border {
+    position: relative;
+    overflow: hidden;
+  }
+  .glow-border::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    background: linear-gradient(135deg, rgba(43, 75, 238, 0.4), rgba(139, 92, 246, 0.2), rgba(6, 182, 212, 0.3), rgba(43, 75, 238, 0.4));
+    background-size: 300% 300%;
+    animation: glowShift 4s ease-in-out infinite;
+    z-index: -1;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    -webkit-mask-composite: xor;
+    padding: 1px;
+  }
+
+  /* ── Glass Accent panels (colored) ── */
+  .glass-accent-violet {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(139, 92, 246, 0.02));
+    border: 1px solid rgba(139, 92, 246, 0.15);
+    backdrop-filter: blur(16px);
+  }
+  .glass-accent-amber {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(245, 158, 11, 0.02));
+    border: 1px solid rgba(245, 158, 11, 0.15);
+    backdrop-filter: blur(16px);
+  }
+  .glass-accent-emerald {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(16, 185, 129, 0.02));
+    border: 1px solid rgba(16, 185, 129, 0.15);
+    backdrop-filter: blur(16px);
+  }
+  .glass-accent-cyan {
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.08), rgba(6, 182, 212, 0.02));
+    border: 1px solid rgba(6, 182, 212, 0.15);
+    backdrop-filter: blur(16px);
   }
 
   .liquid-gradient {
@@ -132,13 +202,13 @@
   }
 
   .btn-primary {
-    background: var(--color-primary);
+    background: linear-gradient(135deg, var(--color-primary), var(--color-accent-purple));
     color: white;
     font-weight: 700;
     padding: 0.625rem 1.5rem;
     border-radius: 0.75rem;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 20px rgba(43, 75, 238, 0.25);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 20px rgba(43, 75, 238, 0.3);
     border: none;
     cursor: pointer;
     display: inline-flex;
@@ -148,9 +218,9 @@
   }
 
   .btn-primary:hover {
-    background: var(--color-primary-light);
-    transform: translateY(-1px);
-    box-shadow: 0 6px 30px rgba(43, 75, 238, 0.35);
+    background: linear-gradient(135deg, var(--color-primary-light), #9b6ff6);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(43, 75, 238, 0.4);
   }
 
   .btn-primary:active {
@@ -178,13 +248,13 @@
   }
 
   .input-glass {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.875rem;
     padding: 0.75rem 1rem;
     color: white;
     font-size: 0.9375rem;
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     outline: none;
     width: 100%;
   }
@@ -195,7 +265,8 @@
 
   .input-glass:focus {
     border-color: rgba(43, 75, 238, 0.5);
-    box-shadow: 0 0 0 3px rgba(43, 75, 238, 0.1);
+    box-shadow: 0 0 0 3px rgba(43, 75, 238, 0.1), 0 0 20px rgba(43, 75, 238, 0.08);
+    background: rgba(255, 255, 255, 0.06);
   }
 
   .badge {
@@ -226,7 +297,7 @@
   .progress-bar-fill {
     height: 100%;
     border-radius: 99px;
-    background: var(--color-primary);
+    background: linear-gradient(90deg, var(--color-primary), var(--color-accent-purple));
     transition: width 1s ease;
   }
 
@@ -363,4 +434,40 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+@keyframes glowShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Staggered entrance utilities ── */
+.fade-up { animation: fadeUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) both; }
+.fade-up-1 { animation: fadeUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.05s both; }
+.fade-up-2 { animation: fadeUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.1s both; }
+.fade-up-3 { animation: fadeUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.15s both; }
+.fade-up-4 { animation: fadeUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.2s both; }
+.fade-up-5 { animation: fadeUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.25s both; }
+.slide-in { animation: slideInRight 0.4s cubic-bezier(0.4, 0, 0.2, 1) both; }
+
+/* ── Shimmer loading state ── */
+.shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
 }

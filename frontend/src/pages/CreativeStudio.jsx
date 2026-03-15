@@ -157,6 +157,8 @@ export default function CreativeStudio() {
         label: '', icon: 'auto_awesome', description: '', type: 'instagram-post', style: 'modern',
         promptFormula: '', referenceImageUrl: '', fields: [], category: ''
     })
+    const [analyzedMeta, setAnalyzedMeta] = useState({ colorPalette: [], layoutDescription: '' }) // from AI analysis
+    const [templateFieldsMode, setTemplateFieldsMode] = useState('simple') // 'simple' | 'advanced'
     const [activeCategory, setActiveCategory] = useState(null)
     const [savedCategories, setSavedCategories] = useState([]) // custom categories from DB
     const [showCreateCategory, setShowCreateCategory] = useState(false)
@@ -840,7 +842,14 @@ export default function CreativeStudio() {
         setTemplateError('')
         setTemplateResult(null)
         try {
-            const builtPrompt = tmpl.buildPrompt(activeBrand, templateFields)
+            let builtPrompt = tmpl.buildPrompt(activeBrand, templateFields)
+
+            // Append additional user instructions (gender change, outfit, background, etc.)
+            const extraInstructions = templateFields._additionalInstructions?.trim()
+            if (extraInstructions) {
+                builtPrompt += `\n\nADDITIONAL CHANGES (apply these intelligently — adapt the ENTIRE image, not just face swap):\n${extraInstructions}`
+            }
+
             setTemplatePromptPreview(builtPrompt)
 
             const options = {
@@ -848,20 +857,51 @@ export default function CreativeStudio() {
                 referenceImages: {},
                 aspectRatio: templateFields._aspectRatio || aspectRatio,
                 imageSize: templateFields._imageSize || '1K',
+                characters: [],
             }
 
-            // Get user-provided product image
-            const imageField = tmpl.fields.find(f => f.type === 'image')
-            const productImage = imageField ? templateFields[imageField.key] : null
+            // Collect ALL image fields from the template — separate by role
+            const imageFields = (tmpl.fields || []).filter(f => f.type === 'image')
+            const modelFields = imageFields.filter(f => /model|person|human|character|lady|man|woman/i.test(f.label || f.key))
+            const productFields = imageFields.filter(f => /product|item|device|object|photo/i.test(f.label || f.key))
+            const otherImageFields = imageFields.filter(f => !modelFields.includes(f) && !productFields.includes(f))
+
+            // Model/Person images → character references (for face/appearance preservation)
+            for (const mf of modelFields) {
+                const imgSrc = templateFields[mf.key]
+                if (imgSrc) {
+                    options.characters.push({ name: mf.label || 'Model', image: imgSrc })
+                }
+            }
+
+            // Product images → product image (first one wins)
+            const productField = productFields[0]
+            const productImage = productField ? templateFields[productField.key] : null
+
+            // If no specific model/product detected, fall back to first image field like before
+            if (modelFields.length === 0 && productFields.length === 0 && imageFields.length > 0) {
+                const fallbackField = imageFields[0]
+                const fallbackImage = templateFields[fallbackField.key]
+                if (fallbackImage) {
+                    if (/model|person/i.test(fallbackField.label)) {
+                        options.characters.push({ name: fallbackField.label || 'Character', image: fallbackImage })
+                    } else {
+                        // Treat as product
+                        if (fallbackImage.startsWith('data:image/')) {
+                            options.baseImage = fallbackImage
+                        } else {
+                            options.productImageUrl = fallbackImage
+                        }
+                    }
+                }
+            }
 
             // Template inpainting mode: reference image exists (saved template)
-            // → Keep exact layout/colors/logo, only swap the product
             const refImage = templateRefImage || tmpl.referenceImageUrl
             if (refImage) {
                 options.templateInpainting = true
                 options.templateRefImageUrl = refImage
                 if (productImage) {
-                    // Product image to swap in — can be data URL or HTTP URL
                     if (productImage.startsWith('data:image/')) {
                         options.baseImage = productImage
                     } else {
@@ -869,11 +909,18 @@ export default function CreativeStudio() {
                     }
                 }
             } else if (productImage) {
-                // No reference image — just use product as base
                 if (productImage.startsWith('data:image/')) {
                     options.baseImage = productImage
                 } else {
                     options.productImageUrl = productImage
+                }
+            }
+
+            // Additional reference images (non-model, non-product)
+            for (const oif of otherImageFields) {
+                const imgSrc = templateFields[oif.key]
+                if (imgSrc && !options.referenceImages.upload) {
+                    options.referenceImages.upload = imgSrc
                 }
             }
 
@@ -1000,61 +1047,89 @@ Return ONLY the prompt formula text, no explanation. Start directly with "Create
         setCreatingTemplate(false)
     }, [activeBrand, newTmpl, loadCustomTemplates])
 
-    // ── Analyze image for new template creation ──
+    // ── Analyze image for new template creation — SMART STRUCTURED ANALYSIS ──
     const handleAnalyzeForTemplate = useCallback(async (imageSource) => {
         if (!activeBrand) return
         setAnalyzeLoading(true)
         setNewTmpl(prev => ({ ...prev, referenceImageUrl: imageSource }))
+        setAnalyzedMeta({ colorPalette: [], layoutDescription: '' })
 
         const isBase64 = imageSource.startsWith('data:')
         const brandColors = activeBrand.dna?.colors?.map(c => c.hex).join(', ') || 'not specified'
 
         try {
-            const resp = await fetch('/api/canvas-assets/ai-analyze', {
+            const token = localStorage.getItem('mantram_token') || ''
+            const resp = await fetch('/api/canvas-assets/ai-analyze-template', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
                 body: JSON.stringify({
-                    prompt: `You are an expert design analyst. Analyze this design image and create a REUSABLE PROMPT FORMULA for generating similar designs.
-
-Extract and describe all visual elements:
-1. Background (color, gradient, texture, pattern)
-2. Layout structure and element arrangement
-3. Typography (font style, hierarchy, colors, weights)
-4. Design elements (shapes, borders, shadows, icons)
-5. Logo/branding placement
-6. Color scheme application
-7. Overall mood and visual theme
-
-Create a prompt formula using {{KEYWORD}} placeholders for changeable parts:
-- {{HEADLINE}} for main headline
-- {{SUBTEXT}} for supporting text
-- {{CTA}} for call-to-action
-- {{PRODUCT_NAME}} for product name
-- {{QUOTE_TEXT}} for quote content
-- {{OFFER}} for offer/discount text
-- {{IMAGE}} for product/reference image
-
-Brand: ${activeBrand.name}
-Brand colors: ${brandColors}
-
-Return ONLY the prompt formula text. Start with "Create a..." or "Design a..."`,
                     ...(isBase64 ? { imageBase64: imageSource } : { imageUrl: imageSource }),
+                    brandName: activeBrand.name,
+                    brandColors,
                 }),
             })
             const data = await resp.json()
-            if (data.description) {
-                setNewTmpl(prev => ({ ...prev, promptFormula: data.description }))
-            } else {
+
+            if (data.promptFormula) {
+                // Auto-generate fields from detected elements
+                const autoFields = (data.elements || []).map((el, i) => {
+                    const key = el.role?.replace(/[^a-z0-9_]/gi, '_').toLowerCase() || `field_${i}`
+                    const placeholder = el.type === 'image'
+                        ? (el.description || 'Upload an image')
+                        : (el.default || `Enter ${el.label?.toLowerCase() || 'value'}`)
+                    
+                    return {
+                        key,
+                        label: el.label || `Element ${i + 1}`,
+                        type: el.type === 'color' ? 'color'
+                            : el.type === 'select' ? 'select'
+                            : el.type === 'image' ? 'image'
+                            : el.role === 'subtext' || el.role === 'body' || el.role === 'quote' ? 'textarea'
+                            : 'text',
+                        placeholder,
+                        default: el.default || '',
+                        options: el.options || [],
+                        style: el.style || '',
+                        description: el.description || '',
+                        _detected: true, // marker for auto-detected fields
+                    }
+                })
+
                 setNewTmpl(prev => ({
                     ...prev,
-                    promptFormula: `Create a design matching this reference style for ${activeBrand.name}. Use brand colors (${brandColors}). Maintain the same layout, typography hierarchy, and visual elements. Replace content with: {{HEADLINE}}, {{SUBTEXT}}, {{CTA}}.`
+                    promptFormula: data.promptFormula,
+                    fields: autoFields,
+                }))
+                setAnalyzedMeta({
+                    colorPalette: data.colorPalette || [],
+                    layoutDescription: data.layoutDescription || '',
+                })
+                setTemplateFieldsMode('advanced') // Auto-switch to show detected elements
+            } else {
+                // Fallback if structured analysis failed
+                setNewTmpl(prev => ({
+                    ...prev,
+                    promptFormula: `Create a design matching this reference style for ${activeBrand.name}. Use brand colors (${brandColors}). Maintain the same layout, typography hierarchy, and visual elements. Replace content with: {{HEADLINE}}, {{SUBTEXT}}, {{CTA}}.`,
+                    fields: [
+                        { key: 'headline', label: 'Headline', type: 'text', placeholder: 'Main heading text', default: '', _detected: true },
+                        { key: 'subtext', label: 'Subtext', type: 'textarea', placeholder: 'Supporting text', default: '', _detected: true },
+                        { key: 'cta', label: 'Call to Action', type: 'text', placeholder: 'e.g. Shop Now', default: 'Shop Now', _detected: true },
+                    ]
                 }))
             }
         } catch (err) {
-            console.error('Analyze error:', err)
+            console.error('Template analyze error:', err)
             setNewTmpl(prev => ({
                 ...prev,
-                promptFormula: `Create a design matching the uploaded reference style for ${activeBrand.name}. Use brand colors. {{HEADLINE}} as the main text. {{SUBTEXT}} as subtext. {{CTA}} as call-to-action.`
+                promptFormula: `Create a design matching the uploaded reference for ${activeBrand.name}. Use brand colors. {{HEADLINE}} as main text. {{SUBTEXT}} as subtext. {{CTA}} as call-to-action.`,
+                fields: [
+                    { key: 'headline', label: 'Headline', type: 'text', placeholder: 'Main heading text', default: '', _detected: true },
+                    { key: 'subtext', label: 'Subtext', type: 'text', placeholder: 'Supporting text', default: '', _detected: true },
+                    { key: 'cta', label: 'Call to Action', type: 'text', placeholder: 'e.g. Shop Now', default: 'Shop Now', _detected: true },
+                ]
             }))
         }
         setAnalyzeLoading(false)
@@ -1190,30 +1265,41 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
     return (
         <DashboardLayout title="Creative Studio" subtitle="AI-powered image generation & design">
             <SEOHead title="Creative Studio — Mantram AI" noIndex={true} />
-            <div className="flex items-center justify-end mb-6">
-                <div className="flex items-center gap-2">
-                    {/* Image Bank badge */}
-                    <button onClick={() => { setStudioMode('imagebank'); loadImageBank() }}
-                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${studioMode === 'imagebank' ? 'bg-primary/15 text-primary border border-primary/30' : 'glass-panel text-slate-400 hover:text-white'}`}>
-                        <span className="material-symbols-outlined text-sm">photo_library</span>
-                        Image Bank
-                        {bankTotal > 0 && <span className="bg-primary/20 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full">{bankTotal}</span>}
+            {/* ══ Unified Studio Navigation ══ */}
+            <div className="flex items-center gap-1.5 p-1 rounded-2xl glass-panel mb-6 fade-up">
+                {[
+                    { id: 'create', icon: 'auto_awesome', label: 'AI Create' },
+                    { id: 'photoshoot', icon: 'photo_camera', label: 'Photoshoot' },
+                    { id: 'templates', icon: 'dashboard_customize', label: 'Templates' },
+                    { id: 'imagebank', icon: 'photo_library', label: 'Image Bank', badge: bankTotal > 0 ? bankTotal : null },
+                    { id: 'canvas', icon: 'draw', label: 'AI Canvas', isNav: true },
+                ].map(tab => (
+                    <button key={tab.id}
+                        onClick={() => {
+                            if (tab.isNav) { navigate('/creative-studio/editor'); return }
+                            setStudioMode(tab.id)
+                            if (tab.id === 'imagebank') loadImageBank()
+                        }}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+                            studioMode === tab.id
+                                ? 'studio-nav-pill text-white'
+                                : 'text-slate-500 hover:text-slate-200 hover:bg-white/[0.04]'
+                        }`}>
+                        <span className="material-symbols-outlined text-lg">{tab.icon}</span>
+                        <span className="hidden sm:inline">{tab.label}</span>
+                        {tab.badge && <span className="bg-white/15 text-[11px] font-bold px-1.5 py-0.5 rounded-full">{tab.badge}</span>}
                     </button>
-                    {/* AI Canvas */}
-                    <button onClick={() => navigate('/creative-studio/editor')}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold glass-panel text-slate-400 hover:text-white transition-all cursor-pointer">
-                        <span className="material-symbols-outlined text-sm">edit</span>
-                        AI Canvas
-                    </button>
-                </div>
+                ))}
             </div>
 
             {/* ====================== UNIFIED CREATE MODE ====================== */}
             {studioMode === 'create' && (
-                <div className="max-w-4xl mx-auto">
+                <div className="max-w-4xl mx-auto fade-up">
 
                     {/* ── Hero Prompt Bar ── */}
-                    <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'linear-gradient(135deg, rgba(43,75,238,0.08), rgba(139,92,246,0.05))' }}>
+                    <div className="glow-border rounded-2xl p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(43,75,238,0.06), rgba(139,92,246,0.04), rgba(6,182,212,0.03))' }}>
+                        {/* Subtle mesh gradient overlay */}
+                        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(139,92,246,0.08) 0%, transparent 50%), radial-gradient(circle at 20% 80%, rgba(43,75,238,0.06) 0%, transparent 50%)' }} />
                         {/* Content-linked banner */}
                         {fromContent && (
                             <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/20 mb-4">
@@ -1336,9 +1422,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             )}
                         </div>
 
-                        <div className="flex items-center gap-2 mb-3">
-                            <span className="material-symbols-outlined text-2xl text-primary">auto_awesome</span>
-                            <h3 className="text-lg font-extrabold text-white">Describe your image</h3>
+                        <div className="flex items-center gap-2.5 mb-4 relative">
+                            <span className="material-symbols-outlined text-3xl text-gradient">auto_awesome</span>
+                            <h3 className="text-xl font-extrabold text-gradient">Describe your vision</h3>
                         </div>
 
                         <div className="relative mb-3">
@@ -1415,17 +1501,17 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                         {/* Enhance Prompt Button */}
                         {prompt.trim() && (
-                            <div className="flex items-center gap-2 mb-3 -mt-1">
+                            <div className="flex items-center gap-2.5 mb-3 -mt-1">
                                 <button onClick={handleEnhancePrompt} disabled={enhancing || !activeBrand}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${enhancing
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${enhancing
                                         ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                                        : 'bg-gradient-to-r from-amber-500/10 to-orange-500/10 text-amber-400 hover:from-amber-500/25 hover:to-orange-500/25 border border-amber-500/20 hover:border-amber-500/40 hover:shadow-lg hover:shadow-amber-500/10'}`}>
-                                    <span className={`material-symbols-outlined text-sm ${enhancing ? 'animate-spin' : ''}`}>
+                                        : 'bg-gradient-to-r from-amber-500/15 to-orange-500/10 text-amber-400 hover:from-amber-500/25 hover:to-orange-500/20 border border-amber-500/20 hover:border-amber-500/40 hover:shadow-lg hover:shadow-amber-500/10'}`}>
+                                    <span className={`material-symbols-outlined text-base ${enhancing ? 'animate-spin' : ''}`}>
                                         {enhancing ? 'progress_activity' : 'auto_awesome'}
                                     </span>
                                     {enhancing ? 'Enhancing...' : '✨ Enhance with AI'}
                                 </button>
-                                <span className="text-[10px] text-slate-600">Makes your prompt detailed & brand-aware</span>
+                                <span className="text-xs text-slate-500">Makes your prompt detailed & brand-aware</span>
                             </div>
                         )}
 
@@ -1497,7 +1583,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                     {/* ── Collapsible Advanced Options Drawer ── */}
                     {showAdvanced && (
-                        <div className="glass-panel rounded-2xl p-5 mb-6 animate-fade-in space-y-4">
+                        <div className="studio-card p-5 mb-6 fade-up space-y-4">
                             <div className="flex items-center justify-between">
                                 <h4 className="text-sm font-bold text-white flex items-center gap-2">
                                     <span className="material-symbols-outlined text-primary text-sm">tune</span>
@@ -1629,7 +1715,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                     {/* ── Inline Template Form (when a quickstart card with fields is active) ── */}
                     {activeQuickTemplate && (
-                        <div className="glass-panel rounded-2xl p-5 mb-6 animate-fade-in border border-primary/10">
+                        <div className="studio-card p-5 mb-6 fade-up border border-primary/10">
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-2">
                                     <span className="material-symbols-outlined text-primary">{activeQuickTemplate.icon}</span>
@@ -1682,7 +1768,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                     {/* ── Result Area ── */}
                     {result && !generating && (
-                        <div className="glass-panel rounded-2xl p-6 mb-6 animate-fade-in">
+                        <div className="studio-card p-6 mb-6 fade-up">
                             <div className="flex items-center justify-between mb-4">
                                 <div>
                                     <h3 className="text-lg font-bold text-white">{result.title || 'Generated Creative'}</h3>
@@ -1786,8 +1872,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                     {/* ── Action Cards — Only shown when no result and prompt is empty ── */}
                     {!result && !generating && !prompt.trim() && (
-                        <div className="animate-fade-in">
-                            <p className="text-sm text-slate-500 text-center mb-4">— or choose a starting point —</p>
+                        <div className="fade-up-2">
+                            <p className="text-sm text-slate-500 text-center mb-5 font-medium">— or choose a starting point —</p>
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                                 {/* Quick-create cards that pre-fill prompts */}
                                 {[
@@ -1823,62 +1909,25 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         id: 'story', icon: 'auto_stories', label: 'Brand Story', desc: 'Tell your brand narrative', color: '#f97316',
                                         prompt: `Create a compelling brand story visual for ${activeBrand?.name || 'the brand'}. Tell the brand narrative through imagery, use brand colors, and convey authenticity with a warm, premium feel.`
                                     },
-                                ].map(card => (
+                                ].map((card, idx) => (
                                     <button key={card.id} onClick={() => {
                                         if (card.template && card.template.fields?.length > 0) {
-                                            // Open inline template form
                                             setActiveQuickTemplate(card.template)
                                             setTemplateFields({})
                                         } else if (card.prompt) {
                                             setPrompt(card.prompt)
                                         }
                                     }}
-                                        className="flex flex-col items-center gap-2 p-5 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] hover:border-primary/20 transition-all cursor-pointer group text-center">
-                                        <div className="w-11 h-11 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform" style={{ background: `${card.color}15` }}>
-                                            <span className="material-symbols-outlined text-xl" style={{ color: card.color }}>{card.icon}</span>
+                                        className={`studio-card flex flex-col items-center gap-2.5 p-5 cursor-pointer group text-center fade-up-${Math.min(idx + 1, 5)}`}>
+                                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg" style={{ background: `linear-gradient(135deg, ${card.color}30, ${card.color}10)`, boxShadow: `0 4px 15px ${card.color}15` }}>
+                                            <span className="material-symbols-outlined text-2xl" style={{ color: card.color }}>{card.icon}</span>
                                         </div>
                                         <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{card.label}</p>
-                                        <p className="text-[11px] text-slate-500 leading-tight">{card.desc}</p>
+                                        <p className="text-xs text-slate-500 leading-relaxed">{card.desc}</p>
                                     </button>
                                 ))}
                             </div>
 
-                            {/* Secondary access — Photoshoot + Templates + Image Bank */}
-                            <div className="grid grid-cols-3 gap-3 mt-4">
-                                <button onClick={() => setStudioMode('photoshoot')}
-                                    className="flex items-center gap-3 p-4 rounded-2xl glass-panel hover:bg-amber-500/[0.05] hover:border-amber-500/20 border border-transparent transition-all cursor-pointer group">
-                                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                        <span className="material-symbols-outlined text-lg text-amber-400">photo_camera</span>
-                                    </div>
-                                    <div className="text-left">
-                                        <p className="text-sm font-bold text-white">AI Photoshoot</p>
-                                        <p className="text-[11px] text-slate-500">Style product photos with AI</p>
-                                    </div>
-                                </button>
-                                <button onClick={() => setStudioMode('templates')}
-                                    className="flex items-center gap-3 p-4 rounded-2xl glass-panel hover:bg-violet-500/[0.05] hover:border-violet-500/20 border border-transparent transition-all cursor-pointer group">
-                                    <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                        <span className="material-symbols-outlined text-lg text-violet-400">dashboard_customize</span>
-                                    </div>
-                                    <div className="text-left">
-                                        <p className="text-sm font-bold text-white">Brand Templates</p>
-                                        <p className="text-[11px] text-slate-500">Quick on-brand designs</p>
-                                    </div>
-                                </button>
-                                <button onClick={() => { setStudioMode('imagebank'); loadImageBank() }}
-                                    className="flex items-center gap-3 p-4 rounded-2xl glass-panel hover:bg-emerald-500/[0.05] hover:border-emerald-500/20 border border-transparent transition-all cursor-pointer group">
-                                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                        <span className="material-symbols-outlined text-lg text-emerald-400">photo_library</span>
-                                    </div>
-                                    <div className="text-left flex items-center gap-2">
-                                        <div>
-                                            <p className="text-sm font-bold text-white">Image Bank</p>
-                                            <p className="text-[11px] text-slate-500">Browse saved images</p>
-                                        </div>
-                                        {bankTotal > 0 && <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{bankTotal}</span>}
-                                    </div>
-                                </button>
-                            </div>
                         </div>
                     )}
                 </div>
@@ -1887,15 +1936,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
             {/* =================== AI PHOTOSHOOT MODE =================== */}
             {studioMode === 'photoshoot' && (
-                <div className="grid grid-cols-12 gap-6">
-                    {/* Back to Studio button */}
-                    <div className="col-span-12">
-                        <button onClick={() => setStudioMode('create')}
-                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs glass-panel text-slate-400 hover:text-white cursor-pointer mb-2">
-                            <span className="material-symbols-outlined text-sm">arrow_back</span>
-                            Back to Studio
-                        </button>
-                    </div>
+                <div className="grid grid-cols-12 gap-6 fade-up">
 
                     {/* Recent Photoshoots */}
                     {(() => {
@@ -1914,15 +1955,15 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             return new Date(d).toLocaleDateString();
                         };
                         return (
-                            <div className="col-span-12 glass-panel rounded-2xl p-4 mb-1">
+                            <div className="col-span-12 studio-card p-5 mb-1 fade-up-1">
                                 <div className="flex items-center justify-between mb-3">
-                                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-amber-500 text-sm">history</span>
+                                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-amber-400 text-lg">history</span>
                                         Recent Photoshoots
-                                        <span className="text-slate-500 font-normal">({recentPhotoshoots.length})</span>
+                                        <span className="text-xs text-slate-500 font-normal">({recentPhotoshoots.length})</span>
                                     </h4>
                                 </div>
-                                <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.06) transparent' }}>
+                                <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.06) transparent' }}>
                                     {recentPhotoshoots.map(img => (
                                         <div key={img._id} className="flex-shrink-0 w-48 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.12] overflow-hidden group transition-all cursor-pointer"
                                             onClick={() => {
@@ -1948,11 +1989,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         )
                     })()}
                     {/* Left — Photoshoot Controls */}
-                    <div className="col-span-12 lg:col-span-5 space-y-5">
+                    <div className="col-span-12 lg:col-span-5 space-y-5 fade-up-2">
                         {/* Product Image Upload */}
-                        <div className="glass-panel rounded-2xl p-5">
+                        <div className="studio-card p-5">
                             <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-4">
-                                <span className="material-symbols-outlined text-primary text-lg">add_a_photo</span>
+                                <span className="material-symbols-outlined text-primary text-xl">add_a_photo</span>
                                 Product Image
                             </h3>
 
@@ -2178,11 +2219,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         )}
 
                         {/* ── Style & Character References (for Photoshoot) ── */}
-                        <div className="glass-panel rounded-2xl p-5">
+                        <div className="studio-card p-5">
                             <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
-                                <span className="material-symbols-outlined text-primary text-lg">image_search</span>
+                                <span className="material-symbols-outlined text-primary text-xl">image_search</span>
                                 Style & Character
-                                <span className="text-xs text-slate-600 bg-white/[0.04] px-1.5 py-0.5 rounded ml-auto">Optional</span>
+                                <span className="text-xs text-slate-500 bg-white/[0.05] px-2 py-0.5 rounded-full ml-auto">Optional</span>
                             </h3>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {[
@@ -2221,9 +2262,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         {/* ═══════════════ PHOTO STUDIO PRO ═══════════════ */}
 
                         {/* ── Aspect Ratio ── */}
-                        <div className="glass-panel rounded-2xl p-3">
+                        <div className="studio-card p-4">
                             <div className="flex items-center gap-2">
-                                <span className="text-[9px] text-slate-500 uppercase tracking-widest font-bold whitespace-nowrap">Ratio</span>
+                                <span className="text-xs text-slate-400 uppercase tracking-widest font-bold whitespace-nowrap">Ratio</span>
                                 <div className="flex gap-1.5 flex-1 justify-center">
                                     {[
                                         { id: '1:1', w: 16, h: 16, label: '1:1' },
@@ -2239,7 +2280,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 : 'bg-transparent border-transparent text-slate-500 hover:text-slate-300'}`}>
                                             <div className={`rounded-[2px] transition-all ${aspectRatio === r.id ? 'bg-primary' : 'bg-slate-600'}`}
                                                 style={{ width: r.w, height: r.h }} />
-                                            <span className="text-[8px] font-bold">{r.label}</span>
+                                            <span className="text-[10px] font-bold">{r.label}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -2247,7 +2288,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         </div>
 
                         {/* ── Tab Navigation ── */}
-                        <div className="flex rounded-xl overflow-hidden border border-white/[0.06] bg-white/[0.02]">
+                        <div className="flex rounded-2xl overflow-hidden border border-white/[0.06] bg-white/[0.02]">
                             {[
                                 { id: 'shot', icon: 'photo_camera', label: 'Shot' },
                                 { id: 'light', icon: 'light_mode', label: 'Light' },
@@ -2255,17 +2296,17 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 { id: 'style', icon: 'palette', label: 'Style' },
                             ].map(t => (
                                 <button key={t.id} onClick={() => setPsTab(t.id)}
-                                    className={`flex-1 flex items-center justify-center gap-1 py-2.5 text-[11px] font-bold transition-all cursor-pointer ${psTab === t.id
-                                        ? 'bg-white/[0.08] text-white border-b-2 border-primary'
+                                    className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-bold transition-all cursor-pointer ${psTab === t.id
+                                        ? 'bg-gradient-to-r from-primary/15 to-accent-purple/10 text-white border-b-2 border-primary shadow-inner'
                                         : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'}`}>
-                                    <span className="material-symbols-outlined text-sm">{t.icon}</span>
+                                    <span className="material-symbols-outlined text-base">{t.icon}</span>
                                     {t.label}
                                 </button>
                             ))}
                         </div>
 
                         {/* ── Tab Content ── */}
-                        <div className="glass-panel rounded-2xl p-4 min-h-[180px]">
+                        <div className="studio-card p-5 min-h-[180px]">
 
                             {/* 📐 SHOT TAB */}
                             {psTab === 'shot' && (
@@ -2479,12 +2520,40 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <textarea value={photoshootBrief}
                                 onChange={e => setPhotoshootBrief(e.target.value)}
                                 placeholder="Extra details: water droplets, steam, brand packaging, props..."
-                                className="input-glass w-full py-2.5 px-3 pr-10 resize-none text-[11px] rounded-xl" rows={2}
+                                className="input-glass w-full py-2.5 px-3 pr-10 resize-none text-xs rounded-xl" rows={2}
                             />
                             <div className="absolute right-1.5 top-1.5">
                                 <VoiceInput onResult={(text) => setPhotoshootBrief(prev => prev ? prev + ' ' + text : text)} size="small" />
                             </div>
                         </div>
+                        {photoshootBrief.trim() && (
+                            <div className="flex items-center gap-2 -mt-1">
+                                <button onClick={async () => {
+                                    if (!photoshootBrief.trim() || !activeBrand || enhancing) return
+                                    setEnhancing(true)
+                                    try {
+                                        const data = await creativesAPI.enhancePrompt({
+                                            brandId: activeBrand._id,
+                                            prompt: `Photoshoot scene: ${photoshootBrief.trim()}`,
+                                            style: 'photorealistic',
+                                            format: 'photoshoot',
+                                            aspectRatio,
+                                        })
+                                        if (data.enhancedPrompt) setPhotoshootBrief(data.enhancedPrompt)
+                                    } catch (err) { console.error('Enhance failed:', err) }
+                                    finally { setEnhancing(false) }
+                                }}
+                                    disabled={enhancing || !activeBrand}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${enhancing
+                                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                        : 'bg-gradient-to-r from-amber-500/15 to-orange-500/10 text-amber-400 hover:from-amber-500/25 hover:to-orange-500/20 border border-amber-500/20 hover:border-amber-500/40'}`}>
+                                    <span className={`material-symbols-outlined text-sm ${enhancing ? 'animate-spin' : ''}`}>
+                                        {enhancing ? 'progress_activity' : 'auto_awesome'}
+                                    </span>
+                                    {enhancing ? 'Enhancing...' : '✨ Enhance'}
+                                </button>
+                            </div>
+                        )}
 
                         {/* Generate Button */}
                         <CreditTooltipWrapper action="photoshoot">
@@ -2551,7 +2620,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                     {/* Right — Photoshoot Result */}
                     <div className="col-span-12 lg:col-span-7">
-                        <div className="glass-panel rounded-2xl p-6 min-h-[500px] flex items-center justify-center">
+                        <div className="studio-card p-6 min-h-[500px] flex items-center justify-center">
                             {!photoshootResult && !photoshootGenerating && (
                                 <div className="text-center">
                                     <span className="material-symbols-outlined text-6xl text-slate-700 mb-4 block">photo_camera</span>
@@ -2635,7 +2704,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                                     {/* ═══ AI IMAGE EDITOR PANEL ═══ */}
                                     {psEditMode && (
-                                        <div className="mt-5 glass-panel rounded-2xl p-5 border border-violet-500/20 animate-fade-in">
+                                        <div className="mt-5 studio-card p-5 border border-violet-500/20 fade-up">
                                             <h4 className="font-bold text-white text-sm flex items-center gap-2 mb-4">
                                                 <span className="material-symbols-outlined text-violet-400">auto_fix_high</span>
                                                 AI Image Editor
@@ -2770,31 +2839,27 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
             {/* =================== BRAND TEMPLATES MODE =================== */}
             {studioMode === 'templates' && (
                 <div>
-                    <button onClick={() => setStudioMode('create')}
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs glass-panel text-slate-400 hover:text-white cursor-pointer mb-4">
-                        <span className="material-symbols-outlined text-sm">arrow_back</span>
-                        Back to Studio
-                    </button>
-                    <div className="flex items-center justify-between mb-5">
+
+                    <div className="flex items-center justify-between mb-6 fade-up">
                         <div>
-                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                <span className="material-symbols-outlined text-primary">dashboard_customize</span>
+                            <h3 className="text-xl font-extrabold text-gradient flex items-center gap-2">
+                                <span className="material-symbols-outlined text-2xl">dashboard_customize</span>
                                 Brand Templates
                             </h3>
-                            <p className="text-sm text-slate-500 mt-1">Pick a template, fill in your details, and generate on-brand designs instantly</p>
+                            <p className="text-sm text-slate-400 mt-1">Pick a template, fill in your details, and generate on-brand designs instantly</p>
                         </div>
                         {activeTemplate && (
                             <button onClick={() => { setActiveTemplate(null); setTemplateFields({}); setTemplateResult(null); setTemplatePromptPreview(''); setTemplateRefImage(null) }}
-                                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs glass-panel text-slate-400 hover:text-white cursor-pointer">
+                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold studio-card text-slate-300 hover:text-white cursor-pointer">
                                 <span className="material-symbols-outlined text-sm">arrow_back</span>
-                                Back to Templates
+                                All Templates
                             </button>
                         )}
                     </div>
 
                     {!activeBrand ? (
-                        <div className="glass-panel rounded-2xl p-12 text-center">
-                            <span className="material-symbols-outlined text-5xl text-slate-700 mb-4 block">brand_awareness</span>
+                        <div className="studio-card p-12 text-center fade-up-1">
+                            <span className="material-symbols-outlined text-5xl text-slate-600 mb-4 block">brand_awareness</span>
                             <h3 className="text-lg font-bold text-slate-400 mb-2">Select a Brand First</h3>
                             <p className="text-xs text-slate-600">Templates use your brand colors, personality, and style</p>
                         </div>
@@ -2806,16 +2871,18 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 <>
                                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                                         {/* ── Built-in Categories ── */}
-                                        {templateCategories.map(cat => (
+                                        {templateCategories.map((cat, idx) => (
                                             <button key={cat.id}
                                                 onClick={() => setActiveCategory(cat)}
-                                                className="glass-panel rounded-2xl p-5 text-left hover:bg-white/[0.04] hover:border-white/10 border border-transparent transition-all cursor-pointer group min-h-[170px]">
-                                                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"
-                                                    style={{ background: `${cat.color}15` }}>
+                                                className={`studio-card p-5 text-left cursor-pointer group min-h-[180px] relative overflow-hidden fade-up-${Math.min(idx + 1, 5)}`}>
+                                                {/* Gradient top band */}
+                                                <div className="absolute top-0 left-0 right-0 h-1 opacity-60" style={{ background: `linear-gradient(90deg, ${cat.color}, transparent)` }} />
+                                                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300 shadow-lg"
+                                                    style={{ background: `linear-gradient(135deg, ${cat.color}25, ${cat.color}08)`, boxShadow: `0 4px 15px ${cat.color}12` }}>
                                                     <span className="material-symbols-outlined text-2xl" style={{ color: cat.color }}>{cat.icon}</span>
                                                 </div>
-                                                <h4 className="text-base font-bold text-white mb-1 group-hover:text-primary transition-colors">{cat.label}</h4>
-                                                <p className="text-sm text-slate-500 leading-relaxed mb-3">{cat.desc}</p>
+                                                <h4 className="text-base font-bold text-white mb-1.5 group-hover:text-primary transition-colors">{cat.label}</h4>
+                                                <p className="text-xs text-slate-500 leading-relaxed mb-3">{cat.desc}</p>
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-xs text-slate-600 bg-white/[0.03] px-2 py-0.5 rounded">
                                                         {cat.subTemplates.length + (savedTemplates.filter(st => st.category === cat.id).length)} templates
@@ -2835,7 +2902,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     referenceImageUrl: cc.referenceImageUrl,
                                                     subTemplates: [] // custom categories only have custom sub-templates
                                                 })}
-                                                className="glass-panel rounded-2xl p-5 text-left hover:bg-white/[0.04] border border-amber-500/10 hover:border-amber-500/30 transition-all cursor-pointer group min-h-[170px] relative">
+                                                className="studio-card p-5 text-left border border-amber-500/10 hover:border-amber-500/30 cursor-pointer group min-h-[170px] relative">
                                                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                                     <button onClick={async (e) => {
                                                         e.stopPropagation()
@@ -2875,7 +2942,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
 
                                     {/* Brand identity bar */}
-                                    <div className="mt-6 glass-panel rounded-2xl p-4 flex items-center gap-4">
+                                    <div className="mt-6 studio-card p-4 flex items-center gap-4">
                                         <div className="flex gap-1.5 shrink-0">
                                             {(activeBrand.dna?.colors || []).slice(0, 5).map((c, i) => (
                                                 <div key={i} className="w-6 h-6 rounded-lg border border-white/[0.1]" style={{ background: c.hex }} />
@@ -2908,7 +2975,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
 
                                     {/* Aspect Ratio for templates */}
-                                    <div className="glass-panel rounded-2xl p-4 mb-4">
+                                    <div className="studio-card p-4 mb-4">
                                         <h4 className="text-xs font-bold text-slate-400 flex items-center gap-2 mb-2">
                                             <span className="material-symbols-outlined text-sm text-primary">aspect_ratio</span>
                                             Aspect Ratio
@@ -2939,7 +3006,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     setTemplateRefImage(null)
                                                     setTemplateError('')
                                                 }}
-                                                className="glass-panel rounded-2xl p-4 text-left hover:bg-white/[0.04] border border-transparent hover:border-white/10 transition-all cursor-pointer group">
+                                                className="studio-card p-4 text-left cursor-pointer group">
                                                 <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-2 group-hover:scale-110 transition-transform"
                                                     style={{ background: `${activeCategory.color}15` }}>
                                                     <span className="material-symbols-outlined text-xl" style={{ color: activeCategory.color }}>{sub.icon}</span>
@@ -2953,7 +3020,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         {/* ── Saved custom sub-templates in this category ── */}
                                         {savedTemplates.filter(st => st.category === activeCategory.id).map(ct => (
                                             <div key={ct.templateId}
-                                                className="glass-panel rounded-2xl p-4 text-left hover:bg-white/[0.04] border border-amber-500/10 hover:border-amber-500/30 transition-all cursor-pointer group relative"
+                                                className="studio-card p-4 text-left border border-amber-500/10 hover:border-amber-500/30 cursor-pointer group relative"
                                                 onClick={() => {
                                                     setActiveTemplate({
                                                         id: ct.templateId, icon: ct.icon, label: ct.label,
@@ -3152,48 +3219,307 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             <p className="text-xs text-slate-600 mt-1 italic">💡 Use {'{{HEADLINE}}'}, {'{{PRODUCT}}'}, {'{{MESSAGE}}'} as placeholders — only these change, the design stays consistent.</p>
                                         </div>
 
-                                        {/* Dynamic Fields */}
+                                        {/* ═══ Simple / Advanced Mode Toggle ═══ */}
                                         <div className="mb-6">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <label className="text-[11px] font-bold text-slate-400">Fill-in Fields</label>
-                                                <button onClick={() => setNewTmpl(p => ({
-                                                    ...p,
-                                                    fields: [...(p.fields || []), { key: `field${(p.fields?.length || 0) + 1}`, label: '', type: 'text', placeholder: '' }]
-                                                }))}
-                                                    className="text-sm text-primary cursor-pointer flex items-center gap-1 hover:text-primary-light">
-                                                    <span className="material-symbols-outlined text-xs">add</span> Add Field
-                                                </button>
-                                            </div>
-                                            {(newTmpl.fields || []).length === 0 && (
-                                                <p className="text-xs text-slate-600 italic">No custom fields. Default Headline + Details fields will be used.</p>
-                                            )}
-                                            {(newTmpl.fields || []).map((f, i) => (
-                                                <div key={i} className="flex gap-2 items-center mb-2">
-                                                    <input type="text" value={f.label}
-                                                        onChange={e => {
-                                                            const updated = [...newTmpl.fields]
-                                                            updated[i] = { ...f, label: e.target.value, key: e.target.value.toLowerCase().replace(/\s+/g, '_') || f.key }
-                                                            setNewTmpl(p => ({ ...p, fields: updated }))
-                                                        }}
-                                                        placeholder="Field name (e.g. Person's Name)"
-                                                        className="input-glass flex-1 py-2 text-xs" />
-                                                    <select value={f.type}
-                                                        onChange={e => {
-                                                            const updated = [...newTmpl.fields]
-                                                            updated[i] = { ...f, type: e.target.value }
-                                                            setNewTmpl(p => ({ ...p, fields: updated }))
-                                                        }}
-                                                        className="input-glass py-2 text-xs w-24">
-                                                        <option value="text">Text</option>
-                                                        <option value="textarea">Long Text</option>
-                                                        <option value="image">Image</option>
-                                                    </select>
-                                                    <button onClick={() => setNewTmpl(p => ({ ...p, fields: p.fields.filter((_, fi) => fi !== i) }))}
-                                                        className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 cursor-pointer">
-                                                        <span className="material-symbols-outlined text-xs">close</span>
+                                            {/* Mode Toggle */}
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div className="flex bg-white/[0.04] rounded-xl p-1 border border-white/[0.06]">
+                                                    <button onClick={() => setTemplateFieldsMode('simple')}
+                                                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${templateFieldsMode === 'simple'
+                                                            ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                                                            : 'text-slate-500 hover:text-slate-300'}`}>
+                                                        <span className="material-symbols-outlined text-xs mr-1 align-middle">tune</span>
+                                                        Simple
+                                                    </button>
+                                                    <button onClick={() => setTemplateFieldsMode('advanced')}
+                                                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${templateFieldsMode === 'advanced'
+                                                            ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20'
+                                                            : 'text-slate-500 hover:text-slate-300'}`}>
+                                                        <span className="material-symbols-outlined text-xs mr-1 align-middle">auto_awesome</span>
+                                                        Advanced
+                                                        {(newTmpl.fields || []).some(f => f._detected) && (
+                                                            <span className="ml-1 text-[8px] bg-white/20 px-1.5 py-0.5 rounded-full">{(newTmpl.fields || []).length}</span>
+                                                        )}
                                                     </button>
                                                 </div>
-                                            ))}
+                                                {templateFieldsMode === 'advanced' && (
+                                                    <button onClick={() => setNewTmpl(p => ({
+                                                        ...p,
+                                                        fields: [...(p.fields || []), { key: `field${(p.fields?.length || 0) + 1}`, label: '', type: 'text', placeholder: '' }]
+                                                    }))}
+                                                        className="text-sm text-primary cursor-pointer flex items-center gap-1 hover:text-primary-light">
+                                                        <span className="material-symbols-outlined text-xs">add</span> Add Field
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {/* ── SIMPLE MODE ── */}
+                                            {templateFieldsMode === 'simple' && (
+                                                <div className="space-y-4">
+                                                    {/* Layout & Color info (from AI analysis) */}
+                                                    {(analyzedMeta.layoutDescription || analyzedMeta.colorPalette.length > 0) && (
+                                                        <div className="p-3 rounded-xl bg-indigo-500/[0.04] border border-indigo-500/10 flex items-center gap-3">
+                                                            {analyzedMeta.colorPalette.length > 0 && (
+                                                                <div className="flex gap-1">
+                                                                    {analyzedMeta.colorPalette.map((c, i) => (
+                                                                        <div key={i} className="w-5 h-5 rounded-md border border-white/10" style={{ background: c }} title={c} />
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                            {analyzedMeta.layoutDescription && (
+                                                                <span className="text-[10px] text-slate-500 flex-1">{analyzedMeta.layoutDescription}</span>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Title Field */}
+                                                    <div>
+                                                        <label className="text-[11px] font-bold text-slate-400 mb-1.5 block">Title / Headline</label>
+                                                        <input type="text"
+                                                            value={newTmpl._simpleTitle || ''}
+                                                            onChange={e => setNewTmpl(p => ({ ...p, _simpleTitle: e.target.value }))}
+                                                            placeholder="e.g. FLAUNT., Summer Sale, Brand Tagline..."
+                                                            className="input-glass w-full py-2.5 text-sm" />
+                                                    </div>
+
+                                                    {/* Message / Details */}
+                                                    <div>
+                                                        <label className="text-[11px] font-bold text-slate-400 mb-1.5 block">Message / Details</label>
+                                                        <textarea
+                                                            value={newTmpl._simpleMessage || ''}
+                                                            onChange={e => setNewTmpl(p => ({ ...p, _simpleMessage: e.target.value }))}
+                                                            placeholder="Additional text, offers, descriptions..."
+                                                            className="input-glass w-full py-2.5 text-sm resize-none" rows={2} />
+                                                    </div>
+
+                                                    {/* Product / Model Image */}
+                                                    <div>
+                                                        <label className="text-[11px] font-bold text-slate-400 mb-1.5 block">Product / Reference Image</label>
+                                                        {newTmpl._simpleImage ? (
+                                                            <div className="relative rounded-xl overflow-hidden bg-black/20 border border-white/[0.06]">
+                                                                <img src={newTmpl._simpleImage} alt="Selected" className="w-full max-h-40 object-contain" />
+                                                                <button onClick={() => setNewTmpl(p => ({ ...p, _simpleImage: '' }))}
+                                                                    className="absolute top-2 right-2 p-1 rounded-lg bg-black/60 text-white hover:bg-rose-500/80 cursor-pointer">
+                                                                    <span className="material-symbols-outlined text-xs">close</span>
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="grid grid-cols-3 gap-2">
+                                                                {/* Upload from system */}
+                                                                <label className="flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 border-dashed border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] hover:border-primary/30 cursor-pointer transition-all text-center">
+                                                                    <span className="material-symbols-outlined text-lg text-slate-500">upload_file</span>
+                                                                    <span className="text-[10px] text-slate-500 font-medium">Upload</span>
+                                                                    <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                                                                        const file = e.target.files?.[0]
+                                                                        if (!file) return
+                                                                        const reader = new FileReader()
+                                                                        reader.onload = (ev) => setNewTmpl(p => ({ ...p, _simpleImage: ev.target.result }))
+                                                                        reader.readAsDataURL(file)
+                                                                    }} />
+                                                                </label>
+                                                                {/* From brand assets */}
+                                                                <button onClick={async () => {
+                                                                    try {
+                                                                        const data = await creativesAPI.imageBank({ brandId: activeBrand._id, limit: 20 })
+                                                                        if (data.images?.length > 0) {
+                                                                            setNewTmpl(p => ({ ...p, _showBrandImages: true, _brandImageList: data.images }))
+                                                                        }
+                                                                    } catch (e) { console.error(e) }
+                                                                }}
+                                                                    className="flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 border-dashed border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] hover:border-amber-500/30 cursor-pointer transition-all text-center">
+                                                                    <span className="material-symbols-outlined text-lg text-amber-500/60">photo_library</span>
+                                                                    <span className="text-[10px] text-slate-500 font-medium">Brand Assets</span>
+                                                                </button>
+                                                                {/* From URL */}
+                                                                <button onClick={() => {
+                                                                    const url = prompt('Enter image URL:')
+                                                                    if (url) setNewTmpl(p => ({ ...p, _simpleImage: url }))
+                                                                }}
+                                                                    className="flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 border-dashed border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] hover:border-blue-500/30 cursor-pointer transition-all text-center">
+                                                                    <span className="material-symbols-outlined text-lg text-blue-500/60">link</span>
+                                                                    <span className="text-[10px] text-slate-500 font-medium">URL</span>
+                                                                </button>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Brand Image Picker Grid */}
+                                                        {newTmpl._showBrandImages && (newTmpl._brandImageList || []).length > 0 && (
+                                                            <div className="mt-2 p-3 rounded-xl bg-black/20 border border-amber-500/10">
+                                                                <div className="flex items-center justify-between mb-2">
+                                                                    <span className="text-[10px] font-bold text-amber-400">Select from Brand Assets</span>
+                                                                    <button onClick={() => setNewTmpl(p => ({ ...p, _showBrandImages: false }))}
+                                                                        className="text-xs text-slate-500 hover:text-white cursor-pointer">✕</button>
+                                                                </div>
+                                                                <div className="grid grid-cols-4 gap-1.5 max-h-32 overflow-y-auto">
+                                                                    {newTmpl._brandImageList.map((img, i) => (
+                                                                        <img key={i} src={img.url} alt=""
+                                                                            className="w-full h-16 object-cover rounded-lg cursor-pointer border-2 border-transparent hover:border-primary transition-all"
+                                                                            onClick={() => setNewTmpl(p => ({ ...p, _simpleImage: img.url, _showBrandImages: false }))} />
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <p className="text-[10px] text-slate-600 italic">
+                                                        💡 Simple mode — set the main text and image. Switch to Advanced for full AI-detected element control.
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {/* ── ADVANCED MODE ── */}
+                                            {templateFieldsMode === 'advanced' && (
+                                                <div>
+                                                    {/* Layout & Color info */}
+                                                    {(analyzedMeta.layoutDescription || analyzedMeta.colorPalette.length > 0) && (
+                                                        <div className="mb-3 p-3 rounded-xl bg-indigo-500/[0.04] border border-indigo-500/10 flex items-center gap-3">
+                                                            {analyzedMeta.colorPalette.length > 0 && (
+                                                                <div className="flex gap-1">
+                                                                    {analyzedMeta.colorPalette.map((c, i) => (
+                                                                        <div key={i} className="w-5 h-5 rounded-md border border-white/10" style={{ background: c }} title={c} />
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                            {analyzedMeta.layoutDescription && (
+                                                                <span className="text-[10px] text-slate-500 flex-1">{analyzedMeta.layoutDescription}</span>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {(newTmpl.fields || []).length === 0 && (
+                                                        <div className="py-6 text-center rounded-xl border-2 border-dashed border-white/[0.06] bg-white/[0.01]">
+                                                            <span className="material-symbols-outlined text-2xl text-slate-700 mb-2 block">upload_file</span>
+                                                            <p className="text-xs text-slate-600">Upload a reference image — AI will auto-detect elements</p>
+                                                            <p className="text-[10px] text-slate-700 mt-1">Or click "Add Field" to create manually</p>
+                                                        </div>
+                                                    )}
+
+                                                    {(newTmpl.fields || []).map((f, i) => {
+                                                        const typeBadge = { text: '📝', textarea: '📝', image: '🖼️', color: '🎨', select: '📋' }[f.type] || '📝'
+                                                        return (
+                                                            <div key={i} className={`mb-2 p-3 rounded-xl border transition-all ${f._detected ? 'border-emerald-500/15 bg-emerald-500/[0.02]' : 'border-white/[0.06] bg-white/[0.02]'}`}>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-sm" title={f.type}>{typeBadge}</span>
+                                                                    <input type="text" value={f.label}
+                                                                        onChange={e => {
+                                                                            const updated = [...newTmpl.fields]
+                                                                            updated[i] = { ...f, label: e.target.value, key: e.target.value.toLowerCase().replace(/\s+/g, '_') || f.key }
+                                                                            setNewTmpl(p => ({ ...p, fields: updated }))
+                                                                        }}
+                                                                        placeholder="Field name"
+                                                                        className="input-glass flex-1 py-1.5 text-xs font-semibold" />
+                                                                    <select value={f.type}
+                                                                        onChange={e => {
+                                                                            const updated = [...newTmpl.fields]
+                                                                            updated[i] = { ...f, type: e.target.value }
+                                                                            setNewTmpl(p => ({ ...p, fields: updated }))
+                                                                        }}
+                                                                        className="input-glass py-1.5 text-[10px] w-20 rounded-lg">
+                                                                        <option value="text">Text</option>
+                                                                        <option value="textarea">Long Text</option>
+                                                                        <option value="image">Image</option>
+                                                                        <option value="color">Color</option>
+                                                                        <option value="select">Select</option>
+                                                                    </select>
+                                                                    {f._detected && (
+                                                                        <span className="text-[8px] bg-emerald-500/15 text-emerald-500 px-1.5 py-0.5 rounded font-bold">AI</span>
+                                                                    )}
+                                                                    <button onClick={() => setNewTmpl(p => ({ ...p, fields: p.fields.filter((_, fi) => fi !== i) }))}
+                                                                        className="p-1 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 cursor-pointer">
+                                                                        <span className="material-symbols-outlined text-xs">close</span>
+                                                                    </button>
+                                                                </div>
+
+                                                                {/* Image upload options for image type fields */}
+                                                                {f.type === 'image' && (
+                                                                    <div className="mt-2 ml-7">
+                                                                        {f._selectedImage ? (
+                                                                            <div className="relative rounded-lg overflow-hidden bg-black/20 inline-block">
+                                                                                <img src={f._selectedImage} alt="" className="max-h-24 object-contain rounded-lg" />
+                                                                                <button onClick={() => {
+                                                                                    const updated = [...newTmpl.fields]
+                                                                                    updated[i] = { ...f, _selectedImage: '' }
+                                                                                    setNewTmpl(p => ({ ...p, fields: updated }))
+                                                                                }}
+                                                                                    className="absolute top-1 right-1 p-0.5 rounded bg-black/60 text-white hover:bg-rose-500/80 cursor-pointer">
+                                                                                    <span className="material-symbols-outlined text-[10px]">close</span>
+                                                                                </button>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="flex gap-1.5">
+                                                                                <label className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] hover:border-primary/30 cursor-pointer transition-all text-[9px] text-slate-500">
+                                                                                    <span className="material-symbols-outlined text-[11px]">upload</span> Upload
+                                                                                    <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                                                                                        const file = e.target.files?.[0]
+                                                                                        if (!file) return
+                                                                                        const reader = new FileReader()
+                                                                                        reader.onload = (ev) => {
+                                                                                            const updated = [...newTmpl.fields]
+                                                                                            updated[i] = { ...f, _selectedImage: ev.target.result }
+                                                                                            setNewTmpl(p => ({ ...p, fields: updated }))
+                                                                                        }
+                                                                                        reader.readAsDataURL(file)
+                                                                                    }} />
+                                                                                </label>
+                                                                                <button onClick={async () => {
+                                                                                    try {
+                                                                                        const data = await creativesAPI.imageBank({ brandId: activeBrand._id, limit: 20 })
+                                                                                        if (data.images?.length > 0) {
+                                                                                            const updated = [...newTmpl.fields]
+                                                                                            updated[i] = { ...f, _showPicker: true, _pickerImages: data.images }
+                                                                                            setNewTmpl(p => ({ ...p, fields: updated }))
+                                                                                        }
+                                                                                    } catch (e) { console.error(e) }
+                                                                                }}
+                                                                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] hover:border-amber-500/30 cursor-pointer transition-all text-[9px] text-slate-500">
+                                                                                    <span className="material-symbols-outlined text-[11px]">photo_library</span> Brand
+                                                                                </button>
+                                                                                <button onClick={() => {
+                                                                                    const url = prompt('Enter image URL:')
+                                                                                    if (url) {
+                                                                                        const updated = [...newTmpl.fields]
+                                                                                        updated[i] = { ...f, _selectedImage: url }
+                                                                                        setNewTmpl(p => ({ ...p, fields: updated }))
+                                                                                    }
+                                                                                }}
+                                                                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] hover:border-blue-500/30 cursor-pointer transition-all text-[9px] text-slate-500">
+                                                                                    <span className="material-symbols-outlined text-[11px]">link</span> URL
+                                                                                </button>
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* Brand image picker */}
+                                                                        {f._showPicker && (f._pickerImages || []).length > 0 && (
+                                                                            <div className="mt-1.5 p-2 rounded-lg bg-black/20 border border-amber-500/10">
+                                                                                <div className="grid grid-cols-4 gap-1 max-h-24 overflow-y-auto">
+                                                                                    {f._pickerImages.map((img, pi) => (
+                                                                                        <img key={pi} src={img.url} alt=""
+                                                                                            className="w-full h-12 object-cover rounded cursor-pointer border-2 border-transparent hover:border-primary"
+                                                                                            onClick={() => {
+                                                                                                const updated = [...newTmpl.fields]
+                                                                                                updated[i] = { ...f, _selectedImage: img.url, _showPicker: false }
+                                                                                                setNewTmpl(p => ({ ...p, fields: updated }))
+                                                                                            }} />
+                                                                                    ))}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+
+                                                                        {f.description && (
+                                                                            <p className="text-[9px] text-amber-500/50 mt-1 italic">{f.description}</p>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+
+                                                                {/* Default value for text fields */}
+                                                                {f.default && f.type !== 'image' && f.type !== 'color' && (
+                                                                    <p className="text-[9px] text-slate-500 ml-7 mt-1">Default: "{f.default}"</p>
+                                                                )}
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Save */}
@@ -3427,7 +3753,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             {/* Left — Form Fields */}
                             <div className="col-span-12 lg:col-span-5 space-y-4">
                                 {/* Template Header */}
-                                <div className="glass-panel rounded-2xl p-5">
+                                <div className="studio-card p-5">
                                     <div className="flex items-center gap-3 mb-4">
                                         <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                                             <span className="material-symbols-outlined text-2xl text-primary">{activeTemplate.icon}</span>
@@ -3509,6 +3835,30 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                 {opt}
                                                             </button>
                                                         ))}
+                                                    </div>
+                                                )}
+
+                                                {field.type === 'color' && (
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="relative">
+                                                            <input type="color"
+                                                                value={templateFields[field.key] || field.default || '#6366f1'}
+                                                                onChange={e => setTemplateFields(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                                                className="w-10 h-10 rounded-lg border-2 border-white/10 cursor-pointer bg-transparent" />
+                                                        </div>
+                                                        <span className="text-xs text-slate-500 font-mono">{templateFields[field.key] || field.default || '#6366f1'}</span>
+                                                        {/* Brand color swatches for quick pick */}
+                                                        {(activeBrand?.dna?.colors || []).length > 0 && (
+                                                            <div className="flex gap-1.5 ml-2">
+                                                                {activeBrand.dna.colors.slice(0, 5).map((c, ci) => (
+                                                                    <button key={ci}
+                                                                        onClick={() => setTemplateFields(prev => ({ ...prev, [field.key]: c.hex }))}
+                                                                        className={`w-7 h-7 rounded-md border-2 cursor-pointer transition-all hover:scale-110 ${templateFields[field.key] === c.hex ? 'border-white shadow-lg' : 'border-white/10'}`}
+                                                                        style={{ background: c.hex }}
+                                                                        title={c.name || c.hex} />
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
 
@@ -3622,7 +3972,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
 
                                 {/* Learn from Image (Reverse Prompting) */}
-                                <div className="glass-panel rounded-2xl p-5">
+                                <div className="studio-card p-5">
                                     <h4 className="text-sm font-bold text-white flex items-center gap-2 mb-3">
                                         <span className="material-symbols-outlined text-amber-400 text-sm">lightbulb</span>
                                         Learn from an Image
@@ -3684,7 +4034,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
 
                                 {/* Size & Resolution Controls */}
-                                <div className="glass-panel rounded-2xl p-5">
+                                <div className="studio-card p-5">
                                     <h4 className="text-sm font-bold text-white flex items-center gap-2 mb-3">
                                         <span className="material-symbols-outlined text-cyan-400 text-sm">aspect_ratio</span>
                                         Size & Resolution
@@ -3736,6 +4086,95 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
                                 </div>
 
+                                {/* Additional Instructions (AI Vision adjustments) */}
+                                <div className="studio-card p-5">
+                                    <div className="flex items-center justify-between cursor-pointer"
+                                        onClick={() => setTemplateFields(prev => ({ ...prev, _showExtraInstructions: !prev._showExtraInstructions }))}>
+                                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-fuchsia-400 text-sm">magic_exchange</span>
+                                            Additional Changes
+                                            <span className="text-xs text-slate-600 bg-white/[0.04] px-1.5 py-0.5 rounded">Optional</span>
+                                        </h4>
+                                        <span className={`material-symbols-outlined text-sm text-slate-500 transition-transform ${templateFields._showExtraInstructions ? 'rotate-180' : ''}`}>
+                                            expand_more
+                                        </span>
+                                    </div>
+
+                                    {templateFields._showExtraInstructions && (
+                                        <div className="mt-3 space-y-3">
+                                            <p className="text-xs text-slate-500">Tell AI what to change — gender, outfit, pose, background, add/remove elements. Our vision engine will intelligently adapt the entire image.</p>
+
+                                            {/* Smart suggestion chips */}
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {[
+                                                    { label: '👨 Make model male', value: 'Change the model to a male with similar pose and expression' },
+                                                    { label: '👩 Make model female', value: 'Change the model to a female with similar pose and expression' },
+                                                    { label: '👔 Formal outfit', value: 'Change outfit to a formal business suit' },
+                                                    { label: '👕 Casual outfit', value: 'Change outfit to casual streetwear' },
+                                                    { label: '🌿 Outdoor background', value: 'Change background to an outdoor natural environment' },
+                                                    { label: '🏢 Studio background', value: 'Change background to a clean studio environment' },
+                                                    { label: '🌙 Dark theme', value: 'Make the overall design darker with a premium dark theme' },
+                                                    { label: '☀️ Light theme', value: 'Make the overall design lighter with a clean light theme' },
+                                                    { label: '🇮🇳 Indian model', value: 'Change the model to an Indian person with similar pose' },
+                                                    { label: '😊 Smiling pose', value: 'Change the expression to a warm natural smile' },
+                                                ].map((chip, i) => (
+                                                    <button key={i} onClick={() => {
+                                                        const current = templateFields._additionalInstructions || ''
+                                                        const sep = current ? '. ' : ''
+                                                        setTemplateFields(prev => ({ ...prev, _additionalInstructions: current + sep + chip.value }))
+                                                    }}
+                                                        className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-white/[0.03] border border-white/[0.06] text-slate-400 hover:bg-fuchsia-500/10 hover:border-fuchsia-500/20 hover:text-fuchsia-300 cursor-pointer transition-all">
+                                                        {chip.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+
+                                            {/* Free-form textarea */}
+                                            <textarea
+                                                value={templateFields._additionalInstructions || ''}
+                                                onChange={e => setTemplateFields(prev => ({ ...prev, _additionalInstructions: e.target.value }))}
+                                                placeholder="e.g., Change the model to a young man in a blue hoodie, make the background a sunset beach scene, add sunglasses..."
+                                                className="input-glass w-full py-3 text-sm resize-none" rows={3} />
+
+                                            {/* Enhance Additional Instructions */}
+                                            {templateFields._additionalInstructions && (
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={async () => {
+                                                        if (!templateFields._additionalInstructions?.trim() || !activeBrand || enhancing) return
+                                                        setEnhancing(true)
+                                                        try {
+                                                            const data = await creativesAPI.enhancePrompt({
+                                                                brandId: activeBrand._id,
+                                                                prompt: `Image modification instructions: ${templateFields._additionalInstructions.trim()}`,
+                                                                style: 'photorealistic',
+                                                                format: 'template-edit',
+                                                                aspectRatio: templateResolution?.ratio || '1:1',
+                                                            })
+                                                            if (data.enhancedPrompt) setTemplateFields(prev => ({ ...prev, _additionalInstructions: data.enhancedPrompt }))
+                                                        } catch (err) { console.error('Enhance failed:', err) }
+                                                        finally { setEnhancing(false) }
+                                                    }}
+                                                        disabled={enhancing || !activeBrand}
+                                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${enhancing
+                                                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                                            : 'bg-gradient-to-r from-amber-500/15 to-orange-500/10 text-amber-400 hover:from-amber-500/25 hover:to-orange-500/20 border border-amber-500/20 hover:border-amber-500/40'}`}>
+                                                        <span className={`material-symbols-outlined text-sm ${enhancing ? 'animate-spin' : ''}`}>
+                                                            {enhancing ? 'progress_activity' : 'auto_awesome'}
+                                                        </span>
+                                                        {enhancing ? 'Enhancing...' : '✨ Enhance'}
+                                                    </button>
+                                                    <span className="text-xs text-emerald-400 flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-xs">visibility</span>
+                                                        AI Vision will apply these changes
+                                                    </span>
+                                                    <button onClick={() => setTemplateFields(prev => ({ ...prev, _additionalInstructions: '' }))}
+                                                        className="text-xs text-rose-400 hover:text-rose-300 cursor-pointer ml-auto">Clear</button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
                                 {/* Generate Button */}
                                 <CreditTooltipWrapper action="creative">
                                     <button onClick={() => handleTemplateGenerate(activeTemplate)}
@@ -3760,7 +4199,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <div className="col-span-12 lg:col-span-7 space-y-4">
                                 {/* Prompt Preview */}
                                 {(templatePromptPreview || Object.keys(templateFields).length > 0) && (
-                                    <div className="glass-panel rounded-2xl p-5">
+                                    <div className="studio-card p-5">
                                         <div className="flex items-center justify-between mb-3">
                                             <h4 className="text-sm font-bold text-white flex items-center gap-2">
                                                 <span className="material-symbols-outlined text-primary text-sm">visibility</span>
@@ -3788,7 +4227,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                                 {/* Result Display */}
                                 {templateGenerating && (
-                                    <div className="glass-panel rounded-2xl p-12 flex flex-col items-center justify-center min-h-[400px]">
+                                    <div className="studio-card p-12 flex flex-col items-center justify-center min-h-[400px]">
                                         <div className="relative inline-block mb-4">
                                             <span className="material-symbols-outlined text-5xl text-primary animate-pulse">{activeTemplate.icon}</span>
                                         </div>
@@ -3803,7 +4242,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 )}
 
                                 {!templateGenerating && !templateResult && (
-                                    <div className="glass-panel rounded-2xl p-12 flex flex-col items-center justify-center min-h-[400px]">
+                                    <div className="studio-card p-12 flex flex-col items-center justify-center min-h-[400px]">
                                         <span className="material-symbols-outlined text-6xl text-slate-700 mb-4">{activeTemplate.icon}</span>
                                         <h3 className="text-lg font-bold text-slate-500 mb-2">{activeTemplate.label}</h3>
                                         <p className="text-xs text-slate-600 max-w-sm text-center">Fill in the fields on the left and click Generate. Your design will appear here with {activeBrand.name}'s brand styling automatically applied.</p>
@@ -3811,7 +4250,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 )}
 
                                 {templateResult && (
-                                    <div className="glass-panel rounded-2xl p-5 animate-fade-in">
+                                    <div className="studio-card p-5 fade-up">
                                         <div className="rounded-2xl overflow-hidden mb-4">
                                             <img src={templateResult.imageUrl} alt={activeTemplate.label} className="w-full rounded-2xl" loading="lazy" decoding="async" />
                                         </div>
@@ -3861,29 +4300,25 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
             {/* =================== IMAGE BANK MODE =================== */}
             {studioMode === 'imagebank' && (
-                <div>
-                    <button onClick={() => setStudioMode('create')}
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs glass-panel text-slate-400 hover:text-white cursor-pointer mb-4">
-                        <span className="material-symbols-outlined text-sm">arrow_back</span>
-                        Back to Studio
-                    </button>
+                <div className="fade-up">
+
 
                     {/* ── Tab Bar ── */}
                     <div className="flex items-center justify-between mb-5">
-                        <div className="flex items-center gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                        <div className="flex items-center gap-1 p-1.5 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
                             {[
                                 { id: 'generated', icon: 'auto_awesome', label: 'AI Generated', count: bankCounts.generated },
                                 { id: 'uploaded', icon: 'upload_file', label: 'Uploaded', count: bankCounts.uploaded },
                                 { id: 'brand', icon: 'language', label: 'Brand Images', count: activeBrand?.dna?.brandImages?.length || 0 },
                             ].map(tab => (
                                 <button key={tab.id} onClick={() => { setBankTab(tab.id); if (tab.id !== 'brand') loadImageBank(tab.id) }}
-                                    className={`flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${bankTab === tab.id
-                                        ? 'bg-gradient-to-r from-violet-600 to-cyan-600 text-white shadow-lg shadow-violet-500/20'
+                                    className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${bankTab === tab.id
+                                        ? 'studio-nav-pill text-white shadow-lg'
                                         : 'text-slate-500 hover:text-white hover:bg-white/[0.05]'}`}>
-                                    <span className="material-symbols-outlined text-sm">{tab.icon}</span>
-                                    {tab.label}
+                                    <span className="material-symbols-outlined text-base">{tab.icon}</span>
+                                    <span className="hidden sm:inline">{tab.label}</span>
                                     {tab.count > 0 && (
-                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${bankTab === tab.id ? 'bg-white/20 text-white' : 'bg-white/[0.06] text-slate-400'}`}>
+                                        <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${bankTab === tab.id ? 'bg-white/20 text-white' : 'bg-white/[0.06] text-slate-400'}`}>
                                             {tab.count}
                                         </span>
                                     )}
@@ -3930,7 +4365,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                                     {allBrandImgs.map((img, idx) => (
                                         <div key={`brand-${idx}`}
-                                            className="glass-panel rounded-2xl overflow-hidden group relative cursor-pointer">
+                                            className="studio-card overflow-hidden group relative cursor-pointer">
                                             <img src={img.url} alt={img.alt || `Brand ${idx + 1}`} loading="lazy"
                                                 className="w-full object-cover transition-transform duration-300 group-hover:scale-105" style={{ minHeight: '100px', maxHeight: '240px' }}
                                                 onError={e => e.target.parentElement.style.display = 'none'} />
@@ -3956,7 +4391,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 <p className="text-xs text-slate-600 mt-3 italic">💡 These images can be used as reference for templates, AI photoshoots, and creative generation.</p>
                             </div>
                         ) : (
-                            <div className="glass-panel rounded-2xl p-12 text-center">
+                            <div className="studio-card p-12 text-center">
                                 <span className="material-symbols-outlined text-6xl text-slate-700 mb-4 block">language</span>
                                 <h3 className="text-lg font-bold text-slate-500 mb-2">No Brand Images</h3>
                                 <p className="text-xs text-slate-600 mb-4 max-w-md mx-auto">Run brand onboarding to scan your website and auto-import brand images.</p>
@@ -3970,7 +4405,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                     {/* ═══ GENERATED / UPLOADED TABS ═══ */}
                     {bankTab !== 'brand' && !bankLoading && bankImages.length === 0 && (
-                        <div className="glass-panel rounded-2xl p-12 text-center">
+                        <div className="studio-card p-12 text-center">
                             <span className="material-symbols-outlined text-6xl text-slate-700 mb-4 block">{bankTab === 'uploaded' ? 'upload_file' : 'auto_awesome'}</span>
                             <h3 className="text-lg font-bold text-slate-500 mb-2">{bankTab === 'uploaded' ? 'No Uploaded Images' : 'No Generated Images Yet'}</h3>
                             <p className="text-xs text-slate-600 mb-4 max-w-md mx-auto">
@@ -4143,7 +4578,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     const isUploaded = img.type === 'uploaded';
                                     const timeAgo = getTimeAgo(img.createdAt);
                                     return (
-                                        <div key={img._id} className="glass-panel rounded-2xl overflow-hidden group relative cursor-pointer"
+                                        <div key={img._id} className="studio-card overflow-hidden group relative cursor-pointer"
                                             onClick={() => setLightboxIdx(idx)}>
                                             <img src={img.imageUrl || img.thumbnailUrl} alt={img.title || 'Generated'} loading="lazy"
                                                 className="w-full object-cover transition-transform duration-300 group-hover:scale-105" style={{ minHeight: '120px', maxHeight: '300px' }} />
