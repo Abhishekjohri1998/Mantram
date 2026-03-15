@@ -59,6 +59,10 @@ router.post('/register', async (req, res) => {
         // Calculate queue number (total users with role: 'user' + 1)
         const lastUser = await User.findOne({ role: 'user' }).sort('-queueNumber');
         const queueNumber = (lastUser?.queueNumber || 0) + 1;
+        
+        // Auto-approve if they were invited via waitlist
+        const waitlistEntry = await Waitlist.findOne({ email: email.toLowerCase() });
+        const autoApprove = waitlistEntry?.status === 'invited';
 
         const user = await User.create({
             name,
@@ -68,7 +72,7 @@ router.post('/register', async (req, res) => {
             verificationToken,
             verificationExpires,
             isVerified: false,
-            approvalStatus: 'pending',
+            approvalStatus: autoApprove ? 'approved' : 'pending',
             queueNumber
         });
         
@@ -325,6 +329,10 @@ router.get('/google/callback', async (req, res) => {
 
         if (!user) {
             // Signup flow
+            // Auto-approve if they were invited via waitlist
+            const waitlistEntry = await Waitlist.findOne({ email: profileData.email.toLowerCase() });
+            const autoApprove = waitlistEntry?.status === 'invited';
+
             user = await User.create({
                 name: profileData.name || 'Google User',
                 email: profileData.email,
@@ -332,6 +340,7 @@ router.get('/google/callback', async (req, res) => {
                 isGoogleUser: true,
                 isVerified: true, // Google users are pre-verified
                 password: Math.random().toString(36).slice(-12),
+                approvalStatus: autoApprove ? 'approved' : 'pending'
             });
             // Update waitlist status if exists
             await Waitlist.findOneAndUpdate({ email: profileData.email.toLowerCase() }, { status: 'registered' });
