@@ -275,6 +275,11 @@ router.post('/waitlist/:id/approve', async (req, res) => {
 
         await transporter.sendMail(mailOptions);
         
+        // Update waitlist entry status
+        entry.status = 'invited';
+        entry.invitedAt = new Date();
+        await entry.save();
+        
         res.json({ success: true, message: 'Invitation email sent successfully' });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });

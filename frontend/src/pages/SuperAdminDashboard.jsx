@@ -590,6 +590,7 @@ export default function SuperAdminDashboard() {
                                                 <th className="px-6 py-4">Company</th>
                                                 <th className="px-6 py-4">Message / Note</th>
                                                 <th className="px-6 py-4">Submitted At</th>
+                                                <th className="px-6 py-4 text-center">Status</th>
                                                 <th className="px-6 py-4 text-right">Actions</th>
                                             </tr>
                                         </thead>
@@ -616,15 +617,35 @@ export default function SuperAdminDashboard() {
                                                     <td className="px-6 py-4 text-[11px] text-slate-600">
                                                         {new Date(entry.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                                     </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        {entry.status === 'registered' ? (
+                                                            <div className="inline-flex flex-col items-center">
+                                                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-black uppercase tracking-wider border border-emerald-500/20">Registered</span>
+                                                            </div>
+                                                        ) : entry.status === 'invited' ? (
+                                                            <div className="inline-flex flex-col items-center gap-1">
+                                                                <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 text-[10px] font-black uppercase tracking-wider border border-indigo-500/20">Invited</span>
+                                                                {entry.invitedAt && <span className="text-[9px] text-slate-700">{new Date(entry.invitedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-500 text-[10px] font-black uppercase tracking-wider border border-slate-500/20">Pending</span>
+                                                        )}
+                                                    </td>
                                                     <td className="px-6 py-4 text-right">
                                                         <div className="flex items-center justify-end gap-2">
-                                                            <button 
-                                                                onClick={() => handleApproveWaitlist(entry._id)}
-                                                                className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white text-[10px] font-black uppercase transition-all border border-emerald-500/20 cursor-pointer"
-                                                                title="Send Invitation"
-                                                            >
-                                                                Invite
-                                                            </button>
+                                                            {entry.status !== 'registered' && (
+                                                                <button 
+                                                                    onClick={() => handleApproveWaitlist(entry._id)}
+                                                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all border cursor-pointer ${
+                                                                        entry.status === 'invited' 
+                                                                        ? 'bg-indigo-500/10 hover:bg-indigo-500 text-indigo-400 hover:text-white border-indigo-500/20' 
+                                                                        : 'bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white border-emerald-500/20'
+                                                                    }`}
+                                                                    title={entry.status === 'invited' ? 'Resend Invitation' : 'Send Invitation'}
+                                                                >
+                                                                    {entry.status === 'invited' ? 'Resend' : 'Invite'}
+                                                                </button>
+                                                            )}
                                                             <button 
                                                                 onClick={() => handleDeleteWaitlist(entry._id)}
                                                                 className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white transition-all border border-rose-500/20 cursor-pointer"

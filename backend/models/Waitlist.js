@@ -38,6 +38,14 @@ const waitlistSchema = new mongoose.Schema({
         enum: ['individual', 'enterprise'],
         default: 'individual'
     },
+    status: {
+        type: String,
+        enum: ['pending', 'invited', 'registered'],
+        default: 'pending'
+    },
+    invitedAt: {
+        type: Date
+    },
     createdAt: {
         type: Date,
         default: Date.now

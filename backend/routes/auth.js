@@ -2,6 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
 import User from '../models/User.js';
+import Waitlist from '../models/Waitlist.js';
 import SubscriptionPackage from '../models/SubscriptionPackage.js';
 import { protect, generateToken } from '../middleware/auth.js';
 import config from '../config/env.js';
@@ -70,6 +71,9 @@ router.post('/register', async (req, res) => {
             approvalStatus: 'pending',
             queueNumber
         });
+        
+        // Update waitlist status if exists
+        await Waitlist.findOneAndUpdate({ email: email.toLowerCase() }, { status: 'registered' });
 
         // Send dual notification emails (User & Admin)
         try {
@@ -329,6 +333,8 @@ router.get('/google/callback', async (req, res) => {
                 isVerified: true, // Google users are pre-verified
                 password: Math.random().toString(36).slice(-12),
             });
+            // Update waitlist status if exists
+            await Waitlist.findOneAndUpdate({ email: profileData.email.toLowerCase() }, { status: 'registered' });
             console.log(`✨ New user signed up via Google: ${user.email}`);
         } else {
             console.log(`👋 [GOOGLE AUTH] User found: ${user.email}`);
