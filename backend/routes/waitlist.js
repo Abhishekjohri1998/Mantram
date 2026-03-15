@@ -1,5 +1,6 @@
 import express from 'express';
 import Waitlist from '../models/Waitlist.js';
+import User from '../models/User.js';
 import nodemailer from 'nodemailer';
 import ExcelJS from 'exceljs';
 import path from 'path';
@@ -24,10 +25,40 @@ router.post('/', async (req, res) => {
     try {
         const { name, email, company, role, phone, teamSize, message, type } = req.body;
 
-        // 1. Save to MongoDB
+        if (!email) {
+            return res.status(400).json({ success: false, message: 'Email is required.' });
+        }
+
+        const normalizedEmail = email.toLowerCase().trim();
+
+        // 1. Check if email already exists in User model
+        const existingUser = await User.findOne({ email: normalizedEmail });
+        if (existingUser) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'You are already a registered user. Please log in to your dashboard.' 
+            });
+        }
+
+        // 2. Check if email already exists in Waitlist model
+        const existingWaitlist = await Waitlist.findOne({ email: normalizedEmail });
+        if (existingWaitlist) {
+            if (existingWaitlist.status === 'registered') {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'You are already a registered user. Please log in.' 
+                });
+            }
+            return res.status(400).json({ 
+                success: false, 
+                message: 'You are already on our waitlist! We will notify you as soon as your access is ready.' 
+            });
+        }
+
+        // 3. Save to MongoDB
         const newEntry = new Waitlist({
             name,
-            email,
+            email: normalizedEmail,
             company,
             role,
             phone,
