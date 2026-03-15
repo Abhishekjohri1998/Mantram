@@ -192,7 +192,14 @@ router.get('/users', async (req, res) => {
         }
         if (plan) filter.plan = plan;
         if (role) filter.role = role;
-        if (approvalStatus) filter.approvalStatus = approvalStatus;
+        if (approvalStatus) {
+            if (approvalStatus === 'pending') {
+                filter.$and = filter.$and || [];
+                filter.$and.push({ $or: [{ approvalStatus: 'pending' }, { approvalStatus: { $exists: false } }, { approvalStatus: null }] });
+            } else {
+                filter.approvalStatus = approvalStatus;
+            }
+        }
 
         const users = await User.find(filter)
             .sort(sort)

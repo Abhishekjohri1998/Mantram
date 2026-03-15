@@ -394,8 +394,8 @@ export default function SuperAdminDashboard() {
                                                     </div>
                                                 </div>
                                                 <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                                                    u.approvalStatus === 'approved' ? 'bg-emerald-500/10 text-emerald-500' :
-                                                    u.approvalStatus === 'rejected' ? 'bg-rose-500/10 text-rose-500' :
+                                                    (u.approvalStatus === 'approved') ? 'bg-emerald-500/10 text-emerald-500' :
+                                                    (u.approvalStatus === 'rejected') ? 'bg-rose-500/10 text-rose-500' :
                                                     'bg-amber-500/10 text-amber-500'
                                                 }`}>
                                                     {u.approvalStatus || 'pending'}
@@ -571,7 +571,7 @@ export default function SuperAdminDashboard() {
                                                     'bg-slate-500/15 text-slate-400'
                                                 }`}>Plan: {u.plan}</span>
                                                 <span className="text-xs px-1.5 py-0.5 rounded font-bold border border-white/10 text-slate-500 uppercase tracking-tighter text-[9px]">{u.role}</span>
-                                                {u.approvalStatus === 'pending' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-amber-500/20 text-amber-400">PENDING</span>}
+                                                {(!u.approvalStatus || u.approvalStatus === 'pending') && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-amber-500/20 text-amber-400">PENDING</span>}
                                                 {u.approvalStatus === 'rejected' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-rose-500/20 text-rose-400">REJECTED</span>}
                                             </div>
                                             <p className="text-[11px] text-slate-600 truncate">{u.email} {u.company ? `• ${u.company}` : ''}</p>
@@ -597,7 +597,7 @@ export default function SuperAdminDashboard() {
                                         <button onClick={() => handleResetCredits(u._id)} title="Reset Credits" className="p-2 rounded-lg hover:bg-cyan-500/10 text-slate-500 hover:text-cyan-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">restart_alt</span></button>
                                         <button onClick={() => setPlanModal(u)} title="Change Plan" className="p-2 rounded-lg hover:bg-blue-500/10 text-slate-500 hover:text-blue-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">upgrade</span></button>
                                         
-                                        {u.approvalStatus === 'pending' ? (
+                                        {(!u.approvalStatus || u.approvalStatus === 'pending') ? (
                                             <div className="flex gap-1 border-x border-white/[0.04] px-1 mx-1">
                                                 <button onClick={() => handleApproveUser(u._id)} title="Approve User" className="p-2 rounded-lg hover:bg-emerald-500/10 text-emerald-500 transition-all cursor-pointer shadow-sm"><span className="material-symbols-outlined text-base font-bold">check_circle</span></button>
                                                 <button onClick={() => handleRejectUser(u._id)} title="Reject User" className="p-2 rounded-lg hover:bg-rose-500/10 text-rose-500 transition-all cursor-pointer shadow-sm"><span className="material-symbols-outlined text-base font-bold">cancel</span></button>
