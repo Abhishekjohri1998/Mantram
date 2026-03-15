@@ -195,6 +195,7 @@ export default function BrainstormStudio() {
     const [chatHistory, setChatHistory] = useState([])
     const [chatMessage, setChatMessage] = useState('')
     const [chatLoading, setChatLoading] = useState(false)
+    const [clickedSuggestions, setClickedSuggestions] = useState(new Set())
 
     const inputRef = useRef(null)
     const bottomRef = useRef(null)
@@ -398,6 +399,10 @@ export default function BrainstormStudio() {
         const brandIdAtStart = activeBrand?._id
         const text = msg || chatMessage.trim()
         if (!text || chatLoading) return
+
+        if (msg) {
+            setClickedSuggestions(prev => new Set([...prev, msg]))
+        }
         setChatMessage('')
         const newHistory = [...chatHistory, { role: 'user', text }]
         setChatHistory(newHistory)
@@ -433,7 +438,7 @@ export default function BrainstormStudio() {
         setStep(0); setIntent(null); setQuestions([]); setCurrentQ(0); setAnswers({});
         setCurrentAnswer(''); setConfirmation(null); setIdeas(null); setExpandedIdea(null);
         setBrandInsight(null); setIdeaFeedback({}); setScreenplay(null); setError(''); setLoading(false);
-        setChatFilm(null); setChatHistory([]); setChatMessage(''); setChatLoading(false)
+        setChatFilm(null); setChatHistory([]); setChatMessage(''); setChatLoading(false); setClickedSuggestions(new Set())
         setStrategyData(null); setStrategyId(null); setStrategyKpis([]); setStrategyMilestones([]);
         setSlides(null); setSlideIndex(0); setSlidesLoading(false); setTrackerView(null); setKpiEditing(null)
     }
@@ -732,16 +737,24 @@ export default function BrainstormStudio() {
                                         {/* Keyword suggestion chips */}
                                         {q.keywords?.length > 0 && (
                                             <div className="flex flex-wrap gap-1.5">
-                                                {q.keywords.map(kw => (
-                                                    <button key={kw} onClick={() => {
-                                                        const sep = currentAnswer.trim() ? ', ' : ''
-                                                        setCurrentAnswer(prev => prev.trim() ? `${prev.trim()}, ${kw}` : kw)
-                                                        inputRef.current?.focus()
-                                                    }}
-                                                        className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
-                                                        {kw}
-                                                    </button>
-                                                ))}
+                                                {q.keywords
+                                                    .filter(kw => {
+                                                        const currentLower = currentAnswer.toLowerCase()
+                                                        const kwLower = kw.toLowerCase()
+                                                        // Filter out if exact match exists in answer (comma separated)
+                                                        const parts = currentLower.split(',').map(p => p.trim())
+                                                        return !parts.includes(kwLower)
+                                                    })
+                                                    .map(kw => (
+                                                        <button key={kw} onClick={() => {
+                                                            const sep = currentAnswer.trim() ? ', ' : ''
+                                                            setCurrentAnswer(prev => prev.trim() ? `${prev.trim()}, ${kw}` : kw)
+                                                            inputRef.current?.focus()
+                                                        }}
+                                                            className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
+                                                            {kw}
+                                                        </button>
+                                                    ))}
                                             </div>
                                         )}
                                     </div>
@@ -1784,12 +1797,14 @@ export default function BrainstormStudio() {
                                 <div className="glass-panel rounded-2xl rounded-tl-md px-4 py-3 max-w-lg">
                                     <p className="text-sm text-white">I love this concept! Let's refine it together. What would you like to change or improve? You can adjust the story, tone, visual style, cast, music — anything.</p>
                                     <div className="flex flex-wrap gap-1.5 mt-3">
-                                        {['Make it more emotional', 'Change the visual style', 'Adjust the story arc', 'Different music mood', 'Change the cast direction'].map(s => (
-                                            <button key={s} onClick={() => sendChatMessage(s)}
-                                                className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
-                                                {s}
-                                            </button>
-                                        ))}
+                                        {['Make it more emotional', 'Change the visual style', 'Adjust the story arc', 'Different music mood', 'Change the cast direction']
+                                            .filter(s => !clickedSuggestions.has(s))
+                                            .map(s => (
+                                                <button key={s} onClick={() => sendChatMessage(s)}
+                                                    className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
+                                                    {s}
+                                                </button>
+                                            ))}
                                     </div>
                                 </div>
                             </div>
@@ -1809,12 +1824,14 @@ export default function BrainstormStudio() {
                                     <p className="text-sm text-white whitespace-pre-wrap">{stripMarkdown(msg.text)}</p>
                                     {msg.suggestions?.length > 0 && (
                                         <div className="flex flex-wrap gap-1.5 mt-3">
-                                            {msg.suggestions.map((s, j) => (
-                                                <button key={j} onClick={() => sendChatMessage(s)}
-                                                    className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
-                                                    {s}
-                                                </button>
-                                            ))}
+                                            {msg.suggestions
+                                                .filter(s => !clickedSuggestions.has(s))
+                                                .map((s, j) => (
+                                                    <button key={j} onClick={() => sendChatMessage(s)}
+                                                        className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
+                                                        {s}
+                                                    </button>
+                                                ))}
                                         </div>
                                     )}
                                 </div>
