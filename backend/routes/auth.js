@@ -59,6 +59,10 @@ router.post('/register', async (req, res) => {
         // Calculate queue number (total users with role: 'user' + 1)
         const lastUser = await User.findOne({ role: 'user' }).sort('-queueNumber');
         const queueNumber = (lastUser?.queueNumber || 0) + 1;
+
+        // Generate verification token
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        const verificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
         
         // Auto-approve if they were invited via waitlist
         const waitlistEntry = await Waitlist.findOne({ email: email.toLowerCase() });
