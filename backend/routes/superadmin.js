@@ -244,8 +244,9 @@ router.post('/waitlist/:id/approve', async (req, res) => {
         const entry = await Waitlist.findById(req.params.id);
         if (!entry) return res.status(404).json({ success: false, error: 'Waitlist entry not found' });
 
-        // Generate invitation link (assuming production URL)
-        const inviteLink = `${env.frontendUrl[0] || 'https://mantram.ai'}/signup?email=${encodeURIComponent(entry.email)}`;
+        // Generate invitation link (prioritize production URL over localhost)
+        const productionUrl = env.frontendUrl.find(url => url.includes('mantram.ai')) || env.frontendUrl[0] || 'https://mantram.ai';
+        const inviteLink = `${productionUrl}/signup?email=${encodeURIComponent(entry.email)}`;
         
         const mailOptions = {
             from: `"Mantram AI" <${env.email.user}>`,
