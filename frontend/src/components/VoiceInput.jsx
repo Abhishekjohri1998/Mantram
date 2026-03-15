@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
+import { voice } from '../services/api'
 
 /**
  * VoiceInput — OpenAI Whisper-powered multilingual voice dictation
@@ -126,15 +127,7 @@ export default function VoiceInput({ onResult, language = 'english', className =
                         formData.append('language', langCode)
                     }
 
-                    const response = await fetch('/api/voice/transcribe', {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
-                        },
-                        body: formData,
-                    })
-
-                    const data = await response.json()
+                    const data = await voice.transcribe(formData)
 
                     if (data.success && data.text) {
                         onResult(data.text)

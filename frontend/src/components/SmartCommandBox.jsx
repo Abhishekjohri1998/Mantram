@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { agentCommand, creatives as creativesAPI } from '../services/api'
+import { agentCommand, creatives as creativesAPI, voice } from '../services/api'
 import { useBrand } from '../context/BrandContext'
 import { stripMarkdown } from '../utils/stripMarkdown'
 
@@ -153,13 +153,7 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                 formData.append('language', 'unknown') // auto-detect: Sarvam for Hindi, Whisper for English
 
                 try {
-                    const token = localStorage.getItem('mantram_token')
-                    const resp = await fetch('/api/voice/transcribe', {
-                        method: 'POST',
-                        headers: token ? { Authorization: `Bearer ${token}` } : {},
-                        body: formData,
-                    })
-                    const data = await resp.json()
+                    const data = await voice.transcribe(formData)
                     if (data.success && data.text) {
                         setInput(data.text)
                         // Reset loading before calling handleSend — handleSend checks `loading` and aborts if true

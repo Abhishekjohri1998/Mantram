@@ -801,3 +801,22 @@ export const socialMediaStudio = {
     get: (id) => apiFetch(`/social-media-studio/strategies/${id}`),
     delete: (id) => apiFetch(`/social-media-studio/strategies/${id}`, { method: 'DELETE' }),
 };
+
+// ============ Voice API ============
+export const voice = {
+    transcribe: (formData) => {
+        const token = localStorage.getItem('mantram_token') || '';
+        return fetch(`${API_BASE}/voice/transcribe`, {
+            method: 'POST',
+            headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: formData,
+        }).then(async (r) => {
+            if (!r.ok) {
+                const errData = await r.json().catch(() => ({}));
+                throw new Error(errData.error || 'Transcription failed');
+            }
+            return r.json();
+        });
+    },
+};
+
