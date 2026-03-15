@@ -68,7 +68,7 @@ router.get('/stats', async (req, res) => {
 
         const recentUsersRaw = await User.find()
             .sort('-createdAt').limit(10)
-            .select('name email plan role credits createdAt lastActive company');
+            .select('name email plan role credits createdAt lastActive company approvalStatus');
 
         // Add credit balance virtualization for frontend
         const recentUsers = recentUsersRaw.map(u => ({
@@ -180,7 +180,7 @@ router.get('/stats', async (req, res) => {
 
 router.get('/users', async (req, res) => {
     try {
-        const { page = 1, limit = 20, search, plan, role, sort = '-createdAt' } = req.query;
+        const { page = 1, limit = 20, search, plan, role, approvalStatus, sort = '-createdAt' } = req.query;
         const filter = {};
         if (search) {
             const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -192,6 +192,7 @@ router.get('/users', async (req, res) => {
         }
         if (plan) filter.plan = plan;
         if (role) filter.role = role;
+        if (approvalStatus) filter.approvalStatus = approvalStatus;
 
         const users = await User.find(filter)
             .sort(sort)

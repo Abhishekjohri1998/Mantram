@@ -393,7 +393,14 @@ export default function SuperAdminDashboard() {
                                                         />
                                                     </div>
                                                 </div>
-                                                <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${
+                                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                                                    u.approvalStatus === 'approved' ? 'bg-emerald-500/10 text-emerald-500' :
+                                                    u.approvalStatus === 'rejected' ? 'bg-rose-500/10 text-rose-500' :
+                                                    'bg-amber-500/10 text-amber-500'
+                                                }`}>
+                                                    {u.approvalStatus || 'pending'}
+                                                </span>
+                                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
                                                     u.plan === 'enterprise' ? 'bg-amber-500/15 text-amber-400' : 
                                                     u.plan === 'professional' ? 'bg-blue-500/15 text-blue-400' : 
                                                     u.plan === 'test' ? 'bg-rose-500/15 text-rose-400' :
@@ -589,9 +596,28 @@ export default function SuperAdminDashboard() {
                                          <button onClick={() => setCreditModal(u)} title="Add Credits" className="p-2 rounded-lg hover:bg-emerald-500/10 text-slate-500 hover:text-emerald-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">add_circle</span></button>
                                         <button onClick={() => handleResetCredits(u._id)} title="Reset Credits" className="p-2 rounded-lg hover:bg-cyan-500/10 text-slate-500 hover:text-cyan-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">restart_alt</span></button>
                                         <button onClick={() => setPlanModal(u)} title="Change Plan" className="p-2 rounded-lg hover:bg-blue-500/10 text-slate-500 hover:text-blue-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">upgrade</span></button>
-                                        {u.approvalStatus === 'pending' && (
-                                            <button onClick={() => handleApproveUser(u._id)} title="Approve User" className="p-2 rounded-lg hover:bg-emerald-500/10 text-emerald-500 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">check_circle</span></button>
+                                        
+                                        {u.approvalStatus === 'pending' ? (
+                                            <div className="flex gap-1 border-x border-white/[0.04] px-1 mx-1">
+                                                <button onClick={() => handleApproveUser(u._id)} title="Approve User" className="p-2 rounded-lg hover:bg-emerald-500/10 text-emerald-500 transition-all cursor-pointer shadow-sm"><span className="material-symbols-outlined text-base font-bold">check_circle</span></button>
+                                                <button onClick={() => handleRejectUser(u._id)} title="Reject User" className="p-2 rounded-lg hover:bg-rose-500/10 text-rose-500 transition-all cursor-pointer shadow-sm"><span className="material-symbols-outlined text-base font-bold">cancel</span></button>
+                                            </div>
+                                        ) : u.approvalStatus === 'approved' ? (
+                                            <div className="px-2 border-x border-white/[0.04] mx-1">
+                                                <span className="text-[9px] font-black text-emerald-500/50 bg-emerald-500/5 px-2 py-1 rounded-md border border-emerald-500/10 flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-[10px]">verified</span>
+                                                    APPROVED
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <div className="px-2 border-x border-white/[0.04] mx-1">
+                                                <span className="text-[9px] font-black text-rose-500/50 bg-rose-500/5 px-2 py-1 rounded-md border border-rose-500/10 flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-[10px]">block</span>
+                                                    REJECTED
+                                                </span>
+                                            </div>
                                         )}
+
                                         <button onClick={() => handleImpersonate(u._id, u.name)} title="Login as User" className="p-2 rounded-lg hover:bg-amber-500/10 text-slate-500 hover:text-amber-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">login</span></button>
                                         <button onClick={() => handleDeleteUser(u._id, u.name)} title="Delete" className="p-2 rounded-lg hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">delete</span></button>
                                     </div>
