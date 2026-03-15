@@ -114,8 +114,12 @@ app.use(cors({
         'x-rtb-fingerprint-id'
     ],
     exposedHeaders: ['x-rtb-fingerprint-id'],
-    optionsSuccessStatus: 204
+    optionsSuccessStatus: 204,
+    maxAge: 86400 // 24 hours preflight cache
 }));
+
+// Preflight OPTIONS handling
+app.options('*', cors());
 // Special middleware for Webhooks to ensure raw body capture for HMAC verification
 app.use((req, res, next) => {
     if (req.originalUrl && (req.originalUrl.includes('/api/shopify/webhooks') || req.originalUrl.includes('/api/funnel-webhooks') || req.originalUrl.includes('/api/webhooks'))) {

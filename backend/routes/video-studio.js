@@ -376,6 +376,11 @@ router.post('/:id/select', protect, async (req, res) => {
         await VideoProject.findByIdAndUpdate(project._id, { selectedConceptIndex: conceptIndex });
 
         // Run script director
+        if (!project.concepts || project.concepts.length === 0) {
+            console.error(`❌ Video Studio select error: Project ${project._id} has no concepts.`, { status: project.status });
+            return res.status(400).json({ success: false, error: 'Concepts missing. Please regenerate brainstorm.' });
+        }
+
         const state = await runStep(project._id, 'script', scriptDirectorNode, {
             userId: req.user._id.toString(),
             brandId: project.brand?.toString(),
