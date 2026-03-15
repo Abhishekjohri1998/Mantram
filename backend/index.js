@@ -90,9 +90,12 @@ app.use(cors({
         const allowedOrigins = config.frontendUrl.map(url => url.toLowerCase().replace(/\/$/, ''));
         
         // Ensure production domains are allowed even if not in .env (fail-safe for live URL)
-        const productionOrigins = ['https://mantram.ai', 'https://www.mantram.ai'];
+        const productionOrigins = ['https://mantram.ai', 'https://www.mantram.ai', 'https://api.mantram.ai'];
         
-        if (allowedOrigins.includes(cleanOrigin) || productionOrigins.includes(cleanOrigin)) {
+        // Match exact or any subdomain of mantram.ai
+        const isMantramDomain = cleanOrigin.endsWith('.mantram.ai') || cleanOrigin === 'https://mantram.ai';
+
+        if (allowedOrigins.includes(cleanOrigin) || productionOrigins.includes(cleanOrigin) || isMantramDomain) {
             callback(null, true);
         } else {
             console.warn(`⚠️ CORS Blocked: Origin "${origin}" (cleaned: "${cleanOrigin}") not in allowed list:`, allowedOrigins);
@@ -100,8 +103,18 @@ app.use(cors({
         }
     },
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-rtb-fingerprint-id'],
-    exposedHeaders: ['x-rtb-fingerprint-id']
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: [
+        'Content-Type', 
+        'Authorization', 
+        'X-Requested-With', 
+        'Accept', 
+        'Origin',
+        'Cache-Control',
+        'x-rtb-fingerprint-id'
+    ],
+    exposedHeaders: ['x-rtb-fingerprint-id'],
+    optionsSuccessStatus: 204
 }));
 // Special middleware for Webhooks to ensure raw body capture for HMAC verification
 app.use((req, res, next) => {

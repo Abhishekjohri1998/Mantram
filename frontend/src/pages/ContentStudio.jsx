@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import SEOHead from '../components/SEOHead'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
@@ -2653,6 +2653,30 @@ export default function ContentStudio() {
             .catch(() => { })
     }, [])
 
+    const abortControllerRef = useRef(null)
+    const activeBrandIdRef = useRef(activeBrand?._id)
+
+    const getSignal = useCallback(() => {
+        if (abortControllerRef.current) abortControllerRef.current.abort()
+        abortControllerRef.current = new AbortController()
+        return abortControllerRef.current.signal
+    }, [])
+
+    useEffect(() => {
+        return () => abortControllerRef.current?.abort()
+    }, [])
+
+    // Abort and reset on brand switch
+    useEffect(() => {
+        if (activeBrand?._id !== activeBrandIdRef.current) {
+            console.log('Brand changed, aborting content processing...')
+            abortControllerRef.current?.abort()
+            activeBrandIdRef.current = activeBrand?._id
+            if (generating) setGenerating(false)
+        }
+    }, [activeBrand?._id, generating])
+
+
     // Read URL params on mount (from Calendar, Dashboard, etc.)
     useEffect(() => {
         const occasion = searchParams.get('occasion')
@@ -2739,7 +2763,7 @@ export default function ContentStudio() {
             }
             setSearchParams({}, { replace: true })
         }
-    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Smart input handler
     const handleSmartParse = (parsed) => {
@@ -2849,6 +2873,7 @@ export default function ContentStudio() {
         const prompt = buildPrompt(settings)
 
         try {
+            const signal = getSignal()
             const data = await contentAPI.generate({
                 brandId: activeBrand._id,
                 type: goal,
@@ -2857,7 +2882,7 @@ export default function ContentStudio() {
                 prompt,
                 toneSettings: settings,
                 options: modelOverride !== 'auto' ? { modelOverride } : {},
-            })
+            }, { signal })
             setResult(data.content)
             setStep(5)
         } catch (err) {
@@ -2871,7 +2896,8 @@ export default function ContentStudio() {
         if (!result?._id) return
         setGenerating(true)
         try {
-            const data = await contentAPI.regenerate(result._id, {})
+            const signal = getSignal()
+            const data = await contentAPI.regenerate(result._id, {}, { signal })
             setResult(data.content)
         } catch (err) {
             console.error(err)
@@ -2969,6 +2995,7 @@ SPOKESPERSON QUOTES:`
 - Output ONLY the press release — no explanations`
 
         try {
+            const signal = getSignal()
             const data = await contentAPI.generate({
                 brandId: activeBrand._id,
                 type: 'press_release',
@@ -2977,7 +3004,7 @@ SPOKESPERSON QUOTES:`
                 prompt,
                 toneSettings: { language: prData.language, tone: prData.tone },
                 options: modelOverride !== 'auto' ? { modelOverride } : {},
-            })
+            }, { signal })
             setResult(data.content)
             setStep(5)
         } catch (err) {
@@ -3026,6 +3053,7 @@ SPOKESPERSON QUOTES:`
         setError('')
 
         try {
+            const signal = getSignal()
             const data = await contentAPI.youtube({
                 brandId: activeBrand._id,
                 brief: ytSettings.brief,
@@ -3035,7 +3063,7 @@ SPOKESPERSON QUOTES:`
                 style: ytSettings.style,
                 language: ytSettings.language,
                 subType: subType || '',
-            })
+            }, { signal })
             setResult(data.content)
             setYoutubeData(data.content?.youtubeData || {})
             setStep(9)  // YouTube result view

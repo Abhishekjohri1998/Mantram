@@ -141,6 +141,31 @@ export default function CreativeStudio() {
         })()
     }, [activeBrand?._id])
 
+    const abortControllerRef = useRef(null)
+    const activeBrandIdRef = useRef(activeBrand?._id)
+
+    const getSignal = useCallback(() => {
+        if (abortControllerRef.current) abortControllerRef.current.abort()
+        abortControllerRef.current = new AbortController()
+        return abortControllerRef.current.signal
+    }, [])
+
+    useEffect(() => {
+        return () => abortControllerRef.current?.abort()
+    }, [])
+
+    // Abort and reset on brand switch
+    useEffect(() => {
+        if (activeBrand?._id !== activeBrandIdRef.current) {
+            console.log('Brand changed, aborting creative processing...')
+            abortControllerRef.current?.abort()
+            activeBrandIdRef.current = activeBrand?._id
+            if (generating || enhancing || templateGenerating) {
+                setGenerating(false); setEnhancing(false); setTemplateGenerating(false)
+            }
+        }
+    }, [activeBrand?._id, generating, enhancing, templateGenerating])
+
     // ── Brand Templates (interactive formula-based) ──
     const [activeTemplate, setActiveTemplate] = useState(null)
     const [templateFields, setTemplateFields] = useState({})
@@ -482,7 +507,7 @@ export default function CreativeStudio() {
             }
             setSearchParams({}, { replace: true })
         }
-    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Auto-generate if triggered from Brainstorm
     useEffect(() => {
@@ -621,6 +646,7 @@ export default function CreativeStudio() {
             if (characters.length > 0) refDescs.push(`${characters.length} character reference image(s) are attached: ${characters.map(c => c.name).join(', ')} — include these characters in the design`)
             if (referenceImages.upload) refDescs.push('A general reference image is attached — use it as contextual inspiration')
 
+            const signal = getSignal()
             const data = await creativesAPI.enhancePrompt({
                 brandId: activeBrand._id,
                 prompt: prompt.trim(),
@@ -628,7 +654,7 @@ export default function CreativeStudio() {
                 format: selectedType,
                 aspectRatio,
                 referenceDescriptions: refDescs.length > 0 ? refDescs.join('. ') : '',
-            })
+            }, { signal })
             if (data.enhancedPrompt) {
                 setPrompt(data.enhancedPrompt)
             }
@@ -692,12 +718,13 @@ export default function CreativeStudio() {
                 addLogo,
             })
 
+            const signal = getSignal()
             const data = await creativesAPI.generate({
                 brandId: activeBrand._id,
                 type: selectedType,
                 prompt: fullPrompt,
                 options,
-            })
+            }, { signal })
 
             let creative = data.creative
 
@@ -944,12 +971,13 @@ export default function CreativeStudio() {
                 }
             }
 
+            const signal = getSignal()
             const data = await creativesAPI.generate({
                 brandId: activeBrand._id,
                 type: tmpl.type,
                 prompt: builtPrompt,
                 options,
-            })
+            }, { signal })
 
             if (data.success && data.creative) {
                 setTemplateResult(data.creative)

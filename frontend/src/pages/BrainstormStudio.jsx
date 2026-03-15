@@ -201,6 +201,17 @@ export default function BrainstormStudio() {
     const bottomRef = useRef(null)
     const chatBottomRef = useRef(null)
     const activeBrandIdRef = useRef(activeBrand?._id)
+    const abortControllerRef = useRef(null)
+
+    const getSignal = useCallback(() => {
+        if (abortControllerRef.current) abortControllerRef.current.abort()
+        abortControllerRef.current = new AbortController()
+        return abortControllerRef.current.signal
+    }, [])
+
+    useEffect(() => {
+        return () => abortControllerRef.current?.abort()
+    }, [])
 
     useEffect(() => {
         activeBrandIdRef.current = activeBrand?._id
@@ -220,8 +231,9 @@ export default function BrainstormStudio() {
 
     // Reset loop if brand changes mid-process
     useEffect(() => {
-        if (step > 0) {
-            console.log('Brand changed mid-brainstorm, resetting state...')
+        if (activeBrand?._id !== activeBrandIdRef.current) {
+            console.log('Brand changed mid-brainstorm, resetting state and aborting processing...')
+            abortControllerRef.current?.abort()
             resetAll()
         }
     }, [activeBrand?._id])
@@ -235,13 +247,14 @@ export default function BrainstormStudio() {
         setLoading(true)
         setLoadingMsg(activeBrand ? `Analyzing ${activeBrand.name}'s DNA for your brainstorm...` : 'Preparing questions...')
         try {
+            const signal = getSignal()
             const data = await bsAPI.start({
                 intent: intentId,
                 brand: activeBrand ? {
                     name: activeBrand.name,
                     dna: activeBrand.dna,
                 } : null,
-            })
+            }, { signal })
             if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success) {
                 setQuestions(data.questions)
@@ -371,10 +384,11 @@ export default function BrainstormStudio() {
         setScreenplayLoading(true)
         setScreenplay(null)
         try {
+            const signal = getSignal()
             const data = await bsAPI.screenplay({
                 filmConcept,
                 brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna } : null,
-            })
+            }, { signal })
             if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success) setScreenplay(data.screenplay)
             else setError(data.error || 'Screenplay generation failed')
@@ -412,12 +426,13 @@ export default function BrainstormStudio() {
         setChatHistory(newHistory)
         setChatLoading(true)
         try {
+            const signal = getSignal()
             const data = await bsAPI.chat({
                 filmConcept: chatFilm,
                 chatHistory: newHistory,
                 userMessage: text,
                 brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna } : null,
-            })
+            }, { signal })
             if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success !== false) {
                 const aiMsg = { role: 'ai', text: data.message, suggestions: data.suggestions || [] }

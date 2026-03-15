@@ -15,6 +15,7 @@ async function api(path, opts = {}) {
     const res = await fetch(`${API_BASE}${path}`, {
         ...opts,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...opts.headers },
+        signal: opts.signal,
     })
     const contentType = res.headers.get('content-type') || ''
     if (!contentType.includes('application/json')) {
@@ -198,7 +199,7 @@ export default function VideoStudio() {
             }
             setSearchParams({}, { replace: true })
         }
-    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Auto-start if triggered from Brainstorm
     useEffect(() => {
@@ -208,6 +209,33 @@ export default function VideoStudio() {
         }
     }, [autoStart, activeBrand, brief, loading, step]) // eslint-disable-line react-hooks/exhaustive-deps
 
+    const abortControllerRef = useRef(null)
+    const activeBrandIdRef = useRef(activeBrand?._id)
+
+    const getSignal = useCallback(() => {
+        if (abortControllerRef.current) abortControllerRef.current.abort()
+        abortControllerRef.current = new AbortController()
+        return abortControllerRef.current.signal
+    }, [])
+
+    useEffect(() => {
+        return () => abortControllerRef.current?.abort()
+    }, [])
+
+    // Reset loop if brand changes mid-process
+    useEffect(() => {
+        if (activeBrand?._id !== activeBrandIdRef.current) {
+            console.log('Brand changed, aborting video processing...')
+            abortControllerRef.current?.abort()
+            activeBrandIdRef.current = activeBrand?._id
+            // Reset to step 0 if we were processing
+            if (loading) {
+                setLoading(false)
+                setStep(0)
+            }
+        }
+    }, [activeBrand?._id, loading])
+
     // ══════════════════════════════════════════════════════════════════════════
     // STEP 1: Start — Submit brief + images → get concepts
     // ══════════════════════════════════════════════════════════════════════════
@@ -215,6 +243,7 @@ export default function VideoStudio() {
         if (!brief.trim() && images.length === 0) { setError('Enter a brief or add at least one image'); return }
         setLoading(true); setError('')
         try {
+            const signal = getSignal()
             const data = await api('/video-studio/start', {
                 method: 'POST',
                 body: JSON.stringify({
@@ -223,6 +252,7 @@ export default function VideoStudio() {
                     images,
                     videoType,
                 }),
+                signal,
             })
             setProjectId(data.project._id)
             setConcepts(data.project.concepts || [])
