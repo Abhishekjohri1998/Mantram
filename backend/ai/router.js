@@ -83,7 +83,7 @@ class ModelRouter {
         const priority = [
             preferences.provider,
             config.ai.defaultImageProvider,
-            'gemini',  // Imagen 3 (nanobanana pro) — user preferred
+            'gemini',  // Gemini 3.1 Flash Image Preview (nanobanana pro)
             'openai',  // DALL-E fallback
         ].filter(Boolean);
 

@@ -83,7 +83,7 @@ export class GeminiProvider extends BaseProvider {
         // Use dedicated image API key (billed)
         const imageKey = this.imageApiKey;
 
-        // Method 1: Nanobanana 2 — Gemini 3.1 Flash Image Preview (latest)
+        // Method 1: Nano Banana 2 — Gemini 3.1 Flash Image Preview (latest, Feb 2026)
         try {
             const modelId = 'gemini-3.1-flash-image-preview';
             const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
