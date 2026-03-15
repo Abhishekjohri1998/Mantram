@@ -153,22 +153,22 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
         }
 
         if (provider.name === 'gemini') {
-          const models = ['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'];
+          const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'];
           for (const modelId of models) {
             if (overallController.signal.aborted || providerController.signal.aborted) break;
             try {
+              // Concatenate for maximum compatibility (some models fail on system_instruction in v1beta)
               const resp = await fetch(
                 `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${provider.key}`,
                 {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
-                    system_instruction: { parts: [{ text: systemPrompt }] },
-                    contents: [{ parts: [{ text: userPrompt }] }],
-                    generation_config: {
+                    contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+                    generationConfig: {
                       temperature, 
-                      max_output_tokens: maxTokens,
-                      ...(json ? { response_mime_type: 'application/json' } : {}),
+                      maxOutputTokens: maxTokens,
+                      ...(json ? { responseMimeType: 'application/json' } : {}),
                     },
                   }),
                   signal: providerController.signal,
@@ -182,7 +182,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
                 return text;
               } else {
                 console.warn(`Gemini ${modelId} error (${resp.status}):`, JSON.stringify(data.error || data));
-                if (isQuotaError(resp.status, data)) break; // Try next provider
+                if (isQuotaError(resp.status, data)) break;
               }
             } catch (e) {
               console.warn(`Gemini ${modelId} request fail: ${e.message}`);
@@ -266,8 +266,8 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
 
     // Timing Safeguard: Check if we have enough time left for AI
     const elapsed = Date.now() - (req.startTime || Date.now());
-    const budget = 28000; // 28s budget for Gateway
-    const remainingBudget = Math.max(5000, budget - elapsed);
+    const budget = 55000; // Increased to 55s to allow for all fallbacks (ALB/CloudFront limit usually 60s)
+    const remainingBudget = Math.max(10000, budget - elapsed);
     console.log(`⏱️ Health Check research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     const systemPrompt = `You are a SENIOR SEO STRATEGIST (not just an auditor). You think like a CMO + technical SEO expert combined. You have REAL CRAWL DATA — use it as ground truth. Never guess or contradict the crawl.
@@ -457,8 +457,8 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
 
     // Timing Safeguard: Check if we have enough time left for AI
     const elapsed = Date.now() - (req.startTime || Date.now());
-    const budget = 28000; // 28s budget for Gateway
-    const remainingBudget = Math.max(5000, budget - elapsed);
+    const budget = 55000; // Increased to 55s to allow for all fallbacks (ALB/CloudFront limit usually 60s)
+    const remainingBudget = Math.max(10000, budget - elapsed);
     console.log(`⏱️ Traffic research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     // Build enriched signal data for AI prompt
@@ -697,8 +697,8 @@ router.post('/competitors', protect, requireStudio('seoStudio'), requireCredits(
 
     // Timing Safeguard: Check if we have enough time left for AI
     const elapsed = Date.now() - (req.startTime || Date.now());
-    const budget = 28000; // 28s budget
-    const remainingBudget = Math.max(5000, budget - elapsed);
+    const budget = 55000; // 55s budget
+    const remainingBudget = Math.max(10000, budget - elapsed);
     console.log(`⏱️ Competitor research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     const systemPrompt = `You are a COMPETITIVE INTELLIGENCE STRATEGIST — you think like a war-room strategist, not a data reporter. You have REAL CRAWL DATA from both the brand and competitor websites. Your job is to explain WHY competitors win, WHAT their strategy is, and HOW to beat them.
@@ -837,8 +837,8 @@ router.post('/ai-visibility', protect, requireStudio('seoStudio'), requireCredit
 
     // Timing Safeguard: Check if we have enough time left for AI
     const elapsed = Date.now() - (req.startTime || Date.now());
-    const budget = 28000; // 28s budget
-    const remainingBudget = Math.max(5000, budget - elapsed);
+    const budget = 55000; // 55s budget
+    const remainingBudget = Math.max(10000, budget - elapsed);
     console.log(`⏱️ AI Visibility research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     const systemPrompt = `You are an AI SEARCH STRATEGIST — the world's foremost expert on making brands visible in AI-powered search (Google AI Overviews, ChatGPT + Bing, Perplexity, Gemini, Claude, etc.) in 2026.
@@ -1460,8 +1460,8 @@ router.post('/competitor-warroom', protect, requireStudio('seoStudio'), requireC
 
     // Timing Safeguard: Check if we have enough time left for AI
     const elapsed = Date.now() - (req.startTime || Date.now());
-    const budget = 28000; // 28s budget
-    const remainingBudget = Math.max(5000, budget - elapsed);
+    const budget = 55000; // 55s budget
+    const remainingBudget = Math.max(10000, budget - elapsed);
     console.log(`⏱️ War Room research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     const systemPrompt = `You are a COMPETITIVE WAR ROOM STRATEGIST — create a 90-day battle plan to systematically outrank competitors. You have REAL CRAWL DATA.
