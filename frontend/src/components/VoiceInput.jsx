@@ -53,6 +53,20 @@ export default function VoiceInput({ onResult, language = 'english', className =
     const vadIntervalRef = useRef(null)
     const silenceStartRef = useRef(null)
 
+    const stopRecording = useCallback(() => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop()
+        }
+        setRecording(false)
+        setAudioLevel(0)
+        clearInterval(timerRef.current)
+        clearInterval(vadIntervalRef.current)
+        if (audioContextRef.current) {
+            audioContextRef.current.close().catch(() => { })
+            audioContextRef.current = null
+        }
+    }, [])
+
     const startRecording = useCallback(async () => {
         setError('')
         setDuration(0)
@@ -185,21 +199,8 @@ export default function VoiceInput({ onResult, language = 'english', className =
             }
             setTimeout(() => setError(''), 3000)
         }
-    }, [language, onResult])
+    }, [language, onResult, stopRecording])
 
-    const stopRecording = useCallback(() => {
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-            mediaRecorderRef.current.stop()
-        }
-        setRecording(false)
-        setAudioLevel(0)
-        clearInterval(timerRef.current)
-        clearInterval(vadIntervalRef.current)
-        if (audioContextRef.current) {
-            audioContextRef.current.close().catch(() => { })
-            audioContextRef.current = null
-        }
-    }, [])
 
     const toggleRecording = () => {
         if (recording) {
