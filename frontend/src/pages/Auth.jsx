@@ -24,6 +24,19 @@ export default function Auth() {
     const redirect = searchParams.get('redirect') || '/dashboard'
     const plan = searchParams.get('plan')
     const scanUrl = searchParams.get('scanUrl')
+    const emailParam = searchParams.get('email')
+    const modeParam = searchParams.get('mode')
+    const isSignupPath = window.location.pathname === '/signup'
+
+    // Initial setup from URL parameters
+    useEffect(() => {
+        if (isSignupPath || modeParam === 'signup') {
+            setIsLogin(false)
+        }
+        if (emailParam) {
+            setForm(prev => ({ ...prev, email: emailParam }))
+        }
+    }, [isSignupPath, modeParam, emailParam])
 
     // If already authenticated, redirect immediately
     useEffect(() => {
