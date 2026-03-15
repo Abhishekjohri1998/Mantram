@@ -164,8 +164,7 @@ export default function CreativeStudio() {
     const [showCreateCategory, setShowCreateCategory] = useState(false)
     const [creatingCategory, setCreatingCategory] = useState(false)
     const [newCat, setNewCat] = useState({
-        label: '', icon: 'auto_awesome', color: '#f59e0b', description: '',
-        referenceImageUrl: '', basePromptFormula: '', imageSource: 'upload' // 'upload' | 'url' | 'bank'
+        label: '', icon: 'auto_awesome', color: '#f59e0b', imageSource: 'upload'
     })
 
     // ── Aspect Ratio Options ──
@@ -1159,14 +1158,11 @@ Return ONLY the prompt formula text, no explanation. Start directly with "Create
                 label: newCat.label,
                 icon: newCat.icon,
                 color: newCat.color,
-                description: newCat.description,
-                referenceImageUrl: newCat.referenceImageUrl,
-                basePromptFormula: newCat.basePromptFormula,
             })
             if (data.success) {
                 await loadCustomCategories()
                 setShowCreateCategory(false)
-                setNewCat({ label: '', icon: 'auto_awesome', color: '#f59e0b', description: '', referenceImageUrl: '', basePromptFormula: '', imageSource: 'upload' })
+                setNewCat({ label: '', icon: 'auto_awesome', color: '#f59e0b', imageSource: 'upload' })
             }
         } catch (err) { console.error('Create category error:', err) }
         setCreatingCategory(false)
@@ -3540,206 +3536,75 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             {showCreateCategory && (
                                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in"
                                     onClick={() => setShowCreateCategory(false)}>
-                                    <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto glass-panel rounded-3xl p-6 mx-4 animate-scale-in"
+                                    <div className="w-full max-w-md studio-card p-6 mx-4 animate-scale-in"
                                         onClick={e => e.stopPropagation()}>
-                                        <div className="flex items-center justify-between mb-6">
-                                            <div>
-                                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                                    <span className="material-symbols-outlined text-primary">create_new_folder</span>
-                                                    Create New Category
-                                                </h3>
-                                                <p className="text-sm text-slate-500 mt-1">Build a template category like Birthday, Anniversary, Festival — learn from a reference design</p>
-                                            </div>
+
+                                        {/* Header */}
+                                        <div className="flex items-center justify-between mb-5">
+                                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-primary">create_new_folder</span>
+                                                New Category
+                                            </h3>
                                             <button onClick={() => setShowCreateCategory(false)}
                                                 className="p-2 rounded-xl bg-white/[0.05] text-slate-400 hover:text-white cursor-pointer">
-                                                <span className="material-symbols-outlined">close</span>
+                                                <span className="material-symbols-outlined text-sm">close</span>
                                             </button>
                                         </div>
 
-                                        {/* Category Name, Icon & Color */}
-                                        <div className="grid grid-cols-12 gap-3 mb-4">
-                                            <div className="col-span-6">
-                                                <label className="text-[11px] font-bold text-slate-400 mb-1.5 block">Category Name *</label>
-                                                <input type="text" value={newCat.label}
-                                                    onChange={e => setNewCat(p => ({ ...p, label: e.target.value }))}
-                                                    placeholder="e.g. Birthday, Anniversary, Diwali..."
-                                                    className="input-glass w-full py-2.5 text-sm" />
+                                        {/* Live Preview */}
+                                        <div className="flex items-center gap-3 p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] mb-5">
+                                            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all"
+                                                style={{ background: `linear-gradient(135deg, ${newCat.color}25, ${newCat.color}08)`, boxShadow: `0 4px 15px ${newCat.color}12` }}>
+                                                <span className="material-symbols-outlined text-2xl" style={{ color: newCat.color }}>{newCat.icon}</span>
                                             </div>
-                                            <div className="col-span-3">
-                                                <label className="text-[11px] font-bold text-slate-400 mb-1.5 block">Icon</label>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-bold text-white truncate">{newCat.label || 'Category Name'}</p>
+                                                <p className="text-xs text-slate-500">Preview — this is how it'll look in your grid</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Category Name */}
+                                        <div className="mb-4">
+                                            <label className="text-xs font-bold text-slate-400 mb-1.5 block">Category Name *</label>
+                                            <input type="text" value={newCat.label}
+                                                onChange={e => setNewCat(p => ({ ...p, label: e.target.value }))}
+                                                placeholder="e.g. Birthday, Anniversary, Diwali..."
+                                                className="input-glass w-full py-3 text-sm"
+                                                autoFocus />
+                                        </div>
+
+                                        {/* Icon & Color — side by side */}
+                                        <div className="grid grid-cols-2 gap-4 mb-5">
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-400 mb-1.5 block">Icon</label>
                                                 <select value={newCat.icon}
                                                     onChange={e => setNewCat(p => ({ ...p, icon: e.target.value }))}
-                                                    className="input-glass w-full py-2.5 text-sm">
+                                                    className="input-glass w-full py-3 text-sm">
                                                     {['auto_awesome', 'cake', 'favorite', 'celebration', 'star', 'card_giftcard', 'mood', 'eco', 'flag', 'spa', 'local_fire_department', 'brush', 'pets', 'music_note', 'restaurant', 'school', 'sports_esports', 'local_offer', 'campaign', 'event'].map(ic => (
                                                         <option key={ic} value={ic}>{ic.replace(/_/g, ' ')}</option>
                                                     ))}
                                                 </select>
                                             </div>
-                                            <div className="col-span-3">
-                                                <label className="text-[11px] font-bold text-slate-400 mb-1.5 block">Color</label>
-                                                <div className="flex gap-1.5 flex-wrap">
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-400 mb-1.5 block">Color</label>
+                                                <div className="flex gap-2 flex-wrap">
                                                     {['#ef4444', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899', '#0ea5e9', '#f97316', '#14b8a6'].map(c => (
                                                         <button key={c} onClick={() => setNewCat(p => ({ ...p, color: c }))}
-                                                            className={`w-7 h-7 rounded-lg border-2 cursor-pointer transition-transform ${newCat.color === c ? 'border-white scale-110' : 'border-transparent'}`}
+                                                            className={`w-8 h-8 rounded-xl border-2 cursor-pointer transition-all ${newCat.color === c ? 'border-white scale-110 shadow-lg' : 'border-transparent hover:scale-105'}`}
                                                             style={{ background: c }} />
                                                     ))}
                                                 </div>
                                             </div>
                                         </div>
 
-                                        {/* Description */}
-                                        <div className="mb-4">
-                                            <label className="text-[11px] font-bold text-slate-400 mb-1.5 block">Description</label>
-                                            <input type="text" value={newCat.description}
-                                                onChange={e => setNewCat(p => ({ ...p, description: e.target.value }))}
-                                                placeholder="e.g. Birthday-themed designs for team members and clients"
-                                                className="input-glass w-full py-2.5 text-sm" />
-                                        </div>
-
-                                        {/* ── IMAGE SOURCE: 3 tabs ── */}
-                                        <div className="mb-4 p-4 rounded-2xl bg-amber-500/[0.04] border border-amber-500/10">
-                                            <h4 className="text-xs font-bold text-amber-400 flex items-center gap-2 mb-3">
-                                                <span className="material-symbols-outlined text-sm">image_search</span>
-                                                Learn from Reference Design
-                                                <span className="text-sm text-amber-500/50 bg-amber-500/10 px-2 py-0.5 rounded ml-auto">Recommended</span>
-                                            </h4>
-                                            <p className="text-sm text-slate-500 mb-3">AI analyzes the reference image and extracts a reusable style formula for this category.</p>
-
-                                            {/* 3 Source Tabs */}
-                                            <div className="flex gap-2 mb-3 flex-wrap">
-                                                {[
-                                                    { key: 'upload', icon: 'upload_file', label: 'Upload' },
-                                                    { key: 'url', icon: 'link', label: 'URL' },
-                                                    { key: 'bank', icon: 'photo_library', label: 'Image Bank' },
-                                                    { key: 'website', icon: 'language', label: 'Brand Website' },
-                                                ].map(src => (
-                                                    <button key={src.key} onClick={() => setNewCat(p => ({ ...p, imageSource: src.key }))}
-                                                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-medium cursor-pointer transition-all flex-1 justify-center ${newCat.imageSource === src.key
-                                                            ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20'
-                                                            : 'bg-white/[0.04] text-slate-400 hover:bg-white/[0.06]'}`}>
-                                                        <span className="material-symbols-outlined text-sm">{src.icon}</span>
-                                                        {src.label}
-                                                    </button>
-                                                ))}
-                                            </div>
-
-                                            {/* Show reference image if already loaded */}
-                                            {newCat.referenceImageUrl ? (
-                                                <div className="relative rounded-xl overflow-hidden mb-2">
-                                                    <img src={newCat.referenceImageUrl} alt="Reference" className="w-full max-h-44 object-contain bg-black/20 rounded-xl" />
-                                                    <button onClick={() => setNewCat(p => ({ ...p, referenceImageUrl: '' }))}
-                                                        className="absolute top-2 right-2 p-1 rounded-lg bg-black/60 text-white hover:bg-rose-500/80 cursor-pointer">
-                                                        <span className="material-symbols-outlined text-xs">close</span>
-                                                    </button>
-                                                    {analyzeLoading && (
-                                                        <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center rounded-xl">
-                                                            <span className="material-symbols-outlined text-2xl text-amber-400 animate-spin mb-2">progress_activity</span>
-                                                            <p className="text-sm text-amber-400">Analyzing design style...</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    {/* Upload tab */}
-                                                    {newCat.imageSource === 'upload' && (
-                                                        <label className="flex flex-col items-center justify-center py-6 rounded-xl border-2 border-dashed border-amber-500/20 hover:border-amber-500/40 cursor-pointer transition-colors bg-amber-500/[0.02]">
-                                                            <span className="material-symbols-outlined text-2xl text-amber-500/40 mb-2">add_photo_alternate</span>
-                                                            <span className="text-[11px] text-amber-400/60 font-medium">Click to upload a reference design</span>
-                                                            <span className="text-xs text-slate-600 mt-1">JPG, PNG, WebP supported</span>
-                                                            <input type="file" className="hidden" accept="image/*" onChange={e => {
-                                                                const file = e.target.files?.[0]
-                                                                if (file) {
-                                                                    const reader = new FileReader()
-                                                                    reader.onload = async ev => {
-                                                                        const s3Url = await uploadToS3(ev.target.result, 'categories')
-                                                                        handleAnalyzeForCategory(s3Url)
-                                                                    }
-                                                                    reader.readAsDataURL(file)
-                                                                }
-                                                            }} />
-                                                        </label>
-                                                    )}
-
-                                                    {/* URL tab */}
-                                                    {newCat.imageSource === 'url' && (
-                                                        <div className="flex gap-2">
-                                                            <input id="cat-img-url" type="url" placeholder="Paste image URL here..."
-                                                                className="input-glass flex-1 py-2.5 text-sm"
-                                                                onKeyDown={e => {
-                                                                    if (e.key === 'Enter' && e.target.value) handleAnalyzeForCategory(e.target.value)
-                                                                }} />
-                                                            <button onClick={() => {
-                                                                const input = document.getElementById('cat-img-url')
-                                                                if (input?.value) handleAnalyzeForCategory(input.value)
-                                                            }}
-                                                                className="btn-primary px-4 py-2.5 rounded-xl text-xs flex items-center gap-1">
-                                                                <span className="material-symbols-outlined text-sm">search</span> Analyze
-                                                            </button>
-                                                        </div>
-                                                    )}
-
-                                                    {/* Image Bank tab */}
-                                                    {newCat.imageSource === 'bank' && (
-                                                        <div>
-                                                            <p className="text-sm text-slate-500 mb-2">Select from your recently generated images:</p>
-                                                            <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto">
-                                                                {(bankImages || []).slice(0, 12).map((img, i) => (
-                                                                    <button key={i} onClick={() => handleAnalyzeForCategory(img.imageUrl || img.url)}
-                                                                        className="rounded-lg overflow-hidden border-2 border-transparent hover:border-amber-500 cursor-pointer transition-all">
-                                                                        <img src={img.imageUrl || img.url} alt="" className="w-full aspect-square object-cover" loading="lazy" decoding="async" />
-                                                                    </button>
-                                                                ))}
-                                                                {(!bankImages || bankImages.length === 0) && (
-                                                                    <p className="col-span-4 text-xs text-slate-600 text-center py-4">No images in bank yet. Generate some first!</p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-                                                    {/* Brand Website tab */}
-                                                    {newCat.imageSource === 'website' && (
-                                                        <div>
-                                                            <p className="text-sm text-slate-500 mb-2">Select from images scraped from your brand website:</p>
-                                                            <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto">
-                                                                {(activeBrand?.dna?.brandImages || activeBrand?.dna?.bannerImages || []).map((img, i) => (
-                                                                    <button key={i} onClick={() => handleAnalyzeForCategory(img.url)}
-                                                                        className="rounded-lg overflow-hidden border-2 border-transparent hover:border-emerald-500 cursor-pointer transition-all">
-                                                                        <img src={img.url} alt={img.alt || ''} className="w-full aspect-square object-cover"
-                                                                            onError={e => e.target.parentElement.style.display = 'none'} />
-                                                                    </button>
-                                                                ))}
-                                                                {!(activeBrand?.dna?.brandImages?.length > 0 || activeBrand?.dna?.bannerImages?.length > 0) && (
-                                                                    <p className="col-span-4 text-xs text-slate-600 text-center py-4">No brand images found. Re-scan your website to capture images.</p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </>
-                                            )}
-                                        </div>
-
-                                        {/* Base Prompt Formula (shown after analysis) */}
-                                        {newCat.basePromptFormula && (
-                                            <div className="mb-4">
-                                                <label className="text-[11px] font-bold text-slate-400 mb-1.5 block flex items-center gap-2">
-                                                    <span className="material-symbols-outlined text-sm text-emerald-400">check_circle</span>
-                                                    Extracted Style Formula
-                                                </label>
-                                                <textarea value={newCat.basePromptFormula}
-                                                    onChange={e => setNewCat(p => ({ ...p, basePromptFormula: e.target.value }))}
-                                                    className="input-glass w-full py-3 text-sm resize-none font-mono" rows={4} />
-                                                <p className="text-xs text-slate-600 mt-1 italic">💡 AI extracted this from the reference. Sub-templates in this category will inherit this style.</p>
-                                            </div>
-                                        )}
-
-                                        {/* Save */}
+                                        {/* Create Button */}
                                         <button onClick={handleCreateCategory}
                                             disabled={!newCat.label || creatingCategory}
-                                            className="btn-primary w-full py-4 rounded-2xl text-sm font-bold disabled:opacity-30">
+                                            className="btn-primary w-full py-3.5 rounded-2xl text-sm font-bold disabled:opacity-30">
                                             {creatingCategory ? (
-                                                <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Creating Category...</>
+                                                <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Creating...</>
                                             ) : (
-                                                <><span className="material-symbols-outlined text-sm">create_new_folder</span> Create "{newCat.label || 'Category'}"</>
+                                                <><span className="material-symbols-outlined text-sm">add</span> Create "{newCat.label || 'Category'}"</>
                                             )}
                                         </button>
                                     </div>

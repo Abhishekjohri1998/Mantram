@@ -4,10 +4,12 @@
     display: flex;
     flex-direction: column;
     height: 100vh;
-    background: #0a0e1a;
+    background: #08090f;
     color: #e2e8f0;
     overflow: hidden;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 /* ─── Top Toolbar ─── */
@@ -15,13 +17,14 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 56px;
-    padding: 0 16px;
-    background: rgba(15, 20, 35, 0.95);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    backdrop-filter: blur(16px);
+    height: 52px;
+    padding: 0 14px;
+    background: rgba(10, 12, 22, 0.98);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(24px);
     z-index: 50;
     flex-shrink: 0;
+    box-shadow: 0 1px 8px rgba(0, 0, 0, 0.3);
 }
 
 .ce-toolbar-left {
@@ -166,21 +169,23 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 20px;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    padding: 7px 18px;
+    background: linear-gradient(135deg, #6366f1, #7c3aed);
     color: #fff;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
     border: none;
     border-radius: 10px;
     cursor: pointer;
-    transition: all 0.2s;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 10px rgba(99, 102, 241, 0.25);
+    letter-spacing: 0.3px;
 }
 
 .ce-save-btn:hover {
     transform: translateY(-1px);
-    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+    filter: brightness(1.1);
 }
 
 /* ─── Main Content Area ─── */
@@ -206,14 +211,14 @@
 
 /* ── Vertical Icon Rail ── */
 .ce-icon-rail {
-    width: 72px;
-    background: rgba(8, 12, 24, 0.98);
-    border-right: 1px solid rgba(255, 255, 255, 0.04);
+    width: 68px;
+    background: rgba(6, 8, 18, 0.99);
+    border-right: 1px solid rgba(255, 255, 255, 0.035);
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 8px 0;
-    gap: 2px;
+    padding: 6px 0;
+    gap: 1px;
     overflow-y: auto;
     overflow-x: hidden;
     flex-shrink: 0;
@@ -229,51 +234,58 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
-    width: 60px;
-    height: 56px;
+    gap: 2px;
+    width: 56px;
+    height: 50px;
     border: none;
-    border-radius: 12px;
+    border-radius: 10px;
     background: transparent;
-    color: #475569;
+    color: #4a5568;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     padding: 4px 0;
 }
 
 .ce-rail-btn .ce-rail-icon {
-    font-size: 22px;
-    transition: all 0.2s;
+    font-size: 20px;
+    transition: all 0.25s;
 }
 
 .ce-rail-btn .ce-rail-label {
-    font-size: 9px;
+    font-size: 8.5px;
     font-weight: 600;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.2px;
     white-space: nowrap;
-    transition: all 0.2s;
+    transition: all 0.25s;
+    opacity: 0.9;
 }
 
 .ce-rail-btn:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(99, 102, 241, 0.06);
     color: #94a3b8;
 }
 
+.ce-rail-btn:hover .ce-rail-icon {
+    transform: scale(1.08);
+}
+
 .ce-rail-btn.active {
-    background: rgba(99, 102, 241, 0.12);
+    background: rgba(99, 102, 241, 0.1);
     color: #a5b4fc;
+    box-shadow: inset 0 0 12px rgba(99, 102, 241, 0.06);
 }
 
 .ce-rail-btn.active::before {
     content: '';
     position: absolute;
-    left: -6px;
-    top: 12px;
-    bottom: 12px;
-    width: 3px;
-    background: #818cf8;
+    left: -5px;
+    top: 14px;
+    bottom: 14px;
+    width: 2.5px;
+    background: linear-gradient(180deg, #818cf8, #6366f1);
     border-radius: 0 3px 3px 0;
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
 }
 
 /* AI tab highlight */
@@ -299,10 +311,10 @@
 
 /* ── Content Panel ── */
 .ce-content-panel {
-    width: 320px;
-    background: rgba(12, 16, 30, 0.97);
-    border-right: 1px solid rgba(255, 255, 255, 0.06);
-    backdrop-filter: blur(20px);
+    width: 300px;
+    background: rgba(10, 13, 26, 0.98);
+    border-right: 1px solid rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(24px);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -316,7 +328,7 @@
 }
 
 .ce-content-panel-inner {
-    width: 320px;
+    width: 300px;
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -325,12 +337,20 @@
 }
 
 .ce-content-panel-inner::-webkit-scrollbar {
-    width: 4px;
+    width: 3px;
+}
+
+.ce-content-panel-inner::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 .ce-content-panel-inner::-webkit-scrollbar-thumb {
-    background: rgba(99, 102, 241, 0.2);
-    border-radius: 4px;
+    background: rgba(99, 102, 241, 0.15);
+    border-radius: 3px;
+}
+
+.ce-content-panel-inner::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.3);
 }
 
 /* ── Sidebar Tab Navigation (kept for compatibility, hidden now) ── */
@@ -456,31 +476,34 @@
 .ce-category-pills {
     display: flex;
     gap: 4px;
-    padding: 0 12px 8px;
+    padding: 4px 12px 10px;
     flex-wrap: wrap;
 }
 
 .ce-category-pill {
-    padding: 4px 10px;
+    padding: 5px 12px;
     font-size: 10px;
     font-weight: 600;
     border-radius: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.03);
-    color: #64748b;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.025);
+    color: #5a6577;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    letter-spacing: 0.2px;
 }
 
 .ce-category-pill:hover {
     color: #94a3b8;
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(99, 102, 241, 0.06);
+    border-color: rgba(99, 102, 241, 0.15);
 }
 
 .ce-category-pill.active {
-    background: rgba(99, 102, 241, 0.2);
-    border-color: rgba(99, 102, 241, 0.4);
-    color: #818cf8;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(139, 92, 246, 0.12));
+    border-color: rgba(99, 102, 241, 0.35);
+    color: #a5b4fc;
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.1);
 }
 
 /* ─── Photo Grid (Unsplash) ─── */
@@ -537,24 +560,29 @@
     justify-content: center;
     gap: 6px;
     margin: 0 12px 8px;
-    padding: 8px;
-    background: rgba(99, 102, 241, 0.15);
-    border: 1px solid rgba(99, 102, 241, 0.3);
-    border-radius: 8px;
-    color: #818cf8;
-    font-size: 12px;
+    padding: 9px 12px;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(139, 92, 246, 0.08));
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    border-radius: 10px;
+    color: #a5b4fc;
+    font-size: 11.5px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    letter-spacing: 0.2px;
 }
 
 .ce-search-btn:hover {
-    background: rgba(99, 102, 241, 0.25);
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.15));
+    border-color: rgba(99, 102, 241, 0.4);
+    box-shadow: 0 0 12px rgba(99, 102, 241, 0.1);
+    transform: translateY(-1px);
 }
 
 .ce-search-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: not-allowed;
+    transform: none;
 }
 
 /* ─── Loading & Empty States ─── */
@@ -1343,17 +1371,17 @@
 }
 
 .ce-panel {
-    padding: 16px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .ce-panel-title {
     font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    color: #64748b;
-    margin-bottom: 12px;
+    letter-spacing: 1.2px;
+    color: #5a6577;
+    margin-bottom: 10px;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -1362,31 +1390,59 @@
 /* Element buttons grid */
 .ce-element-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
 }
 
 .ce-element-btn {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
-    padding: 14px 8px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 12px;
-    color: #94a3b8;
+    justify-content: center;
+    gap: 4px;
+    padding: 12px 4px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
+    color: #7a8599;
     cursor: pointer;
-    transition: all 0.2s;
-    font-size: 10px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 9px;
     font-weight: 600;
+    letter-spacing: 0.1px;
+    position: relative;
+    overflow: hidden;
+}
+
+.ce-element-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.04));
+    opacity: 0;
+    transition: opacity 0.25s;
+    border-radius: 10px;
 }
 
 .ce-element-btn:hover {
-    background: rgba(99, 102, 241, 0.1);
-    border-color: rgba(99, 102, 241, 0.3);
+    background: rgba(99, 102, 241, 0.06);
+    border-color: rgba(99, 102, 241, 0.2);
     color: #c7d2fe;
     transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.ce-element-btn:hover::before {
+    opacity: 1;
+}
+
+.ce-element-btn:hover .material-symbols-outlined {
+    color: #a5b4fc;
+    transform: scale(1.1);
+}
+
+.ce-element-btn .material-symbols-outlined {
+    transition: all 0.25s;
 }
 
 /* Layer list */
@@ -1446,14 +1502,16 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: #080c16;
+    background: #060810;
+    background-image: radial-gradient(rgba(99, 102, 241, 0.02) 1px, transparent 1px);
+    background-size: 20px 20px;
     position: relative;
     overflow: hidden;
 }
 
 .ce-canvas-wrapper {
     position: relative;
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 8px 48px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04);
     border-radius: 4px;
     overflow: visible;
 }
@@ -1494,14 +1552,23 @@
 
 /* ─── Right Sidebar (Advanced Mode) ─── */
 .ce-sidebar-right {
-    width: 260px;
-    background: rgba(15, 20, 35, 0.95);
-    border-left: 1px solid rgba(255, 255, 255, 0.06);
+    width: 250px;
+    background: rgba(10, 13, 26, 0.98);
+    border-left: 1px solid rgba(255, 255, 255, 0.04);
     display: flex;
     flex-direction: column;
     overflow-y: auto;
     flex-shrink: 0;
     transition: width 0.3s ease;
+}
+
+.ce-sidebar-right::-webkit-scrollbar {
+    width: 3px;
+}
+
+.ce-sidebar-right::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.15);
+    border-radius: 3px;
 }
 
 .ce-sidebar-right.collapsed {
@@ -1588,10 +1655,11 @@
     -webkit-appearance: none;
     appearance: none;
     width: 100%;
-    height: 4px;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.08);
+    height: 3px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.06);
     outline: none;
+    cursor: pointer;
 }
 
 .ce-slider::-webkit-slider-thumb {
@@ -1599,8 +1667,16 @@
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    background: #818cf8;
+    background: linear-gradient(135deg, #818cf8, #6366f1);
     cursor: pointer;
+    border: 2px solid rgba(10, 13, 26, 0.9);
+    box-shadow: 0 0 6px rgba(99, 102, 241, 0.3);
+    transition: transform 0.15s;
+}
+
+.ce-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
 }
 
 /* ─── Bottom Bar (Platform Presets) ─── */
@@ -1847,4 +1923,142 @@
         padding: 8px 10px;
         min-width: 56px;
     }
+}
+
+/* ─── Text Style Cards ─── */
+.ce-text-style-card {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 14px 12px;
+    background: rgba(255, 255, 255, 0.015);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    text-align: left;
+    min-height: 48px;
+    position: relative;
+    overflow: hidden;
+}
+
+.ce-text-style-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.06), transparent);
+    opacity: 0;
+    transition: opacity 0.25s;
+}
+
+.ce-text-style-card:hover {
+    background: rgba(99, 102, 241, 0.05);
+    border-color: rgba(99, 102, 241, 0.2);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(99, 102, 241, 0.08);
+}
+
+.ce-text-style-card:hover::after {
+    opacity: 1;
+}
+
+.ce-text-style-preview {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.3;
+    position: relative;
+    z-index: 1;
+}
+
+.ce-text-style-meta {
+    font-size: 8.5px;
+    color: #4a5568;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    position: relative;
+    z-index: 1;
+}
+
+/* ─── Resize Input ─── */
+.ce-resize-input {
+    width: 56px;
+    padding: 3px 6px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: #e2e8f0;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.2s;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.ce-resize-input::-webkit-outer-spin-button,
+.ce-resize-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.ce-resize-input:focus {
+    border-color: rgba(99, 102, 241, 0.5);
+}
+
+/* ─── Property Select (Right Panel) ─── */
+.ce-prop-select {
+    width: 100%;
+    padding: 6px 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    color: #e2e8f0;
+    font-size: 11px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.ce-prop-select:focus {
+    border-color: rgba(99, 102, 241, 0.5);
+}
+
+.ce-prop-select option {
+    background: #1a1e2e;
+    color: #e2e8f0;
+}
+
+/* ─── AI Tool Section ─── */
+.ce-ai-tool-section {
+    padding: 0 12px 12px;
+}
+
+.ce-ai-tool-hint {
+    font-size: 11px;
+    color: #64748b;
+    line-height: 1.5;
+    padding: 8px 12px;
+    background: rgba(139, 92, 246, 0.06);
+    border: 1px solid rgba(139, 92, 246, 0.12);
+    border-radius: 10px;
+    margin: 0 0 8px;
+}
+
+/* ─── Color Swatch (Right Panel) ─── */
+.ce-color-swatch {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+
+.ce-color-swatch:hover {
+    transform: scale(1.2);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
