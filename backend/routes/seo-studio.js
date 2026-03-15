@@ -4,6 +4,7 @@ import { requireStudio } from '../middleware/studioAccess.js';
 import { requireCredits, logTokenUsage } from '../middleware/credits.js';
 import Brand from '../models/Brand.js';
 import SeoAudit from '../models/SeoAudit.js';
+import GscSnapshot from '../models/GscSnapshot.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import {
   researchDomain, researchCompetitors,
@@ -14,6 +15,16 @@ import { runRealLLMProbe, generateProbePrompts } from '../utils/llm-probe.js';
 import { getPageSpeed, formatPageSpeedForPrompt } from '../utils/pagespeed.js';
 import { mineAutocomplete, formatAutocompleteForPrompt } from '../utils/autocomplete.js';
 import { runKeywordIntelligence } from '../utils/keyword-intelligence.js';
+import { batchPAA, formatPAAForPrompt } from '../utils/paa-scraper.js';
+import {
+  getKeywordIntelligence, getDomainBacklinks,
+  formatKeywordDataForPrompt, formatBacklinkDataForPrompt,
+  isDataForSEOConfigured,
+} from '../utils/dataforseo.js';
+import { jsRenderCrawl, formatJSCrawlForPrompt } from '../utils/js-crawler.js';
+import { scoreSiteContent, formatContentScoresForPrompt } from '../utils/content-scorer.js';
+import { crawlCompetitor, compareSnapshots, analyzeKeywordOverlap, formatCompetitorMonitorForPrompt } from '../utils/competitor-monitor.js';
+import CompetitorSnapshot from '../models/CompetitorSnapshot.js';
 
 const router = Router();
 
@@ -323,16 +334,71 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
     const brandObj = brand || brandPayload || {};
     const dna = brandObj.dna || {};
 
-    // Run site crawl + Keyword Intelligence Engine in parallel
-    console.log(`\n🧠 SEO Traffic: Running Intelligence Engine + crawl for ${website}...`);
-    const [siteResearch, keywordIntel] = await Promise.all([
+    // Derive PAA seed queries from brand context
+    const brandName = brand?.name || brandPayload?.name || '';
+    const industryFocus = industry || dna.industry || 'General';
+    const paaSeeds = [
+        brandName && industryFocus !== 'General' ? `${brandName} ${industryFocus}` : '',
+        industryFocus !== 'General' ? `best ${industryFocus}` : '',
+        industryFocus !== 'General' ? `${industryFocus} tips` : '',
+    ].filter(Boolean).slice(0, 3);
+
+    // Map country to Google gl parameter
+    const countryGlMap = { 'India': 'in', 'United States': 'us', 'UAE': 'ae', 'Dubai': 'ae', 'UK': 'gb', 'Singapore': 'sg', 'Australia': 'au', 'Saudi Arabia': 'sa' };
+    const countryFocus = country || dna.country || 'India';
+    const gl = countryGlMap[countryFocus] || 'in';
+
+    // Run site crawl + Keyword Intelligence Engine + PAA scraping in parallel
+    console.log(`\n🧠 SEO Traffic: Running Intelligence Engine + deep crawl + PAA for ${website}...`);
+    const [siteResearch, keywordIntel, paaData] = await Promise.all([
       researchDomain(website),
       runKeywordIntelligence(brandObj, { seedKeywords: [] }).catch(e => {
         console.warn('Keyword Intelligence Engine error:', e.message);
         return { success: false, error: e.message };
       }),
+      paaSeeds.length > 0 ? batchPAA(paaSeeds, gl).catch(e => {
+        console.warn('PAA scraper error:', e.message);
+        return { allQuestions: [], allRelated: [] };
+      }) : Promise.resolve({ allQuestions: [], allRelated: [] }),
     ]);
     const siteData = formatSiteResearch(siteResearch);
+    const paaText = formatPAAForPrompt(paaData);
+    console.log(`🔍 PAA: ${paaData.allQuestions?.length || 0} questions, ${paaData.allRelated?.length || 0} related searches`);
+
+    // ── Wave 2: Enrich discovered keywords with DataForSEO (if configured) ──
+    let realKeywordData = null;
+    let backlinkData = null;
+    if (isDataForSEOConfigured()) {
+      // Collect discovered keywords from keyword intelligence
+      const discoveredKws = [];
+      if (keywordIntel?.strategist?.mustTarget) {
+        for (const kw of keywordIntel.strategist.mustTarget) discoveredKws.push(kw.keyword);
+      }
+      if (keywordIntel?.strategist?.hiddenGems) {
+        for (const kw of keywordIntel.strategist.hiddenGems) discoveredKws.push(kw.keyword);
+      }
+      if (keywordIntel?.signals?.allDiscoveredKeywords) {
+        for (const kw of keywordIntel.signals.allDiscoveredKeywords.slice(0, 30)) {
+          discoveredKws.push(typeof kw === 'string' ? kw : kw.keyword || kw.term);
+        }
+      }
+      const uniqueKws = [...new Set(discoveredKws.filter(Boolean))].slice(0, 50);
+
+      if (uniqueKws.length > 0) {
+        const domain = new URL(website.startsWith('http') ? website : `https://${website}`).hostname;
+        console.log(`📊 DataForSEO: Enriching ${uniqueKws.length} keywords + backlinks for ${domain}...`);
+        [realKeywordData, backlinkData] = await Promise.all([
+          getKeywordIntelligence(uniqueKws, { country: countryFocus }).catch(e => {
+            console.warn('DataForSEO keyword error:', e.message);
+            return null;
+          }),
+          getDomainBacklinks(domain).catch(e => {
+            console.warn('DataForSEO backlinks error:', e.message);
+            return null;
+          }),
+        ]);
+      }
+    }
 
     // Timing Safeguard: Check if we have enough time left for AI
     const elapsed = Date.now() - (req.startTime || Date.now());
@@ -376,17 +442,30 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
       }
     }
 
-    const countryFocus = country || dna.country || 'India';
-    const industryFocus = industry || dna.industry || 'General';
+    // Append PAA data to intelligence
+    if (paaText) {
+      intelligenceData += paaText;
+    }
 
+    // Append DataForSEO real data (when available)
+    const realKwText = formatKeywordDataForPrompt(realKeywordData);
+    const backlinkText = formatBacklinkDataForPrompt(backlinkData);
+    if (realKwText) intelligenceData += realKwText;
+    if (backlinkText) intelligenceData += backlinkText;
+
+    const hasRealData = !!(realKeywordData?.available);
     const systemPrompt = 'You are a STRATEGIC SEO GROWTH ADVISOR. You have REAL DATA from multiple intelligence sources.\n\n'
       + 'You have:\n'
-      + '1. REAL CRAWL DATA from the brand\'s website\n'
+      + '1. REAL CRAWL DATA from the brand\'s website (deep crawl — 20+ pages with sitemap/robots.txt analysis)\n'
       + '2. REAL Google Trends data with verified interest scores\n'
       + '3. REAL Google SERP sampling with difficulty scores\n'
       + '4. REAL suggestions from Google, YouTube, Amazon, and Bing\n'
-      + '5. Multi-agent AI analysis (Scout, Analyst, Strategist)\n\n'
-      + 'CRITICAL: Use the VERIFIED signals. Do NOT override real data with guesses. When volume estimates come from Google Trends or multi-agent consensus, use those numbers.\n\n'
+      + '5. REAL People Also Ask (PAA) questions from Google\n'
+      + '6. Multi-agent AI analysis (Scout, Analyst, Strategist)\n'
+      + (hasRealData ? '7. VERIFIED keyword volumes, CPC, and difficulty from DataForSEO\n8. VERIFIED backlink data from DataForSEO\n' : '')
+      + '\nCRITICAL: Use the VERIFIED signals. Do NOT override real data with guesses. When volume estimates come from Google Trends or multi-agent consensus, use those numbers.'
+      + (hasRealData ? ' The DataForSEO data is the MOST ACCURATE — always prefer it over AI estimates.' : '')
+      + '\n\n'
       + (brandContext ? 'BRAND CONTEXT:\n' + brandContext + '\n\n' : '')
       + 'Country: ' + countryFocus + '\nIndustry: ' + industryFocus + '\n\n'
       + siteData + '\n\n'
@@ -462,9 +541,49 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
         analyst: keywordIntel.analyst,
         strategist: keywordIntel.strategist,
       };
-      parsed.dataSource = 'keyword-intelligence-engine';
+      parsed.dataSource = realKeywordData?.available ? 'dataforseo+intelligence' : 'keyword-intelligence-engine';
     } else {
       parsed.dataSource = 'ai-only';
+    }
+
+    // Attach DataForSEO real keyword data (when available)
+    if (realKeywordData?.available && realKeywordData.keywords?.length > 0) {
+      parsed.verifiedKeywords = realKeywordData.keywords.map(kw => ({
+        keyword: kw.keyword,
+        searchVolume: kw.searchVolume,
+        cpc: kw.cpc,
+        difficulty: kw.difficulty,
+        competition: kw.competitionLevel,
+      }));
+      parsed.dataForSEOEnabled = true;
+    }
+
+    // Attach backlink data (when available)
+    if (backlinkData?.available && backlinkData.summary) {
+      parsed.backlinkProfile = {
+        ...backlinkData.summary,
+        topReferringDomains: (backlinkData.topReferringDomains || []).slice(0, 10),
+      };
+    }
+
+    // Attach PAA data
+    if (paaData?.allQuestions?.length > 0) {
+      parsed.peopleAlsoAsk = paaData.allQuestions;
+      parsed.relatedSearches = paaData.allRelated;
+    }
+
+    // Attach deep crawl intelligence
+    if (siteResearch.siteIntelligence) {
+      parsed.crawlIntelligence = {
+        totalPages: siteResearch.siteIntelligence.totalPages,
+        hasSitemap: siteResearch.siteIntelligence.hasSitemap,
+        hasRobotsTxt: siteResearch.siteIntelligence.hasRobotsTxt,
+        thinPageCount: siteResearch.siteIntelligence.thinPageCount,
+        duplicateContentCount: siteResearch.siteIntelligence.duplicateContentCount,
+        redirectChainCount: siteResearch.siteIntelligence.redirectChainCount,
+        missingMetaCount: siteResearch.siteIntelligence.missingMetaDescriptions?.length || 0,
+        missingH1Count: siteResearch.siteIntelligence.missingH1Tags?.length || 0,
+      };
     }
 
     // Save to SeoAudit for persistence
@@ -1132,9 +1251,9 @@ Generate 5-15 discovered backlinks, 5-10 competitor link gaps, 8-15 link opportu
 
     const userPrompt = `Brand Site Research: ${JSON.stringify(siteResearch).substring(0, 4000)}\n\nCompetitor Backlink Profiles: ${JSON.stringify(competitorLinkProfiles).substring(0, 4000)}\n\nComplete backlink intelligence analysis for: ${brandDomain} (${normalizedUrl})`;
     const elapsedBeforeAI = Date.now() - (req.startTime || Date.now());
-    const remainingBudgetForAI = Math.max(15000, 85000 - elapsedBeforeAI); // 85s total budget
-    // Use 4096 tokens instead of 8192 to speed up generation
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 4096, timeout: remainingBudgetForAI });
+    console.log(`⏱️ Backlink research took ${elapsedBeforeAI}ms. Starting AI analysis...`);
+    // Give AI a dedicated 60s timeout — backlink analysis needs significant generation time
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 4096, timeout: 60000 });
     if (!result) throw new Error('AI analysis returned empty result');
     let parsed;
     try {
@@ -1780,6 +1899,327 @@ router.get('/reports/:type', protect, async (req, res) => {
       report: audit.results,
       generatedAt: audit.updatedAt || audit.createdAt,
       scores: audit.scores,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+// ============================================================================
+// HISTORY COMPARISON — Score trends over time
+// ============================================================================
+
+router.get('/history/compare', protect, async (req, res) => {
+  try {
+    const { brandId, type } = req.query;
+    if (!brandId || !type) return res.status(400).json({ success: false, error: 'brandId and type required' });
+
+    const audits = await SeoAudit.find({
+      user: req.user._id,
+      brand: brandId,
+      type,
+      status: 'completed',
+    })
+      .sort('-createdAt')
+      .limit(10)
+      .select('scores results.seoHealthScore results.aiVisibilityScore results.technicalScore results.contentScore results.authorityScore createdAt')
+      .lean();
+
+    if (audits.length < 1) return res.json({ success: true, hasHistory: false, trend: [] });
+
+    const trend = audits.map(a => ({
+      date: a.createdAt,
+      scores: {
+        seoHealth: a.scores?.seoHealth || a.results?.seoHealthScore || 0,
+        aiVisibility: a.scores?.aiVisibility || a.results?.aiVisibilityScore || 0,
+        technical: a.scores?.technicalScore || a.results?.technicalScore || 0,
+        content: a.scores?.contentScore || a.results?.contentScore || 0,
+        authority: a.scores?.authorityScore || a.results?.authorityScore || 0,
+      },
+    })).reverse();
+
+    const latest = trend[trend.length - 1]?.scores || {};
+    const previous = trend.length >= 2 ? trend[trend.length - 2]?.scores : null;
+    const changes = previous ? {
+      seoHealth: latest.seoHealth - previous.seoHealth,
+      aiVisibility: latest.aiVisibility - previous.aiVisibility,
+      technical: latest.technical - previous.technical,
+      content: latest.content - previous.content,
+      authority: latest.authority - previous.authority,
+    } : null;
+
+    res.json({
+      success: true,
+      hasHistory: audits.length > 1,
+      totalAudits: audits.length,
+      trend,
+      changes,
+      latestDate: audits[0]?.createdAt,
+      previousDate: audits[1]?.createdAt,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+// ============================================================================
+// JS RENDERING CRAWL — Puppeteer-based SPA crawling
+// ============================================================================
+
+router.post('/js-crawl', protect, requireCredits('seoHealthCheck'), async (req, res) => {
+  try {
+    const { brand, url, maxPages = 20, mobile = false } = req.body;
+    const website = url || brand?.website;
+    if (!website) return res.status(400).json({ success: false, error: 'Website URL required' });
+
+    console.log(`🖥️ JS Render Crawl requested for ${website} (max ${maxPages} pages)`);
+    const crawlData = await jsRenderCrawl(website, { maxPages: Math.min(maxPages, 30), mobile });
+
+    res.json({ success: true, ...crawlData });
+  } catch (error) {
+    console.error('JS Crawl error:', error);
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+
+// ============================================================================
+// CONTENT SCORING — Grade existing pages for SEO quality
+// ============================================================================
+
+router.post('/content-score', protect, requireCredits('seoHealthCheck'), async (req, res) => {
+  try {
+    const { brand, url, targetKeywords = [] } = req.body;
+    const website = url || brand?.website;
+    if (!website) return res.status(400).json({ success: false, error: 'Website URL required' });
+
+    console.log(`📊 Content Scoring: Crawling ${website}...`);
+    const crawlResult = await researchDomain(website);
+    if (!crawlResult?.pages?.length) {
+      return res.status(400).json({ success: false, error: 'Could not crawl website' });
+    }
+
+    const pagesForScoring = crawlResult.pages.map(p => ({
+      url: p.url || '', title: p.title || '', metaDesc: p.meta?.description || '',
+      h1s: p.h1 ? [p.h1] : [], h2s: p.h2s || [],
+      bodyText: p.bodyText || p.content || '', wordCount: p.wordCount || 0,
+      internalLinks: p.internalLinks || [], externalLinks: p.externalLinks || [],
+      images: p.images || [], schemas: p.schemas || [],
+    }));
+
+    const siteScores = scoreSiteContent(pagesForScoring, targetKeywords);
+    res.json({ success: true, ...siteScores });
+  } catch (error) {
+    console.error('Content scoring error:', error);
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+
+// ============================================================================
+// COMPETITOR MONITORING — Track competitor content changes
+// ============================================================================
+
+router.post('/competitor-monitor', protect, requireCredits('seoCompetitors'), async (req, res) => {
+  try {
+    const { brand, competitors = [], brandKeywords = [] } = req.body;
+    if (!brand?._id) return res.status(400).json({ success: false, error: 'Brand required' });
+    if (!competitors.length) return res.status(400).json({ success: false, error: 'At least one competitor URL required' });
+
+    const brandId = brand._id;
+    const results = [];
+
+    for (const comp of competitors.slice(0, 5)) {
+      const compUrl = typeof comp === 'string' ? comp : comp.url || comp.website;
+      const compName = typeof comp === 'string' ? compUrl : comp.name || compUrl;
+      if (!compUrl) continue;
+
+      console.log(`🕵️ Competitor Monitor: Analyzing ${compName}...`);
+      const crawlData = await crawlCompetitor(compUrl);
+
+      const prevSnapshot = await CompetitorSnapshot.findOne({
+        user: req.user._id, brand: brandId, competitorUrl: compUrl,
+      }).sort('-createdAt').lean();
+
+      const changes = compareSnapshots(crawlData, prevSnapshot);
+      const overlap = brandKeywords.length > 0
+        ? analyzeKeywordOverlap(brandKeywords, crawlData.titleKeywords || [])
+        : null;
+
+      await CompetitorSnapshot.create({
+        user: req.user._id, brand: brandId,
+        competitorUrl: compUrl, competitorName: compName,
+        pages: crawlData.pages, totalPages: crawlData.totalPages,
+        avgWordCount: crawlData.avgWordCount,
+        titleKeywords: crawlData.titleKeywords, metaKeywords: crawlData.metaKeywords,
+        schemaTypes: crawlData.schemaTypes,
+        newPages: changes.newPages, changedPages: changes.changedPages, removedPages: changes.removedPages,
+      });
+
+      results.push({
+        url: compUrl, name: compName, totalPages: crawlData.totalPages,
+        avgWordCount: crawlData.avgWordCount, schemaTypes: crawlData.schemaTypes,
+        changes, overlap, hasSitemap: crawlData.hasSitemap, hasRobotsTxt: crawlData.hasRobotsTxt,
+      });
+    }
+
+    res.json({
+      success: true,
+      competitors: results,
+      summary: `Monitored ${results.length} competitors. ` +
+        results.map(r => `${r.name}: ${r.changes?.summary || 'analyzed'}`).join('. '),
+    });
+  } catch (error) {
+    console.error('Competitor monitor error:', error);
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+
+// ============================================================================
+// GSC POSITION TRACKING — Snapshot & Trend Endpoints
+// ============================================================================
+
+// POST /api/seo-studio/gsc/snapshot — Take a position snapshot from GSC
+router.post('/gsc/snapshot', protect, async (req, res) => {
+  try {
+    const { brandId, siteUrl } = req.body;
+    if (!brandId || !siteUrl) return res.status(400).json({ success: false, error: 'brandId and siteUrl required' });
+
+    // Get valid GSC token
+    const Integration = (await import('../models/Integration.js')).default;
+    const integration = await Integration.findOne({
+      user: req.user._id, platform: 'google-analytics', status: 'connected',
+      ...(brandId ? { brand: brandId } : {}),
+    });
+    if (!integration?.accessToken) {
+      return res.status(401).json({ success: false, error: 'Google Search Console not connected' });
+    }
+
+    const accessToken = integration.accessToken;
+    const endDate = new Date(Date.now() - 2 * 86400000).toISOString().split('T')[0];
+    const startDate = new Date(Date.now() - 28 * 86400000).toISOString().split('T')[0];
+
+    // Fetch queries and pages from GSC
+    const fetchGSC = async (dimensions, rowLimit = 100) => {
+      const resp = await fetch(
+        `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
+        {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ startDate, endDate, dimensions, rowLimit }),
+        }
+      );
+      return resp.json();
+    };
+
+    const [queriesData, pagesData] = await Promise.all([
+      fetchGSC(['query'], 100),
+      fetchGSC(['page'], 50),
+    ]);
+
+    const queries = (queriesData.rows || []).map(r => ({
+      query: r.keys[0], clicks: r.clicks, impressions: r.impressions, ctr: r.ctr, position: r.position,
+    }));
+    const pages = (pagesData.rows || []).map(r => ({
+      page: r.keys[0], clicks: r.clicks, impressions: r.impressions, ctr: r.ctr, position: r.position,
+    }));
+
+    const totalClicks = queries.reduce((s, q) => s + q.clicks, 0);
+    const totalImpressions = queries.reduce((s, q) => s + q.impressions, 0);
+    const averagePosition = queries.length ? queries.reduce((s, q) => s + q.position, 0) / queries.length : 0;
+    const averageCtr = queries.length ? queries.reduce((s, q) => s + q.ctr, 0) / queries.length : 0;
+
+    const snapshot = await GscSnapshot.create({
+      user: req.user._id, brand: brandId, siteUrl,
+      queries, pages,
+      totalClicks, totalImpressions, averagePosition, averageCtr,
+      dateFrom: new Date(startDate), dateTo: new Date(endDate),
+    });
+
+    res.json({ success: true, snapshot: { _id: snapshot._id, totalClicks, totalImpressions, averagePosition, averageCtr, queriesCount: queries.length } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+// GET /api/seo-studio/gsc/snapshots — Get snapshot history
+router.get('/gsc/snapshots', protect, async (req, res) => {
+  try {
+    const { brandId, siteUrl } = req.query;
+    if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
+
+    const query = { user: req.user._id, brand: brandId };
+    if (siteUrl) query.siteUrl = siteUrl;
+
+    const snapshots = await GscSnapshot.find(query)
+      .sort('-createdAt')
+      .limit(20)
+      .select('totalClicks totalImpressions averagePosition averageCtr siteUrl dateFrom dateTo createdAt')
+      .lean();
+
+    res.json({ success: true, snapshots });
+  } catch (error) {
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+// GET /api/seo-studio/gsc/rank-changes — Compare latest vs previous snapshot
+router.get('/gsc/rank-changes', protect, async (req, res) => {
+  try {
+    const { brandId, siteUrl } = req.query;
+    if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
+
+    const query = { user: req.user._id, brand: brandId };
+    if (siteUrl) query.siteUrl = siteUrl;
+
+    const [latest, previous] = await GscSnapshot.find(query)
+      .sort('-createdAt')
+      .limit(2)
+      .lean();
+
+    if (!latest) return res.json({ success: true, hasData: false });
+
+    // Build query position map from previous snapshot
+    const prevMap = {};
+    if (previous) {
+      for (const q of previous.queries || []) prevMap[q.query] = q;
+    }
+
+    // Compare
+    const changes = (latest.queries || []).map(q => {
+      const prev = prevMap[q.query];
+      return {
+        query: q.query,
+        clicks: q.clicks,
+        impressions: q.impressions,
+        position: Math.round(q.position * 10) / 10,
+        prevPosition: prev ? Math.round(prev.position * 10) / 10 : null,
+        positionChange: prev ? Math.round((prev.position - q.position) * 10) / 10 : null, // Positive = improved
+        clicksChange: prev ? q.clicks - prev.clicks : null,
+        isNew: !prev,
+      };
+    }).sort((a, b) => (b.positionChange || 0) - (a.positionChange || 0));
+
+    // Summary
+    const improved = changes.filter(c => c.positionChange > 0).length;
+    const declined = changes.filter(c => c.positionChange < 0).length;
+    const unchanged = changes.filter(c => c.positionChange === 0).length;
+    const newKeywords = changes.filter(c => c.isNew).length;
+
+    res.json({
+      success: true,
+      hasData: true,
+      hasPrevious: !!previous,
+      latestDate: latest.createdAt,
+      previousDate: previous?.createdAt,
+      summary: { improved, declined, unchanged, newKeywords, total: changes.length },
+      overallChange: {
+        clicks: previous ? latest.totalClicks - previous.totalClicks : null,
+        impressions: previous ? latest.totalImpressions - previous.totalImpressions : null,
+        position: previous ? Math.round((previous.averagePosition - latest.averagePosition) * 10) / 10 : null,
+      },
+      changes: changes.slice(0, 50),
     });
   } catch (error) {
     res.status(500).json({ success: false, error: safeErrorMessage(error) });

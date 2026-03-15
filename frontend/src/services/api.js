@@ -515,6 +515,24 @@ export const seoStudio = {
         return apiFetch(`/seo-studio/history?${query}`);
     },
     getAudit: (id) => apiFetch(`/seo-studio/history/${id}`),
+    historyCompare: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/seo-studio/history/compare?${query}`);
+    },
+    // GSC Position Tracking
+    gscSnapshot: (data) => apiFetch('/seo-studio/gsc/snapshot', { method: 'POST', body: JSON.stringify(data) }),
+    gscSnapshots: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/seo-studio/gsc/snapshots?${query}`);
+    },
+    gscRankChanges: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/seo-studio/gsc/rank-changes?${query}`);
+    },
+    // Phase 3: Advanced
+    jsCrawl: (data) => apiFetch('/seo-studio/js-crawl', { method: 'POST', body: JSON.stringify(data), timeout: 240000 }),
+    contentScore: (data) => apiFetch('/seo-studio/content-score', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
+    competitorMonitor: (data) => apiFetch('/seo-studio/competitor-monitor', { method: 'POST', body: JSON.stringify(data), timeout: 300000 }),
 };
 
 // ============ Skills System API ============

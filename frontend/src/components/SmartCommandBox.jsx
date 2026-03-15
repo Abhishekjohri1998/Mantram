@@ -53,7 +53,7 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                 setLoading(true)
                 const formData = new FormData()
                 formData.append('audio', audioBlob, 'recording.webm')
-                formData.append('language', 'english')
+                formData.append('language', 'unknown') // auto-detect: Sarvam for Hindi, Whisper for English
 
                 try {
                     const token = localStorage.getItem('mantram_token')
@@ -187,7 +187,8 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
             const data = await agentCommand.chat({
                 message: text,
                 history: newHistory.slice(-10),
-                brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna } : null,
+                brandId: activeBrand?._id || null,
+                brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna, knowledge: activeBrand.knowledge } : null,
             })
 
             if (data.success) {
@@ -309,38 +310,77 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                             </div>
                                         )}
 
-                                        {/* ── CREATIVE / IMAGE RESULT ── */}
+                                        {/* ── CREATIVE / IMAGE RESULT (Image-First Flow) ── */}
                                         {msg.intent === 'creative' && msg.data?.imagePrompt && (
-                                            <div className="mb-3">
-                                                {/* Show generated image if available */}
-                                                {msg.generatedImage && (
-                                                    <div className="mb-3">
-                                                        <img src={msg.generatedImage} alt="Generated creative"
-                                                            className="rounded-xl w-full max-h-72 object-cover border border-white/10" />
-                                                        <div className="flex flex-wrap gap-2 mt-2">
-                                                            <button onClick={() => downloadImage(msg.generatedImage)}
+                                            <div className="mb-3 space-y-3">
+                                                {/* Generated image — shown prominently */}
+                                                {(msg.generatedImage || msg.data?.imageUrl) && (
+                                                    <div>
+                                                        <img src={msg.generatedImage || msg.data.imageUrl} alt="Generated creative"
+                                                            className="rounded-xl w-full max-h-80 object-cover border border-white/10 shadow-lg" />
+                                                    </div>
+                                                )}
+
+                                                {/* Structured prompt breakdown — user can see what went into the image */}
+                                                <div className="p-3.5 rounded-xl bg-violet-500/[0.06] border border-violet-500/15 space-y-2">
+                                                    {msg.data.textOverlay && (
+                                                        <div className="flex items-start gap-2">
+                                                            <span className="material-symbols-outlined text-violet-400 text-xs mt-0.5">edit_note</span>
+                                                            <div>
+                                                                <span className="text-[10px] font-bold text-violet-400/70 uppercase tracking-wider">Text on Image</span>
+                                                                <p className="text-sm text-white font-medium">{msg.data.textOverlay}</p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {msg.data.style && (
+                                                        <div className="flex items-start gap-2">
+                                                            <span className="material-symbols-outlined text-violet-400 text-xs mt-0.5">palette</span>
+                                                            <div>
+                                                                <span className="text-[10px] font-bold text-violet-400/70 uppercase tracking-wider">Style</span>
+                                                                <p className="text-xs text-slate-300">{msg.data.style}</p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {msg.data.tagline && (
+                                                        <div className="flex items-start gap-2">
+                                                            <span className="material-symbols-outlined text-violet-400 text-xs mt-0.5">format_quote</span>
+                                                            <div>
+                                                                <span className="text-[10px] font-bold text-violet-400/70 uppercase tracking-wider">Brand Tagline</span>
+                                                                <p className="text-xs text-slate-400 italic">"{msg.data.tagline}"</p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {msg.data.productMention && (
+                                                        <div className="flex items-start gap-2">
+                                                            <span className="material-symbols-outlined text-violet-400 text-xs mt-0.5">inventory_2</span>
+                                                            <div>
+                                                                <span className="text-[10px] font-bold text-violet-400/70 uppercase tracking-wider">Product</span>
+                                                                <p className="text-xs text-slate-300">{msg.data.productMention}</p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Action buttons */}
+                                                <div className="flex flex-wrap gap-2">
+                                                    {(msg.generatedImage || msg.data?.imageUrl) ? (
+                                                        <>
+                                                            <button onClick={() => downloadImage(msg.generatedImage || msg.data.imageUrl)}
                                                                 className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 cursor-pointer transition-all font-medium">
                                                                 <span className="material-symbols-outlined text-xs">download</span> Download
+                                                            </button>
+                                                            <button onClick={() => handleGenerateImage(i, msg.data.imagePrompt)}
+                                                                disabled={generatingImage !== null}
+                                                                className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 cursor-pointer transition-all font-medium disabled:opacity-50">
+                                                                <span className="material-symbols-outlined text-xs">refresh</span> Regenerate
                                                             </button>
                                                             <button onClick={() => openInCreativeStudio(msg.data.imagePrompt)}
                                                                 className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 cursor-pointer transition-all font-medium">
                                                                 <span className="material-symbols-outlined text-xs">tune</span> Edit in Studio
                                                             </button>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {/* Image prompt preview + Generate button (before image is generated) */}
-                                                {!msg.generatedImage && (
-                                                    <div className="p-3.5 rounded-xl bg-violet-500/[0.06] border border-violet-500/15">
-                                                        <div className="flex items-center gap-1.5 mb-2">
-                                                            <span className="material-symbols-outlined text-violet-400 text-xs">image</span>
-                                                            <span className="text-xs font-bold text-violet-400 uppercase tracking-wider">Image Prompt Ready</span>
-                                                        </div>
-                                                        <p className="text-sm text-slate-300 mb-3 leading-relaxed">{msg.data.imagePrompt}</p>
-
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {/* PRIMARY: Generate it right here */}
+                                                        </>
+                                                    ) : (
+                                                        <>
                                                             <button onClick={() => handleGenerateImage(i, msg.data.imagePrompt)}
                                                                 disabled={generatingImage !== null}
                                                                 className="flex items-center gap-1.5 text-[11px] px-4 py-2 rounded-lg bg-primary text-white font-bold hover:bg-primary-light cursor-pointer transition-all shadow-lg shadow-primary/20 disabled:opacity-50">
@@ -350,14 +390,13 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                                                     <><span className="material-symbols-outlined text-xs">auto_awesome</span> Generate Image</>
                                                                 )}
                                                             </button>
-                                                            {/* SECONDARY: Open in Creative Studio */}
                                                             <button onClick={() => openInCreativeStudio(msg.data.imagePrompt)}
                                                                 className="flex items-center gap-1.5 text-[11px] px-3 py-2 rounded-lg bg-white/[0.06] text-slate-300 hover:bg-white/[0.1] cursor-pointer transition-all border border-white/[0.08]">
                                                                 <span className="material-symbols-outlined text-xs">palette</span> Open in Studio
                                                             </button>
-                                                        </div>
-                                                    </div>
-                                                )}
+                                                        </>
+                                                    )}
+                                                </div>
                                             </div>
                                         )}
 
