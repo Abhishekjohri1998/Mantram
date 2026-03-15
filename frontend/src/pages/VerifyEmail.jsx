@@ -83,7 +83,7 @@ export default function VerifyEmail() {
 
                     {status === 'success' && (
                         <Link 
-                            to="/login"
+                            to="/dashboard"
                             className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-primary to-indigo-600 text-white font-bold text-lg hover:shadow-[0_0_30px_rgba(99,102,241,0.4)] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 group"
                         >
                             Get Started Now

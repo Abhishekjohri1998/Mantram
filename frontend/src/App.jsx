@@ -60,6 +60,7 @@ function App() {
                 {/* Public routes */}
                 <Route path="/" element={<Landing />} />
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/login" element={<Auth />} />
                 <Route path="/signup" element={<Auth />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/onboarding" element={<BrandOnboarding />} />
