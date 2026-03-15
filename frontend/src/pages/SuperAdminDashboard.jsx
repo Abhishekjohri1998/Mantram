@@ -62,7 +62,7 @@ export default function SuperAdminDashboard() {
     const [totalLogs, setTotalLogs] = useState(0)
     const [logsLoading, setLogsLoading] = useState(false)
     const [showBudgetModal, setShowBudgetModal] = useState(false)
-    const [budgetForm, setBudgetForm] = useState({ anthropic: 0, openai: 0, gemini: 0, xai: 0, sarvam: 0 })
+    const [budgetForm, setBudgetForm] = useState({ anthropic: 0, openai: 0, gemini: 0, xai: 0, grok: 0, sarvam: 0 })
 
     if (user?.role !== 'superadmin') {
         return <DashboardLayout><div className="flex items-center justify-center h-screen"><div className="text-center"><span className="material-symbols-outlined text-6xl text-rose-500 mb-4">shield</span><h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2><p className="text-slate-500">Super Admin access required</p></div></div></DashboardLayout>
@@ -84,7 +84,7 @@ export default function SuperAdminDashboard() {
         { id: 'logs', label: 'Audit Logs', icon: 'history' },
     ]
 
-    useEffect(() => { loadStats(); loadPackages() }, [])
+    useEffect(() => { loadStats(); loadPackages(); loadTokenUsage() }, [])
     useEffect(() => {
         const handler = setTimeout(() => setDebouncedSearch(search), 500);
         return () => clearTimeout(handler);
@@ -92,13 +92,18 @@ export default function SuperAdminDashboard() {
 
     useEffect(() => {
         if (tab === 'users' || tab === 'ai-credits') loadUsers()
+        if (tab === 'tokenUsage' || tab === 'overview') loadTokenUsage()
+        if (tab === 'approvals') loadPendingUsers()
+        if (tab === 'coupons') loadCoupons()
+        if (tab === 'content') { loadBrands(); loadContent() }
+        if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts() }
+        if (tab === 'users' || tab === 'ai-credits') loadUsers()
         if (tab === 'approvals') loadPendingUsers()
         if (tab === 'coupons') loadCoupons()
         if (tab === 'content') { loadBrands(); loadContent() }
         if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts() }
         if (tab === 'integrations') loadIntegrations()
         if (tab === 'packages') loadPackages()
-        if (tab === 'tokenUsage') loadTokenUsage()
         if (tab === 'logs') loadLogs()
     }, [tab, debouncedSearch, planFilter, userPage, logsPage])
 
@@ -286,6 +291,43 @@ export default function SuperAdminDashboard() {
                                     <Card icon="image" color="text-pink-400" value={stats.totalCreatives} label="Creatives" />
                                     <Card icon="inventory_2" color="text-cyan-400" value={stats.totalProducts} label="Products" />
                                 </div>
+
+                                {/* API Wallet / Provider Health Summary (Promoted to Overview) */}
+                                {tokenData?.providerWallets && (
+                                    <div className="mb-6">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h4 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-tighter">
+                                                <span className="material-symbols-outlined text-amber-400 text-lg">account_balance_wallet</span>
+                                                API Provider Wallet (Real-time)
+                                            </h4>
+                                            <button onClick={() => setTab('tokenUsage')} className="text-[10px] font-bold text-amber-500 hover:text-amber-400 transition-all flex items-center gap-1 cursor-pointer">
+                                                Full Analytics <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                                            </button>
+                                        </div>
+                                        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+                                            {tokenData.providerWallets.map(w => {
+                                                if (w.budget === 0 && w.consumed === 0) return null;
+                                                const remaining = Math.max(0, w.budget - w.consumed);
+                                                const isLow = w.budget > 0 && (remaining / w.budget) < 0.15;
+                                                const colors = { anthropic: 'text-orange-400', openai: 'text-emerald-400', gemini: 'text-blue-400', xai: 'text-slate-200', grok: 'text-slate-200', sarvam: 'text-rose-400' };
+                                                const bgHighlights = { anthropic: 'border-orange-500/10', openai: 'border-emerald-500/10', gemini: 'border-blue-500/10', xai: 'border-slate-500/10', grok: 'border-slate-500/10', sarvam: 'border-rose-500/10' };
+                                                
+                                                return (
+                                                    <div key={w.provider} className={`glass-panel border-white/[0.04] rounded-xl p-3 flex flex-col justify-between transition-all ${isLow ? 'bg-amber-500/10 border-amber-500/30' : 'bg-white/[0.01]'}`}>
+                                                        <div className="flex items-center justify-between gap-2 mb-2">
+                                                            <p className={`text-[10px] font-black uppercase tracking-widest truncate ${colors[w.provider] || 'text-slate-400'}`}>{w.provider === 'xai' ? 'Grok (xAI)' : w.provider}</p>
+                                                            {isLow && <span className="material-symbols-outlined text-amber-500 text-xs animate-pulse">warning</span>}
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-lg font-black text-white tracking-tighter">${remaining.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                                                            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">Remaining</p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
                                     <div className="glass-panel rounded-2xl p-5">
                                         <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-amber-400">payments</span><span className="text-sm font-bold text-white">Revenue</span></div>
@@ -877,20 +919,23 @@ export default function SuperAdminDashboard() {
                                             const pct = w.budget > 0 ? Math.min(100, (w.consumed / w.budget) * 100) : 0;
                                             const remaining = Math.max(0, w.budget - w.consumed);
                                             const isLow = w.budget > 0 && (remaining / w.budget) < 0.15;
-                                            const colors = { anthropic: 'text-orange-400', openai: 'text-emerald-400', gemini: 'text-blue-400', xai: 'text-slate-200', sarvam: 'text-rose-400' };
-                                            const bgColors = { anthropic: 'bg-orange-500', openai: 'bg-emerald-500', gemini: 'bg-blue-500', xai: 'bg-slate-500', sarvam: 'bg-rose-500' };
+                                            const colors = { anthropic: 'text-orange-400', openai: 'text-emerald-400', gemini: 'text-blue-400', xai: 'text-slate-200', grok: 'text-slate-200', sarvam: 'text-rose-400' };
+                                            const bgColors = { anthropic: 'bg-orange-500', openai: 'bg-emerald-500', gemini: 'bg-blue-500', xai: 'bg-slate-500', grok: 'bg-slate-500', sarvam: 'bg-rose-500' };
                                             
                                             return (
                                                 <div key={w.provider} className={`glass-panel rounded-2xl p-5 border transition-all ${isLow ? 'border-amber-500/30' : 'border-white/[0.06]'}`}>
                                                     <div className="flex items-center justify-between mb-3">
-                                                        <p className={`text-xs font-black uppercase tracking-widest ${colors[w.provider] || 'text-slate-400'}`}>{w.provider}</p>
+                                                        <p className={`text-xs font-black uppercase tracking-widest ${colors[w.provider] || 'text-slate-400'}`}>{w.provider === 'xai' ? 'Grok (xAI)' : w.provider}</p>
                                                         {isLow && <span className="material-symbols-outlined text-amber-500 text-sm animate-pulse">warning</span>}
                                                     </div>
                                                     <div className="flex items-baseline gap-1 mb-1">
                                                         <span className="text-2xl font-black text-white">${remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                         <span className="text-[10px] text-slate-500 font-bold tracking-tighter uppercase">Left</span>
                                                     </div>
-                                                    <p className="text-[10px] text-slate-600 mb-4 font-medium">of ${w.budget?.toLocaleString()} purchased</p>
+                                                    <div className="flex justify-between items-center mb-4">
+                                                        <p className="text-[10px] text-slate-600 font-medium">of ${w.budget?.toLocaleString()} purchased</p>
+                                                        <p className="text-[9px] font-bold text-slate-500 bg-white/[0.04] px-1.5 py-0.5 rounded uppercase tracking-tighter">{w.tokens?.toLocaleString() || 0} tokens</p>
+                                                    </div>
                                                     <div className="space-y-1.5">
                                                         <div className="flex justify-between text-[9px] font-bold uppercase tracking-tighter">
                                                             <span className="text-slate-600">Consumed: ${w.consumed?.toLocaleString()}</span>

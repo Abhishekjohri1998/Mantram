@@ -1464,7 +1464,8 @@ router.get('/stats/token-usage', async (req, res) => {
                 { $match: { 'tokenUsage.totalTokens': { $gt: 0 } } },
                 { $group: {
                     _id: '$tokenUsage.provider',
-                    totalConsumed: { $sum: '$tokenUsage.estimatedCost' }
+                    totalConsumed: { $sum: '$tokenUsage.estimatedCost' },
+                    totalTokens: { $sum: '$tokenUsage.totalTokens' }
                 }}
             ])
         ]);
@@ -1475,6 +1476,7 @@ router.get('/stats/token-usage', async (req, res) => {
           openai: 0,
           gemini: 0,
           xai: 0,
+          grok: 0, // Explicitly add grok
           sarvam: 0
         });
 
@@ -1503,11 +1505,15 @@ router.get('/stats/token-usage', async (req, res) => {
                 estimatedCostINR: Math.round((t.estimatedCost || 0) * 85), // approx USD→INR
                 margin: monthlyRevenue > 0 ? Math.round(((monthlyRevenue - (t.estimatedCost || 0) * 85) / monthlyRevenue) * 100) : 0,
             },
-            providerWallets: (totals[1] || []).map(p => ({
-              provider: p._id || 'unknown',
-              consumed: Math.round((p.totalConsumed || 0) * 100) / 100,
-              budget: providerBudgets[p._id] || 0
-            })),
+            providerWallets: Object.keys(providerBudgets).map(p => {
+              const stats = (totals[1] || []).find(s => s._id === p) || {};
+              return {
+                provider: p,
+                consumed: Math.round((stats.totalConsumed || 0) * 100) / 100,
+                tokens: stats.totalTokens || 0,
+                budget: providerBudgets[p] || 0
+              };
+            }),
             byStudio,
             byModel,
             topUsers: byUser,
