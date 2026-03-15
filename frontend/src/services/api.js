@@ -404,6 +404,13 @@ export const superadmin = {
         return apiFetch(`/superadmin/system-logs?${query}`);
     },
     impersonateUser: (id) => apiFetch(`/superadmin/users/${id}/impersonate`, { method: 'POST' }),
+    // Waitlist
+    getWaitlist: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/superadmin/waitlist?${query}`);
+    },
+    deleteWaitlist: (id) => apiFetch(`/superadmin/waitlist/${id}`, { method: 'DELETE' }),
+    approveWaitlist: (id) => apiFetch(`/superadmin/waitlist/${id}/approve`, { method: 'POST' }),
 };
 
 // ============ Credits API ============

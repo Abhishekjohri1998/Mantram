@@ -12,6 +12,7 @@ export default function SuperAdminDashboard() {
     const [stats, setStats] = useState(null)
     const [users, setUsers] = useState([])
     const [pendingUsers, setPendingUsers] = useState([])
+    const [waitlist, setWaitlist] = useState([])
     const [totalUsers, setTotalUsers] = useState(0)
     const [coupons, setCoupons] = useState([])
     const [brands, setBrands] = useState([])
@@ -73,6 +74,7 @@ export default function SuperAdminDashboard() {
     const tabs = [
         { id: 'overview', label: 'Overview', icon: 'dashboard' },
         { id: 'approvals', label: 'Approvals', icon: 'how_to_reg' },
+        { id: 'waitlist', label: 'Waitlist', icon: 'list_alt' },
         { id: 'users', label: 'Users', icon: 'group' },
         { id: 'ai-credits', label: 'AI Usage', icon: 'token' },
         { id: 'tokenUsage', label: 'Token Usage', icon: 'monitoring' },
@@ -94,6 +96,7 @@ export default function SuperAdminDashboard() {
         if (tab === 'users' || tab === 'ai-credits') loadUsers()
         if (tab === 'tokenUsage' || tab === 'overview') loadTokenUsage()
         if (tab === 'approvals') loadPendingUsers()
+        if (tab === 'waitlist') loadWaitlist()
         if (tab === 'coupons') loadCoupons()
         if (tab === 'content') { loadBrands(); loadContent() }
         if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts() }
@@ -111,6 +114,7 @@ export default function SuperAdminDashboard() {
     const loadUsers = async () => { try { const d = await API.getUsers({ page: userPage, limit: 20, search: debouncedSearch, plan: planFilter }); setUsers(d.users || []); setTotalUsers(d.total || 0) } catch (e) { console.error(e) } }
     const loadLogs = async () => { setLogsLoading(true); try { const d = await API.getSystemLogs({ page: logsPage, limit: 50 }); setLogs(d.logs || []); setTotalLogs(d.total || 0) } catch (e) { console.error(e) } finally { setLogsLoading(false) } }
     const loadPendingUsers = async () => { try { const d = await API.getUsers({ approvalStatus: 'pending', limit: 50 }); setPendingUsers(d.users || []) } catch (e) { console.error(e) } }
+    const loadWaitlist = async () => { try { const d = await API.getWaitlist(); setWaitlist(d.waitlist || []) } catch (e) { console.error(e) } }
     const loadCoupons = async () => { try { const d = await API.getCoupons(); setCoupons(d.coupons || []) } catch (e) { console.error(e) } }
     const loadBrands = async () => { try { const d = await API.getBrands({ limit: 50 }); setBrands(d.brands || []); setTotalBrands(d.total || 0) } catch (e) { console.error(e) } }
     const loadContent = async () => { try { const d = await API.getContent({ limit: 50 }); setContent(d.content || []); setTotalContent(d.total || 0) } catch (e) { console.error(e) } }
@@ -151,6 +155,28 @@ export default function SuperAdminDashboard() {
         } catch (e) { 
             showToast(e.message || 'Deletion failed', 'error');
         } 
+    }
+
+    const handleDeleteWaitlist = async (id) => {
+        if (!confirm('Remove this entry from waitlist?')) return;
+        try {
+            await API.deleteWaitlist(id);
+            showToast('Waitlist entry removed');
+            loadWaitlist();
+            loadStats();
+        } catch (e) {
+            showToast(e.message || 'Failed to remove entry', 'error');
+        }
+    }
+
+    const handleApproveWaitlist = async (id) => {
+        try {
+            await API.approveWaitlist(id);
+            showToast('Invitation email sent!');
+            loadWaitlist();
+        } catch (e) {
+            showToast(e.message || 'Failed to send invite', 'error');
+        }
     }
     
     const handleApproveUser = async (id) => { 
@@ -535,6 +561,90 @@ export default function SuperAdminDashboard() {
                                 <span className="material-symbols-outlined text-5xl text-slate-700 mb-3">verified_user</span>
                                 <h3 className="text-lg font-bold text-white mb-1">Queue is Empty</h3>
                                 <p className="text-sm text-slate-500">All users have been processed. Great job!</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* ════════════ WAITLIST ════════════ */}
+                {tab === 'waitlist' && (
+                    <div>
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-indigo-400">list_alt</span>
+                                    Waitlist Submissions ({waitlist.length})
+                                </h3>
+                                <p className="text-sm text-slate-500 mt-1">Direct early access requests from the landing page waitlist</p>
+                            </div>
+                            <button onClick={loadWaitlist} className="p-2 rounded-lg bg-white/[0.04] text-slate-400 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">refresh</span></button>
+                        </div>
+
+                        {waitlist.length > 0 ? (
+                            <div className="glass-panel rounded-2xl overflow-hidden border border-white/[0.06] shadow-2xl">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead>
+                                            <tr className="text-[10px] text-slate-500 font-black uppercase tracking-[0.1em] border-b border-white/[0.06] bg-white/[0.02]">
+                                                <th className="px-6 py-4">Name & Email</th>
+                                                <th className="px-6 py-4">Company</th>
+                                                <th className="px-6 py-4">Message / Note</th>
+                                                <th className="px-6 py-4">Submitted At</th>
+                                                <th className="px-6 py-4 text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-white/[0.04]">
+                                            {waitlist.map(entry => (
+                                                <tr key={entry._id} className="text-sm group hover:bg-white/[0.01] transition-all">
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-9 h-9 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-black shadow-lg">
+                                                                {entry.name?.[0]?.toUpperCase()}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="font-bold text-white truncate">{entry.name}</p>
+                                                                <p className="text-[10px] text-slate-600 truncate">{entry.email}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="text-slate-400">{entry.company || '—'}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 max-w-xs">
+                                                        <p className="text-slate-500 truncate" title={entry.message}>{entry.message || '—'}</p>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-[11px] text-slate-600">
+                                                        {new Date(entry.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <button 
+                                                                onClick={() => handleApproveWaitlist(entry._id)}
+                                                                className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white text-[10px] font-black uppercase transition-all border border-emerald-500/20 cursor-pointer"
+                                                                title="Send Invitation"
+                                                            >
+                                                                Invite
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleDeleteWaitlist(entry._id)}
+                                                                className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white transition-all border border-rose-500/20 cursor-pointer"
+                                                                title="Remove Entry"
+                                                            >
+                                                                <span className="material-symbols-outlined text-sm">delete</span>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="text-center py-20 glass-panel rounded-2xl border border-dashed border-white/[0.06]">
+                                <span className="material-symbols-outlined text-5xl text-slate-700 mb-3">inbox</span>
+                                <h3 className="text-lg font-bold text-white mb-1">Waitlist is Empty</h3>
+                                <p className="text-sm text-slate-500">No new early access requests found.</p>
                             </div>
                         )}
                     </div>

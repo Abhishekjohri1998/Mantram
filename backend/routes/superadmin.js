@@ -14,6 +14,7 @@ import Integration from '../models/Integration.js';
 import SeoAudit from '../models/SeoAudit.js';
 import Subscription from '../models/Subscription.js';
 import Coupon from '../models/Coupon.js';
+import Waitlist from '../models/Waitlist.js';
 import SubscriptionPackage from '../models/SubscriptionPackage.js';
 import SystemSettings, { getSetting, setSetting } from '../models/SystemSettings.js';
 import AuditLog from '../models/AuditLog.js';
@@ -44,7 +45,7 @@ router.use(protect, authorize('superadmin'), adminLimiter);
 
 router.get('/stats', async (req, res) => {
     try {
-        const [totalUsers, totalBrands, totalContent, totalCreatives, totalProducts, totalIntegrations, totalSubscriptions, totalCoupons, totalFeedback, totalSeoAudits] = await Promise.all([
+        const [totalUsers, totalBrands, totalContent, totalCreatives, totalProducts, totalIntegrations, totalSubscriptions, totalCoupons, totalFeedback, totalSeoAudits, totalWaitlist] = await Promise.all([
             User.countDocuments(),
             Brand.countDocuments(),
             Content.countDocuments(),
@@ -55,6 +56,7 @@ router.get('/stats', async (req, res) => {
             Coupon.countDocuments({ isActive: true }),
             Feedback.countDocuments(),
             SeoAudit.countDocuments(),
+            Waitlist.countDocuments(),
         ]);
 
         const planDistribution = await User.aggregate([
@@ -151,7 +153,7 @@ router.get('/stats', async (req, res) => {
             success: true,
             stats: {
                 totalUsers, totalBrands, totalContent, totalCreatives, totalProducts,
-                totalIntegrations, totalSubscriptions, totalCoupons, totalFeedback, totalSeoAudits,
+                totalIntegrations, totalSubscriptions, totalCoupons, totalFeedback, totalSeoAudits, totalWaitlist,
                 planDistribution,
                 totalRevenue: revenueData[0]?.totalRevenue || 0,
                 totalCreditsUsed: totalCreditsUsed[0]?.total || 0,
@@ -216,6 +218,71 @@ router.get('/users', async (req, res) => {
         }));
 
         res.json({ success: true, users: usersWithCredits, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+router.get('/waitlist', async (req, res) => {
+    try {
+        const { page = 1, limit = 50 } = req.query;
+        const entries = await Waitlist.find()
+            .sort('-createdAt')
+            .limit(parseInt(limit))
+            .skip((parseInt(page) - 1) * parseInt(limit));
+        const total = await Waitlist.countDocuments();
+        res.json({ success: true, waitlist: entries, total });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+router.post('/waitlist/:id/approve', async (req, res) => {
+    try {
+        const entry = await Waitlist.findById(req.params.id);
+        if (!entry) return res.status(404).json({ success: false, error: 'Waitlist entry not found' });
+
+        // Generate invitation link (assuming production URL)
+        const inviteLink = 'https://mantram.ai/signup';
+        
+        const mailOptions = {
+            from: `"Mantram AI" <${process.env.EMAIL_USER}>`,
+            to: entry.email,
+            subject: 'Good news! Your early access to Mantram AI is here ✨',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                    <h2 style="color: #6366f1;">You're off the waitlist! 🎉</h2>
+                    <p>Hi ${entry.name.split(' ')[0]},</p>
+                    <p>We're thrilled to invite you to join <strong>Mantram AI</strong>. Your early access request has been approved!</p>
+                    <p>You can now create your workspace and start building with our AI agents.</p>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="${inviteLink}" style="background-color: #6366f1; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Get Started Now</a>
+                    </div>
+                    <p>If you have any questions, just reply to this email.</p>
+                    <br>
+                    <p>See you inside,</p>
+                    <p><strong>The Mantram AI Team</strong></p>
+                </div>
+            `
+        };
+
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+        });
+
+        await transporter.sendMail(mailOptions);
+        
+        res.json({ success: true, message: 'Invitation email sent successfully' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+router.delete('/waitlist/:id', async (req, res) => {
+    try {
+        await Waitlist.findByIdAndDelete(req.params.id);
+        res.json({ success: true, message: 'Waitlist entry deleted' });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
