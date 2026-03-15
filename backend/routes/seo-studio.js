@@ -45,7 +45,6 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
 
   const defaultProvider = process.env.DEFAULT_TEXT_PROVIDER || 'anthropic';
   
-  // Define providers in order, prioritizing the default one
   const providers = [
     { name: 'anthropic', key: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY },
     { name: 'openai', key: process.env.OPENAI_API_KEY },
@@ -53,7 +52,6 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
     { name: 'gemini', key: process.env.GEMINI_API_KEY || process.env.GEMINI_IMAGE_API_KEY },
   ];
 
-  // Reorder to put default first
   const sortedProviders = [
     ...providers.filter(p => p.name === defaultProvider),
     ...providers.filter(p => p.name !== defaultProvider)
@@ -62,19 +60,18 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
   const isQuotaError = (status, data) => {
     if (status === 429) return true;
     const errText = JSON.stringify(data || {}).toLowerCase();
-    return errText.includes('quota') || errText.includes('rate limit') || errText.includes('limit exceeded') || errText.includes('throttled');
+    return errText.includes('quota') || errText.includes('rate limit') || errText.includes('limit exceeded') || errText.includes('throttled') || errText.includes('credit balance');
   };
 
   try {
     for (const provider of sortedProviders) {
       if (!provider.key || overallController.signal.aborted) continue;
 
-      console.log(`🤖 aiCall: Trying ${provider.name}...`);
+      console.log(`🤖 aiCall: Trying ${provider.name}... (timeout: 15s)`);
 
       try {
         const providerController = new AbortController();
-        // Cap each provider to 12s or remaining budget
-        const providerTimeout = Math.min(12000, timeout); 
+        const providerTimeout = Math.min(15000, timeout); 
         const pTimer = setTimeout(() => providerController.abort(), providerTimeout);
 
         if (provider.name === 'anthropic') {
@@ -99,10 +96,10 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
           if (resp.ok && data.content?.[0]?.text) {
             lastTokenUsage = { inputTokens: data.usage?.input_tokens || 0, outputTokens: data.usage?.output_tokens || 0, model: 'claude-3-5-sonnet', provider: 'anthropic' };
             return data.content[0].text;
-          } else if (isQuotaError(resp.status, data)) {
-            console.warn('⚠️ Claude quota hit, trying fallback...');
           } else {
-            console.warn(`Claude error (${resp.status}):`, data.error?.message || 'Unknown error');
+            const err = data.error?.message || JSON.stringify(data);
+            console.warn(`Claude error (${resp.status}): ${err}`);
+            if (isQuotaError(resp.status, data)) continue;
           }
         }
 
@@ -123,10 +120,10 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
           if (resp.ok && data.choices?.[0]?.message?.content) {
             lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'gpt-4o-mini', provider: 'openai' };
             return data.choices[0].message.content;
-          } else if (isQuotaError(resp.status, data)) {
-            console.warn('⚠️ OpenAI quota hit, trying fallback...');
           } else {
-            console.warn(`OpenAI error (${resp.status}):`, data.error?.message || 'Unknown error');
+            const err = data.error?.message || JSON.stringify(data);
+            console.warn(`OpenAI error (${resp.status}): ${err}`);
+            if (isQuotaError(resp.status, data)) continue;
           }
         }
 
@@ -147,8 +144,8 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
           if (resp.ok && data.choices?.[0]?.message?.content) {
             lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'grok-3-mini-fast', provider: 'xai' };
             return data.choices[0].message.content;
-          } else if (isQuotaError(resp.status, data)) {
-            console.warn('⚠️ Grok quota hit, trying fallback...');
+          } else {
+            console.warn(`Grok error (${resp.status}):`, JSON.stringify(data));
           }
         }
 
@@ -179,17 +176,18 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
                 const text = data.candidates[0].content.parts[0].text;
                 lastTokenUsage = { inputTokens: data.usageMetadata?.promptTokenCount || 0, outputTokens: data.usageMetadata?.candidatesTokenCount || 0, model, provider: 'gemini' };
                 return text;
-              } else if (isQuotaError(resp.status, data)) {
-                console.warn(`⚠️ Gemini ${model} quota hit...`);
+              } else {
+                console.warn(`Gemini ${model} error (${resp.status}):`, JSON.stringify(data.error || data));
               }
             } catch (e) {
-              console.warn(`Gemini ${model} fail: ${e.message}`);
+              console.warn(`Gemini ${model} request fail: ${e.message}`);
             }
           }
           clearTimeout(pTimer);
         }
       } catch (e) {
         console.warn(`${provider.name} provider error: ${e.message}`);
+        // Only throw if it's the overall timeout
         if (overallController.signal.aborted) throw e;
       }
     }
@@ -199,6 +197,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
     clearTimeout(overallTimer);
   }
 }
+
 
 function parseJSON(text) {
   let clean = text.trim();
