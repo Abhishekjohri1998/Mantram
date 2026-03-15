@@ -679,6 +679,7 @@ export default function SuperAdminDashboard() {
                                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-lg">search</span>
                                 <input type="text" value={search} onChange={e => { setSearch(e.target.value); setUserPage(1) }} placeholder="Search name, email, company..." className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none focus:border-primary/50" />
                             </div>
+                            <button onClick={loadUsers} className="p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-slate-400 hover:text-white transition-all cursor-pointer" title="Refresh Users"><span className="material-symbols-outlined text-sm">refresh</span></button>
                             <select value={planFilter} onChange={e => { setPlanFilter(e.target.value); setUserPage(1) }} className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none cursor-pointer">
                                 <option value="">All Plans</option>
                                 {packages.map(p => (

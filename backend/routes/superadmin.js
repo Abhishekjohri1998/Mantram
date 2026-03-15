@@ -58,7 +58,7 @@ router.get('/stats', async (req, res) => {
             Coupon.countDocuments({ isActive: true }),
             Feedback.countDocuments(),
             SeoAudit.countDocuments(),
-            Waitlist.countDocuments(),
+            Waitlist.countDocuments({ status: { $ne: 'registered' } }),
         ]);
 
         const planDistribution = await User.aggregate([
@@ -228,11 +228,12 @@ router.get('/users', async (req, res) => {
 router.get('/waitlist', async (req, res) => {
     try {
         const { page = 1, limit = 50 } = req.query;
-        const entries = await Waitlist.find()
+        const filter = { status: { $ne: 'registered' } };
+        const entries = await Waitlist.find(filter)
             .sort('-createdAt')
             .limit(parseInt(limit))
             .skip((parseInt(page) - 1) * parseInt(limit));
-        const total = await Waitlist.countDocuments();
+        const total = await Waitlist.countDocuments(filter);
         res.json({ success: true, waitlist: entries, total });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
