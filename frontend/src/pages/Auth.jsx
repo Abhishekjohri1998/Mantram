@@ -65,6 +65,9 @@ export default function Auth() {
             }
             // After auth, redirect to intended destination
             let dest = redirect
+            if (!isLogin && redirect === '/dashboard') {
+                dest = '/onboarding'
+            }
             if (scanUrl) {
                 dest = `/onboarding?scanUrl=${encodeURIComponent(scanUrl)}`
             }

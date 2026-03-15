@@ -178,6 +178,13 @@ export default function UserDashboard() {
         return () => clearInterval(interval)
     }, [loadSummary, loadTrends, loadAnalytics])
 
+    // Redirect to onboarding if no brands found (and not loading)
+    useEffect(() => {
+        if (!brandsLoading && brands && brands.length === 0) {
+            navigate('/onboarding')
+        }
+    }, [brands, brandsLoading, navigate])
+
     // ── Load intel missions ──
     useEffect(() => {
         async function fetchIntelData() {
