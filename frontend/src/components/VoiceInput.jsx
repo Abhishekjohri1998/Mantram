@@ -43,10 +43,15 @@ export default function VoiceInput({ onResult, language = 'english', className =
     const [processing, setProcessing] = useState(false)
     const [error, setError] = useState('')
     const [duration, setDuration] = useState(0)
+    const [audioLevel, setAudioLevel] = useState(0)
     const mediaRecorderRef = useRef(null)
     const chunksRef = useRef([])
     const timerRef = useRef(null)
     const streamRef = useRef(null)
+    const audioContextRef = useRef(null)
+    const analyserRef = useRef(null)
+    const vadIntervalRef = useRef(null)
+    const silenceStartRef = useRef(null)
 
     const startRecording = useCallback(async () => {
         setError('')
@@ -83,6 +88,11 @@ export default function VoiceInput({ onResult, language = 'english', className =
                 // Stop all tracks
                 stream.getTracks().forEach(track => track.stop())
                 clearInterval(timerRef.current)
+                clearInterval(vadIntervalRef.current)
+                if (audioContextRef.current) {
+                    audioContextRef.current.close().catch(() => { })
+                    audioContextRef.current = null
+                }
 
                 if (chunksRef.current.length === 0) {
                     setError('No audio recorded')
@@ -127,6 +137,37 @@ export default function VoiceInput({ onResult, language = 'english', className =
                 }
             }
 
+            // ===== VAD Logic =====
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+            const source = audioCtx.createMediaStreamSource(stream)
+            const analyser = audioCtx.createAnalyser()
+            analyser.fftSize = 256
+            source.connect(analyser)
+
+            audioContextRef.current = audioCtx
+            analyserRef.current = analyser
+            silenceStartRef.current = null
+
+            const bufferLength = analyser.frequencyBinCount
+            const dataArray = new Uint8Array(bufferLength)
+            const THRESHOLD = 15 // Adjust sensitivity (0-255)
+            const SILENCE_DURATION = 1800 // 1.8 seconds of silence to stop
+
+            vadIntervalRef.current = setInterval(() => {
+                analyser.getByteFrequencyData(dataArray)
+                const average = dataArray.reduce((a, b) => a + b) / bufferLength
+                setAudioLevel(average)
+
+                if (average < THRESHOLD) {
+                    if (!silenceStartRef.current) silenceStartRef.current = Date.now()
+                    else if (Date.now() - silenceStartRef.current > SILENCE_DURATION) {
+                        stopRecording()
+                    }
+                } else {
+                    silenceStartRef.current = null
+                }
+            }, 100)
+
             mediaRecorder.start(250) // Collect data every 250ms
             setRecording(true)
 
@@ -151,7 +192,13 @@ export default function VoiceInput({ onResult, language = 'english', className =
             mediaRecorderRef.current.stop()
         }
         setRecording(false)
+        setAudioLevel(0)
         clearInterval(timerRef.current)
+        clearInterval(vadIntervalRef.current)
+        if (audioContextRef.current) {
+            audioContextRef.current.close().catch(() => { })
+            audioContextRef.current = null
+        }
     }, [])
 
     const toggleRecording = () => {
@@ -177,7 +224,7 @@ export default function VoiceInput({ onResult, language = 'english', className =
                 disabled={processing}
                 type="button"
                 className={`
-                    relative flex items-center justify-center rounded-xl transition-all cursor-pointer
+                    relative flex items-center justify-center rounded-xl transition-all cursor-pointer overflow-hidden
                     ${isSmall ? 'p-1.5' : 'p-2.5'}
                     ${processing
                         ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
@@ -189,6 +236,12 @@ export default function VoiceInput({ onResult, language = 'english', className =
                 `}
                 title={processing ? 'Processing...' : recording ? 'Stop & transcribe' : `Speak in ${language} (Whisper AI)`}
             >
+                {/* Audio Level Meter Overlay */}
+                {recording && (
+                    <div className="absolute inset-0 bg-rose-500/20 transition-transform duration-100"
+                         style={{ transform: `scaleY(${Math.min(audioLevel / 50, 1)})`, transformOrigin: 'bottom' }} />
+                )}
+
                 {/* Pulse animation when recording */}
                 {recording && (
                     <>

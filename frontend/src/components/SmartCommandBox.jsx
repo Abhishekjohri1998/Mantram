@@ -18,12 +18,17 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
     const [recording, setRecording] = useState(false)
     const [recordingTime, setRecordingTime] = useState(0)
     const [generatingImage, setGeneratingImage] = useState(null) // index of message being generated
+    const [audioLevel, setAudioLevel] = useState(0)
 
     const inputRef = useRef(null)
     const chatEndRef = useRef(null)
     const mediaRecorderRef = useRef(null)
     const chunksRef = useRef([])
     const timerRef = useRef(null)
+    const audioContextRef = useRef(null)
+    const analyserRef = useRef(null)
+    const vadIntervalRef = useRef(null)
+    const silenceStartRef = useRef(null)
 
     // Auto-scroll chat
     useEffect(() => {
@@ -45,6 +50,11 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
             mediaRecorder.onstop = async () => {
                 stream.getTracks().forEach(t => t.stop())
                 clearInterval(timerRef.current)
+                clearInterval(vadIntervalRef.current)
+                if (audioContextRef.current) {
+                    audioContextRef.current.close().catch(() => { })
+                    audioContextRef.current = null
+                }
                 setRecordingTime(0)
 
                 const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' })
@@ -77,6 +87,37 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                 }
             }
 
+            // ===== VAD Logic =====
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+            const source = audioCtx.createMediaStreamSource(stream)
+            const analyser = audioCtx.createAnalyser()
+            analyser.fftSize = 256
+            source.connect(analyser)
+            
+            audioContextRef.current = audioCtx
+            analyserRef.current = analyser
+            silenceStartRef.current = null
+
+            const bufferLength = analyser.frequencyBinCount
+            const dataArray = new Uint8Array(bufferLength)
+            const THRESHOLD = 15 // Adjust sensitivity (0-255)
+            const SILENCE_DURATION = 1800 // 1.8 seconds of silence to stop
+
+            vadIntervalRef.current = setInterval(() => {
+                analyser.getByteFrequencyData(dataArray)
+                const average = dataArray.reduce((a, b) => a + b) / bufferLength
+                setAudioLevel(average)
+                
+                if (average < THRESHOLD) {
+                    if (!silenceStartRef.current) silenceStartRef.current = Date.now()
+                    else if (Date.now() - silenceStartRef.current > SILENCE_DURATION) {
+                        stopRecording()
+                    }
+                } else {
+                    silenceStartRef.current = null
+                }
+            }, 100)
+
             mediaRecorder.start(250)
             setRecording(true)
             setRecordingTime(0)
@@ -84,12 +125,18 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
         } catch (err) {
             console.error('Mic access denied:', err)
         }
-    }, [])
+    }, [handleSend, stopRecording])
 
     const stopRecording = useCallback(() => {
         if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop()
         setRecording(false)
+        setAudioLevel(0)
         clearInterval(timerRef.current)
+        clearInterval(vadIntervalRef.current)
+        if (audioContextRef.current) {
+            audioContextRef.current.close().catch(() => { })
+            audioContextRef.current = null
+        }
     }, [])
 
     // ===== Generate Image inline =====
@@ -505,17 +552,24 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
 
                         {/* Mic */}
                         <button onClick={recording ? stopRecording : startRecording} disabled={loading}
-                            className={`flex-shrink-0 p-2.5 rounded-xl transition-all cursor-pointer ${recording
-                                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30 animate-pulse'
+                            className={`flex-shrink-0 p-2.5 rounded-xl transition-all cursor-pointer relative overflow-hidden ${recording
+                                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                                 : 'bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-primary/10 hover:text-primary hover:border-primary/20'
                                 }`}
                             title={recording ? `Recording... ${formatTime(recordingTime)}` : 'Speak your request'}>
+                            
+                            {/* Audio Level Meter Overlay */}
+                            {recording && (
+                                <div className="absolute inset-0 bg-rose-500/30 transition-transform duration-100"
+                                     style={{ transform: `scaleY(${Math.min(audioLevel / 50, 1)})`, transformOrigin: 'bottom' }} />
+                            )}
+
                             {recording ? (
-                                <div className="flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined text-sm">stop_circle</span>
-                                    <span className="text-xs font-bold">{formatTime(recordingTime)}</span>
+                                <div className="flex items-center gap-1.5 relative z-10">
+                                    <span className="material-symbols-outlined text-sm animate-pulse">stop_circle</span>
+                                    <span className="text-xs font-bold font-mono">{formatTime(recordingTime)}</span>
                                 </div>
-                            ) : <span className="material-symbols-outlined text-sm">mic</span>}
+                            ) : <span className="material-symbols-outlined text-sm relative z-10">mic</span>}
                         </button>
 
                         {/* Send */}
