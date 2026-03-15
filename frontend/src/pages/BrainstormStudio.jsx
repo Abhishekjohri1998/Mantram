@@ -212,6 +212,14 @@ export default function BrainstormStudio() {
         chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [chatHistory, chatLoading])
 
+    // Reset loop if brand changes mid-process
+    useEffect(() => {
+        if (step > 0) {
+            console.log('Brand changed mid-brainstorm, resetting state...')
+            resetAll()
+        }
+    }, [activeBrand?._id])
+
     // ========== HANDLERS ==========
 
     const selectIntent = async (intentId) => {
