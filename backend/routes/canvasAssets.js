@@ -44,7 +44,7 @@ router.post('/ai-analyze', protect, async (req, res) => {
         parts.push({ text: prompt })
 
         const baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
-        const url = `${baseUrl}/models/gemini-2.0-flash:generateContent?key=${apiKey}`
+        const url = `${baseUrl}/models/gemini-2.5-flash:generateContent?key=${apiKey}`
         const resp = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -60,6 +60,143 @@ router.post('/ai-analyze', protect, async (req, res) => {
         res.json({ description: text })
     } catch (err) {
         console.error('AI analyze error:', err.message)
+        res.status(500).json({ error: safeErrorMessage(err) })
+    }
+})
+
+// POST /api/canvas-assets/ai-analyze-template — Smart template analysis: extracts structured elements + prompt formula
+router.post('/ai-analyze-template', protect, async (req, res) => {
+    try {
+        const { imageBase64, imageUrl, brandName, brandColors } = req.body
+        if (!imageBase64 && !imageUrl) return res.status(400).json({ error: 'An image is required (imageBase64 or imageUrl)' })
+
+        const apiKey = process.env.GEMINI_API_KEY
+        if (!apiKey) return res.status(400).json({ error: 'GEMINI_API_KEY not configured' })
+
+        // Build image part
+        let imagePart = null
+        if (imageBase64) {
+            const base64Data = imageBase64.includes('base64,') ? imageBase64.split('base64,')[1] : imageBase64
+            const mimeType = imageBase64.startsWith('data:') ? imageBase64.split(';')[0].split(':')[1] : 'image/png'
+            imagePart = { inlineData: { mimeType, data: base64Data } }
+        } else if (imageUrl) {
+            try {
+                const imgResp = await fetch(imageUrl)
+                if (imgResp.ok) {
+                    const buffer = await imgResp.arrayBuffer()
+                    const base64Data = Buffer.from(buffer).toString('base64')
+                    const contentType = imgResp.headers.get('content-type') || 'image/jpeg'
+                    imagePart = { inlineData: { mimeType: contentType, data: base64Data } }
+                }
+            } catch (fetchErr) {
+                console.error('Failed to fetch image URL for template analysis:', fetchErr.message)
+            }
+        }
+
+        if (!imagePart) return res.status(400).json({ error: 'Could not process the image' })
+
+        const prompt = `You are an expert visual design analyst. Look at this image CAREFULLY and identify ONLY what is ACTUALLY VISIBLE.
+
+CRITICAL RULES:
+- Do NOT invent elements that are not in the image
+- Do NOT assume there is a CTA/button if none is visible
+- Do NOT assume there is a subtext if none is visible
+- ONLY report what you can literally SEE in the image
+
+For each visible element, create an entry:
+
+1. TEXT ELEMENTS: If you see any text/words/titles in the image, extract each text block separately. Report the EXACT text you see.
+2. PEOPLE/MODELS: If there is a person/model visible, create an image element with role "model" and describe them (pose, clothing, expression).
+3. PRODUCTS: If there is a product visible (in someone's hand, on a surface, etc.), create an image element with role "product" and describe it specifically.
+4. BACKGROUND: Describe the background as a color element.
+5. DECORATIVE: Any logos, icons, shapes, or decorative elements.
+
+For each element provide:
+- type: "text" | "image" | "color" | "select"
+- role: specific role like "title", "brand_name", "model", "product", "background", "tagline", "price", "offer", "logo", "decorative"
+- label: friendly UI label (e.g. "Brand Title", "Model/Person", "Product Photo", "Background Color")
+- default: for text = exact text visible; for color = hex code; for image = leave empty
+- style: visual description (position, size, font style, color)
+- description: for image elements, detailed description of what you see
+
+Also provide:
+- layoutDescription: describe exactly how elements are arranged (e.g. "Person centered, holding product, brand name at top")
+- colorPalette: actual hex colors from the design (3-5 colors)
+- promptFormula: A reusable prompt to recreate this design. Use {{PLACEHOLDER_NAME}} for each element using the role name in uppercase (e.g. {{TITLE}}, {{MODEL}}, {{PRODUCT}}, {{BACKGROUND}})
+
+Brand: ${brandName || 'Not specified'}
+Brand Colors: ${brandColors || 'Not specified'}
+
+Return ONLY valid JSON (no markdown, no backticks). Only include elements you can ACTUALLY SEE.`
+
+        const parts = [imagePart, { text: prompt }]
+        const baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
+        const url = `${baseUrl}/models/gemini-2.5-flash:generateContent?key=${apiKey}`
+        console.log('🔍 Template analysis: calling Gemini 2.5 Flash...')
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ role: 'user', parts }],
+                generationConfig: { temperature: 0.1, maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 0 } },
+            }),
+        })
+        const data = await resp.json()
+        if (data.error) {
+            console.error('🔍 Template analysis Gemini error:', data.error.message)
+            throw new Error(data.error.message)
+        }
+
+        // Extract text from all parts (gemini-2.5 may return thought + text parts)
+        const allParts = data.candidates?.[0]?.content?.parts || []
+        let text = ''
+        for (const p of allParts) {
+            if (p.text && !p.thought) text += p.text
+        }
+        text = text || '{}'
+        console.log('🔍 Template analysis response length:', text.length, 'chars')
+        
+        // Parse the JSON response
+        let parsed
+        try {
+            const jsonMatch = text.match(/\{[\s\S]*\}/)
+            parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {}
+        } catch (parseErr) {
+            console.error('Template analyze parse error:', parseErr.message, text.substring(0, 300))
+            // Fallback: return the raw text as promptFormula with default elements
+            parsed = {
+                promptFormula: text,
+                elements: [
+                    { type: 'text', role: 'headline', label: 'Headline', default: '', style: 'bold, large' },
+                    { type: 'text', role: 'subtext', label: 'Subtext', default: '', style: 'medium' },
+                    { type: 'text', role: 'cta', label: 'Call to Action', default: 'Shop Now', style: 'button' },
+                ],
+                colorPalette: [],
+                layoutDescription: 'Standard layout'
+            }
+        }
+
+        // Validate and clean elements
+        const elements = (parsed.elements || []).map((el, i) => ({
+            type: ['text', 'image', 'color', 'select'].includes(el.type) ? el.type : 'text',
+            role: el.role || `element_${i}`,
+            label: el.label || `Element ${i + 1}`,
+            default: el.default || '',
+            style: el.style || '',
+            description: el.description || '',
+            options: Array.isArray(el.options) ? el.options : [],
+        }))
+
+        console.log(`🔍 Template analysis: ${elements.length} elements detected (${elements.filter(e => e.type === 'text').length} text, ${elements.filter(e => e.type === 'image').length} image, ${elements.filter(e => e.type === 'color').length} color)`)
+
+        res.json({
+            promptFormula: parsed.promptFormula || '',
+            elements,
+            layoutDescription: parsed.layoutDescription || '',
+            colorPalette: Array.isArray(parsed.colorPalette) ? parsed.colorPalette : [],
+        })
+    } catch (err) {
+        console.error('AI template analyze error:', err.message)
         res.status(500).json({ error: safeErrorMessage(err) })
     }
 })
@@ -345,7 +482,7 @@ router.post('/ai-copy', protect, async (req, res) => {
         if (!apiKey) return res.status(400).json({ error: 'GEMINI_API_KEY not configured' })
 
         const baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
-        const url = `${baseUrl}/models/gemini-2.0-flash:generateContent?key=${apiKey}`
+        const url = `${baseUrl}/models/gemini-2.5-flash:generateContent?key=${apiKey}`
         const resp = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

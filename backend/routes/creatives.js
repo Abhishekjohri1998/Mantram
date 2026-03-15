@@ -380,11 +380,13 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
         }
         // ── Template Inpainting Mode ──────────────────────────────────────
         // When templateInpainting is true, the reference image is THE BASE to edit.
-        // Gemini will keep layout/colors/logo/text placement and only swap the product.
+        // Gemini will keep layout/colors/logo/text placement and swap product + person.
         let isInpainting = false;
         if (options?.templateInpainting && options?.templateRefImageUrl) {
             isInpainting = true;
-            console.log('🎨 TEMPLATE INPAINTING MODE — keeping layout, swapping product');
+            const hasCharacter = characterRefs.length > 0;
+            const swapWhat = hasCharacter ? 'model/person AND product' : 'product';
+            console.log(`🎨 TEMPLATE INPAINTING MODE — keeping layout, swapping ${swapWhat}`);
 
             // Resolve the template reference image (always first — it's the base)
             const templateRef = await resolveRefImage(options.templateRefImageUrl, 'template-base');
@@ -392,10 +394,18 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
                 imageParts.push({ inlineData: { mimeType: templateRef.part.mimeType, data: templateRef.part.data } });
             }
 
+            // If character references exist alongside inpainting, update instructions for person swap
+            if (hasCharacter) {
+                // Remove previously added generic character instruction — we need a template-specific one
+                const charIdx = referenceInstructions.findIndex(r => r.includes('EXACT same person'));
+                if (charIdx !== -1) referenceInstructions.splice(charIdx, 1);
+                referenceInstructions.push('INPAINTING — PERSON SWAP: Replace the model/person in the template with the person from the provided character reference photo. Use their EXACT face, skin tone, hair, body type, and appearance. Keep the same pose, clothing style, and positioning as in the template.');
+            }
+
             // If a new product image is provided, add it as the replacement
             if (options?.baseImage && options.baseImage.startsWith('data:image/')) {
                 imageParts.push({ inlineData: extractBase64(options.baseImage) });
-                referenceInstructions.push('INPAINTING: Replace ONLY the product in the template with the new product image. Keep everything else pixel-perfect: same layout, colors, typography, logo placement, background, and content positions.');
+                referenceInstructions.push('INPAINTING — PRODUCT SWAP: Replace ONLY the product in the template with the new product image. Keep everything else: same layout, colors, typography, logo placement, background, and content positions.');
             } else if (options?.productImageUrl) {
                 try {
                     console.log(`📦 Fetching product image for inpainting: ${options.productImageUrl.substring(0, 80)}...`);
@@ -407,12 +417,12 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
                         const prodBuf = await prodResp.arrayBuffer();
                         const prodCt = (prodResp.headers.get('content-type') || 'image/jpeg').split(';')[0];
                         imageParts.push({ inlineData: { mimeType: prodCt, data: Buffer.from(prodBuf).toString('base64') } });
-                        referenceInstructions.push('INPAINTING: Replace ONLY the product in the template with the new product image. Keep everything else pixel-perfect: same layout, colors, typography, logo placement, background, and content positions.');
+                        referenceInstructions.push('INPAINTING — PRODUCT SWAP: Replace ONLY the product in the template with the new product image. Keep everything else: same layout, colors, typography, logo placement, background, and content positions.');
                         console.log(`✅ Product image for inpainting loaded (${Math.round(prodBuf.byteLength / 1024)}KB)`);
                     }
                 } catch (e) { console.warn('⚠️ Could not fetch product for inpainting:', e.message); }
-            } else {
-                // No product image — just regenerate with same layout but different content
+            } else if (!hasCharacter) {
+                // No product image and no character — just regenerate with same layout but different content
                 referenceInstructions.push('INPAINTING: Recreate this exact design with the same layout, colors, typography, logo, and content placement. Replace the placeholder text ({{HEADLINE}}, {{SUBTEXT}}, {{CTA}}) with the content specified in the prompt.');
             }
         }
@@ -478,9 +488,15 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
         // 4. NEVER mention logos (causes hallucination)
         let fullPrompt;
         if (isInpainting) {
+            // Detect if additional changes mention body/gender/outfit — need full person replacement, not just face
+            const hasBodyChanges = /\b(male|female|man|woman|gender|outfit|clothing|body|build|muscular|slim|tall|short|hoodie|suit|dress|casual)\b/i.test(cleanedPrompt);
+            const bodyInstruction = hasBodyChanges
+                ? 'IMPORTANT: When changing the person, adapt their ENTIRE body, physique, clothing, and build — not just face. Create a completely new person matching the description while keeping the same pose and composition.'
+                : '';
             fullPrompt = `Edit this template image for ${brand.name}. ${cleanedPrompt}
 ${refPart}
-Keep the exact same layout, composition, and content placement. Replace only what is described above. Output must fill the entire canvas edge-to-edge.`;
+${bodyInstruction}
+Keep the exact same layout, composition, text placement, and design style. Replace only the elements described. Output must fill the entire canvas edge-to-edge.`;
         } else if (characterRefs.length > 0) {
             // Character reference mode — use official "this person" pattern
             // Per Gemini docs: "A studio portrait of this man..." / "these people making funny faces"
