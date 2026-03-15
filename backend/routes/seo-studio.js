@@ -44,6 +44,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
   const overallTimer = setTimeout(() => overallController.abort(), timeout);
 
   const defaultProvider = process.env.DEFAULT_TEXT_PROVIDER || 'anthropic';
+  const defaultModel = process.env.DEFAULT_TEXT_MODEL;
   
   const providers = [
     { name: 'anthropic', key: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY },
@@ -67,14 +68,16 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
     for (const provider of sortedProviders) {
       if (!provider.key || overallController.signal.aborted) continue;
 
-      console.log(`🤖 aiCall: Trying ${provider.name}... (timeout: 15s)`);
+      console.log(`🤖 aiCall: Trying ${provider.name}...`);
 
       try {
         const providerController = new AbortController();
-        const providerTimeout = Math.min(15000, timeout); 
-        const pTimer = setTimeout(() => providerController.abort(), providerTimeout);
+        // Give each provider 20s or remaining budget, but leave 5s for overhead/other providers
+        const providerTimeout = Math.min(20000, timeout - 5000); 
+        const pTimer = setTimeout(() => providerController.abort(), Math.max(5000, providerTimeout));
 
         if (provider.name === 'anthropic') {
+          const modelId = (defaultProvider === 'anthropic' && defaultModel) ? defaultModel : 'claude-3-5-sonnet-20240620';
           const resp = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
             headers: {
@@ -83,7 +86,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
               'anthropic-version': '2023-06-01'
             },
             body: JSON.stringify({
-              model: 'claude-3-5-sonnet-20240620',
+              model: modelId,
               max_tokens: maxTokens,
               system: systemPrompt,
               messages: [{ role: 'user', content: userPrompt }],
@@ -94,11 +97,11 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
           clearTimeout(pTimer);
           const data = await resp.json();
           if (resp.ok && data.content?.[0]?.text) {
-            lastTokenUsage = { inputTokens: data.usage?.input_tokens || 0, outputTokens: data.usage?.output_tokens || 0, model: 'claude-3-5-sonnet', provider: 'anthropic' };
+            lastTokenUsage = { inputTokens: data.usage?.input_tokens || 0, outputTokens: data.usage?.output_tokens || 0, model: modelId, provider: 'anthropic' };
             return data.content[0].text;
           } else {
             const err = data.error?.message || JSON.stringify(data);
-            console.warn(`Claude error (${resp.status}): ${err}`);
+            console.warn(`Claude ${modelId} error (${resp.status}): ${err}`);
             if (isQuotaError(resp.status, data)) continue;
           }
         }
@@ -150,21 +153,22 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
         }
 
         if (provider.name === 'gemini') {
-          const models = ['gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-2.0-flash-exp'];
-          for (const model of models) {
+          const models = ['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'];
+          for (const modelId of models) {
             if (overallController.signal.aborted || providerController.signal.aborted) break;
             try {
               const resp = await fetch(
-                `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${provider.key}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${provider.key}`,
                 {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
-                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                    system_instruction: { parts: [{ text: systemPrompt }] },
                     contents: [{ parts: [{ text: userPrompt }] }],
-                    generationConfig: {
-                      temperature, maxOutputTokens: maxTokens,
-                      ...(json ? { responseMimeType: 'application/json' } : {}),
+                    generation_config: {
+                      temperature, 
+                      max_output_tokens: maxTokens,
+                      ...(json ? { response_mime_type: 'application/json' } : {}),
                     },
                   }),
                   signal: providerController.signal,
@@ -174,20 +178,20 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
               if (resp.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
                 clearTimeout(pTimer);
                 const text = data.candidates[0].content.parts[0].text;
-                lastTokenUsage = { inputTokens: data.usageMetadata?.promptTokenCount || 0, outputTokens: data.usageMetadata?.candidatesTokenCount || 0, model, provider: 'gemini' };
+                lastTokenUsage = { inputTokens: data.usageMetadata?.promptTokenCount || 0, outputTokens: data.usageMetadata?.candidatesTokenCount || 0, model: modelId, provider: 'gemini' };
                 return text;
               } else {
-                console.warn(`Gemini ${model} error (${resp.status}):`, JSON.stringify(data.error || data));
+                console.warn(`Gemini ${modelId} error (${resp.status}):`, JSON.stringify(data.error || data));
+                if (isQuotaError(resp.status, data)) break; // Try next provider
               }
             } catch (e) {
-              console.warn(`Gemini ${model} request fail: ${e.message}`);
+              console.warn(`Gemini ${modelId} request fail: ${e.message}`);
             }
           }
           clearTimeout(pTimer);
         }
       } catch (e) {
         console.warn(`${provider.name} provider error: ${e.message}`);
-        // Only throw if it's the overall timeout
         if (overallController.signal.aborted) throw e;
       }
     }
@@ -197,6 +201,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
     clearTimeout(overallTimer);
   }
 }
+
 
 
 function parseJSON(text) {
