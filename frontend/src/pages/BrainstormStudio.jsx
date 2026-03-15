@@ -342,7 +342,11 @@ export default function BrainstormStudio() {
             navigate('/content-studio?fromBrainstorm=true')
         } else if (type === 'creative') {
             sessionStorage.setItem('brainstormContext', JSON.stringify({ prompt: `${idea.title} — ${idea.visualDirection || idea.visualStyle || hook}` }))
-            navigate('/creative-studio?fromBrainstorm=true')
+            if (intent === 'ad-film') {
+                navigate('/video-studio?fromBrainstorm=true')
+            } else {
+                navigate('/creative-studio?fromBrainstorm=true')
+            }
         } else if (type === 'calendar') {
             navigate('/smart-calendar')
         }
@@ -1953,7 +1957,7 @@ export default function BrainstormStudio() {
                             <button onClick={() => {
                                 const prompt = `${screenplay.title}: ${screenplay.scenes?.map(s => s.visual).join('. ')}`
                                 sessionStorage.setItem('brainstormContext', JSON.stringify({ prompt }))
-                                navigate('/creative-studio?fromBrainstorm=true')
+                                navigate('/video-studio?fromBrainstorm=true')
                                 setScreenplay(null)
                             }}
                                 className="flex-1 btn-primary py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer">

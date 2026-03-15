@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import SEOHead from '../components/SEOHead'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
+import { useSearchParams } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { creatives as creativesAPI } from '../services/api'
 import AdvancedMode from '../components/VideoStudio/AdvancedMode'
@@ -52,6 +53,8 @@ export default function VideoStudio() {
     const [loading, setLoading] = useState(false)
     const [studioMode, setStudioMode] = useState('storyboard') // 'advanced' | 'storyboard'
     const [error, setError] = useState('')
+    const [autoStart, setAutoStart] = useState(false)
+    const [searchParams, setSearchParams] = useSearchParams()
 
     // Project state
     const [projectId, setProjectId] = useState(null)
@@ -179,7 +182,31 @@ export default function VideoStudio() {
     // Load history on mount
     useEffect(() => {
         api('/video-studio?limit=50').then(d => setProjects(d.projects || [])).catch(() => { })
-    }, [])
+
+        // Check for brainstorm context
+        if (searchParams.get('fromBrainstorm') === 'true') {
+            const bsCtx = window.sessionStorage.getItem('brainstormContext')
+            if (bsCtx) {
+                try {
+                    const parsed = JSON.parse(bsCtx)
+                    if (parsed.prompt || parsed.description) {
+                        setBrief(parsed.prompt || parsed.description)
+                        setVideoType('ad-film')
+                        setAutoStart(true)
+                    }
+                } catch (e) { console.error('Failed to parse brainstorm context:', e) }
+            }
+            setSearchParams({}, { replace: true })
+        }
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Auto-start if triggered from Brainstorm
+    useEffect(() => {
+        if (autoStart && activeBrand && brief.trim() && !loading && step === 0) {
+            setAutoStart(false)
+            handleStart()
+        }
+    }, [autoStart, activeBrand, brief, loading, step]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // ══════════════════════════════════════════════════════════════════════════
     // STEP 1: Start — Submit brief + images → get concepts

@@ -2725,6 +2725,19 @@ export default function ContentStudio() {
                 setStep(0) // Show goal chooser
             }
             setSearchParams({}, { replace: true })
+        } else if (searchParams.get('fromBrainstorm') === 'true') {
+            const bsCtx = window.sessionStorage.getItem('brainstormContext')
+            if (bsCtx) {
+                try {
+                    const parsed = JSON.parse(bsCtx)
+                    if (parsed.description || parsed.prompt) {
+                        setContext({ details: parsed.description || parsed.prompt })
+                        setGoal('promote') // Default to promote for brainstorm ideas
+                        setStep(1) // Go to sub-type selection
+                    }
+                } catch (e) { console.error('Failed to parse brainstorm context:', e) }
+            }
+            setSearchParams({}, { replace: true })
         }
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
