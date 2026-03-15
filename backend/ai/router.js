@@ -231,3 +231,6 @@ export const getAIRouter = () => {
     if (!routerInstance) routerInstance = new ModelRouter();
     return routerInstance;
 };
+
+// Alias for backward compatibility with existing imports
+export const getRouter = getAIRouter;
