@@ -472,6 +472,122 @@ router.post('/ai-background', protect, async (req, res) => {
     }
 })
 
+// POST /api/canvas-assets/ai-creative-generate — Keywords → Editable Design Layout
+router.post('/ai-creative-generate', protect, async (req, res) => {
+    try {
+        const { keywords, style = 'modern', canvasWidth = 1080, canvasHeight = 1080, brandName, brandColors, brandFonts } = req.body
+        if (!keywords) return res.status(400).json({ error: 'Keywords are required' })
+
+        const apiKey = process.env.GEMINI_API_KEY
+        if (!apiKey) return res.status(400).json({ error: 'GEMINI_API_KEY not configured' })
+
+        const colorStr = Array.isArray(brandColors) && brandColors.length > 0
+            ? `Brand colors: ${brandColors.join(', ')}.`
+            : 'Use sophisticated, modern colors.'
+        const fontStr = Array.isArray(brandFonts) && brandFonts.length > 0
+            ? `Preferred fonts: ${brandFonts.join(', ')}.`
+            : 'Use modern Google Fonts like Inter, Poppins, Playfair Display, Bebas Neue, DM Sans.'
+
+        const prompt = `You are an expert graphic designer. Create a structured design layout for a ${canvasWidth}x${canvasHeight}px canvas.
+
+DESIGN BRIEF:
+- Keywords: ${keywords}
+- Style: ${style}
+- Brand: ${brandName || 'Generic'}
+- ${colorStr}
+- ${fontStr}
+
+CRITICAL RULES:
+1. Return ONLY valid JSON (no markdown, no backticks)
+2. All x/y/w/h values are in pixels relative to ${canvasWidth}x${canvasHeight} canvas
+3. Include 3-8 elements — mix of text, rect, and line types
+4. For text elements: use realistic marketing copy based on the keywords
+5. Place elements with proper spacing and visual hierarchy
+6. Use the brand colors if provided, or colors matching the style
+7. Ensure text contrasts well against the background
+
+Return this exact JSON structure:
+{
+  "background": "#hex_color",
+  "elements": [
+    {
+      "type": "text",
+      "text": "Actual text content",
+      "x": 100,
+      "y": 100,
+      "w": 800,
+      "font": "Font Name",
+      "size": 64,
+      "weight": "700",
+      "color": "#ffffff",
+      "align": "center",
+      "tracking": 0,
+      "label": "Headline"
+    },
+    {
+      "type": "rect",
+      "x": 0,
+      "y": 900,
+      "w": 1080,
+      "h": 180,
+      "color": "#6366f1",
+      "radius": 0,
+      "label": "Footer Bar"
+    },
+    {
+      "type": "line",
+      "x1": 100,
+      "y1": 500,
+      "x2": 980,
+      "y2": 500,
+      "color": "#ffffff",
+      "strokeWidth": 2,
+      "label": "Divider"
+    }
+  ]
+}`
+
+        const baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
+        const url = `${baseUrl}/models/gemini-2.5-flash:generateContent?key=${apiKey}`
+        console.log('🎨 AI Creative Generate: calling Gemini for layout...')
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                generationConfig: { temperature: 0.7, maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 0 } },
+            }),
+        })
+        const data = await resp.json()
+        if (data.error) throw new Error(data.error.message)
+
+        // Extract text from all parts (gemini-2.5 may return thought + text parts)
+        const allParts = data.candidates?.[0]?.content?.parts || []
+        let text = ''
+        for (const p of allParts) {
+            if (p.text && !p.thought) text += p.text
+        }
+        text = text || '{}'
+        console.log('🎨 AI Creative Generate response length:', text.length, 'chars')
+
+        // Parse the JSON response
+        let layout
+        try {
+            const jsonMatch = text.match(/\{[\s\S]*\}/)
+            layout = jsonMatch ? JSON.parse(jsonMatch[0]) : { background: '#1a1a2e', elements: [] }
+        } catch (parseErr) {
+            console.error('AI creative parse error:', parseErr.message, text.substring(0, 300))
+            layout = { background: '#1a1a2e', elements: [{ type: 'text', text: keywords, x: 100, y: 100, w: 800, font: 'Inter', size: 48, weight: '700', color: '#ffffff', label: 'Headline' }] }
+        }
+
+        console.log(`🎨 AI Creative Generate: ${layout.elements?.length || 0} elements created`)
+        res.json({ layout, backgroundImage: null })
+    } catch (err) {
+        console.error('AI creative generate error:', err.message)
+        res.status(500).json({ error: safeErrorMessage(err) })
+    }
+})
+
 // POST /api/canvas-assets/ai-copy — Generate marketing copy
 router.post('/ai-copy', protect, async (req, res) => {
     try {

@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef, useCallback, Component } from 'react'
+import React, { useState, useEffect, useRef, useCallback, Component } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useBrand } from '../context/BrandContext'
 import SEOHead from '../components/SEOHead'
 import * as fabric from 'fabric'
 import { media as mediaAPI } from '../services/api'
+import { TEMPLATE_LIBRARY, TEMPLATE_CATEGORIES } from './canvasTemplates'
+import { SVG_ELEMENT_CATEGORIES } from './canvasElements'
 import './CanvasEditor.css'
 
 // ── Error Boundary to catch render-phase crashes ──
@@ -74,17 +76,50 @@ const FILTERS = [
     { id: 'blur', label: 'Blur' },
 ]
 
-// ── Node type configs for elements ──
-const ELEMENT_TYPES = [
-    { id: 'text', icon: 'text_fields', label: 'Text' },
-    { id: 'heading', icon: 'title', label: 'Heading' },
-    { id: 'shape-rect', icon: 'rectangle', label: 'Rectangle' },
-    { id: 'shape-circle', icon: 'circle', label: 'Circle' },
-    { id: 'shape-line', icon: 'horizontal_rule', label: 'Line' },
-    { id: 'logo', icon: 'add_photo_alternate', label: 'Brand Logo' },
-    { id: 'image', icon: 'image', label: 'Upload Image' },
-    { id: 'ai-element', icon: 'auto_awesome', label: 'AI Element' },
-]
+// ── Element Categories (Canva-style) ──
+const ELEMENT_CATEGORIES = {
+    text: { label: 'Text', icon: 'text_fields', items: [
+        { id: 'text', icon: 'text_fields', label: 'Body Text' },
+        { id: 'heading', icon: 'title', label: 'Heading' },
+        { id: 'subheading', icon: 'format_size', label: 'Subheading' },
+    ]},
+    shapes: { label: 'Shapes', icon: 'shapes', items: [
+        { id: 'shape-rect', icon: 'rectangle', label: 'Rectangle' },
+        { id: 'shape-rounded-rect', icon: 'rounded_corner', label: 'Rounded Rect' },
+        { id: 'shape-circle', icon: 'circle', label: 'Circle' },
+        { id: 'shape-oval', icon: 'lens', label: 'Oval' },
+        { id: 'shape-triangle', icon: 'change_history', label: 'Triangle' },
+        { id: 'shape-diamond', icon: 'diamond', label: 'Diamond' },
+        { id: 'shape-pentagon', icon: 'pentagon', label: 'Pentagon' },
+        { id: 'shape-hexagon', icon: 'hexagon', label: 'Hexagon' },
+        { id: 'shape-star5', icon: 'star', label: 'Star 5pt' },
+        { id: 'shape-star6', icon: 'star_half', label: 'Star 6pt' },
+        { id: 'shape-heart', icon: 'favorite', label: 'Heart' },
+        { id: 'shape-cross', icon: 'add', label: 'Cross' },
+        { id: 'shape-arrow-right', icon: 'arrow_right_alt', label: 'Arrow →' },
+        { id: 'shape-arrow-up', icon: 'arrow_upward', label: 'Arrow ↑' },
+        { id: 'shape-badge', icon: 'verified', label: 'Badge' },
+    ]},
+    lines: { label: 'Lines', icon: 'horizontal_rule', items: [
+        { id: 'shape-line', icon: 'horizontal_rule', label: 'Solid Line' },
+        { id: 'shape-dashed', icon: 'more_horiz', label: 'Dashed Line' },
+        { id: 'shape-dotted', icon: 'pending', label: 'Dotted Line' },
+        { id: 'shape-arrow-line', icon: 'trending_flat', label: 'Arrow Line' },
+        { id: 'shape-double-arrow', icon: 'swap_horiz', label: 'Double Arrow' },
+    ]},
+    decorative: { label: 'Decorative', icon: 'auto_awesome', items: [
+        { id: 'shape-blob', icon: 'blur_on', label: 'Blob' },
+        { id: 'shape-wave', icon: 'waves', label: 'Wave' },
+        { id: 'shape-ring', icon: 'radio_button_unchecked', label: 'Ring' },
+        { id: 'shape-half-circle', icon: 'contrast', label: 'Half Circle' },
+    ]},
+    quick: { label: 'Quick Add', icon: 'bolt', items: [
+        { id: 'logo', icon: 'add_photo_alternate', label: 'Brand Logo' },
+        { id: 'image', icon: 'image', label: 'Upload Image' },
+        { id: 'ai-element', icon: 'auto_awesome', label: 'AI Element' },
+    ]},
+}
+const ELEMENT_TYPES = Object.values(ELEMENT_CATEGORIES).flatMap(c => c.items)
 
 function CanvasEditorInner() {
     const navigate = useNavigate()
@@ -92,7 +127,7 @@ function CanvasEditorInner() {
     const { activeBrand } = useBrand()
 
     // Core state
-    const [mode, setMode] = useState('simple') // simple | advanced
+    const mode = 'advanced' // Unified mode — all features always available
     const [activeTool, setActiveTool] = useState('select')
     const [zoom, setZoom] = useState(100)
     const [toast, setToast] = useState('')
@@ -122,7 +157,7 @@ function CanvasEditorInner() {
     const [textInput, setTextInput] = useState('')
     const [activeFilter, setActiveFilter] = useState('none')
 
-    // Simple mode adjustments
+    // Adjustments
     const [brightness, setBrightness] = useState(0)
     const [contrast, setContrast] = useState(0)
 
@@ -162,6 +197,28 @@ function CanvasEditorInner() {
     // Background tool
     const [bgAction, setBgAction] = useState('remove') // remove | replace
     const [bgPrompt, setBgPrompt] = useState('')
+
+    // ── Resize Panel State ──
+    const [showResizePanel, setShowResizePanel] = useState(false)
+    const [customW, setCustomW] = useState(1080)
+    const [customH, setCustomH] = useState(1080)
+    const [lockRatio, setLockRatio] = useState(true)
+
+    // ── Font Category State ──
+    const [fontCategory, setFontCategory] = useState('all')
+
+    // ── Image Source Tab (for Images sidebar) ──
+    const [imageSourceTab, setImageSourceTab] = useState('upload')
+    const [generatedImages, setGeneratedImages] = useState([])
+
+    // ── AI Creative Generator State ──
+    const [aiCreativeKeywords, setAiCreativeKeywords] = useState('')
+    const [aiCreativeStyle, setAiCreativeStyle] = useState('modern')
+    const [aiCreativeLoading, setAiCreativeLoading] = useState(false)
+
+    // ── Selected object type tracking ──
+    const [selectedObjType, setSelectedObjType] = useState(null) // 'text' | 'shape' | 'image' | null
+    const [elementCategory, setElementCategory] = useState(null) // null=all or key from ELEMENT_CATEGORIES
 
     // Image source — read from sessionStorage (avoids 431 errors with large base64 data URIs)
     const imageUrl = searchParams.get('image') || sessionStorage.getItem('canvasEditorImage') || ''
@@ -253,8 +310,17 @@ function CanvasEditorInner() {
                 opacity: Math.round((obj.opacity || 1) * 100),
             })
             setSelectedLayer(obj.id || null)
+            // Track object type for context-sensitive right panel
+            if (obj.type === 'textbox' || obj.type === 'text' || obj.type === 'i-text') {
+                setSelectedObjType('text')
+            } else if (obj.type === 'image') {
+                setSelectedObjType('image')
+            } else {
+                setSelectedObjType('shape')
+            }
         } else {
             setSelectedLayer(null)
+            setSelectedObjType(null)
         }
     }, [])
 
@@ -315,8 +381,8 @@ function CanvasEditorInner() {
                             top: displayH / 2,
                             originX: 'center',
                             originY: 'center',
-                            selectable: mode === 'advanced',
-                            evented: mode === 'advanced',
+                            selectable: true,
+                            evented: true,
                             customName: 'Background Image',
                             id: 'bg-image',
                         })
@@ -367,19 +433,6 @@ function CanvasEditorInner() {
         }
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-    // ── Update background image selectability when mode changes ──
-    useEffect(() => {
-        const fc = fabricRef.current
-        if (!fc) return
-        const bgImg = fc.getObjects().find(o => o.id === 'bg-image')
-        if (bgImg) {
-            bgImg.set({
-                selectable: mode === 'advanced',
-                evented: mode === 'advanced',
-            })
-            fc.renderAll()
-        }
-    }, [mode])
 
     // ── Resize canvas to new preset ──
     const resizeToPreset = (preset) => {
@@ -453,48 +506,141 @@ function CanvasEditorInner() {
         const fc = fabricRef.current
         if (!fc) return
         const brandColor = activeBrand?.dna?.colors?.[1]?.hex || activeBrand?.dna?.colors?.[0]?.hex || '#6366f1'
+        const fillColor = brandColor + '40'
+        const cx = fc.width / 2
+        const cy = fc.height / 2
+        const ts = Date.now()
+
+        // Helper: create regular polygon points
+        const regularPoly = (sides, radius) => {
+            const pts = []
+            for (let i = 0; i < sides; i++) {
+                const angle = (i * 2 * Math.PI / sides) - Math.PI / 2
+                pts.push({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius })
+            }
+            return pts
+        }
+
+        // Helper: create star points
+        const starPoly = (points, outerR, innerR) => {
+            const pts = []
+            for (let i = 0; i < points * 2; i++) {
+                const r = i % 2 === 0 ? outerR : innerR
+                const angle = (i * Math.PI / points) - Math.PI / 2
+                pts.push({ x: Math.cos(angle) * r, y: Math.sin(angle) * r })
+            }
+            return pts
+        }
 
         let shape
-        if (type === 'shape-rect') {
-            shape = new fabric.Rect({
-                width: 200, height: 150,
-                fill: brandColor + '40',
-                stroke: brandColor,
-                strokeWidth: 2,
-                rx: 12, ry: 12,
-                customName: 'Rectangle',
-                id: `rect-${Date.now()}`,
-            })
-        } else if (type === 'shape-circle') {
-            shape = new fabric.Circle({
-                radius: 80,
-                fill: brandColor + '40',
-                stroke: brandColor,
-                strokeWidth: 2,
-                customName: 'Circle',
-                id: `circle-${Date.now()}`,
-            })
-        } else if (type === 'shape-line') {
-            shape = new fabric.Line([0, 0, 300, 0], {
-                stroke: brandColor,
-                strokeWidth: 3,
-                customName: 'Line',
-                id: `line-${Date.now()}`,
-            })
+        switch (type) {
+            case 'shape-rect':
+                shape = new fabric.Rect({ width: 200, height: 150, fill: fillColor, stroke: brandColor, strokeWidth: 2, rx: 0, ry: 0, customName: 'Rectangle', id: `rect-${ts}` })
+                break
+            case 'shape-rounded-rect':
+                shape = new fabric.Rect({ width: 200, height: 150, fill: fillColor, stroke: brandColor, strokeWidth: 2, rx: 20, ry: 20, customName: 'Rounded Rect', id: `rrect-${ts}` })
+                break
+            case 'shape-circle':
+                shape = new fabric.Circle({ radius: 80, fill: fillColor, stroke: brandColor, strokeWidth: 2, customName: 'Circle', id: `circle-${ts}` })
+                break
+            case 'shape-oval':
+                shape = new fabric.Ellipse({ rx: 120, ry: 70, fill: fillColor, stroke: brandColor, strokeWidth: 2, customName: 'Oval', id: `oval-${ts}` })
+                break
+            case 'shape-triangle':
+                shape = new fabric.Polygon(regularPoly(3, 80), { fill: fillColor, stroke: brandColor, strokeWidth: 2, customName: 'Triangle', id: `tri-${ts}` })
+                break
+            case 'shape-diamond':
+                shape = new fabric.Polygon([{ x: 0, y: -90 }, { x: 70, y: 0 }, { x: 0, y: 90 }, { x: -70, y: 0 }], { fill: fillColor, stroke: brandColor, strokeWidth: 2, customName: 'Diamond', id: `diamond-${ts}` })
+                break
+            case 'shape-pentagon':
+                shape = new fabric.Polygon(regularPoly(5, 80), { fill: fillColor, stroke: brandColor, strokeWidth: 2, customName: 'Pentagon', id: `pent-${ts}` })
+                break
+            case 'shape-hexagon':
+                shape = new fabric.Polygon(regularPoly(6, 80), { fill: fillColor, stroke: brandColor, strokeWidth: 2, customName: 'Hexagon', id: `hex-${ts}` })
+                break
+            case 'shape-star5':
+                shape = new fabric.Polygon(starPoly(5, 80, 35), { fill: fillColor, stroke: brandColor, strokeWidth: 2, customName: 'Star 5pt', id: `star5-${ts}` })
+                break
+            case 'shape-star6':
+                shape = new fabric.Polygon(starPoly(6, 80, 40), { fill: fillColor, stroke: brandColor, strokeWidth: 2, customName: 'Star 6pt', id: `star6-${ts}` })
+                break
+            case 'shape-heart':
+                shape = new fabric.Path('M 0 -40 C -30 -80, -100 -40, -60 20 C -30 60, 0 80, 0 80 C 0 80, 30 60, 60 20 C 100 -40, 30 -80, 0 -40 Z', { fill: '#f87171', stroke: '#ef4444', strokeWidth: 2, customName: 'Heart', id: `heart-${ts}` })
+                break
+            case 'shape-cross':
+                shape = new fabric.Polygon([
+                    { x: -25, y: -75 }, { x: 25, y: -75 }, { x: 25, y: -25 },
+                    { x: 75, y: -25 }, { x: 75, y: 25 }, { x: 25, y: 25 },
+                    { x: 25, y: 75 }, { x: -25, y: 75 }, { x: -25, y: 25 },
+                    { x: -75, y: 25 }, { x: -75, y: -25 }, { x: -25, y: -25 },
+                ], { fill: fillColor, stroke: brandColor, strokeWidth: 2, customName: 'Cross', id: `cross-${ts}` })
+                break
+            case 'shape-arrow-right':
+                shape = new fabric.Polygon([
+                    { x: -80, y: -30 }, { x: 20, y: -30 }, { x: 20, y: -60 },
+                    { x: 80, y: 0 },
+                    { x: 20, y: 60 }, { x: 20, y: 30 }, { x: -80, y: 30 },
+                ], { fill: fillColor, stroke: brandColor, strokeWidth: 2, customName: 'Arrow Right', id: `arrowr-${ts}` })
+                break
+            case 'shape-arrow-up':
+                shape = new fabric.Polygon([
+                    { x: 0, y: -80 },
+                    { x: 60, y: -20 }, { x: 30, y: -20 }, { x: 30, y: 80 },
+                    { x: -30, y: 80 }, { x: -30, y: -20 }, { x: -60, y: -20 },
+                ], { fill: fillColor, stroke: brandColor, strokeWidth: 2, customName: 'Arrow Up', id: `arrowu-${ts}` })
+                break
+            case 'shape-badge':
+                shape = new fabric.Polygon(starPoly(8, 80, 60), { fill: fillColor, stroke: brandColor, strokeWidth: 2, customName: 'Badge', id: `badge-${ts}` })
+                break
+            case 'shape-line':
+                shape = new fabric.Line([0, 0, 300, 0], { stroke: brandColor, strokeWidth: 3, customName: 'Line', id: `line-${ts}` })
+                break
+            case 'shape-dashed':
+                shape = new fabric.Line([0, 0, 300, 0], { stroke: brandColor, strokeWidth: 3, strokeDashArray: [15, 10], customName: 'Dashed', id: `dash-${ts}` })
+                break
+            case 'shape-dotted':
+                shape = new fabric.Line([0, 0, 300, 0], { stroke: brandColor, strokeWidth: 3, strokeDashArray: [3, 8], strokeLineCap: 'round', customName: 'Dotted', id: `dot-${ts}` })
+                break
+            case 'shape-arrow-line':
+                const alGroup = new fabric.Group([
+                    new fabric.Line([0, 0, 250, 0], { stroke: brandColor, strokeWidth: 3 }),
+                    new fabric.Polygon([{ x: 0, y: -10 }, { x: 20, y: 0 }, { x: 0, y: 10 }], { fill: brandColor, left: 250, top: -10 }),
+                ], { customName: 'Arrow Line', id: `aline-${ts}` })
+                shape = alGroup
+                break
+            case 'shape-double-arrow':
+                const daGroup = new fabric.Group([
+                    new fabric.Polygon([{ x: 0, y: 0 }, { x: -20, y: -10 }, { x: -20, y: 10 }], { fill: brandColor }),
+                    new fabric.Line([0, 0, 250, 0], { stroke: brandColor, strokeWidth: 3 }),
+                    new fabric.Polygon([{ x: 250, y: 0 }, { x: 270, y: -10 }, { x: 270, y: 10 }], { fill: brandColor }),
+                ], { customName: 'Double Arrow', id: `darrow-${ts}` })
+                shape = daGroup
+                break
+            case 'shape-blob':
+                shape = new fabric.Path('M 80 0 C 120 -20, 140 40, 100 80 C 60 120, -20 100, -40 60 C -60 20, 40 -40, 80 0 Z', { fill: fillColor, stroke: brandColor, strokeWidth: 2, customName: 'Blob', id: `blob-${ts}`, scaleX: 1.2, scaleY: 1.2 })
+                break
+            case 'shape-wave':
+                shape = new fabric.Path('M 0 50 Q 50 0, 100 50 T 200 50 T 300 50', { fill: 'transparent', stroke: brandColor, strokeWidth: 4, customName: 'Wave', id: `wave-${ts}` })
+                break
+            case 'shape-ring':
+                const ringG = new fabric.Group([
+                    new fabric.Circle({ radius: 80, fill: 'transparent', stroke: brandColor, strokeWidth: 10 }),
+                ], { customName: 'Ring', id: `ring-${ts}` })
+                shape = ringG
+                break
+            case 'shape-half-circle':
+                shape = new fabric.Path('M -80 0 A 80 80 0 0 1 80 0 Z', { fill: fillColor, stroke: brandColor, strokeWidth: 2, customName: 'Half Circle', id: `half-${ts}` })
+                break
+            default: return
         }
 
         if (shape) {
-            shape.set({
-                left: fc.width / 2,
-                top: fc.height / 2,
-                originX: 'center',
-                originY: 'center',
-            })
+            shape.set({ left: cx, top: cy, originX: 'center', originY: 'center' })
             fc.add(shape)
             fc.setActiveObject(shape)
             fc.renderAll()
             saveHistory()
-            showToast(`⬛ ${shape.customName} added`)
+            showToast(`✦ ${shape.customName || 'Shape'} added`)
         }
     }
 
@@ -736,6 +882,10 @@ function CanvasEditorInner() {
         const fc = fabricRef.current
         if (!fc) return
 
+        // Deselect all objects so selection handles don't appear in export
+        fc.discardActiveObject()
+        fc.renderAll()
+
         // Temporarily set zoom to 1 for full-res export
         const currentZoom = fc.getZoom()
         fc.setZoom(1)
@@ -743,7 +893,7 @@ function CanvasEditorInner() {
 
         const dataUrl = fc.toDataURL({
             format,
-            quality: format === 'jpg' ? 0.92 : 1,
+            quality: format === 'jpeg' ? 0.92 : 1,
             multiplier: 1,
         })
 
@@ -785,15 +935,27 @@ function CanvasEditorInner() {
 
     // ── Handle element add in advanced mode ──
     const handleAddElement = (type) => {
+        if (type.startsWith('shape-')) { addShape(type); return }
         switch (type) {
             case 'text': addText('', false); break
             case 'heading': addText('', true); break
-            case 'shape-rect':
-            case 'shape-circle':
-            case 'shape-line': addShape(type); break
+            case 'subheading': {
+                const fc = fabricRef.current
+                if (!fc) return
+                const subText = new fabric.Textbox('Subheading', {
+                    left: fc.width / 2, top: fc.height / 2,
+                    originX: 'center', originY: 'center',
+                    fontSize: 28, fontWeight: '600', fontFamily: 'DM Sans',
+                    fill: '#94a3b8', textAlign: 'center', width: fc.width * 0.6,
+                    editable: true, customName: 'Subheading', id: `sub-${Date.now()}`,
+                })
+                fc.add(subText); fc.setActiveObject(subText); fc.renderAll(); saveHistory()
+                showToast('✏️ Subheading added')
+                break
+            }
             case 'logo': addLogo(); break
             case 'image': uploadImage(); break
-            case 'ai-element': showToast('🤖 AI Element — coming in Phase 2!'); break
+            case 'ai-element': showToast('🤖 AI Element — use the AI Creative tool!'); break
             default: break
         }
     }
@@ -969,26 +1131,78 @@ function CanvasEditorInner() {
         }
     }, [])
 
-    // ── Google Fonts List ──
-    const GOOGLE_FONTS = [
-        'Inter', 'Poppins', 'Roboto', 'Open Sans', 'Montserrat', 'Lato', 'Raleway',
-        'Oswald', 'Playfair Display', 'Merriweather', 'Nunito', 'Ubuntu', 'Rubik',
-        'Work Sans', 'Quicksand', 'Fira Sans', 'Mulish', 'DM Sans', 'Outfit',
-        'Space Grotesk', 'Sora', 'Manrope', 'Plus Jakarta Sans', 'Lexend',
-        'Josefin Sans', 'Karla', 'Libre Baskerville', 'Crimson Text', 'Cormorant Garamond',
-        'Bebas Neue', 'Anton', 'Permanent Marker', 'Pacifico', 'Dancing Script',
-        'Righteous', 'Fredoka One', 'Lobster', 'Abril Fatface', 'Caveat',
-        'Sacramento', 'Great Vibes', 'Satisfy', 'Comfortaa', 'Titan One',
-        'Archivo Black', 'Barlow Condensed', 'Fjalla One', 'Jost', 'Urbanist', 'Bricolage Grotesque',
-        // Vernacular
-        'Noto Sans Devanagari', 'Noto Sans Tamil', 'Noto Sans Telugu', 'Noto Sans Bengali',
-        'Noto Sans Kannada', 'Noto Sans Malayalam', 'Noto Sans Gujarati', 'Noto Sans Gurmukhi',
-        'Noto Sans Oriya', 'Hind',
-    ]
+    // ── Google Fonts — 200+ organized by category ──
+    const FONT_CATEGORIES = {
+        all: 'All',
+        'sans-serif': 'Sans Serif',
+        serif: 'Serif',
+        display: 'Display',
+        handwriting: 'Handwriting',
+        monospace: 'Monospace',
+        indian: '🌐 Indian',
+    }
 
-    const filteredFonts = fontSearch
-        ? GOOGLE_FONTS.filter(f => f.toLowerCase().includes(fontSearch.toLowerCase()))
-        : GOOGLE_FONTS
+    const GOOGLE_FONTS_BY_CATEGORY = {
+        'sans-serif': [
+            'Inter', 'Poppins', 'Roboto', 'Open Sans', 'Montserrat', 'Lato', 'Nunito', 'Rubik',
+            'Work Sans', 'Quicksand', 'Fira Sans', 'Mulish', 'DM Sans', 'Outfit', 'Space Grotesk',
+            'Sora', 'Manrope', 'Plus Jakarta Sans', 'Lexend', 'Josefin Sans', 'Karla', 'Jost',
+            'Urbanist', 'Bricolage Grotesque', 'Albert Sans', 'Figtree', 'Geist', 'Instrument Sans',
+            'Onest', 'Red Hat Display', 'Wix Madefor Display', 'Commissioner', 'Sofia Sans',
+            'Readex Pro', 'Hanken Grotesk', 'General Sans', 'Switzer', 'Cabinet Grotesk',
+            'Satoshi', 'Clash Display', 'Synonym', 'Gilroy', 'Cerebri Sans',
+            'Barlow', 'Barlow Condensed', 'Exo 2', 'Kanit', 'Titillium Web', 'Signika',
+            'Noto Sans', 'Source Sans 3', 'PT Sans', 'Catamaran', 'Asap', 'Overpass',
+            'Nunito Sans', 'Hind Siliguri', 'Cabin', 'Arimo', 'Oxygen', 'Dosis',
+        ],
+        serif: [
+            'Playfair Display', 'Merriweather', 'Libre Baskerville', 'Crimson Text',
+            'Cormorant Garamond', 'EB Garamond', 'Lora', 'Bitter', 'Spectral', 'Newsreader',
+            'Source Serif 4', 'Noto Serif', 'PT Serif', 'Cardo', 'Old Standard TT',
+            'Cormorant', 'Vollkorn', 'Alegreya', 'Gentium Book Plus', 'Literata',
+            'DM Serif Display', 'DM Serif Text', 'IBM Plex Serif', 'Zilla Slab',
+            'Libre Caslon Text', 'Sorts Mill Goudy', 'Bodoni Moda', 'Baskervville',
+        ],
+        display: [
+            'Bebas Neue', 'Anton', 'Righteous', 'Titan One', 'Archivo Black', 'Fjalla One',
+            'Abril Fatface', 'Fredoka One', 'Lobster', 'Bungee', 'Bungee Shade',
+            'Monoton', 'Rubik Mono One', 'Racing Sans One', 'Audiowide', 'Orbitron',
+            'Russo One', 'Black Ops One', 'Modak', 'Lilita One', 'Chango',
+            'Shrikhand', 'Bungee Inline', 'Faster One', 'Nabla', 'Silkscreen',
+            'Press Start 2P', 'Honk', 'Syne', 'Climate Crisis', 'Bagel Fat One',
+            'Young Serif', 'Edu NSW ACT Foundation', 'Londrina Solid',
+        ],
+        handwriting: [
+            'Pacifico', 'Dancing Script', 'Caveat', 'Sacramento', 'Great Vibes',
+            'Satisfy', 'Permanent Marker', 'Kalam', 'Patrick Hand', 'Indie Flower',
+            'Shadows Into Light', 'Amatic SC', 'Covered By Your Grace', 'Rock Salt',
+            'Gloria Hallelujah', 'Homemade Apple', 'Reenie Beanie', 'Gochi Hand',
+            'Architects Daughter', 'Coming Soon', 'Handlee', 'Pangolin', 'Mali',
+            'Sriracha', 'Kaushan Script', 'Alex Brush', 'Allura', 'Rochester',
+        ],
+        monospace: [
+            'Fira Code', 'JetBrains Mono', 'Source Code Pro', 'IBM Plex Mono',
+            'Roboto Mono', 'Inconsolata', 'Space Mono', 'Ubuntu Mono', 'Courier Prime',
+            'Red Hat Mono', 'DM Mono', 'Martian Mono', 'Azeret Mono',
+        ],
+        indian: [
+            'Noto Sans Devanagari', 'Noto Sans Tamil', 'Noto Sans Telugu', 'Noto Sans Bengali',
+            'Noto Sans Kannada', 'Noto Sans Malayalam', 'Noto Sans Gujarati', 'Noto Sans Gurmukhi',
+            'Noto Sans Oriya', 'Hind', 'Hind Siliguri', 'Hind Vadodara', 'Hind Guntur',
+            'Tiro Devanagari Hindi', 'Tiro Tamil', 'Tiro Telugu', 'Tiro Bangla',
+            'Noto Serif Devanagari', 'Noto Serif Bengali', 'Noto Serif Tamil',
+            'Mukta', 'Mukta Vaani', 'Mukta Mahee', 'Baloo 2', 'Baloo Bhai 2',
+            'Baloo Thambi 2', 'Baloo Da 2', 'Baloo Chettan 2',
+        ],
+    }
+
+    const GOOGLE_FONTS = Object.values(GOOGLE_FONTS_BY_CATEGORY).flat()
+
+    const filteredFonts = (() => {
+        let fonts = fontCategory === 'all' ? GOOGLE_FONTS : (GOOGLE_FONTS_BY_CATEGORY[fontCategory] || GOOGLE_FONTS)
+        if (fontSearch) fonts = fonts.filter(f => f.toLowerCase().includes(fontSearch.toLowerCase()))
+        return fonts
+    })()
 
     // ══════════════════════════════════════════════════════════════════════
     // ── PIXABAY TEXTURES & OVERLAYS ──
@@ -1609,17 +1823,651 @@ function CanvasEditorInner() {
         }
     }, [sidebarTab, panelOpen])
 
+    // ── TEXT STYLE PRESETS ──
+    const TEXT_STYLE_PRESETS = [
+        // Headlines
+        { id: 'bold-title', label: 'Bold Title', font: 'Bebas Neue', size: 64, weight: '700', color: '#ffffff', tracking: 2, sample: 'BOLD TITLE', cat: 'headline' },
+        { id: 'modern-heading', label: 'Modern Heading', font: 'Plus Jakarta Sans', size: 48, weight: '800', color: '#ffffff', tracking: -1, sample: 'Modern Heading', cat: 'headline' },
+        { id: 'elegant-serif', label: 'Elegant Serif', font: 'Playfair Display', size: 52, weight: '700', color: '#f5f0e8', tracking: 0, sample: 'Elegant Serif', cat: 'headline' },
+        { id: 'condensed-impact', label: 'Condensed Impact', font: 'Barlow Condensed', size: 60, weight: '800', color: '#f87171', tracking: 1, sample: 'IMPACT', cat: 'headline' },
+        { id: 'neon-glow', label: 'Neon Display', font: 'Syne', size: 48, weight: '800', color: '#22d3ee', tracking: 0, sample: 'NEON GLOW', cat: 'headline' },
+        { id: 'retro-title', label: 'Retro Title', font: 'Bungee', size: 48, weight: '400', color: '#fbbf24', tracking: 1, sample: 'RETRO TITLE', cat: 'headline' },
+        // Subtitles
+        { id: 'minimal-sans', label: 'Minimal Sans', font: 'Inter', size: 36, weight: '300', color: '#e2e8f0', tracking: 3, sample: 'Minimal Sans', cat: 'subtitle' },
+        { id: 'subtitle-light', label: 'Subtitle Light', font: 'DM Sans', size: 24, weight: '400', color: '#94a3b8', tracking: 1, sample: 'Subtle subtitle text', cat: 'subtitle' },
+        { id: 'body-clean', label: 'Body Clean', font: 'Source Sans 3', size: 18, weight: '400', color: '#cbd5e1', tracking: 0, sample: 'Body text paragraph style.', cat: 'subtitle' },
+        { id: 'quote-italic', label: 'Quote Italic', font: 'Lora', size: 28, weight: '400', color: '#a78bfa', tracking: 0, sample: '"An inspiring quote"', italic: true, cat: 'subtitle' },
+        { id: 'caption-micro', label: 'Caption Micro', font: 'IBM Plex Mono', size: 12, weight: '500', color: '#64748b', tracking: 2, sample: 'Caption · Photo Credit', cat: 'subtitle' },
+        // Social Media
+        { id: 'cta-bold', label: 'CTA Button', font: 'Outfit', size: 22, weight: '700', color: '#10b981', tracking: 2, sample: 'SHOP NOW →', cat: 'social' },
+        { id: 'insta-caption', label: 'Instagram Caption', font: 'Poppins', size: 20, weight: '500', color: '#e2e8f0', tracking: 0, sample: 'Living my best life ✨', cat: 'social' },
+        { id: 'story-bold', label: 'Story Bold', font: 'Archivo Black', size: 56, weight: '400', color: '#f43f5e', tracking: 0, sample: 'SWIPE UP', cat: 'social' },
+        { id: 'hashtag-style', label: 'Hashtag Style', font: 'Montserrat', size: 18, weight: '600', color: '#818cf8', tracking: 0, sample: '#trending #design #creative', cat: 'social' },
+        { id: 'sale-banner', label: 'Sale Banner', font: 'Anton', size: 72, weight: '400', color: '#ef4444', tracking: 0, sample: 'SALE', cat: 'social' },
+        // Decorative
+        { id: 'script-fancy', label: 'Script Fancy', font: 'Great Vibes', size: 56, weight: '400', color: '#fbbf24', tracking: 0, sample: 'Script Fancy', cat: 'decorative' },
+        { id: 'brush-stroke', label: 'Brush Stroke', font: 'Permanent Marker', size: 42, weight: '400', color: '#fb923c', tracking: 0, sample: 'BRUSH STYLE', cat: 'decorative' },
+        { id: 'typewriter', label: 'Typewriter', font: 'Special Elite', size: 28, weight: '400', color: '#d4d4d8', tracking: 1, sample: 'The quick brown fox...', cat: 'decorative' },
+        { id: 'retro-mono', label: 'Retro Mono', font: 'Space Mono', size: 30, weight: '700', color: '#fbbf24', tracking: 3, sample: 'RETRO // MONO', cat: 'decorative' },
+        { id: 'outlined-bold', label: 'Outlined Bold', font: 'Oswald', size: 56, weight: '700', color: 'transparent', tracking: 2, sample: 'OUTLINED', cat: 'decorative', stroke: '#ffffff', strokeWidth: 2 },
+        { id: 'gradient-text', label: 'Gradient Pop', font: 'Righteous', size: 48, weight: '400', color: '#818cf8', tracking: 0, sample: 'GRADIENT', cat: 'decorative' },
+        // Indian Languages
+        { id: 'hindi-title', label: 'Hindi Title', font: 'Noto Sans Devanagari', size: 48, weight: '700', color: '#ffffff', tracking: 0, sample: 'हिंदी शीर्षक', cat: 'indian' },
+        { id: 'tamil-heading', label: 'Tamil Heading', font: 'Noto Sans Tamil', size: 42, weight: '700', color: '#fbbf24', tracking: 0, sample: 'தமிழ் தலைப்பு', cat: 'indian' },
+        { id: 'bengali-text', label: 'Bengali Text', font: 'Noto Sans Bengali', size: 36, weight: '600', color: '#e2e8f0', tracking: 0, sample: 'বাংলা শিরোনাম', cat: 'indian' },
+        { id: 'telugu-heading', label: 'Telugu Heading', font: 'Noto Sans Telugu', size: 42, weight: '700', color: '#a78bfa', tracking: 0, sample: 'తెలుగు శీర్షిక', cat: 'indian' },
+        // Events
+        { id: 'wedding-invite', label: 'Wedding Invite', font: 'Cormorant Garamond', size: 42, weight: '600', color: '#d4a574', tracking: 2, sample: 'You are Invited', cat: 'event' },
+        { id: 'party-title', label: 'Party Title', font: 'Lilita One', size: 56, weight: '400', color: '#f43f5e', tracking: 0, sample: 'LET\'S PARTY!', cat: 'event' },
+        { id: 'announcement', label: 'Announcement', font: 'Raleway', size: 36, weight: '800', color: '#10b981', tracking: 4, sample: 'COMING SOON', cat: 'event' },
+        { id: 'festival-title', label: 'Festival Title', font: 'Baloo 2', size: 48, weight: '700', color: '#fb923c', tracking: 0, sample: 'Festival Special 🎉', cat: 'event' },
+    ]
+
+    // ── FONT COMBINATIONS (24 curated heading+body pairs) ──
+    const FONT_COMBOS = [
+        { id: 'fc1', heading: 'Playfair Display', body: 'Source Sans 3', style: 'Elegant Editorial', headColor: '#ffffff', bodyColor: '#94a3b8' },
+        { id: 'fc2', heading: 'Bebas Neue', body: 'Montserrat', style: 'Bold Modern', headColor: '#ffffff', bodyColor: '#e2e8f0' },
+        { id: 'fc3', heading: 'Abril Fatface', body: 'Lato', style: 'Striking Serif', headColor: '#fbbf24', bodyColor: '#cbd5e1' },
+        { id: 'fc4', heading: 'Oswald', body: 'Quattrocento', style: 'Strong Classic', headColor: '#f87171', bodyColor: '#e2e8f0' },
+        { id: 'fc5', heading: 'Poppins', body: 'Inter', style: 'Clean Tech', headColor: '#818cf8', bodyColor: '#94a3b8' },
+        { id: 'fc6', heading: 'Cormorant Garamond', body: 'Proza Libre', style: 'Luxury Fashion', headColor: '#d4a574', bodyColor: '#e2e8f0' },
+        { id: 'fc7', heading: 'Archivo Black', body: 'DM Sans', style: 'Impact News', headColor: '#ffffff', bodyColor: '#94a3b8' },
+        { id: 'fc8', heading: 'Syne', body: 'IBM Plex Sans', style: 'Future Digital', headColor: '#22d3ee', bodyColor: '#cbd5e1' },
+        { id: 'fc9', heading: 'Plus Jakarta Sans', body: 'Nunito', style: 'Friendly App', headColor: '#10b981', bodyColor: '#e2e8f0' },
+        { id: 'fc10', heading: 'Righteous', body: 'Roboto', style: 'Retro Pop', headColor: '#fb923c', bodyColor: '#cbd5e1' },
+        { id: 'fc11', heading: 'Outfit', body: 'Work Sans', style: 'Startup SaaS', headColor: '#818cf8', bodyColor: '#94a3b8' },
+        { id: 'fc12', heading: 'Great Vibes', body: 'Open Sans', style: 'Wedding Elegant', headColor: '#fbbf24', bodyColor: '#e2e8f0' },
+        { id: 'fc13', heading: 'Anton', body: 'Karla', style: 'Sports Bold', headColor: '#ef4444', bodyColor: '#e2e8f0' },
+        { id: 'fc14', heading: 'Fraunces', body: 'Commissioner', style: 'Editorial Magazine', headColor: '#d4a574', bodyColor: '#94a3b8' },
+        { id: 'fc15', heading: 'Bungee', body: 'Rubik', style: 'Gaming Vibes', headColor: '#22d3ee', bodyColor: '#cbd5e1' },
+        { id: 'fc16', heading: 'Lora', body: 'Merriweather Sans', style: 'Book Layout', headColor: '#ffffff', bodyColor: '#94a3b8' },
+        { id: 'fc17', heading: 'Raleway', body: 'Source Serif 4', style: 'Minimal Luxury', headColor: '#e2e8f0', bodyColor: '#94a3b8' },
+        { id: 'fc18', heading: 'Permanent Marker', body: 'Cabin', style: 'Casual Art', headColor: '#fb923c', bodyColor: '#e2e8f0' },
+        { id: 'fc19', heading: 'Space Grotesk', body: 'Space Mono', style: 'Developer Mono', headColor: '#a5b4fc', bodyColor: '#64748b' },
+        { id: 'fc20', heading: 'Barlow Condensed', body: 'Barlow', style: 'Condensed Modern', headColor: '#f87171', bodyColor: '#cbd5e1' },
+        { id: 'fc21', heading: 'Noto Sans Devanagari', body: 'Poppins', style: 'Hindi + English', headColor: '#ffffff', bodyColor: '#94a3b8' },
+        { id: 'fc22', heading: 'Lilita One', body: 'Quicksand', style: 'Fun Playful', headColor: '#f43f5e', bodyColor: '#e2e8f0' },
+        { id: 'fc23', heading: 'DM Serif Display', body: 'DM Sans', style: 'DM Pairing', headColor: '#ffffff', bodyColor: '#94a3b8' },
+        { id: 'fc24', heading: 'Montserrat', body: 'Hind', style: 'Versatile Safe', headColor: '#e2e8f0', bodyColor: '#94a3b8' },
+    ]
+
+    const addFontCombo = useCallback((combo) => {
+        const fc = fabricRef.current
+        if (!fc) return
+        loadGoogleFont(combo.heading)
+        loadGoogleFont(combo.body)
+        setTimeout(() => {
+            const headObj = new fabric.Textbox('Your Heading Here', {
+                left: fc.width / 2, top: fc.height * 0.35,
+                originX: 'center', originY: 'center',
+                fontSize: 48, fontWeight: '700', fontFamily: combo.heading,
+                fill: combo.headColor, textAlign: 'center', width: fc.width * 0.7,
+                editable: true, customName: `${combo.style} Heading`, id: `combo-h-${Date.now()}`,
+            })
+            const bodyObj = new fabric.Textbox('Add your body text here for a complete design.', {
+                left: fc.width / 2, top: fc.height * 0.55,
+                originX: 'center', originY: 'center',
+                fontSize: 20, fontWeight: '400', fontFamily: combo.body,
+                fill: combo.bodyColor, textAlign: 'center', width: fc.width * 0.6,
+                editable: true, customName: `${combo.style} Body`, id: `combo-b-${Date.now()}`,
+            })
+            fc.add(headObj, bodyObj)
+            fc.setActiveObject(headObj)
+            fc.renderAll()
+            saveHistory()
+            showToast(`✨ Font combo: ${combo.style}`)
+        }, 300)
+    }, [loadGoogleFont, saveHistory, showToast])
+
+    // ── TEXT EFFECTS ──
+    const addTextWithShadow = () => {
+        const fc = fabricRef.current; if (!fc) return
+        loadGoogleFont('Outfit')
+        setTimeout(() => {
+            const t = new fabric.Textbox('SHADOW TEXT', {
+                left: fc.width / 2, top: fc.height / 2, originX: 'center', originY: 'center',
+                fontSize: 56, fontWeight: '800', fontFamily: 'Outfit', fill: '#ffffff',
+                shadow: new fabric.Shadow({ color: 'rgba(99,102,241,0.6)', blur: 20, offsetX: 4, offsetY: 4 }),
+                textAlign: 'center', width: fc.width * 0.6, editable: true,
+                customName: 'Shadow Text', id: `shadow-${Date.now()}`,
+            })
+            fc.add(t); fc.setActiveObject(t); fc.renderAll(); saveHistory()
+            showToast('✨ Shadow text added')
+        }, 200)
+    }
+
+    const addTextWithOutline = () => {
+        const fc = fabricRef.current; if (!fc) return
+        loadGoogleFont('Oswald')
+        setTimeout(() => {
+            const t = new fabric.Textbox('OUTLINED', {
+                left: fc.width / 2, top: fc.height / 2, originX: 'center', originY: 'center',
+                fontSize: 64, fontWeight: '700', fontFamily: 'Oswald', fill: 'transparent',
+                stroke: '#ffffff', strokeWidth: 2, charSpacing: 30,
+                textAlign: 'center', width: fc.width * 0.6, editable: true,
+                customName: 'Outlined Text', id: `outline-${Date.now()}`,
+            })
+            fc.add(t); fc.setActiveObject(t); fc.renderAll(); saveHistory()
+            showToast('✨ Outlined text added')
+        }, 200)
+    }
+
+    const addTextWithGlow = () => {
+        const fc = fabricRef.current; if (!fc) return
+        loadGoogleFont('Syne')
+        setTimeout(() => {
+            const t = new fabric.Textbox('NEON GLOW', {
+                left: fc.width / 2, top: fc.height / 2, originX: 'center', originY: 'center',
+                fontSize: 52, fontWeight: '800', fontFamily: 'Syne', fill: '#22d3ee',
+                shadow: new fabric.Shadow({ color: '#22d3ee', blur: 30, offsetX: 0, offsetY: 0 }),
+                textAlign: 'center', width: fc.width * 0.6, editable: true,
+                customName: 'Glow Text', id: `glow-${Date.now()}`,
+            })
+            fc.add(t); fc.setActiveObject(t); fc.renderAll(); saveHistory()
+            showToast('✨ Neon glow text added')
+        }, 200)
+    }
+
+    const addWatermark = () => {
+        const fc = fabricRef.current; if (!fc) return
+        const name = activeBrand?.name || 'BRAND'
+        const t = new fabric.Textbox(name, {
+            left: fc.width - 20, top: fc.height - 20,
+            originX: 'right', originY: 'bottom',
+            fontSize: 14, fontWeight: '600', fontFamily: 'Inter', fill: '#ffffff',
+            opacity: 0.3, textAlign: 'right', width: 200, editable: true,
+            customName: 'Watermark', id: `watermark-${Date.now()}`,
+        })
+        fc.add(t); fc.setActiveObject(t); fc.renderAll(); saveHistory()
+        showToast('🏷️ Watermark added')
+    }
+
+    // ── CANVAS APPS (Built-in tools) ──
+    const CANVAS_APPS = [
+        { id: 'text-shadow', icon: 'blur_on', label: 'Shadow Text', desc: 'Text with drop shadow', action: addTextWithShadow },
+        { id: 'text-outline', icon: 'format_paint', label: 'Outline Text', desc: 'Hollow outlined text', action: addTextWithOutline },
+        { id: 'text-glow', icon: 'flare', label: 'Neon Glow', desc: 'Glowing neon text', action: addTextWithGlow },
+        { id: 'watermark', icon: 'branding_watermark', label: 'Watermark', desc: 'Brand watermark overlay', action: addWatermark },
+        { id: 'lorem', icon: 'notes', label: 'Lorem Ipsum', desc: 'Placeholder text block', action: () => {
+            const fc = fabricRef.current; if (!fc) return
+            const t = new fabric.Textbox('Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.', {
+                left: fc.width / 2, top: fc.height / 2, originX: 'center', originY: 'center',
+                fontSize: 16, fontWeight: '400', fontFamily: 'Inter', fill: '#94a3b8',
+                textAlign: 'left', width: fc.width * 0.5, editable: true,
+                customName: 'Lorem Ipsum', id: `lorem-${Date.now()}`,
+            })
+            fc.add(t); fc.setActiveObject(t); fc.renderAll(); saveHistory()
+            showToast('📝 Lorem ipsum added')
+        }},
+        { id: 'pattern-dots', icon: 'grid_on', label: 'Dot Pattern', desc: 'Dotted background pattern', action: () => {
+            const fc = fabricRef.current; if (!fc) return
+            const brandColor = activeBrand?.dna?.colors?.[0]?.hex || '#6366f1'
+            const patternCanvas = document.createElement('canvas')
+            patternCanvas.width = 20; patternCanvas.height = 20
+            const ctx = patternCanvas.getContext('2d')
+            ctx.fillStyle = brandColor + '30'
+            ctx.beginPath(); ctx.arc(10, 10, 2, 0, Math.PI * 2); ctx.fill()
+            const pattern = new fabric.Pattern({ source: patternCanvas, repeat: 'repeat' })
+            const rect = new fabric.Rect({ width: fc.width * 0.5, height: fc.height * 0.5, fill: pattern, left: fc.width / 2, top: fc.height / 2, originX: 'center', originY: 'center', customName: 'Dot Pattern', id: `pattern-${Date.now()}` })
+            fc.add(rect); fc.setActiveObject(rect); fc.renderAll(); saveHistory()
+            showToast('🔳 Dot pattern added')
+        }},
+        { id: 'pattern-stripes', icon: 'view_week', label: 'Stripe Pattern', desc: 'Striped background', action: () => {
+            const fc = fabricRef.current; if (!fc) return
+            const brandColor = activeBrand?.dna?.colors?.[0]?.hex || '#6366f1'
+            const patternCanvas = document.createElement('canvas')
+            patternCanvas.width = 20; patternCanvas.height = 20
+            const ctx = patternCanvas.getContext('2d')
+            ctx.fillStyle = brandColor + '20'
+            ctx.fillRect(0, 0, 10, 20)
+            const pattern = new fabric.Pattern({ source: patternCanvas, repeat: 'repeat' })
+            const rect = new fabric.Rect({ width: fc.width * 0.5, height: fc.height * 0.5, fill: pattern, left: fc.width / 2, top: fc.height / 2, originX: 'center', originY: 'center', customName: 'Stripe Pattern', id: `stripes-${Date.now()}` })
+            fc.add(rect); fc.setActiveObject(rect); fc.renderAll(); saveHistory()
+            showToast('📏 Stripe pattern added')
+        }},
+        { id: 'social-follow', icon: 'person_add', label: 'Follow Button', desc: 'Social follow CTA badge', action: () => {
+            const fc = fabricRef.current; if (!fc) return
+            loadGoogleFont('Poppins')
+            setTimeout(() => {
+                const bg = new fabric.Rect({ width: 180, height: 48, fill: '#818cf8', rx: 24, ry: 24 })
+                const txt = new fabric.Text('Follow Me', { fontSize: 18, fontWeight: '700', fontFamily: 'Poppins', fill: '#ffffff', originX: 'center', originY: 'center', left: 90, top: 24 })
+                const group = new fabric.Group([bg, txt], { left: fc.width / 2, top: fc.height / 2, originX: 'center', originY: 'center', customName: 'Follow Button', id: `follow-${Date.now()}` })
+                fc.add(group); fc.setActiveObject(group); fc.renderAll(); saveHistory()
+                showToast('👤 Follow button added')
+            }, 200)
+        }},
+        { id: 'social-like', icon: 'thumb_up', label: 'Like Button', desc: 'Social like CTA badge', action: () => {
+            const fc = fabricRef.current; if (!fc) return
+            loadGoogleFont('Poppins')
+            setTimeout(() => {
+                const bg = new fabric.Rect({ width: 150, height: 48, fill: '#ef4444', rx: 24, ry: 24 })
+                const txt = new fabric.Text('❤️ Like', { fontSize: 18, fontWeight: '700', fontFamily: 'Poppins', fill: '#ffffff', originX: 'center', originY: 'center', left: 75, top: 24 })
+                const group = new fabric.Group([bg, txt], { left: fc.width / 2, top: fc.height / 2, originX: 'center', originY: 'center', customName: 'Like Button', id: `like-${Date.now()}` })
+                fc.add(group); fc.setActiveObject(group); fc.renderAll(); saveHistory()
+                showToast('❤️ Like button added')
+            }, 200)
+        }},
+        { id: 'divider', icon: 'horizontal_rule', label: 'Fancy Divider', desc: 'Decorative line divider', action: () => {
+            const fc = fabricRef.current; if (!fc) return
+            const brandColor = activeBrand?.dna?.colors?.[0]?.hex || '#6366f1'
+            const g = new fabric.Group([
+                new fabric.Line([-120, 0, -20, 0], { stroke: brandColor, strokeWidth: 2 }),
+                new fabric.Circle({ radius: 5, fill: brandColor, left: -5, top: -5 }),
+                new fabric.Circle({ radius: 3, fill: brandColor + '60', left: -3, top: -3 }),
+                new fabric.Line([20, 0, 120, 0], { stroke: brandColor, strokeWidth: 2 }),
+            ], { left: fc.width / 2, top: fc.height / 2, originX: 'center', originY: 'center', customName: 'Fancy Divider', id: `divider-${Date.now()}` })
+            fc.add(g); fc.setActiveObject(g); fc.renderAll(); saveHistory()
+            showToast('─ Fancy divider added')
+        }},
+    ]
+
+    const [textStyleCat, setTextStyleCat] = useState('all')
+    const TEXT_STYLE_CATS = { all: 'All', headline: 'Headlines', subtitle: 'Subtitles', social: 'Social', decorative: 'Decorative', indian: 'Indian', event: 'Events' }
+
+    // ── Template State ──
+    const [templateCat, setTemplateCat] = useState('all')
+
+    // ── Interactive Apps State ──
+    const [activeApp, setActiveApp] = useState(null) // null | 'curved' | 'qr' | 'chart' | 'collage' | 'brandkit' | 'countdown' | 'palette'
+    const [curvedTextInput, setCurvedTextInput] = useState('CURVED TEXT')
+    const [curvedTextRadius, setCurvedTextRadius] = useState(200)
+    const [qrInput, setQrInput] = useState('https://example.com')
+
+    // ── Apply Template to Canvas ──
+    const applyTemplate = useCallback(async (template) => {
+        const fc = fabricRef.current
+        if (!fc) return
+        showToast('🎨 Applying template...')
+        // Clear canvas
+        fc.getObjects().slice().forEach(o => fc.remove(o))
+        fc.backgroundColor = template.layout?.background || '#0f172a'
+
+        const elements = template.layout?.elements || []
+        for (const el of elements) {
+            if (el.type === 'text') {
+                loadGoogleFont(el.font || 'Inter')
+                await new Promise(r => setTimeout(r, 100))
+                // For centered text, use originX:'center' so x coordinate is the center point
+                const isCentered = (el.align === 'center')
+                const t = new fabric.Textbox(el.text || 'Text', {
+                    left: (el.x || 50) * (fc.width / (fc._logicalWidth || 1080)),
+                    top: (el.y || 50) * (fc.height / (fc._logicalHeight || 1080)),
+                    originX: isCentered ? 'center' : 'left',
+                    originY: 'center',
+                    width: (el.w || 400) * (fc.width / (fc._logicalWidth || 1080)),
+                    fontSize: el.size || 32, fontWeight: el.weight || '400',
+                    fontFamily: el.font || 'Inter', fill: el.color || '#ffffff',
+                    textAlign: el.align || 'center', charSpacing: (el.tracking || 0) * 10,
+                    editable: true, customName: el.label || 'Text',
+                    id: `tpl-text-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+                })
+                fc.add(t)
+            } else if (el.type === 'rect') {
+                const r = new fabric.Rect({
+                    left: (el.x || 0) * (fc.width / (fc._logicalWidth || 1080)),
+                    top: (el.y || 0) * (fc.height / (fc._logicalHeight || 1080)),
+                    width: (el.w || 200) * (fc.width / (fc._logicalWidth || 1080)),
+                    height: (el.h || 100) * (fc.height / (fc._logicalHeight || 1080)),
+                    fill: el.color || '#6366f1', rx: el.radius || 0, ry: el.radius || 0,
+                    stroke: el.stroke || null, strokeWidth: el.strokeWidth || 0,
+                    customName: el.label || 'Shape',
+                    id: `tpl-rect-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+                })
+                fc.add(r)
+            } else if (el.type === 'line') {
+                const l = new fabric.Line([
+                    (el.x1 || 0) * (fc.width / (fc._logicalWidth || 1080)),
+                    (el.y1 || 0) * (fc.height / (fc._logicalHeight || 1080)),
+                    (el.x2 || 200) * (fc.width / (fc._logicalWidth || 1080)),
+                    (el.y2 || 0) * (fc.height / (fc._logicalHeight || 1080)),
+                ], { stroke: el.color || '#ffffff', strokeWidth: el.strokeWidth || 2,
+                    customName: el.label || 'Line',
+                    id: `tpl-line-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+                })
+                fc.add(l)
+            }
+        }
+        fc.renderAll(); updateLayers(); saveHistory()
+        showToast(`✨ Template "${template.name}" applied with ${elements.length} elements!`)
+    }, [loadGoogleFont, saveHistory, showToast, updateLayers])
+
+    // ── Add SVG Design Element ──
+    const addSvgElement = useCallback((svgEl) => {
+        const fc = fabricRef.current
+        if (!fc) return
+        const scale = Math.min(fc.width, fc.height) * 0.4 / Math.max(svgEl.w || 400, svgEl.h || 400)
+        const pathObj = new fabric.Path(svgEl.path, {
+            left: fc.width / 2, top: fc.height / 2,
+            originX: 'center', originY: 'center',
+            scaleX: scale, scaleY: scale,
+            fill: svgEl.fill || 'transparent',
+            stroke: svgEl.stroke !== 'none' ? (svgEl.stroke || '#ffffff') : null,
+            strokeWidth: svgEl.strokeWidth || 1,
+            customName: svgEl.label || 'Design Element',
+            id: `svg-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        })
+        fc.add(pathObj); fc.setActiveObject(pathObj); fc.renderAll(); saveHistory()
+        showToast(`✨ ${svgEl.label} added`)
+    }, [saveHistory, showToast])
+
+    // ── Add Curved Text (Arc) ──
+    const addCurvedText = useCallback(() => {
+        const fc = fabricRef.current; if (!fc) return
+        loadGoogleFont('Outfit')
+        setTimeout(() => {
+            // Create text along arc using individual letter positioning
+            const text = curvedTextInput || 'CURVED TEXT'
+            const radius = curvedTextRadius || 200
+            const chars = text.split('')
+            const angleStep = (Math.PI * 0.8) / Math.max(chars.length - 1, 1)
+            const startAngle = -Math.PI * 0.4 - Math.PI / 2
+            const objects = []
+            chars.forEach((ch, i) => {
+                const angle = startAngle + i * angleStep
+                const x = radius * Math.cos(angle)
+                const y = radius * Math.sin(angle)
+                const t = new fabric.Text(ch, {
+                    left: x, top: y, fontSize: 36, fontWeight: '800',
+                    fontFamily: 'Outfit', fill: '#ffffff',
+                    angle: ((angle + Math.PI / 2) * 180) / Math.PI,
+                    originX: 'center', originY: 'center',
+                })
+                objects.push(t)
+            })
+            const group = new fabric.Group(objects, {
+                left: fc.width / 2, top: fc.height / 2,
+                originX: 'center', originY: 'center',
+                customName: 'Curved Text', id: `curved-${Date.now()}`,
+            })
+            fc.add(group); fc.setActiveObject(group); fc.renderAll(); saveHistory()
+            showToast('✨ Curved text added')
+        }, 200)
+    }, [curvedTextInput, curvedTextRadius, loadGoogleFont, saveHistory, showToast])
+
+    // ── Generate QR Code (simple pixel-based) ──
+    const addQrCode = useCallback(() => {
+        const fc = fabricRef.current; if (!fc) return
+        const data = qrInput || 'https://example.com'
+        // Simple visual QR placeholder — create a pattern that looks like QR
+        const size = 200
+        const qrCanvas = document.createElement('canvas')
+        qrCanvas.width = size; qrCanvas.height = size
+        const ctx = qrCanvas.getContext('2d')
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, size, size)
+        ctx.fillStyle = '#000000'
+        // Finder patterns (3 corners)
+        const drawFinder = (x, y) => {
+            ctx.fillRect(x, y, 42, 42); ctx.clearRect(x+6, y+6, 30, 30); ctx.fillRect(x+12, y+12, 18, 18)
+        }
+        drawFinder(6, 6); drawFinder(size-48, 6); drawFinder(6, size-48)
+        // Data pixels (seeded from input string)
+        let hash = 0
+        for (let i = 0; i < data.length; i++) hash = ((hash << 5) - hash) + data.charCodeAt(i)
+        for (let row = 0; row < 25; row++) {
+            for (let col = 0; col < 25; col++) {
+                if ((row < 8 && col < 8) || (row < 8 && col > 16) || (row > 16 && col < 8)) continue
+                hash = (hash * 1103515245 + 12345) & 0x7fffffff
+                if (hash % 3 === 0) ctx.fillRect(6 + col * 7.5, 6 + row * 7.5, 6, 6)
+            }
+        }
+        // Add text below
+        ctx.font = '10px Inter'; ctx.fillStyle = '#666666'; ctx.textAlign = 'center'
+        ctx.fillText(data.substring(0, 30), size/2, size - 2)
+
+        const dataUrl = qrCanvas.toDataURL('image/png')
+        fabric.FabricImage.fromURL(dataUrl, { crossOrigin: 'anonymous' }).then(img => {
+            const scale = Math.min(fc.width, fc.height) * 0.3 / size
+            img.set({
+                left: fc.width / 2, top: fc.height / 2,
+                originX: 'center', originY: 'center',
+                scaleX: scale, scaleY: scale,
+                customName: 'QR Code', id: `qr-${Date.now()}`,
+            })
+            fc.add(img); fc.setActiveObject(img); fc.renderAll(); saveHistory()
+            showToast('✨ QR Code added')
+        }).catch(err => {
+            console.error('QR code image load failed:', err)
+            showToast('❌ QR code generation failed')
+        })
+    }, [qrInput, saveHistory, showToast])
+
+    // ── Brand Kit Apply ──
+    const applyBrandKit = useCallback(() => {
+        const fc = fabricRef.current; if (!fc) return
+        const brandFont = activeBrand?.dna?.fonts?.[0] || 'Inter'
+        const brandColor = activeBrand?.dna?.colors?.[0]?.hex || '#6366f1'
+        loadGoogleFont(brandFont)
+        setTimeout(() => {
+            let count = 0
+            fc.getObjects().forEach(obj => {
+                if (obj.type === 'textbox' || obj.type === 'text') {
+                    obj.set({ fontFamily: brandFont, fill: brandColor }); count++
+                }
+            })
+            fc.renderAll(); saveHistory()
+            showToast(`🎨 Brand kit applied to ${count} text elements`)
+        }, 300)
+    }, [activeBrand, loadGoogleFont, saveHistory, showToast])
+
+    const addTextStyle = useCallback((preset) => {
+        const fc = fabricRef.current
+        if (!fc) return
+        loadGoogleFont(preset.font)
+        setTimeout(() => {
+            const textObj = new fabric.Textbox(preset.sample, {
+                left: fc.width / 2,
+                top: fc.height / 2,
+                originX: 'center',
+                originY: 'center',
+                fontSize: preset.size,
+                fontWeight: preset.weight,
+                fontFamily: preset.font,
+                fill: preset.color,
+                fontStyle: preset.italic ? 'italic' : 'normal',
+                charSpacing: (preset.tracking || 0) * 10,
+                textAlign: 'center',
+                width: fc.width * 0.7,
+                editable: true,
+                customName: preset.label,
+                id: `style-${Date.now()}`,
+            })
+            fc.add(textObj)
+            fc.setActiveObject(textObj)
+            fc.renderAll()
+            saveHistory()
+            showToast(`✨ ${preset.label} added`)
+        }, 200)
+    }, [loadGoogleFont, saveHistory, showToast])
+
+    // ── RESIZE WITH PROPORTIONAL SCALING ──
+    const resizeCanvas = useCallback((newW, newH) => {
+        const fc = fabricRef.current
+        if (!fc) return
+        const container = containerRef.current
+        const maxW = container.clientWidth - 80
+        const maxH = container.clientHeight - 80
+        const scale = Math.min(maxW / newW, maxH / newH, 1)
+        const displayW = Math.round(newW * scale)
+        const displayH = Math.round(newH * scale)
+
+        // Calculate scale ratios for proportional element scaling
+        const oldW = fc._logicalWidth || 1080
+        const oldH = fc._logicalHeight || 1080
+        const scaleRatioX = newW / oldW
+        const scaleRatioY = newH / oldH
+
+        fc.setDimensions({ width: displayW, height: displayH })
+        fc._logicalScale = scale
+        fc._logicalWidth = newW
+        fc._logicalHeight = newH
+
+        // Scale all objects proportionally
+        fc.getObjects().forEach(obj => {
+            obj.set({
+                left: (obj.left || 0) * (displayW / (fc.width || displayW)),
+                top: (obj.top || 0) * (displayH / (fc.height || displayH)),
+                scaleX: (obj.scaleX || 1) * scaleRatioX,
+                scaleY: (obj.scaleY || 1) * scaleRatioY,
+            })
+            obj.setCoords()
+        })
+
+        fc.renderAll()
+        setZoom(Math.round(scale * 100))
+        setCustomW(newW)
+        setCustomH(newH)
+        saveHistory()
+
+        // Update preset if it matches
+        const preset = PRESETS.find(p => p.w === newW && p.h === newH)
+        setActivePreset(preset ? preset.id : 'custom')
+        showToast(`📐 Resized to ${newW}×${newH}`)
+    }, [saveHistory, showToast])
+
+    // ── AI CREATIVE GENERATOR ──
+    const aiCreativeGenerate = useCallback(async () => {
+        if (!aiCreativeKeywords.trim()) return
+        const fc = fabricRef.current
+        if (!fc) return
+        setAiCreativeLoading(true)
+        setAiError('')
+        try {
+            showToast('🎨 Generating editable design...')
+            const resp = await fetch('/api/canvas-assets/ai-creative-generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    keywords: aiCreativeKeywords,
+                    style: aiCreativeStyle,
+                    canvasWidth: fc._logicalWidth || 1080,
+                    canvasHeight: fc._logicalHeight || 1080,
+                    brandName: activeBrand?.name || '',
+                    brandColors: activeBrand?.dna?.colors?.map(c => c.hex) || [],
+                    brandFonts: activeBrand?.dna?.fonts || [],
+                }),
+            })
+            if (!resp.ok) {
+                const errText = await resp.text().catch(() => 'Server error')
+                let errMsg = `AI generation failed (${resp.status}). Please try again.`
+                try { const errJson = JSON.parse(errText); errMsg = errJson.error || errMsg } catch (_) { /* non-JSON error body */ }
+                throw new Error(errMsg)
+            }
+            const data = await resp.json()
+            if (data.error) throw new Error(data.error)
+
+            // Clear canvas
+            const allObjects = fc.getObjects().slice()
+            allObjects.forEach(o => fc.remove(o))
+
+            // Set background color
+            fc.backgroundColor = data.layout?.background || '#1a1a2e'
+
+            // If background image was generated, add it
+            if (data.backgroundImage) {
+                try {
+                    const bgImg = await fabric.FabricImage.fromURL(data.backgroundImage, { crossOrigin: 'anonymous' })
+                    const imgScale = Math.max(fc.width / bgImg.width, fc.height / bgImg.height)
+                    bgImg.set({
+                        scaleX: imgScale, scaleY: imgScale,
+                        left: fc.width / 2, top: fc.height / 2,
+                        originX: 'center', originY: 'center',
+                        selectable: true, customName: 'AI Background', id: 'ai-bg',
+                    })
+                    fc.add(bgImg)
+                    fc.sendObjectToBack(bgImg)
+                } catch (e) { console.warn('Failed to load AI background:', e) }
+            }
+
+            // Add each element from the layout
+            const elements = data.layout?.elements || []
+            for (const el of elements) {
+                if (el.type === 'text') {
+                    loadGoogleFont(el.font || 'Inter')
+                    await new Promise(r => setTimeout(r, 150))
+                    const aiCentered = (el.align === 'center')
+                    const textObj = new fabric.Textbox(el.text || 'Text', {
+                        left: (el.x || 50) * (fc.width / (fc._logicalWidth || 1080)),
+                        top: (el.y || 50) * (fc.height / (fc._logicalHeight || 1080)),
+                        originX: aiCentered ? 'center' : 'left',
+                        originY: 'center',
+                        width: (el.w || 400) * (fc.width / (fc._logicalWidth || 1080)),
+                        fontSize: el.size || 32,
+                        fontWeight: el.weight || '400',
+                        fontFamily: el.font || 'Inter',
+                        fill: el.color || '#ffffff',
+                        textAlign: el.align || 'center',
+                        charSpacing: (el.tracking || 0) * 10,
+                        editable: true,
+                        customName: el.label || 'AI Text',
+                        id: `ai-text-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+                    })
+                    fc.add(textObj)
+                } else if (el.type === 'rect') {
+                    const rect = new fabric.Rect({
+                        left: (el.x || 0) * (fc.width / (fc._logicalWidth || 1080)),
+                        top: (el.y || 0) * (fc.height / (fc._logicalHeight || 1080)),
+                        width: (el.w || 200) * (fc.width / (fc._logicalWidth || 1080)),
+                        height: (el.h || 100) * (fc.height / (fc._logicalHeight || 1080)),
+                        fill: el.color || '#6366f1',
+                        rx: el.radius || 0, ry: el.radius || 0,
+                        customName: el.label || 'AI Shape',
+                        id: `ai-rect-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+                    })
+                    fc.add(rect)
+                } else if (el.type === 'circle') {
+                    const circ = new fabric.Circle({
+                        left: (el.x || 0) * (fc.width / (fc._logicalWidth || 1080)),
+                        top: (el.y || 0) * (fc.height / (fc._logicalHeight || 1080)),
+                        radius: (el.radius || 50) * (fc.width / (fc._logicalWidth || 1080)),
+                        fill: el.color || '#6366f1',
+                        customName: el.label || 'AI Circle',
+                        id: `ai-circle-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+                    })
+                    fc.add(circ)
+                } else if (el.type === 'line') {
+                    const line = new fabric.Line([
+                        (el.x1 || 0) * (fc.width / (fc._logicalWidth || 1080)),
+                        (el.y1 || 0) * (fc.height / (fc._logicalHeight || 1080)),
+                        (el.x2 || 200) * (fc.width / (fc._logicalWidth || 1080)),
+                        (el.y2 || 0) * (fc.height / (fc._logicalHeight || 1080)),
+                    ], {
+                        stroke: el.color || '#ffffff',
+                        strokeWidth: el.strokeWidth || 2,
+                        customName: el.label || 'AI Line',
+                        id: `ai-line-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+                    })
+                    fc.add(line)
+                }
+            }
+
+            fc.renderAll()
+            updateLayers()
+            saveHistory()
+            showToast(`✨ Design created with ${elements.length} editable elements!`)
+        } catch (err) {
+            console.error('AI creative generate error:', err)
+            const msg = err.message || 'AI generation failed. Please try again.'
+            setAiError(msg)
+            showToast('❌ ' + msg)
+        }
+        setAiCreativeLoading(false)
+    }, [aiCreativeKeywords, aiCreativeStyle, activeBrand, loadGoogleFont, saveHistory, showToast, updateLayers])
+
     // ── Sidebar Tab Config ──
     const SIDEBAR_TABS = [
         { id: 'ai', icon: 'auto_awesome', label: 'AI', isAi: true },
         { id: 'elements', icon: 'dashboard_customize', label: 'Elements' },
+        { id: 'text-styles', icon: 'format_quote', label: 'Text' },
+        { id: 'apps', icon: 'apps', label: 'Apps' },
+        { id: 'templates', icon: 'view_quilt', label: 'Templates' },
+        { id: 'images', icon: 'photo_library', label: 'Images' },
         { id: 'icons', icon: 'interests', label: 'Icons' },
         { id: 'textures', icon: 'texture', label: 'Textures' },
         { id: 'fonts', icon: 'font_download', label: 'Fonts' },
         { id: 'stickers', icon: 'emoji_emotions', label: 'Stickers' },
         { id: 'brand', icon: 'palette', label: 'Brand' },
         { id: 'gradients', icon: 'gradient', label: 'Gradients' },
-        { id: 'photos', icon: 'photo_library', label: 'Photos' },
     ]
 
     // ── Keyboard shortcuts ──
@@ -1653,21 +2501,11 @@ function CanvasEditorInner() {
                     </button>
                     <div className="ce-divider" />
 
-                    {/* Mode Toggle */}
-                    <div className="ce-mode-toggle">
-                        <button className={`ce-mode-btn ${mode === 'simple' ? 'active' : ''}`}
-                            onClick={() => setMode('simple')}>
-                            ✨ Simple
-                        </button>
-                        <button className={`ce-mode-btn ${mode === 'advanced' ? 'active' : ''}`}
-                            onClick={() => setMode('advanced')}>
-                            🎯 Advanced
-                        </button>
-                    </div>
+
                 </div>
 
-                {/* Center tools (Advanced mode) */}
-                {mode === 'advanced' && (
+                {/* Center tools */}
+                {(
                     <div className="ce-toolbar-center">
                         <button className={`ce-tool-btn ${activeTool === 'select' ? 'active' : ''}`}
                             onClick={() => setActiveTool('select')} title="Select (V)">
@@ -1723,8 +2561,7 @@ function CanvasEditorInner() {
             {/* ── MAIN AREA ── */}
             <div className="ce-main">
 
-                {/* ── LEFT SIDEBAR (Advanced only) — Vertical Icon Rail + Panel ── */}
-                <div className={`ce-sidebar-left ${mode !== 'advanced' ? 'collapsed' : ''}`}>
+                <div className={`ce-sidebar-left`}>
                     {/* ── Icon Rail ── */}
                     <div className="ce-icon-rail">
                         {SIDEBAR_TABS.map(tab => (
@@ -1757,13 +2594,14 @@ function CanvasEditorInner() {
                                         </span>
                                     </div>
 
-                                    {/* ── 4 Tool Cards ── */}
+                                    {/* ── 5 Tool Cards ── */}
                                     <div className="ce-ai-tool-cards">
                                         {[
                                             { id: 'prompt', icon: 'magic_button', label: 'Prompt', desc: 'Edit by text' },
+                                            { id: 'creative', icon: 'dashboard_customize', label: 'Creative', desc: 'Keywords → design' },
                                             { id: 'visual', icon: 'gesture', label: 'Visual', desc: 'Paint & edit' },
                                             { id: 'retouch', icon: 'auto_fix', label: 'Retouch', desc: 'Mask & replace' },
-                                            { id: 'background', icon: 'wallpaper', label: 'Background', desc: 'Remove / swap' },
+                                            { id: 'background', icon: 'wallpaper', label: 'BG', desc: 'Remove / swap' },
                                         ].map(t => (
                                             <button key={t.id}
                                                 className={`ce-ai-tool-card ${aiTool === t.id ? 'active' : ''}`}
@@ -1944,6 +2782,44 @@ function CanvasEditorInner() {
                                                 </button>
                                             </div>
                                         )}
+
+                                        {/* === CREATIVE TOOL (Keywords → Editable Design) === */}
+                                        {aiTool === 'creative' && (
+                                            <div className="ce-ai-tool-section">
+                                                <p className="ce-ai-tool-hint">
+                                                    🎨 Enter keywords and pick a style. AI will generate a fully editable design with text, shapes, and layout.
+                                                </p>
+                                                <div className="ce-ai-prompt-bar">
+                                                    <textarea
+                                                        className="ce-ai-prompt-input"
+                                                        placeholder="e.g. summer sale, 50% off, fashion brand, tropical vibes..."
+                                                        value={aiCreativeKeywords}
+                                                        onChange={e => setAiCreativeKeywords(e.target.value)}
+                                                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); aiCreativeGenerate() } }}
+                                                        rows={3}
+                                                    />
+                                                </div>
+                                                <div style={{ padding: '8px 0' }}>
+                                                    <span style={{ fontSize: 10, color: '#64748b', fontWeight: 600 }}>STYLE</span>
+                                                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                                                        {['modern', 'bold', 'elegant', 'playful', 'minimal', 'corporate'].map(s => (
+                                                            <button key={s}
+                                                                className={`ce-category-pill ${aiCreativeStyle === s ? 'active' : ''}`}
+                                                                onClick={() => setAiCreativeStyle(s)}>
+                                                                {s.charAt(0).toUpperCase() + s.slice(1)}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <button className="ce-ai-bg-action-btn" onClick={aiCreativeGenerate}
+                                                    disabled={aiCreativeLoading || !aiCreativeKeywords.trim()}>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                                                        {aiCreativeLoading ? 'progress_activity' : 'auto_awesome'}
+                                                    </span>
+                                                    {aiCreativeLoading ? 'Generating...' : 'Generate Design'}
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* ── Shared: Loading / Error / Result ── */}
@@ -1965,20 +2841,293 @@ function CanvasEditorInner() {
                                 </div>
                             )}
 
-                            {/* ── ELEMENTS TAB ── */}
+                            {/* ── ELEMENTS TAB (Categorized) ── */}
                             {sidebarTab === 'elements' && (
-                                <div className="ce-panel">
+                                <div className="ce-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                                     <div className="ce-panel-title">
                                         <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#818cf8' }}>dashboard_customize</span>
-                                        Add Elements
+                                        Elements
+                                        <span style={{ marginLeft: 'auto', color: '#475569', fontSize: 9 }}>{ELEMENT_TYPES.length + Object.values(SVG_ELEMENT_CATEGORIES).reduce((s, c) => s + c.items.length, 0)} items</span>
                                     </div>
-                                    <div className="ce-element-grid">
-                                        {ELEMENT_TYPES.map(el => (
-                                            <button key={el.id} className="ce-element-btn" onClick={() => handleAddElement(el.id)}>
-                                                <span className="material-symbols-outlined" style={{ fontSize: 22 }}>{el.icon}</span>
-                                                {el.label}
+                                    {/* Category pills */}
+                                    <div className="ce-category-pills">
+                                        <button className={`ce-category-pill ${!elementCategory ? 'active' : ''}`}
+                                            onClick={() => setElementCategory(null)}>All</button>
+                                        {Object.entries(ELEMENT_CATEGORIES).map(([key, cat]) => (
+                                            <button key={key}
+                                                className={`ce-category-pill ${elementCategory === key ? 'active' : ''}`}
+                                                onClick={() => setElementCategory(key)}>
+                                                {cat.label}
                                             </button>
                                         ))}
+                                        {Object.entries(SVG_ELEMENT_CATEGORIES).map(([key, cat]) => (
+                                            <button key={`svg-${key}`}
+                                                className={`ce-category-pill ${elementCategory === `svg-${key}` ? 'active' : ''}`}
+                                                onClick={() => setElementCategory(`svg-${key}`)}>
+                                                {cat.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="ce-element-grid" style={{ overflowY: 'auto', flex: 1 }}>
+                                        {/* Basic shape elements */}
+                                        {(!elementCategory || (elementCategory && !elementCategory.startsWith('svg-')))
+                                            && (elementCategory
+                                                ? ELEMENT_CATEGORIES[elementCategory]?.items || []
+                                                : ELEMENT_TYPES
+                                            ).map(el => (
+                                                <button key={el.id} className="ce-element-btn" onClick={() => handleAddElement(el.id)}>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 22 }}>{el.icon}</span>
+                                                    {el.label}
+                                                </button>
+                                            ))
+                                        }
+                                        {/* SVG design elements */}
+                                        {(!elementCategory || elementCategory?.startsWith('svg-'))
+                                            && Object.entries(SVG_ELEMENT_CATEGORIES)
+                                                .filter(([key]) => !elementCategory || elementCategory === `svg-${key}`)
+                                                .map(([key, cat]) => (
+                                                    <React.Fragment key={key}>
+                                                        {!elementCategory && (
+                                                            <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 700, color: '#818cf8', padding: '8px 4px 2px', textTransform: 'uppercase', letterSpacing: 1 }}>
+                                                                {cat.label}
+                                                            </div>
+                                                        )}
+                                                        {cat.items.map(svgEl => (
+                                                            <button key={svgEl.id} className="ce-element-btn" onClick={() => addSvgElement(svgEl)}>
+                                                                <span className="material-symbols-outlined" style={{ fontSize: 22 }}>{cat.icon}</span>
+                                                                {svgEl.label}
+                                                            </button>
+                                                        ))}
+                                                    </React.Fragment>
+                                                ))
+                                        }
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ── TEXT STYLES TAB (Enhanced with categories + Font Combos) ── */}
+                            {sidebarTab === 'text-styles' && (
+                                <div className="ce-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                                    <div className="ce-panel-title">
+                                        <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#818cf8' }}>format_quote</span>
+                                        Typography
+                                        <span style={{ marginLeft: 'auto', color: '#475569', fontSize: 9 }}>{TEXT_STYLE_PRESETS.length} styles + {FONT_COMBOS.length} combos</span>
+                                    </div>
+
+                                    {/* Category pills */}
+                                    <div className="ce-category-pills">
+                                        {Object.entries(TEXT_STYLE_CATS).map(([key, label]) => (
+                                            <button key={key}
+                                                className={`ce-category-pill ${textStyleCat === key ? 'active' : ''}`}
+                                                onClick={() => setTextStyleCat(key)}>
+                                                {label}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 4px', overflowY: 'auto', flex: 1 }}>
+                                        {/* Text Style Presets */}
+                                        {TEXT_STYLE_PRESETS
+                                            .filter(p => textStyleCat === 'all' || p.cat === textStyleCat)
+                                            .map(preset => {
+                                                loadGoogleFont(preset.font)
+                                                return (
+                                                    <button key={preset.id} className="ce-text-style-card" onClick={() => addTextStyle(preset)}>
+                                                        <span className="ce-text-style-preview" style={{
+                                                            fontFamily: preset.font,
+                                                            fontSize: Math.min(preset.size * 0.4, 24),
+                                                            fontWeight: preset.weight,
+                                                            fontStyle: preset.italic ? 'italic' : 'normal',
+                                                            color: preset.color === 'transparent' ? '#ffffff' : preset.color,
+                                                            letterSpacing: preset.tracking || 0,
+                                                            WebkitTextStroke: preset.stroke ? `1px ${preset.stroke}` : 'none',
+                                                        }}>
+                                                            {preset.sample}
+                                                        </span>
+                                                        <span className="ce-text-style-meta">
+                                                            {preset.label} • {preset.font} • {preset.size}px
+                                                        </span>
+                                                    </button>
+                                                )
+                                            })}
+
+                                        {/* Font Combinations Section */}
+                                        {textStyleCat === 'all' && (
+                                            <>
+                                                <div className="ce-panel-title" style={{ marginTop: 12, paddingLeft: 0 }}>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#a78bfa' }}>merge_type</span>
+                                                    Font Combinations
+                                                </div>
+                                                {FONT_COMBOS.map(combo => {
+                                                    loadGoogleFont(combo.heading)
+                                                    loadGoogleFont(combo.body)
+                                                    return (
+                                                        <button key={combo.id} className="ce-text-style-card" onClick={() => addFontCombo(combo)}
+                                                            style={{ borderLeft: `3px solid ${combo.headColor}40` }}>
+                                                            <span style={{ fontFamily: combo.heading, fontSize: 18, fontWeight: '700', color: combo.headColor, lineHeight: 1.2 }}>
+                                                                Heading Text
+                                                            </span>
+                                                            <span style={{ fontFamily: combo.body, fontSize: 12, fontWeight: '400', color: combo.bodyColor, lineHeight: 1.3 }}>
+                                                                Body text for this pairing
+                                                            </span>
+                                                            <span className="ce-text-style-meta">{combo.style} • {combo.heading} + {combo.body}</span>
+                                                        </button>
+                                                    )
+                                                })}
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ── APPS TAB ── */}
+                            {sidebarTab === 'apps' && (
+                                <div className="ce-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+                                    <div className="ce-panel-title">
+                                        <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#818cf8' }}>apps</span>
+                                        Apps & Tools
+                                        {activeApp && <button style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#818cf8', cursor: 'pointer', fontSize: 11 }} onClick={() => setActiveApp(null)}>← Back</button>}
+                                    </div>
+
+                                    {/* App Grid (when no app is active) */}
+                                    {!activeApp && (
+                                        <>
+                                            <div className="ce-element-grid" style={{ gap: 6 }}>
+                                                {[
+                                                    { id: 'curved', icon: 'motion_photos_auto', label: 'Curved Text', desc: 'Text along an arc' },
+                                                    { id: 'qr', icon: 'qr_code_2', label: 'QR Code', desc: 'Generate QR code from URL' },
+                                                    { id: 'brandkit', icon: 'palette', label: 'Brand Kit', desc: 'Apply brand fonts & colors' },
+                                                ].map(app => (
+                                                    <button key={app.id} className="ce-element-btn" onClick={() => setActiveApp(app.id)}
+                                                        title={app.desc} style={{ gap: 4, padding: '12px 4px', border: '1px solid #1e293b' }}>
+                                                        <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#818cf8' }}>{app.icon}</span>
+                                                        <span style={{ fontSize: 10, textAlign: 'center', lineHeight: 1.2, fontWeight: 600 }}>{app.label}</span>
+                                                        <span style={{ fontSize: 8, color: '#64748b', textAlign: 'center' }}>{app.desc}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div className="ce-panel-title" style={{ marginTop: 12, fontSize: 10, color: '#64748b' }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 12 }}>bolt</span>
+                                                Quick Add Tools
+                                            </div>
+                                            <div className="ce-element-grid" style={{ gap: 4 }}>
+                                                {CANVAS_APPS.map(app => (
+                                                    <button key={app.id} className="ce-element-btn" onClick={app.action}
+                                                        title={app.desc} style={{ gap: 3, padding: '8px 4px' }}>
+                                                        <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#818cf8' }}>{app.icon}</span>
+                                                        <span style={{ fontSize: 8, textAlign: 'center', lineHeight: 1.2 }}>{app.label}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {/* Curved Text App */}
+                                    {activeApp === 'curved' && (
+                                        <div style={{ padding: '8px 0' }}>
+                                            <p className="ce-ai-tool-hint">Type your text and adjust the curve radius to create arc-shaped text.</p>
+                                            <div style={{ marginBottom: 10 }}>
+                                                <label style={{ fontSize: 10, color: '#64748b', display: 'block', marginBottom: 4 }}>Text</label>
+                                                <input className="ce-asset-search" value={curvedTextInput} onChange={e => setCurvedTextInput(e.target.value)}
+                                                    placeholder="Enter text..." style={{ marginBottom: 8 }} />
+                                            </div>
+                                            <div style={{ marginBottom: 12 }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#64748b', marginBottom: 4 }}>
+                                                    <span>Curve Radius</span><span>{curvedTextRadius}px</span>
+                                                </div>
+                                                <input type="range" className="ce-slider" min={80} max={400} value={curvedTextRadius}
+                                                    onChange={e => setCurvedTextRadius(parseInt(e.target.value))} />
+                                            </div>
+                                            <button className="ce-search-btn" onClick={addCurvedText} style={{ width: '100%' }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add_circle</span>
+                                                Add Curved Text
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* QR Code App */}
+                                    {activeApp === 'qr' && (
+                                        <div style={{ padding: '8px 0' }}>
+                                            <p className="ce-ai-tool-hint">Enter a URL or text to generate a QR code graphic.</p>
+                                            <div style={{ marginBottom: 12 }}>
+                                                <label style={{ fontSize: 10, color: '#64748b', display: 'block', marginBottom: 4 }}>URL or Text</label>
+                                                <input className="ce-asset-search" value={qrInput} onChange={e => setQrInput(e.target.value)}
+                                                    placeholder="https://example.com" style={{ marginBottom: 8 }} />
+                                            </div>
+                                            <button className="ce-search-btn" onClick={addQrCode} style={{ width: '100%' }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>qr_code_2</span>
+                                                Generate QR Code
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Brand Kit App */}
+                                    {activeApp === 'brandkit' && (
+                                        <div style={{ padding: '8px 0' }}>
+                                            <p className="ce-ai-tool-hint">Apply your brand fonts and colors to all text elements on the canvas.</p>
+                                            <div style={{ background: '#0f172a', borderRadius: 8, padding: 12, marginBottom: 12, border: '1px solid #1e293b' }}>
+                                                <div style={{ fontSize: 10, color: '#64748b', marginBottom: 6 }}>Brand Font</div>
+                                                <div style={{ fontSize: 14, color: '#ffffff', fontWeight: 600 }}>{activeBrand?.dna?.fonts?.[0] || 'Inter'}</div>
+                                                <div style={{ fontSize: 10, color: '#64748b', marginTop: 8, marginBottom: 6 }}>Brand Color</div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    <div style={{ width: 24, height: 24, borderRadius: 6, background: activeBrand?.dna?.colors?.[0]?.hex || '#6366f1' }}></div>
+                                                    <span style={{ fontSize: 12, color: '#94a3b8' }}>{activeBrand?.dna?.colors?.[0]?.hex || '#6366f1'}</span>
+                                                </div>
+                                            </div>
+                                            <button className="ce-search-btn" onClick={applyBrandKit} style={{ width: '100%' }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>palette</span>
+                                                Apply Brand Kit
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* ── TEMPLATES TAB ── */}
+                            {sidebarTab === 'templates' && (
+                                <div className="ce-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                                    <div className="ce-panel-title">
+                                        <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#818cf8' }}>view_quilt</span>
+                                        Design Templates
+                                        <span style={{ marginLeft: 'auto', color: '#475569', fontSize: 9 }}>{TEMPLATE_LIBRARY.length} templates</span>
+                                    </div>
+                                    <div className="ce-category-pills">
+                                        {TEMPLATE_CATEGORIES.map(cat => (
+                                            <button key={cat.id}
+                                                className={`ce-category-pill ${templateCat === cat.id ? 'active' : ''}`}
+                                                onClick={() => setTemplateCat(cat.id)}>
+                                                {cat.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div style={{ overflowY: 'auto', flex: 1, padding: '4px 0' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                                            {TEMPLATE_LIBRARY
+                                                .filter(t => templateCat === 'all' || t.cat === templateCat)
+                                                .map(t => (
+                                                    <button key={t.id} onClick={() => applyTemplate(t)}
+                                                        style={{
+                                                            background: t.layout?.background || '#0f172a',
+                                                            border: '1px solid #1e293b', borderRadius: 10,
+                                                            padding: '16px 8px', cursor: 'pointer',
+                                                            display: 'flex', flexDirection: 'column',
+                                                            alignItems: 'center', gap: 6,
+                                                            transition: 'all 0.2s', minHeight: 100,
+                                                        }}
+                                                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#818cf8'; e.currentTarget.style.transform = 'scale(1.03)' }}
+                                                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#1e293b'; e.currentTarget.style.transform = 'scale(1)' }}>
+                                                        <span style={{ fontSize: 28 }}>{t.icon}</span>
+                                                        <span style={{ fontSize: 10, color: '#e2e8f0', fontWeight: 600, textAlign: 'center', lineHeight: 1.2 }}>{t.name}</span>
+                                                        <span style={{ fontSize: 8, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1 }}>{t.cat}</span>
+                                                    </button>
+                                                ))}
+                                        </div>
+                                        <div style={{ padding: '12px 0', textAlign: 'center', borderTop: '1px solid #1e293b', marginTop: 12 }}>
+                                            <button className="ce-search-btn" onClick={() => { setSidebarTab('ai'); setAiTool('creative') }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span>
+                                                Generate Custom Template with AI
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -2021,7 +3170,17 @@ function CanvasEditorInner() {
                                     <div className="ce-panel-title">
                                         <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#818cf8' }}>font_download</span>
                                         Fonts
-                                        <span style={{ marginLeft: 'auto', color: '#475569', fontSize: 9 }}>Google Fonts</span>
+                                        <span style={{ marginLeft: 'auto', color: '#475569', fontSize: 9 }}>{filteredFonts.length} fonts</span>
+                                    </div>
+                                    {/* Category Pills */}
+                                    <div className="ce-category-pills" style={{ paddingBottom: 4 }}>
+                                        {Object.entries(FONT_CATEGORIES).map(([key, label]) => (
+                                            <button key={key}
+                                                className={`ce-category-pill ${fontCategory === key ? 'active' : ''}`}
+                                                onClick={() => setFontCategory(key)}>
+                                                {label}
+                                            </button>
+                                        ))}
                                     </div>
                                     <input
                                         className="ce-asset-search"
@@ -2214,47 +3373,98 @@ function CanvasEditorInner() {
                                 </div>
                             )}
 
-                            {/* ── PHOTOS TAB ── */}
-                            {sidebarTab === 'photos' && (
+                            {/* ── IMAGES TAB (Upload / Brand / Generated / Stock) ── */}
+                            {sidebarTab === 'images' && (
                                 <div className="ce-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                                     <div className="ce-panel-title">
                                         <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#818cf8' }}>photo_library</span>
-                                        Stock Photos
-                                        <span style={{ marginLeft: 'auto', color: '#475569', fontSize: 9 }}>Unsplash</span>
+                                        Images
                                     </div>
-                                    <input
-                                        className="ce-asset-search"
-                                        placeholder="Search photos... (e.g. business, nature)"
-                                        value={photoSearch}
-                                        onChange={e => setPhotoSearch(e.target.value)}
-                                        onKeyDown={e => { if (e.key === 'Enter') searchPhotos(photoSearch) }}
-                                    />
-                                    <button className="ce-search-btn" onClick={() => searchPhotos(photoSearch)} disabled={photoLoading}>
-                                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>search</span>
-                                        {photoLoading ? 'Searching...' : 'Search'}
-                                    </button>
-                                    {photoSetupRequired && (
-                                        <div className="ce-setup-notice">
-                                            <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#fbbf24' }}>info</span>
-                                            <p>Add <code>UNSPLASH_ACCESS_KEY</code> to your <code>.env</code> file to enable photo search.</p>
-                                            <a href="https://unsplash.com/developers" target="_blank" rel="noreferrer" style={{ color: '#818cf8', fontSize: 11 }}>Get free API key →</a>
-                                        </div>
-                                    )}
-                                    {photoLoading && <div className="ce-loading-spinner"><span className="material-symbols-outlined ce-spin">progress_activity</span> Loading...</div>}
-                                    <div className="ce-photo-grid">
-                                        {photoResults.map(photo => (
-                                            <button key={photo.id} className="ce-photo-thumb" onClick={() => addPhotoToCanvas(photo)} title={photo.alt}>
-                                                <img src={photo.thumb} alt={photo.alt} loading="lazy" />
-                                                <span className="ce-photo-author">{photo.author}</span>
+                                    {/* Sub-tab pills */}
+                                    <div className="ce-category-pills" style={{ paddingBottom: 8 }}>
+                                        {[{ id: 'upload', label: '📁 Upload' }, { id: 'brand', label: '🏢 Brand' }, { id: 'generated', label: '✨ Generated' }, { id: 'stock', label: '🖼 Stock' }].map(t => (
+                                            <button key={t.id} className={`ce-category-pill ${imageSourceTab === t.id ? 'active' : ''}`}
+                                                onClick={() => setImageSourceTab(t.id)}>
+                                                {t.label}
                                             </button>
                                         ))}
-                                        {!photoLoading && photoResults.length === 0 && !photoSetupRequired && photoSearch && (
-                                            <p className="ce-empty-state">Press Enter or click Search</p>
-                                        )}
-                                        {!photoSearch && !photoSetupRequired && (
-                                            <p className="ce-empty-state">Search millions of free photos</p>
-                                        )}
                                     </div>
+
+                                    {/* Upload sub-tab */}
+                                    {imageSourceTab === 'upload' && (
+                                        <div style={{ padding: '0 8px' }}>
+                                            <button className="ce-search-btn" onClick={uploadImage} style={{ width: '100%' }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>upload</span>
+                                                Upload Image
+                                            </button>
+                                            <p className="ce-empty-state" style={{ marginTop: 12 }}>Upload images from your computer to add to the canvas.</p>
+                                        </div>
+                                    )}
+
+                                    {/* Brand sub-tab */}
+                                    {imageSourceTab === 'brand' && (
+                                        <div className="ce-asset-grid" style={{ maxHeight: 400 }}>
+                                            {getBrandAssets().map((asset, i) => (
+                                                <button key={i} className="ce-asset-card" onClick={() => addBrandAssetToCanvas(asset)} title={asset.name}>
+                                                    {asset.url ? (
+                                                        <img src={asset.url} alt={asset.name} style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 6 }} />
+                                                    ) : (
+                                                        <span className="material-symbols-outlined" style={{ fontSize: 28, color: '#818cf8' }}>{asset.icon}</span>
+                                                    )}
+                                                    <span className="ce-asset-name">{asset.name}</span>
+                                                </button>
+                                            ))}
+                                            {getBrandAssets().length === 0 && (
+                                                <p className="ce-empty-state">No brand assets found. Complete brand onboarding to see assets here.</p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Generated sub-tab */}
+                                    {imageSourceTab === 'generated' && (
+                                        <div style={{ padding: '0 8px' }}>
+                                            <p className="ce-empty-state">Images generated via Creative Studio AI will appear here. Generate images from the AI Photoshoot or Template modes.</p>
+                                        </div>
+                                    )}
+
+                                    {/* Stock sub-tab (Unsplash) */}
+                                    {imageSourceTab === 'stock' && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                                            <input
+                                                className="ce-asset-search"
+                                                placeholder="Search photos... (e.g. business, nature)"
+                                                value={photoSearch}
+                                                onChange={e => setPhotoSearch(e.target.value)}
+                                                onKeyDown={e => { if (e.key === 'Enter') searchPhotos(photoSearch) }}
+                                            />
+                                            <button className="ce-search-btn" onClick={() => searchPhotos(photoSearch)} disabled={photoLoading}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>search</span>
+                                                {photoLoading ? 'Searching...' : 'Search'}
+                                            </button>
+                                            {photoSetupRequired && (
+                                                <div className="ce-setup-notice">
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#fbbf24' }}>info</span>
+                                                    <p>Add <code>UNSPLASH_ACCESS_KEY</code> to your <code>.env</code> file to enable photo search.</p>
+                                                    <a href="https://unsplash.com/developers" target="_blank" rel="noreferrer" style={{ color: '#818cf8', fontSize: 11 }}>Get free API key →</a>
+                                                </div>
+                                            )}
+                                            {photoLoading && <div className="ce-loading-spinner"><span className="material-symbols-outlined ce-spin">progress_activity</span> Loading...</div>}
+                                            <div className="ce-photo-grid">
+                                                {photoResults.map(photo => (
+                                                    <button key={photo.id} className="ce-photo-thumb" onClick={() => addPhotoToCanvas(photo)} title={photo.alt}>
+                                                        <img src={photo.thumb} alt={photo.alt} loading="lazy" />
+                                                        <span className="ce-photo-author">{photo.author}</span>
+                                                    </button>
+                                                ))}
+                                                {!photoLoading && photoResults.length === 0 && !photoSetupRequired && photoSearch && (
+                                                    <p className="ce-empty-state">Press Enter or click Search</p>
+                                                )}
+                                                {!photoSearch && !photoSetupRequired && (
+                                                    <p className="ce-empty-state">Search millions of free photos</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -2360,58 +3570,100 @@ function CanvasEditorInner() {
                         )
                     }
 
-                    {/* Brand Kit */}
-                    <div className="ce-panel">
-                        <div className="ce-panel-title">
-                            <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#818cf8' }}>palette</span>
-                            Brand Kit
-                        </div>
-
-                        {/* Brand Colors */}
-                        {activeBrand?.dna?.colors?.length > 0 && (
-                            <div style={{ marginBottom: 12 }}>
-                                <p style={{ fontSize: 10, color: '#475569', marginBottom: 6, fontWeight: 600 }}>COLORS</p>
-                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                    {activeBrand.dna.colors.map((c, i) => (
-                                        <div key={i} className="ce-color-swatch"
-                                            style={{ background: c.hex }}
-                                            onClick={() => setTextColor(c.hex)}
-                                            title={c.hex} />
+                    {/* Context-Sensitive Text Properties (replaces old Brand Kit) */}
+                    {selectedObjType === 'text' && (
+                        <div className="ce-panel">
+                            <div className="ce-panel-title">
+                                <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#818cf8' }}>text_fields</span>
+                                Text Properties
+                            </div>
+                            {/* Font Family */}
+                            <div style={{ marginBottom: 8 }}>
+                                <p style={{ fontSize: 10, color: '#475569', marginBottom: 4, fontWeight: 600 }}>FONT</p>
+                                <select className="ce-prop-select" value={(() => {
+                                    const fc = fabricRef.current; const obj = fc?.getActiveObject()
+                                    return obj?.fontFamily || 'Inter'
+                                })()} onChange={e => {
+                                    const fc = fabricRef.current; const obj = fc?.getActiveObject()
+                                    if (obj) { loadGoogleFont(e.target.value); obj.set('fontFamily', e.target.value); fc.renderAll(); saveHistory() }
+                                }}>
+                                    {GOOGLE_FONTS.slice(0, 60).map(f => <option key={f} value={f}>{f}</option>)}
+                                </select>
+                            </div>
+                            {/* Color */}
+                            <div style={{ marginBottom: 8 }}>
+                                <p style={{ fontSize: 10, color: '#475569', marginBottom: 4, fontWeight: 600 }}>COLOR</p>
+                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                    {(activeBrand?.dna?.colors || []).map((c, i) => (
+                                        <div key={i} className="ce-color-swatch" style={{ background: c.hex }}
+                                            onClick={() => setTextColor(c.hex)} title={c.hex} />
                                     ))}
-                                    <div className="ce-color-swatch"
-                                        style={{ background: '#ffffff' }}
-                                        onClick={() => setTextColor('#ffffff')}
-                                        title="White" />
-                                    <div className="ce-color-swatch"
-                                        style={{ background: '#000000', border: '1px solid rgba(255,255,255,0.2)' }}
-                                        onClick={() => setTextColor('#000000')}
-                                        title="Black" />
+                                    <div className="ce-color-swatch" style={{ background: '#ffffff' }}
+                                        onClick={() => setTextColor('#ffffff')} title="White" />
+                                    <div className="ce-color-swatch" style={{ background: '#000000', border: '1px solid rgba(255,255,255,0.2)' }}
+                                        onClick={() => setTextColor('#000000')} title="Black" />
+                                    <div className="ce-color-swatch" style={{ background: '#f87171' }} onClick={() => setTextColor('#f87171')} title="Red" />
+                                    <div className="ce-color-swatch" style={{ background: '#fbbf24' }} onClick={() => setTextColor('#fbbf24')} title="Yellow" />
+                                    <div className="ce-color-swatch" style={{ background: '#34d399' }} onClick={() => setTextColor('#34d399')} title="Green" />
+                                    <div className="ce-color-swatch" style={{ background: '#60a5fa' }} onClick={() => setTextColor('#60a5fa')} title="Blue" />
+                                    <div className="ce-color-swatch" style={{ background: '#a78bfa' }} onClick={() => setTextColor('#a78bfa')} title="Purple" />
                                 </div>
                             </div>
-                        )}
-
-                        {/* Brand Fonts */}
-                        <div>
-                            <p style={{ fontSize: 10, color: '#475569', marginBottom: 6, fontWeight: 600 }}>FONTS</p>
-                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                                {(Array.isArray(activeBrand?.dna?.fonts) ? activeBrand.dna.fonts : ['Inter', 'Poppins', 'Roboto']).map((font, i) => (
-                                    <button key={i} className="ce-font-btn"
-                                        style={{ fontFamily: font }}
-                                        onClick={() => {
-                                            const fc = fabricRef.current
-                                            const obj = fc?.getActiveObject()
-                                            if (obj && obj.fontFamily !== undefined) {
-                                                obj.set('fontFamily', font)
-                                                fc.renderAll()
-                                                saveHistory()
-                                            }
-                                        }}>
-                                        {font}
-                                    </button>
-                                ))}
+                            {/* Alignment */}
+                            <div style={{ marginBottom: 8 }}>
+                                <p style={{ fontSize: 10, color: '#475569', marginBottom: 4, fontWeight: 600 }}>ALIGN</p>
+                                <div style={{ display: 'flex', gap: 4 }}>
+                                    {['left', 'center', 'right'].map(align => (
+                                        <button key={align} className="ce-tool-btn" onClick={() => {
+                                            const fc = fabricRef.current; const obj = fc?.getActiveObject()
+                                            if (obj) { obj.set('textAlign', align); fc.renderAll(); saveHistory() }
+                                        }} style={{ flex: 1 }} title={`Align ${align}`}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{`format_align_${align}`}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            {/* Font Size & Weight */}
+                            <div className="ce-prop-row">
+                                <span className="ce-prop-label" style={{ fontSize: 9 }}>SIZE</span>
+                                <input className="ce-prop-input" type="number" min={8} max={200}
+                                    value={(() => { const fc = fabricRef.current; return fc?.getActiveObject()?.fontSize || 24 })()}
+                                    onChange={e => {
+                                        const fc = fabricRef.current; const obj = fc?.getActiveObject()
+                                        if (obj) { obj.set('fontSize', parseInt(e.target.value)); fc.renderAll(); saveHistory() }
+                                    }} />
+                                <span className="ce-prop-label" style={{ fontSize: 9 }}>BOLD</span>
+                                <button className="ce-tool-btn" onClick={() => {
+                                    const fc = fabricRef.current; const obj = fc?.getActiveObject()
+                                    if (obj) { obj.set('fontWeight', obj.fontWeight === '700' ? '400' : '700'); fc.renderAll(); saveHistory() }
+                                }} style={{ width: 28, height: 28 }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>format_bold</span>
+                                </button>
                             </div>
                         </div>
-                    </div>
+                    )}
+
+                    {/* Shape fill color — when shape selected */}
+                    {selectedObjType === 'shape' && (
+                        <div className="ce-panel">
+                            <div className="ce-panel-title">
+                                <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#818cf8' }}>format_color_fill</span>
+                                Shape
+                            </div>
+                            <div style={{ marginBottom: 8 }}>
+                                <p style={{ fontSize: 10, color: '#475569', marginBottom: 4, fontWeight: 600 }}>FILL COLOR</p>
+                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                    {['#6366f1', '#f87171', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa', '#f472b6', '#ffffff', '#000000', 'transparent'].map(c => (
+                                        <div key={c} className="ce-color-swatch" style={{ background: c === 'transparent' ? 'repeating-conic-gradient(#ccc 0% 25%, transparent 0% 50%) 50% / 12px 12px' : c, border: c === '#000000' || c === 'transparent' ? '1px solid rgba(255,255,255,0.2)' : 'none' }}
+                                            onClick={() => {
+                                                const fc = fabricRef.current; const obj = fc?.getActiveObject()
+                                                if (obj) { obj.set('fill', c); fc.renderAll(); saveHistory() }
+                                            }} title={c} />
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Filters (Advanced) */}
                     <div className="ce-panel">
@@ -2453,80 +3705,40 @@ function CanvasEditorInner() {
                 </div >
             </div >
 
-            {/* ── SIMPLE MODE TOOLS (bottom bar when in simple mode) ── */}
-            {
-                mode === 'simple' && (
-                    <div className="ce-simple-tools">
-                        <button className="ce-simple-tool" onClick={() => setShowTextModal(true)}>
-                            <span className="material-symbols-outlined">text_fields</span>
-                            Add Text
-                        </button>
-                        <button className="ce-simple-tool" onClick={addLogo}>
-                            <span className="material-symbols-outlined">add_photo_alternate</span>
-                            Add Logo
-                        </button>
-                        <button className="ce-simple-tool" onClick={() => setShowFilterPanel(!showFilterPanel)}>
-                            <span className="material-symbols-outlined">auto_fix_high</span>
-                            Filters
-                        </button>
-                        <button className="ce-simple-tool" onClick={uploadImage}>
-                            <span className="material-symbols-outlined">image</span>
-                            Add Image
-                        </button>
-                        <button className="ce-simple-tool" onClick={deleteSelected}>
-                            <span className="material-symbols-outlined">delete</span>
-                            Delete
-                        </button>
-                        <button className="ce-simple-tool" onClick={handleUndo} style={{ opacity: canUndo ? 1 : 0.3 }}>
-                            <span className="material-symbols-outlined">undo</span>
-                            Undo
-                        </button>
-                    </div>
-                )
-            }
 
-            {/* ── Simple Mode Filter Panel ── */}
-            {
-                mode === 'simple' && showFilterPanel && (
-                    <div style={{
-                        position: 'absolute', bottom: 90, left: '50%', transform: 'translateX(-50%)',
-                        background: 'rgba(15,20,35,0.95)', borderRadius: 16, padding: 16,
-                        border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(12px)',
-                        zIndex: 60, width: 320,
-                    }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>Quick Filters</span>
-                            <button onClick={() => setShowFilterPanel(false)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
-                            </button>
-                        </div>
-                        <div className="ce-filter-grid">
-                            {FILTERS.map(f => (
-                                <button key={f.id} className={`ce-filter-btn ${activeFilter === f.id ? 'active' : ''}`}
-                                    onClick={() => applyFilter(f.id)}>
-                                    {f.label}
-                                </button>
-                            ))}
-                        </div>
-                        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#64748b', marginBottom: 4 }}>
-                                <span>Brightness</span><span>{brightness}</span>
-                            </div>
-                            <input type="range" className="ce-slider" min={-50} max={50} value={brightness}
-                                onChange={e => setBrightness(parseInt(e.target.value))} />
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#64748b', marginBottom: 4, marginTop: 8 }}>
-                                <span>Contrast</span><span>{contrast}</span>
-                            </div>
-                            <input type="range" className="ce-slider" min={-50} max={50} value={contrast}
-                                onChange={e => setContrast(parseInt(e.target.value))} />
-                        </div>
-                    </div>
-                )
-            }
 
-            {/* ── BOTTOM BAR (Platform Presets) ── */}
+            {/* ── BOTTOM BAR (Resize + Platform Presets) ── */}
             <div className="ce-bottom-bar">
-                <span style={{ fontSize: 10, color: '#475569', fontWeight: 600, marginRight: 8 }}>RESIZE:</span>
+                {/* Custom resize controls */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 8 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#818cf8' }}>crop</span>
+                    <input className="ce-resize-input" type="number" min={100} max={4000} value={customW}
+                        onChange={e => {
+                            const w = parseInt(e.target.value) || 100
+                            setCustomW(w)
+                            if (lockRatio) setCustomH(Math.round(w * (customH / customW)))
+                        }} title="Width" />
+                    <span style={{ fontSize: 10, color: '#475569' }}>×</span>
+                    <input className="ce-resize-input" type="number" min={100} max={4000} value={customH}
+                        onChange={e => {
+                            const h = parseInt(e.target.value) || 100
+                            setCustomH(h)
+                            if (lockRatio) setCustomW(Math.round(h * (customW / customH)))
+                        }} title="Height" />
+                    <button className="ce-tool-btn" onClick={() => setLockRatio(!lockRatio)}
+                        style={{ width: 24, height: 24 }} title={lockRatio ? 'Unlock ratio' : 'Lock ratio'}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{lockRatio ? 'lock' : 'lock_open'}</span>
+                    </button>
+                    <button className="ce-tool-btn" onClick={() => { const tmp = customW; setCustomW(customH); setCustomH(tmp) }}
+                        style={{ width: 24, height: 24 }} title="Flip orientation">
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>swap_horiz</span>
+                    </button>
+                    <button className="ce-preset-btn active" onClick={() => resizeCanvas(customW, customH)}
+                        style={{ padding: '4px 10px', fontSize: 10 }}>
+                        Apply
+                    </button>
+                </div>
+                <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.08)', margin: '0 4px' }} />
                 {PRESETS.map(p => (
                     <button key={p.id} className={`ce-preset-btn ${activePreset === p.id ? 'active' : ''}`}
                         onClick={() => resizeToPreset(p)}>
