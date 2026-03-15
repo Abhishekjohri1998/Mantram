@@ -24,6 +24,8 @@ import { safeErrorMessage } from '../utils/safeError.js';
 import { logAudit } from '../utils/audit.js';
 import CreditUsage from '../models/CreditUsage.js';
 import rateLimit from 'express-rate-limit';
+import nodemailer from 'nodemailer';
+import env from '../config/env.js';
 
 const router = Router();
 
@@ -243,10 +245,10 @@ router.post('/waitlist/:id/approve', async (req, res) => {
         if (!entry) return res.status(404).json({ success: false, error: 'Waitlist entry not found' });
 
         // Generate invitation link (assuming production URL)
-        const inviteLink = 'https://mantram.ai/signup';
+        const inviteLink = `${env.frontendUrl[0] || 'https://mantram.ai'}/signup`;
         
         const mailOptions = {
-            from: `"Mantram AI" <${process.env.EMAIL_USER}>`,
+            from: `"Mantram AI" <${env.email.user}>`,
             to: entry.email,
             subject: 'Good news! Your early access to Mantram AI is here ✨',
             html: `
@@ -268,7 +270,7 @@ router.post('/waitlist/:id/approve', async (req, res) => {
 
         const transporter = nodemailer.createTransport({
             service: 'gmail',
-            auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+            auth: { user: env.email.user, pass: env.email.pass }
         });
 
         await transporter.sendMail(mailOptions);
