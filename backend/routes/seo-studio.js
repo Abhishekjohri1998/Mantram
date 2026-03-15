@@ -648,6 +648,7 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
           { results: parsed, url: website, status: 'completed' },
           { upsert: true, returnDocument: 'after' }
         );
+        console.log(`✅ SEO Traffic Analysis Successful: ${website}`);
       } catch (dbErr) { console.warn('Could not save traffic audit:', dbErr.message); }
     }
 
@@ -781,6 +782,7 @@ Be STRATEGIC and SPECIFIC. Every insight must have a WHY and an actionable HOW. 
           { results: parsed, url: website, status: 'completed' },
           { upsert: true, returnDocument: 'after' }
         );
+        console.log(`✅ Competitor Analysis Successful: ${website}`);
       } catch (dbErr) { console.warn('Could not save competitors audit:', dbErr.message); }
     }
 
@@ -1395,6 +1397,7 @@ Generate 5-15 discovered backlinks, 5-10 competitor link gaps, 8-15 link opportu
           { url: website, scores: { authorityScore: parsed.backlinkHealthScore || 0 }, results: parsed, status: 'completed', creditsUsed: req.creditsDeducted || 4 },
           { upsert: true, returnDocument: 'after' }
         );
+        console.log(`✅ Backlink Audit Successful: ${website}`);
       } catch (dbErr) { console.warn('Could not save backlink audit:', dbErr.message); }
     }
 
