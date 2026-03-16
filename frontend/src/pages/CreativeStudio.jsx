@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import SEOHead from '../components/SEOHead'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
-import { creatives as creativesAPI, agents as agentsAPI, products as productsAPI, brands as brandsAPI, media as mediaAPI } from '../services/api'
+import { creatives as creativesAPI, agents as agentsAPI, products as productsAPI, brands as brandsAPI, media as mediaAPI, trends as trendsAPI } from '../services/api'
 import { useBrand } from '../context/BrandContext'
 import VoiceInput from '../components/VoiceInput'
 import PublishModal from '../components/PublishModal'
@@ -327,6 +327,84 @@ export default function CreativeStudio() {
     const [aspectRatio, setAspectRatio] = useState('1:1')
     const [publishData, setPublishData] = useState(null) // { image, text } or null
     const [studioMode, setStudioMode] = useState('create')
+
+    // ── Virtual Try-On State ──
+    const [vtoPersonImage, setVtoPersonImage] = useState(null)
+    const [vtoGarmentImage, setVtoGarmentImage] = useState(null)
+    const [vtoPreviewResult, setVtoPreviewResult] = useState(null)
+    const [vtoHdResult, setVtoHdResult] = useState(null)
+    const [vtoLoading, setVtoLoading] = useState(false)
+    const [vtoHdLoading, setVtoHdLoading] = useState(false)
+    const [vtoError, setVtoError] = useState('')
+
+    // ── Lifestyle Mockups State ──
+    const [mockupProductImage, setMockupProductImage] = useState(null)
+    const [mockupScenePrompt, setMockupScenePrompt] = useState('')
+    const [mockupResult, setMockupResult] = useState(null)
+    const [mockupLoading, setMockupLoading] = useState(false)
+    const [mockupError, setMockupError] = useState('')
+    const [mockupAspectRatio, setMockupAspectRatio] = useState('1:1')
+    const [mockupSceneCategory, setMockupSceneCategory] = useState('all')
+    const [mockupSubMode, setMockupSubMode] = useState('lifestyle') // lifestyle | logo
+
+    // ── Logo/Brand Mockup State ──
+    const [logoImage, setLogoImage] = useState(null)
+    const [logoUrl, setLogoUrl] = useState('')
+    const [logoSurface, setLogoSurface] = useState('')
+    const [logoSurfaceCategory, setLogoSurfaceCategory] = useState('all')
+    const [logoStyleRef, setLogoStyleRef] = useState(null)
+    const [logoKeywords, setLogoKeywords] = useState('')
+    const [logoResult, setLogoResult] = useState(null)
+    const [logoLoading, setLogoLoading] = useState(false)
+    const [logoError, setLogoError] = useState('')
+    const [logoAspectRatio, setLogoAspectRatio] = useState('1:1')
+
+    // ── Campaign Logo Generator State ──
+    const [clgText, setClgText] = useState('')
+    const [clgStyle, setClgStyle] = useState('')
+    const [clgOccasion, setClgOccasion] = useState('')
+    const [clgIcon, setClgIcon] = useState('')
+    const [clgColorMode, setClgColorMode] = useState('brand') // brand | custom
+    const [clgCustomColors, setClgCustomColors] = useState('#FFD700, #FF4500')
+    const [clgBg, setClgBg] = useState('transparent')
+    const [clgShape, setClgShape] = useState('freeform')
+    const [clgEnhance, setClgEnhance] = useState('')
+    const [clgResults, setClgResults] = useState([])
+    const [clgLoading, setClgLoading] = useState(false)
+    const [clgError, setClgError] = useState('')
+
+    // ── Campaign Creatives Wizard State ──
+    const [campStep, setCampStep] = useState(1)
+    const [campName, setCampName] = useState('')
+    const [campGoal, setCampGoal] = useState('')
+    const [campKeywordSource, setCampKeywordSource] = useState('trending') // seo | trending | custom
+    const [campKeyword, setCampKeyword] = useState('')
+    const [campTrends, setCampTrends] = useState([])
+    const [campSeoKws, setCampSeoKws] = useState([])
+    const [campTrendsLoading, setCampTrendsLoading] = useState(false)
+    const [campCount, setCampCount] = useState(3)
+    const [campSizes, setCampSizes] = useState(['1:1'])
+    const [campProductStrategy, setCampProductStrategy] = useState('same') // same | different
+    const [campProducts, setCampProducts] = useState([]) // [{image, source}]
+    const [campProductTab, setCampProductTab] = useState('upload') // brand | upload | url
+    const [campProductUrl, setCampProductUrl] = useState('')
+    const [campCampaignLogo, setCampCampaignLogo] = useState(null)
+    const [campCopies, setCampCopies] = useState([]) // [{headline, body, cta}]
+    const [campCopyLoading, setCampCopyLoading] = useState(false)
+    const [campCta, setCampCta] = useState('Shop Now')
+    const [campStyle, setCampStyle] = useState('bold')
+    const [campLogoPlacement, setCampLogoPlacement] = useState('bottom-right')
+    const [campStyleRef, setCampStyleRef] = useState(null)
+    const [campResults, setCampResults] = useState([])
+    const [campGenerating, setCampGenerating] = useState(false)
+    const [campProgress, setCampProgress] = useState(0)
+    const [campError, setCampError] = useState('')
+
+    // ── Best Performing Library State ──
+    const [bplOpen, setBplOpen] = useState(false)
+    const [bplCreatives, setBplCreatives] = useState([])
+    const [bplLoading, setBplLoading] = useState(false)
+    const [bplMode, setBplMode] = useState('style')
 
     // ── AI Photoshoot State ──
     const [productImage, setProductImage] = useState(null)
@@ -1332,6 +1410,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                 {[
                     { id: 'create', icon: 'auto_awesome', label: 'AI Create' },
                     { id: 'photoshoot', icon: 'photo_camera', label: 'Photoshoot' },
+                    { id: 'tryon', icon: 'checkroom', label: 'Try-On' },
+                    { id: 'mockups', icon: 'landscape', label: 'Mockups' },
+                    { id: 'campaigns', icon: 'campaign', label: 'Campaigns' },
+                    { id: 'campaignlogo', icon: 'verified', label: 'Logo Gen' },
                     { id: 'templates', icon: 'dashboard_customize', label: 'Templates' },
                     { id: 'imagebank', icon: 'photo_library', label: 'Image Bank', badge: bankTotal > 0 ? bankTotal : null },
                     { id: 'canvas', icon: 'draw', label: 'AI Canvas', isNav: true },
@@ -2883,6 +2965,567 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             )}
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* =================== CAMPAIGN LOGO GENERATOR =================== */}
+            {studioMode === 'campaignlogo' && (
+                <div className="max-w-6xl mx-auto fade-up">
+                    <div className="glow-border rounded-2xl p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.06), rgba(239,68,68,0.04), rgba(168,85,247,0.03))' }}>
+                        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(245,158,11,0.08) 0%, transparent 50%)' }} />
+                        <div className="relative">
+                            <h2 className="text-xl font-bold text-white flex items-center gap-3 mb-1">
+                                <span className="material-symbols-outlined text-2xl text-amber-400">verified</span>
+                                Campaign Logo Generator
+                                <span className="text-xs font-medium bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full">AI</span>
+                            </h2>
+                            <p className="text-sm text-slate-400">Generate event & campaign logos — Diwali Sale, Summer Fest, MEGA OFFER and more</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-12 gap-6">
+                        <div className="col-span-12 lg:col-span-5 space-y-4">
+                            {/* Text */}
+                            <div className="studio-card p-5">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
+                                    <span className="material-symbols-outlined text-amber-400 text-lg">title</span>Logo Text
+                                </h3>
+                                <input type="text" value={clgText} onChange={e => setClgText(e.target.value)} placeholder="e.g. MEGA SALE, Diwali Dhamaka, Summer Fest 2026" className="w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-amber-400/30" />
+                            </div>
+
+                            {/* Style */}
+                            <div className="studio-card p-5">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
+                                    <span className="material-symbols-outlined text-violet-400 text-lg">palette</span>Style
+                                </h3>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {[{id:'2d-flat',l:'2D Flat'},{id:'3d-render',l:'3D Rendered'},{id:'isometric',l:'Isometric'},{id:'hand-drawn',l:'Hand-drawn'},{id:'neon',l:'Neon Glow'},{id:'metallic',l:'Metallic'},{id:'gradient',l:'Gradient'},{id:'pixel',l:'Pixel Art'}].map(s=>(
+                                        <button key={s.id} onClick={()=>setClgStyle(s.id)} className={`px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${clgStyle===s.id?'border-violet-400/40 bg-violet-500/10 text-white':'border-white/[0.06] bg-white/[0.02] text-slate-400 hover:text-slate-200'}`}>{s.l}</button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Occasion */}
+                            <div className="studio-card p-5">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
+                                    <span className="material-symbols-outlined text-rose-400 text-lg">celebration</span>Occasion
+                                </h3>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {['Diwali','Christmas','New Year','Valentine\'s','Summer Sale','Eid','Independence Day','Black Friday','Anniversary','Flash Sale','Launch','Custom'].map(o=>(
+                                        <button key={o} onClick={()=>setClgOccasion(o)} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${clgOccasion===o?'border-rose-400/40 bg-rose-500/10 text-white':'border-white/[0.06] bg-white/[0.02] text-slate-400 hover:text-slate-200'}`}>{o}</button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Icon Theme */}
+                            <div className="studio-card p-5">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
+                                    <span className="material-symbols-outlined text-cyan-400 text-lg">interests</span>Icon Theme <span className="text-xs text-slate-600 font-normal">(optional)</span>
+                                </h3>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {[{id:'sparkles',l:'✨ Sparkles'},{id:'fireworks',l:'🎆 Fireworks'},{id:'shopping',l:'🛍️ Shopping'},{id:'hearts',l:'❤️ Hearts'},{id:'stars',l:'⭐ Stars'},{id:'trophy',l:'🏆 Trophy'},{id:'gift',l:'🎁 Gift'},{id:'fire',l:'🔥 Fire'},{id:'ribbon',l:'🎀 Ribbon'},{id:'none',l:'None'}].map(i=>(
+                                        <button key={i.id} onClick={()=>setClgIcon(i.id==='none'?'':i.id)} className={`px-2 py-1 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${clgIcon===i.id||(i.id==='none'&&!clgIcon)?'border-cyan-400/30 bg-cyan-500/10 text-white':'border-white/[0.06] bg-white/[0.02] text-slate-400 hover:text-slate-200'}`}>{i.l}</button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Colors, Background, Shape */}
+                            <div className="studio-card p-5 space-y-4">
+                                <div>
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-emerald-400 text-lg">format_color_fill</span>Colors</h3>
+                                    <div className="flex gap-2 mb-2">
+                                        <button onClick={()=>setClgColorMode('brand')} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${clgColorMode==='brand'?'border-emerald-400/30 bg-emerald-500/10 text-white':'border-white/[0.06] text-slate-400'}`}>Brand Colors</button>
+                                        <button onClick={()=>setClgColorMode('custom')} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${clgColorMode==='custom'?'border-emerald-400/30 bg-emerald-500/10 text-white':'border-white/[0.06] text-slate-400'}`}>Custom</button>
+                                    </div>
+                                    {clgColorMode==='custom'&&<input type="text" value={clgCustomColors} onChange={e=>setClgCustomColors(e.target.value)} placeholder="#FFD700, #FF4500" className="w-full px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-xs focus:outline-none focus:border-emerald-400/30" />}
+                                    {clgColorMode==='brand'&&activeBrand?.dna?.colors?.length>0&&<div className="flex gap-1">{activeBrand.dna.colors.slice(0,6).map((c,i)=><div key={i} className="w-6 h-6 rounded-full border border-white/10" title={c} style={{backgroundColor:c}} />)}</div>}
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-blue-400 text-lg">layers</span>Background</h3>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {['transparent','white','black','gradient'].map(b=>(
+                                            <button key={b} onClick={()=>setClgBg(b)} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all cursor-pointer capitalize ${clgBg===b?'border-blue-400/30 bg-blue-500/10 text-white':'border-white/[0.06] text-slate-400'}`}>{b}</button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-pink-400 text-lg">shape_line</span>Shape</h3>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {['freeform','circular badge','ribbon banner','diamond','shield','stamp'].map(sh=>(
+                                            <button key={sh} onClick={()=>setClgShape(sh)} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all cursor-pointer capitalize ${clgShape===sh?'border-pink-400/30 bg-pink-500/10 text-white':'border-white/[0.06] text-slate-400'}`}>{sh}</button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* AI Enhancement */}
+                            <div className="studio-card p-5">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-amber-400 text-lg">auto_awesome</span>AI Enhancement</h3>
+                                <input type="text" value={clgEnhance} onChange={e=>setClgEnhance(e.target.value)} placeholder="e.g. bold, elegant, playful, luxury" className="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-amber-400/30" />
+                                <div className="flex flex-wrap gap-1 mt-2">
+                                    {['bold','elegant','playful','luxury','minimalist','retro','futuristic','vibrant'].map(kw=>(
+                                        <button key={kw} onClick={()=>setClgEnhance(p=>p?`${p}, ${kw}`:kw)} className="px-2 py-0.5 rounded-md text-[10px] bg-white/[0.04] border border-white/[0.06] text-slate-500 hover:text-amber-300 hover:border-amber-400/20 transition-all cursor-pointer">+{kw}</button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Generate */}
+                            <button disabled={!clgText||clgLoading} onClick={async()=>{
+                                setClgLoading(true);setClgError('');
+                                try{
+                                    const brandColors=clgColorMode==='brand'&&activeBrand?.dna?.colors?.length?activeBrand.dna.colors.join(', '):clgCustomColors;
+                                    const v=clgResults.length+1;
+                                    const prompt=`Generate a CAMPAIGN LOGO / EVENT BADGE design.\n\nTEXT: "${clgText}"\nSTYLE: ${clgStyle||'modern'}\n${clgOccasion?`OCCASION: ${clgOccasion}\n`:''}${clgIcon?`ICON ELEMENTS: Include ${clgIcon} visual elements\n`:''}COLORS: Use ${brandColors||'vibrant, eye-catching colors'}\nBACKGROUND: ${clgBg==='transparent'?'transparent/alpha background (PNG-ready)':clgBg}\nSHAPE: ${clgShape}\n${clgEnhance?`STYLE KEYWORDS: ${clgEnhance}\n`:''}VARIANT: ${v} — create a unique, visually distinctive design\n\nCRITICAL RULES:\n- This is a LOGO/BADGE, not a poster — keep it compact and icon-like\n- The text "${clgText}" must be clearly readable and be the HERO element\n- Use professional typography — bold, impactful lettering\n- Make it suitable for use as a campaign identifier across marketing materials\n- ${clgBg==='transparent'?'Ensure the background is fully transparent':'Fill the background as specified'}\n- Do NOT add placeholder text or watermarks`;
+                                    const res=await creativesAPI.generate({prompt,brandId:activeBrand?._id,type:'campaign-logo',options:{aspectRatio:'1:1',style:'logo'}});
+                                    const url=res.creative?.imageUrl||res.imageUrl;
+                                    if(url)setClgResults(prev=>[...prev,url]);
+                                    else setClgError('No image returned — try again');
+                                }catch(err){setClgError(err.message||'Generation failed — please try again')}
+                                finally{setClgLoading(false)}
+                            }} className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+                                {clgLoading?(<><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>Generating Logo...</>):(<><span className="material-symbols-outlined text-lg">auto_awesome</span>{clgResults.length>0?'Generate Another Variant':'Generate Campaign Logo'}<span className="text-xs opacity-60 ml-1">~₹0.25</span></>)}
+                            </button>
+                            {clgError&&<div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-center gap-2"><span className="material-symbols-outlined text-lg">warning</span>{clgError}</div>}
+                        </div>
+
+                        {/* Right — Results */}
+                        <div className="col-span-12 lg:col-span-7">
+                            <div className="studio-card p-5 min-h-[500px] flex flex-col">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-amber-400 text-lg">image</span>Logo Variants</h3>
+                                {clgResults.length>0?(
+                                    <div className="flex-1">
+                                        <div className="grid grid-cols-2 gap-3 mb-4">
+                                            {clgResults.map((url,i)=>(
+                                                <div key={i} className="rounded-xl overflow-hidden bg-[repeating-conic-gradient(#1a1a2e_0%_25%,#16162a_0%_50%)] bg-[length:16px_16px] group relative">
+                                                    <img src={url} alt={`Variant ${i+1}`} className="w-full h-auto object-contain" />
+                                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                                        <a href={url} download={`campaign-logo-${i+1}.png`} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-lg bg-white/20 text-white text-xs font-medium backdrop-blur-sm hover:bg-white/30 transition-all cursor-pointer flex items-center gap-1"><span className="material-symbols-outlined text-sm">download</span>Save</a>
+                                                        <button onClick={()=>{setCampCampaignLogo(url);setStudioMode('campaigns')}} className="px-3 py-1.5 rounded-lg bg-amber-500/30 text-amber-200 text-xs font-medium backdrop-blur-sm hover:bg-amber-500/50 transition-all cursor-pointer flex items-center gap-1"><span className="material-symbols-outlined text-sm">campaign</span>Use in Campaign</button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ):(
+                                    <div className="flex-1 flex flex-col items-center justify-center text-center py-12">
+                                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 flex items-center justify-center mb-4"><span className="material-symbols-outlined text-4xl text-amber-400/40">verified</span></div>
+                                        <p className="text-slate-400 text-sm font-medium mb-1">No logos generated yet</p>
+                                        <p className="text-slate-600 text-xs">Enter your text, pick a style, and generate</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* =================== CAMPAIGN CREATIVES WIZARD =================== */}
+            {studioMode === 'campaigns' && (
+                <div className="max-w-6xl mx-auto fade-up">
+                    {/* Header */}
+                    <div className="glow-border rounded-2xl p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.06), rgba(168,85,247,0.04), rgba(6,182,212,0.03))' }}>
+                        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(59,130,246,0.08) 0%, transparent 50%)' }} />
+                        <div className="relative">
+                            <h2 className="text-xl font-bold text-white flex items-center gap-3 mb-1">
+                                <span className="material-symbols-outlined text-2xl text-blue-400">campaign</span>
+                                Campaign Creatives
+                                <span className="text-xs font-medium bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">AI Wizard</span>
+                            </h2>
+                            <p className="text-sm text-slate-400">Build coordinated campaign batches — trend-powered, AI-driven</p>
+                        </div>
+                    </div>
+
+                    {/* Step Indicator */}
+                    <div className="flex items-center gap-2 mb-6">
+                        {[{n:1,l:'Brief'},{n:2,l:'Products'},{n:3,l:'Copy & Style'},{n:4,l:'Generate'}].map((s,i)=>(
+                            <Fragment key={s.n}>
+                                <button onClick={()=>s.n<campStep&&setCampStep(s.n)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${campStep===s.n?'bg-blue-500/20 text-blue-300 border border-blue-400/30':campStep>s.n?'bg-emerald-500/10 text-emerald-300 border border-emerald-400/20 cursor-pointer':'bg-white/[0.03] text-slate-600 border border-white/[0.05]'}`}>
+                                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${campStep===s.n?'bg-blue-500 text-white':campStep>s.n?'bg-emerald-500 text-white':'bg-white/10 text-slate-600'}`}>{campStep>s.n?'✓':s.n}</span>{s.l}
+                                </button>
+                                {i<3&&<div className={`flex-1 h-px ${campStep>s.n?'bg-emerald-500/30':'bg-white/[0.06]'}`}/>}
+                            </Fragment>
+                        ))}
+                    </div>
+
+                    {/* ══ STEP 1: Campaign Brief ══ */}
+                    {campStep === 1 && (
+                        <div className="grid grid-cols-12 gap-6">
+                            <div className="col-span-12 lg:col-span-7 space-y-4">
+                                {/* Campaign Name */}
+                                <div className="studio-card p-5">
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-blue-400 text-lg">badge</span>Campaign Name</h3>
+                                    <input type="text" value={campName} onChange={e=>setCampName(e.target.value)} placeholder="Auto-generated from keyword..." className="w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-blue-400/30" />
+                                </div>
+                                {/* Campaign Goal */}
+                                <div className="studio-card p-5">
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-emerald-400 text-lg">flag</span>Campaign Goal</h3>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {['Awareness','Engagement','Conversion','Product Launch','Sale / Offer','Seasonal','Trend Ride'].map(g=>(
+                                            <button key={g} onClick={()=>setCampGoal(g)} className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all cursor-pointer ${campGoal===g?'border-emerald-400/40 bg-emerald-500/10 text-white':'border-white/[0.06] bg-white/[0.02] text-slate-400 hover:text-slate-200'}`}>{g}</button>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* Keyword Source */}
+                                <div className="studio-card p-5">
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-amber-400 text-lg">trending_up</span>Keyword / Topic</h3>
+                                    <div className="flex gap-2 mb-3">
+                                        {[{id:'trending',l:'🔥 Trending',icon:'whatshot'},{id:'seo',l:'🔍 SEO Keywords',icon:'search'},{id:'custom',l:'✍️ Custom',icon:'edit'}].map(t=>(
+                                            <button key={t.id} onClick={async()=>{
+                                                setCampKeywordSource(t.id);
+                                                if(t.id==='trending'&&!campTrends.length){
+                                                    setCampTrendsLoading(true);
+                                                    try{const r=await trendsAPI.grokTopics({brandId:activeBrand?._id});setCampTrends(r.trends||r.trendingTopics||[])}catch(e){console.error(e)}
+                                                    finally{setCampTrendsLoading(false)}
+                                                }
+                                                if(t.id==='seo'&&!campSeoKws.length){
+                                                    setCampTrendsLoading(true);
+                                                    try{const r=await trendsAPI.grokSeo({brandId:activeBrand?._id});setCampSeoKws(r.risingKeywords||r.keywords||[])}catch(e){console.error(e)}
+                                                    finally{setCampTrendsLoading(false)}
+                                                }
+                                            }} className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${campKeywordSource===t.id?'border-amber-400/30 bg-amber-500/10 text-amber-300':'border-white/[0.06] text-slate-400 hover:text-slate-200'}`}>{t.l}</button>
+                                        ))}
+                                    </div>
+                                    {campKeywordSource==='trending'&&(campTrendsLoading?<div className="text-center py-4 text-slate-500 text-sm"><span className="material-symbols-outlined animate-spin text-lg align-middle mr-1">progress_activity</span>Fetching trends...</div>:<div className="flex flex-wrap gap-1.5 max-h-[160px] overflow-y-auto">{(Array.isArray(campTrends)?campTrends:[]).slice(0,20).map((t,i)=>{const label=typeof t==='string'?t:t.topic||t.name||t.title||'';return label?<button key={i} onClick={()=>{setCampKeyword(label);if(!campName)setCampName(`${label} Campaign`)}} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${campKeyword===label?'border-amber-400/40 bg-amber-500/10 text-white':'border-white/[0.06] text-slate-400 hover:text-slate-200'}`}>{label}</button>:null})}</div>)}
+                                    {campKeywordSource==='seo'&&(campTrendsLoading?<div className="text-center py-4 text-slate-500 text-sm"><span className="material-symbols-outlined animate-spin text-lg align-middle mr-1">progress_activity</span>Fetching SEO keywords...</div>:<div className="flex flex-wrap gap-1.5 max-h-[160px] overflow-y-auto">{(Array.isArray(campSeoKws)?campSeoKws:[]).slice(0,20).map((k,i)=>{const label=typeof k==='string'?k:k.keyword||k.term||k.name||'';return label?<button key={i} onClick={()=>{setCampKeyword(label);if(!campName)setCampName(`${label} Campaign`)}} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${campKeyword===label?'border-amber-400/40 bg-amber-500/10 text-white':'border-white/[0.06] text-slate-400 hover:text-slate-200'}`}>{label}</button>:null})}</div>)}
+                                    {campKeywordSource==='custom'&&<input type="text" value={campKeyword} onChange={e=>{setCampKeyword(e.target.value);if(!campName)setCampName(`${e.target.value} Campaign`)}} placeholder="Type your keyword or campaign topic..." className="w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-amber-400/30" />}
+                                    {campKeyword&&<div className="mt-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-400/20 text-blue-300 text-xs inline-flex items-center gap-1"><span className="material-symbols-outlined text-sm">check_circle</span>Selected: <strong>{campKeyword}</strong></div>}
+                                </div>
+                            </div>
+                            <div className="col-span-12 lg:col-span-5 space-y-4">
+                                {/* Number of Creatives */}
+                                <div className="studio-card p-5">
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-violet-400 text-lg">grid_view</span>Number of Creatives</h3>
+                                    <div className="flex items-center gap-3">
+                                        <input type="range" min={1} max={10} value={campCount} onChange={e=>setCampCount(Number(e.target.value))} className="flex-1 accent-violet-500" />
+                                        <span className="text-2xl font-bold text-white w-8 text-center">{campCount}</span>
+                                    </div>
+                                    <div className="flex gap-1 mt-2">{[1,3,5,8,10].map(n=><button key={n} onClick={()=>setCampCount(n)} className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-all cursor-pointer ${campCount===n?'border-violet-400/30 bg-violet-500/10 text-white':'border-white/[0.06] text-slate-500'}`}>{n}</button>)}</div>
+                                </div>
+                                {/* Sizes */}
+                                <div className="studio-card p-5">
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-cyan-400 text-lg">aspect_ratio</span>Creative Sizes</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        {[{id:'1:1',l:'IG Post 1:1'},{id:'9:16',l:'Story 9:16'},{id:'4:5',l:'FB Ad 4:5'},{id:'16:9',l:'YouTube 16:9'},{id:'2:3',l:'Pinterest 2:3'},{id:'1.91:1',l:'LinkedIn'}].map(sz=>(
+                                            <button key={sz.id} onClick={()=>setCampSizes(p=>p.includes(sz.id)?p.filter(x=>x!==sz.id):[...p,sz.id])} className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer ${campSizes.includes(sz.id)?'border-cyan-400/30 bg-cyan-500/10 text-white':'border-white/[0.06] text-slate-400 hover:text-slate-200'}`}>{sz.l}</button>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* Next */}
+                                <button disabled={!campKeyword||!campGoal} onClick={()=>setCampStep(2)} className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+                                    Next: Products & Assets <span className="material-symbols-outlined text-lg">arrow_forward</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ══ STEP 2: Products & Assets ══ */}
+                    {campStep === 2 && (
+                        <div className="grid grid-cols-12 gap-6">
+                            <div className="col-span-12 lg:col-span-7 space-y-4">
+                                {/* Product Strategy */}
+                                <div className="studio-card p-5">
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-emerald-400 text-lg">inventory_2</span>Product Strategy</h3>
+                                    <div className="flex gap-3">
+                                        <button onClick={()=>setCampProductStrategy('same')} className={`flex-1 p-4 rounded-xl border text-center transition-all cursor-pointer ${campProductStrategy==='same'?'border-emerald-400/40 bg-emerald-500/10':'border-white/[0.06] bg-white/[0.02] hover:border-white/[0.15]'}`}>
+                                            <span className="material-symbols-outlined text-2xl text-emerald-400 block mb-1">content_copy</span>
+                                            <p className="text-white text-sm font-semibold">Same Product</p><p className="text-slate-500 text-[10px]">All creatives use one product</p>
+                                        </button>
+                                        <button onClick={()=>setCampProductStrategy('different')} className={`flex-1 p-4 rounded-xl border text-center transition-all cursor-pointer ${campProductStrategy==='different'?'border-violet-400/40 bg-violet-500/10':'border-white/[0.06] bg-white/[0.02] hover:border-white/[0.15]'}`}>
+                                            <span className="material-symbols-outlined text-2xl text-violet-400 block mb-1">view_carousel</span>
+                                            <p className="text-white text-sm font-semibold">Different Products</p><p className="text-slate-500 text-[10px]">Unique product per creative</p>
+                                        </button>
+                                    </div>
+                                </div>
+                                {/* Product Upload */}
+                                <div className="studio-card p-5">
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-blue-400 text-lg">add_a_photo</span>{campProductStrategy==='same'?'Product Image':'Product Images'}</h3>
+                                    <div className="flex gap-2 mb-3">
+                                        {[{id:'upload',l:'📤 Upload'},{id:'url',l:'🔗 URL'},{id:'bank',l:'🏦 Image Bank'}].map(t=>(
+                                            <button key={t.id} onClick={async()=>{
+                                                setCampProductTab(t.id);
+                                                if(t.id==='bank'&&!bplCreatives.length){setBplLoading(true);try{const r=await creativesAPI.imageBank({brandId:activeBrand?._id,category:'generated',limit:30});setBplCreatives(r.creatives||[])}catch(e){console.error(e)}finally{setBplLoading(false)}}
+                                            }} className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer ${campProductTab===t.id?'border-blue-400/30 bg-blue-500/10 text-blue-300':'border-white/[0.06] text-slate-400'}`}>{t.l}</button>
+                                        ))}
+                                    </div>
+                                    {campProductTab==='upload'&&(
+                                        <label className="flex flex-col items-center justify-center h-28 rounded-xl border-2 border-dashed border-white/10 hover:border-blue-400/30 bg-white/[0.02] cursor-pointer transition-all group">
+                                            <span className="material-symbols-outlined text-3xl text-slate-600 group-hover:text-blue-400 transition-colors mb-1">upload</span>
+                                            <span className="text-sm text-slate-500">{campProductStrategy==='different'?'Upload multiple product photos':'Upload product photo'}</span>
+                                            <input type="file" accept="image/*" multiple className="hidden" onChange={e=>{
+                                                const files=Array.from(e.target.files||[]);
+                                                files.forEach(file=>{const r=new FileReader();r.onload=ev=>{setCampProducts(p=>[...p,{image:ev.target.result,source:'upload'}])};r.readAsDataURL(file)})
+                                            }} />
+                                        </label>
+                                    )}
+                                    {campProductTab==='url'&&(
+                                        <div className="flex gap-2">
+                                            <input type="text" value={campProductUrl} onChange={e=>setCampProductUrl(e.target.value)} placeholder="https://example.com/product.jpg" className="flex-1 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-blue-400/30" />
+                                            <button disabled={!campProductUrl} onClick={()=>{setCampProducts(p=>[...p,{image:campProductUrl,source:'url'}]);setCampProductUrl('')}} className="px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-300 text-sm font-medium hover:bg-blue-500/20 transition-all cursor-pointer disabled:opacity-30">Add</button>
+                                        </div>
+                                    )}
+                                    {campProductTab==='bank'&&(
+                                        <div>{bplLoading?<div className="text-center py-4 text-slate-500 text-sm"><span className="material-symbols-outlined animate-spin text-lg align-middle mr-1">progress_activity</span>Loading...</div>:
+                                        <div className="grid grid-cols-4 gap-2 max-h-[200px] overflow-y-auto" style={{scrollbarWidth:'thin',scrollbarColor:'rgba(255,255,255,0.1) transparent'}}>
+                                            {bplCreatives.map((c,i)=>(
+                                                <button key={i} onClick={()=>setCampProducts(p=>[...p,{image:c.imageUrl,source:'bank'}])} className="rounded-lg overflow-hidden border border-white/[0.06] hover:border-blue-400/30 transition-all cursor-pointer">
+                                                    <img src={c.imageUrl} alt={c.title||''} className="w-full h-16 object-cover" />
+                                                </button>
+                                            ))}
+                                        </div>}
+                                        </div>
+                                    )}
+                                    {campProducts.length>0&&(
+                                        <div className="mt-3">
+                                            <div className="flex items-center justify-between mb-1"><span className="text-[10px] text-slate-500">{campProducts.length} product{campProducts.length>1?'s':''} selected</span><button onClick={()=>setCampProducts([])} className="text-[10px] text-red-400 hover:text-red-300 cursor-pointer">Clear all</button></div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {campProducts.map((p,i)=>(
+                                                    <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden group">
+                                                        <img src={p.image} alt={`Product ${i+1}`} className="w-full h-full object-cover" />
+                                                        <button onClick={()=>setCampProducts(prev=>prev.filter((_,j)=>j!==i))} className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-[8px]">✕</button>
+                                                        <span className="absolute bottom-0.5 left-0.5 bg-black/60 text-white text-[8px] px-1 rounded">{i+1}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="col-span-12 lg:col-span-5 space-y-4">
+                                {/* Campaign Logo */}
+                                <div className="studio-card p-5">
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-amber-400 text-lg">verified</span>Campaign Logo <span className="text-xs text-slate-600 font-normal">(optional)</span></h3>
+                                    {campCampaignLogo?(
+                                        <div className="relative rounded-xl overflow-hidden group">
+                                            <img src={campCampaignLogo} alt="Campaign Logo" className="w-full h-24 object-contain rounded-xl bg-white/5" />
+                                            <button onClick={()=>setCampCampaignLogo(null)} className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"><span className="material-symbols-outlined text-xs">close</span></button>
+                                        </div>
+                                    ):(
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <label className="flex flex-col items-center justify-center h-20 rounded-xl border-2 border-dashed border-white/10 hover:border-amber-400/30 bg-white/[0.02] cursor-pointer transition-all group">
+                                                <span className="material-symbols-outlined text-xl text-slate-600 group-hover:text-amber-400">upload</span><span className="text-[10px] text-slate-500">Upload</span>
+                                                <input type="file" accept="image/*" className="hidden" onChange={e=>{const f=e.target.files?.[0];if(f){const r=new FileReader();r.onload=ev=>setCampCampaignLogo(ev.target.result);r.readAsDataURL(f)}}} />
+                                            </label>
+                                            <button onClick={()=>setStudioMode('campaignlogo')} className="flex flex-col items-center justify-center h-20 rounded-xl border-2 border-dashed border-white/10 hover:border-amber-400/30 bg-white/[0.02] cursor-pointer transition-all group">
+                                                <span className="material-symbols-outlined text-xl text-slate-600 group-hover:text-amber-400">auto_awesome</span><span className="text-[10px] text-slate-500">Generate</span>
+                                            </button>
+                                            <button onClick={async()=>{
+                                                setBplMode('logo');setBplOpen(true);setBplLoading(true);
+                                                try{const r=await creativesAPI.imageBank({brandId:activeBrand?._id,category:'generated',limit:20});setBplCreatives(r.creatives||[])}catch(e){console.error(e)}
+                                                finally{setBplLoading(false)}
+                                            }} className="flex flex-col items-center justify-center h-20 rounded-xl border-2 border-dashed border-white/10 hover:border-amber-400/30 bg-white/[0.02] cursor-pointer transition-all group">
+                                                <span className="material-symbols-outlined text-xl text-slate-600 group-hover:text-amber-400">photo_library</span><span className="text-[10px] text-slate-500">Image Bank</span>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                                {/* Nav */}
+                                <div className="flex gap-3">
+                                    <button onClick={()=>setCampStep(1)} className="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer"><span className="material-symbols-outlined text-lg">arrow_back</span>Back</button>
+                                    <button onClick={()=>setCampStep(3)} className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 text-white text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer">Next: Copy & Style<span className="material-symbols-outlined text-lg">arrow_forward</span></button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ══ STEP 3: Copy & Style ══ */}
+                    {campStep === 3 && (
+                        <div className="grid grid-cols-12 gap-6">
+                            <div className="col-span-12 lg:col-span-7 space-y-4">
+                                {/* AI Copy */}
+                                <div className="studio-card p-5">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h3 className="font-bold text-white text-sm flex items-center gap-2"><span className="material-symbols-outlined text-emerald-400 text-lg">smart_toy</span>AI-Generated Copies</h3>
+                                        <button disabled={campCopyLoading} onClick={async()=>{
+                                            setCampCopyLoading(true);
+                                            try{
+                                                const prompt=`Generate ${campCount} unique ad copy variations for a ${campGoal} campaign.
+Topic/Keyword: "${campKeyword}"
+Brand: ${activeBrand?.name||'Brand'} (${activeBrand?.dna?.industry||'general'})
+Brand Voice: ${activeBrand?.dna?.voice?.personality||'professional'}
+CTA: ${campCta}
+
+For each variation, return a JSON array with objects: {"headline": "...", "body": "...", "cta": "..."}
+- Headlines: 5-8 words, attention-grabbing, keyword-relevant
+- Body: 15-25 words, compelling, action-oriented
+- CTA: "${campCta}"
+
+Return ONLY a valid JSON array, no markdown, no explanation.`;
+                                                const r=await creativesAPI.enhancePrompt({prompt,brandId:activeBrand?._id});
+                                                const raw=r.enhancedPrompt||r.enhanced||r.result||'';
+                                                const jsonMatch=raw.match(/\[[\s\S]*\]/);
+                                                if(jsonMatch){try{const parsed=JSON.parse(jsonMatch[0]);setCampCopies(Array.isArray(parsed)?parsed.slice(0,campCount):[])}catch{setCampCopies(Array.from({length:campCount},(_,i)=>({headline:`${campKeyword} — Creative ${i+1}`,body:`Discover the best of ${campKeyword}. Don't miss out!`,cta:campCta})))}}
+                                                else{setCampCopies(Array.from({length:campCount},(_,i)=>({headline:`${campKeyword} — Creative ${i+1}`,body:`Discover amazing ${campKeyword} deals. ${campCta} today!`,cta:campCta})))}
+                                            }catch(e){console.error(e);setCampCopies(Array.from({length:campCount},(_,i)=>({headline:`${campKeyword} ${i+1}`,body:'Your message here',cta:campCta})))}
+                                            finally{setCampCopyLoading(false)}
+                                        }} className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-medium hover:bg-emerald-500/20 transition-all cursor-pointer flex items-center gap-1">
+                                            {campCopyLoading?<><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>Generating...</>:<><span className="material-symbols-outlined text-sm">auto_awesome</span>Generate {campCount} Copies</>}
+                                        </button>
+                                    </div>
+                                    {campCopies.length>0?(
+                                        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1" style={{scrollbarWidth:'thin',scrollbarColor:'rgba(255,255,255,0.1) transparent'}}>
+                                            {campCopies.map((c,i)=>(
+                                                <div key={i} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                                                    <div className="flex items-center gap-2 mb-1"><span className="text-[10px] font-bold text-blue-300 bg-blue-500/20 px-1.5 py-0.5 rounded">#{i+1}</span></div>
+                                                    <input value={c.headline||''} onChange={e=>{const u=[...campCopies];u[i]={...u[i],headline:e.target.value};setCampCopies(u)}} className="w-full px-2 py-1 mb-1 rounded-lg bg-white/[0.04] border border-white/[0.06] text-white text-xs font-semibold focus:outline-none focus:border-blue-400/30" placeholder="Headline" />
+                                                    <textarea value={c.body||''} onChange={e=>{const u=[...campCopies];u[i]={...u[i],body:e.target.value};setCampCopies(u)}} rows={2} className="w-full px-2 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06] text-white text-[11px] focus:outline-none focus:border-blue-400/30 resize-none" placeholder="Body copy" />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ):<p className="text-slate-600 text-xs text-center py-4">Click "Generate Copies" to create AI copy for each creative</p>}
+                                </div>
+                                {/* CTA */}
+                                <div className="studio-card p-5">
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-rose-400 text-lg">touch_app</span>Call to Action</h3>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {['Shop Now','Learn More','Order Today','Grab Deal','Download','Sign Up','Book Now','Explore','Get Offer','Buy Now'].map(ct=>(
+                                            <button key={ct} onClick={()=>setCampCta(ct)} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${campCta===ct?'border-rose-400/40 bg-rose-500/10 text-white':'border-white/[0.06] text-slate-400 hover:text-slate-200'}`}>{ct}</button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="col-span-12 lg:col-span-5 space-y-4">
+                                {/* Style */}
+                                <div className="studio-card p-5">
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-violet-400 text-lg">palette</span>Style</h3>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {['Minimal','Bold','Elegant','Vibrant','Dark Luxury','Retro','Gradient Pop','Corporate'].map(st=>(
+                                            <button key={st} onClick={()=>setCampStyle(st.toLowerCase())} className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all cursor-pointer ${campStyle===st.toLowerCase()?'border-violet-400/40 bg-violet-500/10 text-white':'border-white/[0.06] bg-white/[0.02] text-slate-400 hover:text-slate-200'}`}>{st}</button>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* Logo Placement */}
+                                <div className="studio-card p-5">
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-amber-400 text-lg">crop_free</span>Logo Placement</h3>
+                                    <div className="grid grid-cols-3 gap-1.5">
+                                        {[{id:'top-left',l:'↖ TL'},{id:'top-center',l:'↑ TC'},{id:'top-right',l:'↗ TR'},{id:'bottom-left',l:'↙ BL'},{id:'bottom-center',l:'↓ BC'},{id:'bottom-right',l:'↘ BR'},{id:'none',l:'None'}].map(p=>(
+                                            <button key={p.id} onClick={()=>setCampLogoPlacement(p.id)} className={`px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${campLogoPlacement===p.id?'border-amber-400/40 bg-amber-500/10 text-white':'border-white/[0.06] text-slate-400'}`}>{p.l}</button>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* Style from Best Performing */}
+                                <div className="studio-card p-5">
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-yellow-400 text-lg">emoji_events</span>Style from Best Performing</h3>
+                                    {campStyleRef?(
+                                        <div className="relative rounded-xl overflow-hidden group">
+                                            <img src={campStyleRef} alt="Style Ref" className="w-full h-20 object-cover rounded-xl" />
+                                            <button onClick={()=>setCampStyleRef(null)} className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-[10px]">✕</button>
+                                        </div>
+                                    ):(
+                                        <button onClick={async()=>{
+                                            setBplMode('style');setBplOpen(true);setBplLoading(true);
+                                            try{const r=await creativesAPI.imageBank({brandId:activeBrand?._id,category:'generated',limit:20});setBplCreatives(r.creatives||[])}catch(e){console.error(e)}
+                                            finally{setBplLoading(false)}
+                                        }} className="w-full py-3 rounded-xl border-2 border-dashed border-white/10 hover:border-yellow-400/30 bg-white/[0.02] text-slate-400 hover:text-yellow-300 text-sm transition-all cursor-pointer flex items-center justify-center gap-2">
+                                            <span className="material-symbols-outlined text-lg">photo_library</span>Browse Best Performing Creatives
+                                        </button>
+                                    )}
+                                </div>
+                                {/* Nav */}
+                                <div className="flex gap-3">
+                                    <button onClick={()=>setCampStep(2)} className="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer"><span className="material-symbols-outlined text-lg">arrow_back</span>Back</button>
+                                    <button onClick={()=>setCampStep(4)} className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 text-white text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer">Next: Generate<span className="material-symbols-outlined text-lg">arrow_forward</span></button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ══ STEP 4: Generate & Review ══ */}
+                    {campStep === 4 && (
+                        <div className="space-y-4">
+                            {/* Summary */}
+                            <div className="studio-card p-5">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-blue-400 text-lg">summarize</span>Campaign Summary</h3>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                    <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center"><p className="text-slate-500 text-[10px] mb-0.5">Keyword</p><p className="text-white text-xs font-semibold truncate">{campKeyword}</p></div>
+                                    <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center"><p className="text-slate-500 text-[10px] mb-0.5">Goal</p><p className="text-white text-xs font-semibold">{campGoal}</p></div>
+                                    <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center"><p className="text-slate-500 text-[10px] mb-0.5">Creatives</p><p className="text-white text-xs font-semibold">{campCount} × {campSizes.length} sizes</p></div>
+                                    <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center"><p className="text-slate-500 text-[10px] mb-0.5">Style</p><p className="text-white text-xs font-semibold capitalize">{campStyle}</p></div>
+                                </div>
+                            </div>
+                            {/* Generate */}
+                            {campResults.length===0&&(
+                                <button disabled={campGenerating} onClick={async()=>{
+                                    setCampGenerating(true);setCampError('');setCampResults([]);setCampProgress(0);
+                                    try{
+                                        const results=[];
+                                        const total=campCount*campSizes.length;
+                                        for(let i=0;i<campCount;i++){
+                                            for(const size of campSizes){
+                                                const copy=campCopies[i]||{headline:campKeyword,body:'',cta:campCta};
+                                                const productImg=campProductStrategy==='same'?campProducts[0]?.image:campProducts[i]?.image;
+                                                let prompt=`CAMPAIGN CREATIVE for "${campKeyword}" campaign.\nGOAL: ${campGoal}\nSTYLE: ${campStyle}\nHEADLINE: ${copy.headline}\nBODY: ${copy.body}\nCTA: ${copy.cta}\n${productImg?'Include the provided product image prominently.\n':''}${campCampaignLogo&&campLogoPlacement!=='none'?`Place the campaign logo at ${campLogoPlacement}.\n`:''}${campStyleRef?'Match the visual style of the provided reference image.\n':''}Brand: ${activeBrand?.name||'Brand'}\n\nRULES:\n- Professional, scroll-stopping advertising creative\n- Text must be readable and well-composed\n- Use ${campStyle} design aesthetic\n- Aspect ratio: ${size}`;
+                                                const opts={aspectRatio:size,style:campStyle};
+                                                if(productImg&&productImg.startsWith('data:'))opts.baseImage=productImg;
+                                                else if(productImg)opts.productImageUrl=productImg;
+                                                if(campStyleRef)opts.referenceImages={style:campStyleRef};
+                                                const payload={prompt,brandId:activeBrand?._id,type:'campaign',options:opts};
+                                                const res=await creativesAPI.generate(payload);
+                                                const url=res.creative?.imageUrl||res.imageUrl;
+                                                if(url)results.push({url,copy,size,index:i});
+                                                setCampProgress(results.length/total*100);
+                                            }
+                                        }
+                                        setCampResults(results);
+                                    }catch(err){setCampError(err.message)}
+                                    finally{setCampGenerating(false)}
+                                }} className="w-full py-4 rounded-xl font-bold text-base transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500 hover:from-blue-400 hover:via-indigo-400 hover:to-violet-400 text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+                                    {campGenerating?(<><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>Generating... {Math.round(campProgress)}%</>):(<><span className="material-symbols-outlined text-lg">rocket_launch</span>Generate All {campCount * campSizes.length} Creatives<span className="text-xs opacity-60 ml-1">~₹{(campCount*campSizes.length*0.25).toFixed(2)}</span></>)}
+                                </button>
+                            )}
+                            {campGenerating&&<div className="w-full bg-white/[0.06] rounded-full h-2"><div className="bg-gradient-to-r from-blue-500 to-violet-500 h-2 rounded-full transition-all" style={{width:`${campProgress}%`}}/></div>}
+                            {campError&&<div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-center gap-2"><span className="material-symbols-outlined text-lg">warning</span>{campError}</div>}
+                            {/* Results Grid */}
+                            {campResults.length>0&&(
+                                <div>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h3 className="font-bold text-white text-sm flex items-center gap-2"><span className="material-symbols-outlined text-emerald-400 text-lg">check_circle</span>{campResults.length} Creatives Generated</h3>
+                                        <div className="flex gap-2">
+                                            <button onClick={()=>{setCampResults([]);setCampStep(3)}} className="px-3 py-1.5 rounded-lg bg-white/[0.06] text-white text-xs font-medium hover:bg-white/[0.1] transition-all cursor-pointer">Regenerate All</button>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                        {campResults.map((r,i)=>(
+                                            <div key={i} className="rounded-xl overflow-hidden bg-white/[0.03] border border-white/[0.06] group">
+                                                <div className="relative"><img src={r.url} alt={`Creative ${i+1}`} className="w-full h-auto object-contain" />
+                                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                                        <a href={r.url} download={`campaign-${i+1}.png`} target="_blank" rel="noreferrer" className="px-2 py-1 rounded-lg bg-white/20 text-white text-[10px] font-medium backdrop-blur-sm hover:bg-white/30 transition-all cursor-pointer"><span className="material-symbols-outlined text-xs align-middle">download</span></a>
+                                                        <button onClick={()=>setPublishData({image:r.url,text:r.copy?.body||''})} className="px-2 py-1 rounded-lg bg-blue-500/30 text-blue-200 text-[10px] font-medium backdrop-blur-sm hover:bg-blue-500/50 transition-all cursor-pointer"><span className="material-symbols-outlined text-xs align-middle">share</span></button>
+                                                    </div>
+                                                </div>
+                                                <div className="p-2"><p className="text-white text-[10px] font-semibold truncate">{r.copy?.headline||''}</p><p className="text-slate-500 text-[9px]">{r.size}</p></div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            <button onClick={()=>setCampStep(3)} className="py-2.5 px-6 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-sm font-medium flex items-center gap-2 transition-all cursor-pointer"><span className="material-symbols-outlined text-lg">arrow_back</span>Back to Copy & Style</button>
+                        </div>
+                    )}
+
+                    {/* ══ Best Performing Library Modal ══ */}
+                    {bplOpen&&(
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={()=>setBplOpen(false)}>
+                            <div className="bg-[#0f0f23] rounded-2xl border border-white/[0.08] w-full max-w-3xl max-h-[70vh] overflow-hidden" onClick={e=>e.stopPropagation()}>
+                                <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
+                                    <h3 className="font-bold text-white text-base flex items-center gap-2"><span className="material-symbols-outlined text-yellow-400">emoji_events</span>Best Performing Creatives</h3>
+                                    <button onClick={()=>setBplOpen(false)} className="w-8 h-8 rounded-full bg-white/[0.06] flex items-center justify-center text-white hover:bg-white/[0.1] transition-all cursor-pointer"><span className="material-symbols-outlined text-lg">close</span></button>
+                                </div>
+                                <div className="p-5 overflow-y-auto max-h-[55vh]">
+                                    {bplLoading?<div className="text-center py-8 text-slate-500"><span className="material-symbols-outlined animate-spin text-2xl align-middle mr-2">progress_activity</span>Loading creatives...</div>:
+                                    bplCreatives.length>0?(
+                                        <div className="grid grid-cols-3 gap-3">
+                                            {bplCreatives.map((c,i)=>(
+                                                <button key={i} onClick={()=>{if(bplMode==='logo')setCampCampaignLogo(c.imageUrl);else setCampStyleRef(c.imageUrl);setBplOpen(false)}} className="rounded-xl overflow-hidden border border-white/[0.06] hover:border-yellow-400/30 transition-all cursor-pointer group">
+                                                    <img src={c.imageUrl} alt={c.title||`Creative ${i+1}`} className="w-full h-32 object-cover" />
+                                                    <div className="p-2 bg-white/[0.03]"><p className="text-white text-[10px] font-medium truncate">{c.title||c.type||'Creative'}</p><p className="text-emerald-400 text-[9px]">Click to use as style</p></div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ):<p className="text-center text-slate-500 text-sm py-8">No creatives found. Generate some first!</p>}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -4974,6 +5617,986 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )}
                     </div>
+                </div>
+            )}
+
+            {/* ====================== VIRTUAL TRY-ON MODE ====================== */}
+            {studioMode === 'tryon' && (
+                <div className="max-w-5xl mx-auto fade-up">
+                    {/* Hero Header */}
+                    <div className="glow-border rounded-2xl p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(236,72,153,0.06), rgba(139,92,246,0.04), rgba(6,182,212,0.03))' }}>
+                        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(236,72,153,0.08) 0%, transparent 50%), radial-gradient(circle at 20% 80%, rgba(139,92,246,0.06) 0%, transparent 50%)' }} />
+                        <div className="relative">
+                            <h2 className="text-xl font-bold text-white flex items-center gap-3 mb-1">
+                                <span className="material-symbols-outlined text-2xl text-pink-400">checkroom</span>
+                                Virtual Try-On
+                                <span className="text-xs font-medium bg-pink-500/20 text-pink-300 px-2 py-0.5 rounded-full">AI Powered</span>
+                            </h2>
+                            <p className="text-sm text-slate-400">Upload a person photo + clothing item — see them wearing it instantly</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-12 gap-6">
+                        {/* Left — Upload Zone */}
+                        <div className="col-span-12 lg:col-span-5 space-y-4">
+                            {/* Person Photo Upload */}
+                            <div className="studio-card p-5">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
+                                    <span className="material-symbols-outlined text-pink-400 text-lg">person</span>
+                                    Person Photo
+                                </h3>
+                                {!vtoPersonImage ? (
+                                    <label className="flex flex-col items-center justify-center h-40 rounded-xl border-2 border-dashed border-white/10 hover:border-pink-400/30 bg-white/[0.02] cursor-pointer transition-all group">
+                                        <span className="material-symbols-outlined text-3xl text-slate-600 group-hover:text-pink-400 transition-colors mb-2">add_a_photo</span>
+                                        <span className="text-sm text-slate-500 group-hover:text-slate-300">Upload person photo</span>
+                                        <span className="text-xs text-slate-600 mt-1">Full body or half body</span>
+                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                            const file = e.target.files?.[0]
+                                            if (file) {
+                                                const reader = new FileReader()
+                                                reader.onload = (ev) => setVtoPersonImage(ev.target.result)
+                                                reader.readAsDataURL(file)
+                                            }
+                                        }} />
+                                    </label>
+                                ) : (
+                                    <div className="relative rounded-xl overflow-hidden group">
+                                        <img src={vtoPersonImage} alt="Person" className="w-full h-40 object-cover rounded-xl" />
+                                        <button onClick={() => { setVtoPersonImage(null); setVtoPreviewResult(null); setVtoHdResult(null) }}
+                                            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                            <span className="material-symbols-outlined text-sm">close</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Garment Upload */}
+                            <div className="studio-card p-5">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
+                                    <span className="material-symbols-outlined text-violet-400 text-lg">checkroom</span>
+                                    Clothing / Garment
+                                </h3>
+                                {!vtoGarmentImage ? (
+                                    <label className="flex flex-col items-center justify-center h-40 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-400/30 bg-white/[0.02] cursor-pointer transition-all group">
+                                        <span className="material-symbols-outlined text-3xl text-slate-600 group-hover:text-violet-400 transition-colors mb-2">upload</span>
+                                        <span className="text-sm text-slate-500 group-hover:text-slate-300">Upload clothing item</span>
+                                        <span className="text-xs text-slate-600 mt-1">T-shirt, dress, jacket, etc.</span>
+                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                            const file = e.target.files?.[0]
+                                            if (file) {
+                                                const reader = new FileReader()
+                                                reader.onload = (ev) => setVtoGarmentImage(ev.target.result)
+                                                reader.readAsDataURL(file)
+                                            }
+                                        }} />
+                                    </label>
+                                ) : (
+                                    <div className="relative rounded-xl overflow-hidden group">
+                                        <img src={vtoGarmentImage} alt="Garment" className="w-full h-40 object-cover rounded-xl" />
+                                        <button onClick={() => { setVtoGarmentImage(null); setVtoPreviewResult(null); setVtoHdResult(null) }}
+                                            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                            <span className="material-symbols-outlined text-sm">close</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Sample Models — Quick Start */}
+                            <div className="studio-card p-5">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-2">
+                                    <span className="material-symbols-outlined text-amber-400 text-lg">face</span>
+                                    Quick Start — Sample Models
+                                </h3>
+                                <p className="text-xs text-slate-500 mb-3">Click to auto-generate a model photo (no upload needed)</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {[
+                                        { label: 'Woman — Indian', desc: 'Young Indian woman, medium skin tone, full body front pose, plain white background, professional model photo, natural lighting, 5\'6" average build', icon: 'person', gender: 'female' },
+                                        { label: 'Man — Indian', desc: 'Young Indian man, medium skin tone, full body front pose, plain white background, professional model photo, natural lighting, 5\'10" athletic build', icon: 'person', gender: 'male' },
+                                        { label: 'Woman — Western', desc: 'Young Caucasian woman, fair skin, full body front pose, plain white background, professional model photo, natural lighting, 5\'7" slim build', icon: 'person', gender: 'female' },
+                                        { label: 'Man — Western', desc: 'Young Caucasian man, fair skin, full body front pose, plain white background, professional model photo, natural lighting, 6\'0" athletic build', icon: 'person', gender: 'male' },
+                                        { label: 'Woman — East Asian', desc: 'Young East Asian woman, light skin tone, full body front pose, plain white background, professional model photo, natural lighting, 5\'5" slim build', icon: 'person', gender: 'female' },
+                                        { label: 'Man — Dark Skin', desc: 'Young African man, dark skin tone, full body front pose, plain white background, professional model photo, natural lighting, 6\'1" athletic build', icon: 'person', gender: 'male' },
+                                        { label: 'Woman — Curvy', desc: 'Young woman, plus-size curvy body, full body front pose, plain white background, professional model photo, natural lighting, 5\'5" curvy build, wearing simple neutral tank top and jeans', icon: 'person', gender: 'female' },
+                                        { label: 'Teen — Unisex', desc: 'Teenager 16-18 years old, androgynous look, full body front pose, plain white background, professional model photo, natural lighting, 5\'6" slim build', icon: 'person', gender: 'neutral' },
+                                    ].map(m => (
+                                        <button key={m.label}
+                                            disabled={vtoLoading}
+                                            onClick={async () => {
+                                                setVtoLoading(true); setVtoError('')
+                                                try {
+                                                    const res = await creativesAPI.lifestyleMockup({
+                                                        productImage: null,
+                                                        scenePrompt: `Generate ONLY a photo of a person with NO product: ${m.desc}. The person should be wearing simple plain white or grey clothing. Full body visible from head to toe. Studio photo on pure white background. No props, no accessories. This is a reference photo for virtual try-on.`,
+                                                        brandId: activeBrand?._id,
+                                                        aspectRatio: '3:4'
+                                                    })
+                                                    if (res.success && res.imageUrl) {
+                                                        setVtoPersonImage(res.imageUrl)
+                                                    } else {
+                                                        setVtoError('Failed to generate model photo')
+                                                    }
+                                                } catch (err) { setVtoError(err.message) }
+                                                finally { setVtoLoading(false) }
+                                            }}
+                                            className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-2
+                                                border-white/[0.06] bg-white/[0.02] text-slate-400 hover:border-pink-400/30 hover:text-slate-200
+                                                disabled:opacity-40 disabled:cursor-not-allowed`}>
+                                            <span className="material-symbols-outlined text-base">{m.icon}</span>
+                                            <div>
+                                                <span className="text-xs font-medium block">{m.label}</span>
+                                                <span className="text-[10px] text-slate-600">{m.gender}</span>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="space-y-2.5">
+                                <button
+                                    disabled={!vtoPersonImage || !vtoGarmentImage || vtoLoading}
+                                    onClick={async () => {
+                                        setVtoLoading(true); setVtoError(''); setVtoPreviewResult(null); setVtoHdResult(null)
+                                        try {
+                                            const res = await creativesAPI.virtualTryon({
+                                                personImage: vtoPersonImage,
+                                                garmentImage: vtoGarmentImage,
+                                                brandId: activeBrand?._id,
+                                                mode: 'preview'
+                                            })
+                                            if (res.success && res.imageUrl) setVtoPreviewResult(res.imageUrl)
+                                            else setVtoError(res.error || 'Preview generation failed')
+                                        } catch (err) { setVtoError(err.message) }
+                                        finally { setVtoLoading(false) }
+                                    }}
+                                    className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2
+                                        bg-gradient-to-r from-pink-500 to-violet-500 hover:from-pink-400 hover:to-violet-400 text-white
+                                        disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+                                    {vtoLoading ? (
+                                        <><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span> Generating Preview...</>
+                                    ) : (
+                                        <><span className="material-symbols-outlined text-lg">auto_awesome</span> Generate Preview<span className="text-xs opacity-60 ml-1">~₹0.25</span></>
+                                    )}
+                                </button>
+
+                                {vtoPreviewResult && !vtoHdResult && (
+                                    <button
+                                        disabled={vtoHdLoading}
+                                        onClick={async () => {
+                                            setVtoHdLoading(true); setVtoError('')
+                                            try {
+                                                const res = await creativesAPI.virtualTryon({
+                                                    personImage: vtoPersonImage,
+                                                    garmentImage: vtoGarmentImage,
+                                                    brandId: activeBrand?._id,
+                                                    mode: 'hd'
+                                                })
+                                                if (res.success && res.requestId) {
+                                                    // Poll for HD result
+                                                    const poll = async () => {
+                                                        try {
+                                                            const status = await creativesAPI.vtoStatus(res.requestId, activeBrand?._id)
+                                                            if (status.status === 'completed' && status.imageUrl) {
+                                                                setVtoHdResult(status.imageUrl)
+                                                                setVtoHdLoading(false)
+                                                            } else if (status.status === 'failed') {
+                                                                setVtoError('HD generation failed: ' + (status.error || ''))
+                                                                setVtoHdLoading(false)
+                                                            } else {
+                                                                setTimeout(poll, 4000)
+                                                            }
+                                                        } catch { setTimeout(poll, 4000) }
+                                                    }
+                                                    setTimeout(poll, 5000)
+                                                } else {
+                                                    setVtoError(res.error || 'HD queuing failed')
+                                                    setVtoHdLoading(false)
+                                                }
+                                            } catch (err) { setVtoError(err.message); setVtoHdLoading(false) }
+                                        }}
+                                        className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2
+                                            bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white
+                                            disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+                                        {vtoHdLoading ? (
+                                            <><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span> Rendering HD... ~30s</>
+                                        ) : (
+                                            <><span className="material-symbols-outlined text-lg">hd</span> Generate HD Version<span className="text-xs opacity-60 ml-1">~₹3.5</span></>
+                                        )}
+                                    </button>
+                                )}
+                            </div>
+
+                            {vtoError && (
+                                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-lg">warning</span>{vtoError}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Right — Result Preview */}
+                        <div className="col-span-12 lg:col-span-7">
+                            <div className="studio-card p-5 min-h-[400px] flex flex-col">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-4">
+                                    <span className="material-symbols-outlined text-cyan-400 text-lg">image</span>
+                                    Try-On Result
+                                    {vtoHdResult && <span className="text-xs font-medium bg-violet-500/20 text-violet-300 px-2 py-0.5 rounded-full">HD</span>}
+                                    {vtoPreviewResult && !vtoHdResult && <span className="text-xs font-medium bg-pink-500/20 text-pink-300 px-2 py-0.5 rounded-full">Preview</span>}
+                                </h3>
+                                {(vtoHdResult || vtoPreviewResult) ? (
+                                    <div className="flex-1 flex flex-col">
+                                        <div className="flex-1 rounded-xl overflow-hidden bg-black/20 mb-3">
+                                            <img src={vtoHdResult || vtoPreviewResult} alt="Virtual Try-On Result" className="w-full h-full object-contain max-h-[500px]" />
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <a href={vtoHdResult || vtoPreviewResult} download="try-on-result.png" target="_blank" rel="noreferrer"
+                                                className="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer">
+                                                <span className="material-symbols-outlined text-lg">download</span>Download
+                                            </a>
+                                            <button onClick={() => { setVtoPersonImage(null); setVtoGarmentImage(null); setVtoPreviewResult(null); setVtoHdResult(null); setVtoError('') }}
+                                                className="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer">
+                                                <span className="material-symbols-outlined text-lg">restart_alt</span>Start Over
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex-1 flex flex-col items-center justify-center text-center py-12">
+                                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-pink-500/10 to-violet-500/10 flex items-center justify-center mb-4">
+                                            <span className="material-symbols-outlined text-4xl text-pink-400/40">checkroom</span>
+                                        </div>
+                                        <p className="text-slate-400 text-sm font-medium mb-1">No result yet</p>
+                                        <p className="text-slate-600 text-xs">Upload a person photo and clothing item, then generate</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ====================== LIFESTYLE MOCKUPS MODE ====================== */}
+            {studioMode === 'mockups' && (
+                <div className="max-w-5xl mx-auto fade-up">
+                    {/* Hero Header */}
+                    <div className="glow-border rounded-2xl p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(6,182,212,0.06), rgba(59,130,246,0.04), rgba(139,92,246,0.03))' }}>
+                        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(6,182,212,0.08) 0%, transparent 50%), radial-gradient(circle at 20% 80%, rgba(59,130,246,0.06) 0%, transparent 50%)' }} />
+                        <div className="relative">
+                            <h2 className="text-xl font-bold text-white flex items-center gap-3 mb-2">
+                                <span className="material-symbols-outlined text-2xl text-cyan-400">landscape</span>
+                                Mockup Studio
+                                <span className="text-xs font-medium bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full">AI Powered</span>
+                            </h2>
+                            <p className="text-sm text-slate-400 mb-4">Generate product lifestyle scenes or place your logo on merchandise</p>
+                            {/* Sub-mode Toggle */}
+                            <div className="flex gap-2">
+                                <button onClick={() => setMockupSubMode('lifestyle')}
+                                    className={`px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                                        mockupSubMode === 'lifestyle'
+                                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/30'
+                                            : 'bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:text-slate-200'
+                                    }`}>
+                                    <span className="material-symbols-outlined text-lg">landscape</span>
+                                    Product Lifestyle
+                                </button>
+                                <button onClick={() => setMockupSubMode('logo')}
+                                    className={`px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                                        mockupSubMode === 'logo'
+                                            ? 'bg-amber-500/20 text-amber-300 border border-amber-400/30'
+                                            : 'bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:text-slate-200'
+                                    }`}>
+                                    <span className="material-symbols-outlined text-lg">branding_watermark</span>
+                                    Logo / Brand Mockup
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ── Product Lifestyle Sub-mode ── */}
+                    {mockupSubMode === 'lifestyle' && (
+                    <div className="grid grid-cols-12 gap-6">
+                        {/* Left — Controls */}
+                        <div className="col-span-12 lg:col-span-5 space-y-4">
+                            {/* Product Upload */}
+                            <div className="studio-card p-5">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
+                                    <span className="material-symbols-outlined text-cyan-400 text-lg">add_a_photo</span>
+                                    Product Image
+                                </h3>
+                                {!mockupProductImage ? (
+                                    <label className="flex flex-col items-center justify-center h-40 rounded-xl border-2 border-dashed border-white/10 hover:border-cyan-400/30 bg-white/[0.02] cursor-pointer transition-all group">
+                                        <span className="material-symbols-outlined text-3xl text-slate-600 group-hover:text-cyan-400 transition-colors mb-2">upload</span>
+                                        <span className="text-sm text-slate-500 group-hover:text-slate-300">Upload product photo</span>
+                                        <span className="text-xs text-slate-600 mt-1">Any product — cosmetics, electronics, food, etc.</span>
+                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                            const file = e.target.files?.[0]
+                                            if (file) {
+                                                const reader = new FileReader()
+                                                reader.onload = (ev) => setMockupProductImage(ev.target.result)
+                                                reader.readAsDataURL(file)
+                                            }
+                                        }} />
+                                    </label>
+                                ) : (
+                                    <div className="relative rounded-xl overflow-hidden group">
+                                        <img src={mockupProductImage} alt="Product" className="w-full h-40 object-cover rounded-xl" />
+                                        <button onClick={() => { setMockupProductImage(null); setMockupResult(null) }}
+                                            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                            <span className="material-symbols-outlined text-sm">close</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Scene Library */}
+                            <div className="studio-card p-5">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
+                                    <span className="material-symbols-outlined text-amber-400 text-lg">auto_fix_high</span>
+                                    Scene Library
+                                    <span className="text-xs text-slate-500 font-normal ml-auto">{(() => {
+                                        const allScenes = {
+                                            all: [],
+                                            cosmetics: [
+                                                { label: 'Marble Vanity', prompt: 'Elegant white marble bathroom vanity with soft diffused morning light, rose petals scattered, luxury cosmetics lifestyle', icon: 'spa' },
+                                                { label: 'Rose Petals', prompt: 'Scattered pink and white rose petals on a soft silk fabric surface, romantic and luxurious beauty product setting, soft pink lighting', icon: 'local_florist' },
+                                                { label: 'Skincare Shelf', prompt: 'Minimalist white bathroom shelf with green plants, soft towels, and natural light streaming through frosted glass window', icon: 'shelves' },
+                                                { label: 'Gold Tray', prompt: 'Elegant brushed gold vanity tray on white marble, luxury perfume bottles nearby, warm golden hour light, high-end beauty editorial', icon: 'diamond' },
+                                                { label: 'Tropical Spa', prompt: 'Tropical spa setting with fresh coconut shells, frangipani flowers, bamboo mat, warm natural sunlight, serene wellness atmosphere', icon: 'self_improvement' },
+                                                { label: 'Dewy Leaves', prompt: 'Fresh green leaves with morning dew drops, natural organic skincare vibe, macro botanical detail, soft diffused daylight', icon: 'water_drop' },
+                                                { label: 'Powder Cloud', prompt: 'Cosmetic product floating in a cloud of fine powder or shimmer particles, dark dramatic background, luxury makeup editorial', icon: 'blur_on' },
+                                                { label: 'Mirror Reflection', prompt: 'Product reflected in a round vanity mirror on a clean marble counter, warm bathroom lighting, elegant and sophisticated setup', icon: 'looks' },
+                                            ],
+                                            electronics: [
+                                                { label: 'Tech Desk', prompt: 'Clean modern desk setup with LED accent lighting, dark wood surface, minimal tech workspace, professional gadget photography', icon: 'computer' },
+                                                { label: 'Neon Glow', prompt: 'Product illuminated by vibrant RGB neon lighting in purple and blue, dark background, futuristic cyberpunk tech vibe, dramatic reflections', icon: 'lightbulb' },
+                                                { label: 'Floating Chrome', prompt: 'Product levitating on a sleek chrome surface with soft gradient background, futuristic floating product display, clean reflections', icon: 'rocket_launch' },
+                                                { label: 'Dark Minimal', prompt: 'Ultra-minimal dark matte black surface, single dramatic spotlight from above, high-contrast tech product photography', icon: 'dark_mode' },
+                                                { label: 'Circuit Board', prompt: 'Product placed on a stylized glowing circuit board pattern, blue and green LED traces, high-tech electronic engineering aesthetic', icon: 'memory' },
+                                                { label: 'Smart Home', prompt: 'Modern smart home living room with ambient IoT lighting, sleek furniture, product on a side table, warm futuristic home atmosphere', icon: 'home' },
+                                                { label: 'Transparent Glass', prompt: 'Product on a transparent glass shelf with soft under-lighting, clean modern retail display case, premium electronics showroom', icon: 'grid_view' },
+                                            ],
+                                            food: [
+                                                { label: 'Kitchen Counter', prompt: 'Clean white marble kitchen counter with soft natural morning light, fresh herbs and wooden cutting board nearby', icon: 'kitchen' },
+                                                { label: 'Rustic Wood', prompt: 'Rustic reclaimed wood table with linen napkin, vintage cutlery, warm farmhouse kitchen vibes, natural daylight', icon: 'table_restaurant' },
+                                                { label: 'Breakfast Table', prompt: 'Sunny breakfast table with fresh orange juice, croissants, fresh flowers in a vase, bright morning sunlight streaming in', icon: 'breakfast_dining' },
+                                                { label: 'Fresh Ingredients', prompt: 'Product surrounded by fresh ingredients — tomatoes, basil, olive oil, garlic on a wooden cutting board, food photography style', icon: 'restaurant' },
+                                                { label: 'Picnic Blanket', prompt: 'Product on a checkered picnic blanket in a sunny park, fresh fruits and cheese nearby, warm outdoor golden hour light', icon: 'park' },
+                                                { label: 'Dark Food Moody', prompt: 'Dark moody food photography, product on black slate with dramatic side lighting, scattered spices and herbs, editorial food styling', icon: 'restaurant_menu' },
+                                                { label: 'Ice & Frost', prompt: 'Product surrounded by crushed ice and frost crystals on a cold surface, fresh chilled beverage photography, cool blue tones', icon: 'ac_unit' },
+                                            ],
+                                            fashion: [
+                                                { label: 'Fashion Flat Lay', prompt: 'Stylish flat lay arrangement on white marble, sunglasses, watch, wallet nearby, fashion accessories editorial, golden hour light', icon: 'styler' },
+                                                { label: 'Street Style', prompt: 'Urban street background with exposed brick wall and graffiti art, trendy street fashion vibe, natural city lighting', icon: 'location_city' },
+                                                { label: 'Boutique Display', prompt: 'Luxury fashion boutique display shelf with velvet fabric and warm spotlighting, premium retail environment, elegant arrangement', icon: 'storefront' },
+                                                { label: 'Wardrobe Rack', prompt: 'Minimalist clothing rack with curated garments, wooden hangers, soft natural light, Scandinavian style wardrobe', icon: 'checkroom' },
+                                                { label: 'Beach Resort', prompt: 'Luxury beach resort lounge with white cabana, turquoise ocean view, straw hat nearby, summer fashion lifestyle vibe', icon: 'beach_access' },
+                                                { label: 'Velvet Cushion', prompt: 'Product displayed on a rich dark velvet cushion, dramatic spotlight, luxury jewelry and accessories photography style', icon: 'chair' },
+                                            ],
+                                            home: [
+                                                { label: 'Living Room', prompt: 'Cozy modern living room with soft neutral tones, plush sofa, throw blanket, warm ambient lighting, lifestyle home photography', icon: 'living' },
+                                                { label: 'Boho Shelf', prompt: 'Bohemian-style wooden wall shelf with macramé, dried pampas grass, candles, warm earthy tones, natural light', icon: 'shelves' },
+                                                { label: 'Scandinavian Desk', prompt: 'Clean Scandinavian home office desk, light oak wood, minimalist accessories, green plant, soft diffused daylight', icon: 'desk' },
+                                                { label: 'Cozy Bedroom', prompt: 'Luxurious bedroom with crisp white linen sheets, fluffy pillows, soft morning sunlight through sheer curtains', icon: 'bed' },
+                                                { label: 'Garden Table', prompt: 'Outdoor garden table with potted succulents, terracotta pots, fresh herbs, warm afternoon sunlight, natural organic feel', icon: 'yard' },
+                                                { label: 'Fireplace Mantel', prompt: 'Product on a rustic stone fireplace mantel with lit candles, cozy winter atmosphere, warm amber lighting', icon: 'fireplace' },
+                                            ],
+                                            podiums: [
+                                                { label: 'White Podium', prompt: 'Product on a clean white cylindrical podium, soft studio lighting, minimal pure white background, premium product display', icon: 'view_in_ar' },
+                                                { label: 'Gold Podium', prompt: 'Product displayed on a luxurious brushed gold pedestal, soft warm lighting, dark navy background, premium award-style showcase', icon: 'emoji_events' },
+                                                { label: 'Glass Platform', prompt: 'Transparent glass display platform with soft under-glow, floating product effect, clean modern museum-style display', icon: 'crop_square' },
+                                                { label: 'Marble Column', prompt: 'Product on a classical white marble column pedestal, dramatic Roman-style architecture in background, luxury brand showcase', icon: 'account_balance' },
+                                                { label: 'Floating Steps', prompt: 'Product on geometric floating steps/platforms in different heights, soft gradient background, 3D abstract modern display', icon: 'stairs' },
+                                                { label: 'Neon Podium', prompt: 'Product on a dark podium with neon edge lighting in pink and blue, cyberpunk retail display, futuristic product launch', icon: 'blur_linear' },
+                                                { label: 'Stone Pedestal', prompt: 'Raw natural stone pedestal with rough texture, surrounded by dried flowers and earthy elements, organic luxury display', icon: 'landscape' },
+                                                { label: 'Acrylic Cube', prompt: 'Product on a transparent acrylic cube display, clean gallery lighting, contemporary art exhibition product showcase', icon: 'select_all' },
+                                            ],
+                                            seasonal: [
+                                                { label: 'Christmas', prompt: 'Festive Christmas setting with pine branches, red ornaments, gold baubles, twinkling fairy lights, warm holiday atmosphere', icon: 'celebration' },
+                                                { label: 'Diwali', prompt: 'Beautiful Diwali festival setting with lit diyas, marigold garlands, rangoli patterns, warm golden festive lighting', icon: 'local_fire_department' },
+                                                { label: 'Valentine\'s', prompt: 'Romantic Valentine\'s setting with red roses, heart-shaped confetti, soft pink silk fabric, warm candlelight ambiance', icon: 'favorite' },
+                                                { label: 'Spring Bloom', prompt: 'Fresh spring garden with cherry blossoms in full bloom, soft pastel colors, butterflies, warm spring morning light', icon: 'filter_vintage' },
+                                                { label: 'Autumn Harvest', prompt: 'Autumn harvest setting with golden leaves, pumpkins, cinnamon sticks, warm amber tones, cozy fall atmosphere', icon: 'eco' },
+                                                { label: 'Summer Splash', prompt: 'Bright summer pool party setting with splashing water, citrus fruits, tropical flowers, vivid blue sky, fun energetic vibe', icon: 'pool' },
+                                                { label: 'New Year', prompt: 'Glamorous New Year celebration with champagne glasses, gold confetti, sparklers, midnight blue and gold color scheme', icon: 'nightlife' },
+                                                { label: 'Back to School', prompt: 'Neat school desk with colorful stationery, notebooks, pencils, fresh apple, bright cheerful classroom lighting', icon: 'school' },
+                                            ],
+                                            luxury: [
+                                                { label: 'Dark Luxury', prompt: 'Elegant dark wood table with subtle gold accents, luxury lifestyle, soft dramatic lighting, premium feel', icon: 'table_restaurant' },
+                                                { label: 'Penthouse View', prompt: 'Luxury penthouse rooftop with city skyline at twilight, floor-to-ceiling windows, modern furniture, golden hour light', icon: 'apartment' },
+                                                { label: 'Private Jet', prompt: 'Interior of a luxury private jet cabin, leather seats, champagne glass, window showing clouds, ultimate premium lifestyle', icon: 'flight' },
+                                                { label: 'Yacht Deck', prompt: 'Sleek white yacht deck with turquoise sea in background, polished teak wood, luxury maritime lifestyle photography', icon: 'sailing' },
+                                                { label: 'Art Gallery', prompt: 'Minimalist white-walled art gallery with dramatic spot lighting, product as centerpiece, contemporary exhibition style', icon: 'museum' },
+                                                { label: 'Black Silk', prompt: 'Product draped in flowing black silk fabric, dramatic chiaroscuro lighting, ultra-premium luxury brand editorial', icon: 'looks' },
+                                            ],
+                                            nature: [
+                                                { label: 'Nature & Greenery', prompt: 'Lush green botanical setting with natural leaves and flowers, soft dappled sunlight filtering through, organic fresh feel', icon: 'eco' },
+                                                { label: 'Waterfall Rocks', prompt: 'Natural river rocks near a small waterfall, moss-covered stones, fresh flowing water, serene forest atmosphere', icon: 'water' },
+                                                { label: 'Desert Sand', prompt: 'Clean desert sand dunes with golden hour sunlight, dramatic shadows, warm earthy minimalist backdrop', icon: 'landscape' },
+                                                { label: 'Lavender Field', prompt: 'Product in a stunning lavender field at sunset, purple flowers stretching to horizon, warm golden light, French countryside', icon: 'grass' },
+                                                { label: 'Mountain Lake', prompt: 'Serene mountain lake with mirror-like reflection, snow-capped peaks in background, crystal clear water, pristine nature', icon: 'terrain' },
+                                                { label: 'Tropical Jungle', prompt: 'Dense tropical jungle with monstera and palm leaves, exotic flowers, humid atmosphere, vibrant green tone photography', icon: 'forest' },
+                                            ],
+                                            studio: [
+                                                { label: 'Studio White', prompt: 'Professional photography studio with seamless white background, soft diffused studio lighting, clean minimal setup', icon: 'photo_camera' },
+                                                { label: 'Studio Black', prompt: 'Professional studio with seamless black background, dramatic directional lighting, high-contrast product photography', icon: 'contrast' },
+                                                { label: 'Gradient Sweep', prompt: 'Smooth gradient background transitioning from light blue to white, soft even lighting, clean e-commerce product photo style', icon: 'gradient' },
+                                                { label: 'Color Pop', prompt: 'Vibrant solid color background (matching the product accent color), flat lay style, bold graphic editorial product photo', icon: 'palette' },
+                                                { label: '360° Turntable', prompt: 'Product on a sleek turntable/lazy susan, clean white cyclorama background, even studio lighting, 3D product display feel', icon: '360' },
+                                            ],
+                                        };
+                                        const filtered = mockupSceneCategory === 'all'
+                                            ? Object.values(allScenes).flat()
+                                            : allScenes[mockupSceneCategory] || [];
+                                        return `${filtered.length} scenes`;
+                                    })()}</span>
+                                </h3>
+
+                                {/* Category Tabs */}
+                                <div className="flex flex-wrap gap-1.5 mb-3">
+                                    {[
+                                        { id: 'all', label: 'All', icon: 'apps' },
+                                        { id: 'cosmetics', label: 'Beauty', icon: 'spa' },
+                                        { id: 'electronics', label: 'Tech', icon: 'devices' },
+                                        { id: 'food', label: 'Food', icon: 'restaurant' },
+                                        { id: 'fashion', label: 'Fashion', icon: 'checkroom' },
+                                        { id: 'home', label: 'Home', icon: 'home' },
+                                        { id: 'podiums', label: 'Podiums', icon: 'view_in_ar' },
+                                        { id: 'seasonal', label: 'Seasonal', icon: 'celebration' },
+                                        { id: 'luxury', label: 'Luxury', icon: 'diamond' },
+                                        { id: 'nature', label: 'Nature', icon: 'eco' },
+                                        { id: 'studio', label: 'Studio', icon: 'photo_camera' },
+                                    ].map(cat => (
+                                        <button key={cat.id}
+                                            onClick={() => setMockupSceneCategory(cat.id)}
+                                            className={`px-2 py-1 rounded-lg text-[11px] font-medium flex items-center gap-1 transition-all cursor-pointer ${
+                                                mockupSceneCategory === cat.id
+                                                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/30'
+                                                    : 'bg-white/[0.03] text-slate-500 border border-white/[0.05] hover:text-slate-300 hover:border-white/[0.12]'
+                                            }`}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>{cat.icon}</span>
+                                            {cat.label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Scene Grid */}
+                                <div className="grid grid-cols-2 gap-2 mb-3 max-h-[320px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+                                    {(() => {
+                                        const allScenes = {
+                                            cosmetics: [
+                                                { label: 'Marble Vanity', prompt: 'Elegant white marble bathroom vanity with soft diffused morning light, rose petals scattered, luxury cosmetics lifestyle', icon: 'spa' },
+                                                { label: 'Rose Petals', prompt: 'Scattered pink and white rose petals on a soft silk fabric surface, romantic and luxurious beauty product setting, soft pink lighting', icon: 'local_florist' },
+                                                { label: 'Skincare Shelf', prompt: 'Minimalist white bathroom shelf with green plants, soft towels, and natural light streaming through frosted glass window', icon: 'shelves' },
+                                                { label: 'Gold Tray', prompt: 'Elegant brushed gold vanity tray on white marble, luxury perfume bottles nearby, warm golden hour light, high-end beauty editorial', icon: 'diamond' },
+                                                { label: 'Tropical Spa', prompt: 'Tropical spa setting with fresh coconut shells, frangipani flowers, bamboo mat, warm natural sunlight, serene wellness atmosphere', icon: 'self_improvement' },
+                                                { label: 'Dewy Leaves', prompt: 'Fresh green leaves with morning dew drops, natural organic skincare vibe, macro botanical detail, soft diffused daylight', icon: 'water_drop' },
+                                                { label: 'Powder Cloud', prompt: 'Cosmetic product floating in a cloud of fine powder or shimmer particles, dark dramatic background, luxury makeup editorial', icon: 'blur_on' },
+                                                { label: 'Mirror Reflection', prompt: 'Product reflected in a round vanity mirror on a clean marble counter, warm bathroom lighting, elegant and sophisticated setup', icon: 'looks' },
+                                            ],
+                                            electronics: [
+                                                { label: 'Tech Desk', prompt: 'Clean modern desk setup with LED accent lighting, dark wood surface, minimal tech workspace, professional gadget photography', icon: 'computer' },
+                                                { label: 'Neon Glow', prompt: 'Product illuminated by vibrant RGB neon lighting in purple and blue, dark background, futuristic cyberpunk tech vibe, dramatic reflections', icon: 'lightbulb' },
+                                                { label: 'Floating Chrome', prompt: 'Product levitating on a sleek chrome surface with soft gradient background, futuristic floating product display, clean reflections', icon: 'rocket_launch' },
+                                                { label: 'Dark Minimal', prompt: 'Ultra-minimal dark matte black surface, single dramatic spotlight from above, high-contrast tech product photography', icon: 'dark_mode' },
+                                                { label: 'Circuit Board', prompt: 'Product placed on a stylized glowing circuit board pattern, blue and green LED traces, high-tech electronic engineering aesthetic', icon: 'memory' },
+                                                { label: 'Smart Home', prompt: 'Modern smart home living room with ambient IoT lighting, sleek furniture, product on a side table, warm futuristic home atmosphere', icon: 'home' },
+                                                { label: 'Transparent Glass', prompt: 'Product on a transparent glass shelf with soft under-lighting, clean modern retail display case, premium electronics showroom', icon: 'grid_view' },
+                                            ],
+                                            food: [
+                                                { label: 'Kitchen Counter', prompt: 'Clean white marble kitchen counter with soft natural morning light, fresh herbs and wooden cutting board nearby', icon: 'kitchen' },
+                                                { label: 'Rustic Wood', prompt: 'Rustic reclaimed wood table with linen napkin, vintage cutlery, warm farmhouse kitchen vibes, natural daylight', icon: 'table_restaurant' },
+                                                { label: 'Breakfast Table', prompt: 'Sunny breakfast table with fresh orange juice, croissants, fresh flowers in a vase, bright morning sunlight streaming in', icon: 'breakfast_dining' },
+                                                { label: 'Fresh Ingredients', prompt: 'Product surrounded by fresh ingredients — tomatoes, basil, olive oil, garlic on a wooden cutting board, food photography style', icon: 'restaurant' },
+                                                { label: 'Picnic Blanket', prompt: 'Product on a checkered picnic blanket in a sunny park, fresh fruits and cheese nearby, warm outdoor golden hour light', icon: 'park' },
+                                                { label: 'Dark Food Moody', prompt: 'Dark moody food photography, product on black slate with dramatic side lighting, scattered spices and herbs, editorial food styling', icon: 'restaurant_menu' },
+                                                { label: 'Ice & Frost', prompt: 'Product surrounded by crushed ice and frost crystals on a cold surface, fresh chilled beverage photography, cool blue tones', icon: 'ac_unit' },
+                                            ],
+                                            fashion: [
+                                                { label: 'Fashion Flat Lay', prompt: 'Stylish flat lay arrangement on white marble, sunglasses, watch, wallet nearby, fashion accessories editorial, golden hour light', icon: 'styler' },
+                                                { label: 'Street Style', prompt: 'Urban street background with exposed brick wall and graffiti art, trendy street fashion vibe, natural city lighting', icon: 'location_city' },
+                                                { label: 'Boutique Display', prompt: 'Luxury fashion boutique display shelf with velvet fabric and warm spotlighting, premium retail environment, elegant arrangement', icon: 'storefront' },
+                                                { label: 'Wardrobe Rack', prompt: 'Minimalist clothing rack with curated garments, wooden hangers, soft natural light, Scandinavian style wardrobe', icon: 'checkroom' },
+                                                { label: 'Beach Resort', prompt: 'Luxury beach resort lounge with white cabana, turquoise ocean view, straw hat nearby, summer fashion lifestyle vibe', icon: 'beach_access' },
+                                                { label: 'Velvet Cushion', prompt: 'Product displayed on a rich dark velvet cushion, dramatic spotlight, luxury jewelry and accessories photography style', icon: 'chair' },
+                                            ],
+                                            home: [
+                                                { label: 'Living Room', prompt: 'Cozy modern living room with soft neutral tones, plush sofa, throw blanket, warm ambient lighting, lifestyle home photography', icon: 'living' },
+                                                { label: 'Boho Shelf', prompt: 'Bohemian-style wooden wall shelf with macramé, dried pampas grass, candles, warm earthy tones, natural light', icon: 'shelves' },
+                                                { label: 'Scandinavian Desk', prompt: 'Clean Scandinavian home office desk, light oak wood, minimalist accessories, green plant, soft diffused daylight', icon: 'desk' },
+                                                { label: 'Cozy Bedroom', prompt: 'Luxurious bedroom with crisp white linen sheets, fluffy pillows, soft morning sunlight through sheer curtains', icon: 'bed' },
+                                                { label: 'Garden Table', prompt: 'Outdoor garden table with potted succulents, terracotta pots, fresh herbs, warm afternoon sunlight, natural organic feel', icon: 'yard' },
+                                                { label: 'Fireplace Mantel', prompt: 'Product on a rustic stone fireplace mantel with lit candles, cozy winter atmosphere, warm amber lighting', icon: 'fireplace' },
+                                            ],
+                                            podiums: [
+                                                { label: 'White Podium', prompt: 'Product on a clean white cylindrical podium, soft studio lighting, minimal pure white background, premium product display', icon: 'view_in_ar' },
+                                                { label: 'Gold Podium', prompt: 'Product displayed on a luxurious brushed gold pedestal, soft warm lighting, dark navy background, premium award-style showcase', icon: 'emoji_events' },
+                                                { label: 'Glass Platform', prompt: 'Transparent glass display platform with soft under-glow, floating product effect, clean modern museum-style display', icon: 'crop_square' },
+                                                { label: 'Marble Column', prompt: 'Product on a classical white marble column pedestal, dramatic Roman-style architecture in background, luxury brand showcase', icon: 'account_balance' },
+                                                { label: 'Floating Steps', prompt: 'Product on geometric floating steps/platforms in different heights, soft gradient background, 3D abstract modern display', icon: 'stairs' },
+                                                { label: 'Neon Podium', prompt: 'Product on a dark podium with neon edge lighting in pink and blue, cyberpunk retail display, futuristic product launch', icon: 'blur_linear' },
+                                                { label: 'Stone Pedestal', prompt: 'Raw natural stone pedestal with rough texture, surrounded by dried flowers and earthy elements, organic luxury display', icon: 'landscape' },
+                                                { label: 'Acrylic Cube', prompt: 'Product on a transparent acrylic cube display, clean gallery lighting, contemporary art exhibition product showcase', icon: 'select_all' },
+                                            ],
+                                            seasonal: [
+                                                { label: 'Christmas', prompt: 'Festive Christmas setting with pine branches, red ornaments, gold baubles, twinkling fairy lights, warm holiday atmosphere', icon: 'celebration' },
+                                                { label: 'Diwali', prompt: 'Beautiful Diwali festival setting with lit diyas, marigold garlands, rangoli patterns, warm golden festive lighting', icon: 'local_fire_department' },
+                                                { label: 'Valentine\'s', prompt: 'Romantic Valentine\'s setting with red roses, heart-shaped confetti, soft pink silk fabric, warm candlelight ambiance', icon: 'favorite' },
+                                                { label: 'Spring Bloom', prompt: 'Fresh spring garden with cherry blossoms in full bloom, soft pastel colors, butterflies, warm spring morning light', icon: 'filter_vintage' },
+                                                { label: 'Autumn Harvest', prompt: 'Autumn harvest setting with golden leaves, pumpkins, cinnamon sticks, warm amber tones, cozy fall atmosphere', icon: 'eco' },
+                                                { label: 'Summer Splash', prompt: 'Bright summer pool party setting with splashing water, citrus fruits, tropical flowers, vivid blue sky, fun energetic vibe', icon: 'pool' },
+                                                { label: 'New Year', prompt: 'Glamorous New Year celebration with champagne glasses, gold confetti, sparklers, midnight blue and gold color scheme', icon: 'nightlife' },
+                                                { label: 'Back to School', prompt: 'Neat school desk with colorful stationery, notebooks, pencils, fresh apple, bright cheerful classroom lighting', icon: 'school' },
+                                            ],
+                                            luxury: [
+                                                { label: 'Dark Luxury', prompt: 'Elegant dark wood table with subtle gold accents, luxury lifestyle, soft dramatic lighting, premium feel', icon: 'table_restaurant' },
+                                                { label: 'Penthouse View', prompt: 'Luxury penthouse rooftop with city skyline at twilight, floor-to-ceiling windows, modern furniture, golden hour light', icon: 'apartment' },
+                                                { label: 'Private Jet', prompt: 'Interior of a luxury private jet cabin, leather seats, champagne glass, window showing clouds, ultimate premium lifestyle', icon: 'flight' },
+                                                { label: 'Yacht Deck', prompt: 'Sleek white yacht deck with turquoise sea in background, polished teak wood, luxury maritime lifestyle photography', icon: 'sailing' },
+                                                { label: 'Art Gallery', prompt: 'Minimalist white-walled art gallery with dramatic spot lighting, product as centerpiece, contemporary exhibition style', icon: 'museum' },
+                                                { label: 'Black Silk', prompt: 'Product draped in flowing black silk fabric, dramatic chiaroscuro lighting, ultra-premium luxury brand editorial', icon: 'looks' },
+                                            ],
+                                            nature: [
+                                                { label: 'Greenery', prompt: 'Lush green botanical setting with natural leaves and flowers, soft dappled sunlight filtering through, organic fresh feel', icon: 'eco' },
+                                                { label: 'Waterfall Rocks', prompt: 'Natural river rocks near a small waterfall, moss-covered stones, fresh flowing water, serene forest atmosphere', icon: 'water' },
+                                                { label: 'Desert Sand', prompt: 'Clean desert sand dunes with golden hour sunlight, dramatic shadows, warm earthy minimalist backdrop', icon: 'landscape' },
+                                                { label: 'Lavender Field', prompt: 'Product in a stunning lavender field at sunset, purple flowers stretching to horizon, warm golden light, French countryside', icon: 'grass' },
+                                                { label: 'Mountain Lake', prompt: 'Serene mountain lake with mirror-like reflection, snow-capped peaks in background, crystal clear water, pristine nature', icon: 'terrain' },
+                                                { label: 'Tropical Jungle', prompt: 'Dense tropical jungle with monstera and palm leaves, exotic flowers, humid atmosphere, vibrant green tone photography', icon: 'forest' },
+                                            ],
+                                            studio: [
+                                                { label: 'Studio White', prompt: 'Professional photography studio with seamless white background, soft diffused studio lighting, clean minimal setup', icon: 'photo_camera' },
+                                                { label: 'Studio Black', prompt: 'Professional studio with seamless black background, dramatic directional lighting, high-contrast product photography', icon: 'contrast' },
+                                                { label: 'Gradient Sweep', prompt: 'Smooth gradient background transitioning from light blue to white, soft even lighting, clean e-commerce product photo style', icon: 'gradient' },
+                                                { label: 'Color Pop', prompt: 'Vibrant solid color background (matching the product accent color), flat lay style, bold graphic editorial product photo', icon: 'palette' },
+                                                { label: '360° Turntable', prompt: 'Product on a sleek turntable/lazy susan, clean white cyclorama background, even studio lighting, 3D product display feel', icon: '360' },
+                                            ],
+                                        };
+                                        const scenes = mockupSceneCategory === 'all'
+                                            ? Object.values(allScenes).flat()
+                                            : allScenes[mockupSceneCategory] || [];
+                                        return scenes.map(scene => (
+                                            <button key={scene.label}
+                                                onClick={() => setMockupScenePrompt(scene.prompt)}
+                                                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-2 ${
+                                                    mockupScenePrompt === scene.prompt
+                                                        ? 'border-cyan-400/40 bg-cyan-500/10 text-white'
+                                                        : 'border-white/[0.06] bg-white/[0.02] text-slate-400 hover:border-white/[0.15] hover:text-slate-200'
+                                                }`}>
+                                                <span className="material-symbols-outlined text-lg">{scene.icon}</span>
+                                                <span className="text-xs font-medium">{scene.label}</span>
+                                            </button>
+                                        ));
+                                    })()}
+                                </div>
+
+                                {/* Custom Scene Prompt */}
+                                <textarea
+                                    value={mockupScenePrompt}
+                                    onChange={(e) => setMockupScenePrompt(e.target.value)}
+                                    placeholder="Or describe your own scene... e.g. 'Rustic wooden shelf in a cozy bookshop'"
+                                    rows={3}
+                                    className="w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-cyan-400/30 resize-none"
+                                />
+                            </div>
+
+                            {/* Aspect Ratio */}
+                            <div className="studio-card p-5">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
+                                    <span className="material-symbols-outlined text-blue-400 text-lg">aspect_ratio</span>
+                                    Aspect Ratio
+                                </h3>
+                                <div className="flex flex-wrap gap-2">
+                                    {['1:1', '4:5', '16:9', '9:16', '3:4', '2:3'].map(r => (
+                                        <button key={r}
+                                            onClick={() => setMockupAspectRatio(r)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                                                mockupAspectRatio === r
+                                                    ? 'bg-blue-500/20 text-blue-300 border border-blue-400/30'
+                                                    : 'bg-white/[0.04] text-slate-400 border border-white/[0.06] hover:text-slate-200'
+                                            }`}>{r}</button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Generate Button */}
+                            <button
+                                disabled={!mockupProductImage || mockupLoading}
+                                onClick={async () => {
+                                    setMockupLoading(true); setMockupError(''); setMockupResult(null)
+                                    try {
+                                        const res = await creativesAPI.lifestyleMockup({
+                                            productImage: mockupProductImage,
+                                            scenePrompt: mockupScenePrompt,
+                                            brandId: activeBrand?._id,
+                                            aspectRatio: mockupAspectRatio
+                                        })
+                                        if (res.success && res.imageUrl) setMockupResult(res.imageUrl)
+                                        else setMockupError(res.error || 'Mockup generation failed')
+                                    } catch (err) { setMockupError(err.message) }
+                                    finally { setMockupLoading(false) }
+                                }}
+                                className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2
+                                    bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white
+                                    disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+                                {mockupLoading ? (
+                                    <><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span> Generating Mockup...</>
+                                ) : (
+                                    <><span className="material-symbols-outlined text-lg">auto_awesome</span> Generate Mockup<span className="text-xs opacity-60 ml-1">~₹0.25</span></>
+                                )}
+                            </button>
+
+                            {mockupError && (
+                                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-lg">warning</span>{mockupError}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Right — Result */}
+                        <div className="col-span-12 lg:col-span-7">
+                            <div className="studio-card p-5 min-h-[400px] flex flex-col">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-4">
+                                    <span className="material-symbols-outlined text-cyan-400 text-lg">image</span>
+                                    Mockup Result
+                                </h3>
+                                {mockupResult ? (
+                                    <div className="flex-1 flex flex-col">
+                                        <div className="flex-1 rounded-xl overflow-hidden bg-black/20 mb-3">
+                                            <img src={mockupResult} alt="Lifestyle Mockup" className="w-full h-full object-contain max-h-[500px]" />
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <a href={mockupResult} download="lifestyle-mockup.png" target="_blank" rel="noreferrer"
+                                                className="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer">
+                                                <span className="material-symbols-outlined text-lg">download</span>Download
+                                            </a>
+                                            <button onClick={() => { setMockupResult(null); setMockupScenePrompt('') }}
+                                                className="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer">
+                                                <span className="material-symbols-outlined text-lg">restart_alt</span>Try Another Scene
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex-1 flex flex-col items-center justify-center text-center py-12">
+                                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-cyan-500/10 to-blue-500/10 flex items-center justify-center mb-4">
+                                            <span className="material-symbols-outlined text-4xl text-cyan-400/40">landscape</span>
+                                        </div>
+                                        <p className="text-slate-400 text-sm font-medium mb-1">No mockup yet</p>
+                                        <p className="text-slate-600 text-xs">Upload a product photo, pick a scene, and generate</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    )}
+
+                    {/* ── Logo / Brand Mockup Sub-mode ── */}
+                    {mockupSubMode === 'logo' && (
+                    <div className="grid grid-cols-12 gap-6">
+                        {/* Left — Controls */}
+                        <div className="col-span-12 lg:col-span-5 space-y-4">
+                            {/* Logo Upload */}
+                            <div className="studio-card p-5">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
+                                    <span className="material-symbols-outlined text-amber-400 text-lg">branding_watermark</span>
+                                    Logo / Design
+                                </h3>
+                                {!logoImage ? (
+                                    <>
+                                        <label className="flex flex-col items-center justify-center h-36 rounded-xl border-2 border-dashed border-white/10 hover:border-amber-400/30 bg-white/[0.02] cursor-pointer transition-all group mb-3">
+                                            <span className="material-symbols-outlined text-3xl text-slate-600 group-hover:text-amber-400 transition-colors mb-2">upload</span>
+                                            <span className="text-sm text-slate-500 group-hover:text-slate-300">Upload logo, badge, or design</span>
+                                            <span className="text-xs text-slate-600 mt-1">PNG with transparent background works best</span>
+                                            <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                                const file = e.target.files?.[0]
+                                                if (file) {
+                                                    const reader = new FileReader()
+                                                    reader.onload = (ev) => { setLogoImage(ev.target.result); setLogoUrl('') }
+                                                    reader.readAsDataURL(file)
+                                                }
+                                            }} />
+                                        </label>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <div className="flex-1 h-px bg-white/[0.06]"></div>
+                                            <span className="text-xs text-slate-600">or paste URL</span>
+                                            <div className="flex-1 h-px bg-white/[0.06]"></div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)}
+                                                placeholder="https://example.com/logo.png"
+                                                className="flex-1 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-amber-400/30"
+                                            />
+                                            <button disabled={!logoUrl} onClick={() => { setLogoImage(logoUrl); setLogoUrl('') }}
+                                                className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm font-medium hover:bg-amber-500/20 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+                                                Use
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="relative rounded-xl overflow-hidden group">
+                                        <img src={logoImage} alt="Logo" className="w-full h-36 object-contain rounded-xl bg-white/5" />
+                                        <button onClick={() => { setLogoImage(null); setLogoResult(null) }}
+                                            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                            <span className="material-symbols-outlined text-sm">close</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Surface Presets */}
+                            <div className="studio-card p-5">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
+                                    <span className="material-symbols-outlined text-cyan-400 text-lg">category</span>
+                                    Mockup Surface
+                                </h3>
+                                {/* Category Tabs */}
+                                <div className="flex flex-wrap gap-1 mb-3">
+                                    {[
+                                        { id: 'all', label: 'All', icon: 'apps' },
+                                        { id: 'apparel', label: 'Apparel', icon: 'checkroom' },
+                                        { id: 'drinkware', label: 'Drinkware', icon: 'coffee' },
+                                        { id: 'stationery', label: 'Stationery', icon: 'edit_note' },
+                                        { id: 'packaging', label: 'Packaging', icon: 'inventory_2' },
+                                        { id: 'tech', label: 'Tech', icon: 'devices' },
+                                        { id: 'promo', label: 'Promo', icon: 'campaign' },
+                                        { id: 'signage', label: 'Signage', icon: 'signpost' },
+                                    ].map(cat => (
+                                        <button key={cat.id} onClick={() => setLogoSurfaceCategory(cat.id)}
+                                            className={`px-2 py-0.5 rounded-md text-[10px] font-medium flex items-center gap-1 transition-all cursor-pointer ${
+                                                logoSurfaceCategory === cat.id
+                                                    ? 'bg-amber-500/20 text-amber-300 border border-amber-400/30'
+                                                    : 'bg-white/[0.03] text-slate-500 border border-white/[0.05] hover:text-slate-300'
+                                            }`}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>{cat.icon}</span>
+                                            {cat.label}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 max-h-[240px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+                                    {(() => {
+                                        const surfaces = {
+                                            apparel: [
+                                                { label: 'T-Shirt (White)', prompt: 'Logo printed on the front of a plain white cotton t-shirt, flat lay on clean white background, professional t-shirt mockup', icon: 'checkroom' },
+                                                { label: 'T-Shirt (Black)', prompt: 'Logo printed on the front chest area of a plain black cotton t-shirt, flat lay on dark surface, premium streetwear mockup', icon: 'checkroom' },
+                                                { label: 'Hoodie', prompt: 'Logo embroidered on a premium heather grey hoodie, front view, folded on wooden surface, lifestyle fashion mockup', icon: 'apparel' },
+                                                { label: 'Cap / Hat', prompt: 'Logo embroidered on the front panel of a structured baseball cap, 3/4 angle view, clean background, premium headwear mockup', icon: 'styler' },
+                                                { label: 'Polo Shirt', prompt: 'Logo embroidered on the left chest of a premium cotton polo shirt, neatly folded, professional corporate merchandise mockup', icon: 'dry_cleaning' },
+                                                { label: 'Tote Bag', prompt: 'Logo screen-printed on a natural canvas tote bag, hanging against white wall, eco-friendly merchandise mockup', icon: 'shopping_bag' },
+                                            ],
+                                            drinkware: [
+                                                { label: 'Coffee Mug', prompt: 'Logo printed on a white ceramic coffee mug, steam rising, on a cozy wooden desk with books nearby, warm morning light mockup', icon: 'coffee' },
+                                                { label: 'Travel Tumbler', prompt: 'Logo engraved on a sleek stainless steel travel tumbler, modern desk setting, premium drinkware branding mockup', icon: 'local_drink' },
+                                                { label: 'Water Bottle', prompt: 'Logo printed on a matte sport water bottle, gym/outdoor fitness setting, active lifestyle branding mockup', icon: 'water_drop' },
+                                                { label: 'Glass Cup', prompt: 'Logo frosted/engraved on a clear glass cup, café table setting with latte art, premium café branding mockup', icon: 'local_cafe' },
+                                            ],
+                                            stationery: [
+                                                { label: 'Business Card', prompt: 'Logo printed on a premium thick business card with embossed texture, stack of cards on marble surface, luxury stationery mockup', icon: 'contact_page' },
+                                                { label: 'Letterhead', prompt: 'Logo at the top of a clean white A4 letterhead, pen beside it on a wooden desk, corporate stationery mockup', icon: 'description' },
+                                                { label: 'Notebook', prompt: 'Logo debossed on the cover of a premium leather notebook, pen on top, desk setting, executive stationery mockup', icon: 'book' },
+                                                { label: 'Envelope', prompt: 'Logo printed on a premium kraft envelope with wax seal, vintage stationery flat lay mockup', icon: 'mail' },
+                                                { label: 'Pen', prompt: 'Logo engraved on a sleek metal ballpoint pen, lying on a premium notebook, executive gift mockup', icon: 'edit' },
+                                                { label: 'Stamp / Seal', prompt: 'Logo as a rubber stamp impression on textured cream paper, wax seal nearby, vintage branding mockup', icon: 'approval' },
+                                            ],
+                                            packaging: [
+                                                { label: 'Cardboard Box', prompt: 'Logo printed on a kraft cardboard shipping box, clean white background, e-commerce packaging mockup, unboxing experience', icon: 'inventory_2' },
+                                                { label: 'Gift Box', prompt: 'Logo foil-stamped on a luxury matte black gift box with ribbon, elegant packaging product mockup', icon: 'redeem' },
+                                                { label: 'Paper Bag', prompt: 'Logo printed on a premium kraft paper shopping bag with twisted handles, retail store front mockup', icon: 'shopping_bag' },
+                                                { label: 'Product Label', prompt: 'Logo on a clean minimalist product label stuck on a glass bottle/jar, close-up detail shot, artisan branding mockup', icon: 'label' },
+                                                { label: 'Food Pouch', prompt: 'Logo printed on a premium standup pouch/food bag, surrounded by ingredients, food product packaging mockup', icon: 'takeout_dining' },
+                                                { label: 'Tissue Paper', prompt: 'Logo repeated as a pattern on branded tissue paper inside an open gift box, luxury unboxing experience mockup', icon: 'note' },
+                                            ],
+                                            tech: [
+                                                { label: 'Phone Case', prompt: 'Logo printed on the back of a smartphone case, phone standing on a clean desk, mobile accessories mockup', icon: 'smartphone' },
+                                                { label: 'Laptop Sticker', prompt: 'Logo as a vinyl sticker on the top of a MacBook laptop lid, creative workspace, tech branding mockup', icon: 'laptop' },
+                                                { label: 'USB Drive', prompt: 'Logo engraved on a premium wooden USB flash drive, on a desk, corporate technology gift mockup', icon: 'usb' },
+                                                { label: 'Mouse Pad', prompt: 'Logo printed on a large desk mouse pad, gaming/office setup, tech accessories branding mockup', icon: 'mouse' },
+                                            ],
+                                            promo: [
+                                                { label: 'Coaster', prompt: 'Logo embossed on a round leather coaster, on a dark wood bar counter with cocktail glass nearby, hospitality branding mockup', icon: 'radio_button_unchecked' },
+                                                { label: 'Fridge Magnet', prompt: 'Logo on a custom-shaped fridge magnet placed on a stainless steel refrigerator door, promotional merchandise mockup', icon: 'push_pin' },
+                                                { label: 'Keychain', prompt: 'Logo engraved on a premium metal keychain with car keys on a table, corporate gift merchandise mockup', icon: 'key' },
+                                                { label: 'Umbrella', prompt: 'Logo printed on a large golf umbrella, person holding it in rain, outdoor promotional merchandise mockup', icon: 'umbrella' },
+                                                { label: 'Lanyard / Badge', prompt: 'Logo printed on a fabric lanyard with ID badge holder, conference/event setting, corporate event branding mockup', icon: 'badge' },
+                                            ],
+                                            signage: [
+                                                { label: 'Wall Sign', prompt: 'Logo as a 3D metallic wall sign on an exposed brick wall, reception area, premium office branding mockup', icon: 'signpost' },
+                                                { label: 'Window Decal', prompt: 'Logo as a frosted glass window decal, modern glass office door, corporate office entrance branding mockup', icon: 'window' },
+                                                { label: 'Banner / Flag', prompt: 'Logo on a vertical retractable banner stand, trade show booth setting, event marketing mockup', icon: 'flag' },
+                                                { label: 'Neon Sign', prompt: 'Logo as a glowing LED neon sign on a dark wall, trendy restaurant/bar interior, nightlife branding mockup', icon: 'wb_iridescent' },
+                                                { label: 'Vehicle Wrap', prompt: 'Logo applied as a vehicle wrap decal on the side of a modern delivery van, urban street setting, fleet branding mockup', icon: 'local_shipping' },
+                                            ],
+                                        };
+                                        const items = logoSurfaceCategory === 'all'
+                                            ? Object.values(surfaces).flat()
+                                            : surfaces[logoSurfaceCategory] || [];
+                                        return items.map(s => (
+                                            <button key={s.label} onClick={() => setLogoSurface(s.prompt)}
+                                                className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-2 ${
+                                                    logoSurface === s.prompt
+                                                        ? 'border-amber-400/40 bg-amber-500/10 text-white'
+                                                        : 'border-white/[0.06] bg-white/[0.02] text-slate-400 hover:border-white/[0.15] hover:text-slate-200'
+                                                }`}>
+                                                <span className="material-symbols-outlined text-base">{s.icon}</span>
+                                                <span className="text-xs font-medium">{s.label}</span>
+                                            </button>
+                                        ));
+                                    })()}
+                                </div>
+                                {/* Custom surface */}
+                                <textarea value={logoSurface} onChange={(e) => setLogoSurface(e.target.value)}
+                                    placeholder="Or describe your own surface... e.g. 'Embroidered on a denim jacket back panel'"
+                                    rows={2} className="w-full mt-3 px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-amber-400/30 resize-none"
+                                />
+                            </div>
+
+                            {/* Style Reference (optional) */}
+                            <div className="studio-card p-5">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
+                                    <span className="material-symbols-outlined text-violet-400 text-lg">style</span>
+                                    Style Reference <span className="text-xs text-slate-600 font-normal">(optional)</span>
+                                </h3>
+                                {!logoStyleRef ? (
+                                    <label className="flex flex-col items-center justify-center h-24 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-400/30 bg-white/[0.02] cursor-pointer transition-all group">
+                                        <span className="material-symbols-outlined text-2xl text-slate-600 group-hover:text-violet-400 transition-colors mb-1">add_photo_alternate</span>
+                                        <span className="text-xs text-slate-500 group-hover:text-slate-300">Upload a reference mockup style</span>
+                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                            const file = e.target.files?.[0]
+                                            if (file) {
+                                                const reader = new FileReader()
+                                                reader.onload = (ev) => setLogoStyleRef(ev.target.result)
+                                                reader.readAsDataURL(file)
+                                            }
+                                        }} />
+                                    </label>
+                                ) : (
+                                    <div className="relative rounded-xl overflow-hidden group">
+                                        <img src={logoStyleRef} alt="Style Ref" className="w-full h-24 object-cover rounded-xl" />
+                                        <button onClick={() => setLogoStyleRef(null)}
+                                            className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                            <span className="material-symbols-outlined text-xs">close</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* AI Enhancement Keywords */}
+                            <div className="studio-card p-5">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
+                                    <span className="material-symbols-outlined text-emerald-400 text-lg">auto_awesome</span>
+                                    AI Enhancement Keywords <span className="text-xs text-slate-600 font-normal">(optional)</span>
+                                </h3>
+                                <input type="text" value={logoKeywords} onChange={(e) => setLogoKeywords(e.target.value)}
+                                    placeholder="e.g. minimalist, premium, vibrant colors, 3D embossed, gold foil"
+                                    className="w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-emerald-400/30"
+                                />
+                                <div className="flex flex-wrap gap-1 mt-2">
+                                    {['minimalist', 'premium', '3D embossed', 'gold foil', 'photorealistic', 'vibrant colors', 'matte finish', 'glossy', 'vintage', 'neon glow'].map(kw => (
+                                        <button key={kw} onClick={() => setLogoKeywords(prev => prev ? `${prev}, ${kw}` : kw)}
+                                            className="px-2 py-0.5 rounded-md text-[10px] bg-white/[0.04] border border-white/[0.06] text-slate-500 hover:text-emerald-300 hover:border-emerald-400/20 transition-all cursor-pointer">
+                                            +{kw}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Aspect Ratio */}
+                            <div className="studio-card p-5">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
+                                    <span className="material-symbols-outlined text-blue-400 text-lg">aspect_ratio</span>
+                                    Aspect Ratio
+                                </h3>
+                                <div className="flex flex-wrap gap-2">
+                                    {['1:1', '4:5', '16:9', '9:16', '3:4', '2:3'].map(r => (
+                                        <button key={r} onClick={() => setLogoAspectRatio(r)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                                                logoAspectRatio === r
+                                                    ? 'bg-blue-500/20 text-blue-300 border border-blue-400/30'
+                                                    : 'bg-white/[0.04] text-slate-400 border border-white/[0.06] hover:text-slate-200'
+                                            }`}>{r}</button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Generate Button */}
+                            <button
+                                disabled={!logoImage || !logoSurface || logoLoading}
+                                onClick={async () => {
+                                    setLogoLoading(true); setLogoError(''); setLogoResult(null)
+                                    try {
+                                        // Build the prompt
+                                        let prompt = `LOGO/BRAND MOCKUP: Place the logo/design from the provided image onto the following surface/product.\n\nSURFACE: ${logoSurface}`
+                                        if (logoKeywords) prompt += `\n\nSTYLE KEYWORDS: ${logoKeywords}`
+                                        if (logoStyleRef) prompt += `\n\nMATCH THE STYLE from the provided style reference image.`
+                                        prompt += `\n\nCRITICAL RULES:\n- Place the logo NATURALLY on the product surface — correct perspective, wrapping, and material interaction\n- The logo should look like it was actually printed/embossed/engraved on the product\n- Maintain correct color reproduction of the logo\n- Use professional product photography lighting\n- The mockup should look photorealistic, not like a flat overlay\n- Show realistic material textures (fabric weave, metal sheen, paper grain etc)\n- Make it look like a real professional product photograph`
+
+                                        // Collect image parts
+                                        const images = [logoImage]
+                                        if (logoStyleRef) images.push(logoStyleRef)
+
+                                        const res = await creativesAPI.lifestyleMockup({
+                                            productImage: images[0],
+                                            scenePrompt: prompt,
+                                            brandId: activeBrand?._id,
+                                            aspectRatio: logoAspectRatio,
+                                            ...(logoStyleRef ? { styleRef: logoStyleRef } : {})
+                                        })
+                                        if (res.success && res.imageUrl) setLogoResult(res.imageUrl)
+                                        else setLogoError(res.error || 'Logo mockup generation failed')
+                                    } catch (err) { setLogoError(err.message) }
+                                    finally { setLogoLoading(false) }
+                                }}
+                                className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2
+                                    bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white
+                                    disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+                                {logoLoading ? (
+                                    <><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span> Generating Mockup...</>
+                                ) : (
+                                    <><span className="material-symbols-outlined text-lg">auto_awesome</span> Generate Logo Mockup<span className="text-xs opacity-60 ml-1">~₹0.25</span></>
+                                )}
+                            </button>
+
+                            {logoError && (
+                                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-lg">warning</span>{logoError}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Right — Result */}
+                        <div className="col-span-12 lg:col-span-7">
+                            <div className="studio-card p-5 min-h-[400px] flex flex-col">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-4">
+                                    <span className="material-symbols-outlined text-amber-400 text-lg">image</span>
+                                    Logo Mockup Result
+                                </h3>
+                                {logoResult ? (
+                                    <div className="flex-1 flex flex-col">
+                                        <div className="flex-1 rounded-xl overflow-hidden bg-black/20 mb-3">
+                                            <img src={logoResult} alt="Logo Mockup" className="w-full h-full object-contain max-h-[500px]" />
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <a href={logoResult} download="logo-mockup.png" target="_blank" rel="noreferrer"
+                                                className="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer">
+                                                <span className="material-symbols-outlined text-lg">download</span>Download
+                                            </a>
+                                            <button onClick={() => { setLogoResult(null); setLogoSurface('') }}
+                                                className="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer">
+                                                <span className="material-symbols-outlined text-lg">restart_alt</span>Try Another Surface
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex-1 flex flex-col items-center justify-center text-center py-12">
+                                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 flex items-center justify-center mb-4">
+                                            <span className="material-symbols-outlined text-4xl text-amber-400/40">branding_watermark</span>
+                                        </div>
+                                        <p className="text-slate-400 text-sm font-medium mb-1">No mockup yet</p>
+                                        <p className="text-slate-600 text-xs">Upload your logo, pick a surface, and generate</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    )}
+
                 </div>
             )}
 

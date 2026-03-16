@@ -32,6 +32,7 @@ const STEPS = [
     { id: 'input', label: 'Brief & Images', icon: 'edit_note' },
     { id: 'concepts', label: 'Concepts', icon: 'lightbulb' },
     { id: 'script', label: 'Script & Prompt', icon: 'movie' },
+    { id: 'voiceover', label: 'Voice Over', icon: 'record_voice_over' },
     { id: 'cost', label: 'Model & Cost', icon: 'payments' },
     { id: 'generate', label: 'Generating', icon: 'slow_motion_video' },
     { id: 'review', label: 'Review & Edit', icon: 'rate_review' },
@@ -51,7 +52,7 @@ export default function VideoStudio() {
     const { activeBrand, brands } = useBrand()
 
     // ── State ──
-    const [step, setStep] = useState(0) // 0=input, 1=concepts, 2=script, 3=cost, 4=generate, 5=review
+    const [step, setStep] = useState(0) // 0=input, 1=concepts, 2=script, 3=voiceover, 4=cost, 5=generate, 6=review
     const [loading, setLoading] = useState(false)
     const [studioMode, setStudioMode] = useState('storyboard') // 'advanced' | 'storyboard' | 'ugc'
     const [error, setError] = useState('')
@@ -70,6 +71,15 @@ export default function VideoStudio() {
     const [routing, setRouting] = useState(null)
     const [references, setReferences] = useState(null)
     const [generation, setGeneration] = useState(null)
+
+    // Voice over preview state
+    const [voiceoverAudioUrl, setVoiceoverAudioUrl] = useState('')
+    const [voiceoverLoading, setVoiceoverLoading] = useState(false)
+    const [selectedVoProvider, setSelectedVoProvider] = useState('minimax') // 'minimax' | 'sarvam'
+    const [selectedVoVoice, setSelectedVoVoice] = useState(null)
+    const [voSpeed, setVoSpeed] = useState(1.0)
+    const [sarvamVoiceList, setSarvamVoiceList] = useState([])
+    const [voiceoverSkipped, setVoiceoverSkipped] = useState(false)
     const [critique, setCritique] = useState(null)
     const [pipeline, setPipeline] = useState(null)
 
@@ -284,7 +294,7 @@ export default function VideoStudio() {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // STEP 3: Approve script → get routing + cost
+    // STEP 3: Approve script → go to voice over preview
     // ══════════════════════════════════════════════════════════════════════════
     async function handleApproveScript() {
         setLoading(true); setError('')
@@ -300,13 +310,42 @@ export default function VideoStudio() {
             if (data.project.firstFrameUrl) {
                 setImages(prev => [{ url: data.project.firstFrameUrl, source: 'ai-first-frame', label: 'Auto-generated first frame' }, ...prev])
             }
-            setStep(3)
+            // Load sarvam voices for the voice over step
+            if (sarvamVoiceList.length === 0) {
+                api('/video-studio/ugc/sarvam-voices').then(d => setSarvamVoiceList(d.voices || [])).catch(() => {})
+            }
+            setStep(3) // voice over preview step
         } catch (err) { setError(err.message) }
         setLoading(false)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // STEP 4: Confirm cost → generate video
+    // STEP 3b: Generate voice over preview (TTS)
+    // ══════════════════════════════════════════════════════════════════════════
+    async function handleGenerateVoiceover() {
+        setVoiceoverLoading(true); setError('')
+        try {
+            const body = {
+                voiceProvider: selectedVoProvider,
+                speed: voSpeed,
+            }
+            if (selectedVoProvider === 'sarvam' && selectedVoVoice) {
+                body.speaker = selectedVoVoice.speaker
+                body.langCode = selectedVoVoice.lang_code
+            } else if (selectedVoVoice) {
+                body.voiceId = selectedVoVoice.voiceId || selectedVoVoice.voice_id || 'moss_en_hd'
+            }
+            const data = await api(`/video-studio/${projectId}/voiceover-preview`, {
+                method: 'POST',
+                body: JSON.stringify(body),
+            })
+            setVoiceoverAudioUrl(data.audioUrl)
+        } catch (err) { setError(err.message) }
+        setVoiceoverLoading(false)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // STEP 5: Confirm cost → generate video
     // ══════════════════════════════════════════════════════════════════════════
     async function handleGenerate() {
         setLoading(true); setError('')
@@ -322,7 +361,7 @@ export default function VideoStudio() {
             })
             setGeneration(data.project.generation)
             setPipeline(data.project.pipeline)
-            setStep(4)
+            setStep(5)
             startPolling()
         } catch (err) { setError(err.message) }
         setLoading(false)
@@ -339,12 +378,12 @@ export default function VideoStudio() {
                 if (data.project.status === 'critique' || data.project.generation?.status === 'COMPLETED') {
                     clearInterval(pollRef.current)
                     setCritique(data.project.critique)
-                    setStep(5)
+                    setStep(6)
                 } else if (data.project.generation?.status === 'FAILED') {
                     clearInterval(pollRef.current)
                     const errMsg = data.project.generation?.error || 'Video generation failed. Try editing the prompt and regenerating.'
                     setError(errMsg)
-                    setStep(5)
+                    setStep(6)
                 }
             } catch { /* keep polling */ }
         }, 5000) // Poll every 5 seconds
@@ -353,7 +392,7 @@ export default function VideoStudio() {
     useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
 
     // ══════════════════════════════════════════════════════════════════════════
-    // STEP 6: Edit prompt → re-generate
+    // STEP 7: Edit prompt → re-generate
     // ══════════════════════════════════════════════════════════════════════════
     async function handleEditAndRegenerate() {
         setLoading(true); setError('')
@@ -363,7 +402,7 @@ export default function VideoStudio() {
                 body: JSON.stringify({ editedPrompt: backendPrompt }),
             })
             setGeneration(data.project.generation)
-            setStep(4)
+            setStep(5)
             startPolling()
         } catch (err) { setError(err.message) }
         setLoading(false)
@@ -413,8 +452,8 @@ export default function VideoStudio() {
             setGeneration(p.generation)
             setCritique(p.critique)
             setPipeline(p.pipeline)
-            // Determine step from status
-            const statusMap = { brainstorm: 1, script: 2, routing: 3, generating: 4, critique: 5, editing: 5, done: 5, references: 3 }
+            // Determine step from status (voiceover=3, routing=4, generating=5, critique/done=6)
+            const statusMap = { brainstorm: 1, script: 2, voiceover: 3, routing: 4, references: 4, generating: 5, critique: 6, editing: 6, done: 6 }
             setStep(statusMap[p.status] || 0)
             setShowHistory(false)
             if (p.status === 'generating') startPolling()
@@ -1114,9 +1153,155 @@ export default function VideoStudio() {
                     )}
 
                     {/* ════════════════════════════════════════════════════════════ */}
-                    {/* STEP 3: MODEL SELECTOR + COST PREVIEW                     */}
+                    {/* STEP 3: VOICE OVER PREVIEW / QC                            */}
                     {/* ════════════════════════════════════════════════════════════ */}
-                    {step === 3 && routing && (
+                    {step === 3 && (
+                        <div className="space-y-6">
+                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                                <span className="material-symbols-outlined text-cyan-400">record_voice_over</span>
+                                Voice Over Preview
+                            </h2>
+                            <p className="text-sm text-slate-400 -mt-3">
+                                Generate a voice over from your script dialogue to QC before creating the final video.
+                            </p>
+
+                            {/* Script dialogue preview */}
+                            {script?.shots?.some(s => s.dialogue) && (
+                                <div className="glass-panel rounded-2xl p-5 border border-white/[0.08]">
+                                    <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-amber-400 text-base">description</span>
+                                        Script Dialogue
+                                    </h3>
+                                    <div className="space-y-2">
+                                        {script.shots.filter(s => s.dialogue).map((shot, i) => (
+                                            <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                                                <span className="text-xs font-bold text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded flex-shrink-0 mt-0.5">
+                                                    Shot {shot.shotNum}
+                                                </span>
+                                                <p className="text-sm text-slate-300 italic">"{shot.dialogue}"</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Voice Provider Tabs */}
+                            <div className="glass-panel rounded-2xl p-5 border border-cyan-500/20">
+                                <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-cyan-400 text-base">mic</span>
+                                    Select Voice
+                                </h3>
+                                <div className="flex gap-2 mb-4">
+                                    <button onClick={() => setSelectedVoProvider('minimax')}
+                                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer ${selectedVoProvider === 'minimax'
+                                            ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
+                                            : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'}`}>
+                                        🌍 Global (Minimax)
+                                    </button>
+                                    <button onClick={() => setSelectedVoProvider('sarvam')}
+                                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer ${selectedVoProvider === 'sarvam'
+                                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                            : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'}`}>
+                                        🇮🇳 Indian (Sarvam)
+                                    </button>
+                                </div>
+
+                                {/* Voice Cards */}
+                                {selectedVoProvider === 'minimax' ? (
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+                                        {[
+                                            { voice_id: 'moss_en_hd', name: 'Moss', gender: 'Male', desc: 'Warm & professional' },
+                                            { voice_id: 'Binbin_en_hd', name: 'Binbin', gender: 'Female', desc: 'Clear & bright' },
+                                            { voice_id: 'Kevin_en_hd', name: 'Kevin', gender: 'Male', desc: 'Friendly narrator' },
+                                            { voice_id: 'Vivian_en_hd', name: 'Vivian', gender: 'Female', desc: 'Soft & calm' },
+                                            { voice_id: 'Luke_en_hd', name: 'Luke', gender: 'Male', desc: 'Energetic & lively' },
+                                            { voice_id: 'Sophia_en_hd', name: 'Sophia', gender: 'Female', desc: 'Confident & warm' },
+                                        ].map(v => (
+                                            <button key={v.voice_id} onClick={() => setSelectedVoVoice(v)}
+                                                className={`text-left p-3 rounded-xl transition-all cursor-pointer ${selectedVoVoice?.voice_id === v.voice_id
+                                                    ? 'bg-violet-500/15 border-2 border-violet-500/40'
+                                                    : 'bg-white/[0.02] border border-white/[0.06] hover:border-white/[0.12]'}`}>
+                                                <p className="text-sm font-bold text-white">{v.name}</p>
+                                                <p className="text-xs text-slate-500">{v.gender} · {v.desc}</p>
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+                                        {sarvamVoiceList.map(v => (
+                                            <button key={v.voice_id} onClick={() => setSelectedVoVoice(v)}
+                                                className={`text-left p-3 rounded-xl transition-all cursor-pointer ${selectedVoVoice?.voice_id === v.voice_id
+                                                    ? 'bg-amber-500/15 border-2 border-amber-500/40'
+                                                    : 'bg-white/[0.02] border border-white/[0.06] hover:border-white/[0.12]'}`}>
+                                                <p className="text-sm font-bold text-white">{v.name}</p>
+                                                <p className="text-xs text-slate-500">{v.language} · {v.gender}</p>
+                                            </button>
+                                        ))}
+                                        {sarvamVoiceList.length === 0 && (
+                                            <p className="text-sm text-slate-500 col-span-full text-center py-4">Loading voices...</p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Speed Control */}
+                                <div className="flex items-center gap-3 mt-4 pt-4 border-t border-white/[0.06]">
+                                    <span className="text-sm text-slate-500">Speed:</span>
+                                    <input type="range" min="0.5" max="2" step="0.1" value={voSpeed}
+                                        onChange={e => setVoSpeed(parseFloat(e.target.value))}
+                                        className="flex-1 accent-cyan-500" />
+                                    <span className="text-sm font-medium text-cyan-400 w-10 text-right">{voSpeed}x</span>
+                                </div>
+                            </div>
+
+                            {/* Audio Player (if generated) */}
+                            {voiceoverAudioUrl && (
+                                <div className="glass-panel rounded-2xl p-5 border border-emerald-500/20">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <span className="material-symbols-outlined text-emerald-400">headphones</span>
+                                        <h3 className="text-sm font-bold text-white">Voice Over Preview</h3>
+                                        <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">Ready</span>
+                                    </div>
+                                    <audio controls src={voiceoverAudioUrl} className="w-full" style={{ filter: 'invert(1) hue-rotate(180deg)', borderRadius: 12 }} />
+                                    <p className="text-xs text-slate-500 mt-2">Listen to the voice over and approve, or try a different voice.</p>
+                                </div>
+                            )}
+
+                            {/* Action Buttons */}
+                            <div className="flex gap-3">
+                                <button onClick={handleGenerateVoiceover}
+                                    disabled={voiceoverLoading || (!selectedVoVoice && selectedVoProvider !== 'minimax')}
+                                    className="flex-1 py-4 rounded-2xl bg-gradient-to-r from-cyan-600 to-violet-600 text-white font-bold hover:shadow-xl hover:shadow-cyan-500/20 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-3">
+                                    {voiceoverLoading ? (
+                                        <><span className="material-symbols-outlined animate-spin">progress_activity</span>Generating voice over...</>
+                                    ) : voiceoverAudioUrl ? (
+                                        <><span className="material-symbols-outlined">refresh</span>Regenerate with Different Voice</>
+                                    ) : (
+                                        <><span className="material-symbols-outlined">record_voice_over</span>Generate Voice Over</>
+                                    )}
+                                </button>
+                            </div>
+
+                            <div className="flex gap-3">
+                                {voiceoverAudioUrl && (
+                                    <button onClick={() => { setVoiceoverSkipped(false); setStep(4) }}
+                                        className="flex-1 py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-cyan-600 text-white font-bold hover:shadow-xl hover:shadow-emerald-500/20 transition-all cursor-pointer flex items-center justify-center gap-3">
+                                        <span className="material-symbols-outlined">check_circle</span>
+                                        Approve & Continue to Model Selection
+                                    </button>
+                                )}
+                                <button onClick={() => { setVoiceoverSkipped(true); setStep(4) }}
+                                    className="px-6 py-4 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-slate-300 font-medium hover:text-white hover:bg-white/[0.08] transition-all flex items-center gap-2 cursor-pointer">
+                                    <span className="material-symbols-outlined">skip_next</span>
+                                    Skip
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ════════════════════════════════════════════════════════════ */}
+                    {/* STEP 4: MODEL SELECTOR + COST PREVIEW                     */}
+                    {/* ════════════════════════════════════════════════════════════ */}
+                    {step === 4 && routing && (
                         <div className="space-y-6">
                             <h2 className="text-lg font-bold text-white flex items-center gap-2">
                                 <span className="material-symbols-outlined text-emerald-400">payments</span>
@@ -1269,9 +1454,9 @@ export default function VideoStudio() {
                     )}
 
                     {/* ════════════════════════════════════════════════════════════ */}
-                    {/* STEP 4: GENERATING — Live Progress                        */}
+                    {/* STEP 5: GENERATING — Live Progress                        */}
                     {/* ════════════════════════════════════════════════════════════ */}
-                    {step === 4 && (
+                    {step === 5 && (
                         <div className="flex flex-col items-center justify-center py-16">
                             <div className="relative mb-8">
                                 <div className="w-32 h-32 rounded-full border-4 border-violet-500/20 flex items-center justify-center">
@@ -1298,9 +1483,9 @@ export default function VideoStudio() {
                     )}
 
                     {/* ════════════════════════════════════════════════════════════ */}
-                    {/* STEP 5: REVIEW — Video + Critic + Edit                    */}
+                    {/* STEP 6: REVIEW — Video + Critic + Edit                    */}
                     {/* ════════════════════════════════════════════════════════════ */}
-                    {step === 5 && (
+                    {step === 6 && (
                         <div className="space-y-6">
                             <h2 className="text-lg font-bold text-white flex items-center gap-2">
                                 <span className="material-symbols-outlined text-emerald-400">rate_review</span>

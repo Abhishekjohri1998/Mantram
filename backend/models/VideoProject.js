@@ -13,7 +13,7 @@ const videoProjectSchema = new mongoose.Schema({
     // ── Current pipeline status ──
     status: {
         type: String,
-        enum: ['brainstorm', 'script', 'references', 'routing', 'generating', 'critique', 'editing', 'done', 'failed', 'advanced-generating'],
+        enum: ['brainstorm', 'script', 'voiceover', 'references', 'routing', 'generating', 'critique', 'editing', 'done', 'failed', 'advanced-generating'],
         default: 'brainstorm',
     },
     checkpoint: { type: Number, default: 0 }, // for resumability
@@ -81,6 +81,15 @@ const videoProjectSchema = new mongoose.Schema({
         narrative: { type: String, default: '' },  // overall story arc
     },
     backendPrompt: { type: String, default: '' },  // exact fal.ai prompt (user-visible)
+
+    // ── Voice Over Preview (QC before video generation) ──
+    voiceoverPreview: {
+        audioUrl: { type: String, default: '' },
+        voiceProvider: { type: String, default: '' },  // 'minimax' | 'sarvam' | 'cloned'
+        voiceId: { type: String, default: '' },
+        speed: { type: Number, default: 1.0 },
+        generatedAt: { type: Date },
+    },
 
     // ── Step 4: Reference Curator Output ──
     references: {

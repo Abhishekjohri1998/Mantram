@@ -157,7 +157,7 @@ export const content = {
 
 // ============ Creatives API ============
 export const creatives = {
-    generate: (data, options = {}) => apiFetch('/creatives/generate', { method: 'POST', body: JSON.stringify(data), ...options }),
+    generate: (data, options = {}) => apiFetch('/creatives/generate', { method: 'POST', body: JSON.stringify(data), timeout: 180000, ...options }),
     enhancePrompt: (data, options = {}) => apiFetch('/creatives/enhance-prompt', { method: 'POST', body: JSON.stringify(data), ...options }),
     list: (params = {}) => {
         const query = new URLSearchParams(params).toString();
@@ -171,6 +171,9 @@ export const creatives = {
         return apiFetch(`/creatives/image-bank?${query}`);
     },
     uploadToBank: (data) => apiFetch('/creatives/upload-to-bank', { method: 'POST', body: JSON.stringify(data) }),
+    virtualTryon: (data) => apiFetch('/creatives/virtual-tryon', { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
+    lifestyleMockup: (data) => apiFetch('/creatives/lifestyle-mockup', { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
+    vtoStatus: (requestId, brandId) => apiFetch(`/creatives/vto-status/${requestId}${brandId ? `?brandId=${brandId}` : ''}`),
 };
 
 // ============ Agent API ============

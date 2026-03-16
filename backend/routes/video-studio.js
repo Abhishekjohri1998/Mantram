@@ -1755,6 +1755,154 @@ Output ONLY the image, no text or labels.`;
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
+// POST /api/video-studio/:id/voiceover-preview — Generate TTS voiceover for QC
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/:id/voiceover-preview', protect, async (req, res) => {
+    try {
+        const { voiceProvider, voiceId, speaker, langCode, speed, emotion } = req.body;
+        const project = await VideoProject.findOne({ _id: req.params.id, user: req.user._id });
+        if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
+
+        // Extract dialogue from the script shots
+        const shots = project.script?.shots || [];
+        const dialogueParts = shots
+            .filter(s => s.dialogue && s.dialogue.trim())
+            .map(s => s.dialogue.trim());
+
+        if (dialogueParts.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'No dialogue found in the script. Add dialogue to your shots to generate a voiceover.',
+            });
+        }
+
+        const fullScript = dialogueParts.join('\n\n');
+        console.log(`🎙️ Voiceover preview: provider=${voiceProvider}, voice=${voiceId || speaker}, script=${fullScript.length} chars`);
+
+        let audioUrl = '';
+        let durationMs = 0;
+
+        if (voiceProvider === 'sarvam') {
+            // ── Sarvam TTS for Indian languages ──
+            const apiKey = process.env.SARVAM_API_KEY;
+            if (!apiKey) return res.status(500).json({ success: false, error: 'Sarvam API key not configured' });
+
+            const ttsResp = await fetch('https://api.sarvam.ai/text-to-speech', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'api-subscription-key': apiKey },
+                body: JSON.stringify({
+                    inputs: [fullScript.substring(0, 2000)],
+                    target_language_code: langCode || 'hi-IN',
+                    speaker: speaker || 'anushka',
+                    model: 'bulbul:v2',
+                    pitch: 0,
+                    pace: speed || 1.0,
+                    loudness: 1.5,
+                    enable_preprocessing: true,
+                }),
+            });
+
+            if (!ttsResp.ok) {
+                const errBody = await ttsResp.text().catch(() => '');
+                throw new Error(`Sarvam TTS failed (${ttsResp.status}): ${errBody.substring(0, 200)}`);
+            }
+
+            const ttsData = await ttsResp.json();
+            const audioBase64 = ttsData.audios?.[0];
+            if (!audioBase64) throw new Error('No audio returned from Sarvam');
+
+            const buffer = Buffer.from(audioBase64, 'base64');
+            const s3Key = `voiceover-preview/${req.user._id}/${Date.now()}.wav`;
+            audioUrl = await uploadToS3(buffer, s3Key, 'audio/wav');
+            durationMs = Math.round(buffer.length / 16000) * 1000;
+
+        } else {
+            // ── Minimax TTS (global voices + cloned voices) via fal.ai ──
+            const falKey = process.env.FAL_API_KEY;
+            if (!falKey) return res.status(500).json({ success: false, error: 'FAL_API_KEY not configured' });
+
+            const payload = {
+                text: fullScript.substring(0, 5000),
+                voice_setting: {
+                    voice_id: voiceId || 'moss_en_hd',
+                    speed: speed || 1,
+                },
+                output_format: 'url',
+                language_boost: 'auto',
+            };
+            if (emotion) payload.voice_setting.emotion = emotion;
+
+            // Submit to fal.ai queue
+            const submitResp = await fetch(`${FAL_QUEUE_URL}/fal-ai/minimax/speech-02-hd`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Key ${falKey}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+                signal: AbortSignal.timeout(30000),
+            });
+
+            if (!submitResp.ok) {
+                const errText = await submitResp.text();
+                throw new Error(`TTS failed (${submitResp.status}): ${errText.substring(0, 200)}`);
+            }
+
+            const submitData = await submitResp.json();
+            const requestId = submitData.request_id;
+
+            // Poll for completion (up to 60s)
+            let result = null;
+            for (let i = 0; i < 20; i++) {
+                await new Promise(r => setTimeout(r, 3000));
+                const statusResp = await fetch(
+                    `${FAL_QUEUE_URL}/fal-ai/minimax/requests/${requestId}/status`,
+                    { headers: { 'Authorization': `Key ${falKey}` } }
+                );
+                if (!statusResp.ok) continue;
+                const statusData = await statusResp.json();
+                if (statusData.status === 'COMPLETED') {
+                    const resultResp = await fetch(
+                        `${FAL_QUEUE_URL}/fal-ai/minimax/requests/${requestId}`,
+                        { headers: { 'Authorization': `Key ${falKey}` } }
+                    );
+                    result = await resultResp.json();
+                    break;
+                } else if (statusData.status === 'FAILED') {
+                    throw new Error('TTS generation failed');
+                }
+            }
+
+            if (!result?.audio?.url) throw new Error('TTS timed out — please try again');
+
+            // Download audio and upload to S3
+            const audioResp = await fetch(result.audio.url);
+            const audioBuffer = Buffer.from(await audioResp.arrayBuffer());
+            const s3Key = `voiceover-preview/${req.user._id}/${Date.now()}.mp3`;
+            audioUrl = await uploadToS3(audioBuffer, s3Key, 'audio/mpeg');
+            durationMs = result.duration_ms || 0;
+        }
+
+        // Save voiceover preview to project
+        await VideoProject.findByIdAndUpdate(project._id, {
+            voiceoverPreview: {
+                audioUrl,
+                voiceProvider: voiceProvider || 'minimax',
+                voiceId: voiceId || speaker || '',
+                speed: speed || 1.0,
+                generatedAt: new Date(),
+            },
+        });
+
+        console.log(`✅ Voiceover preview generated: ${audioUrl.substring(0, 80)}...`);
+        res.json({ success: true, audioUrl, durationMs });
+    } catch (error) {
+        console.error('Voiceover preview error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 // POST /api/video-studio/:id/generate — Confirm cost → trigger fal.ai
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/:id/generate', protect, requireCredits('videoGenerate'), async (req, res) => {

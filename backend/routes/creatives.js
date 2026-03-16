@@ -615,6 +615,7 @@ The output must fill the entire canvas edge-to-edge. No frames, borders, or mock
         await req.user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } });
         res.json({ success: true, creative });
     } catch (error) {
+        console.error('❌ CREATIVE GENERATE ERROR:', error.message, error.stack?.split('\n').slice(0,3).join('\n'));
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -736,7 +737,7 @@ router.get('/image-bank', protect, async (req, res) => {
         if (category === 'uploaded') {
             match.type = 'uploaded';
         } else if (category === 'generated') {
-            match.type = { $in: ['ai-photoshoot', 'instagram-post', 'instagram-story', 'facebook-ad', 'linkedin-post', 'youtube-thumb', 'banner', 'twitter-post', 'pinterest', 'photoshoot', 'other'] };
+            match.type = { $in: ['ai-photoshoot', 'instagram-post', 'instagram-story', 'facebook-ad', 'linkedin-post', 'youtube-thumb', 'banner', 'twitter-post', 'pinterest', 'photoshoot', 'virtual-tryon', 'lifestyle-mockup', 'logo-mockup', 'campaign', 'campaign-logo', 'other'] };
         }
 
         // Lightweight projection — strip base64 to first 500 chars (enough for HTTP URLs)
@@ -861,6 +862,307 @@ router.post('/upload-to-bank', protect, async (req, res) => {
 
         res.json({ success: true, creative });
     } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/creatives/virtual-tryon — Virtual Try-On (Gemini preview + fal.ai Kolors HD)
+// ══════════════════════════════════════════════════════════════════════════════
+const FAL_QUEUE_URL = 'https://queue.fal.run';
+
+router.post('/virtual-tryon', protect, requireStudio('creativeStudio'), requireCredits('creative'), async (req, res) => {
+    try {
+        const { personImage, garmentImage, brandId, mode = 'preview' } = req.body;
+        if (!personImage || !garmentImage) {
+            return res.status(400).json({ success: false, error: 'Person image and garment image are required' });
+        }
+
+        console.log(`\n══════ VIRTUAL TRY-ON (${mode.toUpperCase()}) ══════`);
+
+        if (mode === 'hd') {
+            // ── HD Mode: fal.ai Kolors Virtual Try-On ──
+            const falKey = process.env.FAL_API_KEY;
+            if (!falKey) return res.status(500).json({ success: false, error: 'FAL_API_KEY not configured' });
+
+            // Upload images to S3 first (fal.ai needs URLs, not base64)
+            let personUrl = personImage;
+            let garmentUrl = garmentImage;
+            if (personImage.startsWith('data:image/')) {
+                personUrl = await uploadToS3(personImage, `vto/${brandId || 'default'}/${Date.now()}-person.png`);
+            }
+            if (garmentImage.startsWith('data:image/')) {
+                garmentUrl = await uploadToS3(garmentImage, `vto/${brandId || 'default'}/${Date.now()}-garment.png`);
+            }
+
+            const endpoint = 'fal-ai/kling/v1-5/kolors-virtual-try-on';
+            const payload = {
+                human_image_url: personUrl,
+                garment_image_url: garmentUrl,
+            };
+
+            console.log(`👗 Submitting to fal.ai: ${endpoint}`);
+            const response = await fetch(`${FAL_QUEUE_URL}/${endpoint}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Key ${falKey}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+                signal: AbortSignal.timeout(30000),
+            });
+
+            if (!response.ok) {
+                const errText = await response.text();
+                console.error(`❌ fal.ai VTO error: ${response.status}`, errText);
+                return res.status(500).json({ success: false, error: `VTO HD failed: ${errText.substring(0, 200)}` });
+            }
+
+            const data = await response.json();
+            console.log(`✅ fal.ai VTO queued: requestId=${data.request_id}`);
+            res.json({ success: true, mode: 'hd', requestId: data.request_id, status: 'pending' });
+
+        } else {
+            // ── Preview Mode: Gemini Flash ──
+            const imageParts = [];
+
+            // Person image
+            if (personImage.startsWith('data:image/')) {
+                imageParts.push({ inlineData: extractBase64(personImage) });
+            } else if (personImage.startsWith('http')) {
+                const resp = await fetch(personImage, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+                if (resp.ok) {
+                    const buf = await resp.arrayBuffer();
+                    const ct = (resp.headers.get('content-type') || 'image/jpeg').split(';')[0];
+                    imageParts.push({ inlineData: { mimeType: ct, data: Buffer.from(buf).toString('base64') } });
+                }
+            }
+
+            // Garment image
+            if (garmentImage.startsWith('data:image/')) {
+                imageParts.push({ inlineData: extractBase64(garmentImage) });
+            } else if (garmentImage.startsWith('http')) {
+                const resp = await fetch(garmentImage, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+                if (resp.ok) {
+                    const buf = await resp.arrayBuffer();
+                    const ct = (resp.headers.get('content-type') || 'image/jpeg').split(';')[0];
+                    imageParts.push({ inlineData: { mimeType: ct, data: Buffer.from(buf).toString('base64') } });
+                }
+            }
+
+            const vtoPrompt = `VIRTUAL TRY-ON: Show the person from the FIRST image wearing the clothing/garment from the SECOND image. 
+CRITICAL RULES:
+- Keep the person's face, skin tone, body shape, hair, and overall appearance EXACTLY the same
+- Replace what they're currently wearing with the garment from the second image
+- The garment should fit naturally on their body with realistic fabric draping and wrinkles
+- Maintain the same pose, angle, and background
+- Make it look like a real photograph, not a composite
+- Preserve lighting and shadows naturally`;
+
+            const genResult = await geminiImageGenerate(vtoPrompt, imageParts, 0.2, '3:4');
+
+            if (!genResult.imageUrl) {
+                return res.status(500).json({ success: false, error: 'Failed to generate virtual try-on preview' });
+            }
+
+            // Upload to S3 (fallback to base64 if S3 fails)
+            let imageUrl = genResult.imageUrl;
+            if (imageUrl.startsWith('data:image/')) {
+                try {
+                    imageUrl = await uploadToS3(imageUrl, `vto/${brandId || 'default'}/${Date.now()}-preview.png`);
+                } catch (s3Err) {
+                    console.warn('⚠️ VTO Preview S3 upload failed, returning base64:', s3Err.message);
+                }
+            }
+
+            // Save to Creative model
+            if (brandId) {
+                await Creative.create({
+                    user: req.user._id,
+                    brand: brandId,
+                    type: 'virtual-tryon',
+                    title: 'Virtual Try-On Preview',
+                    prompt: 'Virtual Try-On — Gemini Flash Preview',
+                    imageUrl,
+                    thumbnailUrl: imageUrl,
+                    aiMeta: { provider: 'gemini', model: genResult.model, method: 'vto-preview' },
+                    tags: ['virtual-tryon', 'preview'],
+                    status: 'draft',
+                });
+            }
+
+            console.log(`✅ VTO Preview generated`);
+            res.json({ success: true, mode: 'preview', imageUrl, model: genResult.model });
+        }
+    } catch (error) {
+        console.error('❌ Virtual Try-On error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GET /api/creatives/vto-status/:requestId — Poll fal.ai for HD VTO result
+// ══════════════════════════════════════════════════════════════════════════════
+router.get('/vto-status/:requestId', protect, async (req, res) => {
+    try {
+        const { requestId } = req.params;
+        const { brandId } = req.query;
+        const falKey = process.env.FAL_API_KEY;
+        if (!falKey) return res.status(500).json({ success: false, error: 'FAL_API_KEY not configured' });
+
+        const endpoint = 'fal-ai/kling/v1-5/kolors-virtual-try-on';
+        const statusResp = await fetch(`${FAL_QUEUE_URL}/${endpoint}/requests/${requestId}/status`, {
+            headers: { 'Authorization': `Key ${falKey}` },
+        });
+
+        if (!statusResp.ok) {
+            return res.json({ success: true, status: 'pending' });
+        }
+
+        const statusData = await statusResp.json();
+        console.log(`📡 VTO Status: ${statusData.status}`);
+
+        if (statusData.status === 'COMPLETED') {
+            // Fetch the actual result
+            const resultResp = await fetch(`${FAL_QUEUE_URL}/${endpoint}/requests/${requestId}`, {
+                headers: { 'Authorization': `Key ${falKey}` },
+            });
+            const resultData = await resultResp.json();
+            let imageUrl = resultData.image?.url || resultData.output?.url || '';
+
+            if (!imageUrl && resultData.images?.[0]?.url) {
+                imageUrl = resultData.images[0].url;
+            }
+
+            // Save to bank if brandId provided
+            if (imageUrl && brandId) {
+                // Upload to our S3 for permanence
+                try {
+                    const imgResp = await fetch(imageUrl);
+                    if (imgResp.ok) {
+                        const buf = await imgResp.arrayBuffer();
+                        const base64 = `data:image/png;base64,${Buffer.from(buf).toString('base64')}`;
+                        const s3Url = await uploadToS3(base64, `vto/${brandId}/${Date.now()}-hd.png`);
+                        imageUrl = s3Url;
+                    }
+                } catch (e) { console.warn('VTO S3 upload failed, using fal URL:', e.message); }
+
+                await Creative.create({
+                    user: req.user._id,
+                    brand: brandId,
+                    type: 'virtual-tryon',
+                    title: 'Virtual Try-On HD',
+                    prompt: 'Virtual Try-On — Kolors HD',
+                    imageUrl,
+                    thumbnailUrl: imageUrl,
+                    aiMeta: { provider: 'fal.ai', model: 'kolors-virtual-try-on', method: 'vto-hd' },
+                    tags: ['virtual-tryon', 'hd'],
+                    status: 'draft',
+                });
+            }
+
+            return res.json({ success: true, status: 'completed', imageUrl });
+        } else if (statusData.status === 'FAILED') {
+            return res.json({ success: true, status: 'failed', error: statusData.error || 'Generation failed' });
+        }
+
+        res.json({ success: true, status: 'pending' });
+    } catch (error) {
+        console.error('VTO status error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/creatives/lifestyle-mockup — Product Lifestyle Mockup (Gemini Flash)
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/lifestyle-mockup', protect, requireStudio('creativeStudio'), requireCredits('creative'), async (req, res) => {
+    try {
+        const { productImage, scenePrompt, brandId, aspectRatio = '1:1' } = req.body;
+        if (!productImage) {
+            return res.status(400).json({ success: false, error: 'Product image is required' });
+        }
+
+        console.log(`\n══════ LIFESTYLE MOCKUP ══════`);
+        console.log(`📐 Aspect ratio: ${aspectRatio}`);
+        console.log(`🎬 Scene: ${scenePrompt?.substring(0, 100) || '(auto)'}`);
+
+        const imageParts = [];
+
+        // Product image
+        if (productImage.startsWith('data:image/')) {
+            imageParts.push({ inlineData: extractBase64(productImage) });
+        } else if (productImage.startsWith('http')) {
+            const resp = await fetch(productImage, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+            if (resp.ok) {
+                const buf = await resp.arrayBuffer();
+                const ct = (resp.headers.get('content-type') || 'image/jpeg').split(';')[0];
+                imageParts.push({ inlineData: { mimeType: ct, data: Buffer.from(buf).toString('base64') } });
+            }
+        }
+
+        // Get brand context if available
+        let brandContext = '';
+        if (brandId) {
+            const brand = await Brand.findById(brandId).lean();
+            if (brand) {
+                brandContext = `Brand: ${brand.name}. ${buildVisualContext(brand)}`;
+            }
+        }
+
+        const scene = scenePrompt || 'a premium professional product photography setting with beautiful lighting';
+        const mockupPrompt = `PRODUCT LIFESTYLE MOCKUP: Place the product from the provided image into a new lifestyle scene.
+
+SCENE: ${scene}
+${brandContext ? `BRAND CONTEXT: ${brandContext}` : ''}
+
+CRITICAL RULES:
+- Keep the product COMPLETELY IDENTICAL — same colors, labels, text, shape, proportions, and branding
+- ONLY change the background, surface, and environment around the product
+- The product should look naturally placed in the scene — correct shadows, reflections, and lighting
+- Professional product photography quality — magazine/catalog grade
+- Make the scene enhance the product's appeal
+- The output must fill the entire canvas edge-to-edge
+- No frames, borders, watermarks, or text overlays`;
+
+        const genResult = await geminiImageGenerate(mockupPrompt, imageParts, 0.2, aspectRatio);
+
+        if (!genResult.imageUrl) {
+            return res.status(500).json({ success: false, error: 'Failed to generate lifestyle mockup' });
+        }
+
+        // Upload to S3 (fallback to base64 if S3 fails)
+        let imageUrl = genResult.imageUrl;
+        if (imageUrl.startsWith('data:image/')) {
+            try {
+                imageUrl = await uploadToS3(imageUrl, `mockups/${brandId || 'default'}/${Date.now()}.png`);
+            } catch (s3Err) {
+                console.warn('⚠️ Mockup S3 upload failed, returning base64:', s3Err.message);
+            }
+        }
+
+        // Save to Creative model
+        if (brandId) {
+            await Creative.create({
+                user: req.user._id,
+                brand: brandId,
+                type: 'lifestyle-mockup',
+                title: `Lifestyle Mockup — ${scene.substring(0, 40)}`,
+                prompt: scenePrompt || 'Professional lifestyle setting',
+                imageUrl,
+                thumbnailUrl: imageUrl,
+                aiMeta: { provider: 'gemini', model: genResult.model, method: 'lifestyle-mockup' },
+                tags: ['lifestyle-mockup', 'product'],
+                status: 'draft',
+            });
+        }
+
+        await req.user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } });
+
+        console.log(`✅ Lifestyle Mockup generated`);
+        res.json({ success: true, imageUrl, model: genResult.model });
+    } catch (error) {
+        console.error('❌ Lifestyle Mockup error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
