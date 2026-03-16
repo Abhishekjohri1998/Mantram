@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { agentCommand, creatives as creativesAPI } from '../services/api'
+import { agentCommand, creatives as creativesAPI, voice } from '../services/api'
 import { useBrand } from '../context/BrandContext'
 import { stripMarkdown } from '../utils/stripMarkdown'
 
@@ -18,17 +18,109 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
     const [recording, setRecording] = useState(false)
     const [recordingTime, setRecordingTime] = useState(0)
     const [generatingImage, setGeneratingImage] = useState(null) // index of message being generated
+    const [audioLevel, setAudioLevel] = useState(0)
 
     const inputRef = useRef(null)
     const chatEndRef = useRef(null)
     const mediaRecorderRef = useRef(null)
     const chunksRef = useRef([])
     const timerRef = useRef(null)
+    const audioContextRef = useRef(null)
+    const analyserRef = useRef(null)
+    const vadIntervalRef = useRef(null)
+    const silenceStartRef = useRef(null)
 
     // Auto-scroll chat
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [history, loading])
+
+    const stopRecording = useCallback(() => {
+        if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop()
+        setRecording(false)
+        setAudioLevel(0)
+        clearInterval(timerRef.current)
+        clearInterval(vadIntervalRef.current)
+        if (audioContextRef.current) {
+            audioContextRef.current.close().catch(() => { })
+            audioContextRef.current = null
+        }
+    }, [])
+
+    // ===== Open in Studio helpers =====
+    const openInCreativeStudio = useCallback((prompt) => {
+        navigate(`/creative-studio?prompt=${encodeURIComponent(prompt)}&fromContent=true`)
+    }, [navigate])
+
+    const openInContentStudio = useCallback((prompt) => {
+        navigate(`/content-studio?prompt=${encodeURIComponent(prompt)}`)
+    }, [navigate])
+
+    const openInBrainstormStudio = useCallback(() => {
+        navigate('/brainstorm')
+    }, [navigate])
+
+    const downloadImage = useCallback(async (url) => {
+        try {
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `mantram-creative-${Date.now()}.png`
+            a.target = '_blank'
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+        } catch { }
+    }, [])
+
+    // ===== Send Message =====
+    const handleSend = useCallback(async (overrideText) => {
+        const text = overrideText || input.trim()
+        if (!text || loading) return
+
+        setInput('')
+        setExpanded(true)
+
+        const userMsg = { role: 'user', text }
+        const newHistory = [...history, userMsg]
+        setHistory(newHistory)
+        setLoading(true)
+
+        try {
+            const data = await agentCommand.chat({
+                message: text,
+                history: newHistory.slice(-10),
+                brandId: activeBrand?._id || null,
+                brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna, knowledge: activeBrand.knowledge } : null,
+            })
+
+            if (data.success) {
+                if (data.type === 'navigate' && (data.data?.path || data.path)) {
+                    const path = data.data?.path || data.path
+                    setHistory(prev => [...prev, {
+                        role: 'ai', text: data.message, type: 'navigate', path,
+                        suggestions: data.suggestions,
+                    }])
+                    setTimeout(() => navigate(path), 2000)
+                } else {
+                    setHistory(prev => [...prev, {
+                        role: 'ai', text: data.message, type: data.type || 'result',
+                        intent: data.intent, data: data.data, suggestions: data.suggestions,
+                    }])
+                }
+            } else {
+                setHistory(prev => [...prev, {
+                    role: 'ai', text: data.error || 'Sorry, something went wrong. Try again.',
+                    type: 'error',
+                }])
+            }
+        } catch (err) {
+            setHistory(prev => [...prev, {
+                role: 'ai', text: `Connection error: ${err.message}`, type: 'error',
+            }])
+        } finally {
+            setLoading(false)
+        }
+    }, [input, loading, history, activeBrand, navigate])
 
     // ===== Voice Recording =====
     const startRecording = useCallback(async () => {
@@ -45,6 +137,11 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
             mediaRecorder.onstop = async () => {
                 stream.getTracks().forEach(t => t.stop())
                 clearInterval(timerRef.current)
+                clearInterval(vadIntervalRef.current)
+                if (audioContextRef.current) {
+                    audioContextRef.current.close().catch(() => { })
+                    audioContextRef.current = null
+                }
                 setRecordingTime(0)
 
                 const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' })
@@ -56,13 +153,7 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                 formData.append('language', 'unknown') // auto-detect: Sarvam for Hindi, Whisper for English
 
                 try {
-                    const token = localStorage.getItem('mantram_token')
-                    const resp = await fetch('/api/voice/transcribe', {
-                        method: 'POST',
-                        headers: token ? { Authorization: `Bearer ${token}` } : {},
-                        body: formData,
-                    })
-                    const data = await resp.json()
+                    const data = await voice.transcribe(formData)
                     if (data.success && data.text) {
                         setInput(data.text)
                         // Reset loading before calling handleSend — handleSend checks `loading` and aborts if true
@@ -77,6 +168,37 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                 }
             }
 
+            // ===== VAD Logic =====
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+            const source = audioCtx.createMediaStreamSource(stream)
+            const analyser = audioCtx.createAnalyser()
+            analyser.fftSize = 256
+            source.connect(analyser)
+            
+            audioContextRef.current = audioCtx
+            analyserRef.current = analyser
+            silenceStartRef.current = null
+
+            const bufferLength = analyser.frequencyBinCount
+            const dataArray = new Uint8Array(bufferLength)
+            const THRESHOLD = 15 // Adjust sensitivity (0-255)
+            const SILENCE_DURATION = 1800 // 1.8 seconds of silence to stop
+
+            vadIntervalRef.current = setInterval(() => {
+                analyser.getByteFrequencyData(dataArray)
+                const average = dataArray.reduce((a, b) => a + b) / bufferLength
+                setAudioLevel(average)
+                
+                if (average < THRESHOLD) {
+                    if (!silenceStartRef.current) silenceStartRef.current = Date.now()
+                    else if (Date.now() - silenceStartRef.current > SILENCE_DURATION) {
+                        stopRecording()
+                    }
+                } else {
+                    silenceStartRef.current = null
+                }
+            }, 100)
+
             mediaRecorder.start(250)
             setRecording(true)
             setRecordingTime(0)
@@ -84,16 +206,13 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
         } catch (err) {
             console.error('Mic access denied:', err)
         }
-    }, [])
+    }, [handleSend, stopRecording])
 
-    const stopRecording = useCallback(() => {
-        if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop()
-        setRecording(false)
-        clearInterval(timerRef.current)
-    }, [])
+
+
 
     // ===== Generate Image inline =====
-    const handleGenerateImage = async (msgIdx, imagePrompt) => {
+    const handleGenerateImage = useCallback(async (msgIdx, imagePrompt) => {
         if (generatingImage !== null) return
 
         // No brand selected — show helpful message
@@ -143,85 +262,11 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
         } finally {
             setGeneratingImage(null)
         }
-    }
-
-    // ===== Open in Studio helpers =====
-    const openInCreativeStudio = (prompt) => {
-        navigate(`/creative-studio?prompt=${encodeURIComponent(prompt)}&fromContent=true`)
-    }
-
-    const openInContentStudio = (prompt) => {
-        navigate(`/content-studio?prompt=${encodeURIComponent(prompt)}`)
-    }
-
-    const openInBrainstormStudio = () => {
-        navigate('/brainstorm')
-    }
-
-    const downloadImage = async (url) => {
-        try {
-            const a = document.createElement('a')
-            a.href = url
-            a.download = `mantram-creative-${Date.now()}.png`
-            a.target = '_blank'
-            document.body.appendChild(a)
-            a.click()
-            document.body.removeChild(a)
-        } catch { }
-    }
-
-    // ===== Send Message =====
-    const handleSend = async (overrideText) => {
-        const text = overrideText || input.trim()
-        if (!text || loading) return
-
-        setInput('')
-        setExpanded(true)
-
-        const userMsg = { role: 'user', text }
-        const newHistory = [...history, userMsg]
-        setHistory(newHistory)
-        setLoading(true)
-
-        try {
-            const data = await agentCommand.chat({
-                message: text,
-                history: newHistory.slice(-10),
-                brandId: activeBrand?._id || null,
-                brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna, knowledge: activeBrand.knowledge } : null,
-            })
-
-            if (data.success) {
-                if (data.type === 'navigate' && (data.data?.path || data.path)) {
-                    const path = data.data?.path || data.path
-                    setHistory(prev => [...prev, {
-                        role: 'ai', text: data.message, type: 'navigate', path,
-                        suggestions: data.suggestions,
-                    }])
-                    setTimeout(() => navigate(path), 2000)
-                } else {
-                    setHistory(prev => [...prev, {
-                        role: 'ai', text: data.message, type: data.type || 'result',
-                        intent: data.intent, data: data.data, suggestions: data.suggestions,
-                    }])
-                }
-            } else {
-                setHistory(prev => [...prev, {
-                    role: 'ai', text: data.error || 'Sorry, something went wrong. Try again.',
-                    type: 'error',
-                }])
-            }
-        } catch (err) {
-            setHistory(prev => [...prev, {
-                role: 'ai', text: `Connection error: ${err.message}`, type: 'error',
-            }])
-        } finally {
-            setLoading(false)
-        }
-    }
+    }, [generatingImage, activeBrand, creativesAPI])
 
     const clearChat = () => { setHistory([]); setExpanded(false); setInput('') }
     const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+
 
     const placeholders = variant === 'brainstorm'
         ? ["Tell me what you want to create...", "Try: 'Diwali campaign ideas'", "Try: 'Name my new product'"]
@@ -505,17 +550,24 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
 
                         {/* Mic */}
                         <button onClick={recording ? stopRecording : startRecording} disabled={loading}
-                            className={`flex-shrink-0 p-2.5 rounded-xl transition-all cursor-pointer ${recording
-                                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30 animate-pulse'
+                            className={`flex-shrink-0 p-2.5 rounded-xl transition-all cursor-pointer relative overflow-hidden ${recording
+                                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                                 : 'bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-primary/10 hover:text-primary hover:border-primary/20'
                                 }`}
                             title={recording ? `Recording... ${formatTime(recordingTime)}` : 'Speak your request'}>
+                            
+                            {/* Audio Level Meter Overlay */}
+                            {recording && (
+                                <div className="absolute inset-0 bg-rose-500/30 transition-transform duration-100"
+                                     style={{ transform: `scaleY(${Math.min(audioLevel / 50, 1)})`, transformOrigin: 'bottom' }} />
+                            )}
+
                             {recording ? (
-                                <div className="flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined text-sm">stop_circle</span>
-                                    <span className="text-xs font-bold">{formatTime(recordingTime)}</span>
+                                <div className="flex items-center gap-1.5 relative z-10">
+                                    <span className="material-symbols-outlined text-sm animate-pulse">stop_circle</span>
+                                    <span className="text-xs font-bold font-mono">{formatTime(recordingTime)}</span>
                                 </div>
-                            ) : <span className="material-symbols-outlined text-sm">mic</span>}
+                            ) : <span className="material-symbols-outlined text-sm relative z-10">mic</span>}
                         </button>
 
                         {/* Send */}

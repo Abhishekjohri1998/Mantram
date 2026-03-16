@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import SEOHead from '../components/SEOHead'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
@@ -141,10 +141,10 @@ function IdeaCard({ idea, index, onExpand, onAction, isFilm, onFeedback, feedbac
                     title="Generate Content">
                     <span className="material-symbols-outlined text-sm">edit_note</span>
                 </button>
-                <button onClick={() => onAction('creative', idea)}
+                <button onClick={() => isFilm ? handleIdeaAction('creative', idea) : onAction('creative', idea)}
                     className="py-2 px-3 rounded-xl bg-white/5 text-slate-300 text-[11px] font-bold hover:bg-white/10 cursor-pointer transition-all"
-                    title="Generate Visual">
-                    <span className="material-symbols-outlined text-sm">palette</span>
+                    title={isFilm ? "Generate Film" : "Generate Visual"}>
+                    <span className="material-symbols-outlined text-sm">{isFilm ? "movie" : "palette"}</span>
                 </button>
             </div>
         </div>
@@ -195,10 +195,27 @@ export default function BrainstormStudio() {
     const [chatHistory, setChatHistory] = useState([])
     const [chatMessage, setChatMessage] = useState('')
     const [chatLoading, setChatLoading] = useState(false)
+    const [clickedSuggestions, setClickedSuggestions] = useState(new Set())
 
     const inputRef = useRef(null)
     const bottomRef = useRef(null)
     const chatBottomRef = useRef(null)
+    const activeBrandIdRef = useRef(activeBrand?._id)
+    const abortControllerRef = useRef(null)
+
+    const getSignal = useCallback(() => {
+        if (abortControllerRef.current) abortControllerRef.current.abort()
+        abortControllerRef.current = new AbortController()
+        return abortControllerRef.current.signal
+    }, [])
+
+    useEffect(() => {
+        return () => abortControllerRef.current?.abort()
+    }, [])
+
+    useEffect(() => {
+        activeBrandIdRef.current = activeBrand?._id
+    }, [activeBrand?._id])
 
     useEffect(() => {
         if (inputRef.current) inputRef.current.focus()
@@ -212,21 +229,33 @@ export default function BrainstormStudio() {
         chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [chatHistory, chatLoading])
 
+    // Reset loop if brand changes mid-process
+    useEffect(() => {
+        if (activeBrand?._id !== activeBrandIdRef.current) {
+            console.log('Brand changed mid-brainstorm, resetting state and aborting processing...')
+            abortControllerRef.current?.abort()
+            resetAll()
+        }
+    }, [activeBrand?._id])
+
     // ========== HANDLERS ==========
 
-    const selectIntent = async (intentId) => {
+    async function selectIntent(intentId) {
+        const brandIdAtStart = activeBrand?._id
         setIntent(intentId)
         setError('')
         setLoading(true)
         setLoadingMsg(activeBrand ? `Analyzing ${activeBrand.name}'s DNA for your brainstorm...` : 'Preparing questions...')
         try {
+            const signal = getSignal()
             const data = await bsAPI.start({
                 intent: intentId,
                 brand: activeBrand ? {
                     name: activeBrand.name,
                     dna: activeBrand.dna,
                 } : null,
-            })
+            }, { signal })
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success) {
                 setQuestions(data.questions)
                 setBrandInsight(data.brandInsight || null)
@@ -237,13 +266,16 @@ export default function BrainstormStudio() {
                 setError(data.error || 'Failed to start')
             }
         } catch (e) {
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             setError(e.message)
         } finally {
-            setLoading(false)
+            if (activeBrandIdRef.current === brandIdAtStart) {
+                setLoading(false)
+            }
         }
     }
 
-    const submitAnswer = () => {
+    function submitAnswer() {
         if (!currentAnswer.trim() && !questions[currentQ]?.optional) return
         const q = questions[currentQ]
         const newAnswers = { ...answers, [q.id]: currentAnswer.trim() || '(skipped)' }
@@ -258,7 +290,9 @@ export default function BrainstormStudio() {
         }
     }
 
-    const confirmUnderstanding = async (ans) => {
+
+    async function confirmUnderstanding(ans) {
+        const brandIdAtStart = activeBrand?._id
         setLoading(true)
         setLoadingMsg('Analyzing your brief...')
         setStep(2)
@@ -268,19 +302,25 @@ export default function BrainstormStudio() {
                 answers: ans,
                 brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna } : null,
             })
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success) {
                 setConfirmation(data)
             } else {
                 setError(data.error || 'Confirmation failed')
             }
         } catch (e) {
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             setError(e.message)
         } finally {
-            setLoading(false)
+            if (activeBrandIdRef.current === brandIdAtStart) {
+                setLoading(false)
+            }
         }
     }
 
-    const generateIdeas = async (refinementHint) => {
+
+    async function generateIdeas(refinementHint) {
+        const brandIdAtStart = activeBrand?._id
         setLoading(true)
         setLoadingMsg(refinementHint ? 'Refining ideas...' : 'Generating multi-layer strategy...')
         setStep(3)
@@ -293,33 +333,51 @@ export default function BrainstormStudio() {
                 brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna } : null,
                 ...(refinementHint ? { refinementPrompt: refinementHint, previousIdeas: ideas } : {}),
             })
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success && data.ideas) {
                 setIdeas(data.ideas)
             } else {
                 setError(data.error || 'Generation failed')
             }
         } catch (e) {
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             setError(e.message)
         } finally {
-            setLoading(false)
+            if (activeBrandIdRef.current === brandIdAtStart) {
+                setLoading(false)
+            }
         }
     }
 
-    const handleIdeaAction = (type, idea) => {
+
+    function handleIdeaAction(type, idea) {
         const hook = idea.hook || idea.logline || ''
         const desc = idea.description || idea.synopsis || ''
         if (type === 'content') {
             sessionStorage.setItem('brainstormContext', JSON.stringify({ title: idea.title, hook, description: desc }))
             navigate('/content-studio?fromBrainstorm=true')
         } else if (type === 'creative') {
-            sessionStorage.setItem('brainstormContext', JSON.stringify({ prompt: `${idea.title} — ${idea.visualDirection || idea.visualStyle || hook}` }))
-            navigate('/creative-studio?fromBrainstorm=true')
+            const hook = idea.hook || idea.logline || ''
+            const fullDesc = idea.synopsis || idea.description || ''
+            const prompt = `${idea.title}: ${hook}. ${fullDesc}`
+            sessionStorage.setItem('brainstormContext', JSON.stringify({ 
+                prompt,
+                title: idea.title,
+                description: fullDesc,
+                isFilm: intent === 'ad-film'
+            }))
+            if (intent === 'ad-film') {
+                navigate('/video-studio?fromBrainstorm=true')
+            } else {
+                navigate('/creative-studio?fromBrainstorm=true')
+            }
         } else if (type === 'calendar') {
             navigate('/smart-calendar')
         }
     }
 
-    const handleFeedback = async (idea, type) => {
+
+    async function handleFeedback(idea, type) {
         const key = idea.title
         setIdeaFeedback(prev => ({ ...prev, [key]: type }))
         try {
@@ -333,19 +391,31 @@ export default function BrainstormStudio() {
         } catch (e) { console.warn('Feedback save failed:', e) }
     }
 
-    const generateScreenplay = async (filmConcept) => {
+
+    async function generateScreenplay(filmConcept) {
+        const brandIdAtStart = activeBrand?._id
         setScreenplayLoading(true)
         setScreenplay(null)
         try {
+            const signal = getSignal()
             const data = await bsAPI.screenplay({
                 filmConcept,
                 brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna } : null,
-            })
+            }, { signal })
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success) setScreenplay(data.screenplay)
             else setError(data.error || 'Screenplay generation failed')
-        } catch (e) { setError(e.message) }
-        finally { setScreenplayLoading(false) }
+        } catch (e) {
+            if (activeBrandIdRef.current !== brandIdAtStart) return
+            setError(e.message)
+        }
+        finally {
+            if (activeBrandIdRef.current === brandIdAtStart) {
+                setScreenplayLoading(false)
+            }
+        }
     }
+
 
     // Open interactive chat for a film concept
     const openFilmChat = (film) => {
@@ -357,20 +427,27 @@ export default function BrainstormStudio() {
     }
 
     // Send chat message for film refinement
-    const sendChatMessage = async (msg) => {
+    async function sendChatMessage(msg) {
+        const brandIdAtStart = activeBrand?._id
         const text = msg || chatMessage.trim()
         if (!text || chatLoading) return
+
+        if (msg) {
+            setClickedSuggestions(prev => new Set([...prev, msg]))
+        }
         setChatMessage('')
         const newHistory = [...chatHistory, { role: 'user', text }]
         setChatHistory(newHistory)
         setChatLoading(true)
         try {
+            const signal = getSignal()
             const data = await bsAPI.chat({
                 filmConcept: chatFilm,
                 chatHistory: newHistory,
                 userMessage: text,
                 brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna } : null,
-            })
+            }, { signal })
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success !== false) {
                 const aiMsg = { role: 'ai', text: data.message, suggestions: data.suggestions || [] }
                 setChatHistory(prev => [...prev, aiMsg])
@@ -381,24 +458,29 @@ export default function BrainstormStudio() {
                 setChatHistory(prev => [...prev, { role: 'ai', text: data.error || 'Sorry, I couldn\'t process that. Try again.' }])
             }
         } catch (e) {
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             setChatHistory(prev => [...prev, { role: 'ai', text: `Error: ${e.message}` }])
         } finally {
-            setChatLoading(false)
+            if (activeBrandIdRef.current === brandIdAtStart) {
+                setChatLoading(false)
+            }
         }
     }
 
-    const resetAll = () => {
+
+    function resetAll() {
         setStep(0); setIntent(null); setQuestions([]); setCurrentQ(0); setAnswers({});
         setCurrentAnswer(''); setConfirmation(null); setIdeas(null); setExpandedIdea(null);
         setBrandInsight(null); setIdeaFeedback({}); setScreenplay(null); setError(''); setLoading(false);
-        setChatFilm(null); setChatHistory([]); setChatMessage(''); setChatLoading(false)
+        setChatFilm(null); setChatHistory([]); setChatMessage(''); setChatLoading(false); setClickedSuggestions(new Set())
         setStrategyData(null); setStrategyId(null); setStrategyKpis([]); setStrategyMilestones([]);
         setSlides(null); setSlideIndex(0); setSlidesLoading(false); setTrackerView(null); setKpiEditing(null)
     }
 
     // ========== STRATEGY HANDLERS ==========
 
-    const generateStrategy = async () => {
+    async function generateStrategy() {
+        const brandIdAtStart = activeBrand?._id
         setLoading(true)
         setLoadingMsg('Building your comprehensive brand strategy...')
         setStep(6)
@@ -408,6 +490,7 @@ export default function BrainstormStudio() {
                 answers,
                 brand: activeBrand ? { _id: activeBrand._id, name: activeBrand.name, dna: activeBrand.dna } : null,
             })
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success && data.strategy) {
                 setStrategyData(data.strategy)
                 setStrategyId(data.strategyId)
@@ -416,11 +499,20 @@ export default function BrainstormStudio() {
             } else {
                 setError(data.error || 'Strategy generation failed')
             }
-        } catch (e) { setError(e.message) }
-        finally { setLoading(false) }
+        } catch (e) {
+            if (activeBrandIdRef.current !== brandIdAtStart) return
+            setError(e.message)
+        }
+        finally {
+            if (activeBrandIdRef.current === brandIdAtStart) {
+                setLoading(false)
+            }
+        }
     }
 
-    const generateSlides = async () => {
+
+    async function generateSlides() {
+        const brandIdAtStart = activeBrand?._id
         setSlidesLoading(true)
         setSlides(null)
         try {
@@ -429,16 +521,25 @@ export default function BrainstormStudio() {
                 strategy: strategyData,
                 brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna } : null,
             })
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success && data.slides) {
                 setSlides(data.slides)
                 setSlideIndex(0)
                 setStep(7)
             } else { setError(data.error || 'Slides generation failed') }
-        } catch (e) { setError(e.message) }
-        finally { setSlidesLoading(false) }
+        } catch (e) {
+            if (activeBrandIdRef.current !== brandIdAtStart) return
+            setError(e.message)
+        }
+        finally {
+            if (activeBrandIdRef.current === brandIdAtStart) {
+                setSlidesLoading(false)
+            }
+        }
     }
 
-    const updateKpiValue = async (kpiName, value) => {
+
+    async function updateKpiValue(kpiName, value) {
         if (!strategyId) return
         try {
             const data = await bsAPI.updateKpi(strategyId, { kpiName, current: Number(value) })
@@ -446,7 +547,8 @@ export default function BrainstormStudio() {
         } catch (e) { console.warn('KPI update failed:', e) }
     }
 
-    const toggleMilestone = async (milestoneId, completed) => {
+
+    async function toggleMilestone(milestoneId, completed) {
         if (!strategyId) return
         try {
             const data = await bsAPI.toggleMilestone(strategyId, { milestoneId, completed })
@@ -454,17 +556,21 @@ export default function BrainstormStudio() {
         } catch (e) { console.warn('Milestone toggle failed:', e) }
     }
 
-    const loadSavedStrategies = async () => {
+
+    async function loadSavedStrategies() {
         try {
             const data = await bsAPI.listStrategies()
             if (data.success) setSavedStrategies(data.strategies || [])
         } catch (e) { console.warn('Failed to load strategies:', e) }
     }
 
-    const openSavedStrategy = async (id) => {
+
+    async function openSavedStrategy(id) {
+        const brandIdAtStart = activeBrand?._id
         setLoading(true); setLoadingMsg('Loading strategy...')
         try {
             const data = await bsAPI.getStrategy(id)
+            if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success && data.strategy) {
                 const s = data.strategy
                 setStrategyData(s.strategy)
@@ -474,9 +580,17 @@ export default function BrainstormStudio() {
                 setIntent('brand-strategy')
                 setStep(6)
             }
-        } catch (e) { setError(e.message) }
-        finally { setLoading(false) }
+        } catch (e) {
+            if (activeBrandIdRef.current !== brandIdAtStart) return
+            setError(e.message)
+        }
+        finally {
+            if (activeBrandIdRef.current === brandIdAtStart) {
+                setLoading(false)
+            }
+        }
     }
+
 
     useEffect(() => { loadSavedStrategies() }, [])
 
@@ -539,22 +653,33 @@ export default function BrainstormStudio() {
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-                        {INTENTS.map((item, i) => (
-                            <button key={item.id} onClick={() => selectIntent(item.id)} disabled={loading}
-                                className="glass-panel rounded-2xl p-5 text-left hover:border-primary/30 hover:scale-[1.02] transition-all cursor-pointer group animate-fade-in"
-                                style={{ animationDelay: `${i * 60}ms` }}>
-                                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
-                                    <span className="material-symbols-outlined text-white text-lg">{item.icon}</span>
-                                </div>
-                                <h3 className="text-base font-bold text-white mb-1">{item.label}</h3>
-                                <p className="text-sm text-slate-500 leading-relaxed">{item.desc}</p>
-                            </button>
-                        ))}
+                        {INTENTS.map((item, i) => {
+                            const isSelected = intent === item.id && loading;
+                            const isDimmed = loading && intent !== item.id;
+
+                            return (
+                                <button key={item.id} onClick={() => selectIntent(item.id)} disabled={loading}
+                                    className={`glass-panel rounded-2xl p-5 text-left hover:border-primary/30 hover:scale-[1.02] transition-all cursor-pointer group animate-fade-in ${isDimmed ? 'opacity-40 grayscale pointer-events-none' : ''}`}
+                                    style={{ animationDelay: `${i * 60}ms` }}>
+                                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+                                        {isSelected ? (
+                                            <span className="material-symbols-outlined text-white text-lg animate-spin">progress_activity</span>
+                                        ) : (
+                                            <span className="material-symbols-outlined text-white text-lg">{item.icon}</span>
+                                        )}
+                                    </div>
+                                    <h3 className="text-base font-bold text-white mb-1">
+                                        {isSelected ? 'Processing...' : item.label}
+                                    </h3>
+                                    <p className="text-sm text-slate-500 leading-relaxed">{item.desc}</p>
+                                </button>
+                            );
+                        })}
                     </div>
 
                     {loading && (
                         <div className="text-center mt-8">
-                            <span className="material-symbols-outlined text-3xl text-primary animate-spin block mb-2">progress_activity</span>
+                            {step !== 0 && <span className="material-symbols-outlined text-3xl text-primary animate-spin block mb-2">progress_activity</span>}
                             <p className="text-sm text-slate-400">{loadingMsg}</p>
                         </div>
                     )}
@@ -652,16 +777,24 @@ export default function BrainstormStudio() {
                                         {/* Keyword suggestion chips */}
                                         {q.keywords?.length > 0 && (
                                             <div className="flex flex-wrap gap-1.5">
-                                                {q.keywords.map(kw => (
-                                                    <button key={kw} onClick={() => {
-                                                        const sep = currentAnswer.trim() ? ', ' : ''
-                                                        setCurrentAnswer(prev => prev.trim() ? `${prev.trim()}, ${kw}` : kw)
-                                                        inputRef.current?.focus()
-                                                    }}
-                                                        className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
-                                                        {kw}
-                                                    </button>
-                                                ))}
+                                                {q.keywords
+                                                    .filter(kw => {
+                                                        const currentLower = currentAnswer.toLowerCase()
+                                                        const kwLower = kw.toLowerCase()
+                                                        // Filter out if exact match exists in answer (comma separated)
+                                                        const parts = currentLower.split(',').map(p => p.trim())
+                                                        return !parts.includes(kwLower)
+                                                    })
+                                                    .map(kw => (
+                                                        <button key={kw} onClick={() => {
+                                                            const sep = currentAnswer.trim() ? ', ' : ''
+                                                            setCurrentAnswer(prev => prev.trim() ? `${prev.trim()}, ${kw}` : kw)
+                                                            inputRef.current?.focus()
+                                                        }}
+                                                            className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
+                                                            {kw}
+                                                        </button>
+                                                    ))}
                                             </div>
                                         )}
                                     </div>
@@ -1593,14 +1726,19 @@ export default function BrainstormStudio() {
                                 </div>
 
                                 {/* Film-specific actions */}
-                                <div className="flex gap-3">
+                                <div className="flex gap-2">
                                     <button onClick={() => openFilmChat(expandedIdea)}
-                                        className="flex-1 btn-primary py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer">
-                                        <span className="material-symbols-outlined text-sm">chat</span> Refine This Film
+                                        className="flex-1 btn-primary py-3 rounded-xl text-[11px] font-bold flex items-center justify-center gap-2 cursor-pointer">
+                                        <span className="material-symbols-outlined text-sm">chat</span> Refine Film
                                     </button>
                                     <button onClick={() => { generateScreenplay(expandedIdea); setExpandedIdea(null) }}
-                                        className="flex-1 py-3 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all">
-                                        <span className="material-symbols-outlined text-sm">description</span> Generate Screenplay
+                                        className="flex-1 py-3 rounded-xl bg-emerald-500/10 text-emerald-400 text-[11px] font-bold hover:bg-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all">
+                                        <span className="material-symbols-outlined text-sm">description</span> Screenplay
+                                    </button>
+                                    <button onClick={() => { handleIdeaAction('creative', expandedIdea); setExpandedIdea(null) }}
+                                        className="px-4 py-3 rounded-xl glass-panel text-[11px] font-bold text-slate-300 hover:text-white flex items-center justify-center gap-2 cursor-pointer transition-all"
+                                        title="Generate Film">
+                                        <span className="material-symbols-outlined text-sm">movie</span>
                                     </button>
                                 </div>
                             </>
@@ -1668,10 +1806,17 @@ export default function BrainstormStudio() {
                             <h3 className="text-base font-bold text-white">{chatFilm.title}</h3>
                             <p className="text-sm text-slate-500">Refine this film concept with your creative director</p>
                         </div>
-                        <button onClick={() => generateScreenplay(chatFilm)}
-                            className="px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 cursor-pointer transition-all flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-sm">description</span> Generate Screenplay
-                        </button>
+                        <div className="flex gap-2">
+                             <button onClick={() => { handleIdeaAction('creative', chatFilm); setChatFilm(null); setStep(3) }}
+                                className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 text-xs font-bold hover:bg-white/10 cursor-pointer transition-all flex items-center gap-1.5"
+                                title="Generate Film">
+                                <span className="material-symbols-outlined text-sm">movie</span> Direct
+                            </button>
+                            <button onClick={() => generateScreenplay(chatFilm)}
+                                className="px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 cursor-pointer transition-all flex items-center gap-1.5">
+                                <span className="material-symbols-outlined text-sm">description</span> Screenplay
+                            </button>
+                        </div>
                     </div>
 
                     {/* Current concept card (collapsible) */}
@@ -1704,12 +1849,14 @@ export default function BrainstormStudio() {
                                 <div className="glass-panel rounded-2xl rounded-tl-md px-4 py-3 max-w-lg">
                                     <p className="text-sm text-white">I love this concept! Let's refine it together. What would you like to change or improve? You can adjust the story, tone, visual style, cast, music — anything.</p>
                                     <div className="flex flex-wrap gap-1.5 mt-3">
-                                        {['Make it more emotional', 'Change the visual style', 'Adjust the story arc', 'Different music mood', 'Change the cast direction'].map(s => (
-                                            <button key={s} onClick={() => sendChatMessage(s)}
-                                                className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
-                                                {s}
-                                            </button>
-                                        ))}
+                                        {['Make it more emotional', 'Change the visual style', 'Adjust the story arc', 'Different music mood', 'Change the cast direction']
+                                            .filter(s => !clickedSuggestions.has(s))
+                                            .map(s => (
+                                                <button key={s} onClick={() => sendChatMessage(s)}
+                                                    className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
+                                                    {s}
+                                                </button>
+                                            ))}
                                     </div>
                                 </div>
                             </div>
@@ -1729,12 +1876,14 @@ export default function BrainstormStudio() {
                                     <p className="text-sm text-white whitespace-pre-wrap">{stripMarkdown(msg.text)}</p>
                                     {msg.suggestions?.length > 0 && (
                                         <div className="flex flex-wrap gap-1.5 mt-3">
-                                            {msg.suggestions.map((s, j) => (
-                                                <button key={j} onClick={() => sendChatMessage(s)}
-                                                    className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
-                                                    {s}
-                                                </button>
-                                            ))}
+                                            {msg.suggestions
+                                                .filter(s => !clickedSuggestions.has(s))
+                                                .map((s, j) => (
+                                                    <button key={j} onClick={() => sendChatMessage(s)}
+                                                        className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
+                                                        {s}
+                                                    </button>
+                                                ))}
                                         </div>
                                     )}
                                 </div>
@@ -1856,7 +2005,7 @@ export default function BrainstormStudio() {
                             <button onClick={() => {
                                 const prompt = `${screenplay.title}: ${screenplay.scenes?.map(s => s.visual).join('. ')}`
                                 sessionStorage.setItem('brainstormContext', JSON.stringify({ prompt }))
-                                navigate('/creative-studio?fromBrainstorm=true')
+                                navigate('/video-studio?fromBrainstorm=true')
                                 setScreenplay(null)
                             }}
                                 className="flex-1 btn-primary py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer">

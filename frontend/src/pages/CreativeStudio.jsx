@@ -8,30 +8,314 @@ import { useBrand } from '../context/BrandContext'
 import VoiceInput from '../components/VoiceInput'
 import PublishModal from '../components/PublishModal'
 
-// ── S3 Upload Helper — replaces all base64-in-state patterns ──
-async function uploadToS3(base64DataUri, folder = 'refs') {
-    if (!base64DataUri) return null;
-    // If already a URL, return as-is
-    if (base64DataUri.startsWith('http')) return base64DataUri;
-    try {
-        const { url } = await mediaAPI.upload({ imageData: base64DataUri, folder });
-        return url;
-    } catch (e) {
-        console.warn('S3 upload failed, falling back to base64:', e.message);
-        return base64DataUri; // fallback to base64 if S3 fails
-    }
+// ── Helper: Time Ago ──
+function getTimeAgo(dateStr) {
+    if (!dateStr) return '';
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    if (days < 7) return `${days}d ago`;
+    return new Date(dateStr).toLocaleDateString();
 }
+ 
+// ── Aspect Ratio Options ──
+const ASPECT_RATIOS = [
+    { ratio: '1:1', label: 'Square', icon: '⬜' },
+    { ratio: '16:9', label: 'Widescreen', icon: '🖥️' },
+    { ratio: '9:16', label: 'Social Story', icon: '📱' },
+    { ratio: '2:3', label: 'Portrait', icon: '📷' },
+    { ratio: '3:4', label: 'Traditional', icon: '🖼️' },
+    { ratio: '4:5', label: 'Social Post', icon: '📸' },
+    { ratio: '3:2', label: 'Standard', icon: '🎞️' },
+    { ratio: '4:3', label: 'Classic', icon: '📺' },
+]
+
+// ── Creative Formats ──
+const creativeTypes = [
+    { id: 'instagram-post', icon: 'photo_camera', label: 'Instagram Post', size: '1080×1080', aspectRatio: '1:1' },
+    { id: 'instagram-story', icon: 'smartphone', label: 'Story', size: '1080×1920', aspectRatio: '9:16' },
+    { id: 'facebook-ad', icon: 'ads_click', label: 'Facebook Ad', size: '1200×628', aspectRatio: '16:9' },
+    { id: 'linkedin-post', icon: 'work', label: 'LinkedIn Post', size: '1200×627', aspectRatio: '16:9' },
+    { id: 'youtube-thumb', icon: 'smart_display', label: 'YouTube Thumb', size: '1280×720', aspectRatio: '16:9' },
+    { id: 'banner', icon: 'web', label: 'Banner', size: '1920×600', aspectRatio: '16:9' },
+]
+
+// ── Design Styles ──
+const styles = [
+    { id: 'modern', label: 'Modern', icon: 'auto_awesome' },
+    { id: 'minimal', label: 'Minimal', icon: 'format_shapes' },
+    { id: 'bold', label: 'Bold', icon: 'bolt' },
+    { id: 'elegant', label: 'Elegant', icon: 'diamond' },
+    { id: 'playful', label: 'Playful', icon: 'mood' },
+    { id: 'corporate', label: 'Corporate', icon: 'business' },
+]
+
+// ── Quick-start categories ──
+const quickStartCards = [
+    { id: 'social', icon: 'share', label: 'Social Media Post', desc: 'Instagram, Facebook, LinkedIn', color: '#6366f1' },
+    { id: 'product', icon: 'inventory_2', label: 'Product Showcase', desc: 'Feature your product or service', color: '#f59e0b' },
+    { id: 'promo', icon: 'local_offer', label: 'Promotional Offer', desc: 'Sales, discounts, special deals', color: '#ef4444' },
+    { id: 'quote', icon: 'format_quote', label: 'Customer Quote', desc: 'Reviews and testimonials', color: '#10b981' },
+    { id: 'announce', icon: 'campaign', label: 'Announcement', desc: 'Launches, updates, news', color: '#8b5cf6' },
+    { id: 'story', icon: 'auto_stories', label: 'Brand Story', desc: 'Tell your brand narrative', color: '#ec4899' },
+]
+
+// ── Template Categories with Sub-Templates ──
+const templateCategories = [
+    {
+        id: 'sales', icon: 'local_offer', label: 'Sales & Offers', color: '#ef4444',
+        desc: 'Promotional offers, discounts, festive & seasonal sales',
+        subTemplates: [
+            {
+                id: 'general-sale', label: 'General Sale', icon: 'sell',
+                desc: 'All-purpose sale/offer design',
+                fields: [
+                    { key: 'offerText', label: 'Offer Details', type: 'text', placeholder: 'e.g. FLAT 50% OFF' },
+                    { key: 'validTill', label: 'Valid Till', type: 'text', placeholder: 'e.g. This Weekend Only' },
+                    { key: 'cta', label: 'Call to Action', type: 'text', placeholder: 'e.g. Order Now', default: 'Order Now' },
+                    { key: 'mood', label: 'Design Mood', type: 'select', options: ['Urgency/Bold', 'Elegant Luxury', 'Minimalist', 'Playful/Fun'] },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a promotional sale creative for ${brand.name}.\nOFFER: ${vals.offerText || 'SPECIAL OFFER'}\nVALID TILL: ${vals.validTill || 'Limited Time'}\nCTA: "${vals.cta || 'Order Now'}"\nMOOD: ${vals.mood || 'Urgency/Bold'}\nBRAND COLORS: ${colors}\nMake the offer text LARGE and prominent. Eye-catching, bold, impossible to scroll past. Include ${brand.name} branding.`
+                }
+            },
+            {
+                id: 'diwali-sale', label: 'Diwali Sale', icon: 'celebration',
+                desc: 'Festival of lights themed sale',
+                fields: [
+                    { key: 'offerText', label: 'Offer', type: 'text', placeholder: 'e.g. Diwali Mega Sale - Up to 60% OFF' },
+                    { key: 'productName', label: 'Product/Category', type: 'text', placeholder: 'e.g. on all Electronics' },
+                    { key: 'cta', label: 'CTA', type: 'text', placeholder: 'e.g. Shop the Festive Sale', default: 'Shop Now' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a Diwali sale creative for ${brand.name}.\nOFFER: ${vals.offerText || 'Diwali Special Offer'}\nPRODUCT: ${vals.productName || ''}\nCTA: "${vals.cta || 'Shop Now'}"\nTHEME: Diwali — diyas, rangoli, lanterns, golden sparkles, warm festive lighting\nBRAND COLORS: ${colors}\nFestive and joyful but still on-brand. Include ${brand.name} logo. Traditional+modern design.`
+                }
+            },
+            {
+                id: 'republic-sale', label: 'Republic Day Sale', icon: 'flag',
+                desc: 'Patriotic themed sale',
+                fields: [
+                    { key: 'offerText', label: 'Offer', type: 'text', placeholder: 'e.g. Republic Day Sale – 26% OFF' },
+                    { key: 'productName', label: 'Product', type: 'text', placeholder: 'e.g. on all categories' },
+                    { key: 'cta', label: 'CTA', type: 'text', placeholder: 'e.g. Celebrate & Save', default: 'Shop Now' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a Republic Day sale creative for ${brand.name}.\nOFFER: ${vals.offerText || 'Republic Day Special'}\nPRODUCT: ${vals.productName || ''}\nCTA: "${vals.cta || 'Shop Now'}"\nTHEME: Republic Day — tricolor (saffron, white, green), patriotic, flag elements, Ashoka Chakra subtle\nBRAND COLORS: ${colors}\nPatriotic + brand identity blend. Include ${brand.name} logo.`
+                }
+            },
+        ]
+    },
+    {
+        id: 'product', icon: 'shopping_bag', label: 'Product Showcase', color: '#f59e0b',
+        desc: 'Feature products with professional brand styling',
+        subTemplates: [
+            {
+                id: 'product-hero', label: 'Hero Shot', icon: 'star',
+                desc: 'Full product hero with brand styling',
+                fields: [
+                    { key: 'productName', label: 'Product Name', type: 'text', placeholder: 'e.g. Premium Leather Bag' },
+                    { key: 'tagline', label: 'Tagline', type: 'text', placeholder: 'e.g. Crafted for Excellence' },
+                    { key: 'cta', label: 'CTA', type: 'text', placeholder: 'e.g. Shop Now', default: 'Shop Now' },
+                    { key: 'layout', label: 'Layout', type: 'select', options: ['Centered', 'Lifestyle', 'Flat Lay', 'Minimal White', 'Dark Luxury'] },
+                    { key: 'image', label: 'Product Image', type: 'image', hint: 'Upload product photo' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    const font = brand.dna?.fonts?.heading?.family || 'modern sans-serif'
+                    return `Create a premium product showcase for ${brand.name}.\nPRODUCT: ${vals.productName || 'a product'}\nTAGLINE: "${vals.tagline || 'Quality You Deserve'}"\nCTA: "${vals.cta || 'Shop Now'}"\nLAYOUT: ${vals.layout || 'Centered'}\nBRAND COLORS: ${colors}\nFONT: ${font}\nClean background, brand color accents, product as hero element, professional.`
+                }
+            },
+            {
+                id: 'product-comparison', label: 'Product Comparison', icon: 'compare',
+                desc: 'Side-by-side product comparison',
+                fields: [
+                    { key: 'product1', label: 'Product 1', type: 'text', placeholder: 'e.g. Basic Plan' },
+                    { key: 'product2', label: 'Product 2', type: 'text', placeholder: 'e.g. Premium Plan' },
+                    { key: 'highlight', label: 'What to Highlight', type: 'text', placeholder: 'e.g. Premium = Best Value' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a product comparison visual for ${brand.name}.\nLEFT: ${vals.product1 || 'Option A'}\nRIGHT: ${vals.product2 || 'Option B'}\nHIGHLIGHT: ${vals.highlight || 'Choose the best'}\nBRAND COLORS: ${colors}\nClean split layout, easy to compare, ${brand.name} branding applied.`
+                }
+            },
+        ]
+    },
+    {
+        id: 'quotes', icon: 'format_quote', label: 'Quotes & Testimonials', color: '#10b981',
+        desc: 'Customer reviews, brand quotes, motivational content',
+        subTemplates: [
+            {
+                id: 'testimonial', label: 'Customer Testimonial', icon: 'reviews',
+                desc: 'Customer review card',
+                fields: [
+                    { key: 'quote', label: 'Quote Text', type: 'textarea', placeholder: 'Type the quote...' },
+                    { key: 'author', label: 'Author Name', type: 'text', placeholder: 'e.g. Rahul Sharma, CEO' },
+                    { key: 'bgStyle', label: 'Background', type: 'select', options: ['Solid Brand Color', 'Gradient', 'Texture', 'Photo (Blurred)', 'Dark/Moody'] },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a testimonial card for ${brand.name}.\nQUOTE: "${vals.quote || 'Great experience!'}"\nAUTHOR: ${vals.author || 'Happy Customer'}\nBG: ${vals.bgStyle || 'Solid Brand Color'}\nBRAND COLORS: ${colors}\nElegant, large quotation marks, ${brand.name} logo subtle in corner.`
+                }
+            },
+            {
+                id: 'motivational', label: 'Motivational Quote', icon: 'lightbulb',
+                desc: 'Inspirational brand quote',
+                fields: [
+                    { key: 'quote', label: 'Quote', type: 'textarea', placeholder: 'e.g. Dream big, start small...' },
+                    { key: 'bgStyle', label: 'Background', type: 'select', options: ['Gradient', 'Nature Photo', 'Abstract', 'Minimal', 'Dark'] },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a motivational quote post for ${brand.name}.\nQUOTE: "${vals.quote || 'Success starts with a single step'}"\nBG: ${vals.bgStyle || 'Gradient'}\nUSE brand colors: ${colors}\nInspirational, visually stunning, ${brand.name} branding.`
+                }
+            },
+        ]
+    },
+    {
+        id: 'announcement', icon: 'campaign', label: 'Announcements', color: '#8b5cf6',
+        desc: 'Launches, updates, news, and alerts',
+        subTemplates: [
+            {
+                id: 'launch', label: 'Product Launch', icon: 'rocket_launch',
+                desc: 'New product/service launch',
+                fields: [
+                    { key: 'headline', label: 'Headline', type: 'text', placeholder: 'e.g. Introducing Our Latest Innovation' },
+                    { key: 'details', label: 'Details', type: 'textarea', placeholder: 'Brief details...' },
+                    { key: 'tone', label: 'Tone', type: 'select', options: ['Exciting', 'Professional', 'Teaser/Mystery', 'Celebratory'] },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a product launch announcement for ${brand.name}.\nHEADLINE: "${vals.headline || 'Something Big is Coming!'}"\nDETAILS: ${vals.details || ''}\nTONE: ${vals.tone || 'Exciting'}\nBRAND COLORS: ${colors}\nBold, shareable, ${brand.name} branding prominent.`
+                }
+            },
+            {
+                id: 'news-update', label: 'News/Update', icon: 'newspaper',
+                desc: 'Brand news or company update',
+                fields: [
+                    { key: 'headline', label: 'Headline', type: 'text', placeholder: 'e.g. We just hit 10K customers!' },
+                    { key: 'details', label: 'Details', type: 'textarea', placeholder: 'More info...' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a news update post for ${brand.name}.\nHEADLINE: "${vals.headline || 'Exciting Update'}"\nDETAILS: ${vals.details || ''}\nBRAND COLORS: ${colors}\nProfessional, newsworthy, ${brand.name} identity applied.`
+                }
+            },
+        ]
+    },
+    {
+        id: 'events', icon: 'event', label: 'Events', color: '#ec4899',
+        desc: 'Event promotions, invitations, and recaps',
+        subTemplates: [
+            {
+                id: 'event-promo', label: 'Event Promotion', icon: 'calendar_month',
+                desc: 'Promote an upcoming event',
+                fields: [
+                    { key: 'eventName', label: 'Event Name', type: 'text', placeholder: 'e.g. Annual Tech Summit 2026' },
+                    { key: 'date', label: 'Date & Time', type: 'text', placeholder: 'e.g. March 15 | 10AM' },
+                    { key: 'venue', label: 'Venue', type: 'text', placeholder: 'e.g. Taj Hotel, Mumbai' },
+                    { key: 'cta', label: 'CTA', type: 'text', placeholder: 'e.g. Register Now', default: 'Register Now' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create an event promo for ${brand.name}.\nEVENT: ${vals.eventName || 'Event'}\nDATE: ${vals.date || 'Coming Soon'}\nVENUE: ${vals.venue || 'TBA'}\nCTA: "${vals.cta || 'Register Now'}"\nBRAND COLORS: ${colors}\nClear hierarchy: Name > Date > Venue > CTA. ${brand.name} branding prominent.`
+                }
+            },
+            {
+                id: 'birthday', label: 'Birthday Post', icon: 'cake',
+                desc: 'Birthday greetings for team/clients',
+                fields: [
+                    { key: 'personName', label: 'Person\'s Name', type: 'text', placeholder: 'e.g. Amit Kumar' },
+                    { key: 'message', label: 'Birthday Message', type: 'textarea', placeholder: 'e.g. Wishing you a wonderful birthday!' },
+                    { key: 'image', label: 'Photo', type: 'image', hint: 'Upload their photo (optional)' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a birthday greeting post for ${brand.name}.\nNAME: ${vals.personName || 'Team Member'}\nMESSAGE: "${vals.message || 'Happy Birthday!'}"\nBRAND COLORS: ${colors}\nFestive, warm, celebration vibes. Cake/balloons/confetti elements. Brand logo included.`
+                }
+            },
+            {
+                id: 'anniversary', label: 'Anniversary', icon: 'favorite',
+                desc: 'Work anniversary or milestone celebration',
+                fields: [
+                    { key: 'personName', label: 'Person\'s Name', type: 'text', placeholder: 'e.g. Priya Patel' },
+                    { key: 'years', label: 'Years / Milestone', type: 'text', placeholder: 'e.g. 5 Years' },
+                    { key: 'message', label: 'Message', type: 'textarea', placeholder: 'e.g. Thank you for your dedication!' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a work anniversary celebration post for ${brand.name}.\nNAME: ${vals.personName || 'Team Member'}\nMILESTONE: ${vals.years || 'Anniversary'}\nMESSAGE: "${vals.message || 'Thank you for your incredible journey with us!'}"\nBRAND COLORS: ${colors}\nCelebratory, professional, warm. ${brand.name} branding applied.`
+                }
+            },
+        ]
+    },
+    {
+        id: 'content', icon: 'analytics', label: 'Content & Info', color: '#0ea5e9',
+        desc: 'Infographics, tips, educational content',
+        subTemplates: [
+            {
+                id: 'infographic', label: 'Infographic', icon: 'bar_chart',
+                desc: 'Data-driven visual content',
+                fields: [
+                    { key: 'topic', label: 'Topic', type: 'text', placeholder: 'e.g. 5 Benefits of Organic Products' },
+                    { key: 'points', label: 'Key Points (one per line)', type: 'textarea', placeholder: 'Point 1\nPoint 2\nPoint 3' },
+                    { key: 'style', label: 'Style', type: 'select', options: ['Numbered List', 'Icon Grid', 'Flowchart', 'Statistics'] },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create an infographic for ${brand.name}.\nTOPIC: ${vals.topic || 'Key Facts'}\nPOINTS: ${vals.points || '1. Point one\n2. Point two'}\nSTYLE: ${vals.style || 'Numbered List'}\nBRAND COLORS: ${colors}\nIcons for each point, visually digestible, ${brand.name} branding.`
+                }
+            },
+            {
+                id: 'service-post', label: 'Service Highlight', icon: 'design_services',
+                desc: 'Highlight a service offering',
+                fields: [
+                    { key: 'serviceName', label: 'Service Name', type: 'text', placeholder: 'e.g. Interior Design Consultation' },
+                    { key: 'headline', label: 'Headline', type: 'text', placeholder: 'e.g. Expert Design, Made Simple' },
+                    { key: 'style', label: 'Visual Style', type: 'select', options: ['Corporate Clean', 'Modern Gradient', 'Illustrated', 'Geometric'] },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a service highlight post for ${brand.name}.\nSERVICE: ${vals.serviceName || 'our service'}\nHEADLINE: "${vals.headline || 'Expert Service'}"\nSTYLE: ${vals.style || 'Corporate Clean'}\nBRAND COLORS: ${colors}\nInformative, visually appealing, ${brand.name} identity.`
+                }
+            },
+            {
+                id: 'behind-scenes', label: 'Behind the Scenes', icon: 'videocam',
+                desc: 'Show process and culture',
+                fields: [
+                    { key: 'scene', label: 'What\'s Happening?', type: 'text', placeholder: 'e.g. Team brainstorming' },
+                    { key: 'vibe', label: 'Vibe', type: 'select', options: ['Authentic', 'Professional', 'Fun/Playful', 'Creative'] },
+                    { key: 'image', label: 'Photo', type: 'image', hint: 'Upload a BTS photo' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a behind-the-scenes story for ${brand.name}.\nSCENE: ${vals.scene || 'Team at work'}\nVIBE: ${vals.vibe || 'Authentic'}\nBRAND COLORS: ${colors} as accent overlays\nAuthentic, warm, ${brand.name} brand identity maintained.`
+                }
+            },
+        ]
+    },
+]
 
 export default function CreativeStudio() {
+
     const navigate = useNavigate()
     const { activeBrand } = useBrand()
     const [searchParams, setSearchParams] = useSearchParams()
+
+    // ── Global State ──
     const [selectedType, setSelectedType] = useState('instagram-post')
     const [prompt, setPrompt] = useState('')
     const [selectedProduct, setSelectedProduct] = useState(null)
     const [showProductPicker, setShowProductPicker] = useState(false)
     const [productsList, setProductsList] = useState([])
     const [generating, setGenerating] = useState(false)
+    const [autoGenerate, setAutoGenerate] = useState(false)
     const [enhancing, setEnhancing] = useState(false)
     const [result, setResult] = useState(null)
     const [error, setError] = useState('')
@@ -42,11 +326,9 @@ export default function CreativeStudio() {
     const [fromContent, setFromContent] = useState(false)
     const [aspectRatio, setAspectRatio] = useState('1:1')
     const [publishData, setPublishData] = useState(null) // { image, text } or null
-
-    // Studio mode: 'create' (unified), 'photoshoot', 'templates', or 'imagebank'
     const [studioMode, setStudioMode] = useState('create')
 
-    // AI Photoshoot state
+    // ── AI Photoshoot State ──
     const [productImage, setProductImage] = useState(null)
     const [productFile, setProductFile] = useState(null)
     const [productPickerOpen, setProductPickerOpen] = useState(false)
@@ -59,7 +341,6 @@ export default function CreativeStudio() {
     const [photoshootError, setPhotoshootError] = useState('')
     const [photoshootSaved, setPhotoshootSaved] = useState(false)
     const [fidelity, setFidelity] = useState(80)
-    // Professional Photography Controls
     const [cameraAngle, setCameraAngle] = useState('eye-level')
     const [lens, setLens] = useState('50mm')
     const [lightingStyle, setLightingStyle] = useState('softbox')
@@ -68,10 +349,8 @@ export default function CreativeStudio() {
     const [modelPresence, setModelPresence] = useState('none')
     const [mood, setMood] = useState(['commercial'])
     const [psTab, setPsTab] = useState('shot')
-
-    // ── AI Image Editing (inline in photoshoot) ──
-    const [psEditMode, setPsEditMode] = useState(false) // show AI editor panel
-    const [psEditTool, setPsEditTool] = useState('prompt') // prompt | visual | retouch | background
+    const [psEditMode, setPsEditMode] = useState(false)
+    const [psEditTool, setPsEditTool] = useState('prompt')
     const [psEditPrompt, setPsEditPrompt] = useState('')
     const [psEditLoading, setPsEditLoading] = useState(false)
     const [psEditError, setPsEditError] = useState('')
@@ -79,56 +358,88 @@ export default function CreativeStudio() {
     const [psBgPrompt, setPsBgPrompt] = useState('')
     const [psMaskMode, setPsMaskMode] = useState(false)
     const [psMaskBrushSize, setPsMaskBrushSize] = useState(30)
+
+    // ── Image Bank State ──
+    const [bankImages, setBankImages] = useState([])
+    const [bankLoading, setBankLoading] = useState(false)
+    const [bankTotal, setBankTotal] = useState(0)
+    const [lightboxIdx, setLightboxIdx] = useState(null)
+    const [bankView, setBankView] = useState('list')
+    const [bankCopiedId, setBankCopiedId] = useState(null)
+    const [bankTab, setBankTab] = useState('generated')
+    const [bankCounts, setBankCounts] = useState({ uploaded: 0, generated: 0 })
+
+    // ── Template & Category State ──
+    const [activeTemplate, setActiveTemplate] = useState(null)
+    const [templateFields, setTemplateFields] = useState({})
+    const [templatePromptPreview, setTemplatePromptPreview] = useState('')
+    const [templateRefImage, setTemplateRefImage] = useState(null)
+    const [templateGenerating, setTemplateGenerating] = useState(false)
+    const [templateResult, setTemplateResult] = useState(null)
+    const [templateError, setTemplateError] = useState('')
+    const [reversePrompting, setReversePrompting] = useState(false)
+    const [savedTemplates, setSavedTemplates] = useState([])
+    const [showCreateTemplate, setShowCreateTemplate] = useState(false)
+    const [creatingTemplate, setCreatingTemplate] = useState(false)
+    const [analyzeLoading, setAnalyzeLoading] = useState(false)
+    const [newTmpl, setNewTmpl] = useState({
+        label: '', icon: 'auto_awesome', description: '', type: 'instagram-post', style: 'modern',
+        promptFormula: '', referenceImageUrl: '', fields: [], category: ''
+    })
+    const [analyzedMeta, setAnalyzedMeta] = useState({ colorPalette: [], layoutDescription: '' })
+    const [templateFieldsMode, setTemplateFieldsMode] = useState('simple')
+    const [activeCategory, setActiveCategory] = useState(null)
+    const [savedCategories, setSavedCategories] = useState([])
+    const [showCreateCategory, setShowCreateCategory] = useState(false)
+    const [creatingCategory, setCreatingCategory] = useState(false)
+    const [newCat, setNewCat] = useState({ label: '', icon: 'auto_awesome', color: '#f59e0b', imageSource: 'upload' })
+
+    // ── Other UI/Ref State ──
+    const [designBaseImage, setDesignBaseImage] = useState(null)
+    const [referenceImages, setReferenceImages] = useState({ style: null, character: null, upload: null })
+    const [characters, setCharacters] = useState([])
+    const [addLogo, setAddLogo] = useState(() => !!activeBrand?.dna?.logo?.url)
+    const [logoPosition, setLogoPosition] = useState('bottom-right')
+    const [logoSize, setLogoSize] = useState('medium')
+    const [showAdvanced, setShowAdvanced] = useState(false)
+    const [activeQuickTemplate, setActiveQuickTemplate] = useState(null)
+    const [showQuickStart, setShowQuickStart] = useState(true)
+    const [guidedForm, setGuidedForm] = useState(null)
+    const [refPickerSlot, setRefPickerSlot] = useState(null)
+    const [refPickerTab, setRefPickerTab] = useState('upload')
+    const [brandImages, setBrandImages] = useState([])
+    const [showCharTags, setShowCharTags] = useState(false)
+    const [charTagFilter, setCharTagFilter] = useState('')
+    const [zoomImage, setZoomImage] = useState(null)
+
+    // ── Refs ──
     const psMaskCanvasRef = useRef(null)
     const psMaskCtxRef = useRef(null)
     const psImageRef = useRef(null)
     const psIsPainting = useRef(false)
+    const promptTextareaRef = useRef(null)
+    const abortControllerRef = useRef(null)
+    const activeBrandIdRef = useRef(activeBrand?._id)
 
-    // Image Bank state
-    const [bankImages, setBankImages] = useState([])
-    const [bankLoading, setBankLoading] = useState(false)
-    const [bankTotal, setBankTotal] = useState(0)
-    const [lightboxIdx, setLightboxIdx] = useState(null) // index into bankImages for zoom view
-    const [bankView, setBankView] = useState('list') // 'list' | 'grid'
-    const [bankCopiedId, setBankCopiedId] = useState(null)
-    const [bankTab, setBankTab] = useState('generated') // 'generated' | 'uploaded' | 'brand'
-    const [bankCounts, setBankCounts] = useState({ uploaded: 0, generated: 0 })
+    // ── Helper Functions ──
+    function getSignal() {
+        if (abortControllerRef.current) abortControllerRef.current.abort()
+        abortControllerRef.current = new AbortController()
+        return abortControllerRef.current.signal
+    }
 
-    // Photoshoot image passed to design mode
-    const [designBaseImage, setDesignBaseImage] = useState(null)
+    // ── Effects ──
+    useEffect(() => {
+        return () => abortControllerRef.current?.abort()
+    }, [])
 
-    // ── NEW: Reference Images (style / upload) + multi-character ──
-    const [referenceImages, setReferenceImages] = useState({ style: null, character: null, upload: null })
-    const [characters, setCharacters] = useState([]) // [{ name: 'Character 1', image: 'data:...' }]
-
-    // ── NEW: Logo Overlay — auto-enable when brand has a logo ──
-    const [addLogo, setAddLogo] = useState(() => !!activeBrand?.dna?.logo?.url)
-    const [logoPosition, setLogoPosition] = useState('bottom-right')
-    const [logoSize, setLogoSize] = useState('medium')
-
-    // ── Unified landing state ──
-    const [showAdvanced, setShowAdvanced] = useState(false)
-    const [activeQuickTemplate, setActiveQuickTemplate] = useState(null) // inline template
-    const [showQuickStart, setShowQuickStart] = useState(true)
-    const [guidedForm, setGuidedForm] = useState(null) // which template is open
-    const [refPickerSlot, setRefPickerSlot] = useState(null) // which ref slot is being picked: 'style'|'character-N'|'upload'|null
-    const [refPickerTab, setRefPickerTab] = useState('upload') // 'upload'|'bank'|'brand'
-    const [brandImages, setBrandImages] = useState([]) // brand images from onboarding
-    const [showCharTags, setShowCharTags] = useState(false) // @character tag autocomplete
-    const [charTagFilter, setCharTagFilter] = useState('') // filter for @character autocomplete
-    const promptTextareaRef = useRef(null) // ref for prompt textarea
-    const [zoomImage, setZoomImage] = useState(null) // fullscreen zoom lightbox
-
-    // Load brand images from DNA (with fallback fetch by ID)
     useEffect(() => {
         if (!activeBrand?._id) { setBrandImages([]); return }
-        // Try from context first
         if (activeBrand.dna?.brandImages?.length > 0) {
             setBrandImages(activeBrand.dna.brandImages)
             return
         }
-        // Fallback: fetch full brand by ID (context may strip heavy fields)
-        ; (async () => {
+        (async () => {
             try {
                 const data = await brandsAPI.get(activeBrand._id)
                 if (data?.brand?.dna?.brandImages?.length > 0) {
@@ -140,292 +451,53 @@ export default function CreativeStudio() {
         })()
     }, [activeBrand?._id])
 
-    // ── Brand Templates (interactive formula-based) ──
-    const [activeTemplate, setActiveTemplate] = useState(null)
-    const [templateFields, setTemplateFields] = useState({})
-    const [templatePromptPreview, setTemplatePromptPreview] = useState('')
-    const [templateRefImage, setTemplateRefImage] = useState(null)
-    const [templateGenerating, setTemplateGenerating] = useState(false)
-    const [templateResult, setTemplateResult] = useState(null)
-    const [templateError, setTemplateError] = useState('')
-    const [reversePrompting, setReversePrompting] = useState(false)
-    const [savedTemplates, setSavedTemplates] = useState([]) // custom templates from DB
-    const [showCreateTemplate, setShowCreateTemplate] = useState(false)
-    const [creatingTemplate, setCreatingTemplate] = useState(false)
-    const [analyzeLoading, setAnalyzeLoading] = useState(false)
-    const [newTmpl, setNewTmpl] = useState({
-        label: '', icon: 'auto_awesome', description: '', type: 'instagram-post', style: 'modern',
-        promptFormula: '', referenceImageUrl: '', fields: [], category: ''
-    })
-    const [analyzedMeta, setAnalyzedMeta] = useState({ colorPalette: [], layoutDescription: '' }) // from AI analysis
-    const [templateFieldsMode, setTemplateFieldsMode] = useState('simple') // 'simple' | 'advanced'
-    const [activeCategory, setActiveCategory] = useState(null)
-    const [savedCategories, setSavedCategories] = useState([]) // custom categories from DB
-    const [showCreateCategory, setShowCreateCategory] = useState(false)
-    const [creatingCategory, setCreatingCategory] = useState(false)
-    const [newCat, setNewCat] = useState({
-        label: '', icon: 'auto_awesome', color: '#f59e0b', imageSource: 'upload'
-    })
+    useEffect(() => {
+        if (activeBrand?._id !== activeBrandIdRef.current) {
+            console.log('Brand changed, aborting creative processing...')
+            abortControllerRef.current?.abort()
+            activeBrandIdRef.current = activeBrand?._id
+            if (generating || enhancing || templateGenerating) {
+                setGenerating(false); setEnhancing(false); setTemplateGenerating(false)
+            }
+        }
+    }, [activeBrand?._id, generating, enhancing, templateGenerating])
+    useEffect(() => {
+        if (autoGenerate && activeBrand && prompt.trim() && !generating) {
+            setAutoGenerate(false)
+            handleGenerate()
+        }
+    }, [autoGenerate, activeBrand, prompt, generating, handleGenerate]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    // ── Aspect Ratio Options ──
-    const ASPECT_RATIOS = [
-        { ratio: '1:1', label: 'Square', icon: '⬜' },
-        { ratio: '16:9', label: 'Widescreen', icon: '🖥️' },
-        { ratio: '9:16', label: 'Social Story', icon: '📱' },
-        { ratio: '2:3', label: 'Portrait', icon: '📷' },
-        { ratio: '3:4', label: 'Traditional', icon: '🖼️' },
-        { ratio: '4:5', label: 'Social Post', icon: '📸' },
-        { ratio: '3:2', label: 'Standard', icon: '🎞️' },
-        { ratio: '4:3', label: 'Classic', icon: '📺' },
-    ]
+    useEffect(() => {
+        if (activeBrand?._id) {
+            loadImageBank()
+        }
+    }, [activeBrand?._id])
 
-    // ── Template Categories with Sub-Templates ──
-    const templateCategories = [
-        {
-            id: 'sales', icon: 'local_offer', label: 'Sales & Offers', color: '#ef4444',
-            desc: 'Promotional offers, discounts, festive & seasonal sales',
-            subTemplates: [
-                {
-                    id: 'general-sale', label: 'General Sale', icon: 'sell',
-                    desc: 'All-purpose sale/offer design',
-                    fields: [
-                        { key: 'offerText', label: 'Offer Details', type: 'text', placeholder: 'e.g. FLAT 50% OFF' },
-                        { key: 'validTill', label: 'Valid Till', type: 'text', placeholder: 'e.g. This Weekend Only' },
-                        { key: 'cta', label: 'Call to Action', type: 'text', placeholder: 'e.g. Order Now', default: 'Order Now' },
-                        { key: 'mood', label: 'Design Mood', type: 'select', options: ['Urgency/Bold', 'Elegant Luxury', 'Minimalist', 'Playful/Fun'] },
-                    ],
-                    buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
-                        return `Create a promotional sale creative for ${brand.name}.\nOFFER: ${vals.offerText || 'SPECIAL OFFER'}\nVALID TILL: ${vals.validTill || 'Limited Time'}\nCTA: "${vals.cta || 'Order Now'}"\nMOOD: ${vals.mood || 'Urgency/Bold'}\nBRAND COLORS: ${colors}\nMake the offer text LARGE and prominent. Eye-catching, bold, impossible to scroll past. Include ${brand.name} branding.`
-                    }
-                },
-                {
-                    id: 'diwali-sale', label: 'Diwali Sale', icon: 'celebration',
-                    desc: 'Festival of lights themed sale',
-                    fields: [
-                        { key: 'offerText', label: 'Offer', type: 'text', placeholder: 'e.g. Diwali Mega Sale - Up to 60% OFF' },
-                        { key: 'productName', label: 'Product/Category', type: 'text', placeholder: 'e.g. on all Electronics' },
-                        { key: 'cta', label: 'CTA', type: 'text', placeholder: 'e.g. Shop the Festive Sale', default: 'Shop Now' },
-                    ],
-                    buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
-                        return `Create a Diwali sale creative for ${brand.name}.\nOFFER: ${vals.offerText || 'Diwali Special Offer'}\nPRODUCT: ${vals.productName || ''}\nCTA: "${vals.cta || 'Shop Now'}"\nTHEME: Diwali — diyas, rangoli, lanterns, golden sparkles, warm festive lighting\nBRAND COLORS: ${colors}\nFestive and joyful but still on-brand. Include ${brand.name} logo. Traditional+modern design.`
-                    }
-                },
-                {
-                    id: 'republic-sale', label: 'Republic Day Sale', icon: 'flag',
-                    desc: 'Patriotic themed sale',
-                    fields: [
-                        { key: 'offerText', label: 'Offer', type: 'text', placeholder: 'e.g. Republic Day Sale – 26% OFF' },
-                        { key: 'productName', label: 'Product', type: 'text', placeholder: 'e.g. on all categories' },
-                        { key: 'cta', label: 'CTA', type: 'text', placeholder: 'e.g. Celebrate & Save', default: 'Shop Now' },
-                    ],
-                    buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
-                        return `Create a Republic Day sale creative for ${brand.name}.\nOFFER: ${vals.offerText || 'Republic Day Special'}\nPRODUCT: ${vals.productName || ''}\nCTA: "${vals.cta || 'Shop Now'}"\nTHEME: Republic Day — tricolor (saffron, white, green), patriotic, flag elements, Ashoka Chakra subtle\nBRAND COLORS: ${colors}\nPatriotic + brand identity blend. Include ${brand.name} logo.`
-                    }
-                },
-            ]
-        },
-        {
-            id: 'product', icon: 'shopping_bag', label: 'Product Showcase', color: '#f59e0b',
-            desc: 'Feature products with professional brand styling',
-            subTemplates: [
-                {
-                    id: 'product-hero', label: 'Hero Shot', icon: 'star',
-                    desc: 'Full product hero with brand styling',
-                    fields: [
-                        { key: 'productName', label: 'Product Name', type: 'text', placeholder: 'e.g. Premium Leather Bag' },
-                        { key: 'tagline', label: 'Tagline', type: 'text', placeholder: 'e.g. Crafted for Excellence' },
-                        { key: 'cta', label: 'CTA', type: 'text', placeholder: 'e.g. Shop Now', default: 'Shop Now' },
-                        { key: 'layout', label: 'Layout', type: 'select', options: ['Centered', 'Lifestyle', 'Flat Lay', 'Minimal White', 'Dark Luxury'] },
-                        { key: 'image', label: 'Product Image', type: 'image', hint: 'Upload product photo' },
-                    ],
-                    buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
-                        const font = brand.dna?.fonts?.heading?.family || 'modern sans-serif'
-                        return `Create a premium product showcase for ${brand.name}.\nPRODUCT: ${vals.productName || 'a product'}\nTAGLINE: "${vals.tagline || 'Quality You Deserve'}"\nCTA: "${vals.cta || 'Shop Now'}"\nLAYOUT: ${vals.layout || 'Centered'}\nBRAND COLORS: ${colors}\nFONT: ${font}\nClean background, brand color accents, product as hero element, professional.`
-                    }
-                },
-                {
-                    id: 'product-comparison', label: 'Product Comparison', icon: 'compare',
-                    desc: 'Side-by-side product comparison',
-                    fields: [
-                        { key: 'product1', label: 'Product 1', type: 'text', placeholder: 'e.g. Basic Plan' },
-                        { key: 'product2', label: 'Product 2', type: 'text', placeholder: 'e.g. Premium Plan' },
-                        { key: 'highlight', label: 'What to Highlight', type: 'text', placeholder: 'e.g. Premium = Best Value' },
-                    ],
-                    buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
-                        return `Create a product comparison visual for ${brand.name}.\nLEFT: ${vals.product1 || 'Option A'}\nRIGHT: ${vals.product2 || 'Option B'}\nHIGHLIGHT: ${vals.highlight || 'Choose the best'}\nBRAND COLORS: ${colors}\nClean split layout, easy to compare, ${brand.name} branding applied.`
-                    }
-                },
-            ]
-        },
-        {
-            id: 'quotes', icon: 'format_quote', label: 'Quotes & Testimonials', color: '#10b981',
-            desc: 'Customer reviews, brand quotes, motivational content',
-            subTemplates: [
-                {
-                    id: 'testimonial', label: 'Customer Testimonial', icon: 'reviews',
-                    desc: 'Customer review card',
-                    fields: [
-                        { key: 'quote', label: 'Quote Text', type: 'textarea', placeholder: 'Type the quote...' },
-                        { key: 'author', label: 'Author Name', type: 'text', placeholder: 'e.g. Rahul Sharma, CEO' },
-                        { key: 'bgStyle', label: 'Background', type: 'select', options: ['Solid Brand Color', 'Gradient', 'Texture', 'Photo (Blurred)', 'Dark/Moody'] },
-                    ],
-                    buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
-                        return `Create a testimonial card for ${brand.name}.\nQUOTE: "${vals.quote || 'Great experience!'}"\nAUTHOR: ${vals.author || 'Happy Customer'}\nBG: ${vals.bgStyle || 'Solid Brand Color'}\nBRAND COLORS: ${colors}\nElegant, large quotation marks, ${brand.name} logo subtle in corner.`
-                    }
-                },
-                {
-                    id: 'motivational', label: 'Motivational Quote', icon: 'lightbulb',
-                    desc: 'Inspirational brand quote',
-                    fields: [
-                        { key: 'quote', label: 'Quote', type: 'textarea', placeholder: 'e.g. Dream big, start small...' },
-                        { key: 'bgStyle', label: 'Background', type: 'select', options: ['Gradient', 'Nature Photo', 'Abstract', 'Minimal', 'Dark'] },
-                    ],
-                    buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
-                        return `Create a motivational quote post for ${brand.name}.\nQUOTE: "${vals.quote || 'Success starts with a single step'}"\nBG: ${vals.bgStyle || 'Gradient'}\nUSE brand colors: ${colors}\nInspirational, visually stunning, ${brand.name} branding.`
-                    }
-                },
-            ]
-        },
-        {
-            id: 'announcement', icon: 'campaign', label: 'Announcements', color: '#8b5cf6',
-            desc: 'Launches, updates, news, and alerts',
-            subTemplates: [
-                {
-                    id: 'launch', label: 'Product Launch', icon: 'rocket_launch',
-                    desc: 'New product/service launch',
-                    fields: [
-                        { key: 'headline', label: 'Headline', type: 'text', placeholder: 'e.g. Introducing Our Latest Innovation' },
-                        { key: 'details', label: 'Details', type: 'textarea', placeholder: 'Brief details...' },
-                        { key: 'tone', label: 'Tone', type: 'select', options: ['Exciting', 'Professional', 'Teaser/Mystery', 'Celebratory'] },
-                    ],
-                    buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
-                        return `Create a product launch announcement for ${brand.name}.\nHEADLINE: "${vals.headline || 'Something Big is Coming!'}"\nDETAILS: ${vals.details || ''}\nTONE: ${vals.tone || 'Exciting'}\nBRAND COLORS: ${colors}\nBold, shareable, ${brand.name} branding prominent.`
-                    }
-                },
-                {
-                    id: 'news-update', label: 'News/Update', icon: 'newspaper',
-                    desc: 'Brand news or company update',
-                    fields: [
-                        { key: 'headline', label: 'Headline', type: 'text', placeholder: 'e.g. We just hit 10K customers!' },
-                        { key: 'details', label: 'Details', type: 'textarea', placeholder: 'More info...' },
-                    ],
-                    buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
-                        return `Create a news update post for ${brand.name}.\nHEADLINE: "${vals.headline || 'Exciting Update'}"\nDETAILS: ${vals.details || ''}\nBRAND COLORS: ${colors}\nProfessional, newsworthy, ${brand.name} identity applied.`
-                    }
-                },
-            ]
-        },
-        {
-            id: 'events', icon: 'event', label: 'Events', color: '#ec4899',
-            desc: 'Event promotions, invitations, and recaps',
-            subTemplates: [
-                {
-                    id: 'event-promo', label: 'Event Promotion', icon: 'calendar_month',
-                    desc: 'Promote an upcoming event',
-                    fields: [
-                        { key: 'eventName', label: 'Event Name', type: 'text', placeholder: 'e.g. Annual Tech Summit 2026' },
-                        { key: 'date', label: 'Date & Time', type: 'text', placeholder: 'e.g. March 15½ | 10AM' },
-                        { key: 'venue', label: 'Venue', type: 'text', placeholder: 'e.g. Taj Hotel, Mumbai' },
-                        { key: 'cta', label: 'CTA', type: 'text', placeholder: 'e.g. Register Now', default: 'Register Now' },
-                    ],
-                    buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
-                        return `Create an event promo for ${brand.name}.\nEVENT: ${vals.eventName || 'Event'}\nDATE: ${vals.date || 'Coming Soon'}\nVENUE: ${vals.venue || 'TBA'}\nCTA: "${vals.cta || 'Register Now'}"\nBRAND COLORS: ${colors}\nClear hierarchy: Name > Date > Venue > CTA. ${brand.name} branding prominent.`
-                    }
-                },
-                {
-                    id: 'birthday', label: 'Birthday Post', icon: 'cake',
-                    desc: 'Birthday greetings for team/clients',
-                    fields: [
-                        { key: 'personName', label: 'Person\'s Name', type: 'text', placeholder: 'e.g. Amit Kumar' },
-                        { key: 'message', label: 'Birthday Message', type: 'textarea', placeholder: 'e.g. Wishing you a wonderful birthday!' },
-                        { key: 'image', label: 'Photo', type: 'image', hint: 'Upload their photo (optional)' },
-                    ],
-                    buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
-                        return `Create a birthday greeting post for ${brand.name}.\nNAME: ${vals.personName || 'Team Member'}\nMESSAGE: "${vals.message || 'Happy Birthday!'}"\nBRAND COLORS: ${colors}\nFestive, warm, celebration vibes. Cake/balloons/confetti elements. Brand logo included.`
-                    }
-                },
-                {
-                    id: 'anniversary', label: 'Anniversary', icon: 'favorite',
-                    desc: 'Work anniversary or milestone celebration',
-                    fields: [
-                        { key: 'personName', label: 'Person\'s Name', type: 'text', placeholder: 'e.g. Priya Patel' },
-                        { key: 'years', label: 'Years / Milestone', type: 'text', placeholder: 'e.g. 5 Years' },
-                        { key: 'message', label: 'Message', type: 'textarea', placeholder: 'e.g. Thank you for your dedication!' },
-                    ],
-                    buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
-                        return `Create a work anniversary celebration post for ${brand.name}.\nNAME: ${vals.personName || 'Team Member'}\nMILESTONE: ${vals.years || 'Anniversary'}\nMESSAGE: "${vals.message || 'Thank you for your incredible journey with us!'}"\nBRAND COLORS: ${colors}\nCelebratory, professional, warm. ${brand.name} branding applied.`
-                    }
-                },
-            ]
-        },
-        {
-            id: 'content', icon: 'analytics', label: 'Content & Info', color: '#0ea5e9',
-            desc: 'Infographics, tips, educational content',
-            subTemplates: [
-                {
-                    id: 'infographic', label: 'Infographic', icon: 'bar_chart',
-                    desc: 'Data-driven visual content',
-                    fields: [
-                        { key: 'topic', label: 'Topic', type: 'text', placeholder: 'e.g. 5 Benefits of Organic Products' },
-                        { key: 'points', label: 'Key Points (one per line)', type: 'textarea', placeholder: 'Point 1\nPoint 2\nPoint 3' },
-                        { key: 'style', label: 'Style', type: 'select', options: ['Numbered List', 'Icon Grid', 'Flowchart', 'Statistics'] },
-                    ],
-                    buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
-                        return `Create an infographic for ${brand.name}.\nTOPIC: ${vals.topic || 'Key Facts'}\nPOINTS: ${vals.points || '1. Point one\n2. Point two'}\nSTYLE: ${vals.style || 'Numbered List'}\nBRAND COLORS: ${colors}\nIcons for each point, visually digestible, ${brand.name} branding.`
-                    }
-                },
-                {
-                    id: 'service-post', label: 'Service Highlight', icon: 'design_services',
-                    desc: 'Highlight a service offering',
-                    fields: [
-                        { key: 'serviceName', label: 'Service Name', type: 'text', placeholder: 'e.g. Interior Design Consultation' },
-                        { key: 'headline', label: 'Headline', type: 'text', placeholder: 'e.g. Expert Design, Made Simple' },
-                        { key: 'style', label: 'Visual Style', type: 'select', options: ['Corporate Clean', 'Modern Gradient', 'Illustrated', 'Geometric'] },
-                    ],
-                    buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
-                        return `Create a service highlight post for ${brand.name}.\nSERVICE: ${vals.serviceName || 'our service'}\nHEADLINE: "${vals.headline || 'Expert Service'}"\nSTYLE: ${vals.style || 'Corporate Clean'}\nBRAND COLORS: ${colors}\nInformative, visually appealing, ${brand.name} identity.`
-                    }
-                },
-                {
-                    id: 'behind-scenes', label: 'Behind the Scenes', icon: 'videocam',
-                    desc: 'Show process and culture',
-                    fields: [
-                        { key: 'scene', label: 'What\'s Happening?', type: 'text', placeholder: 'e.g. Team brainstorming' },
-                        { key: 'vibe', label: 'Vibe', type: 'select', options: ['Authentic', 'Professional', 'Fun/Playful', 'Creative'] },
-                        { key: 'image', label: 'Photo', type: 'image', hint: 'Upload a BTS photo' },
-                    ],
-                    buildPrompt: (brand, vals) => {
-                        const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
-                        return `Create a behind-the-scenes story for ${brand.name}.\nSCENE: ${vals.scene || 'Team at work'}\nVIBE: ${vals.vibe || 'Authentic'}\nBRAND COLORS: ${colors} as accent overlays\nAuthentic, warm, ${brand.name} brand identity maintained.`
-                    }
-                },
-            ]
-        },
-    ]
+    useEffect(() => {
+        if (studioMode === 'templates' && activeBrand?._id) loadCustomTemplates()
+    }, [studioMode, activeBrand, loadCustomTemplates])
 
-    // Quick-start categories for non-technical users
-    const quickStartCards = [
-        { id: 'social', icon: 'share', label: 'Social Media Post', desc: 'Instagram, Facebook, LinkedIn', color: '#6366f1' },
-        { id: 'product', icon: 'inventory_2', label: 'Product Showcase', desc: 'Feature your product or service', color: '#f59e0b' },
-        { id: 'promo', icon: 'local_offer', label: 'Promotional Offer', desc: 'Sales, discounts, special deals', color: '#ef4444' },
-        { id: 'quote', icon: 'format_quote', label: 'Customer Quote', desc: 'Reviews and testimonials', color: '#10b981' },
-        { id: 'announce', icon: 'campaign', label: 'Announcement', desc: 'Launches, updates, news', color: '#8b5cf6' },
-        { id: 'story', icon: 'auto_stories', label: 'Brand Story', desc: 'Tell your brand narrative', color: '#ec4899' },
-    ]
+    useEffect(() => {
+        if (studioMode === 'templates' && activeBrand?._id) {
+            loadCustomCategories()
+        }
+    }, [studioMode, activeBrand, loadCustomCategories])
+
+    useEffect(() => {
+        if (prompt.trim()) {
+            const detected = detectFormatFromPrompt(prompt)
+            if (detected) setSelectedType(detected)
+        }
+    }, [prompt, detectFormatFromPrompt])
+
+    useEffect(() => {
+        const typeInfo = creativeTypes.find(t => t.id === selectedType)
+        if (typeInfo?.aspectRatio) {
+            setAspectRatio(typeInfo.aspectRatio)
+        }
+    }, [selectedType])
+
 
     // Read URL params from Content Studio
     useEffect(() => {
@@ -468,17 +540,22 @@ export default function CreativeStudio() {
             }
 
             setSearchParams({}, { replace: true })
+        } else if (searchParams.get('fromBrainstorm') === 'true') {
+            const bsCtx = window.sessionStorage.getItem('brainstormContext')
+            if (bsCtx) {
+                try {
+                    const parsed = JSON.parse(bsCtx)
+                    if (parsed.prompt) {
+                        setPrompt(parsed.prompt)
+                        setAutoGenerate(true)
+                    }
+                } catch (e) { console.error('Failed to parse brainstorm context:', e) }
+            }
+            setSearchParams({}, { replace: true })
         }
-    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Load image bank on mount + when brand changes (needed for reference picker's Library tab)
-    useEffect(() => {
-        if (activeBrand?._id) {
-            loadImageBank()
-        }
-    }, [activeBrand?._id])
-
-    const loadImageBank = async (cat) => {
+    async function loadImageBank(cat) {
         const category = cat || bankTab
         setBankLoading(true)
         try {
@@ -498,7 +575,7 @@ export default function CreativeStudio() {
     }
 
     // Auto-save photoshoot result to image bank
-    const saveToImageBank = async (imageData) => {
+    async function saveToImageBank(imageData) {
         if (!activeBrand?._id) {
             console.warn('Cannot save to image bank: no active brand')
             return
@@ -524,26 +601,13 @@ export default function CreativeStudio() {
         }
     }
 
-    const creativeTypes = [
-        { id: 'instagram-post', icon: 'photo_camera', label: 'Instagram Post', size: '1080×1080', aspectRatio: '1:1' },
-        { id: 'instagram-story', icon: 'smartphone', label: 'Story', size: '1080×1920', aspectRatio: '9:16' },
-        { id: 'facebook-ad', icon: 'ads_click', label: 'Facebook Ad', size: '1200×628', aspectRatio: '16:9' },
-        { id: 'linkedin-post', icon: 'work', label: 'LinkedIn Post', size: '1200×627', aspectRatio: '16:9' },
-        { id: 'youtube-thumb', icon: 'smart_display', label: 'YouTube Thumb', size: '1280×720', aspectRatio: '16:9' },
-        { id: 'banner', icon: 'web', label: 'Banner', size: '1920×600', aspectRatio: '16:9' },
-    ]
 
-    const styles = [
-        { id: 'modern', label: 'Modern', icon: 'auto_awesome' },
-        { id: 'minimal', label: 'Minimal', icon: 'format_shapes' },
-        { id: 'bold', label: 'Bold', icon: 'bolt' },
-        { id: 'elegant', label: 'Elegant', icon: 'diamond' },
-        { id: 'playful', label: 'Playful', icon: 'mood' },
-        { id: 'corporate', label: 'Corporate', icon: 'business' },
-    ]
+
+
+
 
     // ── Client-side logo compositing (pixel-perfect, uses actual brand logo) ──
-    const compositeLogoOnImage = (imageUrl, logoUrl, position, size) => {
+    function compositeLogoOnImage(imageUrl, logoUrl, position, size) {
         return new Promise((resolve) => {
             const img = new window.Image()
             img.crossOrigin = 'anonymous'
@@ -553,7 +617,7 @@ export default function CreativeStudio() {
                 canvas.height = img.height
                 const ctx = canvas.getContext('2d')
                 ctx.drawImage(img, 0, 0)
-
+ 
                 const logo = new window.Image()
                 logo.crossOrigin = 'anonymous'
                 logo.onload = () => {
@@ -564,7 +628,7 @@ export default function CreativeStudio() {
                     const lw = logo.width * scale
                     const lh = logo.height * scale
                     const pad = canvas.width * 0.03 // 3% padding from edges
-
+ 
                     // Position mapping
                     const posMap = {
                         'top-left': [pad, pad],
@@ -578,7 +642,7 @@ export default function CreativeStudio() {
                         'bottom-right': [canvas.width - lw - pad, canvas.height - lh - pad],
                     }
                     const [x, y] = posMap[position] || posMap['bottom-right']
-
+ 
                     ctx.drawImage(logo, x, y, lw, lh)
                     resolve(canvas.toDataURL('image/png'))
                 }
@@ -590,7 +654,8 @@ export default function CreativeStudio() {
         })
     }
 
-    const handleEnhancePrompt = async () => {
+
+    async function handleEnhancePrompt() {
         if (!prompt.trim() || !activeBrand || enhancing) return
         setEnhancing(true)
         try {
@@ -600,6 +665,7 @@ export default function CreativeStudio() {
             if (characters.length > 0) refDescs.push(`${characters.length} character reference image(s) are attached: ${characters.map(c => c.name).join(', ')} — include these characters in the design`)
             if (referenceImages.upload) refDescs.push('A general reference image is attached — use it as contextual inspiration')
 
+            const signal = getSignal()
             const data = await creativesAPI.enhancePrompt({
                 brandId: activeBrand._id,
                 prompt: prompt.trim(),
@@ -607,7 +673,7 @@ export default function CreativeStudio() {
                 format: selectedType,
                 aspectRatio,
                 referenceDescriptions: refDescs.length > 0 ? refDescs.join('. ') : '',
-            })
+            }, { signal })
             if (data.enhancedPrompt) {
                 setPrompt(data.enhancedPrompt)
             }
@@ -618,7 +684,8 @@ export default function CreativeStudio() {
         }
     }
 
-    const handleGenerate = async () => {
+
+    async function handleGenerate() {
         if (!prompt.trim() || !activeBrand) return
         setGenerating(true)
         setError('')
@@ -671,12 +738,13 @@ export default function CreativeStudio() {
                 addLogo,
             })
 
+            const signal = getSignal()
             const data = await creativesAPI.generate({
                 brandId: activeBrand._id,
                 type: selectedType,
                 prompt: fullPrompt,
                 options,
-            })
+            }, { signal })
 
             let creative = data.creative
 
@@ -692,7 +760,7 @@ export default function CreativeStudio() {
         }
     }
 
-    const handleFeedback = async (signalType, extra = {}) => {
+    async function handleFeedback(signalType, extra = {}) {
         if (!result?._id) {
             console.warn('Feedback: no result._id — skipping API call but showing UI feedback')
         }
@@ -720,8 +788,9 @@ export default function CreativeStudio() {
         }
     }
 
+
     // ── Photoshoot AI Editing: mask helpers ──
-    const setupPsMaskCanvas = useCallback(() => {
+    function setupPsMaskCanvas() {
         const img = psImageRef.current
         if (!img || psMaskCanvasRef.current) return
         const canvas = document.createElement('canvas')
@@ -738,7 +807,7 @@ export default function CreativeStudio() {
         img.parentElement.style.position = 'relative'
         img.parentElement.appendChild(canvas)
         // Events
-        const getPos = (e) => {
+        function getPos(e) {
             const rect = canvas.getBoundingClientRect()
             return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) }
         }
@@ -746,17 +815,19 @@ export default function CreativeStudio() {
         canvas.onmousemove = (e) => { if (!psIsPainting.current) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke() }
         canvas.onmouseup = () => { psIsPainting.current = false }
         canvas.onmouseleave = () => { psIsPainting.current = false }
-    }, [psMaskBrushSize])
+    }
 
-    const teardownPsMaskCanvas = useCallback(() => {
+
+    function teardownPsMaskCanvas() {
         if (psMaskCanvasRef.current) {
             psMaskCanvasRef.current.remove()
             psMaskCanvasRef.current = null
             psMaskCtxRef.current = null
         }
-    }, [])
+    }
 
-    const getPsMaskDataUrl = useCallback(() => {
+
+    function getPsMaskDataUrl() {
         const src = psMaskCanvasRef.current
         if (!src) return null
         const c = document.createElement('canvas')
@@ -774,12 +845,14 @@ export default function CreativeStudio() {
         }
         ctx.putImageData(outData, 0, 0)
         return c.toDataURL('image/png')
-    }, [])
+    }
+
 
     // ── Photoshoot AI Edit Handler ──
-    const handlePsEdit = useCallback(async () => {
+    async function handlePsEdit() {
         if (!photoshootResult?.imageUrl) return
         setPsEditLoading(true)
+
         setPsEditError('')
         try {
             const imageBase64 = photoshootResult.imageUrl
@@ -832,10 +905,12 @@ export default function CreativeStudio() {
             }
         } catch (err) { setPsEditError(err.message) }
         setPsEditLoading(false)
-    }, [photoshootResult, psEditTool, psEditPrompt, psBgAction, psBgPrompt, getPsMaskDataUrl, teardownPsMaskCanvas])
+    }
+
 
     // ── Template Generation Handler ──
-    const handleTemplateGenerate = useCallback(async (tmpl) => {
+    async function handleTemplateGenerate(tmpl) {
+
         if (!activeBrand || templateGenerating) return
         setTemplateGenerating(true)
         setTemplateError('')
@@ -923,12 +998,13 @@ export default function CreativeStudio() {
                 }
             }
 
+            const signal = getSignal()
             const data = await creativesAPI.generate({
                 brandId: activeBrand._id,
                 type: tmpl.type,
                 prompt: builtPrompt,
                 options,
-            })
+            }, { signal })
 
             if (data.success && data.creative) {
                 setTemplateResult(data.creative)
@@ -939,10 +1015,12 @@ export default function CreativeStudio() {
             setTemplateError(err.message || 'Template generation failed')
         }
         setTemplateGenerating(false)
-    }, [activeBrand, templateFields, templateRefImage, templateGenerating, aspectRatio])
+    }
+
 
     // ── Reverse Prompt Handler (analyze uploaded image to extract design formula) ──
-    const handleReversePrompt = useCallback(async (imageSource, tmplId) => {
+    async function handleReversePrompt(imageSource, tmplId) {
+
         if (!activeBrand) return
         setReversePrompting(true)
         try {
@@ -1013,23 +1091,23 @@ Return ONLY the prompt formula text, no explanation. Start directly with "Create
             setTemplatePromptPreview(`Create a design matching the uploaded reference style for ${activeBrand.name}. Use brand colors. {{HEADLINE}} as the main text. {{SUBTEXT}} as supporting text. {{CTA}} as call-to-action.`)
         }
         setReversePrompting(false)
-    }, [activeBrand])
+    }
+
 
     // ── Load custom templates for the active brand ──
-    const loadCustomTemplates = useCallback(async () => {
+    async function loadCustomTemplates() {
+
         if (!activeBrand?._id) return
         try {
             const data = await brandsAPI.getTemplates(activeBrand._id)
             if (data.success) setSavedTemplates(data.templates || [])
         } catch (err) { console.error('Load templates error:', err) }
-    }, [activeBrand])
+    }
 
-    useEffect(() => {
-        if (studioMode === 'templates' && activeBrand?._id) loadCustomTemplates()
-    }, [studioMode, activeBrand, loadCustomTemplates])
 
     // ── Create a new custom template ──
-    const handleCreateTemplate = useCallback(async () => {
+    async function handleCreateTemplate() {
+
         if (!activeBrand?._id || !newTmpl.label || !newTmpl.promptFormula) return
         setCreatingTemplate(true)
         try {
@@ -1044,10 +1122,12 @@ Return ONLY the prompt formula text, no explanation. Start directly with "Create
             }
         } catch (err) { console.error('Create template error:', err) }
         setCreatingTemplate(false)
-    }, [activeBrand, newTmpl, loadCustomTemplates])
+    }
+
 
     // ── Analyze image for new template creation — SMART STRUCTURED ANALYSIS ──
-    const handleAnalyzeForTemplate = useCallback(async (imageSource) => {
+    async function handleAnalyzeForTemplate(imageSource) {
+
         if (!activeBrand) return
         setAnalyzeLoading(true)
         setNewTmpl(prev => ({ ...prev, referenceImageUrl: imageSource }))
@@ -1132,25 +1212,23 @@ Return ONLY the prompt formula text, no explanation. Start directly with "Create
             }))
         }
         setAnalyzeLoading(false)
-    }, [activeBrand])
+    }
+
 
     // ── Load custom categories from DB ──
-    const loadCustomCategories = useCallback(async () => {
+    async function loadCustomCategories() {
+
         if (!activeBrand?._id) return
         try {
             const data = await brandsAPI.getCategories(activeBrand._id)
             if (data.success) setSavedCategories(data.categories || [])
         } catch (err) { console.error('Load categories error:', err) }
-    }, [activeBrand])
+    }
 
-    useEffect(() => {
-        if (studioMode === 'templates' && activeBrand?._id) {
-            loadCustomCategories()
-        }
-    }, [studioMode, activeBrand, loadCustomCategories])
 
     // ── Create a new custom category ──
-    const handleCreateCategory = useCallback(async () => {
+    async function handleCreateCategory() {
+
         if (!activeBrand?._id || !newCat.label) return
         setCreatingCategory(true)
         try {
@@ -1166,10 +1244,12 @@ Return ONLY the prompt formula text, no explanation. Start directly with "Create
             }
         } catch (err) { console.error('Create category error:', err) }
         setCreatingCategory(false)
-    }, [activeBrand, newCat, loadCustomCategories])
+    }
+
 
     // ── Analyze image for category creation (reverse prompting) ──
-    const handleAnalyzeForCategory = useCallback(async (imageSource) => {
+    async function handleAnalyzeForCategory(imageSource) {
+
         if (!activeBrand) return
         setAnalyzeLoading(true)
         setNewCat(prev => ({ ...prev, referenceImageUrl: imageSource }))
@@ -1226,12 +1306,13 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
             }))
         }
         setAnalyzeLoading(false)
-    }, [activeBrand])
+    }
+
 
     const selectedTypeInfo = creativeTypes.find(t => t.id === selectedType)
 
     // ── Smart format detection from prompt ──
-    const detectFormatFromPrompt = useCallback((text) => {
+    function detectFormatFromPrompt(text) {
         const lower = text.toLowerCase()
         if (/instagram\s*(post|feed|grid)/i.test(lower)) return 'instagram-post'
         if (/story|stories|reel/i.test(lower)) return 'instagram-story'
@@ -1240,23 +1321,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
         if (/youtube|thumbnail|thumb/i.test(lower)) return 'youtube-thumb'
         if (/banner|hero|header|website/i.test(lower)) return 'banner'
         return null // keep current selection
-    }, [])
+    }
 
-    // Auto-detect format when prompt changes
-    useEffect(() => {
-        if (prompt.trim()) {
-            const detected = detectFormatFromPrompt(prompt)
-            if (detected) setSelectedType(detected)
-        }
-    }, [prompt, detectFormatFromPrompt])
-
-    // Auto-lock aspect ratio when format changes
-    useEffect(() => {
-        const typeInfo = creativeTypes.find(t => t.id === selectedType)
-        if (typeInfo?.aspectRatio) {
-            setAspectRatio(typeInfo.aspectRatio)
-        }
-    }, [selectedType])
 
     return (
         <DashboardLayout title="Creative Studio" subtitle="AI-powered image generation & design">
@@ -1938,18 +2004,6 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     {(() => {
                         const recentPhotoshoots = bankImages.filter(i => i.type === 'ai-photoshoot' || i.type === 'photoshoot').slice(0, 8);
                         if (recentPhotoshoots.length === 0) return null;
-                        const getTimeAgo = (d) => {
-                            if (!d) return '';
-                            const diff = Date.now() - new Date(d).getTime();
-                            const m = Math.floor(diff / 60000);
-                            if (m < 1) return 'just now';
-                            if (m < 60) return `${m}m ago`;
-                            const h = Math.floor(m / 60);
-                            if (h < 24) return `${h}h ago`;
-                            const dy = Math.floor(h / 24);
-                            if (dy < 7) return `${dy}d ago`;
-                            return new Date(d).toLocaleDateString();
-                        };
                         return (
                             <div className="col-span-12 studio-card p-5 mb-1 fade-up-1">
                                 <div className="flex items-center justify-between mb-3">
@@ -4294,19 +4348,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     )}
 
                     {bankTab !== 'brand' && !bankLoading && bankImages.length > 0 && (() => {
-                        const getTimeAgo = (dateStr) => {
-                            if (!dateStr) return '';
-                            const diff = Date.now() - new Date(dateStr).getTime();
-                            const mins = Math.floor(diff / 60000);
-                            if (mins < 1) return 'just now';
-                            if (mins < 60) return `${mins}m ago`;
-                            const hrs = Math.floor(mins / 60);
-                            if (hrs < 24) return `${hrs}h ago`;
-                            const days = Math.floor(hrs / 24);
-                            if (days < 7) return `${days}d ago`;
-                            return new Date(dateStr).toLocaleDateString();
-                        };
-                        const handleRefillCreative = (img) => {
+                        function handleRefillCreative(img) {
                             const isPhotoshootType = img.type === 'ai-photoshoot' || img.type === 'photoshoot';
                             if (isPhotoshootType) {
                                 setPhotoshootBrief(img.prompt || '');
@@ -4320,8 +4362,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 setStudioMode('create');
                                 setShowQuickStart(false);
                             }
-                        };
-                        const handleDownloadImage = async (url, title) => {
+                        }
+                        async function handleDownloadImage(url, title) {
                             if (!url) return;
                             try {
                                 const resp = await fetch(url);
@@ -4334,14 +4376,15 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 a.click();
                                 setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(blobUrl) }, 100);
                             } catch { window.open(url, '_blank') }
-                        };
-                        const handleCopyImagePrompt = (text, id) => {
+                        }
+                        function handleCopyImagePrompt(text, id) {
                             if (!text) return;
                             navigator.clipboard.writeText(text).then(() => {
                                 setBankCopiedId(id);
                                 setTimeout(() => setBankCopiedId(null), 2000);
                             });
-                        };
+                        }
+
                         return bankView === 'list' ? (
                             <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
                                 {bankImages.map((img, idx) => {

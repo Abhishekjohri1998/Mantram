@@ -44,19 +44,29 @@ export async function apiFetch(endpoint, options = {}) {
 
     // Configurable timeout — default 90s, heavy operations can pass longer
     const { timeout: timeoutMs = 90000, ...fetchOptions } = options;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const internalController = new AbortController();
+    const timer = setTimeout(() => internalController.abort(), timeoutMs);
+
+    // If an external signal is provided, link it to our internal controller
+    if (options.signal) {
+        if (options.signal.aborted) internalController.abort();
+        options.signal.addEventListener('abort', () => internalController.abort());
+    }
 
     let response;
     try {
         response = await fetch(`${API_BASE}${endpoint}`, {
             ...fetchOptions,
             headers,
-            signal: controller.signal,
+            signal: internalController.signal,
         });
     } catch (e) {
         clearTimeout(timer);
-        if (e.name === 'AbortError') throw new Error('Request timed out — the server is still processing. Please try again.');
+        if (e.name === 'AbortError') {
+            // If it was aborted externally, we might not want to throw the "timeout" message
+            if (options.signal?.aborted) throw e; 
+            throw new Error('Request timed out — the server is still processing. Please try again.');
+        }
         throw new Error(e.message === 'Load failed' ? 'Network error — check your connection and ensure the backend is running.' : e.message);
     }
     clearTimeout(timer);
@@ -129,7 +139,7 @@ export const brands = {
 // ============ Content API ============
 export const content = {
     providers: () => apiFetch('/content/providers'),
-    generate: (data) => apiFetch('/content/generate', { method: 'POST', body: JSON.stringify(data) }),
+    generate: (data, options = {}) => apiFetch('/content/generate', { method: 'POST', body: JSON.stringify(data), ...options }),
     list: (params = {}) => {
         const query = new URLSearchParams(params).toString();
         return apiFetch(`/content?${query}`);
@@ -137,9 +147,9 @@ export const content = {
     get: (id) => apiFetch(`/content/${id}`),
     update: (id, data) => apiFetch(`/content/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     feedback: (id, data) => apiFetch(`/content/${id}/feedback`, { method: 'POST', body: JSON.stringify(data) }),
-    regenerate: (id, data) => apiFetch(`/content/${id}/regenerate`, { method: 'POST', body: JSON.stringify(data) }),
+    regenerate: (id, data, options = {}) => apiFetch(`/content/${id}/regenerate`, { method: 'POST', body: JSON.stringify(data), ...options }),
     delete: (id) => apiFetch(`/content/${id}`, { method: 'DELETE' }),
-    refine: (id, data) => apiFetch(`/content/${id}/refine`, { method: 'POST', body: JSON.stringify(data) }),
+    refine: (id, data, options = {}) => apiFetch(`/content/${id}/refine`, { method: 'POST', body: JSON.stringify(data), ...options }),
     refineText: (data) => apiFetch('/content/refine-text', { method: 'POST', body: JSON.stringify(data) }),
     youtube: (data) => apiFetch('/content/agentic/youtube', { method: 'POST', body: JSON.stringify(data) }),
     youtubeSeo: (data) => apiFetch('/content/agentic/youtube-seo', { method: 'POST', body: JSON.stringify(data) }),
@@ -147,8 +157,8 @@ export const content = {
 
 // ============ Creatives API ============
 export const creatives = {
-    generate: (data) => apiFetch('/creatives/generate', { method: 'POST', body: JSON.stringify(data) }),
-    enhancePrompt: (data) => apiFetch('/creatives/enhance-prompt', { method: 'POST', body: JSON.stringify(data) }),
+    generate: (data, options = {}) => apiFetch('/creatives/generate', { method: 'POST', body: JSON.stringify(data), ...options }),
+    enhancePrompt: (data, options = {}) => apiFetch('/creatives/enhance-prompt', { method: 'POST', body: JSON.stringify(data), ...options }),
     list: (params = {}) => {
         const query = new URLSearchParams(params).toString();
         return apiFetch(`/creatives?${query}`);
@@ -427,13 +437,13 @@ export const credits = {
 
 // ============ Brainstorm Studio API ============
 export const brainstormStudio = {
-    start: (data) => apiFetch('/brainstorm-studio/start', { method: 'POST', body: JSON.stringify(data) }),
-    confirm: (data) => apiFetch('/brainstorm-studio/confirm', { method: 'POST', body: JSON.stringify(data) }),
-    generate: (data) => apiFetch('/brainstorm-studio/generate', { method: 'POST', body: JSON.stringify(data) }),
-    refine: (data) => apiFetch('/brainstorm-studio/refine', { method: 'POST', body: JSON.stringify(data) }),
-    feedback: (data) => apiFetch('/brainstorm-studio/feedback', { method: 'POST', body: JSON.stringify(data) }),
-    screenplay: (data) => apiFetch('/brainstorm-studio/screenplay', { method: 'POST', body: JSON.stringify(data) }),
-    chat: (data) => apiFetch('/brainstorm-studio/chat', { method: 'POST', body: JSON.stringify(data) }),
+    start: (data, options = {}) => apiFetch('/brainstorm-studio/start', { method: 'POST', body: JSON.stringify(data), ...options }),
+    confirm: (data, options = {}) => apiFetch('/brainstorm-studio/confirm', { method: 'POST', body: JSON.stringify(data), ...options }),
+    generate: (data, options = {}) => apiFetch('/brainstorm-studio/generate', { method: 'POST', body: JSON.stringify(data), ...options }),
+    refine: (data, options = {}) => apiFetch('/brainstorm-studio/refine', { method: 'POST', body: JSON.stringify(data), ...options }),
+    feedback: (data, options = {}) => apiFetch('/brainstorm-studio/feedback', { method: 'POST', body: JSON.stringify(data), ...options }),
+    screenplay: (data, options = {}) => apiFetch('/brainstorm-studio/screenplay', { method: 'POST', body: JSON.stringify(data), ...options }),
+    chat: (data, options = {}) => apiFetch('/brainstorm-studio/chat', { method: 'POST', body: JSON.stringify(data), ...options }),
     // Brand Strategy
     strategy: (data) => apiFetch('/brainstorm-studio/strategy', { method: 'POST', body: JSON.stringify(data) }),
     strategySlides: (data) => apiFetch('/brainstorm-studio/strategy-slides', { method: 'POST', body: JSON.stringify(data) }),
@@ -801,3 +811,22 @@ export const socialMediaStudio = {
     get: (id) => apiFetch(`/social-media-studio/strategies/${id}`),
     delete: (id) => apiFetch(`/social-media-studio/strategies/${id}`, { method: 'DELETE' }),
 };
+
+// ============ Voice API ============
+export const voice = {
+    transcribe: (formData) => {
+        const token = localStorage.getItem('mantram_token') || '';
+        return fetch(`${API_BASE}/voice/transcribe`, {
+            method: 'POST',
+            headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: formData,
+        }).then(async (r) => {
+            if (!r.ok) {
+                const errData = await r.json().catch(() => ({}));
+                throw new Error(errData.error || 'Transcription failed');
+            }
+            return r.json();
+        });
+    },
+};
+

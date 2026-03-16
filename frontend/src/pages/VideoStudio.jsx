@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import SEOHead from '../components/SEOHead'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
+import { useSearchParams } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { creatives as creativesAPI } from '../services/api'
 import AdvancedMode from '../components/VideoStudio/AdvancedMode'
@@ -15,6 +16,7 @@ async function api(path, opts = {}) {
     const res = await fetch(`${API_BASE}${path}`, {
         ...opts,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...opts.headers },
+        signal: opts.signal,
     })
     const contentType = res.headers.get('content-type') || ''
     if (!contentType.includes('application/json')) {
@@ -53,6 +55,8 @@ export default function VideoStudio() {
     const [loading, setLoading] = useState(false)
     const [studioMode, setStudioMode] = useState('storyboard') // 'advanced' | 'storyboard' | 'ugc'
     const [error, setError] = useState('')
+    const [autoStart, setAutoStart] = useState(false)
+    const [searchParams, setSearchParams] = useSearchParams()
 
     // Project state
     const [projectId, setProjectId] = useState(null)
@@ -180,7 +184,59 @@ export default function VideoStudio() {
     // Load history on mount
     useEffect(() => {
         api('/video-studio?limit=50').then(d => setProjects(d.projects || [])).catch(() => { })
+
+        // Check for brainstorm context
+        if (searchParams.get('fromBrainstorm') === 'true') {
+            const bsCtx = window.sessionStorage.getItem('brainstormContext')
+            if (bsCtx) {
+                try {
+                    const parsed = JSON.parse(bsCtx)
+                    if (parsed.prompt || parsed.description || parsed.title) {
+                        const content = parsed.prompt || parsed.description || parsed.title
+                        setBrief(content)
+                        setVideoType('ad-film')
+                        setAutoStart(true)
+                    }
+                } catch (e) { console.error('Failed to parse brainstorm context:', e) }
+            }
+            setSearchParams({}, { replace: true })
+        }
+    }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Auto-start if triggered from Brainstorm
+    useEffect(() => {
+        if (autoStart && activeBrand && brief.trim() && !loading && step === 0) {
+            setAutoStart(false)
+            handleStart()
+        }
+    }, [autoStart, activeBrand, brief, loading, step]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    const abortControllerRef = useRef(null)
+    const activeBrandIdRef = useRef(activeBrand?._id)
+
+    const getSignal = useCallback(() => {
+        if (abortControllerRef.current) abortControllerRef.current.abort()
+        abortControllerRef.current = new AbortController()
+        return abortControllerRef.current.signal
     }, [])
+
+    useEffect(() => {
+        return () => abortControllerRef.current?.abort()
+    }, [])
+
+    // Reset loop if brand changes mid-process
+    useEffect(() => {
+        if (activeBrand?._id !== activeBrandIdRef.current) {
+            console.log('Brand changed, aborting video processing...')
+            abortControllerRef.current?.abort()
+            activeBrandIdRef.current = activeBrand?._id
+            // Reset to step 0 if we were processing
+            if (loading) {
+                setLoading(false)
+                setStep(0)
+            }
+        }
+    }, [activeBrand?._id, loading])
 
     // ══════════════════════════════════════════════════════════════════════════
     // STEP 1: Start — Submit brief + images → get concepts
@@ -189,6 +245,7 @@ export default function VideoStudio() {
         if (!brief.trim() && images.length === 0) { setError('Enter a brief or add at least one image'); return }
         setLoading(true); setError('')
         try {
+            const signal = getSignal()
             const data = await api('/video-studio/start', {
                 method: 'POST',
                 body: JSON.stringify({
@@ -197,6 +254,7 @@ export default function VideoStudio() {
                     images,
                     videoType,
                 }),
+                signal,
             })
             setProjectId(data.project._id)
             setConcepts(data.project.concepts || [])

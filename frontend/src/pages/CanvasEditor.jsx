@@ -8,49 +8,9 @@ import { TEMPLATE_LIBRARY, TEMPLATE_CATEGORIES } from './canvasTemplates'
 import { SVG_ELEMENT_CATEGORIES } from './canvasElements'
 import './CanvasEditor.css'
 
-// ── Error Boundary to catch render-phase crashes ──
-class CanvasErrorBoundary extends Component {
-    constructor(props) {
-        super(props)
-        this.state = { hasError: false, error: null, errorInfo: null }
-    }
-    static getDerivedStateFromError(error) {
-        return { hasError: true, error }
-    }
-    componentDidCatch(error, errorInfo) {
-        console.error('CanvasEditor Error Boundary caught:', error, errorInfo)
-        this.setState({ errorInfo })
-    }
-    render() {
-        if (this.state.hasError) {
-            return (
-                <div style={{ background: '#0a0e1a', color: '#fff', padding: 40, height: '100vh', fontFamily: 'monospace' }}>
-                    <h2 style={{ color: '#f87171' }}>⚠️ Canvas Editor Error</h2>
-                    <p style={{ color: '#94a3b8' }}>The editor encountered an error:</p>
-                    <pre style={{ background: '#1e1e2e', padding: 16, borderRadius: 8, overflow: 'auto', color: '#fbbf24', fontSize: 13, maxHeight: 300 }}>
-                        {this.state.error?.toString()}
-                        {'\n\n'}
-                        {this.state.errorInfo?.componentStack}
-                    </pre>
-                    <button
-                        onClick={() => window.location.href = '/creative-studio'}
-                        style={{ marginTop: 16, padding: '10px 24px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}
-                    >
-                        ← Back to Creative Studio
-                    </button>
-                </div>
-            )
-        }
-        return this.props.children
-    }
-}
-
-// Wrap the main component with ErrorBoundary
-export default function CanvasEditorWrapper() {
-    return <CanvasErrorBoundary><SEOHead title="Canvas Editor — Mantram AI" noIndex={true} /><CanvasEditorInner /></CanvasErrorBoundary>
-}
 
 // ── Platform Size Presets ──
+
 const PRESETS = [
     { id: 'ig-post', label: 'IG Post', icon: 'photo_camera', w: 1080, h: 1080 },
     { id: 'ig-story', label: 'IG Story', icon: 'smartphone', w: 1080, h: 1920 },
@@ -4214,5 +4174,52 @@ function CanvasEditorInner() {
             {/* ── TOAST ── */}
             {toast && <div className="ce-toast">{toast}</div>}
         </div >
+    )
+}
+
+// ── Error Boundary to catch render-phase crashes ──
+class CanvasErrorBoundary extends Component {
+    constructor(props) {
+        super(props)
+        this.state = { hasError: false, error: null, errorInfo: null }
+    }
+    static getDerivedStateFromError(error) {
+        return { hasError: true, error }
+    }
+    componentDidCatch(error, errorInfo) {
+        console.error('CanvasEditor Error Boundary caught:', error, errorInfo)
+        this.setState({ errorInfo })
+    }
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div style={{ background: '#0a0e1a', color: '#fff', padding: 40, height: '100vh', fontFamily: 'monospace' }}>
+                    <h2 style={{ color: '#f87171' }}>⚠️ Canvas Editor Error</h2>
+                    <p style={{ color: '#94a3b8' }}>The editor encountered an error:</p>
+                    <pre style={{ background: '#1e1e2e', padding: 16, borderRadius: 8, overflow: 'auto', color: '#fbbf24', fontSize: 13, maxHeight: 300 }}>
+                        {this.state.error?.toString()}
+                        {'\n\n'}
+                        {this.state.errorInfo?.componentStack}
+                    </pre>
+                    <button
+                        onClick={() => window.location.href = '/creative-studio'}
+                        style={{ marginTop: 16, padding: '10px 24px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}
+                    >
+                        ← Back to Creative Studio
+                    </button>
+                </div>
+            )
+        }
+        return this.props.children
+    }
+}
+
+// Wrap the main component with ErrorBoundary — exporting at the bottom ensures all components/constants are initialized
+export default function CanvasEditorWrapper() {
+    return (
+        <CanvasErrorBoundary>
+            <SEOHead title="Canvas Editor — Mantram AI" noIndex={true} />
+            <CanvasEditorInner />
+        </CanvasErrorBoundary>
     )
 }
