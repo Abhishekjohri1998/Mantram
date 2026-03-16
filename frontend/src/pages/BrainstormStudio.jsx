@@ -141,10 +141,10 @@ function IdeaCard({ idea, index, onExpand, onAction, isFilm, onFeedback, feedbac
                     title="Generate Content">
                     <span className="material-symbols-outlined text-sm">edit_note</span>
                 </button>
-                <button onClick={() => onAction('creative', idea)}
+                <button onClick={() => isFilm ? handleIdeaAction('creative', idea) : onAction('creative', idea)}
                     className="py-2 px-3 rounded-xl bg-white/5 text-slate-300 text-[11px] font-bold hover:bg-white/10 cursor-pointer transition-all"
-                    title="Generate Visual">
-                    <span className="material-symbols-outlined text-sm">palette</span>
+                    title={isFilm ? "Generate Film" : "Generate Visual"}>
+                    <span className="material-symbols-outlined text-sm">{isFilm ? "movie" : "palette"}</span>
                 </button>
             </div>
         </div>
@@ -354,7 +354,15 @@ export default function BrainstormStudio() {
             sessionStorage.setItem('brainstormContext', JSON.stringify({ title: idea.title, hook, description: desc }))
             navigate('/content-studio?fromBrainstorm=true')
         } else if (type === 'creative') {
-            sessionStorage.setItem('brainstormContext', JSON.stringify({ prompt: `${idea.title} — ${idea.visualDirection || idea.visualStyle || hook}` }))
+            const hook = idea.hook || idea.logline || ''
+            const fullDesc = idea.synopsis || idea.description || ''
+            const prompt = `${idea.title}: ${hook}. ${fullDesc}`
+            sessionStorage.setItem('brainstormContext', JSON.stringify({ 
+                prompt,
+                title: idea.title,
+                description: fullDesc,
+                isFilm: intent === 'ad-film'
+            }))
             if (intent === 'ad-film') {
                 navigate('/video-studio?fromBrainstorm=true')
             } else {
@@ -1705,14 +1713,19 @@ export default function BrainstormStudio() {
                                 </div>
 
                                 {/* Film-specific actions */}
-                                <div className="flex gap-3">
+                                <div className="flex gap-2">
                                     <button onClick={() => openFilmChat(expandedIdea)}
-                                        className="flex-1 btn-primary py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer">
-                                        <span className="material-symbols-outlined text-sm">chat</span> Refine This Film
+                                        className="flex-1 btn-primary py-3 rounded-xl text-[11px] font-bold flex items-center justify-center gap-2 cursor-pointer">
+                                        <span className="material-symbols-outlined text-sm">chat</span> Refine Film
                                     </button>
                                     <button onClick={() => { generateScreenplay(expandedIdea); setExpandedIdea(null) }}
-                                        className="flex-1 py-3 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all">
-                                        <span className="material-symbols-outlined text-sm">description</span> Generate Screenplay
+                                        className="flex-1 py-3 rounded-xl bg-emerald-500/10 text-emerald-400 text-[11px] font-bold hover:bg-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all">
+                                        <span className="material-symbols-outlined text-sm">description</span> Screenplay
+                                    </button>
+                                    <button onClick={() => { handleIdeaAction('creative', expandedIdea); setExpandedIdea(null) }}
+                                        className="px-4 py-3 rounded-xl glass-panel text-[11px] font-bold text-slate-300 hover:text-white flex items-center justify-center gap-2 cursor-pointer transition-all"
+                                        title="Generate Film">
+                                        <span className="material-symbols-outlined text-sm">movie</span>
                                     </button>
                                 </div>
                             </>
@@ -1780,10 +1793,17 @@ export default function BrainstormStudio() {
                             <h3 className="text-base font-bold text-white">{chatFilm.title}</h3>
                             <p className="text-sm text-slate-500">Refine this film concept with your creative director</p>
                         </div>
-                        <button onClick={() => generateScreenplay(chatFilm)}
-                            className="px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 cursor-pointer transition-all flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-sm">description</span> Generate Screenplay
-                        </button>
+                        <div className="flex gap-2">
+                             <button onClick={() => { handleIdeaAction('creative', chatFilm); setChatFilm(null); setStep(3) }}
+                                className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 text-xs font-bold hover:bg-white/10 cursor-pointer transition-all flex items-center gap-1.5"
+                                title="Generate Film">
+                                <span className="material-symbols-outlined text-sm">movie</span> Direct
+                            </button>
+                            <button onClick={() => generateScreenplay(chatFilm)}
+                                className="px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 cursor-pointer transition-all flex items-center gap-1.5">
+                                <span className="material-symbols-outlined text-sm">description</span> Screenplay
+                            </button>
+                        </div>
                     </div>
 
                     {/* Current concept card (collapsible) */}

@@ -190,8 +190,9 @@ export default function VideoStudio() {
             if (bsCtx) {
                 try {
                     const parsed = JSON.parse(bsCtx)
-                    if (parsed.prompt || parsed.description) {
-                        setBrief(parsed.prompt || parsed.description)
+                    if (parsed.prompt || parsed.description || parsed.title) {
+                        const content = parsed.prompt || parsed.description || parsed.title
+                        setBrief(content)
                         setVideoType('ad-film')
                         setAutoStart(true)
                     }
