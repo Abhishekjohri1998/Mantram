@@ -307,6 +307,8 @@ export default function CreativeStudio() {
     const navigate = useNavigate()
     const { activeBrand } = useBrand()
     const [searchParams, setSearchParams] = useSearchParams()
+
+    // ── Global State ──
     const [selectedType, setSelectedType] = useState('instagram-post')
     const [prompt, setPrompt] = useState('')
     const [selectedProduct, setSelectedProduct] = useState(null)
@@ -324,11 +326,9 @@ export default function CreativeStudio() {
     const [fromContent, setFromContent] = useState(false)
     const [aspectRatio, setAspectRatio] = useState('1:1')
     const [publishData, setPublishData] = useState(null) // { image, text } or null
-
-    // Studio mode: 'create' (unified), 'photoshoot', 'templates', or 'imagebank'
     const [studioMode, setStudioMode] = useState('create')
 
-    // AI Photoshoot state
+    // ── AI Photoshoot State ──
     const [productImage, setProductImage] = useState(null)
     const [productFile, setProductFile] = useState(null)
     const [productPickerOpen, setProductPickerOpen] = useState(false)
@@ -341,7 +341,6 @@ export default function CreativeStudio() {
     const [photoshootError, setPhotoshootError] = useState('')
     const [photoshootSaved, setPhotoshootSaved] = useState(false)
     const [fidelity, setFidelity] = useState(80)
-    // Professional Photography Controls
     const [cameraAngle, setCameraAngle] = useState('eye-level')
     const [lens, setLens] = useState('50mm')
     const [lightingStyle, setLightingStyle] = useState('softbox')
@@ -350,10 +349,8 @@ export default function CreativeStudio() {
     const [modelPresence, setModelPresence] = useState('none')
     const [mood, setMood] = useState(['commercial'])
     const [psTab, setPsTab] = useState('shot')
-
-    // ── AI Image Editing (inline in photoshoot) ──
-    const [psEditMode, setPsEditMode] = useState(false) // show AI editor panel
-    const [psEditTool, setPsEditTool] = useState('prompt') // prompt | visual | retouch | background
+    const [psEditMode, setPsEditMode] = useState(false)
+    const [psEditTool, setPsEditTool] = useState('prompt')
     const [psEditPrompt, setPsEditPrompt] = useState('')
     const [psEditLoading, setPsEditLoading] = useState(false)
     const [psEditError, setPsEditError] = useState('')
@@ -361,56 +358,88 @@ export default function CreativeStudio() {
     const [psBgPrompt, setPsBgPrompt] = useState('')
     const [psMaskMode, setPsMaskMode] = useState(false)
     const [psMaskBrushSize, setPsMaskBrushSize] = useState(30)
+
+    // ── Image Bank State ──
+    const [bankImages, setBankImages] = useState([])
+    const [bankLoading, setBankLoading] = useState(false)
+    const [bankTotal, setBankTotal] = useState(0)
+    const [lightboxIdx, setLightboxIdx] = useState(null)
+    const [bankView, setBankView] = useState('list')
+    const [bankCopiedId, setBankCopiedId] = useState(null)
+    const [bankTab, setBankTab] = useState('generated')
+    const [bankCounts, setBankCounts] = useState({ uploaded: 0, generated: 0 })
+
+    // ── Template & Category State ──
+    const [activeTemplate, setActiveTemplate] = useState(null)
+    const [templateFields, setTemplateFields] = useState({})
+    const [templatePromptPreview, setTemplatePromptPreview] = useState('')
+    const [templateRefImage, setTemplateRefImage] = useState(null)
+    const [templateGenerating, setTemplateGenerating] = useState(false)
+    const [templateResult, setTemplateResult] = useState(null)
+    const [templateError, setTemplateError] = useState('')
+    const [reversePrompting, setReversePrompting] = useState(false)
+    const [savedTemplates, setSavedTemplates] = useState([])
+    const [showCreateTemplate, setShowCreateTemplate] = useState(false)
+    const [creatingTemplate, setCreatingTemplate] = useState(false)
+    const [analyzeLoading, setAnalyzeLoading] = useState(false)
+    const [newTmpl, setNewTmpl] = useState({
+        label: '', icon: 'auto_awesome', description: '', type: 'instagram-post', style: 'modern',
+        promptFormula: '', referenceImageUrl: '', fields: [], category: ''
+    })
+    const [analyzedMeta, setAnalyzedMeta] = useState({ colorPalette: [], layoutDescription: '' })
+    const [templateFieldsMode, setTemplateFieldsMode] = useState('simple')
+    const [activeCategory, setActiveCategory] = useState(null)
+    const [savedCategories, setSavedCategories] = useState([])
+    const [showCreateCategory, setShowCreateCategory] = useState(false)
+    const [creatingCategory, setCreatingCategory] = useState(false)
+    const [newCat, setNewCat] = useState({ label: '', icon: 'auto_awesome', color: '#f59e0b', imageSource: 'upload' })
+
+    // ── Other UI/Ref State ──
+    const [designBaseImage, setDesignBaseImage] = useState(null)
+    const [referenceImages, setReferenceImages] = useState({ style: null, character: null, upload: null })
+    const [characters, setCharacters] = useState([])
+    const [addLogo, setAddLogo] = useState(() => !!activeBrand?.dna?.logo?.url)
+    const [logoPosition, setLogoPosition] = useState('bottom-right')
+    const [logoSize, setLogoSize] = useState('medium')
+    const [showAdvanced, setShowAdvanced] = useState(false)
+    const [activeQuickTemplate, setActiveQuickTemplate] = useState(null)
+    const [showQuickStart, setShowQuickStart] = useState(true)
+    const [guidedForm, setGuidedForm] = useState(null)
+    const [refPickerSlot, setRefPickerSlot] = useState(null)
+    const [refPickerTab, setRefPickerTab] = useState('upload')
+    const [brandImages, setBrandImages] = useState([])
+    const [showCharTags, setShowCharTags] = useState(false)
+    const [charTagFilter, setCharTagFilter] = useState('')
+    const [zoomImage, setZoomImage] = useState(null)
+
+    // ── Refs ──
     const psMaskCanvasRef = useRef(null)
     const psMaskCtxRef = useRef(null)
     const psImageRef = useRef(null)
     const psIsPainting = useRef(false)
+    const promptTextareaRef = useRef(null)
+    const abortControllerRef = useRef(null)
+    const activeBrandIdRef = useRef(activeBrand?._id)
 
-    // Image Bank state
-    const [bankImages, setBankImages] = useState([])
-    const [bankLoading, setBankLoading] = useState(false)
-    const [bankTotal, setBankTotal] = useState(0)
-    const [lightboxIdx, setLightboxIdx] = useState(null) // index into bankImages for zoom view
-    const [bankView, setBankView] = useState('list') // 'list' | 'grid'
-    const [bankCopiedId, setBankCopiedId] = useState(null)
-    const [bankTab, setBankTab] = useState('generated') // 'generated' | 'uploaded' | 'brand'
-    const [bankCounts, setBankCounts] = useState({ uploaded: 0, generated: 0 })
+    // ── Helper Functions ──
+    function getSignal() {
+        if (abortControllerRef.current) abortControllerRef.current.abort()
+        abortControllerRef.current = new AbortController()
+        return abortControllerRef.current.signal
+    }
 
-    // Photoshoot image passed to design mode
-    const [designBaseImage, setDesignBaseImage] = useState(null)
+    // ── Effects ──
+    useEffect(() => {
+        return () => abortControllerRef.current?.abort()
+    }, [])
 
-    // ── NEW: Reference Images (style / upload) + multi-character ──
-    const [referenceImages, setReferenceImages] = useState({ style: null, character: null, upload: null })
-    const [characters, setCharacters] = useState([]) // [{ name: 'Character 1', image: 'data:...' }]
-
-    // ── NEW: Logo Overlay — auto-enable when brand has a logo ──
-    const [addLogo, setAddLogo] = useState(() => !!activeBrand?.dna?.logo?.url)
-    const [logoPosition, setLogoPosition] = useState('bottom-right')
-    const [logoSize, setLogoSize] = useState('medium')
-
-    // ── Unified landing state ──
-    const [showAdvanced, setShowAdvanced] = useState(false)
-    const [activeQuickTemplate, setActiveQuickTemplate] = useState(null) // inline template
-    const [showQuickStart, setShowQuickStart] = useState(true)
-    const [guidedForm, setGuidedForm] = useState(null) // which template is open
-    const [refPickerSlot, setRefPickerSlot] = useState(null) // which ref slot is being picked: 'style'|'character-N'|'upload'|null
-    const [refPickerTab, setRefPickerTab] = useState('upload') // 'upload'|'bank'|'brand'
-    const [brandImages, setBrandImages] = useState([]) // brand images from onboarding
-    const [showCharTags, setShowCharTags] = useState(false) // @character tag autocomplete
-    const [charTagFilter, setCharTagFilter] = useState('') // filter for @character autocomplete
-    const promptTextareaRef = useRef(null) // ref for prompt textarea
-    const [zoomImage, setZoomImage] = useState(null) // fullscreen zoom lightbox
-
-    // Load brand images from DNA (with fallback fetch by ID)
     useEffect(() => {
         if (!activeBrand?._id) { setBrandImages([]); return }
-        // Try from context first
         if (activeBrand.dna?.brandImages?.length > 0) {
             setBrandImages(activeBrand.dna.brandImages)
             return
         }
-        // Fallback: fetch full brand by ID (context may strip heavy fields)
-        ; (async () => {
+        (async () => {
             try {
                 const data = await brandsAPI.get(activeBrand._id)
                 if (data?.brand?.dna?.brandImages?.length > 0) {
@@ -422,20 +451,6 @@ export default function CreativeStudio() {
         })()
     }, [activeBrand?._id])
 
-    const abortControllerRef = useRef(null)
-    const activeBrandIdRef = useRef(activeBrand?._id)
-
-    function getSignal() {
-        if (abortControllerRef.current) abortControllerRef.current.abort()
-        abortControllerRef.current = new AbortController()
-        return abortControllerRef.current.signal
-    }
-
-    useEffect(() => {
-        return () => abortControllerRef.current?.abort()
-    }, [])
-
-    // Abort and reset on brand switch
     useEffect(() => {
         if (activeBrand?._id !== activeBrandIdRef.current) {
             console.log('Brand changed, aborting creative processing...')
@@ -446,33 +461,42 @@ export default function CreativeStudio() {
             }
         }
     }, [activeBrand?._id, generating, enhancing, templateGenerating])
+    useEffect(() => {
+        if (autoGenerate && activeBrand && prompt.trim() && !generating) {
+            setAutoGenerate(false)
+            handleGenerate()
+        }
+    }, [autoGenerate, activeBrand, prompt, generating, handleGenerate]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    // ── Brand Templates (interactive formula-based) ──
-    const [activeTemplate, setActiveTemplate] = useState(null)
-    const [templateFields, setTemplateFields] = useState({})
-    const [templatePromptPreview, setTemplatePromptPreview] = useState('')
-    const [templateRefImage, setTemplateRefImage] = useState(null)
-    const [templateGenerating, setTemplateGenerating] = useState(false)
-    const [templateResult, setTemplateResult] = useState(null)
-    const [templateError, setTemplateError] = useState('')
-    const [reversePrompting, setReversePrompting] = useState(false)
-    const [savedTemplates, setSavedTemplates] = useState([]) // custom templates from DB
-    const [showCreateTemplate, setShowCreateTemplate] = useState(false)
-    const [creatingTemplate, setCreatingTemplate] = useState(false)
-    const [analyzeLoading, setAnalyzeLoading] = useState(false)
-    const [newTmpl, setNewTmpl] = useState({
-        label: '', icon: 'auto_awesome', description: '', type: 'instagram-post', style: 'modern',
-        promptFormula: '', referenceImageUrl: '', fields: [], category: ''
-    })
-    const [analyzedMeta, setAnalyzedMeta] = useState({ colorPalette: [], layoutDescription: '' }) // from AI analysis
-    const [templateFieldsMode, setTemplateFieldsMode] = useState('simple') // 'simple' | 'advanced'
-    const [activeCategory, setActiveCategory] = useState(null)
-    const [savedCategories, setSavedCategories] = useState([]) // custom categories from DB
-    const [showCreateCategory, setShowCreateCategory] = useState(false)
-    const [creatingCategory, setCreatingCategory] = useState(false)
-    const [newCat, setNewCat] = useState({
-        label: '', icon: 'auto_awesome', color: '#f59e0b', imageSource: 'upload'
-    })
+    useEffect(() => {
+        if (activeBrand?._id) {
+            loadImageBank()
+        }
+    }, [activeBrand?._id])
+
+    useEffect(() => {
+        if (studioMode === 'templates' && activeBrand?._id) loadCustomTemplates()
+    }, [studioMode, activeBrand, loadCustomTemplates])
+
+    useEffect(() => {
+        if (studioMode === 'templates' && activeBrand?._id) {
+            loadCustomCategories()
+        }
+    }, [studioMode, activeBrand, loadCustomCategories])
+
+    useEffect(() => {
+        if (prompt.trim()) {
+            const detected = detectFormatFromPrompt(prompt)
+            if (detected) setSelectedType(detected)
+        }
+    }, [prompt, detectFormatFromPrompt])
+
+    useEffect(() => {
+        const typeInfo = creativeTypes.find(t => t.id === selectedType)
+        if (typeInfo?.aspectRatio) {
+            setAspectRatio(typeInfo.aspectRatio)
+        }
+    }, [selectedType])
 
 
     // Read URL params from Content Studio
@@ -530,21 +554,6 @@ export default function CreativeStudio() {
             setSearchParams({}, { replace: true })
         }
     }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
-
-    // Auto-generate if triggered from Brainstorm
-    useEffect(() => {
-        if (autoGenerate && activeBrand && prompt.trim() && !generating) {
-            setAutoGenerate(false)
-            handleGenerate()
-        }
-    }, [autoGenerate, activeBrand, prompt, generating, handleGenerate]) // eslint-disable-line react-hooks/exhaustive-deps
-
-    // Load image bank on mount + when brand changes (needed for reference picker's Library tab)
-    useEffect(() => {
-        if (activeBrand?._id) {
-            loadImageBank()
-        }
-    }, [activeBrand?._id])
 
     async function loadImageBank(cat) {
         const category = cat || bankTab
@@ -1096,10 +1105,6 @@ Return ONLY the prompt formula text, no explanation. Start directly with "Create
     }
 
 
-    useEffect(() => {
-        if (studioMode === 'templates' && activeBrand?._id) loadCustomTemplates()
-    }, [studioMode, activeBrand, loadCustomTemplates])
-
     // ── Create a new custom template ──
     async function handleCreateTemplate() {
 
@@ -1221,12 +1226,6 @@ Return ONLY the prompt formula text, no explanation. Start directly with "Create
     }
 
 
-    useEffect(() => {
-        if (studioMode === 'templates' && activeBrand?._id) {
-            loadCustomCategories()
-        }
-    }, [studioMode, activeBrand, loadCustomCategories])
-
     // ── Create a new custom category ──
     async function handleCreateCategory() {
 
@@ -1324,22 +1323,6 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
         return null // keep current selection
     }
 
-
-    // Auto-detect format when prompt changes
-    useEffect(() => {
-        if (prompt.trim()) {
-            const detected = detectFormatFromPrompt(prompt)
-            if (detected) setSelectedType(detected)
-        }
-    }, [prompt, detectFormatFromPrompt])
-
-    // Auto-lock aspect ratio when format changes
-    useEffect(() => {
-        const typeInfo = creativeTypes.find(t => t.id === selectedType)
-        if (typeInfo?.aspectRatio) {
-            setAspectRatio(typeInfo.aspectRatio)
-        }
-    }, [selectedType])
 
     return (
         <DashboardLayout title="Creative Studio" subtitle="AI-powered image generation & design">
