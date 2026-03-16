@@ -167,7 +167,7 @@ function SmartInput({ onParse, onSkip }) {
     const [input, setInput] = useState('')
     const [parsing, setParsing] = useState(false)
 
-    const handleSubmit = async () => {
+    async function handleSubmit() {
         if (!input.trim()) return
         setParsing(true)
         // For now, do basic keyword detection. In future, this hits AI.
@@ -278,7 +278,7 @@ function StepChannel({ onSelect, onBack, goal }) {
     const [selected, setSelected] = useState([])
     const isMulti = goal === 'educate' || goal === 'brand'
 
-    const handleToggle = (id) => {
+    function handleToggle(id) {
         if (id === 'multi') {
             setSelected(CHANNELS.filter(c => c.id !== 'multi').map(c => c.id))
             return
@@ -286,7 +286,7 @@ function StepChannel({ onSelect, onBack, goal }) {
         setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
     }
 
-    const handleContinue = () => {
+    function handleContinue() {
         if (selected.length > 0) onSelect(selected.length === 1 ? selected[0] : selected)
     }
 
@@ -382,7 +382,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
         if (contextType === 'library') loadLibrary()
     }, [contextType]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    const handleDrop = (e) => {
+    function handleDrop(e) {
         e.preventDefault()
         const dropped = Array.from(e.dataTransfer?.files || e.target.files || [])
         setFiles(prev => [...prev, ...dropped])
@@ -396,7 +396,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                     'Describe your brand, positioning, audience...'
 
     // Fetch smart product suggestions when details change
-    const fetchSuggestions = async () => {
+    async function fetchSuggestions() {
         if (!brandId || !details || details.length < 10) return
         setLoadingSuggestions(true)
         try {
@@ -412,7 +412,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
         }
     }
 
-    const toggleProduct = (product) => {
+    function toggleProduct(product) {
         setAttachedProducts(prev => {
             const exists = prev.find(p => p._id === product._id)
             if (exists) return prev.filter(p => p._id !== product._id)
@@ -420,7 +420,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
         })
     }
 
-    const handleContextComplete = () => {
+    function handleContextComplete() {
         let ctx = { details, url, contextType }
         // Inject attached product data into context
         if (attachedProducts.length > 0) {
@@ -2195,13 +2195,13 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
     // Keep editContent in sync when result changes
     useEffect(() => { setEditContent(result?.content || '') }, [result?.content])
 
-    const handleCopy = () => {
+    function handleCopy() {
         navigator.clipboard.writeText(stripMarkdown(editing ? editContent : result.content))
         setCopied(true)
         setTimeout(() => setCopied(false), 2000)
     }
 
-    const handleSaveEdit = () => {
+    function handleSaveEdit() {
         if (editContent !== result.content) {
             // Save manual edit via callback
             onRefine && onRefine({ manualEdit: editContent })
@@ -2209,7 +2209,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
         setEditing(false)
     }
 
-    const handleAIRefine = async () => {
+    async function handleAIRefine() {
         if (!refineInput.trim() || refining) return
         setRefining(true)
         try {
@@ -2656,11 +2656,11 @@ export default function ContentStudio() {
     const abortControllerRef = useRef(null)
     const activeBrandIdRef = useRef(activeBrand?._id)
 
-    const getSignal = useCallback(() => {
+    function getSignal() {
         if (abortControllerRef.current) abortControllerRef.current.abort()
         abortControllerRef.current = new AbortController()
         return abortControllerRef.current.signal
-    }, [])
+    }
 
     useEffect(() => {
         return () => abortControllerRef.current?.abort()
@@ -2766,7 +2766,7 @@ export default function ContentStudio() {
     }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Smart input handler
-    const handleSmartParse = (parsed) => {
+    function handleSmartParse(parsed) {
         if (parsed.goal) {
             setGoal(parsed.goal)
             if (parsed.channel) {
@@ -2783,7 +2783,7 @@ export default function ContentStudio() {
     }
 
     // Build the full prompt from all selections
-    const buildPrompt = (settings) => {
+    function buildPrompt(settings) {
         // Use passed settings directly (React setState is async, can't rely on toneSettings state here)
         const ts = settings || toneSettings || {}
         const goalData = GOALS.find(g => g.id === goal)
@@ -2863,7 +2863,7 @@ export default function ContentStudio() {
         return prompt
     }
 
-    const handleGenerate = async (settings) => {
+    async function handleGenerate(settings) {
         setToneSettings(settings)
         if (!activeBrand) { setError('Please select a brand first.'); return }
         setGenerating(true)
@@ -2892,7 +2892,7 @@ export default function ContentStudio() {
         }
     }
 
-    const handleRegenerate = async () => {
+    async function handleRegenerate() {
         if (!result?._id) return
         setGenerating(true)
         try {
@@ -2908,7 +2908,7 @@ export default function ContentStudio() {
 
     const [contentFeedback, setContentFeedback] = useState(null) // 'liked' | 'disliked'
 
-    const handleFeedback = async (signalType, extra = {}) => {
+    async function handleFeedback(signalType, extra = {}) {
         // Immediate visual feedback regardless of _id
         if (signalType === 'thumbs') {
             setContentFeedback(extra.thumbs === 'up' ? 'liked' : 'disliked')
@@ -2927,7 +2927,7 @@ export default function ContentStudio() {
         }
     }
 
-    const handleCreateVisual = () => {
+    function handleCreateVisual() {
         // Navigate to Creative Studio with content context
         const contentSummary = result?.content?.substring(0, 200) || ''
         const params = new URLSearchParams({
@@ -2939,7 +2939,7 @@ export default function ContentStudio() {
     }
 
     // Press Release generation handler
-    const handleGeneratePR = async (prData) => {
+    async function handleGeneratePR(prData) {
         if (!activeBrand) { setError('Please select a brand first.'); return }
         setGenerating(true)
         setError('')
@@ -3015,7 +3015,7 @@ SPOKESPERSON QUOTES:`
     }
 
     // Refine handler — updates content in-place
-    const handleRefine = (refineData) => {
+    function handleRefine(refineData) {
         if (refineData.manualEdit) {
             // User manually edited and saved
             setResult(prev => ({ ...prev, content: refineData.manualEdit }))
@@ -3032,14 +3032,14 @@ SPOKESPERSON QUOTES:`
         }
     }
 
-    const handleHistorySelect = (item) => {
+    function handleHistorySelect(item) {
         setResult(item)
         setStep(5)
         setAccepted(item.status === 'approved')
         setShowHistory(false)
     }
 
-    const resetAll = () => {
+    function resetAll() {
         setStep(0); setGoal(null); setSubType(null); setChannel(null)
         setContext(null); setToneSettings(null); setResult(null); setError('')
         setAccepted(false); setPrefilledOccasion(null); setSelectedProduct(null)
@@ -3047,7 +3047,7 @@ SPOKESPERSON QUOTES:`
     }
 
     // YouTube content generation handler (Script & Ideation)
-    const handleGenerateYouTube = async (ytSettings) => {
+    async function handleGenerateYouTube(ytSettings) {
         if (!activeBrand) { setError('Please select a brand first.'); return }
         setGenerating(true)
         setError('')
@@ -3075,7 +3075,7 @@ SPOKESPERSON QUOTES:`
     }
 
     // YouTube SEO / Publish Optimizer handler (metadata only)
-    const handleGenerateYouTubeSeo = async (seoSettings) => {
+    async function handleGenerateYouTubeSeo(seoSettings) {
         if (!activeBrand) { setError('Please select a brand first.'); return }
         setGenerating(true)
         setError('')

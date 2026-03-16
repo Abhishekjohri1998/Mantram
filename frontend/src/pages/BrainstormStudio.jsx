@@ -275,7 +275,7 @@ export default function BrainstormStudio() {
         }
     }
 
-    const submitAnswer = () => {
+    function submitAnswer() {
         if (!currentAnswer.trim() && !questions[currentQ]?.optional) return
         const q = questions[currentQ]
         const newAnswers = { ...answers, [q.id]: currentAnswer.trim() || '(skipped)' }
@@ -290,7 +290,8 @@ export default function BrainstormStudio() {
         }
     }
 
-    const confirmUnderstanding = async (ans) => {
+
+    async function confirmUnderstanding(ans) {
         const brandIdAtStart = activeBrand?._id
         setLoading(true)
         setLoadingMsg('Analyzing your brief...')
@@ -317,7 +318,8 @@ export default function BrainstormStudio() {
         }
     }
 
-    const generateIdeas = async (refinementHint) => {
+
+    async function generateIdeas(refinementHint) {
         const brandIdAtStart = activeBrand?._id
         setLoading(true)
         setLoadingMsg(refinementHint ? 'Refining ideas...' : 'Generating multi-layer strategy...')
@@ -347,7 +349,8 @@ export default function BrainstormStudio() {
         }
     }
 
-    const handleIdeaAction = (type, idea) => {
+
+    function handleIdeaAction(type, idea) {
         const hook = idea.hook || idea.logline || ''
         const desc = idea.description || idea.synopsis || ''
         if (type === 'content') {
@@ -373,7 +376,8 @@ export default function BrainstormStudio() {
         }
     }
 
-    const handleFeedback = async (idea, type) => {
+
+    async function handleFeedback(idea, type) {
         const key = idea.title
         setIdeaFeedback(prev => ({ ...prev, [key]: type }))
         try {
@@ -387,7 +391,8 @@ export default function BrainstormStudio() {
         } catch (e) { console.warn('Feedback save failed:', e) }
     }
 
-    const generateScreenplay = async (filmConcept) => {
+
+    async function generateScreenplay(filmConcept) {
         const brandIdAtStart = activeBrand?._id
         setScreenplayLoading(true)
         setScreenplay(null)
@@ -411,6 +416,7 @@ export default function BrainstormStudio() {
         }
     }
 
+
     // Open interactive chat for a film concept
     const openFilmChat = (film) => {
         setChatFilm({ ...film })
@@ -421,7 +427,7 @@ export default function BrainstormStudio() {
     }
 
     // Send chat message for film refinement
-    const sendChatMessage = async (msg) => {
+    async function sendChatMessage(msg) {
         const brandIdAtStart = activeBrand?._id
         const text = msg || chatMessage.trim()
         if (!text || chatLoading) return
@@ -461,6 +467,7 @@ export default function BrainstormStudio() {
         }
     }
 
+
     function resetAll() {
         setStep(0); setIntent(null); setQuestions([]); setCurrentQ(0); setAnswers({});
         setCurrentAnswer(''); setConfirmation(null); setIdeas(null); setExpandedIdea(null);
@@ -472,7 +479,7 @@ export default function BrainstormStudio() {
 
     // ========== STRATEGY HANDLERS ==========
 
-    const generateStrategy = async () => {
+    async function generateStrategy() {
         const brandIdAtStart = activeBrand?._id
         setLoading(true)
         setLoadingMsg('Building your comprehensive brand strategy...')
@@ -503,7 +510,8 @@ export default function BrainstormStudio() {
         }
     }
 
-    const generateSlides = async () => {
+
+    async function generateSlides() {
         const brandIdAtStart = activeBrand?._id
         setSlidesLoading(true)
         setSlides(null)
@@ -530,7 +538,8 @@ export default function BrainstormStudio() {
         }
     }
 
-    const updateKpiValue = async (kpiName, value) => {
+
+    async function updateKpiValue(kpiName, value) {
         if (!strategyId) return
         try {
             const data = await bsAPI.updateKpi(strategyId, { kpiName, current: Number(value) })
@@ -538,7 +547,8 @@ export default function BrainstormStudio() {
         } catch (e) { console.warn('KPI update failed:', e) }
     }
 
-    const toggleMilestone = async (milestoneId, completed) => {
+
+    async function toggleMilestone(milestoneId, completed) {
         if (!strategyId) return
         try {
             const data = await bsAPI.toggleMilestone(strategyId, { milestoneId, completed })
@@ -546,14 +556,16 @@ export default function BrainstormStudio() {
         } catch (e) { console.warn('Milestone toggle failed:', e) }
     }
 
-    const loadSavedStrategies = async () => {
+
+    async function loadSavedStrategies() {
         try {
             const data = await bsAPI.listStrategies()
             if (data.success) setSavedStrategies(data.strategies || [])
         } catch (e) { console.warn('Failed to load strategies:', e) }
     }
 
-    const openSavedStrategy = async (id) => {
+
+    async function openSavedStrategy(id) {
         const brandIdAtStart = activeBrand?._id
         setLoading(true); setLoadingMsg('Loading strategy...')
         try {
@@ -578,6 +590,7 @@ export default function BrainstormStudio() {
             }
         }
     }
+
 
     useEffect(() => { loadSavedStrategies() }, [])
 
