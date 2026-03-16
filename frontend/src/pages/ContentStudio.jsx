@@ -363,7 +363,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
     }, [initialImage]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Load library images when library tab is selected
-    const loadLibrary = async (cat = libraryCategory) => {
+    async function loadLibrary(cat = libraryCategory) {
         setLibraryLoading(true)
         try {
             const data = await creativesAPI.imageBank({ category: cat })

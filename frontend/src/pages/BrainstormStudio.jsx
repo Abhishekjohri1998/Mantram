@@ -240,7 +240,7 @@ export default function BrainstormStudio() {
 
     // ========== HANDLERS ==========
 
-    const selectIntent = async (intentId) => {
+    async function selectIntent(intentId) {
         const brandIdAtStart = activeBrand?._id
         setIntent(intentId)
         setError('')
@@ -461,7 +461,7 @@ export default function BrainstormStudio() {
         }
     }
 
-    const resetAll = () => {
+    function resetAll() {
         setStep(0); setIntent(null); setQuestions([]); setCurrentQ(0); setAnswers({});
         setCurrentAnswer(''); setConfirmation(null); setIdeas(null); setExpandedIdea(null);
         setBrandInsight(null); setIdeaFeedback({}); setScreenplay(null); setError(''); setLoading(false);

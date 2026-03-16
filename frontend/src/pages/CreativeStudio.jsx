@@ -524,7 +524,7 @@ export default function CreativeStudio() {
         }
     }, [activeBrand?._id])
 
-    const loadImageBank = async (cat) => {
+    async function loadImageBank(cat) {
         const category = cat || bankTab
         setBankLoading(true)
         try {
@@ -665,7 +665,7 @@ export default function CreativeStudio() {
         }
     }
 
-    const handleGenerate = async () => {
+    async function handleGenerate() {
         if (!prompt.trim() || !activeBrand) return
         setGenerating(true)
         setError('')
