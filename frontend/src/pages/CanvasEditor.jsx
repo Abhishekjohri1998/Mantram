@@ -2073,6 +2073,22 @@ function CanvasEditorInner() {
     const [curvedTextRadius, setCurvedTextRadius] = useState(200)
     const [qrInput, setQrInput] = useState('https://example.com')
 
+    // ── Chart Creator State ──
+    const [chartType, setChartType] = useState('bar') // 'bar' | 'pie'
+    const [chartData, setChartData] = useState([
+        { label: 'Product A', value: 45 },
+        { label: 'Product B', value: 30 },
+        { label: 'Product C', value: 60 },
+        { label: 'Product D', value: 25 },
+    ])
+    // ── Countdown State ──
+    const [countdownDate, setCountdownDate] = useState('')
+    const [countdownLabel, setCountdownLabel] = useState('THE BIG EVENT')
+    // ── Collage State ──
+    const [collageLayout, setCollageLayout] = useState(4)
+    // ── Blur State ──
+    const [blurIntensity, setBlurIntensity] = useState(20)
+
     // ── Apply Template to Canvas ──
     const applyTemplate = useCallback(async (template) => {
         const fc = fabricRef.current
@@ -2249,6 +2265,255 @@ function CanvasEditorInner() {
             showToast(`🎨 Brand kit applied to ${count} text elements`)
         }, 300)
     }, [activeBrand, loadGoogleFont, saveHistory, showToast])
+
+    // ── Chart Creator ──
+    const addChart = useCallback(() => {
+        const fc = fabricRef.current; if (!fc) return
+        const brandColor = activeBrand?.dna?.colors?.[0]?.hex || '#6366f1'
+        const maxVal = Math.max(...chartData.map(d => d.value), 1)
+        const ts = Date.now()
+
+        if (chartType === 'bar') {
+            // Bar chart
+            const barW = 50, gap = 20, chartH = 200, baseY = chartH + 40
+            const totalW = chartData.length * (barW + gap) - gap
+            const objects = []
+            // Axis line
+            objects.push(new fabric.Line([0, baseY, totalW + 20, baseY], { stroke: '#475569', strokeWidth: 2 }))
+            const colors = ['#6366f1', '#22d3ee', '#f59e0b', '#ef4444', '#22c55e', '#a78bfa']
+            chartData.forEach((d, i) => {
+                const barH = (d.value / maxVal) * chartH
+                const x = i * (barW + gap)
+                // Bar
+                objects.push(new fabric.Rect({
+                    left: x, top: baseY - barH, width: barW, height: barH,
+                    fill: colors[i % colors.length], rx: 4, ry: 4,
+                }))
+                // Value label
+                objects.push(new fabric.Text(String(d.value), {
+                    left: x + barW / 2, top: baseY - barH - 16,
+                    fontSize: 12, fontWeight: '700', fontFamily: 'Inter',
+                    fill: '#e2e8f0', originX: 'center',
+                }))
+                // Category label
+                objects.push(new fabric.Text(d.label, {
+                    left: x + barW / 2, top: baseY + 8,
+                    fontSize: 10, fontWeight: '500', fontFamily: 'Inter',
+                    fill: '#94a3b8', originX: 'center',
+                }))
+            })
+            const group = new fabric.Group(objects, {
+                left: fc.width / 2, top: fc.height / 2,
+                originX: 'center', originY: 'center',
+                customName: 'Bar Chart', id: `chart-${ts}`,
+            })
+            fc.add(group); fc.setActiveObject(group); fc.renderAll(); saveHistory()
+            showToast('📊 Bar chart added')
+        } else {
+            // Pie chart
+            const radius = 100, cx = 0, cy = 0
+            const total = chartData.reduce((s, d) => s + d.value, 0) || 1
+            const colors = ['#6366f1', '#22d3ee', '#f59e0b', '#ef4444', '#22c55e', '#a78bfa']
+            const objects = []
+            let startAngle = -Math.PI / 2
+            chartData.forEach((d, i) => {
+                const sliceAngle = (d.value / total) * Math.PI * 2
+                const endAngle = startAngle + sliceAngle
+                // SVG arc for pie slice
+                const x1 = cx + radius * Math.cos(startAngle)
+                const y1 = cy + radius * Math.sin(startAngle)
+                const x2 = cx + radius * Math.cos(endAngle)
+                const y2 = cy + radius * Math.sin(endAngle)
+                const largeArc = sliceAngle > Math.PI ? 1 : 0
+                const pathStr = `M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`
+                objects.push(new fabric.Path(pathStr, {
+                    fill: colors[i % colors.length], stroke: '#0f172a', strokeWidth: 2,
+                }))
+                // Label
+                const midAngle = startAngle + sliceAngle / 2
+                const labelR = radius + 20
+                objects.push(new fabric.Text(`${d.label} (${Math.round(d.value / total * 100)}%)`, {
+                    left: cx + labelR * Math.cos(midAngle),
+                    top: cy + labelR * Math.sin(midAngle),
+                    fontSize: 10, fontWeight: '600', fontFamily: 'Inter',
+                    fill: '#e2e8f0', originX: 'center', originY: 'center',
+                }))
+                startAngle = endAngle
+            })
+            const group = new fabric.Group(objects, {
+                left: fc.width / 2, top: fc.height / 2,
+                originX: 'center', originY: 'center',
+                customName: 'Pie Chart', id: `pie-${ts}`,
+            })
+            fc.add(group); fc.setActiveObject(group); fc.renderAll(); saveHistory()
+            showToast('🥧 Pie chart added')
+        }
+    }, [chartType, chartData, activeBrand, saveHistory, showToast])
+
+    // ── Countdown Timer ──
+    const addCountdown = useCallback(() => {
+        const fc = fabricRef.current; if (!fc) return
+        loadGoogleFont('Bebas Neue')
+        loadGoogleFont('Inter')
+        const targetDate = countdownDate ? new Date(countdownDate) : new Date(Date.now() + 30 * 86400000)
+        const now = new Date()
+        const diffMs = targetDate - now
+        const days = Math.max(0, Math.ceil(diffMs / 86400000))
+        const label = countdownLabel || 'THE BIG EVENT'
+        setTimeout(() => {
+            const objects = [
+                new fabric.Text(String(days), {
+                    left: 0, top: 0, fontSize: 120, fontWeight: '700',
+                    fontFamily: 'Bebas Neue', fill: '#ffffff',
+                    originX: 'center', originY: 'center',
+                }),
+                new fabric.Text('DAYS UNTIL', {
+                    left: 0, top: 70, fontSize: 18, fontWeight: '600',
+                    fontFamily: 'Inter', fill: '#818cf8',
+                    originX: 'center', originY: 'center',
+                    charSpacing: 200,
+                }),
+                new fabric.Text(label.toUpperCase(), {
+                    left: 0, top: 100, fontSize: 28, fontWeight: '800',
+                    fontFamily: 'Inter', fill: '#f59e0b',
+                    originX: 'center', originY: 'center',
+                }),
+            ]
+            const group = new fabric.Group(objects, {
+                left: fc.width / 2, top: fc.height / 2,
+                originX: 'center', originY: 'center',
+                customName: 'Countdown', id: `countdown-${Date.now()}`,
+            })
+            fc.add(group); fc.setActiveObject(group); fc.renderAll(); saveHistory()
+            showToast(`⏳ Countdown: ${days} days added`)
+        }, 200)
+    }, [countdownDate, countdownLabel, loadGoogleFont, saveHistory, showToast])
+
+    // ── Color Palette Generator ──
+    const [generatedPalette, setGeneratedPalette] = useState([])
+    const generatePalette = useCallback(() => {
+        const brandColor = activeBrand?.dna?.colors?.[0]?.hex || '#6366f1'
+        // Generate harmonious palette from brand color using HSL shifts
+        const hexToHsl = (hex) => {
+            let r = parseInt(hex.slice(1,3), 16) / 255
+            let g = parseInt(hex.slice(3,5), 16) / 255
+            let b = parseInt(hex.slice(5,7), 16) / 255
+            const max = Math.max(r, g, b), min = Math.min(r, g, b)
+            let h = 0, s = 0, l = (max + min) / 2
+            if (max !== min) {
+                const d = max - min
+                s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+                if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6
+                else if (max === g) h = ((b - r) / d + 2) / 6
+                else h = ((r - g) / d + 4) / 6
+            }
+            return [h * 360, s * 100, l * 100]
+        }
+        const hslToHex = (h, s, l) => {
+            h = ((h % 360) + 360) % 360
+            s /= 100; l /= 100
+            const a = s * Math.min(l, 1 - l)
+            const f = n => { const k = (n + h / 30) % 12; return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1) }
+            return '#' + [f(0), f(8), f(4)].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join('')
+        }
+        const [h, s, l] = hexToHsl(brandColor)
+        const palette = [
+            brandColor,
+            hslToHex(h + 30, s, l),
+            hslToHex(h + 60, Math.min(s + 10, 100), Math.max(l - 10, 20)),
+            hslToHex(h + 180, s * 0.8, l),
+            hslToHex(h + 210, s * 0.6, Math.min(l + 20, 85)),
+        ]
+        setGeneratedPalette(palette)
+    }, [activeBrand])
+
+    const addPaletteToCanvas = useCallback(() => {
+        const fc = fabricRef.current; if (!fc) return
+        const colors = generatedPalette.length ? generatedPalette : ['#6366f1', '#22d3ee', '#f59e0b', '#ef4444', '#22c55e']
+        const swatchW = 50, swatchH = 60, gap = 8
+        const objects = []
+        colors.forEach((hex, i) => {
+            objects.push(new fabric.Rect({
+                left: i * (swatchW + gap), top: 0,
+                width: swatchW, height: swatchH,
+                fill: hex, rx: 8, ry: 8,
+            }))
+            objects.push(new fabric.Text(hex.toUpperCase(), {
+                left: i * (swatchW + gap) + swatchW / 2, top: swatchH + 10,
+                fontSize: 8, fontWeight: '600', fontFamily: 'Inter',
+                fill: '#94a3b8', originX: 'center',
+            }))
+        })
+        const group = new fabric.Group(objects, {
+            left: fc.width / 2, top: fc.height / 2,
+            originX: 'center', originY: 'center',
+            customName: 'Color Palette', id: `palette-${Date.now()}`,
+        })
+        fc.add(group); fc.setActiveObject(group); fc.renderAll(); saveHistory()
+        showToast('🎨 Color palette added')
+    }, [generatedPalette, saveHistory, showToast])
+
+    // ── Photo Collage ──
+    const addCollage = useCallback(() => {
+        const fc = fabricRef.current; if (!fc) return
+        const brandColor = activeBrand?.dna?.colors?.[0]?.hex || '#6366f1'
+        const totalW = fc.width * 0.7, totalH = fc.height * 0.7
+        const gap = 8
+        const objects = []
+        let grid = []
+        switch (collageLayout) {
+            case 2: grid = [[0, 0, 0.5, 1], [0.5, 0, 0.5, 1]]; break
+            case 3: grid = [[0, 0, 0.5, 0.5], [0.5, 0, 0.5, 0.5], [0, 0.5, 1, 0.5]]; break
+            case 4: grid = [[0, 0, 0.5, 0.5], [0.5, 0, 0.5, 0.5], [0, 0.5, 0.5, 0.5], [0.5, 0.5, 0.5, 0.5]]; break
+            case 6: grid = [[0, 0, 1/3, 0.5], [1/3, 0, 1/3, 0.5], [2/3, 0, 1/3, 0.5], [0, 0.5, 1/3, 0.5], [1/3, 0.5, 1/3, 0.5], [2/3, 0.5, 1/3, 0.5]]; break
+            default: grid = [[0, 0, 0.5, 0.5], [0.5, 0, 0.5, 0.5], [0, 0.5, 0.5, 0.5], [0.5, 0.5, 0.5, 0.5]]
+        }
+        grid.forEach((slot, i) => {
+            const [sx, sy, sw, sh] = slot
+            const slotW = totalW * sw - gap
+            const slotH = totalH * sh - gap
+            objects.push(new fabric.Rect({
+                left: sx * totalW + gap / 2, top: sy * totalH + gap / 2,
+                width: slotW, height: slotH,
+                fill: '#1e293b', stroke: brandColor + '60',
+                strokeWidth: 2, strokeDashArray: [8, 4],
+                rx: 8, ry: 8,
+            }))
+            // Slot number + icon
+            objects.push(new fabric.Text(`📷 ${i + 1}`, {
+                left: sx * totalW + slotW / 2 + gap / 2,
+                top: sy * totalH + slotH / 2 + gap / 2,
+                fontSize: 20, fontWeight: '600', fontFamily: 'Inter',
+                fill: '#475569', originX: 'center', originY: 'center',
+            }))
+        })
+        const group = new fabric.Group(objects, {
+            left: fc.width / 2, top: fc.height / 2,
+            originX: 'center', originY: 'center',
+            customName: 'Photo Collage', id: `collage-${Date.now()}`,
+        })
+        fc.add(group); fc.setActiveObject(group); fc.renderAll(); saveHistory()
+        showToast(`🖼️ ${collageLayout}-slot collage added`)
+    }, [collageLayout, activeBrand, saveHistory, showToast])
+
+    // ── Blur Tool ──
+    const applyBlurToSelected = useCallback(() => {
+        const fc = fabricRef.current; if (!fc) return
+        const obj = fc.getActiveObject()
+        if (!obj || obj.type !== 'image') {
+            showToast('⚠️ Select an image first')
+            return
+        }
+        obj.filters = obj.filters || []
+        // Remove existing blur filter if any
+        obj.filters = obj.filters.filter(f => !(f instanceof fabric.filters.Blur))
+        if (blurIntensity > 0) {
+            obj.filters.push(new fabric.filters.Blur({ blur: blurIntensity / 100 }))
+        }
+        obj.applyFilters()
+        fc.renderAll(); saveHistory()
+        showToast(`🌫️ Blur ${blurIntensity > 0 ? 'applied' : 'removed'}`)
+    }, [blurIntensity, saveHistory, showToast])
 
     const addTextStyle = useCallback((preset) => {
         const fc = fabricRef.current
@@ -2997,6 +3262,11 @@ function CanvasEditorInner() {
                                                     { id: 'curved', icon: 'motion_photos_auto', label: 'Curved Text', desc: 'Text along an arc' },
                                                     { id: 'qr', icon: 'qr_code_2', label: 'QR Code', desc: 'Generate QR code from URL' },
                                                     { id: 'brandkit', icon: 'palette', label: 'Brand Kit', desc: 'Apply brand fonts & colors' },
+                                                    { id: 'chart', icon: 'bar_chart', label: 'Chart Creator', desc: 'Bar or pie chart from data' },
+                                                    { id: 'countdown', icon: 'timer', label: 'Countdown', desc: 'Days-until timer graphic' },
+                                                    { id: 'palette', icon: 'colorize', label: 'Color Palette', desc: 'Generate color swatches' },
+                                                    { id: 'collage', icon: 'grid_view', label: 'Photo Collage', desc: 'Grid layout with image slots' },
+                                                    { id: 'blur', icon: 'blur_on', label: 'Blur Tool', desc: 'Blur selected image' },
                                                 ].map(app => (
                                                     <button key={app.id} className="ce-element-btn" onClick={() => setActiveApp(app.id)}
                                                         title={app.desc} style={{ gap: 4, padding: '12px 4px', border: '1px solid #1e293b' }}>
@@ -3077,6 +3347,160 @@ function CanvasEditorInner() {
                                             <button className="ce-search-btn" onClick={applyBrandKit} style={{ width: '100%' }}>
                                                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>palette</span>
                                                 Apply Brand Kit
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Chart Creator App */}
+                                    {activeApp === 'chart' && (
+                                        <div style={{ padding: '8px 0' }}>
+                                            <p className="ce-ai-tool-hint">Create a bar or pie chart from your data.</p>
+                                            <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                                                {['bar', 'pie'].map(t => (
+                                                    <button key={t} className={`ce-category-pill ${chartType === t ? 'active' : ''}`}
+                                                        onClick={() => setChartType(t)} style={{ flex: 1, textTransform: 'capitalize' }}>
+                                                        {t === 'bar' ? '📊' : '🥧'} {t} Chart
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div style={{ fontSize: 10, color: '#64748b', marginBottom: 6 }}>Data Rows</div>
+                                            {chartData.map((d, i) => (
+                                                <div key={i} style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+                                                    <input className="ce-asset-search" value={d.label}
+                                                        onChange={e => { const nd = [...chartData]; nd[i] = { ...nd[i], label: e.target.value }; setChartData(nd) }}
+                                                        style={{ flex: 1, fontSize: 11, padding: '4px 6px' }} placeholder="Label" />
+                                                    <input className="ce-asset-search" type="number" value={d.value}
+                                                        onChange={e => { const nd = [...chartData]; nd[i] = { ...nd[i], value: parseInt(e.target.value) || 0 }; setChartData(nd) }}
+                                                        style={{ width: 60, fontSize: 11, padding: '4px 6px' }} placeholder="Value" />
+                                                </div>
+                                            ))}
+                                            <div style={{ display: 'flex', gap: 4, marginBottom: 10, marginTop: 4 }}>
+                                                <button style={{ fontSize: 10, color: '#818cf8', background: 'none', border: '1px solid #1e293b', borderRadius: 6, padding: '4px 8px', cursor: 'pointer' }}
+                                                    onClick={() => setChartData([...chartData, { label: `Item ${chartData.length + 1}`, value: 20 }])}>+ Add Row</button>
+                                                {chartData.length > 2 && (
+                                                    <button style={{ fontSize: 10, color: '#ef4444', background: 'none', border: '1px solid #1e293b', borderRadius: 6, padding: '4px 8px', cursor: 'pointer' }}
+                                                        onClick={() => setChartData(chartData.slice(0, -1))}>− Remove</button>
+                                                )}
+                                            </div>
+                                            <button className="ce-search-btn" onClick={addChart} style={{ width: '100%' }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add_circle</span>
+                                                Add {chartType === 'bar' ? 'Bar' : 'Pie'} Chart
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Countdown Timer App */}
+                                    {activeApp === 'countdown' && (
+                                        <div style={{ padding: '8px 0' }}>
+                                            <p className="ce-ai-tool-hint">Create a "X Days Until" countdown graphic.</p>
+                                            <div style={{ marginBottom: 10 }}>
+                                                <label style={{ fontSize: 10, color: '#64748b', display: 'block', marginBottom: 4 }}>Target Date</label>
+                                                <input className="ce-asset-search" type="date" value={countdownDate}
+                                                    onChange={e => setCountdownDate(e.target.value)}
+                                                    style={{ marginBottom: 8, colorScheme: 'dark' }} />
+                                            </div>
+                                            <div style={{ marginBottom: 12 }}>
+                                                <label style={{ fontSize: 10, color: '#64748b', display: 'block', marginBottom: 4 }}>Event Name</label>
+                                                <input className="ce-asset-search" value={countdownLabel}
+                                                    onChange={e => setCountdownLabel(e.target.value)}
+                                                    placeholder="e.g. Product Launch" style={{ marginBottom: 8 }} />
+                                            </div>
+                                            {countdownDate && (
+                                                <div style={{ background: '#0f172a', borderRadius: 8, padding: 12, marginBottom: 12, border: '1px solid #1e293b', textAlign: 'center' }}>
+                                                    <div style={{ fontSize: 48, fontWeight: 700, color: '#ffffff' }}>
+                                                        {Math.max(0, Math.ceil((new Date(countdownDate) - new Date()) / 86400000))}
+                                                    </div>
+                                                    <div style={{ fontSize: 10, color: '#818cf8', letterSpacing: 3, fontWeight: 600 }}>DAYS UNTIL</div>
+                                                    <div style={{ fontSize: 14, color: '#f59e0b', fontWeight: 700, marginTop: 4 }}>{countdownLabel.toUpperCase()}</div>
+                                                </div>
+                                            )}
+                                            <button className="ce-search-btn" onClick={addCountdown} style={{ width: '100%' }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>timer</span>
+                                                Add Countdown
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Color Palette App */}
+                                    {activeApp === 'palette' && (
+                                        <div style={{ padding: '8px 0' }}>
+                                            <p className="ce-ai-tool-hint">Generate a harmonious color palette from your brand color.</p>
+                                            <button className="ce-search-btn" onClick={generatePalette}
+                                                style={{ width: '100%', marginBottom: 12 }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span>
+                                                Generate Palette
+                                            </button>
+                                            {generatedPalette.length > 0 && (
+                                                <>
+                                                    <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                                                        {generatedPalette.map((hex, i) => (
+                                                            <div key={i} style={{ flex: 1, textAlign: 'center', cursor: 'pointer' }}
+                                                                onClick={() => { navigator.clipboard?.writeText(hex); showToast(`📋 Copied ${hex}`) }}>
+                                                                <div style={{ width: '100%', height: 40, borderRadius: 8, background: hex, border: '1px solid #ffffff20' }}></div>
+                                                                <div style={{ fontSize: 8, color: '#94a3b8', marginTop: 4 }}>{hex}</div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <button className="ce-search-btn" onClick={addPaletteToCanvas} style={{ width: '100%' }}>
+                                                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add_circle</span>
+                                                        Add Swatches to Canvas
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Photo Collage App */}
+                                    {activeApp === 'collage' && (
+                                        <div style={{ padding: '8px 0' }}>
+                                            <p className="ce-ai-tool-hint">Create a photo grid layout with placeholder slots.</p>
+                                            <div style={{ fontSize: 10, color: '#64748b', marginBottom: 8 }}>Grid Layout</div>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+                                                {[2, 3, 4, 6].map(n => (
+                                                    <button key={n}
+                                                        style={{
+                                                            background: collageLayout === n ? '#1e1b4b' : '#0f172a',
+                                                            border: `1px solid ${collageLayout === n ? '#6366f1' : '#1e293b'}`,
+                                                            borderRadius: 8, padding: 12, cursor: 'pointer',
+                                                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                                                        }}
+                                                        onClick={() => setCollageLayout(n)}>
+                                                        <div style={{ display: 'grid', gridTemplateColumns: n <= 3 ? `repeat(${Math.min(n, 2)}, 1fr)` : `repeat(${Math.min(n, 3)}, 1fr)`, gap: 2, width: 40, height: 40 }}>
+                                                            {Array.from({ length: n }).map((_, i) => (
+                                                                <div key={i} style={{ background: collageLayout === n ? '#818cf8' : '#334155', borderRadius: 2, minHeight: 10 }}></div>
+                                                            ))}
+                                                        </div>
+                                                        <span style={{ fontSize: 10, color: collageLayout === n ? '#818cf8' : '#64748b', fontWeight: 600 }}>{n} Slots</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <button className="ce-search-btn" onClick={addCollage} style={{ width: '100%' }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>grid_view</span>
+                                                Create {collageLayout}-Slot Collage
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Blur Tool App */}
+                                    {activeApp === 'blur' && (
+                                        <div style={{ padding: '8px 0' }}>
+                                            <p className="ce-ai-tool-hint">Apply blur effect to the selected image on canvas.</p>
+                                            <div style={{ marginBottom: 12 }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#64748b', marginBottom: 4 }}>
+                                                    <span>Blur Intensity</span><span>{blurIntensity}%</span>
+                                                </div>
+                                                <input type="range" className="ce-slider" min={0} max={100} value={blurIntensity}
+                                                    onChange={e => setBlurIntensity(parseInt(e.target.value))} />
+                                            </div>
+                                            <div style={{ background: '#0f172a', borderRadius: 8, padding: 10, marginBottom: 12, border: '1px solid #1e293b' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#f59e0b' }}>info</span>
+                                                    <span style={{ fontSize: 10, color: '#94a3b8' }}>Select an image on the canvas first, then adjust intensity and click Apply.</span>
+                                                </div>
+                                            </div>
+                                            <button className="ce-search-btn" onClick={applyBlurToSelected} style={{ width: '100%' }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>blur_on</span>
+                                                Apply Blur
                                             </button>
                                         </div>
                                     )}

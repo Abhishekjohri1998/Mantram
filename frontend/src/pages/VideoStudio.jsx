@@ -5,6 +5,7 @@ import { useBrand } from '../context/BrandContext'
 import DashboardLayout from '../components/DashboardLayout'
 import { creatives as creativesAPI } from '../services/api'
 import AdvancedMode from '../components/VideoStudio/AdvancedMode'
+import UGCCreator from '../components/VideoStudio/UGCCreator'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -50,7 +51,7 @@ export default function VideoStudio() {
     // ── State ──
     const [step, setStep] = useState(0) // 0=input, 1=concepts, 2=script, 3=cost, 4=generate, 5=review
     const [loading, setLoading] = useState(false)
-    const [studioMode, setStudioMode] = useState('storyboard') // 'advanced' | 'storyboard'
+    const [studioMode, setStudioMode] = useState('storyboard') // 'advanced' | 'storyboard' | 'ugc'
     const [error, setError] = useState('')
 
     // Project state
@@ -369,7 +370,7 @@ export default function VideoStudio() {
     return (
         <DashboardLayout title="Video Studio" subtitle="AI-powered video generation & editing">
             <SEOHead title="Video Studio — Mantram AI" noIndex={true} />
-            <div className="max-w-6xl mx-auto">
+            <div className="max-w-7xl mx-auto">
                 {/* ── Header Actions ── */}
                 <div className="flex items-center justify-end mb-6">
                     <button onClick={() => {
@@ -382,18 +383,24 @@ export default function VideoStudio() {
                 </div>
 
                 {/* ── Mode Toggle ── */}
-                <div className="flex items-center gap-2 mb-6 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06] w-fit">
+                <div className="flex items-center gap-2 mb-8 p-1.5 rounded-2xl bg-white/[0.025] border border-white/[0.05] w-fit">
                     <button onClick={() => setStudioMode('advanced')}
-                        className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${studioMode === 'advanced'
+                        className={`px-6 py-3 rounded-xl text-base font-semibold transition-all cursor-pointer flex items-center gap-2.5 ${studioMode === 'advanced'
                             ? 'bg-gradient-to-r from-violet-600 to-cyan-600 text-white shadow-lg shadow-violet-500/20'
-                            : 'text-slate-500 hover:text-white'}`}>
-                        <span className="material-symbols-outlined text-base">terminal</span> Advanced
+                            : 'text-slate-500 hover:text-white hover:bg-white/[0.03]'}`}>
+                        <span className="material-symbols-outlined text-lg">terminal</span> Advanced
                     </button>
                     <button onClick={() => setStudioMode('storyboard')}
-                        className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${studioMode === 'storyboard'
+                        className={`px-6 py-3 rounded-xl text-base font-semibold transition-all cursor-pointer flex items-center gap-2.5 ${studioMode === 'storyboard'
                             ? 'bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-lg shadow-rose-500/20'
-                            : 'text-slate-500 hover:text-white'}`}>
-                        <span className="material-symbols-outlined text-base">view_timeline</span> Storyboard
+                            : 'text-slate-500 hover:text-white hover:bg-white/[0.03]'}`}>
+                        <span className="material-symbols-outlined text-lg">view_timeline</span> Storyboard
+                    </button>
+                    <button onClick={() => setStudioMode('ugc')}
+                        className={`px-6 py-3 rounded-xl text-base font-semibold transition-all cursor-pointer flex items-center gap-2.5 ${studioMode === 'ugc'
+                            ? 'bg-gradient-to-r from-amber-500 to-pink-600 text-white shadow-lg shadow-amber-500/20'
+                            : 'text-slate-500 hover:text-white hover:bg-white/[0.03]'}`}>
+                        <span className="material-symbols-outlined text-lg">person_play</span> UGC Creator
                     </button>
                 </div>
 
@@ -638,6 +645,11 @@ export default function VideoStudio() {
                 {/* ── ADVANCED MODE ── */}
                 {studioMode === 'advanced' && (
                     <AdvancedMode activeBrand={activeBrand} initialData={advancedRefillData} />
+                )}
+
+                {/* ── UGC CREATOR MODE (HeyGen) ── */}
+                {studioMode === 'ugc' && (
+                    <UGCCreator activeBrand={activeBrand} />
                 )}
 
                 {/* ── STORYBOARD MODE ── */}

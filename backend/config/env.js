@@ -56,6 +56,11 @@ export default {
         apiKey: process.env.PIAPI_API_KEY,
     },
 
+    // HeyGen — UGC Avatar Video Generation
+    heygen: {
+        apiKey: process.env.HEYGEN_API_KEY,
+    },
+
     // Google OAuth
     google: {
         clientId: process.env.GOOGLE_CLIENT_ID,
