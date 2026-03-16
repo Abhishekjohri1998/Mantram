@@ -8,6 +8,20 @@ import { useBrand } from '../context/BrandContext'
 import VoiceInput from '../components/VoiceInput'
 import PublishModal from '../components/PublishModal'
 
+// ── Helper: Time Ago ──
+function getTimeAgo(dateStr) {
+    if (!dateStr) return '';
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    if (days < 7) return `${days}d ago`;
+    return new Date(dateStr).toLocaleDateString();
+}
+ 
 // ── Aspect Ratio Options ──
 const ASPECT_RATIOS = [
     { ratio: '1:1', label: 'Square', icon: '⬜' },
@@ -411,11 +425,11 @@ export default function CreativeStudio() {
     const abortControllerRef = useRef(null)
     const activeBrandIdRef = useRef(activeBrand?._id)
 
-    const getSignal = useCallback(() => {
+    function getSignal() {
         if (abortControllerRef.current) abortControllerRef.current.abort()
         abortControllerRef.current = new AbortController()
         return abortControllerRef.current.signal
-    }, [])
+    }
 
     useEffect(() => {
         return () => abortControllerRef.current?.abort()
@@ -594,7 +608,7 @@ export default function CreativeStudio() {
                 canvas.height = img.height
                 const ctx = canvas.getContext('2d')
                 ctx.drawImage(img, 0, 0)
-
+ 
                 const logo = new window.Image()
                 logo.crossOrigin = 'anonymous'
                 logo.onload = () => {
@@ -605,7 +619,7 @@ export default function CreativeStudio() {
                     const lw = logo.width * scale
                     const lh = logo.height * scale
                     const pad = canvas.width * 0.03 // 3% padding from edges
-
+ 
                     // Position mapping
                     const posMap = {
                         'top-left': [pad, pad],
@@ -619,7 +633,7 @@ export default function CreativeStudio() {
                         'bottom-right': [canvas.width - lw - pad, canvas.height - lh - pad],
                     }
                     const [x, y] = posMap[position] || posMap['bottom-right']
-
+ 
                     ctx.drawImage(logo, x, y, lw, lh)
                     resolve(canvas.toDataURL('image/png'))
                 }
@@ -2007,18 +2021,6 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     {(() => {
                         const recentPhotoshoots = bankImages.filter(i => i.type === 'ai-photoshoot' || i.type === 'photoshoot').slice(0, 8);
                         if (recentPhotoshoots.length === 0) return null;
-                        const getTimeAgo = (d) => {
-                            if (!d) return '';
-                            const diff = Date.now() - new Date(d).getTime();
-                            const m = Math.floor(diff / 60000);
-                            if (m < 1) return 'just now';
-                            if (m < 60) return `${m}m ago`;
-                            const h = Math.floor(m / 60);
-                            if (h < 24) return `${h}h ago`;
-                            const dy = Math.floor(h / 24);
-                            if (dy < 7) return `${dy}d ago`;
-                            return new Date(d).toLocaleDateString();
-                        };
                         return (
                             <div className="col-span-12 studio-card p-5 mb-1 fade-up-1">
                                 <div className="flex items-center justify-between mb-3">
@@ -4363,18 +4365,6 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     )}
 
                     {bankTab !== 'brand' && !bankLoading && bankImages.length > 0 && (() => {
-                        function getTimeAgo(dateStr) {
-                            if (!dateStr) return '';
-                            const diff = Date.now() - new Date(dateStr).getTime();
-                            const mins = Math.floor(diff / 60000);
-                            if (mins < 1) return 'just now';
-                            if (mins < 60) return `${mins}m ago`;
-                            const hrs = Math.floor(mins / 60);
-                            if (hrs < 24) return `${hrs}h ago`;
-                            const days = Math.floor(hrs / 24);
-                            if (days < 7) return `${days}d ago`;
-                            return new Date(dateStr).toLocaleDateString();
-                        }
                         function handleRefillCreative(img) {
                             const isPhotoshootType = img.type === 'ai-photoshoot' || img.type === 'photoshoot';
                             if (isPhotoshootType) {
