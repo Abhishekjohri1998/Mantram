@@ -114,6 +114,7 @@ export const brands = {
     updateAutonomy: (id, settings) => apiFetch(`/brands/${id}/autonomy`, { method: 'PUT', body: JSON.stringify(settings) }),
     getAuditLog: (id, page = 1) => apiFetch(`/brands/${id}/audit-log?page=${page}`),
     delete: (id) => apiFetch(`/brands/${id}`, { method: 'DELETE' }),
+    analyzeVisualDNA: (id) => apiFetch(`/brands/${id}/analyze-visual-dna`, { method: 'POST' }),
     // Custom Templates
     getTemplates: (id) => apiFetch(`/brands/${id}/templates`),
     saveTemplate: (id, data) => apiFetch(`/brands/${id}/templates`, { method: 'POST', body: JSON.stringify(data) }),
@@ -157,7 +158,7 @@ export const content = {
 
 // ============ Creatives API ============
 export const creatives = {
-    generate: (data, options = {}) => apiFetch('/creatives/generate', { method: 'POST', body: JSON.stringify(data), timeout: 180000, ...options }),
+    generate: (data, options = {}) => apiFetch('/creatives/generate', { method: 'POST', body: JSON.stringify(data), timeout: 300000, ...options }),
     enhancePrompt: (data, options = {}) => apiFetch('/creatives/enhance-prompt', { method: 'POST', body: JSON.stringify(data), ...options }),
     list: (params = {}) => {
         const query = new URLSearchParams(params).toString();
@@ -178,7 +179,7 @@ export const creatives = {
 
 // ============ Agent API ============
 export const agents = {
-    scanWebsite: (url) => apiFetch('/agents/scan-website', { method: 'POST', body: JSON.stringify({ url }) }),
+    scanWebsite: (url) => apiFetch('/agents/scan-website', { method: 'POST', body: JSON.stringify({ url }), timeout: 180000 }),
     brainstorm: (data) => apiFetch('/agents/brainstorm', { method: 'POST', body: JSON.stringify(data) }),
     saveBrainstorm: (brandData) => apiFetch('/agents/brainstorm/save', { method: 'POST', body: JSON.stringify({ brandData }) }),
     generateLogo: (data) => apiFetch('/agents/generate-logo', { method: 'POST', body: JSON.stringify(data) }),
@@ -227,6 +228,7 @@ export const trends = {
     refresh: (geo = 'IN') => apiFetch(`/trends/refresh?geo=${geo}`, { method: 'POST' }),
     grokTopics: (params = {}) => { const q = new URLSearchParams(params).toString(); return apiFetch(`/trends/grok-topics?${q}`); },
     grokSeo: (params = {}) => { const q = new URLSearchParams(params).toString(); return apiFetch(`/trends/grok-seo?${q}`); },
+    productIntelligence: (data) => apiFetch('/trends/product-intelligence', { method: 'POST', body: JSON.stringify(data) }),
     grokContent: (params = {}) => { const q = new URLSearchParams(params).toString(); return apiFetch(`/trends/grok-content?${q}`); },
     grokCompetitors: (params = {}) => { const q = new URLSearchParams(params).toString(); return apiFetch(`/trends/grok-competitors?${q}`); },
 };

@@ -269,6 +269,43 @@ router.get('/:id/audit-log', protect, async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════
+// POST /api/brands/:id/analyze-visual-dna — AI-powered visual identity analysis
+// Extracts design style, typography, layout, mood, rules from brand data
+// ═══════════════════════════════════════════════════════════════
+router.post('/:id/analyze-visual-dna', protect, async (req, res) => {
+    try {
+        const brand = await findBrandWithAccess(req.params.id, req.user._id);
+        if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
+
+        console.log(`🎨 Analyzing Visual DNA for brand: ${brand.name}`);
+        const { analyzeVisualDNA } = await import('../services/visualDNA.js');
+        const visualDNA = await analyzeVisualDNA(brand);
+
+        if (!visualDNA) {
+            return res.status(500).json({ success: false, error: 'Visual DNA analysis failed — please try again' });
+        }
+
+        // Save to brand
+        await Brand.findOneAndUpdate(
+            { _id: brand._id },
+            { $set: { 'dna.visualDNA': visualDNA } }
+        );
+
+        await logAudit(brand, req.user, 'visual_dna_analyzed', {
+            section: 'visualDNA',
+            summary: `AI Visual DNA analyzed: ${visualDNA.designStyle}, ${visualDNA.typographyStyle}, ${visualDNA.imageMood}`,
+            changes: { visualDNA },
+        });
+
+        console.log(`✅ Visual DNA saved for ${brand.name}: style=${visualDNA.designStyle}, mood=${visualDNA.imageMood}`);
+        res.json({ success: true, visualDNA });
+    } catch (error) {
+        console.error('❌ Visual DNA analysis error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
 // PUT /api/brands/:id/autonomy — update autonomy settings
 // ═══════════════════════════════════════════════════════════════
 router.put('/:id/autonomy', protect, async (req, res) => {

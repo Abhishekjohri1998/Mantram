@@ -32,11 +32,41 @@ function buildVisualContext(brand) {
     const parts = [];
     const dna = brand.dna || {};
     if (dna.voice?.personality) parts.push(`Brand personality: ${dna.voice.personality}`);
+    
+    // ── Typography — inject actual font preferences ──
+    const fonts = dna.fonts || {};
+    const fontParts = [];
+    if (fonts.heading?.family) fontParts.push(`Headlines: "${fonts.heading.family}" ${fonts.heading.weight || 'Bold'} ${fonts.heading.style || ''}`);
+    if (fonts.body?.family) fontParts.push(`Body text: "${fonts.body.family}" ${fonts.body.weight || 'Regular'}`);
+    if (fonts.accent?.family) fontParts.push(`Accent/CTA: "${fonts.accent.family}" ${fonts.accent.weight || 'SemiBold'}`);
+    if (fontParts.length > 0) parts.push(`TYPOGRAPHY — use these exact fonts: ${fontParts.join('; ')}`);
+    
+    // ── Photography & Image Style ──
+    if (dna.photographyStyle) parts.push(`Photography direction: ${dna.photographyStyle}`);
+    
+    // ── Visual DNA — AI-extracted design intelligence ──
+    const vdna = dna.visualDNA || {};
+    if (vdna.designStyle) parts.push(`Design style: ${vdna.designStyle}`);
+    if (vdna.layoutPreference) parts.push(`Layout: ${vdna.layoutPreference}`);
+    if (vdna.textPlacement) parts.push(`Text placement: ${vdna.textPlacement}`);
+    if (vdna.imageMood) parts.push(`Image mood: ${vdna.imageMood}`);
+    if (vdna.textureStyle) parts.push(`Texture/surface: ${vdna.textureStyle}`);
+    if (vdna.typographyStyle) parts.push(`Typography rendering: ${vdna.typographyStyle}`);
+    if (vdna.decorativeElements) parts.push(`Decorative elements: ${vdna.decorativeElements}`);
+    if (vdna.imageAnalysis) parts.push(`Brand visual patterns: ${vdna.imageAnalysis}`);
+    
+    // ── Design rules from visual DNA ──
+    const designRules = vdna.designRules || [];
+    const designAvoid = vdna.designAvoid || [];
+    if (designRules.length > 0) parts.push(`DESIGN RULES — always follow: ${designRules.slice(0, 5).join('; ')}`);
+    if (designAvoid.length > 0) parts.push(`DESIGN AVOIDS — never do: ${designAvoid.slice(0, 5).join('; ')}`);
+    
+    // ── Content style do's and don'ts ──
     if (dna.contentStyle?.dos?.length) {
-        parts.push(`Design principles: ${dna.contentStyle.dos.slice(0, 3).join(', ')}`);
+        parts.push(`Content principles: ${dna.contentStyle.dos.slice(0, 3).join(', ')}`);
     }
     if (dna.contentStyle?.donts?.length) {
-        parts.push(`Avoid in design: ${dna.contentStyle.donts.slice(0, 3).join(', ')}`);
+        parts.push(`Content avoids: ${dna.contentStyle.donts.slice(0, 3).join(', ')}`);
     }
     return parts.join('. ');
 }
@@ -471,6 +501,8 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
         const textOverlayPart = options?.textOverlay ? ` Include the text "${options.textOverlay}" in a clean, readable font.` : '';
         const colorPart = colorPhrase ? ` ${colorPhrase}.` : '';
         const refPart = referenceInstructions.length > 0 ? '\n' + referenceInstructions.join('\n') : '';
+        const visualCtx = buildVisualContext(brand);
+        const visualPart = visualCtx ? `\nBRAND VISUAL GUIDELINES: ${visualCtx}` : '';
 
         // Clean the user's prompt — strip @Character tags, replace with natural language
         let cleanedPrompt = prompt;
@@ -493,19 +525,19 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
                 ? 'IMPORTANT: When changing the person, adapt their ENTIRE body, physique, clothing, and build — not just face. Create a completely new person matching the description while keeping the same pose and composition.'
                 : '';
             fullPrompt = `Edit this template image for ${brand.name}. ${cleanedPrompt}
-${refPart}
+${refPart}${visualPart}
 ${bodyInstruction}
 Keep the exact same layout, composition, text placement, and design style. Replace only the elements described. Output must fill the entire canvas edge-to-edge.`;
         } else if (characterRefs.length > 0) {
             // Character reference mode — use official "this person" pattern
             // Per Gemini docs: "A studio portrait of this man..." / "these people making funny faces"
             fullPrompt = `Using the provided reference photo of this person: ${cleanedPrompt}
-${platformSize} ${styleWord} image for ${brand.name}.${colorPart}${textOverlayPart}
+${platformSize} ${styleWord} image for ${brand.name}.${colorPart}${textOverlayPart}${visualPart}
 ${refPart}
 The output must fill the entire canvas edge-to-edge. No frames, borders, or mockups.`;
         } else {
             fullPrompt = `${cleanedPrompt}${textOverlayPart}
-${platformSize} ${styleWord} image for ${brand.name}.${colorPart}${refPart}
+${platformSize} ${styleWord} image for ${brand.name}.${colorPart}${visualPart}${refPart}
 The output must fill the entire canvas edge-to-edge. No frames, borders, or mockups.`;
         }
 

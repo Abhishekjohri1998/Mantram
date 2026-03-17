@@ -8,8 +8,31 @@ export async function scanWebsite(url, aiRouter) {
     if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
     console.log(`🔍 Scanning website: ${url}`);
 
-    const html = await fetchPage(url);
-    const $ = cheerio.load(html);
+    let html = await fetchPage(url);
+    let $ = cheerio.load(html);
+
+    // ── SPA Detection: if body text is too short, the site is a JS-rendered SPA ──
+    const bodyText = $('body').text().replace(/\s+/g, ' ').trim();
+    const isSPA = bodyText.length < 200 || $('#root, #app, #__next, #__nuxt').length > 0;
+
+    // Puppeteer browser instance — reused for sub-page crawling of SPAs
+    let sharedBrowser = null;
+
+    if (isSPA) {
+        console.log(`  ⚡ SPA detected (body text: ${bodyText.length} chars) — using Puppeteer for content extraction`);
+        try {
+            const rendered = await puppeteerExtractContent(url);
+            if (rendered) {
+                sharedBrowser = rendered._browser; // reuse for sub-pages
+                // Rebuild cheerio from rendered HTML
+                html = rendered.html;
+                $ = cheerio.load(html);
+                console.log(`  ✅ Puppeteer extracted ${rendered.textContent?.length || 0} chars of content`);
+            }
+        } catch (err) {
+            console.warn('  ⚠️ Puppeteer content extraction failed:', err.message);
+        }
+    }
 
     // Fetch external CSS stylesheets and inject as inline styles
     await fetchExternalCSS($, url);
@@ -31,12 +54,17 @@ export async function scanWebsite(url, aiRouter) {
     console.log(`  📷 Total homepage images found: ${allImages.length}`);
 
     // ── Phase 1b: AI Vision Analysis (Puppeteer screenshot → Gemini) ────
+    // Skip for SPAs — we already used Puppeteer for content extraction above
     let visionAnalysis = null;
-    try {
-        visionAnalysis = await captureAndAnalyze(url, allImages, selectorLogos);
-        console.log(`  🧠 Vision analysis: logo=${visionAnalysis?.logo ? '✅' : '❌'}, colors=${visionAnalysis?.colors?.length || 0}`);
-    } catch (err) {
-        console.warn('  ⚠️ Vision analysis failed (falling back to selectors):', err.message);
+    if (!isSPA) {
+        try {
+            visionAnalysis = await captureAndAnalyze(url, allImages, selectorLogos);
+            console.log(`  🧠 Vision analysis: logo=${visionAnalysis?.logo ? '✅' : '❌'}, colors=${visionAnalysis?.colors?.length || 0}`);
+        } catch (err) {
+            console.warn('  ⚠️ Vision analysis failed (falling back to selectors):', err.message);
+        }
+    } else {
+        console.log('  ⏭️ Skipping Vision analysis (SPA — Puppeteer already used for content)');
     }
 
     // ── Phase 2: Social Media Intelligence ────────────────────────────────
@@ -53,13 +81,18 @@ export async function scanWebsite(url, aiRouter) {
         console.warn('  ⚠️ Social media analysis failed:', err.message);
     }
 
-    // ── Phase 3: Deeper Content — crawl sub-pages ────────────────────────
+    // ── Phase 3: Deep Multi-Page Crawl ───────────────────────────────────
     let subPageContent = [];
     try {
-        subPageContent = await crawlSubPages($, url);
-        console.log(`  📄 Sub-pages crawled: ${subPageContent.length}`);
+        subPageContent = await crawlSubPages($, url, isSPA, sharedBrowser);
+        console.log(`  📄 Sub-pages crawled: ${subPageContent.length} content pieces`);
     } catch (err) {
         console.warn('  ⚠️ Sub-page crawl failed:', err.message);
+    }
+
+    // Close shared Puppeteer browser if we opened one
+    if (sharedBrowser) {
+        try { await sharedBrowser.close(); } catch {}
     }
 
     // ── Merge all content samples for richer voice analysis ──────────────
@@ -90,12 +123,18 @@ Sample captions: ${(socialVoice.sampleCaptions || []).slice(0, 3).join(' | ')}`
 
             voiceAnalysis = await aiRouter.analyzeText({
                 text: allContentSamples.join('\n\n') + colorContext + bannerContext + socialContext,
-                task: `You are a brand strategist and visual identity expert. Analyze this website's brand identity.
+                task: `You are a brand strategist and visual identity expert. Analyze this website's brand identity using ALL the content provided — including sub-page content from About, Team, Products, Services, Values pages.
 Return ONLY valid JSON (no markdown, no explanation) with these fields:
 
 {
   "personality": "e.g. Professional & Innovative",
   "description": "2-3 sentences about brand voice",
+  "brandDescription": "3-5 sentence comprehensive description of what this company/brand does, their core offerings, and what makes them unique. This should read like an 'About Us' summary.",
+  "companyOverview": "1-2 sentence elevator pitch — who they are and what they do",
+  "servicesOffered": ["list of 5-10 specific products, services, or capabilities the brand offers"],
+  "uniqueSellingPoints": ["3-5 things that differentiate this brand from competitors"],
+  "missionStatement": "the brand's mission statement if found, else empty string",
+  "brandValues": ["3-5 core values the brand stands for"],
   "tone": 50,
   "clarity": 50,
   "warmth": 50,
@@ -103,14 +142,14 @@ Return ONLY valid JSON (no markdown, no explanation) with these fields:
   "wit": 25,
   "keywords": ["5-10 brand keywords"],
   "sampleQuote": "best example of brand voice from the content",
-  "industry": "detected industry",
-  "targetAudience": "who the brand targets",
+  "industry": "detected industry — be specific (e.g. 'Marketing Consultancy' not just 'Business')",
+  "targetAudience": "who the brand targets — be specific about demographics, profession, and needs",
   "tagline": "brand tagline or slogan if found, else empty string",
   "photographyStyle": "flat lay / lifestyle / studio / UGC / mixed — based on images",
   "contentStyle": {
     "dos": ["5-8 writing rules to follow"],
     "donts": ["5-8 things to avoid"],
-    "keyPhrases": ["5-10 signature phrases or brand language"],
+    "keyPhrases": ["5-10 signature phrases or brand language found in the content"],
     "writingStyle": "1-2 sentence description of how they write",
     "ctaStyle": "How CTAs are written — e.g. Shop Now, Learn More, DM Us",
     "emojiUsage": "none/minimal/moderate/heavy",
@@ -130,6 +169,8 @@ IMPORTANT for brandColors:
 - Include the primary accent color (the color that stands out most)
 - Each color needs: hex (uppercase), name (descriptive), usage (primary/secondary/accent/background)
 - Order: primary first, then secondary, accent, background
+
+IMPORTANT: The content includes data from multiple pages [About], [Team], [Products], [Services], [Mission & Values], etc. Use ALL of this to build a comprehensive brand profile. The brandDescription should be detailed and specific — not generic.
 
 ${socialContext ? 'IMPORTANT: Social media data is provided — use it to deeply understand the brand voice and content style. The social captions reveal the TRUE brand personality more than website copy.' : ''}`,
             });
@@ -289,15 +330,90 @@ Rules:
             socialVoice,
             bannerImages: bannerImages.slice(0, 15),
             brandImages: allImages,
-            brandDescription: meta.description || '',
+            brandDescription: voiceAnalysis.brandDescription || voiceAnalysis.companyOverview || meta.description || '',
             targetAudience: voiceAnalysis.targetAudience || '',
             industry: voiceAnalysis.industry || '',
             tagline: voiceAnalysis.tagline || '',
             photographyStyle: voiceAnalysis.photographyStyle || '',
             websiteSnapshot: visionAnalysis?.screenshot || '',
+            // New deep-crawl fields
+            companyOverview: voiceAnalysis.companyOverview || '',
+            servicesOffered: voiceAnalysis.servicesOffered || [],
+            uniqueSellingPoints: voiceAnalysis.uniqueSellingPoints || [],
+            missionStatement: voiceAnalysis.missionStatement || '',
+            brandValues: voiceAnalysis.brandValues || [],
         },
         rawScanData: { meta, colors: namedColors, fonts, logos: selectorLogos, bannerImages, contentSamples: contentSamples.slice(0, 3) },
     };
+}
+
+// ============================================================================
+// PUPPETEER CONTENT EXTRACTION — for SPA/JS-rendered websites
+// ============================================================================
+
+/**
+ * Use Puppeteer to render a JS-heavy/SPA page and extract the full rendered DOM.
+ * Returns rendered HTML, text content, navigation links, and keeps browser alive for reuse.
+ */
+async function puppeteerExtractContent(url) {
+    const puppeteer = await import('puppeteer');
+    
+    console.log('  🌐 Launching Puppeteer for SPA content extraction...');
+    const browser = await puppeteer.default.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
+    });
+    
+    try {
+        const page = await browser.newPage();
+        await page.setViewport({ width: 1440, height: 900 });
+        await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: 25000 });
+        
+        // Wait for SPA content to render (reduced from 3s)
+        await new Promise(r => setTimeout(r, 1500));
+        
+        // Scroll down to trigger lazy-loaded content
+        await page.evaluate(() => {
+            window.scrollTo(0, document.body.scrollHeight / 2);
+        });
+        await new Promise(r => setTimeout(r, 800));
+        await page.evaluate(() => {
+            window.scrollTo(0, document.body.scrollHeight);
+        });
+        await new Promise(r => setTimeout(r, 800));
+        await page.evaluate(() => {
+            window.scrollTo(0, 0);
+        });
+        
+        // Extract full rendered HTML
+        const html = await page.content();
+        
+        // Extract text content summary
+        const textContent = await page.evaluate(() => {
+            const elements = document.querySelectorAll('h1, h2, h3, h4, p, li, span, a, td, th, blockquote, figcaption, [class*="title"], [class*="desc"], [class*="text"], [class*="content"]');
+            const texts = [];
+            elements.forEach(el => {
+                const text = el.innerText?.trim();
+                if (text && text.length > 10 && text.length < 1000) {
+                    texts.push(text);
+                }
+            });
+            return [...new Set(texts)].join('\n');
+        });
+        
+        console.log(`  📄 Puppeteer rendered: ${html.length} chars HTML, ${textContent.length} chars text`);
+        
+        return {
+            html,
+            textContent,
+            _browser: browser, // Keep alive for sub-page crawling
+        };
+    } catch (err) {
+        await browser.close().catch(() => {});
+        throw err;
+    }
 }
 
 // ============================================================================
@@ -782,66 +898,178 @@ async function analyzeSocialMedia(socialLinks, aiRouter) {
 // ============================================================================
 
 /**
- * Crawl important sub-pages (About, Products, Services) for richer content
+ * Deep multi-page crawl — extracts content from About, Team, Products, Services, Values, etc.
+ * Supports SPA sites via shared Puppeteer browser instance.
  */
-async function crawlSubPages($, baseUrl) {
+async function crawlSubPages($, baseUrl, isSPA = false, sharedBrowser = null) {
     const subPageContent = [];
 
-    // Find important links from the navigation
+    // ── Discover important sub-page links ────────────────────────────────
     const importantPaths = [];
-    const importantKeywords = /about|story|our-story|mission|products|services|what-we-do|who-we-are|philosophy/i;
+    const seen = new Set();
+    
+    // Much broader keyword matching for page discovery
+    const importantKeywords = /about|story|our-story|mission|vision|values|products|services|what-we-do|who-we-are|philosophy|team|people|founders|leadership|careers|work|portfolio|gallery|clients|partners|brands|testimonials|reviews|blog|news|contact|faq|pricing|capabilities|approach|process|expertise|solutions|industries|overview|company/i;
+    
+    // Category labels for content tagging
+    const categoryMap = {
+        about: 'About', story: 'About', 'our-story': 'About', 'who-we-are': 'About', company: 'About', overview: 'About',
+        mission: 'Mission & Values', vision: 'Mission & Values', values: 'Mission & Values', philosophy: 'Mission & Values',
+        team: 'Team', people: 'Team', founders: 'Team', leadership: 'Team',
+        products: 'Products', services: 'Services', solutions: 'Services', capabilities: 'Services', expertise: 'Services',
+        portfolio: 'Portfolio', work: 'Portfolio', gallery: 'Portfolio', 'what-we-do': 'Portfolio',
+        clients: 'Clients', partners: 'Clients', brands: 'Clients', testimonials: 'Clients', reviews: 'Clients',
+        blog: 'Blog', news: 'Blog',
+        careers: 'Careers',
+        contact: 'Contact', faq: 'FAQ', pricing: 'Pricing',
+        approach: 'Approach', process: 'Approach', industries: 'Industries',
+    };
+    
+    function getCategoryLabel(href, text) {
+        const combined = `${href} ${text}`.toLowerCase();
+        for (const [keyword, label] of Object.entries(categoryMap)) {
+            if (combined.includes(keyword)) return label;
+        }
+        return 'Page';
+    }
 
-    $('nav a[href], header a[href], footer a[href]').each((_, el) => {
+    // Scan ALL links on the page (not just nav/header/footer)
+    $('a[href]').each((_, el) => {
         const href = $(el).attr('href') || '';
         const text = $(el).text().trim().toLowerCase();
-        if (importantKeywords.test(href) || importantKeywords.test(text)) {
-            let fullUrl;
-            try {
-                fullUrl = new URL(href, baseUrl).href;
-            } catch { return; }
-            // Only same-domain
-            try {
-                if (new URL(fullUrl).hostname !== new URL(baseUrl).hostname) return;
-            } catch { return; }
-            if (!importantPaths.some(p => p.url === fullUrl)) {
-                importantPaths.push({ url: fullUrl, label: text || href });
-            }
-        }
+        
+        // Check if link text or href matches important keywords
+        if (!importantKeywords.test(href) && !importantKeywords.test(text)) return;
+        
+        let fullUrl;
+        try {
+            fullUrl = new URL(href, baseUrl).href;
+        } catch { return; }
+        
+        // Only same-domain links
+        try {
+            if (new URL(fullUrl).hostname !== new URL(baseUrl).hostname) return;
+        } catch { return; }
+        
+        // Skip anchors, assets, and duplicates
+        if (fullUrl.includes('#') && fullUrl.split('#')[0] === baseUrl) return;
+        if (/\.(pdf|jpg|jpeg|png|gif|svg|css|js|mp4|mp3|zip)$/i.test(fullUrl)) return;
+        if (seen.has(fullUrl)) return;
+        seen.add(fullUrl);
+        
+        const label = getCategoryLabel(href, text);
+        importantPaths.push({ url: fullUrl, label, linkText: text || href });
+    });
+    
+    // Prioritize: About → Team → Products → Services → Mission → Others
+    const priority = ['About', 'Team', 'Products', 'Services', 'Mission & Values', 'Portfolio', 'Clients', 'Blog'];
+    importantPaths.sort((a, b) => {
+        const aIdx = priority.indexOf(a.label);
+        const bIdx = priority.indexOf(b.label);
+        return (aIdx === -1 ? 99 : aIdx) - (bIdx === -1 ? 99 : bIdx);
     });
 
-    // Crawl up to 3 sub-pages
-    for (const { url: pageUrl, label } of importantPaths.slice(0, 3)) {
+    // SPA sites: limit to 5 pages (Puppeteer is slower), non-SPA: 8 pages
+    const maxPages = isSPA ? 5 : 8;
+    console.log(`    🔗 Found ${importantPaths.length} important sub-pages, crawling up to ${maxPages}`);
+
+    // ── Crawl up to 8 sub-pages ──────────────────────────────────────────
+    for (const { url: pageUrl, label, linkText } of importantPaths.slice(0, maxPages)) {
         try {
-            console.log(`    📄 Crawling sub-page: ${label} (${pageUrl.substring(0, 60)}...)`);
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 8000);
-            const resp = await fetch(pageUrl, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-                    'Accept': 'text/html',
-                },
-                signal: controller.signal,
-            });
-            clearTimeout(timeout);
-
-            if (resp.ok) {
-                const html = await resp.text();
-                const sub$ = cheerio.load(html);
-
-                // Extract paragraphs and headings
-                sub$('h1, h2, h3, p').each((_, el) => {
-                    const text = sub$(el).text().trim();
-                    if (text.length > 20 && text.length < 800) {
-                        subPageContent.push(`[${label}] ${text}`);
-                    }
-                });
+            console.log(`    📄 Crawling [${label}]: ${linkText} (${pageUrl.substring(0, 70)}...)`);
+            
+            let pageHtml = '';
+            
+            if (isSPA && sharedBrowser) {
+                // Use Puppeteer for SPA sub-pages
+                try {
+                    const page = await sharedBrowser.newPage();
+                    await page.setViewport({ width: 1440, height: 900 });
+                    await page.goto(pageUrl, { waitUntil: 'networkidle2', timeout: 15000 });
+                    await new Promise(r => setTimeout(r, 1000)); // wait for SPA render
+                    
+                    // Scroll to trigger lazy content
+                    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+                    await new Promise(r => setTimeout(r, 500));
+                    
+                    pageHtml = await page.content();
+                    await page.close();
+                } catch (puppErr) {
+                    console.warn(`    ⚠️ Puppeteer sub-page failed, falling back to fetch: ${puppErr.message}`);
+                }
             }
+            
+            // Fallback to fetch for non-SPA or if Puppeteer failed
+            if (!pageHtml) {
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 15000);
+                const resp = await fetch(pageUrl, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+                        'Accept': 'text/html',
+                    },
+                    signal: controller.signal,
+                });
+                clearTimeout(timeout);
+                
+                if (resp.ok) {
+                    pageHtml = await resp.text();
+                }
+            }
+            
+            if (!pageHtml) continue;
+            
+            const sub$ = cheerio.load(pageHtml);
+            
+            // Extract META description
+            const metaDesc = sub$('meta[name="description"]').attr('content') || '';
+            if (metaDesc && metaDesc.length > 20) {
+                subPageContent.push(`[${label} - Meta] ${metaDesc}`);
+            }
+            
+            // Extract headings, paragraphs, lists, blockquotes
+            sub$('h1, h2, h3, h4, p, li, blockquote, figcaption, dd, [class*="description"], [class*="bio"], [class*="intro"], [class*="summary"]').each((_, el) => {
+                const text = sub$(el).text().trim();
+                if (text.length > 15 && text.length < 1000) {
+                    // Deduplicate
+                    const entry = `[${label}] ${text}`;
+                    if (!subPageContent.includes(entry)) {
+                        subPageContent.push(entry);
+                    }
+                }
+            });
+            
+            // Extract JSON-LD structured data
+            sub$('script[type="application/ld+json"]').each((_, el) => {
+                try {
+                    const data = JSON.parse(sub$(el).text());
+                    if (data.description) subPageContent.push(`[${label} - Schema] ${data.description}`);
+                    if (data.name && data['@type']) subPageContent.push(`[${label} - Schema] ${data['@type']}: ${data.name}`);
+                    // Extract team members from Person schema
+                    if (data['@type'] === 'Person') {
+                        subPageContent.push(`[Team Member] ${data.name}${data.jobTitle ? ' — ' + data.jobTitle : ''}`);
+                    }
+                    // Extract organization info
+                    if (data['@type'] === 'Organization') {
+                        if (data.description) subPageContent.push(`[Company] ${data.description}`);
+                        if (data.slogan) subPageContent.push(`[Tagline] ${data.slogan}`);
+                        if (data.foundingDate) subPageContent.push(`[Founded] ${data.foundingDate}`);
+                    }
+                    // Handle arrays (e.g. ItemList, FAQ)
+                    if (Array.isArray(data['@graph'])) {
+                        for (const item of data['@graph'].slice(0, 10)) {
+                            if (item.description) subPageContent.push(`[${label} - Schema] ${item.description}`);
+                        }
+                    }
+                } catch { /* ignore malformed JSON-LD */ }
+            });
+            
         } catch (err) {
             console.warn(`    ⚠️ Sub-page crawl failed for ${label}:`, err.message);
         }
     }
 
-    return subPageContent.slice(0, 30); // Cap at 30 samples
+    return subPageContent.slice(0, 80); // Cap at 80 content pieces (was 30)
 }
 
 // ============================================================================

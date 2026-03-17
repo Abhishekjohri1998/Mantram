@@ -76,6 +76,12 @@ const brandSchema = new mongoose.Schema({
         brandDescription: { type: String, default: '' },
         tagline: { type: String, default: '' },
         photographyStyle: { type: String, default: '' },
+        // Deep-crawl fields — extracted from About, Team, Products, Mission pages
+        companyOverview: { type: String, default: '' },       // 1-2 sentence elevator pitch
+        servicesOffered: [String],                            // List of products/services/capabilities
+        uniqueSellingPoints: [String],                        // 3-5 differentiators
+        missionStatement: { type: String, default: '' },      // Company mission
+        brandValues: [String],                                // Core values
         country: { type: String, default: 'India' },
         region: { type: String, default: '' },
         // Target markets — ISO country codes, e.g. ['IN', 'US', 'UK', 'AE']
@@ -89,6 +95,20 @@ const brandSchema = new mongoose.Schema({
             source: { type: String, default: 'website' },
             alt: { type: String, default: '' },
         }],
+        // Visual DNA — AI-extracted design intelligence for brand-consistent creative generation
+        visualDNA: {
+            designStyle: { type: String, default: '' },        // "minimalist" | "bold-graphic" | "luxury" | "playful" | "editorial" | "corporate"
+            layoutPreference: { type: String, default: '' },   // "clean-centered" | "asymmetric" | "grid-based" | "full-bleed"
+            textPlacement: { type: String, default: '' },      // "left-aligned" | "centered" | "overlay-on-image" | "below-image"
+            imageMood: { type: String, default: '' },          // "bright-airy" | "dark-moody" | "warm-golden" | "cool-blue" | "high-contrast" | "muted-earthy"
+            textureStyle: { type: String, default: '' },       // "flat-clean" | "textured-organic" | "gradient-rich" | "photographic" | "illustrated"
+            typographyStyle: { type: String, default: '' },    // "sans-serif-modern" | "serif-elegant" | "bold-display" | "handwritten-casual"
+            decorativeElements: { type: String, default: '' }, // "none" | "geometric-shapes" | "organic-curves" | "borders-frames" | "icons-badges"
+            imageAnalysis: { type: String, default: '' },      // AI-generated summary of visual patterns from brand images
+            designRules: [String],                             // "Always use ample white space" | "Headlines must be all-caps"
+            designAvoid: [String],                             // "Never use busy patterns" | "Avoid neon colors"
+            lastAnalyzedAt: { type: Date },
+        },
     },
 
     // Custom Categories — user-created template categories (e.g. Birthday, Anniversary)
