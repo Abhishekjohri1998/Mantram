@@ -47,8 +47,8 @@ export const uploadToS3 = async (fileContent, fileName, mimeType = "image/png") 
         await upload.done();
 
         // Construct the public URL
-        // Format: https://bucket-name.s3.region.amazonaws.com/key
-        return `https://${config.aws.bucket}.s3.${config.aws.region}.amazonaws.com/${key}`;
+        // Using path-style URL to avoid SSL issues with buckets containing dots (e.g. mantram.ai)
+        return `https://s3.${config.aws.region}.amazonaws.com/${config.aws.bucket}/${key}`;
     } catch (error) {
         console.error("S3 Upload Error:", error);
         throw new Error(`S3 Upload failed: ${error.message}`);
