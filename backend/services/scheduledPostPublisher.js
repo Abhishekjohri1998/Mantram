@@ -10,7 +10,10 @@ import SocialAccount from '../models/SocialAccount.js';
 import {
     publishToFacebook,
     publishToInstagram,
-    publishToLinkedIn
+    publishToLinkedIn,
+    publishCarouselToFacebook,
+    publishCarouselToInstagram,
+    publishCarouselToLinkedIn
 } from './socialService.js';
 import { uploadToS3 } from '../utils/s3.js';
 import config from '../config/env.js';
@@ -75,8 +78,18 @@ async function publishScheduledPost(post) {
         console.log(`[SCHEDULER] Publishing scheduled post ${post._id} to ${post.platform} (${account.accountName}) — Caption: ${caption.substring(0, 60)}...`);
 
         let postId = null;
+        const carouselUrls = Array.isArray(post.imageUrls) && post.imageUrls.length > 1 ? post.imageUrls : null;
 
-        if (post.platform === 'facebook') {
+        if (carouselUrls) {
+            console.log(`[SCHEDULER] Carousel mode: ${carouselUrls.length} images`);
+            if (post.platform === 'facebook') {
+                postId = await publishCarouselToFacebook(account.accountId, account.accessToken, caption, carouselUrls);
+            } else if (post.platform === 'instagram') {
+                postId = await publishCarouselToInstagram(account.accountId, account.accessToken, caption, carouselUrls);
+            } else if (post.platform === 'linkedin') {
+                postId = await publishCarouselToLinkedIn(account.accountId, account.accessToken, caption, carouselUrls);
+            }
+        } else if (post.platform === 'facebook') {
             postId = await publishToFacebook(account.accountId, account.accessToken, caption, absoluteImageUrl);
         } else if (post.platform === 'instagram') {
             postId = await publishToInstagram(account.accountId, account.accessToken, caption, absoluteImageUrl);

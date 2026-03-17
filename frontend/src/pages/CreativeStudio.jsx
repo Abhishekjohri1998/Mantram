@@ -385,16 +385,22 @@ export default function CreativeStudio() {
     const [campCount, setCampCount] = useState(3)
     const [campSizes, setCampSizes] = useState(['1:1'])
     const [campProductStrategy, setCampProductStrategy] = useState('same') // same | different
-    const [campProducts, setCampProducts] = useState([]) // [{image, source}]
-    const [campProductTab, setCampProductTab] = useState('upload') // brand | upload | url
+    const [campProducts, setCampProducts] = useState([]) // [{image, source, title, features, price}]
+    const [campProductTab, setCampProductTab] = useState('catalog') // catalog | upload | url | bank
     const [campProductUrl, setCampProductUrl] = useState('')
+    const [campBrandProducts, setCampBrandProducts] = useState([]) // products from brand catalog
+    const [campBrandProductsLoading, setCampBrandProductsLoading] = useState(false)
+    const [campPrice, setCampPrice] = useState('') // price point for copy/creative
     const [campCampaignLogo, setCampCampaignLogo] = useState(null)
     const [campCopies, setCampCopies] = useState([]) // [{headline, body, cta}]
     const [campCopyLoading, setCampCopyLoading] = useState(false)
     const [campCta, setCampCta] = useState('Shop Now')
     const [campStyle, setCampStyle] = useState('bold')
     const [campLogoPlacement, setCampLogoPlacement] = useState('bottom-right')
+    const [campFeatures, setCampFeatures] = useState([]) // product features to distribute across creatives
+    const [campFeatureInput, setCampFeatureInput] = useState('')
     const [campStyleRef, setCampStyleRef] = useState(null)
+    const [campScene, setCampScene] = useState('auto') // auto, studio, outdoor, indoor, podium, etc.
     const [campResults, setCampResults] = useState([])
     const [campGenerating, setCampGenerating] = useState(false)
     const [campProgress, setCampProgress] = useState(0)
@@ -3073,7 +3079,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <button disabled={!clgText||clgLoading} onClick={async()=>{
                                 setClgLoading(true);setClgError('');
                                 try{
-                                    const brandColors=clgColorMode==='brand'&&activeBrand?.dna?.colors?.length?activeBrand.dna.colors.join(', '):clgCustomColors;
+                                    const brandColors=clgColorMode==='brand'&&activeBrand?.dna?.colors?.length?activeBrand.dna.colors.map(c=>typeof c==='string'?c:c.hex||c.name||'').filter(Boolean).join(', '):clgCustomColors;
                                     const v=clgResults.length+1;
                                     const prompt=`Generate a CAMPAIGN LOGO / EVENT BADGE design.\n\nTEXT: "${clgText}"\nSTYLE: ${clgStyle||'modern'}\n${clgOccasion?`OCCASION: ${clgOccasion}\n`:''}${clgIcon?`ICON ELEMENTS: Include ${clgIcon} visual elements\n`:''}COLORS: Use ${brandColors||'vibrant, eye-catching colors'}\nBACKGROUND: ${clgBg==='transparent'?'transparent/alpha background (PNG-ready)':clgBg}\nSHAPE: ${clgShape}\n${clgEnhance?`STYLE KEYWORDS: ${clgEnhance}\n`:''}VARIANT: ${v} — create a unique, visually distinctive design\n\nCRITICAL RULES:\n- This is a LOGO/BADGE, not a poster — keep it compact and icon-like\n- The text "${clgText}" must be clearly readable and be the HERO element\n- Use professional typography — bold, impactful lettering\n- Make it suitable for use as a campaign identifier across marketing materials\n- ${clgBg==='transparent'?'Ensure the background is fully transparent':'Fill the background as specified'}\n- Do NOT add placeholder text or watermarks`;
                                     const res=await creativesAPI.generate({prompt,brandId:activeBrand?._id,type:'campaign-logo',options:{aspectRatio:'1:1',style:'logo'}});
@@ -3100,7 +3106,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     <img src={url} alt={`Variant ${i+1}`} className="w-full h-auto object-contain" />
                                                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                                                         <a href={url} download={`campaign-logo-${i+1}.png`} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-lg bg-white/20 text-white text-xs font-medium backdrop-blur-sm hover:bg-white/30 transition-all cursor-pointer flex items-center gap-1"><span className="material-symbols-outlined text-sm">download</span>Save</a>
-                                                        <button onClick={()=>{setCampCampaignLogo(url);setStudioMode('campaigns')}} className="px-3 py-1.5 rounded-lg bg-amber-500/30 text-amber-200 text-xs font-medium backdrop-blur-sm hover:bg-amber-500/50 transition-all cursor-pointer flex items-center gap-1"><span className="material-symbols-outlined text-sm">campaign</span>Use in Campaign</button>
+                                                        <button onClick={()=>{setCampCampaignLogo(url);setStudioMode('campaigns');creativesAPI.saveToBank({imageUrl:url,brandId:activeBrand?._id,title:'Campaign Logo',source:'campaign-logo'}).catch(()=>{})}} className="px-3 py-1.5 rounded-lg bg-amber-500/30 text-amber-200 text-xs font-medium backdrop-blur-sm hover:bg-amber-500/50 transition-all cursor-pointer flex items-center gap-1"><span className="material-symbols-outlined text-sm">campaign</span>Use in Campaign</button>
                                                     </div>
                                                 </div>
                                             ))}
@@ -3211,7 +3217,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
                                 </div>
                                 {/* Next */}
-                                <button disabled={!campKeyword||!campGoal} onClick={()=>setCampStep(2)} className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+                                <button disabled={!campKeyword||!campGoal} onClick={()=>{setCampStep(2);if(!campBrandProducts.length&&activeBrand?._id){setCampBrandProductsLoading(true);productsAPI.list({brandId:activeBrand._id,limit:50}).then(r=>setCampBrandProducts(r.products||[])).catch(()=>{}).finally(()=>setCampBrandProductsLoading(false))}}} className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
                                     Next: Products & Assets <span className="material-symbols-outlined text-lg">arrow_forward</span>
                                 </button>
                             </div>
@@ -3239,14 +3245,69 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 {/* Product Upload */}
                                 <div className="studio-card p-5">
                                     <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-blue-400 text-lg">add_a_photo</span>{campProductStrategy==='same'?'Product Image':'Product Images'}</h3>
-                                    <div className="flex gap-2 mb-3">
-                                        {[{id:'upload',l:'📤 Upload'},{id:'url',l:'🔗 URL'},{id:'bank',l:'🏦 Image Bank'}].map(t=>(
+                                    <div className="flex gap-2 mb-3 flex-wrap">
+                                        {[{id:'catalog',l:'🏷️ Brand Products'},{id:'upload',l:'📤 Upload'},{id:'url',l:'🔗 URL'},{id:'bank',l:'🏦 Image Bank'}].map(t=>(
                                             <button key={t.id} onClick={async()=>{
                                                 setCampProductTab(t.id);
+                                                if(t.id==='catalog'&&!campBrandProducts.length){
+                                                    setCampBrandProductsLoading(true);
+                                                    try{const r=await productsAPI.list({brandId:activeBrand?._id,limit:50});setCampBrandProducts(r.products||[])}catch(e){console.error(e)}
+                                                    finally{setCampBrandProductsLoading(false)}
+                                                }
                                                 if(t.id==='bank'&&!bplCreatives.length){setBplLoading(true);try{const r=await creativesAPI.imageBank({brandId:activeBrand?._id,category:'generated',limit:30});setBplCreatives(r.creatives||[])}catch(e){console.error(e)}finally{setBplLoading(false)}}
                                             }} className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer ${campProductTab===t.id?'border-blue-400/30 bg-blue-500/10 text-blue-300':'border-white/[0.06] text-slate-400'}`}>{t.l}</button>
                                         ))}
                                     </div>
+                                    {/* Brand Products Catalog */}
+                                    {campProductTab==='catalog'&&(
+                                        <div>{campBrandProductsLoading?<div className="text-center py-4 text-slate-500 text-sm"><span className="material-symbols-outlined animate-spin text-lg align-middle mr-1">progress_activity</span>Loading products...</div>:
+                                        campBrandProducts.length>0?(
+                                            <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1" style={{scrollbarWidth:'thin',scrollbarColor:'rgba(255,255,255,0.1) transparent'}}>
+                                                {campBrandProducts.map((prod,idx)=>{
+                                                    const isSelected=campProducts.some(p=>p.productId===prod._id);
+                                                    return(
+                                                        <button key={prod._id||idx} onClick={()=>{
+                                                            if(isSelected){setCampProducts(p=>{const next=p.filter(x=>x.productId!==prod._id);if(next.length<=1)setCampProductStrategy('same');return next;});return}
+                                                            const img=prod.images?.[0]?.url||prod.imageUrl||'';
+                                                            // Auto-populate features — accumulate from all selected products
+                                                            if(prod.features?.length>0){
+                                                                setCampFeatures(prev=>{
+                                                                    const merged=[...prev];
+                                                                    prod.features.forEach(f=>{if(!merged.includes(f))merged.push(f)});
+                                                                    return merged;
+                                                                });
+                                                            }
+                                                            // Auto-populate price from selected product
+                                                            if(prod.price?.amount){setCampPrice(`₹${prod.price.amount.toLocaleString('en-IN')}`)}
+                                                            // Auto-switch to 'different' strategy when multiple products selected
+                                                            setCampProducts(prev=>{
+                                                                const next=[...prev,{image:img,source:'catalog',title:prod.title,productId:prod._id,features:prod.features||[],price:prod.price}];
+                                                                if(next.length>1)setCampProductStrategy('different');
+                                                                return next;
+                                                            });
+                                                        }} className={`w-full flex items-center gap-3 p-2.5 rounded-xl border transition-all cursor-pointer text-left ${isSelected?'border-emerald-400/40 bg-emerald-500/10':'border-white/[0.06] bg-white/[0.02] hover:border-white/[0.15]'}`}>
+                                                            <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-white/5">
+                                                                {(prod.images?.[0]?.url||prod.imageUrl)?<img src={prod.images?.[0]?.url||prod.imageUrl} alt={prod.title} className="w-full h-full object-cover" onError={e=>{e.target.style.display='none';e.target.nextSibling&&(e.target.nextSibling.style.display='flex')}} />
+                                                                :<span className="material-symbols-outlined text-2xl text-slate-600 flex items-center justify-center h-full">inventory_2</span>}
+                                                                {(prod.images?.[0]?.url||prod.imageUrl)&&<span className="material-symbols-outlined text-2xl text-slate-600 items-center justify-center h-full" style={{display:'none'}}>inventory_2</span>}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-white text-xs font-semibold truncate">{prod.title}</p>
+                                                                <p className="text-slate-500 text-[10px] truncate">{prod.category||prod.shortDescription||''}</p>
+                                                                <div className="flex items-center gap-2 mt-0.5">
+                                                                    {prod.price?.amount>0&&<span className="text-emerald-400 text-[10px] font-bold">₹{prod.price.amount.toLocaleString('en-IN')}</span>}
+                                                                    {prod.features?.length>0&&<span className="text-[9px] text-orange-300 bg-orange-500/15 px-1 py-0.5 rounded">{prod.features.length} features</span>}
+                                                                    {prod.images?.length>1&&<span className="text-[9px] text-blue-300 bg-blue-500/15 px-1 py-0.5 rounded">{prod.images.length} images</span>}
+                                                                </div>
+                                                            </div>
+                                                            <span className={`material-symbols-outlined text-lg ${isSelected?'text-emerald-400':'text-slate-600'}`}>{isSelected?'check_circle':'radio_button_unchecked'}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        ):(<div className="text-center py-6"><span className="material-symbols-outlined text-3xl text-slate-600 block mb-1">inventory_2</span><p className="text-slate-500 text-xs">No products in catalog yet.</p><p className="text-slate-600 text-[10px] mt-1">Go to Brand DNA → Products to sync from your website or add manually.</p></div>)
+                                        }</div>
+                                    )}
                                     {campProductTab==='upload'&&(
                                         <label className="flex flex-col items-center justify-center h-28 rounded-xl border-2 border-dashed border-white/10 hover:border-blue-400/30 bg-white/[0.02] cursor-pointer transition-all group">
                                             <span className="material-symbols-outlined text-3xl text-slate-600 group-hover:text-blue-400 transition-colors mb-1">upload</span>
@@ -3280,7 +3341,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             <div className="flex flex-wrap gap-2">
                                                 {campProducts.map((p,i)=>(
                                                     <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden group">
-                                                        <img src={p.image} alt={`Product ${i+1}`} className="w-full h-full object-cover" />
+                                                        {p.image?<img src={p.image} alt={`Product ${i+1}`} className="w-full h-full object-cover" onError={e=>{e.target.style.display='none';e.target.parentElement.classList.add('flex','items-center','justify-center','bg-white/5')}} />:<span className="material-symbols-outlined text-lg text-slate-600">inventory_2</span>}
                                                         <button onClick={()=>setCampProducts(prev=>prev.filter((_,j)=>j!==i))} className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-[8px]">✕</button>
                                                         <span className="absolute bottom-0.5 left-0.5 bg-black/60 text-white text-[8px] px-1 rounded">{i+1}</span>
                                                     </div>
@@ -3300,7 +3361,13 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             <button onClick={()=>setCampCampaignLogo(null)} className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"><span className="material-symbols-outlined text-xs">close</span></button>
                                         </div>
                                     ):(
-                                        <div className="grid grid-cols-3 gap-2">
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {activeBrand?.dna?.logo?.url&&(
+                                                <button onClick={()=>setCampCampaignLogo(activeBrand.dna.logo.url)} className="flex flex-col items-center justify-center h-20 rounded-xl border-2 border-dashed border-amber-400/20 hover:border-amber-400/40 bg-amber-500/5 cursor-pointer transition-all group">
+                                                    <img src={activeBrand.dna.logo.url} alt="Brand logo" className="h-8 object-contain opacity-70 group-hover:opacity-100 transition-opacity" />
+                                                    <span className="text-[10px] text-amber-300 mt-1">Brand Logo</span>
+                                                </button>
+                                            )}
                                             <label className="flex flex-col items-center justify-center h-20 rounded-xl border-2 border-dashed border-white/10 hover:border-amber-400/30 bg-white/[0.02] cursor-pointer transition-all group">
                                                 <span className="material-symbols-outlined text-xl text-slate-600 group-hover:text-amber-400">upload</span><span className="text-[10px] text-slate-500">Upload</span>
                                                 <input type="file" accept="image/*" className="hidden" onChange={e=>{const f=e.target.files?.[0];if(f){const r=new FileReader();r.onload=ev=>setCampCampaignLogo(ev.target.result);r.readAsDataURL(f)}}} />
@@ -3310,10 +3377,16 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             </button>
                                             <button onClick={async()=>{
                                                 setBplMode('logo');setBplOpen(true);setBplLoading(true);
-                                                try{const r=await creativesAPI.imageBank({brandId:activeBrand?._id,category:'generated',limit:20});setBplCreatives(r.creatives||[])}catch(e){console.error(e)}
+                                                try{
+                                                    const r=await creativesAPI.imageBank({brandId:activeBrand?._id,category:'generated',limit:50});
+                                                    // Filter for campaign-logo type images
+                                                    const allImages=r.images||r.creatives||[];
+                                                    const logoImages=allImages.filter(img=>img.type==='campaign-logo'||img.title?.toLowerCase().includes('logo'));
+                                                    setBplCreatives(logoImages.length>0?logoImages:allImages);
+                                                }catch(e){console.error(e)}
                                                 finally{setBplLoading(false)}
                                             }} className="flex flex-col items-center justify-center h-20 rounded-xl border-2 border-dashed border-white/10 hover:border-amber-400/30 bg-white/[0.02] cursor-pointer transition-all group">
-                                                <span className="material-symbols-outlined text-xl text-slate-600 group-hover:text-amber-400">photo_library</span><span className="text-[10px] text-slate-500">Image Bank</span>
+                                                <span className="material-symbols-outlined text-xl text-slate-600 group-hover:text-amber-400">photo_library</span><span className="text-[10px] text-slate-500">Saved Logos</span>
                                             </button>
                                         </div>
                                     )}
@@ -3321,7 +3394,13 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 {/* Nav */}
                                 <div className="flex gap-3">
                                     <button onClick={()=>setCampStep(1)} className="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer"><span className="material-symbols-outlined text-lg">arrow_back</span>Back</button>
-                                    <button onClick={()=>setCampStep(3)} className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 text-white text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer">Next: Copy & Style<span className="material-symbols-outlined text-lg">arrow_forward</span></button>
+                                    <button onClick={()=>{setCampStep(3);// Auto-merge features from ALL selected products
+const merged=[];campProducts.forEach(p=>{(p.features||[]).forEach(f=>{if(!merged.includes(f))merged.push(f)})});if(merged.length>0)setCampFeatures(merged);
+// Auto-set price from first product if not set
+if(!campPrice){const p1=campProducts[0];if(p1?.price?.amount)setCampPrice(`₹${p1.price.amount.toLocaleString('en-IN')}`)}
+// Auto-switch strategy if multiple products
+if(campProducts.length>1)setCampProductStrategy('different');
+}} className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 text-white text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer">Next: Copy & Style<span className="material-symbols-outlined text-lg">arrow_forward</span></button>
                                 </div>
                             </div>
                         </div>
@@ -3338,24 +3417,84 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         <button disabled={campCopyLoading} onClick={async()=>{
                                             setCampCopyLoading(true);
                                             try{
-                                                const prompt=`Generate ${campCount} unique ad copy variations for a ${campGoal} campaign.
-Topic/Keyword: "${campKeyword}"
-Brand: ${activeBrand?.name||'Brand'} (${activeBrand?.dna?.industry||'general'})
-Brand Voice: ${activeBrand?.dna?.voice?.personality||'professional'}
+                                                const prompt=(() => {
+// Build per-product context for multi-product campaigns
+const productContextLines = [];
+const allFeatures = [];
+for(let vi=0;vi<campCount;vi++){
+    const prod=campProductStrategy==='same'?campProducts[0]:campProducts[vi%campProducts.length];
+    if(prod?.title){
+        const pFeatures=prod.features||[];
+        const pPrice=prod.price?.amount?`₹${prod.price.amount.toLocaleString('en-IN')}`:campPrice;
+        productContextLines.push(`  - Variation ${vi+1}: Product "${prod.title}"${pFeatures.length>0?`, highlight feature: "${pFeatures[vi%pFeatures.length]}"`:campFeatures.length>0?`, highlight feature: "${campFeatures[vi%campFeatures.length]}"`:''}${pPrice?`, price: ${pPrice}`:''}`);
+        if(pFeatures.length>0) allFeatures.push(...pFeatures.filter(f => !allFeatures.includes(f)));
+    } else if(campFeatures.length>0){
+        productContextLines.push(`  - Variation ${vi+1}: Highlight feature "${campFeatures[vi%campFeatures.length]}"`);
+    }
+}
+const mergedFeatures=allFeatures.length>0?allFeatures:campFeatures;
+return `You are an award-winning Brand Manager and Senior Copywriter.
+CAMPAIGN NAME: "${campName||campKeyword}"
+CAMPAIGN GOAL: ${campGoal}
+KEYWORD/TOPIC: "${campKeyword}"
+BRAND: ${activeBrand?.name||'Brand'} — ${activeBrand?.dna?.industry||'general'} industry
+BRAND VOICE: ${activeBrand?.dna?.voice?.personality||'professional, confident'}
 CTA: ${campCta}
+${campPrice?`PRICE POINT: ${campPrice} — incorporate this price strategically in the copy. Make it a selling point.\n`:''}${productContextLines.length>0?`
+PRODUCT LINEUP (each variation focuses on a specific product):
+${productContextLines.join('\n')}
+`:''}${mergedFeatures.length>0&&productContextLines.length===0?`
+PRODUCT FEATURES TO HIGHLIGHT (distribute one per variation):
+${mergedFeatures.map((f,i)=>`${i+1}. ${f}`).join('\n')}
+`:''}
+Generate ${campCount} unique ad copy variations as a JSON array.
 
-For each variation, return a JSON array with objects: {"headline": "...", "body": "...", "cta": "..."}
-- Headlines: 5-8 words, attention-grabbing, keyword-relevant
-- Body: 15-25 words, compelling, action-oriented
-- CTA: "${campCta}"
+IMPORTANT RULES — think like a real campaign manager:
+1. The HEADLINE of each variation MUST lead with or prominently feature the campaign name "${campName||campKeyword}". The campaign name is the brand's identity for this campaign — it MUST be the hero.
+2. ${productContextLines.length>0?`Each copy variation MUST match its assigned product and feature from the PRODUCT LINEUP above. The body copy should make that product's feature the hero selling point.`:`${mergedFeatures.length>0?`Each body copy MUST highlight a DIFFERENT product feature. Distribute features round-robin:
+${mergedFeatures.map((f,i)=>`   - Variation ${i+1}: Highlight feature "${f}"`).join('\n')}${campCount>mergedFeatures.length?`
+   - Variations ${mergedFeatures.length+1}+: Cycle through features again, each with a fresh angle`:''}`:` Each body copy should complement the campaign name from a DIFFERENT angle:
+   - Variation 1: Benefit-led (what the customer gains)
+   - Variation 2: Urgency/FOMO (limited time, exclusive)
+   - Variation 3: Emotional storytelling (aspirational, feel-good)
+   - Variation 4: Social proof (trusted by, loved by)
+   - Variation 5+: Mix of curiosity, value proposition, lifestyle`}`}
+3. Body copy: 12-20 words, punchy, scroll-stopping. No clichés.${mergedFeatures.length>0||productContextLines.length>0?' Each copy must clearly communicate its assigned feature as the hero benefit.':''}
+4. Headlines: 4-7 words. Must include campaign name or a derivative.
+5. CTA must be "${campCta}" for all.
+6. Add a "feature" field to each JSON object with the exact feature being highlighted.${productContextLines.length>0?`
+7. Add a "product" field to each JSON object with the product name.`:''}
 
-Return ONLY a valid JSON array, no markdown, no explanation.`;
+Return ONLY a valid JSON array: [{"headline":"...","body":"...","cta":"...","feature":"..."${productContextLines.length>0?',"product":"..."':''}}]
+No markdown, no explanation.`; })();
                                                 const r=await creativesAPI.enhancePrompt({prompt,brandId:activeBrand?._id});
                                                 const raw=r.enhancedPrompt||r.enhanced||r.result||'';
                                                 const jsonMatch=raw.match(/\[[\s\S]*\]/);
-                                                if(jsonMatch){try{const parsed=JSON.parse(jsonMatch[0]);setCampCopies(Array.isArray(parsed)?parsed.slice(0,campCount):[])}catch{setCampCopies(Array.from({length:campCount},(_,i)=>({headline:`${campKeyword} — Creative ${i+1}`,body:`Discover the best of ${campKeyword}. Don't miss out!`,cta:campCta})))}}
-                                                else{setCampCopies(Array.from({length:campCount},(_,i)=>({headline:`${campKeyword} — Creative ${i+1}`,body:`Discover amazing ${campKeyword} deals. ${campCta} today!`,cta:campCta})))}
-                                            }catch(e){console.error(e);setCampCopies(Array.from({length:campCount},(_,i)=>({headline:`${campKeyword} ${i+1}`,body:'Your message here',cta:campCta})))}
+                                                if(jsonMatch){try{const parsed=JSON.parse(jsonMatch[0]);setCampCopies(Array.isArray(parsed)?parsed.slice(0,campCount):[])}catch{
+// Fallback: product-specific copies
+const fallbackCopies=Array.from({length:campCount},(_,i)=>{
+    const prod=campProducts.length>1?campProducts[i%campProducts.length]:campProducts[0];
+    const pName=prod?.title||campKeyword;
+    const pPrice=prod?.price?.amount?`₹${prod.price.amount.toLocaleString('en-IN')}`:(campPrice||'');
+    const feat=prod?.features?.[i%Math.max(1,prod.features?.length||1)]||campFeatures[i%Math.max(1,campFeatures.length)]||'';
+    return{headline:`${campName||campKeyword} — ${pName}`,body:`${feat?feat+'. ':''}${pPrice?'Now at '+pPrice+'. ':''}${campCta}.`,cta:campCta,product:pName,feature:feat};
+});
+setCampCopies(fallbackCopies);}}
+                                                else{
+const fallbackCopies2=Array.from({length:campCount},(_,i)=>{
+    const prod=campProducts.length>1?campProducts[i%campProducts.length]:campProducts[0];
+    const pName=prod?.title||campKeyword;
+    const pPrice=prod?.price?.amount?`₹${prod.price.amount.toLocaleString('en-IN')}`:(campPrice||'');
+    const feat=prod?.features?.[i%Math.max(1,prod.features?.length||1)]||campFeatures[i%Math.max(1,campFeatures.length)]||'';
+    return{headline:`${campName||campKeyword} — ${pName}`,body:`Discover ${pName}. ${feat?feat+'. ':''}${pPrice?pPrice+'. ':''}${campCta}.`,cta:campCta,product:pName,feature:feat};
+});
+setCampCopies(fallbackCopies2);}
+                                            }catch(e){console.error(e);
+const errCopies=Array.from({length:campCount},(_,i)=>{
+    const prod=campProducts.length>1?campProducts[i%campProducts.length]:campProducts[0];
+    return{headline:`${campName||campKeyword} — ${prod?.title||`Creative ${i+1}`}`,body:`${prod?.features?.[0]||'Your message here'}. ${prod?.price?.amount?'₹'+prod.price.amount.toLocaleString('en-IN')+'. ':''}${campCta}.`,cta:campCta,product:prod?.title||'',feature:prod?.features?.[0]||''};
+});
+setCampCopies(errCopies);}
                                             finally{setCampCopyLoading(false)}
                                         }} className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-medium hover:bg-emerald-500/20 transition-all cursor-pointer flex items-center gap-1">
                                             {campCopyLoading?<><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>Generating...</>:<><span className="material-symbols-outlined text-sm">auto_awesome</span>Generate {campCount} Copies</>}
@@ -3365,13 +3504,45 @@ Return ONLY a valid JSON array, no markdown, no explanation.`;
                                         <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1" style={{scrollbarWidth:'thin',scrollbarColor:'rgba(255,255,255,0.1) transparent'}}>
                                             {campCopies.map((c,i)=>(
                                                 <div key={i} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                                                    <div className="flex items-center gap-2 mb-1"><span className="text-[10px] font-bold text-blue-300 bg-blue-500/20 px-1.5 py-0.5 rounded">#{i+1}</span></div>
+                                                    <div className="flex items-center gap-2 mb-1 flex-wrap"><span className="text-[10px] font-bold text-blue-300 bg-blue-500/20 px-1.5 py-0.5 rounded">#{i+1}</span>{c.product&&<span className="text-[9px] text-cyan-300 bg-cyan-500/15 px-1.5 py-0.5 rounded font-medium">📦 {c.product}</span>}{c.feature&&<span className="text-[9px] text-orange-300 bg-orange-500/15 px-1.5 py-0.5 rounded font-medium">⭐ {c.feature}</span>}</div>
                                                     <input value={c.headline||''} onChange={e=>{const u=[...campCopies];u[i]={...u[i],headline:e.target.value};setCampCopies(u)}} className="w-full px-2 py-1 mb-1 rounded-lg bg-white/[0.04] border border-white/[0.06] text-white text-xs font-semibold focus:outline-none focus:border-blue-400/30" placeholder="Headline" />
                                                     <textarea value={c.body||''} onChange={e=>{const u=[...campCopies];u[i]={...u[i],body:e.target.value};setCampCopies(u)}} rows={2} className="w-full px-2 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06] text-white text-[11px] focus:outline-none focus:border-blue-400/30 resize-none" placeholder="Body copy" />
                                                 </div>
                                             ))}
                                         </div>
-                                    ):<p className="text-slate-600 text-xs text-center py-4">Click "Generate Copies" to create AI copy for each creative</p>}
+                                    ):(<p className="text-slate-600 text-xs text-center py-4">Click "Generate Copies" to create AI copy for each creative{campFeatures.length>0?` — each highlighting a different feature`:''}</p>)}
+                                </div>
+                                {/* Product Features */}
+                                <div className="studio-card p-5">
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-orange-400 text-lg">stars</span>Product Features<span className="text-[10px] text-slate-500 font-normal ml-1">distributed across creatives</span></h3>
+                                    <p className="text-slate-500 text-[10px] mb-3">Add key features/USPs — each creative will highlight a different feature in its copy and visual.</p>
+                                    <div className="flex flex-wrap gap-1.5 mb-2">
+                                        {campFeatures.map((f,i)=>(
+                                            <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-200 text-[11px] font-medium">
+                                                <span className="text-[9px] text-orange-400/60 font-bold">#{i+1}</span>{f}
+                                                <button onClick={()=>setCampFeatures(p=>p.filter((_,j)=>j!==i))} className="ml-0.5 text-orange-400/60 hover:text-orange-300 cursor-pointer text-xs">×</button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input value={campFeatureInput} onChange={e=>setCampFeatureInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&campFeatureInput.trim()){setCampFeatures(p=>[...p,campFeatureInput.trim()]);setCampFeatureInput('')}}} className="flex-1 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.06] text-white text-xs focus:outline-none focus:border-orange-400/30 placeholder:text-slate-600" placeholder="e.g. Noise cancellation, 40hr battery..." />
+                                        <button disabled={!campFeatureInput.trim()} onClick={()=>{if(campFeatureInput.trim()){setCampFeatures(p=>[...p,campFeatureInput.trim()]);setCampFeatureInput('')}}} className="px-3 py-2 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-300 text-xs font-medium hover:bg-orange-500/20 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">+ Add</button>
+                                    </div>
+                                    {campFeatures.length>0&&campFeatures.length<campCount&&<p className="text-yellow-400/60 text-[10px] mt-1.5">💡 {campFeatures.length} features for {campCount} creatives — features will cycle. Add {campCount-campFeatures.length} more for unique features per creative.</p>}
+                                    {campFeatures.length>=campCount&&campFeatures.length>0&&<p className="text-emerald-400/60 text-[10px] mt-1.5">✅ {campFeatures.length} features for {campCount} creatives — each creative gets a unique feature!</p>}
+                                </div>
+                                {/* Price Point */}
+                                <div className="studio-card p-5">
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-green-400 text-lg">payments</span>Price Point<span className="text-[10px] text-slate-500 font-normal ml-1">optional — for pricing messaging</span></h3>
+                                    <div className="flex gap-2 mb-2">
+                                        <input value={campPrice} onChange={e=>setCampPrice(e.target.value)} className="flex-1 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.06] text-white text-xs font-semibold focus:outline-none focus:border-green-400/30 placeholder:text-slate-600" placeholder="e.g. ₹2,999 or Starting at ₹999" />
+                                        {campPrice&&<button onClick={()=>setCampPrice('')} className="px-2 py-1 text-xs text-red-400 hover:text-red-300 cursor-pointer">Clear</button>}
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {['₹499','₹999','₹1,999','₹2,999','₹4,999','₹9,999','Starting at ₹','Flat 50% Off','Buy 1 Get 1'].map(p=>(
+                                            <button key={p} onClick={()=>setCampPrice(p)} className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-all cursor-pointer ${campPrice===p?'border-green-400/30 bg-green-500/10 text-green-300':'border-white/[0.06] text-slate-500 hover:text-slate-300'}`}>{p}</button>
+                                        ))}
+                                    </div>
                                 </div>
                                 {/* CTA */}
                                 <div className="studio-card p-5">
@@ -3399,6 +3570,28 @@ Return ONLY a valid JSON array, no markdown, no explanation.`;
                                     <div className="grid grid-cols-3 gap-1.5">
                                         {[{id:'top-left',l:'↖ TL'},{id:'top-center',l:'↑ TC'},{id:'top-right',l:'↗ TR'},{id:'bottom-left',l:'↙ BL'},{id:'bottom-center',l:'↓ BC'},{id:'bottom-right',l:'↘ BR'},{id:'none',l:'None'}].map(p=>(
                                             <button key={p.id} onClick={()=>setCampLogoPlacement(p.id)} className={`px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${campLogoPlacement===p.id?'border-amber-400/40 bg-amber-500/10 text-white':'border-white/[0.06] text-slate-400'}`}>{p.l}</button>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* Creative Scene / Setting */}
+                                <div className="studio-card p-5">
+                                    <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-teal-400 text-lg">photo_camera</span>Creative Scene</h3>
+                                    <div className="grid grid-cols-3 gap-1.5">
+                                        {[
+                                            {id:'auto',l:'🎲 Auto',d:'AI picks best scene'},
+                                            {id:'studio',l:'📸 Studio',d:'Clean studio backdrop'},
+                                            {id:'outdoor',l:'🌿 Outdoor',d:'Natural outdoor setting'},
+                                            {id:'indoor',l:'🏠 Indoor',d:'Styled interior'},
+                                            {id:'podium',l:'🏆 Podium',d:'Product on pedestal'},
+                                            {id:'hands',l:'🤲 Hands',d:'Product held in hands'},
+                                            {id:'model',l:'👤 Model',d:'Person using product'},
+                                            {id:'flatlay',l:'📐 Flat Lay',d:'Top-down arrangement'},
+                                            {id:'lifestyle',l:'🏡 Lifestyle',d:'Real-life context'},
+                                            {id:'urban',l:'🏙️ Urban',d:'City/street background'},
+                                            {id:'nature',l:'🌊 Nature',d:'Natural landscape'},
+                                            {id:'minimal',l:'✨ Minimal',d:'Clean, simple backdrop'},
+                                        ].map(s=>(
+                                            <button key={s.id} onClick={()=>setCampScene(s.id)} title={s.d} className={`px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${campScene===s.id?'border-teal-400/40 bg-teal-500/10 text-white':'border-white/[0.06] text-slate-400 hover:text-slate-200'}`}>{s.l}</button>
                                         ))}
                                     </div>
                                 </div>
@@ -3435,11 +3628,13 @@ Return ONLY a valid JSON array, no markdown, no explanation.`;
                             {/* Summary */}
                             <div className="studio-card p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-blue-400 text-lg">summarize</span>Campaign Summary</h3>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                                     <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center"><p className="text-slate-500 text-[10px] mb-0.5">Keyword</p><p className="text-white text-xs font-semibold truncate">{campKeyword}</p></div>
                                     <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center"><p className="text-slate-500 text-[10px] mb-0.5">Goal</p><p className="text-white text-xs font-semibold">{campGoal}</p></div>
                                     <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center"><p className="text-slate-500 text-[10px] mb-0.5">Creatives</p><p className="text-white text-xs font-semibold">{campCount} × {campSizes.length} sizes</p></div>
                                     <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center"><p className="text-slate-500 text-[10px] mb-0.5">Style</p><p className="text-white text-xs font-semibold capitalize">{campStyle}</p></div>
+                                    {campFeatures.length>0&&<div className="p-3 rounded-xl bg-orange-500/5 border border-orange-500/10 text-center"><p className="text-orange-400/60 text-[10px] mb-0.5">Features</p><p className="text-orange-200 text-xs font-semibold">{campFeatures.length} USPs</p></div>}
+                                    {(campPrice||campProducts.some(p=>p.price?.amount))&&<div className="p-3 rounded-xl bg-green-500/5 border border-green-500/10 text-center"><p className="text-green-400/60 text-[10px] mb-0.5">Price{campProducts.length>1?' Range':''}</p><p className="text-green-200 text-xs font-semibold">{campProducts.length>1&&campProducts.some(p=>p.price?.amount)?(()=>{const prices=campProducts.filter(p=>p.price?.amount).map(p=>p.price.amount);const min=Math.min(...prices);const max=Math.max(...prices);return min===max?`₹${min.toLocaleString('en-IN')}`:`₹${min.toLocaleString('en-IN')} – ₹${max.toLocaleString('en-IN')}`})():campPrice}</p></div>}
                                 </div>
                             </div>
                             {/* Generate */}
@@ -3448,20 +3643,51 @@ Return ONLY a valid JSON array, no markdown, no explanation.`;
                                     setCampGenerating(true);setCampError('');setCampResults([]);setCampProgress(0);
                                     try{
                                         const results=[];
-                                        const total=campCount*campSizes.length;
+                                        const total=campCount*(campSizes.length||1);
+                                        const angles=['Hero product shot — front-facing, centered, dramatic lighting, product as the star','Flat lay / top-down arrangement — product with lifestyle props, styled composition','Lifestyle context — product in-use by a person or in a real environment','Close-up detail — macro focus on product texture, craftsmanship, premium details','Dramatic side angle — dynamic 45° perspective with depth of field','Contextual scene — product placed in its natural habitat or aspirational setting','Overhead bird\'s-eye — clean arrangement with negative space, editorial feel','Artistic detail — selective focus on unique feature or design element','Environmental wide — product small in a beautiful, branded scene','Dynamic action — product in motion or being interacted with, energy and movement'];
                                         for(let i=0;i<campCount;i++){
-                                            for(const size of campSizes){
-                                                const copy=campCopies[i]||{headline:campKeyword,body:'',cta:campCta};
-                                                const productImg=campProductStrategy==='same'?campProducts[0]?.image:campProducts[i]?.image;
-                                                let prompt=`CAMPAIGN CREATIVE for "${campKeyword}" campaign.\nGOAL: ${campGoal}\nSTYLE: ${campStyle}\nHEADLINE: ${copy.headline}\nBODY: ${copy.body}\nCTA: ${copy.cta}\n${productImg?'Include the provided product image prominently.\n':''}${campCampaignLogo&&campLogoPlacement!=='none'?`Place the campaign logo at ${campLogoPlacement}.\n`:''}${campStyleRef?'Match the visual style of the provided reference image.\n':''}Brand: ${activeBrand?.name||'Brand'}\n\nRULES:\n- Professional, scroll-stopping advertising creative\n- Text must be readable and well-composed\n- Use ${campStyle} design aesthetic\n- Aspect ratio: ${size}`;
-                                                const opts={aspectRatio:size,style:campStyle};
+                                            for(const size of (campSizes.length?campSizes:['1:1'])){
+                                                const copy=campCopies[i]||{headline:campName||campKeyword,body:'',cta:campCta};
+                                                // Per-product data: get the product for this creative
+                                                const prodData=campProductStrategy==='same'?campProducts[0]:campProducts[i%campProducts.length];
+                                                const productImg=prodData?.image||null;
+                                                const prodFeatures=prodData?.features||[];
+                                                const prodPrice=prodData?.price?.amount?`₹${prodData.price.amount.toLocaleString('en-IN')}`:campPrice;
+                                                const angle=angles[i%angles.length];
+                                                // Feature assignment: per-product features first, then campFeatures fallback
+                                                const featurePool=prodFeatures.length>0?prodFeatures:campFeatures;
+                                                const assignedFeature=featurePool.length>0?featurePool[i%featurePool.length]:null;
+                                                let prompt=`CAMPAIGN CREATIVE #${i+1} for "${campName||campKeyword}" by ${activeBrand?.name||'Brand'}.${prodData?.title?` Product: ${prodData.title}.`:''}
+
+CAMPAIGN NAME (must appear prominently): "${campName||campKeyword}"
+HEADLINE: ${copy.headline}
+BODY TEXT: ${copy.body}
+${assignedFeature?`FEATURE HIGHLIGHT: This creative MUST visually emphasize the feature "${assignedFeature}". Make this feature the visual hero — show it in action, highlight it with callouts, or design the composition around it.\n`:''}${prodPrice?`PRICE: ${prodPrice}\n`:''}CTA BUTTON: ${copy.cta}
+CAMPAIGN GOAL: ${campGoal}
+DESIGN STYLE: ${campStyle}
+
+PHOTOGRAPHY DIRECTION: ${angle}
+SCENE/SETTING: ${campScene==='auto'?'AI decides the best scene and setting for maximum impact':campScene==='studio'?'Clean professional studio with neutral/gradient backdrop, controlled lighting':campScene==='outdoor'?'Natural outdoor setting — golden hour, lush greenery, or dramatic sky':campScene==='indoor'?'Styled interior — modern, cozy, or luxurious room setting':campScene==='podium'?'Product displayed on a sleek pedestal/podium with dramatic lighting':campScene==='hands'?'Product being held in elegant hands, human touch, clean background':campScene==='model'?'Attractive person using/wearing the product in a natural, aspirational way':campScene==='flatlay'?'Top-down flat lay arrangement with curated props and styling':campScene==='lifestyle'?'Product in real-life use context — home, office, on-the-go':campScene==='urban'?'Urban street/city background with modern architecture':campScene==='nature'?'Natural landscape — beach, mountains, forest, water':'Minimalist clean backdrop with ample negative space'}
+${productImg?'Feature the provided product image as the hero element, shot from this specific angle/composition direction.\n':''}${campCampaignLogo&&campLogoPlacement!=='none'?`Campaign logo MUST appear at ${campLogoPlacement} position.\n`:''}${campStyleRef?'Match the visual mood and design language of the provided style reference.\n':''}
+DESIGN RULES:
+- The campaign name "${campName||campKeyword}" must be the LARGEST, most prominent text
+- Supporting copy complements but never overpowers the campaign name
+- Professional advertising creative — scroll-stopping, magazine-quality
+- ${campStyle} design aesthetic with premium typography
+- Clear visual hierarchy: Campaign Name → Product → Body → CTA
+${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sticker, or callout in the creative\n`:''}- Aspect ratio: ${size}`;                                                const opts={aspectRatio:size,style:campStyle};
                                                 if(productImg&&productImg.startsWith('data:'))opts.baseImage=productImg;
                                                 else if(productImg)opts.productImageUrl=productImg;
                                                 if(campStyleRef)opts.referenceImages={style:campStyleRef};
+                                                // Logo overlay — use server-side overlay (addLogo flag), NOT referenceImages.logo
+                                                if(campCampaignLogo&&campLogoPlacement!=='none'){
+                                                    opts.addLogo=true;
+                                                    opts.logoPosition=campLogoPlacement;
+                                                }
                                                 const payload={prompt,brandId:activeBrand?._id,type:'campaign',options:opts};
                                                 const res=await creativesAPI.generate(payload);
                                                 const url=res.creative?.imageUrl||res.imageUrl;
-                                                if(url)results.push({url,copy,size,index:i});
+                                                if(url)results.push({url,copy,size,index:i,angle:angle.split('—')[0].trim(),feature:assignedFeature,product:prodData?.title||null,price:prodPrice||null});
                                                 setCampProgress(results.length/total*100);
                                             }
                                         }
@@ -3480,6 +3706,17 @@ Return ONLY a valid JSON array, no markdown, no explanation.`;
                                     <div className="flex items-center justify-between mb-3">
                                         <h3 className="font-bold text-white text-sm flex items-center gap-2"><span className="material-symbols-outlined text-emerald-400 text-lg">check_circle</span>{campResults.length} Creatives Generated</h3>
                                         <div className="flex gap-2">
+                                            <button onClick={()=>{
+                                                // Compose campaign caption with all copy variations
+                                                const allUrls=campResults.map(r=>r.url).filter(Boolean);
+                                                const copies=campResults.map(r=>r.copy?.body).filter(Boolean);
+                                                const headlines=campResults.map(r=>r.copy?.headline).filter(Boolean);
+                                                const heroLine=campCampaignName||campKeyword||'Campaign';
+                                                const uniqueHeadlines=[...new Set(headlines)].slice(0,3).join(' | ');
+                                                const bestCopy=copies[0]||'';
+                                                const caption=`${heroLine}\n\n${uniqueHeadlines?uniqueHeadlines+'\n\n':''}${bestCopy}${campCTA?'\n\n'+campCTA:''}\n\n#${heroLine.replace(/\s+/g,'')} #Campaign #${campKeyword?.replace(/\s+/g,'')||'trending'}`;
+                                                setPublishData({images:allUrls,text:caption});
+                                            }} className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-500/20 to-violet-500/20 border border-blue-500/30 text-blue-200 text-xs font-bold hover:from-blue-500/30 hover:to-violet-500/30 transition-all cursor-pointer flex items-center gap-1.5"><span className="material-symbols-outlined text-sm">view_carousel</span>Publish as Carousel</button>
                                             <button onClick={()=>{setCampResults([]);setCampStep(3)}} className="px-3 py-1.5 rounded-lg bg-white/[0.06] text-white text-xs font-medium hover:bg-white/[0.1] transition-all cursor-pointer">Regenerate All</button>
                                         </div>
                                     </div>
@@ -3492,7 +3729,7 @@ Return ONLY a valid JSON array, no markdown, no explanation.`;
                                                         <button onClick={()=>setPublishData({image:r.url,text:r.copy?.body||''})} className="px-2 py-1 rounded-lg bg-blue-500/30 text-blue-200 text-[10px] font-medium backdrop-blur-sm hover:bg-blue-500/50 transition-all cursor-pointer"><span className="material-symbols-outlined text-xs align-middle">share</span></button>
                                                     </div>
                                                 </div>
-                                                <div className="p-2"><p className="text-white text-[10px] font-semibold truncate">{r.copy?.headline||''}</p><p className="text-slate-500 text-[9px]">{r.size}</p></div>
+                                                <div className="p-2"><p className="text-white text-[10px] font-semibold truncate">{r.copy?.headline||''}</p><div className="flex flex-wrap gap-1 mt-0.5">{r.product&&<span className="inline-block text-[8px] text-cyan-300 bg-cyan-500/15 px-1.5 py-0.5 rounded">📦 {r.product}</span>}{r.feature&&<span className="inline-block text-[8px] text-orange-300 bg-orange-500/15 px-1.5 py-0.5 rounded">⭐ {r.feature}</span>}{r.price&&<span className="inline-block text-[8px] text-green-300 bg-green-500/15 px-1.5 py-0.5 rounded">💰 {r.price}</span>}</div><p className="text-slate-500 text-[9px]">{r.size}</p></div>
                                             </div>
                                         ))}
                                     </div>
@@ -6606,6 +6843,7 @@ Return ONLY a valid JSON array, no markdown, no explanation.`;
                 onClose={() => setPublishData(null)}
                 defaultText={publishData?.text || ''}
                 defaultImage={publishData?.image || null}
+                defaultImages={publishData?.images || null}
                 brandId={activeBrand?._id}
             />
 

@@ -683,7 +683,7 @@ router.delete('/:id', protect, async (req, res) => {
 // POST /api/creatives/save-to-bank — Save any generated image to the image bank
 router.post('/save-to-bank', protect, async (req, res) => {
     try {
-        const { imageUrl, source, prompt, keywords, brandId, aiMeta, scene } = req.body;
+        const { imageUrl, source, prompt, keywords, brandId, aiMeta, scene, title } = req.body;
         if (!imageUrl || !brandId) {
             return res.status(400).json({ success: false, error: 'imageUrl and brandId are required' });
         }
@@ -706,7 +706,7 @@ router.post('/save-to-bank', protect, async (req, res) => {
             user: req.user._id,
             brand: brandId,
             type: source || 'other',
-            title: prompt?.substring(0, 80) || 'AI Generated Image',
+            title: title || prompt?.substring(0, 80) || 'AI Generated Image',
             prompt: prompt || '',
             imageUrl: finalImageUrl,
             thumbnailUrl: finalImageUrl,

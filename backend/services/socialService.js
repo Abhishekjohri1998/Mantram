@@ -316,6 +316,180 @@ export const publishToInstagram = async (igAccountId, accessToken, text, imageUr
 };
 
 /**
+ * Publish a CAROUSEL post to Instagram (2-10 images)
+ * Flow: create child containers → poll each → create carousel container → publish
+ */
+export const publishCarouselToInstagram = async (igAccountId, accessToken, text, imageUrls) => {
+    try {
+        if (!imageUrls || imageUrls.length < 2) {
+            throw new Error("Instagram carousel requires at least 2 images.");
+        }
+        if (imageUrls.length > 10) {
+            imageUrls = imageUrls.slice(0, 10); // Instagram max 10 carousel items
+        }
+
+        // Step 1: Create child containers (no caption on children)
+        console.log(`[SOCIAL] Creating ${imageUrls.length} Instagram carousel child containers...`);
+        const childIds = [];
+        for (const url of imageUrls) {
+            const containerResponse = await axios.post(`${FB_API_URL}/${igAccountId}/media`, {
+                image_url: url,
+                is_carousel_item: true,
+                access_token: accessToken
+            });
+            childIds.push(containerResponse.data.id);
+            console.log(`[SOCIAL] Child container created: ${containerResponse.data.id}`);
+        }
+
+        // Step 2: Poll each child until FINISHED
+        for (const childId of childIds) {
+            let isReady = false;
+            let attempts = 0;
+            while (!isReady && attempts < 15) {
+                attempts++;
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                try {
+                    const statusResp = await axios.get(`${FB_API_URL}/${childId}`, {
+                        params: { fields: 'status_code', access_token: accessToken }
+                    });
+                    const status = statusResp.data.status_code;
+                    if (status === 'FINISHED') isReady = true;
+                    else if (status === 'ERROR') throw new Error(`Child container ${childId} processing failed.`);
+                } catch (err) {
+                    if (err.message.includes('processing failed')) throw err;
+                    console.warn(`[SOCIAL] Polling child ${childId}: ${err.message}`);
+                }
+            }
+            if (!isReady) throw new Error(`Instagram child container ${childId} timed out.`);
+        }
+
+        // Step 3: Create the carousel container
+        console.log(`[SOCIAL] Creating carousel container with ${childIds.length} children...`);
+        const carouselResp = await axios.post(`${FB_API_URL}/${igAccountId}/media`, {
+            media_type: 'CAROUSEL',
+            children: childIds.join(','),
+            caption: text,
+            access_token: accessToken
+        });
+        const carouselId = carouselResp.data.id;
+        console.log(`[SOCIAL] Carousel container created: ${carouselId}`);
+
+        // Step 4: Poll carousel container
+        let carouselReady = false;
+        let cAttempts = 0;
+        while (!carouselReady && cAttempts < 15) {
+            cAttempts++;
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            try {
+                const sResp = await axios.get(`${FB_API_URL}/${carouselId}`, {
+                    params: { fields: 'status_code', access_token: accessToken }
+                });
+                if (sResp.data.status_code === 'FINISHED') carouselReady = true;
+                else if (sResp.data.status_code === 'ERROR') throw new Error('Carousel processing failed.');
+            } catch (err) {
+                if (err.message.includes('processing failed')) throw err;
+            }
+        }
+        if (!carouselReady) throw new Error('Instagram carousel processing timed out.');
+
+        // Step 5: Publish
+        const publishResp = await axios.post(`${FB_API_URL}/${igAccountId}/media_publish`, {
+            creation_id: carouselId,
+            access_token: accessToken
+        });
+
+        console.log(`[SOCIAL] ✅ Instagram carousel published! Post ID: ${publishResp.data.id}`);
+        return publishResp.data.id;
+    } catch (error) {
+        console.error('Instagram Carousel Error:', error.response?.data || error.message);
+        const fbError = error.response?.data?.error;
+        throw new Error(fbError?.error_user_msg || fbError?.message || error.message);
+    }
+};
+
+/**
+ * Publish a multi-photo post to Facebook
+ * Flow: upload each photo unpublished → create feed post with attached_media
+ */
+export const publishCarouselToFacebook = async (pageId, accessToken, text, imageUrls) => {
+    try {
+        if (!imageUrls || imageUrls.length < 2) {
+            // Fallback to single photo
+            return publishToFacebook(pageId, accessToken, text, imageUrls?.[0]);
+        }
+
+        // Step 1: Upload each photo as unpublished
+        console.log(`[SOCIAL] Uploading ${imageUrls.length} unpublished photos to Facebook...`);
+        const mediaFbIds = [];
+        for (const url of imageUrls) {
+            const resp = await axios.post(`${FB_API_URL}/${pageId}/photos`, {
+                url: url,
+                published: false,
+                access_token: accessToken
+            });
+            mediaFbIds.push({ media_fbid: resp.data.id });
+            console.log(`[SOCIAL] Unpublished photo uploaded: ${resp.data.id}`);
+        }
+
+        // Step 2: Create feed post with all photos
+        const feedResp = await axios.post(`${FB_API_URL}/${pageId}/feed`, {
+            message: text,
+            attached_media: JSON.stringify(mediaFbIds),
+            access_token: accessToken
+        });
+
+        console.log(`[SOCIAL] ✅ Facebook multi-photo post published! Post ID: ${feedResp.data.id}`);
+        return feedResp.data.id;
+    } catch (error) {
+        console.error('Facebook Carousel Error:', error.response?.data || error.message);
+        const fbError = error.response?.data?.error;
+        throw new Error(fbError?.error_user_msg || fbError?.message || error.message);
+    }
+};
+
+/**
+ * Publish a multi-image post to LinkedIn
+ */
+export const publishCarouselToLinkedIn = async (personUrn, accessToken, text, imageUrls) => {
+    try {
+        // LinkedIn multi-image uses the same ugcPosts API with multiple media entries
+        const media = imageUrls.map(url => ({
+            status: 'READY',
+            originalUrl: url,
+            description: { text: text.substring(0, 200) },
+        }));
+
+        const body = {
+            author: `urn:li:person:${personUrn}`,
+            lifecycleState: 'PUBLISHED',
+            specificContent: {
+                'com.linkedin.ugc.ShareContent': {
+                    shareCommentary: { text },
+                    shareMediaCategory: 'IMAGE',
+                    media,
+                },
+            },
+            visibility: {
+                'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
+            },
+        };
+
+        const response = await axios.post('https://api.linkedin.com/v2/ugcPosts', body, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`,
+                'X-Restli-Protocol-Version': '2.0.0',
+            }
+        });
+
+        console.log(`[SOCIAL] ✅ LinkedIn multi-image post published! ID: ${response.data.id}`);
+        return response.data.id;
+    } catch (error) {
+        throw new Error(error.response?.data?.message || 'Failed to publish multi-image to LinkedIn');
+    }
+};
+
+/**
  * Fetch recent posts from a Facebook Page or Instagram Account
  */
 export const fetchRecentPosts = async (accountId, accessToken, platform) => {

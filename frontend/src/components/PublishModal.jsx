@@ -11,11 +11,12 @@ const PLATFORM_META = {
 /**
  * PublishModal — Smart publish + schedule flow
  */
-export default function PublishModal({ isOpen, onClose, defaultText = '', defaultImage = null, brandId = null }) {
+export default function PublishModal({ isOpen, onClose, defaultText = '', defaultImage = null, defaultImages = null, brandId = null }) {
     const [accounts, setAccounts] = useState([])
     const [selectedAccounts, setSelectedAccounts] = useState([])
     const [loading, setLoading] = useState(false)
     const [imageUrl, setImageUrl] = useState(defaultImage || '')
+    const [imageUrls, setImageUrls] = useState(defaultImages || [])
     const [caption, setCaption] = useState(defaultText || '')
     const [platformCaptions, setPlatformCaptions] = useState({})
     const [isAdapted, setIsAdapted] = useState(false)
@@ -33,7 +34,8 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
 
     useEffect(() => {
         if (isOpen) {
-            setImageUrl(defaultImage || '')
+            setImageUrl(defaultImage || (defaultImages?.[0] || ''))
+            setImageUrls(defaultImages || [])
             setCaption(defaultText || '')
             setPlatformCaptions({})
             setIsAdapted(false)
@@ -46,7 +48,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
             setAdaptError('')
             loadAccounts()
         }
-    }, [isOpen, defaultImage, defaultText])
+    }, [isOpen, defaultImage, defaultImages, defaultText])
 
     const loadAccounts = async () => {
         setLoading(true)
@@ -151,7 +153,8 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                 accountIds: selectedAccounts,
                 text: fallbackText,
                 captions,
-                imageUrl,
+                imageUrl: isCarouselMode ? undefined : imageUrl,
+                imageUrls: isCarouselMode ? imageUrls : undefined,
                 brandId: brandId || undefined,
             })
             setResults(res.results)
@@ -182,7 +185,8 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                 accountIds: selectedAccounts,
                 text: fallbackText,
                 captions,
-                imageUrl,
+                imageUrl: isCarouselMode ? imageUrls[0] : imageUrl,
+                imageUrls: isCarouselMode ? imageUrls : undefined,
                 brandId: brandId || undefined,
                 scheduledFor,
             })
@@ -197,6 +201,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
     if (!isOpen) return null
 
     const selectedPlatforms = getSelectedPlatforms()
+    const isCarouselMode = Array.isArray(imageUrls) && imageUrls.length > 1
 
     const getMinDateTime = () => {
         const now = new Date()
@@ -296,7 +301,20 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                     ) : (
                         <>
                             {/* ── Image Preview ── */}
-                            {imageUrl && (
+                            {isCarouselMode ? (
+                                <div className="rounded-2xl overflow-hidden border border-white/[0.06] bg-black/30 p-3">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="material-symbols-outlined text-violet-400 text-sm">view_carousel</span>
+                                        <span className="text-xs font-bold text-violet-300">Carousel Post</span>
+                                        <span className="text-[10px] text-slate-500 bg-white/[0.06] px-2 py-0.5 rounded-full">{imageUrls.length} images</span>
+                                    </div>
+                                    <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+                                        {imageUrls.map((url, i) => (
+                                            <img key={i} src={url} alt={`Slide ${i+1}`} className="h-28 w-28 object-cover rounded-xl flex-shrink-0 border border-white/[0.06]" loading="lazy" />
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : imageUrl && (
                                 <div className="rounded-2xl overflow-hidden border border-white/[0.06] bg-black/30">
                                     <img src={imageUrl} alt="Creative" className="w-full max-h-44 object-contain" loading="lazy" onError={e => e.target.style.display = 'none'} />
                                 </div>

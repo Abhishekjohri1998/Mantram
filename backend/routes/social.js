@@ -11,10 +11,13 @@ import {
     fetchUserPagesAndIgAccounts,
     publishToFacebook,
     publishToInstagram,
+    publishCarouselToInstagram,
+    publishCarouselToFacebook,
     getLinkedInAuthUrl,
     exchangeLinkedInCodeForToken,
     fetchLinkedInProfile,
     publishToLinkedIn,
+    publishCarouselToLinkedIn,
     fetchRecentPosts,
     fetchPostAnalytics
 } from '../services/socialService.js';
@@ -327,43 +330,63 @@ Do not include any text outside the JSON. Do not wrap in markdown code blocks.`;
         }
 
         const parts = [];
-        // If image URL is provided, fetch and include it for vision analysis
+        // If image URL is provided, include it for vision analysis
         let normalizedImageUrl = imageUrl;
-        if (imageUrl && !imageUrl.startsWith('http')) {
-            const baseUrl = (config.backendUrl || 'https://api.mantram.ai').replace(/\/$/, '');
-            normalizedImageUrl = `${baseUrl}${imageUrl.startsWith('/') ? imageUrl : '/' + imageUrl}`;
-            console.log(`[CAPTION] Normalized relative URL: ${normalizedImageUrl}`);
-        }
 
-        if (normalizedImageUrl && normalizedImageUrl.startsWith('http')) {
+        // Handle base64 data URIs directly (no need to fetch)
+        if (imageUrl && imageUrl.startsWith('data:')) {
             try {
-                console.log(`[CAPTION] Fetching image for vision analysis: ${normalizedImageUrl.substring(0, 80)}...`);
-                const imgResp = await fetch(normalizedImageUrl, {
-                    headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'image/*' },
-                    redirect: 'follow',
-                });
-                if (imgResp.ok) {
-                    const buf = await imgResp.arrayBuffer();
-                    const ct = (imgResp.headers.get('content-type') || 'image/jpeg').split(';')[0];
+                const match = imageUrl.match(/^data:(image\/[^;]+);base64,(.+)$/);
+                if (match) {
                     parts.push({
                         inlineData: {
-                            mimeType: ct,
-                            data: Buffer.from(buf).toString('base64')
+                            mimeType: match[1],
+                            data: match[2]
                         }
                     });
-                    console.log(`[CAPTION] Image loaded for analysis (${Math.round(buf.byteLength / 1024)}KB)`);
-                } else {
-                    console.warn(`[CAPTION] Image fetch failed (${imgResp.status}):`, normalizedImageUrl);
+                    console.log(`[CAPTION] Image loaded from data URI (${match[1]}, ${Math.round(match[2].length * 0.75 / 1024)}KB)`);
                 }
-            } catch (imgErr) {
-                console.warn('[CAPTION] Could not fetch image for analysis:', imgErr.message);
+            } catch (e) {
+                console.warn('[CAPTION] Failed to parse data URI:', e.message);
+            }
+        } else {
+            // Normalize relative URLs
+            if (imageUrl && !imageUrl.startsWith('http')) {
+                const baseUrl = (config.backendUrl || 'https://api.mantram.ai').replace(/\/$/, '');
+                normalizedImageUrl = `${baseUrl}${imageUrl.startsWith('/') ? imageUrl : '/' + imageUrl}`;
+                console.log(`[CAPTION] Normalized relative URL: ${normalizedImageUrl}`);
+            }
+
+            if (normalizedImageUrl && normalizedImageUrl.startsWith('http')) {
+                try {
+                    console.log(`[CAPTION] Fetching image for vision analysis: ${normalizedImageUrl.substring(0, 80)}...`);
+                    const imgResp = await fetch(normalizedImageUrl, {
+                        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'image/*' },
+                        redirect: 'follow',
+                    });
+                    if (imgResp.ok) {
+                        const buf = await imgResp.arrayBuffer();
+                        const ct = (imgResp.headers.get('content-type') || 'image/jpeg').split(';')[0];
+                        parts.push({
+                            inlineData: {
+                                mimeType: ct,
+                                data: Buffer.from(buf).toString('base64')
+                            }
+                        });
+                        console.log(`[CAPTION] Image loaded for analysis (${Math.round(buf.byteLength / 1024)}KB)`);
+                    } else {
+                        console.warn(`[CAPTION] Image fetch failed (${imgResp.status}):`, normalizedImageUrl);
+                    }
+                } catch (imgErr) {
+                    console.warn('[CAPTION] Could not fetch image for analysis:', imgErr.message);
+                }
             }
         }
 
         parts.push({ text: systemPrompt });
 
         // Call Gemini for caption generation (text-only response)
-        const models = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+        const models = ['gemini-2.5-flash', 'gemini-2.0-flash-001'];
         let captionsResult = null;
 
         for (const modelId of models) {
@@ -440,26 +463,28 @@ Do not include any text outside the JSON. Do not wrap in markdown code blocks.`;
  * @access  Private
  */
 router.post('/publish', protect, async (req, res) => {
-    const { accountIds, text, imageUrl, captions } = req.body;
+    const { accountIds, text, imageUrl, imageUrls, captions } = req.body;
 
     if (!accountIds || accountIds.length === 0 || (!text && !captions)) {
         return res.status(400).json({ success: false, error: 'Please provide text/captions and select at least one account' });
     }
 
-    // Ensure imageUrl is an absolute URL if it is provided and relative
+    // Determine if this is a carousel (multi-image) or single-image publish
+    const isCarousel = Array.isArray(imageUrls) && imageUrls.length > 1;
+    console.log(`[SOCIAL] Publish mode: ${isCarousel ? `CAROUSEL (${imageUrls.length} images)` : 'SINGLE IMAGE'}`);
+
+    // For single-image: ensure URL is absolute
     let absoluteImageUrl = imageUrl;
-    if (imageUrl && !imageUrl.startsWith('http')) {
+    if (!isCarousel && imageUrl && !imageUrl.startsWith('http')) {
         if (imageUrl.startsWith('data:')) {
             console.log('[SOCIAL] Image is a data URI (base64) - Uploading to S3 fallback');
             try {
-                // Determine userId for the folder structure
                 const userId = req.user._id;
                 const s3Url = await uploadToS3(imageUrl, `social-fallback/${userId}/${Date.now()}.png`);
                 absoluteImageUrl = s3Url;
                 console.log(`[SOCIAL] Fallback S3 Upload Success: ${absoluteImageUrl}`);
             } catch (s3Err) {
                 console.error('[SOCIAL] Fallback S3 Upload Failed:', s3Err.message);
-                // absoluteImageUrl remains base64, Meta will likely reject
             }
         } else {
             const baseUrl = (config.backendUrl || '').replace(/\/$/, '');
@@ -467,12 +492,33 @@ router.post('/publish', protect, async (req, res) => {
             absoluteImageUrl = `${baseUrl}${path}`;
             console.log(`[SOCIAL] Transformed relative URL to absolute: ${absoluteImageUrl}`);
         }
-    } else if (imageUrl) {
+    } else if (!isCarousel && imageUrl) {
         console.log(`[SOCIAL] Using provided absolute URL: ${imageUrl}`);
     }
 
+    // For carousel: resolve all URLs to absolute (upload data: URIs to S3 if possible)
+    let carouselUrls = [];
+    if (isCarousel) {
+        for (const url of imageUrls) {
+            if (!url) continue;
+            if (url.startsWith('http')) {
+                carouselUrls.push(url);
+            } else if (url.startsWith('data:')) {
+                try {
+                    const userId = req.user._id;
+                    const s3Url = await uploadToS3(url, `social-carousel/${userId}/${Date.now()}-${carouselUrls.length}.png`);
+                    carouselUrls.push(s3Url);
+                    console.log(`[SOCIAL] Carousel data URI uploaded to S3: ${s3Url.substring(0, 60)}...`);
+                } catch (s3Err) {
+                    console.warn(`[SOCIAL] Carousel S3 upload failed, keeping data URI: ${s3Err.message}`);
+                    carouselUrls.push(url); // Keep data URI as fallback
+                }
+            }
+        }
+        console.log(`[SOCIAL] Carousel URLs resolved: ${carouselUrls.length} valid of ${imageUrls.length} total`);
+    }
+
     try {
-        // Find all selected active accounts for this user
         const accounts = await SocialAccount.find({
             _id: { $in: accountIds },
             user: req.user._id,
@@ -484,23 +530,31 @@ router.post('/publish', protect, async (req, res) => {
         }
 
         const results = [];
-        // Process sequentially or using Promise.allSettled
         for (const account of accounts) {
             try {
-                // Use platform-specific caption if available, fallback to generic text
                 const postText = captions?.[account.platform] || text || '';
-
-                // Log what we are about to do
-                console.log(`[SOCIAL] Publishing to ${account.platform} (${account.accountName}) - Caption: ${postText.substring(0, 80)}... - Image: ${absoluteImageUrl || 'None'}`);
+                console.log(`[SOCIAL] Publishing ${isCarousel ? 'carousel' : 'single'} to ${account.platform} (${account.accountName}) - Caption: ${postText.substring(0, 80)}...`);
 
                 let postId = null;
 
-                if (account.platform === 'facebook') {
-                    postId = await publishToFacebook(account.accountId, account.accessToken, postText, absoluteImageUrl);
-                } else if (account.platform === 'instagram') {
-                    postId = await publishToInstagram(account.accountId, account.accessToken, postText, absoluteImageUrl);
-                } else if (account.platform === 'linkedin') {
-                    postId = await publishToLinkedIn(account.accountId, account.accessToken, postText, absoluteImageUrl);
+                if (isCarousel && carouselUrls.length >= 2) {
+                    // Carousel publish
+                    if (account.platform === 'facebook') {
+                        postId = await publishCarouselToFacebook(account.accountId, account.accessToken, postText, carouselUrls);
+                    } else if (account.platform === 'instagram') {
+                        postId = await publishCarouselToInstagram(account.accountId, account.accessToken, postText, carouselUrls);
+                    } else if (account.platform === 'linkedin') {
+                        postId = await publishCarouselToLinkedIn(account.accountId, account.accessToken, postText, carouselUrls);
+                    }
+                } else {
+                    // Single image publish
+                    if (account.platform === 'facebook') {
+                        postId = await publishToFacebook(account.accountId, account.accessToken, postText, absoluteImageUrl);
+                    } else if (account.platform === 'instagram') {
+                        postId = await publishToInstagram(account.accountId, account.accessToken, postText, absoluteImageUrl);
+                    } else if (account.platform === 'linkedin') {
+                        postId = await publishToLinkedIn(account.accountId, account.accessToken, postText, absoluteImageUrl);
+                    }
                 }
 
                 results.push({
@@ -522,7 +576,7 @@ router.post('/publish', protect, async (req, res) => {
             }
         }
 
-        // ── Save SocialPost records for each result ──
+        // ── Save SocialPost records ──
         for (const r of results) {
             try {
                 await SocialPost.create({
@@ -532,7 +586,7 @@ router.post('/publish', protect, async (req, res) => {
                     accountId: r.accountId?.toString() || '',
                     accountName: r.accountName,
                     caption: captions?.[r.platform] || text || '',
-                    imageUrl: absoluteImageUrl || '',
+                    imageUrl: isCarousel ? carouselUrls[0] : (absoluteImageUrl || ''),
                     postId: r.postId || '',
                     status: r.status === 'success' ? 'published' : 'failed',
                     error: r.error || '',
@@ -598,7 +652,7 @@ router.get('/accounts/:id/posts/:postId/insights', protect, async (req, res) => 
  * @access  Private
  */
 router.post('/schedule', protect, async (req, res) => {
-    const { accountIds, text, imageUrl, captions, scheduledFor, brandId } = req.body;
+    const { accountIds, text, imageUrl, imageUrls, captions, scheduledFor, brandId } = req.body;
 
     if (!accountIds || accountIds.length === 0 || (!text && !captions)) {
         return res.status(400).json({ success: false, error: 'Please provide text/captions and select at least one account' });
@@ -632,7 +686,8 @@ router.post('/schedule', protect, async (req, res) => {
                 accountId: account.accountId,
                 accountName: account.accountName,
                 caption: postCaption,
-                imageUrl: imageUrl || '',
+                imageUrl: imageUrl || (Array.isArray(imageUrls) ? imageUrls[0] : '') || '',
+                imageUrls: Array.isArray(imageUrls) && imageUrls.length > 1 ? imageUrls : undefined,
                 status: 'scheduled',
                 scheduledFor: scheduleDate,
             });
