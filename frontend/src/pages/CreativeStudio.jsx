@@ -22,6 +22,26 @@ function getTimeAgo(dateStr) {
     return new Date(dateStr).toLocaleDateString();
 }
  
+// ── Helper: Upload base64 image to S3 via backend ──
+async function uploadToS3(base64Data, folder = 'uploads') {
+    try {
+        if (base64Data.startsWith('http')) return base64Data;
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/media/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ imageData: base64Data, folder }),
+        });
+        const data = await res.json();
+        if (data.success && data.url) return data.url;
+        console.warn('[uploadToS3] S3 upload failed, using base64 fallback:', data.error);
+        return base64Data;
+    } catch (err) {
+        console.warn('[uploadToS3] Upload error, using base64 fallback:', err.message);
+        return base64Data;
+    }
+}
+
 // ── Aspect Ratio Options ──
 const ASPECT_RATIOS = [
     { ratio: '1:1', label: 'Square', icon: '⬜' },
@@ -791,9 +811,11 @@ export default function CreativeStudio() {
                 aspectRatio,
             }
             if (designBaseImage) {
-                options.baseImage = designBaseImage
-                if (!fullPrompt.toLowerCase().includes('photoshoot') && !fullPrompt.toLowerCase().includes('product')) {
-                    fullPrompt = `Using the provided product photoshoot image as the base: ${fullPrompt}`
+                // Use template inpainting mode — preserves layout, characters, products from the original image
+                options.templateInpainting = true
+                options.templateRefImageUrl = designBaseImage
+                if (!fullPrompt.toLowerCase().includes('edit') && !fullPrompt.toLowerCase().includes('change') && !fullPrompt.toLowerCase().includes('modify')) {
+                    fullPrompt = `Edit this image while keeping the same layout, composition, characters, and products. Apply these changes: ${fullPrompt}`
                 }
             }
 
@@ -1467,8 +1489,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-4">
                                 <img src={designBaseImage} alt="Base" className="w-10 h-10 rounded-lg object-cover" />
                                 <div className="flex-1">
-                                    <p className="text-sm font-bold text-white">📸 Using photoshoot image as base</p>
-                                    <p className="text-sm text-slate-400">Describe how to adapt this for your platform</p>
+                                    <p className="text-sm font-bold text-white">✏️ Editing image as template</p>
+                                    <p className="text-sm text-slate-400">Describe what to change — layout, characters & products will be preserved</p>
                                 </div>
                                 <button onClick={() => setDesignBaseImage(null)} className="text-slate-500 hover:text-white cursor-pointer">
                                     <span className="material-symbols-outlined text-sm">close</span>
@@ -1548,12 +1570,16 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                                 {/* Upload Ref */}
                                 {referenceImages.upload ? (
-                                    <div className="relative flex-shrink-0">
+                                    <div className="relative flex-shrink-0 group">
                                         <div className="w-14 h-14 rounded-xl overflow-hidden border-2 border-cyan-500/40">
                                             <img src={referenceImages.upload} alt="Ref" className="w-full h-full object-cover" />
                                         </div>
                                         <button onClick={() => setReferenceImages(prev => ({ ...prev, upload: null }))}
-                                            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center cursor-pointer">×</button>
+                                            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center cursor-pointer z-10">×</button>
+                                        <button onClick={() => { setCharacters(prev => [...prev, { name: `Character ${prev.length + 1}`, image: referenceImages.upload }]); setReferenceImages(prev => ({ ...prev, upload: null })) }}
+                                            className="absolute -bottom-1 -left-1 w-5 h-5 rounded-full bg-violet-500 text-white text-[10px] flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-10" title="Use as Character">
+                                            <span className="material-symbols-outlined text-[10px]">person_add</span>
+                                        </button>
                                         <span className="block text-[8px] text-cyan-400 text-center mt-0.5 font-bold">Upload</span>
                                     </div>
                                 ) : (
@@ -1587,7 +1613,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     const cursor = e.target.selectionStart
                                     const textBefore = val.substring(0, cursor)
                                     const atMatch = textBefore.match(/@(\w*)$/)
-                                    if (atMatch && characters.length > 0) {
+                                    if (atMatch && (characters.length > 0 || referenceImages.upload)) {
                                         setShowCharTags(true)
                                         setCharTagFilter(atMatch[1].toLowerCase())
                                     } else {
@@ -1609,7 +1635,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             />
 
                             {/* @character tag autocomplete dropdown */}
-                            {showCharTags && characters.length > 0 && (
+                            {showCharTags && (characters.length > 0 || referenceImages.upload) && (
                                 <div className="absolute left-4 bottom-full mb-1 bg-[#1a1a2e] border border-violet-500/30 rounded-xl shadow-2xl shadow-violet-500/10 p-2 z-50 min-w-[200px] animate-fade-in">
                                     <p className="text-[10px] text-slate-500 mb-1.5 px-2">Tag a character</p>
                                     {characters
@@ -1639,6 +1665,27 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 </div>
                                             </button>
                                         ))}
+                                    {/* Upload reference in autocomplete */}
+                                    {referenceImages.upload && (!charTagFilter || 'upload'.includes(charTagFilter) || 'reference'.includes(charTagFilter)) && (
+                                        <button onClick={() => {
+                                            const textarea = promptTextareaRef.current
+                                            if (!textarea) return
+                                            const cursor = textarea.selectionStart
+                                            const textBefore = prompt.substring(0, cursor)
+                                            const textAfter = prompt.substring(cursor)
+                                            const newBefore = textBefore.replace(/@\w*$/, '@Upload ')
+                                            setPrompt(newBefore + textAfter)
+                                            setShowCharTags(false)
+                                            setTimeout(() => { textarea.focus(); textarea.selectionStart = textarea.selectionEnd = newBefore.length }, 50)
+                                        }}
+                                            className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-cyan-500/15 cursor-pointer transition-colors text-left">
+                                            <img src={referenceImages.upload} alt="Upload" className="w-6 h-6 rounded-full object-cover border border-cyan-500/30" />
+                                            <div>
+                                                <span className="text-xs font-bold text-white">Reference Image</span>
+                                                <span className="text-[10px] text-cyan-400 ml-1.5">@Upload</span>
+                                            </div>
+                                        </button>
+                                    )}
                                 </div>
                             )}
                             <div className="absolute right-3 top-3">
@@ -1686,6 +1733,24 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         </button>
                                     )
                                 })}
+                            </div>
+                        )}
+                        {/* Quick-insert upload reference tag */}
+                        {referenceImages.upload && (
+                            <div className="flex items-center gap-1.5 mb-3 -mt-1">
+                                <span className="text-[10px] text-slate-600 mr-0.5">Ref:</span>
+                                <button onClick={() => {
+                                    const textarea = promptTextareaRef.current
+                                    const cursor = textarea?.selectionStart ?? prompt.length
+                                    const before = prompt.substring(0, cursor)
+                                    const after = prompt.substring(cursor)
+                                    setPrompt(before + '@Upload ' + after)
+                                    setTimeout(() => textarea?.focus(), 50)
+                                }}
+                                    className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 text-[10px] font-bold hover:bg-cyan-500/20 border border-cyan-500/15 cursor-pointer transition-all">
+                                    <img src={referenceImages.upload} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
+                                    @Upload
+                                </button>
                             </div>
                         )}
 
@@ -3726,6 +3791,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                                 <div className="relative"><img src={r.url} alt={`Creative ${i+1}`} className="w-full h-auto object-contain" />
                                                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                                                         <a href={r.url} download={`campaign-${i+1}.png`} target="_blank" rel="noreferrer" className="px-2 py-1 rounded-lg bg-white/20 text-white text-[10px] font-medium backdrop-blur-sm hover:bg-white/30 transition-all cursor-pointer"><span className="material-symbols-outlined text-xs align-middle">download</span></a>
+                                                        <button onClick={()=>{setDesignBaseImage(r.url);setPrompt(r.copy?.headline||campName||campKeyword||'Edit this creative');setStudioMode('create');setShowQuickStart(false)}} className="px-2 py-1 rounded-lg bg-amber-500/30 text-amber-200 text-[10px] font-medium backdrop-blur-sm hover:bg-amber-500/50 transition-all cursor-pointer"><span className="material-symbols-outlined text-xs align-middle">edit</span></button>
                                                         <button onClick={()=>setPublishData({image:r.url,text:r.copy?.body||''})} className="px-2 py-1 rounded-lg bg-blue-500/30 text-blue-200 text-[10px] font-medium backdrop-blur-sm hover:bg-blue-500/50 transition-all cursor-pointer"><span className="material-symbols-outlined text-xs align-middle">share</span></button>
                                                     </div>
                                                 </div>
@@ -5239,6 +5305,8 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                 if (img.designData?.style) setStyle(img.designData.style);
                                 if (img.type && !['uploaded', 'other'].includes(img.type)) setSelectedType(img.type);
                                 if (img.designData?.textOverlay) setTextOverlay(img.designData.textOverlay);
+                                // Set image as template base for inpainting when re-generating
+                                if (img.imageUrl) setDesignBaseImage(img.imageUrl);
                                 setStudioMode('create');
                                 setShowQuickStart(false);
                             }
