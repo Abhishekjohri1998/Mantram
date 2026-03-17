@@ -74,6 +74,7 @@ const subscriptionPackageSchema = new mongoose.Schema({
     // Status
     isActive: { type: Boolean, default: true },
     isDefault: { type: Boolean, default: false }, // assigned to new users
+    watermarkEnabled: { type: Boolean, default: true }, // watermark on outputs (disable for premium)
     displayOrder: { type: Number, default: 0 },
 
     // AI generation metadata

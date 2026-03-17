@@ -18,11 +18,12 @@ import Waitlist from '../models/Waitlist.js';
 import SubscriptionPackage from '../models/SubscriptionPackage.js';
 import SystemSettings, { getSetting, setSetting } from '../models/SystemSettings.js';
 import AuditLog from '../models/AuditLog.js';
-import { CREDIT_COSTS, getCreditCosts, getCreditBalance, invalidateCreditCostCache } from '../middleware/credits.js';
+import { CREDIT_COSTS, getCreditCosts, getCreditBalance, invalidateCreditCostCache, MODEL_COSTS } from '../middleware/credits.js';
 import { protect, authorize, generateToken } from '../middleware/auth.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { logAudit } from '../utils/audit.js';
 import CreditUsage from '../models/CreditUsage.js';
+import { uploadToS3 } from '../utils/s3.js';
 import rateLimit from 'express-rate-limit';
 import nodemailer from 'nodemailer';
 import env from '../config/env.js';
@@ -887,12 +888,139 @@ router.get('/ai-health', async (req, res) => {
     }
 });
 
+// ══════════════════════════════════════════════════════════════
+// API KEY MANAGEMENT
+// ══════════════════════════════════════════════════════════════
+
+// Provider definitions with env var mappings
+const API_PROVIDERS = {
+    gemini:    { label: 'Google Gemini', fields: [{ key: 'apiKey', env: 'GEMINI_API_KEY', label: 'API Key' }, { key: 'imageApiKey', env: 'GEMINI_IMAGE_API_KEY', label: 'Image API Key' }], testUrl: 'https://generativelanguage.googleapis.com/v1beta/models?key=__KEY__', icon: 'diamond' },
+    openai:    { label: 'OpenAI', fields: [{ key: 'apiKey', env: 'OPENAI_API_KEY', label: 'API Key' }], testUrl: 'https://api.openai.com/v1/models', testHeader: 'Bearer', icon: 'psychology' },
+    anthropic: { label: 'Anthropic (Claude)', fields: [{ key: 'apiKey', env: 'ANTHROPIC_API_KEY', label: 'API Key' }], testUrl: 'https://api.anthropic.com/v1/models', testHeader: 'x-api-key', icon: 'smart_toy' },
+    grok:      { label: 'xAI (Grok)', fields: [{ key: 'apiKey', env: 'GROK_API_KEY', label: 'API Key' }], testUrl: 'https://api.x.ai/v1/models', testHeader: 'Bearer', icon: 'bolt' },
+    piapi:     { label: 'PiAPI (Seedance)', fields: [{ key: 'apiKey', env: 'PIAPI_API_KEY', label: 'API Key' }], testUrl: 'https://api.piapi.ai/api/v1/account', testHeader: 'Bearer', icon: 'movie' },
+    fal:       { label: 'fal.ai (Kling)', fields: [{ key: 'apiKey', env: 'FAL_API_KEY', label: 'API Key' }], testUrl: 'https://queue.fal.run/fal-ai/fast-sdxl', testHeader: 'Key', icon: 'videocam' },
+    heygen:    { label: 'HeyGen (UGC)', fields: [{ key: 'apiKey', env: 'HEYGEN_API_KEY', label: 'API Key' }], testUrl: 'https://api.heygen.com/v2/user/remaining_quota', testHeader: 'x-api-key', icon: 'person_play' },
+    kie:       { label: 'kie.ai (Veo)', fields: [{ key: 'apiKey', env: 'KIE_API_KEY', label: 'API Key' }], icon: 'play_circle' },
+    sarvam:    { label: 'Sarvam AI', fields: [{ key: 'apiKey', env: 'SARVAM_API_KEY', label: 'API Key' }], testUrl: 'https://api.sarvam.ai/text-to-speech', testHeader: 'api-subscription-key', icon: 'record_voice_over' },
+    aws:       { label: 'AWS S3', fields: [{ key: 'accessKeyId', env: 'AWS_ACCESS_KEY_ID', label: 'Access Key ID' }, { key: 'secretAccessKey', env: 'AWS_SECRET_ACCESS_KEY', label: 'Secret Key' }, { key: 'bucket', env: 'AWS_S3_BUCKET', label: 'Bucket' }, { key: 'region', env: 'AWS_REGION', label: 'Region' }], icon: 'cloud_upload' },
+    razorpay:  { label: 'Razorpay', fields: [{ key: 'keyId', env: 'RAZORPAY_KEY_ID', label: 'Key ID' }, { key: 'keySecret', env: 'RAZORPAY_KEY_SECRET', label: 'Key Secret' }], icon: 'payments' },
+};
+
+const maskKey = (key) => key && key.length > 4 ? '•'.repeat(key.length - 4) + key.slice(-4) : key ? '••••' : '';
+
+// GET /superadmin/api-keys — list all providers with masked keys
+router.get('/api-keys', async (req, res) => {
+    try {
+        const storedKeys = await getSetting('api_keys', {});
+        const providers = Object.entries(API_PROVIDERS).map(([id, p]) => {
+            const fields = p.fields.map(f => {
+                const dbValue = storedKeys[id]?.[f.key];
+                const envValue = process.env[f.env];
+                const value = dbValue || envValue || '';
+                return { key: f.key, label: f.label, source: dbValue ? 'database' : envValue ? 'env' : 'none', masked: maskKey(value), hasValue: !!value };
+            });
+            return { id, label: p.label, icon: p.icon, fields, canTest: !!p.testUrl };
+        });
+        res.json({ success: true, providers });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// PUT /superadmin/api-keys — update provider keys
+router.put('/api-keys', async (req, res) => {
+    try {
+        const { provider, keys } = req.body;
+        if (!provider || !API_PROVIDERS[provider]) return res.status(400).json({ success: false, error: 'Invalid provider' });
+        if (!keys || typeof keys !== 'object') return res.status(400).json({ success: false, error: 'Keys object required' });
+
+        const storedKeys = await getSetting('api_keys', {});
+        storedKeys[provider] = { ...(storedKeys[provider] || {}), ...keys };
+        await setSetting('api_keys', storedKeys, req.user._id);
+
+        await logAudit(req, { action: 'UPDATE_API_KEY', targetModel: 'SystemSettings', targetId: provider, severity: 'high', metadata: { provider, fields: Object.keys(keys) } });
+        res.json({ success: true, message: `${API_PROVIDERS[provider].label} keys updated` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// DELETE /superadmin/api-keys/:provider — remove provider keys
+router.delete('/api-keys/:provider', async (req, res) => {
+    try {
+        const { provider } = req.params;
+        if (!API_PROVIDERS[provider]) return res.status(400).json({ success: false, error: 'Invalid provider' });
+
+        const storedKeys = await getSetting('api_keys', {});
+        delete storedKeys[provider];
+        await setSetting('api_keys', storedKeys, req.user._id);
+
+        await logAudit(req, { action: 'DELETE_API_KEY', targetModel: 'SystemSettings', targetId: provider, severity: 'high', metadata: { provider } });
+        res.json({ success: true, message: `${API_PROVIDERS[provider].label} keys removed from database (env vars still apply)` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// POST /superadmin/api-keys/:provider/test — test provider connectivity
+router.post('/api-keys/:provider/test', async (req, res) => {
+    try {
+        const { provider } = req.params;
+        const pConfig = API_PROVIDERS[provider];
+        if (!pConfig) return res.status(400).json({ success: false, error: 'Invalid provider' });
+        if (!pConfig.testUrl) return res.json({ success: true, status: 'untestable', message: 'No test endpoint available for this provider' });
+
+        const storedKeys = await getSetting('api_keys', {});
+        const apiKey = storedKeys[provider]?.apiKey || process.env[pConfig.fields[0].env] || '';
+        if (!apiKey) return res.json({ success: false, status: 'no_key', message: 'No API key configured' });
+
+        const headers = { 'Content-Type': 'application/json' };
+        let url = pConfig.testUrl;
+
+        if (pConfig.testUrl.includes('__KEY__')) {
+            url = pConfig.testUrl.replace('__KEY__', apiKey);
+        } else if (pConfig.testHeader === 'Bearer') {
+            headers['Authorization'] = `Bearer ${apiKey}`;
+        } else if (pConfig.testHeader === 'x-api-key') {
+            headers['x-api-key'] = apiKey;
+        } else if (pConfig.testHeader === 'Key') {
+            headers['Authorization'] = `Key ${apiKey}`;
+        } else if (pConfig.testHeader === 'api-subscription-key') {
+            headers['api-subscription-key'] = apiKey;
+        }
+
+        // Add anthropic version header
+        if (provider === 'anthropic') {
+            headers['anthropic-version'] = '2023-06-01';
+        }
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+        const resp = await fetch(url, { method: 'GET', headers, signal: controller.signal });
+        clearTimeout(timeout);
+
+        if (resp.ok || resp.status === 405 || resp.status === 200) {
+            res.json({ success: true, status: 'connected', message: `${pConfig.label} API is reachable`, httpStatus: resp.status });
+        } else {
+            const body = await resp.text().catch(() => '');
+            res.json({ success: false, status: 'error', message: `${pConfig.label} returned ${resp.status}`, httpStatus: resp.status, detail: body.slice(0, 200) });
+        }
+    } catch (error) {
+        res.json({ success: false, status: 'unreachable', message: error.name === 'AbortError' ? 'Connection timed out (10s)' : error.message });
+    }
+});
+
 router.get('/system-settings', async (req, res) => {
     try {
         const watermarkEnabled = await getSetting('watermark_enabled', true);
         const defaultProvider = await getSetting('default_ai_provider', 'gemini');
         const maintenanceMode = await getSetting('maintenance_mode', false);
-        res.json({ success: true, settings: { watermarkEnabled, defaultProvider, maintenanceMode } });
+        const watermarkLogoUrl = await getSetting('watermark_logo_url', '');
+        const watermarkPosition = await getSetting('watermark_position', 'bottom-right');
+        const watermarkOpacity = await getSetting('watermark_opacity', 0.4);
+        const watermarkOverrides = await getSetting('watermark_overrides', {});
+        res.json({ success: true, settings: { watermarkEnabled, defaultProvider, maintenanceMode, watermarkLogoUrl, watermarkPosition, watermarkOpacity, watermarkOverrides } });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -934,6 +1062,193 @@ router.put('/system-settings', async (req, res) => {
         });
 
         res.json({ success: true, message: 'Settings updated' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════
+// WATERMARK MANAGEMENT
+// ══════════════════════════════════════════════════════════════
+
+// POST /superadmin/watermark/upload — upload logo image for watermark
+router.post('/watermark/upload', async (req, res) => {
+    try {
+        const { image } = req.body; // base64 data URL
+        if (!image) return res.status(400).json({ success: false, error: 'Image data required' });
+
+        // Extract base64
+        const commaIdx = image.indexOf(',');
+        const base64Data = commaIdx > -1 ? image.substring(commaIdx + 1) : image;
+        const mimeMatch = image.match(/data:([^;]+);/);
+        const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+        const ext = mimeType.includes('png') ? 'png' : 'jpg';
+
+        const buffer = Buffer.from(base64Data, 'base64');
+        const s3Key = `system/watermark-logo-${Date.now()}.${ext}`;
+        const url = await uploadToS3(buffer, s3Key, mimeType);
+
+        await setSetting('watermark_logo_url', url, req.user._id);
+        await logAudit(req, { action: 'UPDATE_WATERMARK_LOGO', targetModel: 'SystemSettings', targetId: 'watermark_logo', severity: 'medium', metadata: { url } });
+
+        res.json({ success: true, url, message: 'Watermark logo uploaded' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// PUT /superadmin/watermark/settings — update watermark position, opacity
+router.put('/watermark/settings', async (req, res) => {
+    try {
+        const { position, opacity, enabled } = req.body;
+        if (position) await setSetting('watermark_position', position, req.user._id);
+        if (opacity !== undefined) await setSetting('watermark_opacity', Math.max(0.1, Math.min(1, parseFloat(opacity))), req.user._id);
+        if (enabled !== undefined) await setSetting('watermark_enabled', !!enabled, req.user._id);
+
+        await logAudit(req, { action: 'UPDATE_WATERMARK_SETTINGS', targetModel: 'SystemSettings', targetId: 'watermark', severity: 'low', metadata: { position, opacity, enabled } });
+        res.json({ success: true, message: 'Watermark settings updated' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// PUT /superadmin/watermark/override — set per-brand or per-user watermark override
+router.put('/watermark/override', async (req, res) => {
+    try {
+        const { targetType, targetId, enabled, logoUrl } = req.body; // targetType: 'brand' | 'user'
+        if (!['brand', 'user'].includes(targetType) || !targetId) return res.status(400).json({ success: false, error: 'targetType (brand/user) and targetId required' });
+
+        const overrides = await getSetting('watermark_overrides', {});
+        const key = `${targetType}_${targetId}`;
+
+        if (enabled === undefined && !logoUrl) {
+            // Remove override
+            delete overrides[key];
+        } else {
+            overrides[key] = { targetType, targetId, enabled: enabled !== undefined ? !!enabled : true, logoUrl: logoUrl || null, updatedAt: new Date() };
+        }
+
+        await setSetting('watermark_overrides', overrides, req.user._id);
+        await logAudit(req, { action: 'UPDATE_WATERMARK_OVERRIDE', targetModel: targetType === 'brand' ? 'Brand' : 'User', targetId, severity: 'low', metadata: { enabled, logoUrl } });
+        res.json({ success: true, message: `Watermark override ${enabled === undefined && !logoUrl ? 'removed' : 'set'} for ${targetType} ${targetId}` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// GET /superadmin/watermark/overrides — list all overrides
+router.get('/watermark/overrides', async (req, res) => {
+    try {
+        const overrides = await getSetting('watermark_overrides', {});
+        // Enrich with names
+        const entries = await Promise.all(Object.entries(overrides).map(async ([key, val]) => {
+            let name = key;
+            if (val.targetType === 'brand') {
+                const brand = await Brand.findById(val.targetId).select('name').lean();
+                name = brand?.name || val.targetId;
+            } else if (val.targetType === 'user') {
+                const user = await User.findById(val.targetId).select('name email').lean();
+                name = user?.name || user?.email || val.targetId;
+            }
+            return { ...val, key, name };
+        }));
+        res.json({ success: true, overrides: entries });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════
+// PROVIDER USAGE INTELLIGENCE
+// ══════════════════════════════════════════════════════════════
+
+// GET /superadmin/provider-usage — real API usage from providers + internal logs
+router.get('/provider-usage', async (req, res) => {
+    try {
+        const storedKeys = await getSetting('api_keys', {});
+        const days = parseInt(req.query.days) || 30;
+        const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+        // Aggregate internal usage from CreditUsage
+        const internalUsage = await CreditUsage.aggregate([
+            { $match: { createdAt: { $gte: since } } },
+            { $group: {
+                _id: '$tokenUsage.model',
+                calls: { $sum: 1 },
+                totalTokens: { $sum: '$tokenUsage.totalTokens' },
+                inputTokens: { $sum: '$tokenUsage.inputTokens' },
+                outputTokens: { $sum: '$tokenUsage.outputTokens' },
+                estimatedCost: { $sum: '$tokenUsage.estimatedCost' },
+                totalCredits: { $sum: '$cost' },
+            }},
+            { $sort: { estimatedCost: -1 } },
+        ]);
+
+        // Map models to providers
+        const providerModels = {
+            openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
+            anthropic: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet', 'claude-3-haiku'],
+            gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-image'],
+            grok: ['grok-3', 'grok-3-mini', 'grok-beta'],
+            piapi: ['seedance-2.0', 'kling-v2'],
+            fal: ['kling-fal', 'fast-sdxl'],
+            sarvam: ['bulbul', 'saaras', 'sarvam-2b'],
+        };
+
+        const providerUsage = {};
+        for (const [prov, models] of Object.entries(providerModels)) {
+            const usage = internalUsage.filter(u => models.some(m => (u._id || '').toLowerCase().includes(m.toLowerCase())));
+            providerUsage[prov] = {
+                calls: usage.reduce((s, u) => s + u.calls, 0),
+                totalTokens: usage.reduce((s, u) => s + (u.totalTokens || 0), 0),
+                estimatedCostUSD: Math.round(usage.reduce((s, u) => s + (u.estimatedCost || 0), 0) * 100) / 100,
+                creditsUsed: usage.reduce((s, u) => s + u.totalCredits, 0),
+                models: usage.map(u => ({ model: u._id || 'unknown', calls: u.calls, tokens: u.totalTokens || 0, cost: Math.round((u.estimatedCost || 0) * 100) / 100 })),
+            };
+        }
+
+        // Try to fetch real usage from OpenAI (if key available)
+        let openaiRealUsage = null;
+        const openaiKey = storedKeys.openai?.apiKey || process.env.OPENAI_API_KEY;
+        if (openaiKey) {
+            try {
+                const startDate = since.toISOString().split('T')[0];
+                const endDate = new Date().toISOString().split('T')[0];
+                const oResp = await fetch(`https://api.openai.com/v1/organization/usage/completions?start_time=${Math.floor(since.getTime() / 1000)}&limit=1&group_by=model`, {
+                    headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' }
+                });
+                if (oResp.ok) openaiRealUsage = await oResp.json();
+            } catch (e) { /* OpenAI usage API may not be available */ }
+        }
+
+        // Try PiAPI account balance
+        let piapiBalance = null;
+        const piapiKey = storedKeys.piapi?.apiKey || process.env.PIAPI_API_KEY;
+        if (piapiKey) {
+            try {
+                const pResp = await fetch('https://api.piapi.ai/api/v1/account', { headers: { 'Authorization': `Bearer ${piapiKey}` } });
+                if (pResp.ok) piapiBalance = await pResp.json();
+            } catch (e) { /* ignore */ }
+        }
+
+        // Daily trend (last N days)
+        const dailyTrend = await CreditUsage.aggregate([
+            { $match: { createdAt: { $gte: since } } },
+            { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, calls: { $sum: 1 }, credits: { $sum: '$cost' }, cost: { $sum: '$tokenUsage.estimatedCost' } } },
+            { $sort: { _id: 1 } },
+        ]);
+
+        res.json({
+            success: true,
+            days,
+            providerUsage,
+            openaiRealUsage,
+            piapiBalance,
+            dailyTrend,
+            totalEstimatedCostUSD: Math.round(Object.values(providerUsage).reduce((s, p) => s + p.estimatedCostUSD, 0) * 100) / 100,
+            totalCalls: Object.values(providerUsage).reduce((s, p) => s + p.calls, 0),
+            totalCreditsUsed: Object.values(providerUsage).reduce((s, p) => s + p.creditsUsed, 0),
+        });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -1374,6 +1689,173 @@ router.post('/credit-costs/reset', async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 // CREDIT BALANCE (public, protect only)
 // ══════════════════════════════════════════════════════════════
+
+// GET /superadmin/pricing-calculator — Cost vs Revenue analysis per action
+router.get('/pricing-calculator', async (req, res) => {
+    try {
+        const costs = await getCreditCosts();
+        const { creditPriceINR = 2, usdToInr = 85, targetMargin = 60 } = req.query;
+        const pricePerCredit = parseFloat(creditPriceINR);
+        const exchangeRate = parseFloat(usdToInr);
+        const margin = parseFloat(targetMargin);
+
+        // Estimated API cost per action (USD cents) based on typical token usage
+        // Text actions: ~2K input + ~1K output tokens average
+        // Image actions: flat per-image cost
+        // Video actions: flat per-generation cost
+        const ACTION_API_COSTS = {
+            content: 0.15,           // ~3K tokens on gemini-2.5-flash
+            contentRefine: 0.10,     // ~2K tokens
+            creative: 4.0,           // Gemini image gen (~$0.04/image)
+            photoshoot: 4.5,         // Gemini image gen + ref images
+            seoHealthCheck: 0.20,    // ~4K tokens on gemini-2.5-flash
+            seoTraffic: 0.20,
+            seoCompetitors: 0.25,
+            seoAiVisibility: 0.25,
+            seoAsk: 0.08,           // ~1K tokens
+            seoAuditPage: 0.15,
+            seoCompetitorDiscover: 0.10,
+            seoBacklinks: 0.30,     // ~6K tokens
+            seoWarRoom: 0.35,       // ~8K tokens
+            seoLlmProbe: 0.25,
+            seoAutoFix: 0.15,
+            seoPromptMining: 0.20,
+            brainstorm: 0.20,       // ~4K tokens on grok
+            brainstormRefine: 0.12,
+            brainstormChat: 0.10,
+            brainstormScreenplay: 0.30,
+            trendRefresh: 0.12,
+            videoBrainstorm: 0.15,
+            videoGenerate: 10.0,     // PiAPI/Seedance (~$0.10/video)
+            videoEdit: 5.0,
+            socialMedia: 0.20,
+            socialMediaCalendar: 0.25,
+            socialMediaAudit: 0.30,
+            socialMediaCompetitor: 0.30,
+            socialMediaScore: 0.15,
+            canvasGenerate: 4.0,     // Gemini image gen
+            canvasBgRemove: 4.0,
+            canvasExtend: 4.0,
+            adCreative: 4.0,         // Gemini image gen
+            voiceClone: 2.0,         // MiniMax Speech-02 HD
+            voiceTranscribe: 0.50,   // Sarvam STT
+        };
+
+        // Human-readable labels
+        const ACTION_LABELS = {
+            content: 'Content Generate', contentRefine: 'Content Refine',
+            creative: 'Creative Image', photoshoot: 'AI Photoshoot',
+            seoHealthCheck: 'SEO Health Check', seoTraffic: 'SEO Traffic', seoCompetitors: 'SEO Competitors',
+            seoAiVisibility: 'SEO AI Visibility', seoAsk: 'SEO Ask', seoAuditPage: 'SEO Page Audit',
+            seoCompetitorDiscover: 'SEO Discover', seoBacklinks: 'SEO Backlinks', seoWarRoom: 'SEO War Room',
+            seoLlmProbe: 'SEO LLM Probe', seoAutoFix: 'SEO Auto-Fix', seoPromptMining: 'SEO Prompt Mining',
+            brainstorm: 'Brainstorm Generate', brainstormRefine: 'Brainstorm Refine', brainstormChat: 'Brainstorm Chat',
+            brainstormScreenplay: 'Screenplay', trendRefresh: 'Trend Refresh',
+            videoBrainstorm: 'Video Brainstorm', videoGenerate: 'Video Generate', videoEdit: 'Video Edit',
+            socialMedia: 'Social Strategy', socialMediaCalendar: 'Social Calendar', socialMediaAudit: 'Social Audit',
+            socialMediaCompetitor: 'Social Competitor', socialMediaScore: 'Social Score',
+            canvasGenerate: 'Canvas AI Generate', canvasBgRemove: 'Canvas BG Remove', canvasExtend: 'Canvas Extend',
+            adCreative: 'Ad Creative', voiceClone: 'Voice Clone', voiceTranscribe: 'Voice Transcribe',
+        };
+
+        // Studios mapping
+        const studioOf = (a) => {
+            if (a.startsWith('seo')) return 'SEO';
+            if (a.startsWith('brainstorm') || a === 'trendRefresh') return 'Brainstorm';
+            if (a.startsWith('video')) return 'Video';
+            if (a.startsWith('social')) return 'Social Media';
+            if (a.startsWith('canvas')) return 'Creative (Canvas)';
+            if (['content', 'contentRefine'].includes(a)) return 'Content';
+            if (['creative', 'photoshoot'].includes(a)) return 'Creative';
+            if (a === 'adCreative') return 'Performance Marketing';
+            if (a.startsWith('voice')) return 'Voice';
+            return 'Other';
+        };
+
+        // Build per-action breakdown
+        const actions = Object.entries(costs).map(([action, creditCost]) => {
+            const apiCostCents = ACTION_API_COSTS[action] || 0.10;
+            const apiCostINR = (apiCostCents / 100) * exchangeRate;
+            const revenueINR = creditCost * pricePerCredit;
+            const profitINR = revenueINR - apiCostINR;
+            const marginPct = revenueINR > 0 ? ((profitINR / revenueINR) * 100) : 0;
+            const status = marginPct >= 50 ? 'profitable' : marginPct >= 20 ? 'breakeven' : 'loss';
+
+            return {
+                action,
+                label: ACTION_LABELS[action] || action,
+                studio: studioOf(action),
+                creditCost,
+                apiCostUSD: Math.round(apiCostCents) / 100,
+                apiCostINR: Math.round(apiCostINR * 100) / 100,
+                revenueINR: Math.round(revenueINR * 100) / 100,
+                profitINR: Math.round(profitINR * 100) / 100,
+                marginPct: Math.round(marginPct),
+                status,
+            };
+        });
+
+        // Studio summaries
+        const studioSummary = {};
+        actions.forEach(a => {
+            if (!studioSummary[a.studio]) studioSummary[a.studio] = { actions: 0, avgMargin: 0, totalApiCostINR: 0, totalRevenueINR: 0, losses: 0 };
+            const s = studioSummary[a.studio];
+            s.actions++;
+            s.totalApiCostINR += a.apiCostINR;
+            s.totalRevenueINR += a.revenueINR;
+            if (a.status === 'loss') s.losses++;
+        });
+        Object.values(studioSummary).forEach(s => {
+            s.avgMargin = s.totalRevenueINR > 0 ? Math.round(((s.totalRevenueINR - s.totalApiCostINR) / s.totalRevenueINR) * 100) : 0;
+        });
+
+        // Recommended credit price per target margin
+        const recommendedPrices = actions.map(a => {
+            const apiCostINR = a.apiCostINR;
+            const reqPrice = apiCostINR / (1 - margin / 100);
+            return { action: a.action, label: a.label, currentPriceINR: a.revenueINR, recommendedPriceINR: Math.round(reqPrice * 100) / 100, recommendedPerCredit: a.creditCost > 0 ? Math.round((reqPrice / a.creditCost) * 100) / 100 : 0 };
+        });
+
+        // Get actual usage data from DB (last 30 days)
+        const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        const usageData = await CreditUsage.aggregate([
+            { $match: { createdAt: { $gte: since } } },
+            { $group: { _id: '$action', count: { $sum: 1 }, totalCredits: { $sum: '$cost' }, totalTokens: { $sum: '$tokenUsage.totalTokens' }, estimatedAPICost: { $sum: '$tokenUsage.estimatedCost' } } },
+            { $sort: { totalCredits: -1 } },
+        ]);
+        const usageMap = usageData.reduce((m, u) => { m[u._id] = u; return m; }, {});
+
+        // Enrich actions with actual usage
+        actions.forEach(a => {
+            const u = usageMap[a.action];
+            a.last30d = u ? { count: u.count, totalCredits: u.totalCredits, actualAPICostUSD: Math.round((u.estimatedAPICost || 0) * 100) / 100 } : { count: 0, totalCredits: 0, actualAPICostUSD: 0 };
+        });
+
+        // Overall summary
+        const totalEstApiCost = actions.reduce((s, a) => s + (a.last30d.count * a.apiCostINR), 0);
+        const totalRevenue = actions.reduce((s, a) => s + (a.last30d.totalCredits * pricePerCredit), 0);
+
+        res.json({
+            success: true,
+            config: { creditPriceINR: pricePerCredit, usdToInr: exchangeRate, targetMargin: margin },
+            summary: {
+                totalActions: actions.length,
+                profitableActions: actions.filter(a => a.status === 'profitable').length,
+                breakevenActions: actions.filter(a => a.status === 'breakeven').length,
+                lossActions: actions.filter(a => a.status === 'loss').length,
+                estimatedMonthlyAPICostINR: Math.round(totalEstApiCost),
+                estimatedMonthlyRevenueINR: Math.round(totalRevenue),
+                overallMarginPct: totalRevenue > 0 ? Math.round(((totalRevenue - totalEstApiCost) / totalRevenue) * 100) : 0,
+            },
+            actions,
+            studioSummary,
+            recommendedPrices,
+            modelCosts: MODEL_COSTS,
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
 
 export const creditRouter = Router();
 

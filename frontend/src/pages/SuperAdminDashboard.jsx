@@ -64,6 +64,23 @@ export default function SuperAdminDashboard() {
     const [logsLoading, setLogsLoading] = useState(false)
     const [showBudgetModal, setShowBudgetModal] = useState(false)
     const [budgetForm, setBudgetForm] = useState({ anthropic: 0, openai: 0, gemini: 0, xai: 0, grok: 0, sarvam: 0 })
+    // Pricing Calculator state
+    const [pricingData, setPricingData] = useState(null)
+    const [pricingPrice, setPricingPrice] = useState(2)
+    const [pricingLoading, setPricingLoading] = useState(false)
+    const [pricingStudioFilter, setPricingStudioFilter] = useState('all')
+    // API Key Management state
+    const [apiProviders, setApiProviders] = useState([])
+    const [editingProvider, setEditingProvider] = useState(null)
+    const [editProviderKeys, setEditProviderKeys] = useState({})
+    const [testingProvider, setTestingProvider] = useState(null)
+    const [testResults, setTestResults] = useState({})
+    // Watermark Management state
+    const [watermarkLogoPreview, setWatermarkLogoPreview] = useState('')
+    // Provider Usage state
+    const [providerUsageData, setProviderUsageData] = useState(null)
+    const [providerUsageDays, setProviderUsageDays] = useState(30)
+    const [providerUsageLoading, setProviderUsageLoading] = useState(false)
 
     if (user?.role !== 'superadmin') {
         return <DashboardLayout><div className="flex items-center justify-center h-screen"><div className="text-center"><span className="material-symbols-outlined text-6xl text-rose-500 mb-4">shield</span><h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2><p className="text-slate-500">Super Admin access required</p></div></div></DashboardLayout>
@@ -99,12 +116,12 @@ export default function SuperAdminDashboard() {
         if (tab === 'waitlist') loadWaitlist()
         if (tab === 'coupons') loadCoupons()
         if (tab === 'content') { loadBrands(); loadContent() }
-        if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts() }
+        if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts(); loadApiKeys() }
         if (tab === 'users' || tab === 'ai-credits') loadUsers()
         if (tab === 'approvals') loadPendingUsers()
         if (tab === 'coupons') loadCoupons()
         if (tab === 'content') { loadBrands(); loadContent() }
-        if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts() }
+        if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts(); loadApiKeys() }
         if (tab === 'integrations') loadIntegrations()
         if (tab === 'packages') loadPackages()
         if (tab === 'logs') loadLogs()
@@ -133,7 +150,18 @@ export default function SuperAdminDashboard() {
     const loadCreditCosts = async () => { try { const d = await API.getCreditCosts(); setCreditCosts(d.costs); } catch (e) { console.error(e) } }
     const handleSaveCosts = async () => { try { await API.updateCreditCosts(editingCosts); showToast('Credit costs updated'); setEditingCosts(null); loadCreditCosts() } catch (e) { showToast(e.error || 'Failed', 'error') } }
     const handleResetCosts = async () => { if (!confirm('Reset all credit costs to defaults?')) return; try { await API.resetCreditCosts(); showToast('Reset to defaults'); setEditingCosts(null); loadCreditCosts() } catch { showToast('Failed', 'error') } }
-    const creditCostLabels = { content: 'Content Generate', contentRefine: 'Content Refine/Regen', creative: 'Creative (Image)', photoshoot: 'AI Photoshoot', seoHealthCheck: 'SEO Health Check', seoTraffic: 'SEO Traffic', seoCompetitors: 'SEO Competitors', seoAiVisibility: 'SEO AI Visibility', seoAsk: 'SEO Ask', seoAuditPage: 'SEO Page Audit', seoCompetitorDiscover: 'SEO Discover', seoBacklinks: 'SEO Backlinks', brainstorm: 'Brainstorm Generate', brainstormRefine: 'Brainstorm Refine', brainstormChat: 'Brainstorm Chat', brainstormScreenplay: 'Screenplay', trendRefresh: 'Trend Refresh' }
+    const creditCostLabels = { content: 'Content Generate', contentRefine: 'Content Refine/Regen', creative: 'Creative (Image)', photoshoot: 'AI Photoshoot', seoHealthCheck: 'SEO Health Check', seoTraffic: 'SEO Traffic', seoCompetitors: 'SEO Competitors', seoAiVisibility: 'SEO AI Visibility', seoAsk: 'SEO Ask', seoAuditPage: 'SEO Page Audit', seoCompetitorDiscover: 'SEO Discover', seoBacklinks: 'SEO Backlinks', seoWarRoom: 'SEO War Room', seoLlmProbe: 'SEO LLM Probe', seoAutoFix: 'SEO Auto-Fix', seoPromptMining: 'SEO Prompt Mining', brainstorm: 'Brainstorm Generate', brainstormRefine: 'Brainstorm Refine', brainstormChat: 'Brainstorm Chat', brainstormScreenplay: 'Screenplay', trendRefresh: 'Trend Refresh', videoBrainstorm: 'Video Brainstorm', videoGenerate: 'Video Generate', videoEdit: 'Video Edit', socialMedia: 'Social Strategy', socialMediaCalendar: 'Social Calendar', socialMediaAudit: 'Social Audit', socialMediaCompetitor: 'Social Competitor', socialMediaScore: 'Social Score', canvasGenerate: 'Canvas AI Gen', canvasBgRemove: 'Canvas BG Remove', canvasExtend: 'Canvas Extend', adCreative: 'Ad Creative', voiceClone: 'Voice Clone', voiceTranscribe: 'Voice Transcribe' }
+    const loadPricingData = async (price) => { setPricingLoading(true); try { const d = await API.getPricingCalculator({ creditPriceINR: price || pricingPrice, usdToInr: 85, targetMargin: 60 }); setPricingData(d) } catch (e) { console.error('Pricing calc error:', e) } finally { setPricingLoading(false) } }
+    // API Key Management functions
+    const loadApiKeys = async () => { try { const d = await API.getApiKeys(); setApiProviders(d.providers || []) } catch (e) { console.error(e) } }
+    const handleSaveApiKey = async (provider) => { try { await API.updateApiKeys(provider, editProviderKeys); showToast('API key updated'); setEditingProvider(null); setEditProviderKeys({}); loadApiKeys() } catch (e) { showToast(e.error || 'Failed', 'error') } }
+    const handleDeleteApiKey = async (provider) => { if (!confirm(`Remove stored key for ${provider}? Env vars will still apply.`)) return; try { await API.deleteApiKeys(provider); showToast('Key removed'); loadApiKeys() } catch (e) { showToast(e.error || 'Failed', 'error') } }
+    const handleTestApiKey = async (provider) => { setTestingProvider(provider); try { const d = await API.testApiKey(provider); setTestResults(r => ({ ...r, [provider]: d })) } catch (e) { setTestResults(r => ({ ...r, [provider]: { success: false, status: 'error', message: e.message } })) } finally { setTestingProvider(null) } }
+    // Watermark functions
+    const handleWatermarkLogoUpload = async (e) => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = async (ev) => { const dataUrl = ev.target.result; setWatermarkLogoPreview(dataUrl); try { const d = await API.uploadWatermarkLogo(dataUrl); showToast('Watermark logo uploaded'); loadSettings() } catch (err) { showToast(err.error || 'Upload failed', 'error') } }; reader.readAsDataURL(file) }
+    const handleWatermarkSettingsUpdate = async (updates) => { try { await API.updateWatermarkSettings(updates); showToast('Watermark settings updated'); loadSettings() } catch (e) { showToast(e.error || 'Failed', 'error') } }
+    // Provider Usage functions
+    const loadProviderUsage = async (days) => { setProviderUsageLoading(true); try { const d = await API.getProviderUsage(days || providerUsageDays); setProviderUsageData(d) } catch (e) { console.error(e) } finally { setProviderUsageLoading(false) } }
     const loadTokenUsage = async () => { try { const d = await API.getTokenUsage(tokenDays); setTokenData(d); if (d.providerWallets) { const b = {}; d.providerWallets.forEach(w => b[w.provider] = w.budget); setBudgetForm(b) } } catch (e) { console.error(e) } }
     const handleSaveBudgets = async (e) => { e.preventDefault(); try { await API.updateProviderBudgets(budgetForm); showToast('Provider budgets updated'); setShowBudgetModal(false); loadTokenUsage() } catch (e) { showToast(e.error || 'Failed', 'error') } }
     const addFeature = () => { if (!newFeature.trim()) return; setPkgForm(f => ({ ...f, features: [...f.features, { name: newFeature.trim(), included: true }] })); setNewFeature('') }
@@ -1743,6 +1771,346 @@ export default function SuperAdminDashboard() {
                                 </div>
                             </div>
                         )}
+
+                        {/* ──────── PRICING CALCULATOR ──────── */}
+                        <div className="mt-8">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-emerald-400">calculate</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-base font-bold text-white">Pricing Calculator</p>
+                                        <p className="text-sm text-slate-500">API cost vs credit revenue — per action profitability</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => loadPricingData()} disabled={pricingLoading} className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold hover:from-emerald-500/20 hover:to-cyan-500/20 cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
+                                    <span className={`material-symbols-outlined text-sm ${pricingLoading ? 'animate-spin' : ''}`}>{pricingLoading ? 'progress_activity' : 'refresh'}</span>
+                                    {pricingLoading ? 'Loading...' : pricingData ? 'Refresh' : 'Load Pricing Data'}
+                                </button>
+                            </div>
+
+                            {pricingData && (
+                                <div className="space-y-4">
+                                    {/* Credit Price Slider */}
+                                    <div className="glass-panel rounded-2xl p-5 border border-emerald-500/10">
+                                        <label className="text-xs font-bold text-slate-400 mb-2 block">PRICE PER CREDIT (₹)</label>
+                                        <div className="flex items-center gap-4">
+                                            <input type="range" min="0.5" max="10" step="0.5" value={pricingPrice} onChange={e => { setPricingPrice(parseFloat(e.target.value)); loadPricingData(parseFloat(e.target.value)) }} className="flex-1 accent-emerald-500 cursor-pointer" />
+                                            <span className="text-2xl font-extrabold text-emerald-400 min-w-[60px] text-center">₹{pricingPrice}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Summary Cards */}
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                        {[{ l: 'Profitable', v: pricingData.summary?.profitableActions, c: 'text-emerald-400', bg: 'from-emerald-500/10', i: 'trending_up' },
+                                          { l: 'Break-even', v: pricingData.summary?.breakevenActions, c: 'text-amber-400', bg: 'from-amber-500/10', i: 'trending_flat' },
+                                          { l: 'Loss', v: pricingData.summary?.lossActions, c: 'text-rose-400', bg: 'from-rose-500/10', i: 'trending_down' },
+                                          { l: 'Overall Margin', v: `${pricingData.summary?.overallMarginPct || 0}%`, c: (pricingData.summary?.overallMarginPct || 0) >= 50 ? 'text-emerald-400' : (pricingData.summary?.overallMarginPct || 0) >= 20 ? 'text-amber-400' : 'text-rose-400', bg: 'from-indigo-500/10', i: 'donut_large' },
+                                        ].map(s => (
+                                            <div key={s.l} className={`glass-panel rounded-xl p-4 bg-gradient-to-br ${s.bg} to-transparent`}>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className={`material-symbols-outlined text-sm ${s.c}`}>{s.i}</span>
+                                                    <span className="text-xs text-slate-500 font-bold">{s.l}</span>
+                                                </div>
+                                                <p className={`text-2xl font-extrabold ${s.c}`}>{s.v}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Monthly Projection */}
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div className="glass-panel rounded-xl p-4 text-center">
+                                            <p className="text-xs text-slate-500 mb-1">Est. Monthly API Cost</p>
+                                            <p className="text-lg font-extrabold text-rose-400">₹{(pricingData.summary?.estimatedMonthlyAPICostINR || 0).toLocaleString()}</p>
+                                        </div>
+                                        <div className="glass-panel rounded-xl p-4 text-center">
+                                            <p className="text-xs text-slate-500 mb-1">Est. Monthly Revenue</p>
+                                            <p className="text-lg font-extrabold text-emerald-400">₹{(pricingData.summary?.estimatedMonthlyRevenueINR || 0).toLocaleString()}</p>
+                                        </div>
+                                        <div className="glass-panel rounded-xl p-4 text-center">
+                                            <p className="text-xs text-slate-500 mb-1">Est. Monthly Profit</p>
+                                            <p className={`text-lg font-extrabold ${((pricingData.summary?.estimatedMonthlyRevenueINR || 0) - (pricingData.summary?.estimatedMonthlyAPICostINR || 0)) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{((pricingData.summary?.estimatedMonthlyRevenueINR || 0) - (pricingData.summary?.estimatedMonthlyAPICostINR || 0)).toLocaleString()}</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Studio Filter */}
+                                    <div className="flex gap-2 flex-wrap">
+                                        {['all', ...Object.keys(pricingData.studioSummary || {})].map(s => (
+                                            <button key={s} onClick={() => setPricingStudioFilter(s)} className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${pricingStudioFilter === s ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-white/[0.04] text-slate-500 border border-white/[0.08] hover:text-white'}`}>
+                                                {s === 'all' ? 'All Studios' : s}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* Per-Action Table */}
+                                    <div className="glass-panel rounded-2xl overflow-hidden border border-white/[0.06]">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left">
+                                                <thead>
+                                                    <tr className="text-[10px] text-slate-500 font-bold uppercase tracking-wider border-b border-white/[0.06] bg-white/[0.02]">
+                                                        <th className="px-4 py-3">Action</th>
+                                                        <th className="px-3 py-3">Studio</th>
+                                                        <th className="px-3 py-3 text-right">Credits</th>
+                                                        <th className="px-3 py-3 text-right">API Cost ($)</th>
+                                                        <th className="px-3 py-3 text-right">API Cost (₹)</th>
+                                                        <th className="px-3 py-3 text-right">Revenue (₹)</th>
+                                                        <th className="px-3 py-3 text-right">Profit (₹)</th>
+                                                        <th className="px-3 py-3 text-right">Margin</th>
+                                                        <th className="px-3 py-3 text-center">30d Uses</th>
+                                                        <th className="px-3 py-3 text-center">Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-white/[0.04]">
+                                                    {(pricingData.actions || []).filter(a => pricingStudioFilter === 'all' || a.studio === pricingStudioFilter).map(a => (
+                                                        <tr key={a.action} className="text-sm hover:bg-white/[0.02] transition-all">
+                                                            <td className="px-4 py-2.5"><span className="font-bold text-white text-xs">{a.label}</span></td>
+                                                            <td className="px-3 py-2.5"><span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.05] text-slate-400 font-bold">{a.studio}</span></td>
+                                                            <td className="px-3 py-2.5 text-right font-bold text-amber-400">{a.creditCost}</td>
+                                                            <td className="px-3 py-2.5 text-right text-slate-400 font-mono text-xs">${a.apiCostUSD}</td>
+                                                            <td className="px-3 py-2.5 text-right text-slate-400">₹{a.apiCostINR}</td>
+                                                            <td className="px-3 py-2.5 text-right text-white font-bold">₹{a.revenueINR}</td>
+                                                            <td className={`px-3 py-2.5 text-right font-bold ${a.profitINR >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>₹{a.profitINR}</td>
+                                                            <td className={`px-3 py-2.5 text-right font-extrabold ${a.marginPct >= 50 ? 'text-emerald-400' : a.marginPct >= 20 ? 'text-amber-400' : 'text-rose-400'}`}>{a.marginPct}%</td>
+                                                            <td className="px-3 py-2.5 text-center text-slate-500">{a.last30d?.count || 0}</td>
+                                                            <td className="px-3 py-2.5 text-center">
+                                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${a.status === 'profitable' ? 'bg-emerald-500/15 text-emerald-400' : a.status === 'breakeven' ? 'bg-amber-500/15 text-amber-400' : 'bg-rose-500/15 text-rose-400'}`}>
+                                                                    {a.status === 'profitable' ? '🟢' : a.status === 'breakeven' ? '🟡' : '🔴'} {a.status}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    {/* Studio Summary Cards */}
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                                        {Object.entries(pricingData.studioSummary || {}).map(([studio, data]) => (
+                                            <div key={studio} className="glass-panel rounded-xl p-3">
+                                                <p className="text-xs font-bold text-white mb-1">{studio}</p>
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className={`text-lg font-extrabold ${data.avgMargin >= 50 ? 'text-emerald-400' : data.avgMargin >= 20 ? 'text-amber-400' : 'text-rose-400'}`}>{data.avgMargin}%</span>
+                                                    <span className="text-[10px] text-slate-600">avg margin</span>
+                                                </div>
+                                                <p className="text-[10px] text-slate-600">{data.actions} actions{data.losses > 0 ? ` • ${data.losses} loss` : ''}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ──────── API KEY MANAGEMENT ──────── */}
+                        <div className="mt-8">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/20 to-purple-500/20 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-violet-400">key</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-base font-bold text-white">API Key Management</p>
+                                        <p className="text-sm text-slate-500">Manage external API keys — DB overrides env vars</p>
+                                    </div>
+                                </div>
+                                <button onClick={loadApiKeys} className="px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 text-xs font-bold hover:bg-violet-500/20 cursor-pointer flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-sm">refresh</span> Refresh
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {apiProviders.map(p => (
+                                    <div key={p.id} className="glass-panel rounded-xl p-4 border border-white/[0.06] hover:border-violet-500/20 transition-all">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-violet-400 text-lg">{p.icon}</span>
+                                                <span className="text-sm font-bold text-white">{p.label}</span>
+                                            </div>
+                                            <div className="flex gap-1">
+                                                {p.canTest && (
+                                                    <button onClick={() => handleTestApiKey(p.id)} disabled={testingProvider === p.id} className="p-1 rounded hover:bg-white/[0.05] cursor-pointer" title="Test">
+                                                        <span className={`material-symbols-outlined text-sm ${testingProvider === p.id ? 'animate-spin text-amber-400' : 'text-slate-500'}`}>{testingProvider === p.id ? 'progress_activity' : 'speed'}</span>
+                                                    </button>
+                                                )}
+                                                <button onClick={() => { setEditingProvider(p.id); setEditProviderKeys({}) }} className="p-1 rounded hover:bg-white/[0.05] cursor-pointer" title="Edit">
+                                                    <span className="material-symbols-outlined text-sm text-slate-500">edit</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {p.fields.map(f => (
+                                            <div key={f.key} className="flex items-center justify-between py-1.5 border-t border-white/[0.04]">
+                                                <span className="text-[10px] text-slate-500 font-bold">{f.label}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs text-slate-400 font-mono">{f.masked || '—'}</span>
+                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${f.source === 'database' ? 'bg-violet-500/15 text-violet-400' : f.source === 'env' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>{f.source}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {testResults[p.id] && (
+                                            <div className={`mt-2 p-2 rounded-lg text-[10px] font-bold ${testResults[p.id].success ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                                {testResults[p.id].status === 'connected' ? '🟢' : testResults[p.id].status === 'no_key' ? '⚫' : '🔴'} {testResults[p.id].message}
+                                            </div>
+                                        )}
+                                        {editingProvider === p.id && (
+                                            <div className="mt-3 pt-3 border-t border-violet-500/20 space-y-2">
+                                                {p.fields.map(f => (
+                                                    <input key={f.key} type="password" placeholder={`New ${f.label}`} value={editProviderKeys[f.key] || ''} onChange={e => setEditProviderKeys(k => ({ ...k, [f.key]: e.target.value }))} className="w-full px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.1] text-white text-xs focus:border-violet-500/50 outline-none" />
+                                                ))}
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => handleSaveApiKey(p.id)} className="flex-1 px-3 py-1.5 rounded-lg bg-violet-500/20 text-violet-400 text-xs font-bold hover:bg-violet-500/30 cursor-pointer">Save</button>
+                                                    <button onClick={() => handleDeleteApiKey(p.id)} className="px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 text-xs font-bold hover:bg-rose-500/20 cursor-pointer">Remove</button>
+                                                    <button onClick={() => setEditingProvider(null)} className="px-3 py-1.5 rounded-lg bg-white/[0.05] text-slate-500 text-xs font-bold hover:bg-white/[0.1] cursor-pointer">Cancel</button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* ──────── WATERMARK CONFIGURATION ──────── */}
+                        {systemSettings && (
+                            <div className="mt-8">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-teal-500/20 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-cyan-400">branding_watermark</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-base font-bold text-white">Watermark Configuration</p>
+                                        <p className="text-sm text-slate-500">Logo, position, opacity — applied to images & videos</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="glass-panel rounded-xl p-4 border border-white/[0.06]">
+                                        <label className="text-xs font-bold text-slate-400 mb-2 block">WATERMARK LOGO</label>
+                                        <div className="flex flex-col items-center gap-3">
+                                            {(watermarkLogoPreview || systemSettings.watermarkLogoUrl) ? (
+                                                <div className="w-full h-24 rounded-lg bg-slate-800/50 flex items-center justify-center overflow-hidden border border-white/[0.06]">
+                                                    <img src={watermarkLogoPreview || systemSettings.watermarkLogoUrl} alt="Watermark" className="max-h-20 max-w-full object-contain" />
+                                                </div>
+                                            ) : (
+                                                <div className="w-full h-24 rounded-lg bg-slate-800/50 flex items-center justify-center border border-dashed border-white/[0.1]">
+                                                    <span className="text-slate-600 text-xs">No logo — text watermark active</span>
+                                                </div>
+                                            )}
+                                            <label className="px-4 py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-bold hover:bg-cyan-500/20 cursor-pointer flex items-center gap-1.5">
+                                                <span className="material-symbols-outlined text-sm">upload</span> Upload Logo
+                                                <input type="file" accept="image/*" onChange={handleWatermarkLogoUpload} className="hidden" />
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div className="glass-panel rounded-xl p-4 border border-white/[0.06]">
+                                        <label className="text-xs font-bold text-slate-400 mb-2 block">POSITION</label>
+                                        <select value={systemSettings.watermarkPosition || 'bottom-right'} onChange={e => handleWatermarkSettingsUpdate({ position: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.1] text-white text-xs mb-4 cursor-pointer outline-none">
+                                            {['top-left', 'top-right', 'center', 'bottom-left', 'bottom-right'].map(pos => (
+                                                <option key={pos} value={pos} className="bg-slate-900">{pos.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
+                                            ))}
+                                        </select>
+                                        <label className="text-xs font-bold text-slate-400 mb-2 block">OPACITY ({Math.round((systemSettings.watermarkOpacity || 0.4) * 100)}%)</label>
+                                        <input type="range" min="0.1" max="1" step="0.05" value={systemSettings.watermarkOpacity || 0.4} onChange={e => handleWatermarkSettingsUpdate({ opacity: parseFloat(e.target.value) })} className="w-full accent-cyan-500 cursor-pointer" />
+                                    </div>
+
+                                    <div className="glass-panel rounded-xl p-4 border border-white/[0.06]">
+                                        <label className="text-xs font-bold text-slate-400 mb-3 block">WATERMARK STATUS</label>
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <button onClick={() => handleWatermarkSettingsUpdate({ enabled: !systemSettings.watermarkEnabled })} className={`relative inline-flex h-6 w-11 items-center rounded-full cursor-pointer transition-colors ${systemSettings.watermarkEnabled ? 'bg-cyan-500' : 'bg-slate-700'}`}>
+                                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${systemSettings.watermarkEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                                            </button>
+                                            <span className={`text-sm font-bold ${systemSettings.watermarkEnabled ? 'text-cyan-400' : 'text-slate-500'}`}>{systemSettings.watermarkEnabled ? 'ON — All Outputs' : 'OFF — No Watermarks'}</span>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center gap-2 text-[10px]"><span className="material-symbols-outlined text-xs text-cyan-400">image</span><span className="text-slate-400">Applied to generated images</span></div>
+                                            <div className="flex items-center gap-2 text-[10px]"><span className="material-symbols-outlined text-xs text-cyan-400">movie</span><span className="text-slate-400">Applied to generated videos</span></div>
+                                            <div className="flex items-center gap-2 text-[10px]"><span className="material-symbols-outlined text-xs text-amber-400">tune</span><span className="text-slate-400">Per-brand/user overrides available</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ──────── PROVIDER USAGE INTELLIGENCE ──────── */}
+                        <div className="mt-8">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-orange-400">monitoring</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-base font-bold text-white">Provider Usage Intelligence</p>
+                                        <p className="text-sm text-slate-500">Real API usage data from providers + internal logs</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <select value={providerUsageDays} onChange={e => { setProviderUsageDays(parseInt(e.target.value)); loadProviderUsage(parseInt(e.target.value)) }} className="px-2 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.1] text-white text-xs cursor-pointer outline-none">
+                                        {[7, 14, 30, 60, 90].map(d => <option key={d} value={d} className="bg-slate-900">{d} days</option>)}
+                                    </select>
+                                    <button onClick={() => loadProviderUsage()} disabled={providerUsageLoading} className="px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-bold hover:bg-orange-500/20 cursor-pointer flex items-center gap-1 disabled:opacity-50">
+                                        <span className={`material-symbols-outlined text-sm ${providerUsageLoading ? 'animate-spin' : ''}`}>{providerUsageLoading ? 'progress_activity' : 'refresh'}</span>
+                                        {providerUsageLoading ? 'Loading...' : providerUsageData ? 'Refresh' : 'Load Usage'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {providerUsageData && (
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div className="glass-panel rounded-xl p-4 text-center">
+                                            <p className="text-xs text-slate-500 mb-1">Total API Cost (Est.)</p>
+                                            <p className="text-xl font-extrabold text-rose-400">${providerUsageData.totalEstimatedCostUSD}</p>
+                                            <p className="text-[10px] text-slate-600">≈ ₹{Math.round((providerUsageData.totalEstimatedCostUSD || 0) * 85).toLocaleString()}</p>
+                                        </div>
+                                        <div className="glass-panel rounded-xl p-4 text-center">
+                                            <p className="text-xs text-slate-500 mb-1">Total API Calls</p>
+                                            <p className="text-xl font-extrabold text-amber-400">{(providerUsageData.totalCalls || 0).toLocaleString()}</p>
+                                        </div>
+                                        <div className="glass-panel rounded-xl p-4 text-center">
+                                            <p className="text-xs text-slate-500 mb-1">Credits Consumed</p>
+                                            <p className="text-xl font-extrabold text-indigo-400">{(providerUsageData.totalCreditsUsed || 0).toLocaleString()}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                                        {Object.entries(providerUsageData.providerUsage || {}).map(([prov, data]) => (
+                                            <div key={prov} className={`glass-panel rounded-xl p-4 border ${data.calls > 0 ? 'border-orange-500/10' : 'border-white/[0.04]'}`}>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <span className="text-xs font-bold text-white capitalize">{prov}</span>
+                                                    {data.calls > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-400 font-bold">ACTIVE</span>}
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <div className="flex justify-between text-[10px]"><span className="text-slate-500">Calls</span><span className="text-white font-bold">{data.calls.toLocaleString()}</span></div>
+                                                    <div className="flex justify-between text-[10px]"><span className="text-slate-500">Tokens</span><span className="text-white font-bold">{(data.totalTokens || 0).toLocaleString()}</span></div>
+                                                    <div className="flex justify-between text-[10px]"><span className="text-slate-500">Est. Cost</span><span className="text-rose-400 font-bold">${data.estimatedCostUSD}</span></div>
+                                                    <div className="flex justify-between text-[10px]"><span className="text-slate-500">Credits</span><span className="text-amber-400 font-bold">{data.creditsUsed}</span></div>
+                                                </div>
+                                                {data.models?.length > 0 && (
+                                                    <div className="mt-2 pt-2 border-t border-white/[0.04]">
+                                                        {data.models.slice(0, 3).map(m => (
+                                                            <div key={m.model} className="flex justify-between text-[9px] py-0.5">
+                                                                <span className="text-slate-600 truncate max-w-[60%]">{m.model}</span>
+                                                                <span className="text-slate-500">{m.calls} calls</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {providerUsageData.piapiBalance && (
+                                        <div className="glass-panel rounded-xl p-4 border border-orange-500/10">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className="material-symbols-outlined text-orange-400 text-sm">account_balance_wallet</span>
+                                                <span className="text-xs font-bold text-white">PiAPI Account Balance</span>
+                                            </div>
+                                            <pre className="text-[10px] text-slate-400 bg-white/[0.02] p-2 rounded overflow-auto max-h-24">{JSON.stringify(providerUsageData.piapiBalance, null, 2)}</pre>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
 

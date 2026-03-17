@@ -410,7 +410,20 @@ export const superadmin = {
     getCreditCosts: () => apiFetch('/superadmin/credit-costs'),
     updateCreditCosts: (costs) => apiFetch('/superadmin/credit-costs', { method: 'PUT', body: JSON.stringify({ costs }) }),
     resetCreditCosts: () => apiFetch('/superadmin/credit-costs/reset', { method: 'POST' }),
+    getPricingCalculator: (params = {}) => { const q = new URLSearchParams(params).toString(); return apiFetch(`/superadmin/pricing-calculator?${q}`); },
     updateProviderBudgets: (budgets) => apiFetch('/superadmin/settings/provider-budgets', { method: 'PUT', body: JSON.stringify({ budgets }) }),
+    // API Key Management
+    getApiKeys: () => apiFetch('/superadmin/api-keys'),
+    updateApiKeys: (provider, keys) => apiFetch('/superadmin/api-keys', { method: 'PUT', body: JSON.stringify({ provider, keys }) }),
+    deleteApiKeys: (provider) => apiFetch(`/superadmin/api-keys/${provider}`, { method: 'DELETE' }),
+    testApiKey: (provider) => apiFetch(`/superadmin/api-keys/${provider}/test`, { method: 'POST' }),
+    // Watermark Management
+    uploadWatermarkLogo: (image) => apiFetch('/superadmin/watermark/upload', { method: 'POST', body: JSON.stringify({ image }) }),
+    updateWatermarkSettings: (data) => apiFetch('/superadmin/watermark/settings', { method: 'PUT', body: JSON.stringify(data) }),
+    setWatermarkOverride: (data) => apiFetch('/superadmin/watermark/override', { method: 'PUT', body: JSON.stringify(data) }),
+    getWatermarkOverrides: () => apiFetch('/superadmin/watermark/overrides'),
+    // Provider Usage Intelligence
+    getProviderUsage: (days = 30) => apiFetch(`/superadmin/provider-usage?days=${days}`),
     // Token Usage Analytics
     getTokenUsage: (days = 30) => apiFetch(`/superadmin/stats/token-usage?days=${days}`),
     syncCredits: () => apiFetch('/superadmin/system/sync-all-credits', { method: 'POST' }),

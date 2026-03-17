@@ -7,6 +7,7 @@
 
 import { Router } from 'express';
 import { protect } from '../middleware/auth.js';
+import { requireCredits } from '../middleware/credits.js';
 import AdReport from '../models/AdReport.js';
 import AdCampaign from '../models/AdCampaign.js';
 import AdLearning from '../models/AdLearning.js';
@@ -720,7 +721,7 @@ router.put('/learnings/:id/status', protect, async (req, res) => {
  * POST /api/pm-studio/generate-ad-image
  * Generate an ad visual using the Creative Studio's Gemini pipeline
  */
-router.post('/generate-ad-image', protect, async (req, res) => {
+router.post('/generate-ad-image', protect, requireCredits('adCreative'), async (req, res) => {
     try {
         const { prompt, brandId, platform, format } = req.body;
         if (!prompt) return res.status(400).json({ success: false, error: 'prompt is required' });
