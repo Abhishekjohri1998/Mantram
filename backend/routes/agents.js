@@ -5,8 +5,38 @@ import { getOrchestrator } from '../agents/orchestrator.js';
 import { addWatermark } from '../utils/watermark.js';
 import { getSetting } from '../models/SystemSettings.js';
 import { safeErrorMessage } from '../utils/safeError.js';
+import { mirrorUrlToS3 } from '../utils/s3.js';
 
 const router = Router();
+
+// Helper: Mirror brand assets to S3
+async function mirrorBrandAssets(dna, brandId) {
+    if (!dna) return;
+
+    // Mirror logo
+    if (dna.logo?.url && !dna.logo.url.includes('s3.amazonaws.com') && !dna.logo.url.startsWith('data:')) {
+        const s3Url = await mirrorUrlToS3(dna.logo.url, `brands/${brandId}/logo.png`);
+        if (s3Url) dna.logo.url = s3Url;
+    }
+
+    // Mirror brand images
+    if (dna.brandImages && dna.brandImages.length > 0) {
+        dna.brandImages = await Promise.all(dna.brandImages.map(async (img, idx) => {
+            if (!img.url || img.url.includes('s3.amazonaws.com') || img.url.startsWith('data:')) return img;
+            const s3Url = await mirrorUrlToS3(img.url, `brands/${brandId}/images/img_${idx}.png`);
+            return s3Url ? { ...img, url: s3Url } : img;
+        }));
+    }
+
+    // Mirror banner images
+    if (dna.bannerImages && dna.bannerImages.length > 0) {
+        dna.bannerImages = await Promise.all(dna.bannerImages.map(async (img, idx) => {
+            if (!img.url || img.url.includes('s3.amazonaws.com') || img.url.startsWith('data:')) return img;
+            const s3Url = await mirrorUrlToS3(img.url, `brands/${brandId}/banners/banner_${idx}.png`);
+            return s3Url ? { ...img, url: s3Url } : img;
+        }));
+    }
+}
 
 // POST /api/agents/scan-website — Brand Scanner Agent
 router.post('/scan-website', optionalAuth, async (req, res) => {
@@ -32,6 +62,12 @@ router.post('/scan-website', optionalAuth, async (req, res) => {
         // If user is authenticated, save brand to DB
         let brand = null;
         if (req.user) {
+            // Placeholder ID for keying assets before creation
+            const tempBrandId = crypto.randomUUID();
+            
+            // Mirror assets to S3 before DB save
+            await mirrorBrandAssets(scanResult.dna, tempBrandId);
+
             brand = await Brand.create({
                 user: req.user._id,
                 name: scanResult.name || parsedUrl.hostname.replace(/^www\./, ''),
@@ -94,41 +130,47 @@ router.post('/brainstorm/save', protect, async (req, res) => {
     try {
         const { brandData } = req.body;
 
+        // Mirror assets to S3 before DB save
+        const tempBrandId = crypto.randomUUID();
+        const dna = {
+            logo: {
+                url: brandData.logoUrl || '',
+                metadata: { source: brandData.logoUrl ? 'ai-generated' : '' },
+            },
+            voice: {
+                personality: brandData.personality || '',
+                description: brandData.voiceDescription || '',
+                tone: brandData.tone || 50,
+                clarity: brandData.clarity || 50,
+                formality: brandData.formality || 50,
+                warmth: brandData.warmth || 50,
+                keywords: brandData.keyPhrases || [],
+            },
+            contentStyle: {
+                dos: brandData.dos || [],
+                donts: brandData.donts || [],
+                keyPhrases: brandData.keyPhrases || [],
+            },
+            colors: (brandData.colorSuggestions || []).map(c => ({
+                name: c.name, hex: c.hex, usage: c.usage || 'accent',
+            })),
+            fonts: {
+                heading: { family: brandData.fontSuggestions?.heading || 'Inter', weight: '700' },
+                body: { family: brandData.fontSuggestions?.body || 'Inter', weight: '400' },
+            },
+            industry: brandData.industry || '',
+            targetAudience: brandData.targetAudience || '',
+            brandDescription: brandData.description || '',
+            country: brandData.country || 'India',
+        };
+
+        await mirrorBrandAssets(dna, tempBrandId);
+
         const brand = await Brand.create({
             user: req.user._id,
             name: brandData.name || 'New Brand',
             onboardingMethod: 'brainstorm',
-            dna: {
-                logo: {
-                    url: brandData.logoUrl || '',
-                    metadata: { source: brandData.logoUrl ? 'ai-generated' : '' },
-                },
-                voice: {
-                    personality: brandData.personality || '',
-                    description: brandData.voiceDescription || '',
-                    tone: brandData.tone || 50,
-                    clarity: brandData.clarity || 50,
-                    formality: brandData.formality || 50,
-                    warmth: brandData.warmth || 50,
-                    keywords: brandData.keyPhrases || [],
-                },
-                contentStyle: {
-                    dos: brandData.dos || [],
-                    donts: brandData.donts || [],
-                    keyPhrases: brandData.keyPhrases || [],
-                },
-                colors: (brandData.colorSuggestions || []).map(c => ({
-                    name: c.name, hex: c.hex, usage: c.usage || 'accent',
-                })),
-                fonts: {
-                    heading: { family: brandData.fontSuggestions?.heading || 'Inter', weight: '700' },
-                    body: { family: brandData.fontSuggestions?.body || 'Inter', weight: '400' },
-                },
-                industry: brandData.industry || '',
-                targetAudience: brandData.targetAudience || '',
-                brandDescription: brandData.description || '',
-                country: brandData.country || 'India',
-            },
+            dna
         });
 
         await req.user.updateOne({ $inc: { 'usage.brandsCreated': 1 } });

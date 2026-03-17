@@ -1305,6 +1305,12 @@ router.post('/ugc/webhook-callback', async (req, res) => {
                 project.finalVideoUrl = event_data.video_url || '';
                 await project.save();
                 console.log(`✅ Webhook: Project ${project._id} marked done`);
+
+                // Mirror to S3 immediately
+                if (event_data.video_url) {
+                    downloadAndUploadVideoToS3(project._id.toString(), event_data.video_url)
+                        .catch(e => console.warn('⚠️ Webhook Video S3 upload failed:', e.message));
+                }
             }
         } else if (event_type === 'video.failed' && videoId) {
             const project = await VideoProject.findOne({ 'generation.falRequestId': videoId });
@@ -2604,9 +2610,11 @@ export async function downloadAndUploadVideoToS3(projectId, videoUrl) {
         const s3Url = await uploadToS3(buffer, s3Key, 'video/mp4');
         console.log(`✅ Video uploaded to S3: ${s3Url}`);
 
-        // Update DB with permanent S3 URL
+        // Update DB with permanent S3 URL — overwrite the ephemeral one
         await VideoProject.findByIdAndUpdate(projectId, {
+            'generation.videoUrl': s3Url,
             'generation.s3VideoUrl': s3Url,
+            finalVideoUrl: s3Url
         });
 
         return s3Url;

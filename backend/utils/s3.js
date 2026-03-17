@@ -55,4 +55,35 @@ export const uploadToS3 = async (fileContent, fileName, mimeType = "image/png") 
     }
 };
 
-export default { uploadToS3 };
+/**
+ * Downloads a file from a URL and uploads it to S3
+ * @param {string} url - The external URL to mirror
+ * @param {string} targetKey - The desired S3 key/path
+ * @param {string} defaultMimeType - Fallback MIME type
+ * @returns {Promise<string|null>} - The S3 URL or null if failed
+ */
+export const mirrorUrlToS3 = async (url, targetKey, defaultMimeType = "image/png") => {
+    if (!url || !url.startsWith("http")) return null;
+    try {
+        console.log(`📥 Mirroring URL to S3: ${url.substring(0, 80)}...`);
+        const response = await fetch(url, {
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            redirect: 'follow',
+        });
+        if (!response.ok) {
+            console.warn(`⚠️ Failed to download for mirroring (${response.status}): ${url}`);
+            return null;
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const contentType = response.headers.get("content-type") || defaultMimeType;
+
+        return await uploadToS3(buffer, targetKey, contentType);
+    } catch (error) {
+        console.error("Mirror URL to S3 Error:", error);
+        return null;
+    }
+};
+
+export default { uploadToS3, mirrorUrlToS3 };

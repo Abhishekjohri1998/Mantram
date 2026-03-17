@@ -120,6 +120,7 @@ const videoProjectSchema = new mongoose.Schema({
         falResultUrl: { type: String, default: '' },
         provider: { type: String, enum: ['fal', 'grok', 'kie', 'heygen', 'piapi'], default: 'fal' },
         videoUrl: { type: String, default: '' },
+        s3VideoUrl: { type: String, default: '' },
         thumbnailUrl: { type: String, default: '' },
         audioUrl: { type: String, default: '' },
         progress: { type: Number, default: 0 },  // 0-100

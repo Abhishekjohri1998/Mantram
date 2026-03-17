@@ -7,7 +7,9 @@ import User from '../models/User.js';
 import { protect } from '../middleware/auth.js';
 import multer from 'multer';
 import crypto from 'crypto';
+import { getOrchestrator } from '../agents/orchestrator.js';
 import { safeErrorMessage } from '../utils/safeError.js';
+import { uploadToS3, mirrorUrlToS3 } from '../utils/s3.js';
 
 
 const router = Router();
@@ -565,6 +567,11 @@ router.post('/:id/knowledge/ingest', protect, knowledgeUpload.single('file'), as
             }
 
             if (!content) return res.status(400).json({ success: false, error: 'Could not extract text from file' });
+
+            // Upload original file to S3
+            const s3Key = `knowledge/${brandId}/${Date.now()}_${fileName}`;
+            const s3Url = await uploadToS3(req.file.buffer, s3Key, req.file.mimetype);
+            if (s3Url) sourceUrl = s3Url;
         }
 
         // ── URL SCRAPING ──

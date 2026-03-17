@@ -4,6 +4,7 @@ import { protect } from '../middleware/auth.js'
 import { requireCredits } from '../middleware/credits.js'
 import { URL } from 'url'
 import { safeErrorMessage } from '../utils/safeError.js';
+import { uploadToS3 } from '../utils/s3.js';
 const router = express.Router()
 
 // ══════════════════════════════════════════════════════════════════════
@@ -243,7 +244,12 @@ router.post('/ai-generate', protect, requireCredits('canvasGenerate'), async (re
         }
 
         if (!imageUrl) return res.status(500).json({ error: 'Image generation failed — all models exhausted' })
-        res.json({ imageUrl, model: 'NanoBanana 2' })
+        
+        // Upload Base64 result to S3
+        const s3Key = `canvas/${req.user._id}/${Date.now()}.png`;
+        const s3Url = await uploadToS3(imageUrl, s3Key, 'image/png');
+        
+        res.json({ imageUrl: s3Url || imageUrl, model: 'NanoBanana 2', source: s3Url ? 's3' : 'base64' })
     } catch (err) {
         console.error('AI generate error:', err.message)
         res.status(500).json({ error: safeErrorMessage(err) })
@@ -300,7 +306,12 @@ router.post('/ai-edit', protect, requireCredits('canvasGenerate'), async (req, r
         }
 
         if (!imageUrl) return res.status(500).json({ error: 'Image editing failed' })
-        res.json({ imageUrl, model: 'NanoBanana 2' })
+        
+        // Upload Base64 result to S3
+        const s3Key = `canvas/${req.user._id}/${Date.now()}_edit.png`;
+        const s3Url = await uploadToS3(imageUrl, s3Key, 'image/png');
+        
+        res.json({ imageUrl: s3Url || imageUrl, model: 'NanoBanana 2', source: s3Url ? 's3' : 'base64' })
     } catch (err) {
         console.error('AI edit error:', err.message)
         res.status(500).json({ error: safeErrorMessage(err) })
@@ -354,7 +365,12 @@ router.post('/ai-edit-visual', protect, requireCredits('canvasGenerate'), async 
             }
         }
         if (!imageUrl) return res.status(500).json({ error: 'Inpainting failed — no image returned' })
-        res.json({ imageUrl, model: 'Gemini Flash' })
+        
+        // Upload Base64 result to S3
+        const s3Key = `canvas/${req.user._id}/${Date.now()}_visual.png`;
+        const s3Url = await uploadToS3(imageUrl, s3Key, 'image/png');
+        
+        res.json({ imageUrl: s3Url || imageUrl, model: 'Gemini Flash', source: s3Url ? 's3' : 'base64' })
     } catch (err) {
         console.error('AI visual edit error:', err.message)
         res.status(500).json({ error: safeErrorMessage(err) })
@@ -412,7 +428,12 @@ router.post('/ai-retouch', protect, requireCredits('canvasGenerate'), async (req
             }
         }
         if (!imageUrl) return res.status(500).json({ error: 'Retouch failed — no image returned' })
-        res.json({ imageUrl, model: 'Gemini Flash' })
+        
+        // Upload Base64 result to S3
+        const s3Key = `canvas/${req.user._id}/${Date.now()}_retouch.png`;
+        const s3Url = await uploadToS3(imageUrl, s3Key, 'image/png');
+        
+        res.json({ imageUrl: s3Url || imageUrl, model: 'Gemini Flash', source: s3Url ? 's3' : 'base64' })
     } catch (err) {
         console.error('AI retouch error:', err.message)
         res.status(500).json({ error: safeErrorMessage(err) })
@@ -466,7 +487,12 @@ router.post('/ai-background', protect, requireCredits('canvasBgRemove'), async (
             }
         }
         if (!imageUrl) return res.status(500).json({ error: 'Background operation failed — no image returned' })
-        res.json({ imageUrl, action, model: 'Gemini Flash' })
+        
+        // Upload Base64 result to S3
+        const s3Key = `canvas/${req.user._id}/${Date.now()}_background.png`;
+        const s3Url = await uploadToS3(imageUrl, s3Key, 'image/png');
+        
+        res.json({ imageUrl: s3Url || imageUrl, action, model: 'Gemini Flash', source: s3Url ? 's3' : 'base64' })
     } catch (err) {
         console.error('AI background error:', err.message)
         res.status(500).json({ error: safeErrorMessage(err) })

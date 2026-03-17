@@ -19,7 +19,7 @@ const productSchema = new mongoose.Schema({
     features: [String],                                // Key selling points / USPs
     specifications: { type: mongoose.Schema.Types.Mixed, default: {} }, // Flexible specs
 
-    // Images — URL-only, never downloaded to our server
+    // Images — Stores S3 URLs of product images
     images: [{
         url: { type: String },
         alt: { type: String, default: '' },

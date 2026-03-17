@@ -9,7 +9,7 @@
  *   const { url } = await mediaAPI.upload({ imageData: 'data:image/png;base64,...', folder: 'refs' })
  */
 import { Router } from 'express';
-import { uploadToS3 } from '../utils/s3.js';
+import { uploadToS3, mirrorUrlToS3 } from '../utils/s3.js';
 import { protect } from '../middleware/auth.js';
 import crypto from 'crypto';
 
@@ -26,9 +26,15 @@ router.post('/upload', protect, async (req, res) => {
             return res.status(400).json({ success: false, error: 'imageData is required' });
         }
 
-        // If already a URL, return as-is (idempotent)
+        // If it's a URL, mirror it to our S3 for persistence (unless already in our S3)
         if (imageData.startsWith('http')) {
-            return res.json({ success: true, url: imageData });
+            if (imageData.includes('s3.amazonaws.com') && imageData.includes(process.env.AWS_S3_BUCKET)) {
+                return res.json({ success: true, url: imageData });
+            }
+            
+            const s3Key = `${folder}/${req.user._id}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+            const s3Url = await mirrorUrlToS3(imageData, s3Key);
+            return res.json({ success: !!s3Url, url: s3Url || imageData });
         }
 
         // Validate base64 data URI format
