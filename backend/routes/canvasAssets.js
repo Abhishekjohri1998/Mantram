@@ -1,6 +1,7 @@
 import express from 'express'
 import { getOrchestrator } from '../agents/orchestrator.js'
 import { protect } from '../middleware/auth.js'
+import { requireCredits } from '../middleware/credits.js'
 import { URL } from 'url'
 import { safeErrorMessage } from '../utils/safeError.js';
 const router = express.Router()
@@ -202,7 +203,7 @@ Return ONLY valid JSON (no markdown, no backticks). Only include elements you ca
 })
 
 // POST /api/canvas-assets/ai-generate — Generate image from text prompt
-router.post('/ai-generate', protect, async (req, res) => {
+router.post('/ai-generate', protect, requireCredits('canvasGenerate'), async (req, res) => {
     try {
         const { prompt, size = '1024x1024' } = req.body
         if (!prompt) return res.status(400).json({ error: 'Prompt is required' })
@@ -250,7 +251,7 @@ router.post('/ai-generate', protect, async (req, res) => {
 })
 
 // POST /api/canvas-assets/ai-edit — Edit image with prompt (inpaint/outpaint)
-router.post('/ai-edit', protect, async (req, res) => {
+router.post('/ai-edit', protect, requireCredits('canvasGenerate'), async (req, res) => {
     try {
         const { prompt, imageBase64 } = req.body
         if (!prompt || !imageBase64) return res.status(400).json({ error: 'Prompt and imageBase64 required' })
@@ -307,7 +308,7 @@ router.post('/ai-edit', protect, async (req, res) => {
 })
 
 // POST /api/canvas-assets/ai-edit-visual — Inpaint with mask (Visual tool)
-router.post('/ai-edit-visual', protect, async (req, res) => {
+router.post('/ai-edit-visual', protect, requireCredits('canvasGenerate'), async (req, res) => {
     try {
         const { prompt, imageBase64, maskBase64 } = req.body
         if (!prompt || !imageBase64) return res.status(400).json({ error: 'Prompt and imageBase64 required' })
@@ -361,7 +362,7 @@ router.post('/ai-edit-visual', protect, async (req, res) => {
 })
 
 // POST /api/canvas-assets/ai-retouch — Retouch/Replace masked area
-router.post('/ai-retouch', protect, async (req, res) => {
+router.post('/ai-retouch', protect, requireCredits('canvasGenerate'), async (req, res) => {
     try {
         const { prompt, imageBase64, maskBase64, replaceImageBase64 } = req.body
         if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' })
@@ -419,7 +420,7 @@ router.post('/ai-retouch', protect, async (req, res) => {
 })
 
 // POST /api/canvas-assets/ai-background — Remove or replace background
-router.post('/ai-background', protect, async (req, res) => {
+router.post('/ai-background', protect, requireCredits('canvasBgRemove'), async (req, res) => {
     try {
         const { imageBase64, action = 'remove', bgPrompt } = req.body
         if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' })

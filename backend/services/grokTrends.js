@@ -344,6 +344,131 @@ Return 6-10 content suggestions. Make them SPECIFIC and ACTIONABLE.`,
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+// 5. PRODUCT-AWARE TRENDING FEATURES — What's trending for THIS brand's products
+// ══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Analyze brand's actual product catalog and return trending features/keywords.
+ * Unlike getTrendingTopics (generic industry), this is hyper-specific to products.
+ *
+ * @param {object} brand - Brand document (name, dna, industry, etc.)
+ * @param {Array} products - Array of product summaries [{_id, title, features, category, subCategory, tags, keywords}]
+ * @param {string} country
+ */
+export async function getProductTrendingFeatures(brand, products = [], country = 'India') {
+    const brandName = brand?.name || 'Brand';
+    const industry = brand?.dna?.industry || 'general';
+
+    // Build product digest for the prompt
+    const productDigest = products.slice(0, 30).map(p => {
+        const feats = (p.features || []).slice(0, 6).join(', ');
+        const tags = (p.tags || []).concat(p.keywords || []).slice(0, 8).join(', ');
+        return `• ${p.title} [${p.category || p.subCategory || p.productType || 'general'}]${feats ? ` — Features: ${feats}` : ''}${tags ? ` — Tags: ${tags}` : ''}`;
+    }).join('\n');
+
+    const categories = [...new Set(products.map(p => p.category || p.subCategory || p.productType).filter(Boolean))];
+    const allFeatures = [...new Set(products.flatMap(p => p.features || []))];
+    const allTags = [...new Set(products.flatMap(p => (p.tags || []).concat(p.keywords || [])))];
+
+    const cacheKey = `prodtrend:${brand?._id || brandName}:${country}`;
+    const cached = getCached(cacheKey);
+    if (cached) return cached;
+
+    const result = await grokCall(
+        `You are a product market intelligence agent with real-time access to social media, search trends, Amazon/Flipkart bestseller data, YouTube reviews, Reddit discussions, and X (Twitter) conversations. Today is ${new Date().toISOString().split('T')[0]}.
+
+BRAND: ${brandName}
+INDUSTRY: ${industry}
+COUNTRY: ${country}
+PRODUCT CATEGORIES: ${categories.join(', ') || industry}
+
+PRODUCT CATALOG:
+${productDigest || 'No products loaded yet — analyze the category/industry instead.'}
+
+EXISTING FEATURES IN CATALOG: ${allFeatures.slice(0, 30).join(', ') || 'N/A'}
+EXISTING TAGS: ${allTags.slice(0, 20).join(', ') || 'N/A'}
+
+YOUR TASK: Research what's TRENDING RIGHT NOW for these specific product categories. Think like a product marketing expert:
+
+1. TRENDING PRODUCT FEATURES — What features are people talking about, searching for, reviewing, and comparing? (e.g., for earphones: ANC, spatial audio, 40hr battery, fast charge, LDAC codec, app EQ control)
+2. TRENDING KEYWORDS — What are people searching for when shopping in this category? (e.g., "best ANC earphones under 2000", "earphone for gym")
+3. COMPETITOR BUZZWORDS — What features are competitors highlighting in their ads and social posts?
+4. VIRAL PRODUCT ANGLES — What product-related content is going viral? (unboxings, comparisons, hacks, fails)
+
+For each trending feature, tell me WHICH products from the catalog match it (by product title).
+
+Respond in JSON:
+{
+  "trendingFeatures": [
+    {
+      "feature": "Feature name (e.g., Active Noise Cancellation)",
+      "category": "Which product category this belongs to",
+      "trendScore": 0-100,
+      "whyTrending": "1-line reason why this is trending right now",
+      "searchVolume": "high|medium|low",
+      "contentAngle": "How to showcase this feature in a creative post",
+      "hashtags": ["#relevant", "#hashtags"],
+      "matchingProducts": ["Exact product titles from catalog that have this feature"],
+      "competitorContext": "What competitors are doing with this feature"
+    }
+  ],
+  "trendingKeywords": [
+    {
+      "keyword": "Search query / keyword",
+      "intent": "buy|compare|learn|review",
+      "trendScore": 0-100,
+      "matchingProducts": ["Product titles that match this keyword"]
+    }
+  ],
+  "viralAngles": [
+    {
+      "angle": "Viral content angle",
+      "format": "reel|carousel|comparison|unboxing|hack|before-after",
+      "whyViral": "Why this type of content is performing well",
+      "suggestedProduct": "Best product from catalog for this angle"
+    }
+  ],
+  "categoryInsight": "Overall category trend summary — what's hot, what's cooling down",
+  "topRecommendation": "The single best product + feature combo to promote RIGHT NOW and why"
+}
+
+Return 10-15 trending features, 8-12 keywords, and 4-6 viral angles. Be SPECIFIC and REAL — use actual trending data, not generic advice.`,
+        `What product features, keywords and content angles are trending RIGHT NOW for ${categories.join(', ') || industry} products in ${country}? The brand "${brandName}" sells: ${products.slice(0, 5).map(p => p.title).join(', ') || 'products in ' + industry}. Give me hyper-specific, actionable intelligence.`,
+        { temperature: 0.6, maxTokens: 4096 }
+    );
+
+    if (result?.trendingFeatures) {
+        // Map matching product titles back to IDs
+        const titleToId = {};
+        products.forEach(p => { titleToId[p.title?.toLowerCase()] = p._id?.toString() });
+
+        result.trendingFeatures.forEach(f => {
+            f.matchingProductIds = (f.matchingProducts || [])
+                .map(title => {
+                    const lower = title.toLowerCase();
+                    // Exact match or partial match
+                    return titleToId[lower] || Object.entries(titleToId).find(([t]) => t.includes(lower) || lower.includes(t))?.[1];
+                })
+                .filter(Boolean);
+        });
+
+        result.trendingKeywords?.forEach(k => {
+            k.matchingProductIds = (k.matchingProducts || [])
+                .map(title => {
+                    const lower = title.toLowerCase();
+                    return titleToId[lower] || Object.entries(titleToId).find(([t]) => t.includes(lower) || lower.includes(t))?.[1];
+                })
+                .filter(Boolean);
+        });
+
+        setCache(cacheKey, result);
+        console.log(`🧠 Grok: Product intelligence — ${result.trendingFeatures.length} trending features for ${brandName}`);
+    }
+
+    return result || { trendingFeatures: [], trendingKeywords: [], viralAngles: [], categoryInsight: '', topRecommendation: '' };
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 // UTILITY — Check if Grok is available
 // ══════════════════════════════════════════════════════════════════════════
 

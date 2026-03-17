@@ -26,6 +26,10 @@ const ACTION_LABELS = {
     brainstormChat: 'Brainstorm Chat', brainstormScreenplay: 'Screenplay Generation',
     trendRefresh: 'Trend Refresh',
     videoBrainstorm: 'Video Brainstorm', videoGenerate: 'Video Generation', videoEdit: 'Video Edit',
+    socialMedia: 'Social Media Strategy', socialMediaCalendar: 'Social Calendar', socialMediaAudit: 'Social Account Audit',
+    socialMediaCompetitor: 'Social Competitor Analysis', socialMediaScore: 'Social Profile Score',
+    canvasGenerate: 'Canvas AI Generate', canvasBgRemove: 'Canvas BG Remove', canvasExtend: 'Canvas Extend/Fill',
+    adCreative: 'Ad Creative Image', voiceClone: 'Voice Clone', voiceTranscribe: 'Voice Transcribe',
 };
 
 // Default credit costs (used when SystemSettings has no override)
@@ -54,6 +58,17 @@ const DEFAULT_CREDIT_COSTS = {
     videoBrainstorm: 2,
     videoGenerate: 15,
     videoEdit: 5,
+    socialMedia: 3,
+    socialMediaCalendar: 3,
+    socialMediaAudit: 4,
+    socialMediaCompetitor: 4,
+    socialMediaScore: 2,
+    canvasGenerate: 2,
+    canvasBgRemove: 2,
+    canvasExtend: 2,
+    adCreative: 5,
+    voiceClone: 3,
+    voiceTranscribe: 1,
 };
 
 // Cache for credit costs (refresh every 5 minutes)
@@ -161,7 +176,7 @@ export const requireCredits = (actionOrCost = 1) => {
             // Log usage (fire-and-forget)
             const balanceAfter = (updated.credits?.total || 0) + (updated.credits?.bonus || 0) - (updated.credits?.used || 0);
             // Detect studio from action name
-            const studioMap = { content: 'content', contentRefine: 'content', creative: 'creative', photoshoot: 'creative', brainstorm: 'brainstorm', brainstormRefine: 'brainstorm', brainstormChat: 'brainstorm', brainstormScreenplay: 'brainstorm', trendRefresh: 'brainstorm', videoBrainstorm: 'video', videoGenerate: 'video', videoEdit: 'video' };
+            const studioMap = { content: 'content', contentRefine: 'content', creative: 'creative', photoshoot: 'creative', brainstorm: 'brainstorm', brainstormRefine: 'brainstorm', brainstormChat: 'brainstorm', brainstormScreenplay: 'brainstorm', trendRefresh: 'brainstorm', videoBrainstorm: 'video', videoGenerate: 'video', videoEdit: 'video', socialMedia: 'social', socialMediaCalendar: 'social', socialMediaAudit: 'social', socialMediaCompetitor: 'social', socialMediaScore: 'social', canvasGenerate: 'creative', canvasBgRemove: 'creative', canvasExtend: 'creative', adCreative: 'performance', voiceClone: 'voice', voiceTranscribe: 'voice' };
             const studio = studioMap[actionName] || (actionName?.startsWith('seo') ? 'seo' : 'unknown');
 
             CreditUsage.create({
@@ -222,16 +237,35 @@ export const getCreditBalance = (user) => {
 // Export defaults for reference
 export const CREDIT_COSTS = DEFAULT_CREDIT_COSTS;
 
-// Per-model cost estimates (USD cents per 1K tokens)
+// Per-model cost estimates (USD cents per 1K tokens for text; flat USD cents per call for image/video/voice)
 const MODEL_COSTS = {
+    // ── Text models (per 1K tokens) ──
     'gpt-4o-mini': { input: 0.015, output: 0.06 },
     'gpt-4o': { input: 0.25, output: 1.0 },
     'grok-3-mini-fast': { input: 0.03, output: 0.10 },
     'grok-3-mini': { input: 0.03, output: 0.10 },
     'gemini-2.0-flash': { input: 0.01, output: 0.04 },
     'gemini-2.5-flash': { input: 0.01, output: 0.04 },
+    'gemini-2.5-pro': { input: 0.125, output: 0.50 },
     'claude-sonnet-4-20250514': { input: 0.3, output: 1.5 },
+    'sarvam-m': { input: 0.02, output: 0.08 },
+    // ── Image models (flat cost per image in USD cents) ──
+    'gemini-3.1-flash-image-preview': { flatCost: 4.0, type: 'image' },
+    'gemini-2.0-flash-exp-image-generation': { flatCost: 4.0, type: 'image' },
+    'imagen-4.0-generate-001': { flatCost: 4.0, type: 'image' },
+    'imagen-3.0-generate-001': { flatCost: 4.0, type: 'image' },
+    // ── Video models (flat cost per generation in USD cents) ──
+    'seedance-1.0': { flatCost: 10.0, type: 'video' },
+    'piapi-seedance': { flatCost: 10.0, type: 'video' },
+    'piapi-wan': { flatCost: 8.0, type: 'video' },
+    // ── Voice models (flat cost per call in USD cents) ──
+    'sarvam-stt-saaras-v3': { flatCost: 0.5, type: 'voice' },
+    'sarvam-tts-bulbul-v2': { flatCost: 1.0, type: 'voice' },
+    'minimax-speech-02-hd': { flatCost: 2.0, type: 'voice' },
 };
+
+// Exported for pricing calculator
+export { MODEL_COSTS };
 
 /**
  * Log AI token usage — call this after an AI response to track actual consumption

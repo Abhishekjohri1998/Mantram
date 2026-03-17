@@ -41,6 +41,20 @@ router.post('/scan-website', optionalAuth, async (req, res) => {
                 rawScanData: scanResult.rawScanData,
             });
             await req.user.updateOne({ $inc: { 'usage.brandsCreated': 1 } });
+
+            // Auto-trigger Visual DNA analysis in background (fire-and-forget)
+            import('../services/visualDNA.js').then(async ({ analyzeVisualDNA }) => {
+                try {
+                    const visualDNA = await analyzeVisualDNA(brand);
+                    if (visualDNA) {
+                        await Brand.findOneAndUpdate(
+                            { _id: brand._id },
+                            { $set: { 'dna.visualDNA': visualDNA } }
+                        );
+                        console.log(`✅ Visual DNA auto-analyzed for ${brand.name}: style=${visualDNA.designStyle}`);
+                    }
+                } catch (e) { console.warn('⚠️ Background Visual DNA analysis failed:', e.message); }
+            });
         } else {
             // Return scan result as if it's a brand (for preview before signup)
             brand = {

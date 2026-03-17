@@ -6,6 +6,7 @@ import { Router } from 'express';
 import { protect } from '../middleware/auth.js';
 import { requireCredits } from '../middleware/credits.js';
 import Brand from '../models/Brand.js';
+import Product from '../models/Product.js';
 import { getOrchestrator } from '../agents/orchestrator.js';
 import { fetchAllTrends, matchTrendsToBrand, clearTrendCache } from '../services/trendEngine.js';
 import { safeErrorMessage } from '../utils/safeError.js';
@@ -14,6 +15,7 @@ import {
     getTrendingSEOKeywords,
     getCompetitorTrendIntel,
     getContentSuggestions,
+    getProductTrendingFeatures,
     isGrokAvailable,
 } from '../services/grokTrends.js';
 
@@ -158,6 +160,51 @@ router.get('/grok-content', protect, async (req, res) => {
         const data = await getContentSuggestions(brand, platList);
         res.json({ success: true, ...data, source: 'grok', brandName: brand.name });
     } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// POST /api/trends/product-intelligence — Product-aware trending features (xAI Grok)
+router.post('/product-intelligence', protect, async (req, res) => {
+    try {
+        if (!isGrokAvailable()) return res.json({ success: true, trendingFeatures: [], message: 'Grok not configured' });
+        const { brandId, country } = req.body;
+        if (!brandId) return res.status(400).json({ success: false, error: 'brandId is required' });
+
+        const brand = await Brand.findById(brandId);
+        if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
+
+        // Load brand's active products
+        const products = await Product.find({ brand: brandId, status: 'active' })
+            .select('title features tags keywords category subCategory productType images price')
+            .limit(50)
+            .lean();
+
+        const data = await getProductTrendingFeatures(brand, products, country || 'India');
+
+        // Attach product summaries so frontend can show them inline
+        const productMap = {};
+        products.forEach(p => {
+            productMap[p._id.toString()] = {
+                _id: p._id,
+                title: p.title,
+                image: p.images?.[0]?.url || '',
+                features: (p.features || []).slice(0, 5),
+                price: p.price,
+                category: p.category || p.subCategory || p.productType || '',
+            };
+        });
+
+        res.json({
+            success: true,
+            ...data,
+            products: productMap,
+            productCount: products.length,
+            source: 'grok',
+            brandName: brand.name,
+        });
+    } catch (error) {
+        console.error('Product intelligence error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
