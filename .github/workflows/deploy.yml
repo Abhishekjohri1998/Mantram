@@ -133,7 +133,10 @@ jobs:
             cd $RELEASE_DIR/backend
             PUPPETEER_SKIP_DOWNLOAD=true npm ci --omit=dev --no-audit --no-fund --loglevel=error
             
-            # 3.5 Seed Superadmin accounts and subscription packages
+            # 3.5 Cleanup & Seed
+            echo "🧹 Reclaiming database space..."
+            node scripts/cleanupDatabase.js
+
             echo "🔑 Seeding data..."
             node scripts/seedSuperAdmin.js
             node scripts/seedPackages.js
