@@ -1242,10 +1242,11 @@ export async function researchDomain(baseUrl) {
             wordCount: p.wordCount,
             contentSnippet: p.contentSnippet,
             redirectChain: p.redirectChain,
-            // ── NEW: Per-page enhanced data ──
+            // ── Per-page enhanced data ──
             statusCode: p.statusCode || 200,
             responseTimeMs: p.responseTimeMs || 0,
             pageSizeKB: p.pageSizeKB || 0,
+            pageSizeBytes: p.pageSizeBytes || 0,
             titleLength: p.titleLength || 0,
             metaDescLength: p.metaDescLength || 0,
             headingHierarchy: p.headingHierarchy || { valid: true, skippedLevels: [] },
@@ -1256,6 +1257,11 @@ export async function researchDomain(baseUrl) {
             urlTooLong: p.urlTooLong || false,
             hasHreflang: p.hasHreflang || false,
             hasLangAttr: p.hasLangAttr || false,
+            // ── Previously missing fields (critical for Semrush parity) ──
+            images: p.images || { total: 0, withAlt: 0, withoutAlt: 0 },
+            canonical: p.canonical || '',
+            hasSchemaOrg: p.hasSchemaOrg || false,
+            textToHtmlRatio: p.textToHtmlRatio || 0,
         })),
         homepage: {
             title: homepage.title,
@@ -1339,7 +1345,7 @@ export async function researchDomain(baseUrl) {
             brokenExternalCount: brokenExternal.length,
             // ── Permanent Redirects (301/308 — Semrush shows 636 for acwo.com) ──
             permanentRedirects: allPages.filter(p => p.statusCode === 301 || p.statusCode === 308 || (p.redirectChain?.length > 0)).map(p => ({
-                url: p.url, statusCode: p.statusCode, finalUrl: p.redirectChain?.[p.redirectChain.length - 1] || p.url,
+                url: p.url, statusCode: p.statusCode, finalUrl: p.redirectChain?.[p.redirectChain.length - 1]?.to || p.url,
             })),
             permanentRedirectCount: allPages.filter(p => p.statusCode === 301 || p.statusCode === 308 || (p.redirectChain?.length > 0)).length,
             // ── Blocked by robots.txt (internal pages disallowed) ──
@@ -1348,7 +1354,7 @@ export async function researchDomain(baseUrl) {
                 const blockedInternal = allPages.filter(p => {
                     try {
                         const path = new URL(p.url).pathname;
-                        return robotsTxt.disallowRules.some(rule => path.startsWith(rule));
+                        return robotsTxt.disallowRules.some(rule => path.startsWith(rule.path || rule));
                     } catch { return false; }
                 });
                 return {

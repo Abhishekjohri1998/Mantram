@@ -23,6 +23,7 @@ import {
   formatKeywordDataForPrompt, formatBacklinkDataForPrompt,
   isDataForSEOConfigured,
 } from '../utils/dataforseo.js';
+import { getMozDomainAuthority, getMozBatchDA, formatMozDataForPrompt, isMozConfigured } from '../utils/moz.js';
 import { jsRenderCrawl, formatJSCrawlForPrompt } from '../utils/js-crawler.js';
 import { scoreSiteContent, formatContentScoresForPrompt } from '../utils/content-scorer.js';
 import { crawlCompetitor, compareSnapshots, analyzeKeywordOverlap, formatCompetitorMonitorForPrompt } from '../utils/competitor-monitor.js';
@@ -256,14 +257,20 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
 
     const brandContext = buildBrandContext(brand || brandPayload);
 
-    // STEP 1: Real website research + Real PageSpeed (in parallel)
-    console.log(`🔍 SEO Health Check: crawling ${website} + fetching PageSpeed...`);
-    const [siteResearch, pageSpeedData] = await Promise.all([
+    // STEP 1: Real website research + Real PageSpeed + Real Backlinks (in parallel)
+    console.log(`🔍 SEO Health Check: crawling ${website} + fetching PageSpeed + backlinks...`);
+    let brandDomain;
+    try { brandDomain = new URL(website.startsWith('http') ? website : `https://${website}`).hostname.replace(/^www\./, ''); } catch { brandDomain = website; }
+    const [siteResearch, pageSpeedData, backlinkData, mozData] = await Promise.all([
       researchDomain(website),
       getPageSpeed(website, 'mobile').catch(e => ({ success: false, error: e.message })),
+      isDataForSEOConfigured() ? getDomainBacklinks(brandDomain).catch(e => ({ available: false, error: e.message })) : Promise.resolve({ available: false }),
+      isMozConfigured() ? getMozDomainAuthority(brandDomain).catch(e => ({ available: false, error: e.message })) : Promise.resolve({ available: false }),
     ]);
     const siteData = formatSiteResearch(siteResearch);
     const pageSpeedText = formatPageSpeedForPrompt(pageSpeedData);
+    const backlinkText = formatBacklinkDataForPrompt(backlinkData);
+    const mozText = formatMozDataForPrompt(mozData);
 
     // AI gets a generous timeout — full-site crawl (800 pages) takes up to 180s first
     const aiTimeout = 90000; // 90s for AI call — crawl takes the bulk of the time
@@ -276,6 +283,10 @@ ${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
 ${siteData}
 
 ${pageSpeedText}
+
+${backlinkText}
+
+${mozText}
 
 Respond in STRICT JSON:
 {
@@ -399,6 +410,33 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
       blockedResourceCount: si.resourceScanning?.blockedResourceCount || 0,
       uncachedResourceCount: si.resourceScanning?.uncachedResourceCount || 0,
       unminifiedResourceCount: si.resourceScanning?.unminifiedResourceCount || 0,
+      // Permanent redirects (Semrush: 636 for ACwO)
+      permanentRedirectCount: si.permanentRedirectCount || 0,
+      // Blocked by robots.txt (Semrush: 209 internal + 838 external)
+      blockedByRobotsTxtCount: si.blockedByRobotsTxt?.internalCount || 0,
+      // Alt text (Semrush: 8 missing)
+      missingAltCount: si.imagesWithoutAlt || 0,
+      totalImages: si.totalImages || 0,
+      // Detail arrays for issue cards
+      missingH1Tags: (si.missingH1Tags || []).slice(0, 15),
+      multipleH1Pages: (si.multipleH1Pages || []).slice(0, 15),
+      // Real backlink data (DataForSEO — beats AI estimation)
+      backlinkDataAvailable: backlinkData?.available || false,
+      totalBacklinks: backlinkData?.summary?.totalBacklinks || 0,
+      referringDomains: backlinkData?.summary?.referringDomains || 0,
+      domainRank: backlinkData?.summary?.domainRank || 0,
+      backlinkDofollow: backlinkData?.summary?.backlinksDofollow || 0,
+      backlinkNofollow: backlinkData?.summary?.backlinksNofollow || 0,
+      brokenBacklinks: backlinkData?.summary?.brokenBacklinks || 0,
+      topReferringDomains: (backlinkData?.topReferringDomains || []).slice(0, 10),
+      // Moz Domain Authority (real)
+      mozAvailable: mozData?.available || false,
+      domainAuthority: mozData?.domainAuthority || 0,
+      pageAuthority: mozData?.pageAuthority || 0,
+      spamScore: mozData?.spamScore || 0,
+      mozLinkingDomains: mozData?.rootDomainsToRootDomain || 0,
+      // Missing meta descriptions
+      missingMetaDescCount: si.missingMetaDescriptions?.length || 0,
     };
     parsed.pageReports = pages.slice(0, 50).map(p => ({
       url: p.url,
@@ -420,29 +458,194 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
       metaRobots: p.metaRobots || {},
     }));
 
-    // ── GROUP ISSUES BY TYPE: Errors / Warnings / Notices (Semrush parity) ──
-    // Try deterministic baseline details first, fall back to AI-generated issues
-    const baselineDetails = parsed.baselineScores?.technical?.details || [];
-    const onPageDetails = parsed.baselineScores?.onPage?.details || [];
-    let allDeterministicIssues = [...baselineDetails, ...onPageDetails].filter(d => d.issueType);
-    // If no deterministic issues (health-check flow), build from AI issues
-    if (allDeterministicIssues.length === 0 && parsed.issues?.length > 0) {
-      allDeterministicIssues = parsed.issues.map(i => ({
-        check: i.title,
-        value: i.description || '',
-        issueType: i.severity === 'critical' ? 'error' : i.severity === 'high' ? 'error' : i.severity === 'medium' ? 'warning' : 'notice',
-        aboutThisIssue: i.whyItMatters || i.description || '',
-        howToFix: i.fix || '',
-        affectedUrls: [],
-      }));
-    }
+    // ── BUILD DETERMINISTIC GROUPED ISSUES FROM CRAWL DATA (Semrush parity) ──
+    // Each issue has: check, value, issueType, aboutThisIssue, howToFix, affectedUrls
+    const st = parsed.siteStats;
+    const deterministicChecks = [];
+
+    if (st.missingH1Count > 0) deterministicChecks.push({
+      check: `${st.missingH1Count} pages without H1 tag`, value: st.missingH1Count, issueType: 'error',
+      aboutThisIssue: 'The H1 tag is the most important heading on a page. It tells search engines what the page is about and is a critical on-page SEO signal. Pages without H1 tags are harder for Google to understand and rank.',
+      howToFix: 'Add a unique, descriptive H1 tag to each page that includes the primary keyword. There should be exactly one H1 per page. Learn more: https://developers.google.com/search/docs/fundamentals/seo-starter-guide#use-heading-tags',
+      affectedUrls: (st.missingH1Tags || []).slice(0, 10),
+    });
+    if (st.multipleH1Count > 0) deterministicChecks.push({
+      check: `${st.multipleH1Count} pages with multiple H1 tags`, value: st.multipleH1Count, issueType: 'warning',
+      aboutThisIssue: 'Having multiple H1 tags on a page dilutes the primary topic signal. While Google can handle multiple H1s, it creates ambiguity about which heading represents the main topic.',
+      howToFix: 'Keep only one H1 tag per page. Convert other H1s to H2 or H3 as appropriate for the content hierarchy.',
+      affectedUrls: (st.multipleH1Pages || []).slice(0, 10).map(p => p.url || p),
+    });
+    if (st.brokenInternalCount > 0) deterministicChecks.push({
+      check: `${st.brokenInternalCount} broken internal links`, value: st.brokenInternalCount, issueType: 'error',
+      aboutThisIssue: 'Broken internal links (404s) waste crawl budget, prevent PageRank flow, and create a poor user experience. Google may reduce the perceived quality of a site with many broken links.',
+      howToFix: 'Fix or remove broken internal links. Update the href to the correct page, or set up 301 redirects. Use Search Console to identify crawl errors. Learn more: https://developers.google.com/search/docs/crawling-indexing/http-network-errors',
+      affectedUrls: (st.brokenInternalLinks || []).slice(0, 10).map(l => l.url || l),
+    });
+    if (st.permanentRedirectCount > 0) deterministicChecks.push({
+      check: `${st.permanentRedirectCount} pages with permanent redirects`, value: st.permanentRedirectCount, issueType: 'warning',
+      aboutThisIssue: 'Pages returning 301/308 redirects add latency and waste crawl budget. While redirects pass link equity, excessive redirects indicate URL structure issues and slow down page load.',
+      howToFix: 'Update internal links to point directly to the final destination URL instead of the redirect source. Remove redirect chains where possible. Learn more: https://developers.google.com/search/docs/crawling-indexing/301-redirects',
+      affectedUrls: [],
+    });
+    if (st.blockedByRobotsTxtCount > 0) deterministicChecks.push({
+      check: `${st.blockedByRobotsTxtCount} internal pages blocked by robots.txt`, value: st.blockedByRobotsTxtCount, issueType: 'warning',
+      aboutThisIssue: 'Pages blocked by robots.txt cannot be crawled by search engines. If these pages should be indexed, they need to be unblocked. Blocking important pages wastes potential organic traffic.',
+      howToFix: 'Review your robots.txt file and remove Disallow rules for pages that should be indexed. Use "noindex" meta tag instead if you want pages crawlable but not indexed. Learn more: https://developers.google.com/search/docs/crawling-indexing/robots/intro',
+      affectedUrls: [],
+    });
+    if (st.blockedResourceCount > 0) deterministicChecks.push({
+      check: `${st.blockedResourceCount} JS/CSS resources blocked`, value: st.blockedResourceCount, issueType: 'warning',
+      aboutThisIssue: 'Blocked resources prevent Googlebot from rendering pages correctly. If CSS or JavaScript files are blocked, Google cannot see the page as users do, potentially missing important content.',
+      howToFix: 'Allow Googlebot to access all CSS and JS resources. Update robots.txt to remove blocks on /css/, /js/, and similar paths. Test with Google\'s Mobile-Friendly Test tool.',
+      affectedUrls: [],
+    });
+    if (st.uncachedResourceCount > 0) deterministicChecks.push({
+      check: `${st.uncachedResourceCount} JS/CSS resources without cache headers`, value: st.uncachedResourceCount, issueType: 'warning',
+      aboutThisIssue: 'Resources without cache-control headers are re-downloaded on every page load, increasing page load time and TTI (Time to Interactive). This directly impacts Core Web Vitals.',
+      howToFix: 'Add Cache-Control headers to all static resources (JS, CSS, images). Set max-age to at least 1 year for versioned files. Learn more: https://web.dev/articles/http-cache',
+      affectedUrls: [],
+    });
+    if (st.unminifiedResourceCount > 0) deterministicChecks.push({
+      check: `${st.unminifiedResourceCount} unminified JS/CSS resources`, value: st.unminifiedResourceCount, issueType: 'notice',
+      aboutThisIssue: 'Unminified resources contain unnecessary whitespace, comments, and long variable names. Minification typically reduces file size by 20-40%, improving page load speed.',
+      howToFix: 'Use build tools like webpack, Vite, or esbuild to minify JS and CSS files. Enable minification in your bundler config. Learn more: https://web.dev/articles/reduce-network-payloads-using-text-compression',
+      affectedUrls: [],
+    });
+    if (st.missingAltCount > 0) deterministicChecks.push({
+      check: `${st.missingAltCount} images without alt text`, value: st.missingAltCount, issueType: 'warning',
+      aboutThisIssue: 'Images without alt text cannot be understood by search engines or screen readers. Alt text is a ranking factor for image search and contributes to overall page relevance. It also improves accessibility.',
+      howToFix: 'Add descriptive alt text to all meaningful images. Alt text should describe the image content and include relevant keywords naturally. Learn more: https://developers.google.com/search/docs/appearance/google-images#descriptive-alt-text',
+      affectedUrls: [],
+    });
+    if (st.titleDuplicateCount > 0) deterministicChecks.push({
+      check: `${st.titleDuplicateCount} pages with duplicate titles`, value: st.titleDuplicateCount, issueType: 'warning',
+      aboutThisIssue: 'Duplicate title tags confuse search engines about which page to rank for a query. Each page should have a unique, descriptive title that reflects its specific content.',
+      howToFix: 'Write unique title tags for each page. Include the primary keyword and keep titles under 60 characters. Learn more: https://developers.google.com/search/docs/appearance/title-link',
+      affectedUrls: [],
+    });
+    if (st.thinPageCount > 0) deterministicChecks.push({
+      check: `${st.thinPageCount} thin pages (under 300 words)`, value: st.thinPageCount, issueType: 'warning',
+      aboutThisIssue: 'Thin content pages provide little value to users and are a signal of low quality. Google\'s Helpful Content system can demote entire sites that have too many thin pages.',
+      howToFix: 'Expand thin pages with genuinely useful content, or consolidate them with similar pages using 301 redirects. Aim for at least 500 words of unique, valuable content per page.',
+      affectedUrls: [],
+    });
+    if (st.brokenExternalCount > 0) deterministicChecks.push({
+      check: `${st.brokenExternalCount} broken external links`, value: st.brokenExternalCount, issueType: 'notice',
+      aboutThisIssue: 'Broken external links lead users to dead pages, creating a poor experience. While external link quality is a minor signal, maintaining working links shows content freshness and reliability.',
+      howToFix: 'Remove or update broken external links. Replace with links to working, authoritative sources.',
+      affectedUrls: (st.brokenExternalLinks || []).slice(0, 10).map(l => l.url || l),
+    });
+    if (st.redirectChainCount > 0) deterministicChecks.push({
+      check: `${st.redirectChainCount} pages with redirect chains`, value: st.redirectChainCount, issueType: 'notice',
+      aboutThisIssue: 'Redirect chains (A→B→C) add multiple round-trips, increasing page load time. Each redirect loses a small amount of link equity. Google may stop following chains after 5+ hops.',
+      howToFix: 'Eliminate redirect chains by pointing directly to the final destination URL. Update both internal links and server redirect rules.',
+      affectedUrls: [],
+    });
+    // ── 15 NEW checks (total: 28) ──
+    if (st.headingSkippedCount > 0) deterministicChecks.push({
+      check: `${st.headingSkippedCount} pages with skipped heading levels`, value: st.headingSkippedCount, issueType: 'warning',
+      aboutThisIssue: 'Skipping heading levels (e.g., H1→H3 without H2) breaks the semantic document outline. Screen readers and search engines use heading hierarchy to understand content structure.',
+      howToFix: 'Ensure headings follow a logical sequence: H1→H2→H3. Never skip H2 when going from H1 to H3. Learn more: https://web.dev/articles/headings-and-landmarks',
+      affectedUrls: [],
+    });
+    if (st.noindexPageCount > 0) deterministicChecks.push({
+      check: `${st.noindexPageCount} pages with noindex tag`, value: st.noindexPageCount, issueType: 'warning',
+      aboutThisIssue: 'Pages with a noindex meta tag are excluded from search results entirely. Verify these pages are intentionally hidden — accidental noindex on important pages causes total traffic loss.',
+      howToFix: 'Review each noindex page. If the page should appear in search, remove the noindex meta tag. If intentional, ensure no important content is behind noindex.',
+      affectedUrls: [],
+    });
+    if (st.nofollowInternalCount > 0) deterministicChecks.push({
+      check: `${st.nofollowInternalCount} internal links with nofollow`, value: st.nofollowInternalCount, issueType: 'warning',
+      aboutThisIssue: 'Nofollow on internal links wastes PageRank by preventing link equity from flowing to important pages. Internal links should almost always be followed.',
+      howToFix: 'Remove rel="nofollow" from internal links. Reserve nofollow for untrusted external links or user-generated content.',
+      affectedUrls: [],
+    });
+    if (st.emptyAnchorCount > 0) deterministicChecks.push({
+      check: `${st.emptyAnchorCount} links with empty anchor text`, value: st.emptyAnchorCount, issueType: 'warning',
+      aboutThisIssue: 'Links without visible anchor text provide no context to search engines about the linked page. This includes image links without alt text and icon-only links.',
+      howToFix: 'Add descriptive anchor text to all links. For image links, add alt text to the image. For icon links, add aria-label or visible text.',
+      affectedUrls: [],
+    });
+    if (st.conflictingCanonicalCount > 0) deterministicChecks.push({
+      check: `${st.conflictingCanonicalCount} pages with conflicting canonical tags`, value: st.conflictingCanonicalCount, issueType: 'error',
+      aboutThisIssue: 'A canonical tag pointing to a different URL tells Google this page is a copy. If incorrect, the wrong page gets indexed and the original loses all ranking signals.',
+      howToFix: 'Ensure each page\'s canonical tag points to itself (self-referencing) or to the correct preferred version. Learn more: https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls',
+      affectedUrls: [],
+    });
+    if (st.orphanPageCount > 0) deterministicChecks.push({
+      check: `${st.orphanPageCount} orphan pages (no incoming internal links)`, value: st.orphanPageCount, issueType: 'warning',
+      aboutThisIssue: 'Orphan pages have no internal links pointing to them. Google discovers pages through links — orphan pages may not be crawled or indexed effectively.',
+      howToFix: 'Add internal links from relevant pages to orphan pages. Include them in navigation, related content sections, or sitemaps.',
+      affectedUrls: [],
+    });
+    if (st.mixedContentCount > 0) deterministicChecks.push({
+      check: `${st.mixedContentCount} pages with mixed content (HTTP on HTTPS)`, value: st.mixedContentCount, issueType: 'error',
+      aboutThisIssue: 'Loading HTTP resources on HTTPS pages creates security warnings and can cause browsers to block content. This degrades user trust and can trigger ranking penalties.',
+      howToFix: 'Update all resource URLs from http:// to https://. Check images, scripts, stylesheets, and iframes. Learn more: https://web.dev/articles/fixing-mixed-content',
+      affectedUrls: [],
+    });
+    if (st.slowPageCount > 0) deterministicChecks.push({
+      check: `${st.slowPageCount} pages with slow response (>3s)`, value: st.slowPageCount, issueType: 'warning',
+      aboutThisIssue: 'Pages taking more than 3 seconds to respond impact Core Web Vitals and user experience. Google explicitly uses page speed as a ranking factor.',
+      howToFix: 'Optimize server response time with caching, CDN, and efficient database queries. Target under 200ms server response. Learn more: https://web.dev/articles/ttfb',
+      affectedUrls: [],
+    });
+    if ((st.oversizedPageCount || 0) > 0) deterministicChecks.push({
+      check: `${st.oversizedPageCount} oversized pages (>3MB)`, value: st.oversizedPageCount, issueType: 'warning',
+      aboutThisIssue: 'Pages over 3MB take significantly longer to load, especially on mobile networks. Large pages are penalized by Core Web Vitals metrics and increase bounce rate.',
+      howToFix: 'Compress images, minify CSS/JS, lazy-load below-fold resources, remove unused code. Target total page size under 1.5MB.',
+      affectedUrls: [],
+    });
+    if (st.urlTooLongCount > 0) deterministicChecks.push({
+      check: `${st.urlTooLongCount} pages with URLs longer than 75 characters`, value: st.urlTooLongCount, issueType: 'notice',
+      aboutThisIssue: 'Long URLs are harder to share, look spammy in search results, and may be truncated. Google recommends keeping URLs concise and descriptive.',
+      howToFix: 'Use short, descriptive URLs with the primary keyword. Avoid unnecessary parameters, session IDs, and deeply nested paths.',
+      affectedUrls: [],
+    });
+    if (st.missingMetaDescCount > 0) deterministicChecks.push({
+      check: `${st.missingMetaDescCount} pages without meta descriptions`, value: st.missingMetaDescCount, issueType: 'warning',
+      aboutThisIssue: 'Pages without meta descriptions leave the search snippet to Google\'s discretion. A well-crafted meta description improves click-through rate by 5-10%.',
+      howToFix: 'Write unique, compelling meta descriptions for each page. Keep between 120-160 characters. Include the primary keyword and a call to action.',
+      affectedUrls: [],
+    });
+    if (st.lowTextRatioCount > 0) deterministicChecks.push({
+      check: `${st.lowTextRatioCount} pages with low text-to-HTML ratio`, value: st.lowTextRatioCount, issueType: 'notice',
+      aboutThisIssue: 'Low text-to-HTML ratio (<10%) indicates pages are mostly code with little visible content. Search engines may consider these pages as low value.',
+      howToFix: 'Increase visible text content. Remove unnecessary HTML, inline styles, and JavaScript. Consider if the page provides enough value for search intent.',
+      affectedUrls: [],
+    });
+    if (st.singleIncomingCount > 0) deterministicChecks.push({
+      check: `${st.singleIncomingCount} pages with only 1 incoming internal link`, value: st.singleIncomingCount, issueType: 'notice',
+      aboutThisIssue: 'Pages with only one internal link pointing to them receive minimal PageRank. Important pages should have multiple internal links from authoritative pages.',
+      howToFix: 'Build contextual internal links from related content pages. Add the page to relevant category and navigation menus. Create a hub-and-spoke linking structure.',
+      affectedUrls: [],
+    });
+    if ((st.schemaTypes || []).length === 0) deterministicChecks.push({
+      check: 'No structured data (schema markup) found', value: 0, issueType: 'warning',
+      aboutThisIssue: 'Without schema markup, search engines cannot generate rich results (star ratings, prices, FAQs, breadcrumbs). Schema also helps AI models understand and cite your content.',
+      howToFix: 'Add JSON-LD schema markup for your content type: Organization, Product, FAQ, BreadcrumbList, Article, etc. Test with https://search.google.com/test/rich-results',
+      affectedUrls: [],
+    });
+    if (!st.hasSitemap) deterministicChecks.push({
+      check: 'No sitemap.xml found', value: 0, issueType: 'notice',
+      aboutThisIssue: 'A sitemap.xml helps search engines discover all important pages on your site. Without it, pages may be missed during crawling, especially on large sites.',
+      howToFix: 'Create and submit a sitemap.xml file. Include all important pages. Submit via Google Search Console. Learn more: https://developers.google.com/search/docs/crawling-indexing/sitemaps/overview',
+      affectedUrls: [],
+    });
+
+    // Merge deterministic checks with any AI-generated issues
+    const aiIssues = (parsed.issues || []).map(i => ({
+      check: i.title, value: i.description || '', issueType: i.severity === 'critical' ? 'error' : i.severity === 'high' ? 'error' : i.severity === 'medium' ? 'warning' : 'notice',
+      aboutThisIssue: i.whyItMatters || i.description || '', howToFix: i.fix || '', affectedUrls: [],
+    }));
+    const allGroupedIssues = [...deterministicChecks, ...aiIssues];
     parsed.groupedIssues = {
-      errors: allDeterministicIssues.filter(d => d.issueType === 'error'),
-      warnings: allDeterministicIssues.filter(d => d.issueType === 'warning'),
-      notices: allDeterministicIssues.filter(d => d.issueType === 'notice'),
-      errorCount: allDeterministicIssues.filter(d => d.issueType === 'error').length,
-      warningCount: allDeterministicIssues.filter(d => d.issueType === 'warning').length,
-      noticeCount: allDeterministicIssues.filter(d => d.issueType === 'notice').length,
+      errors: allGroupedIssues.filter(d => d.issueType === 'error'),
+      warnings: allGroupedIssues.filter(d => d.issueType === 'warning'),
+      notices: allGroupedIssues.filter(d => d.issueType === 'notice'),
+      errorCount: allGroupedIssues.filter(d => d.issueType === 'error').length,
+      warningCount: allGroupedIssues.filter(d => d.issueType === 'warning').length,
+      noticeCount: allGroupedIssues.filter(d => d.issueType === 'notice').length,
     };
 
     // Attach real PageSpeed data to response
@@ -866,15 +1069,37 @@ router.post('/competitors', protect, requireStudio('seoStudio'), requireCredits(
     const providedCompetitors = (competitorUrls || []).filter(u => u.trim());
     const allCompetitorUrls = [...new Set([...storedCompetitors, ...providedCompetitors])].slice(0, 5);
 
-    // STEP 1 & 2: Crawl brand and competitors in PARALLEL
+    // STEP 1 & 2: Crawl brand and competitors + fetch real backlinks in PARALLEL
     console.log(`🔍 SEO Competitors: parallel crawl for ${website} and ${allCompetitorUrls.length} competitors...`);
-    const [siteResearch, competitorResults] = await Promise.all([
+    let compBrandDomain;
+    try { compBrandDomain = new URL(website.startsWith('http') ? website : `https://${website}`).hostname.replace(/^www\./, ''); } catch { compBrandDomain = website; }
+    const competitorDomains = allCompetitorUrls.map(u => { try { return new URL(u.startsWith('http') ? u : `https://${u}`).hostname.replace(/^www\./, ''); } catch { return u; } });
+
+    const [siteResearch, competitorResults, brandBacklinks, mozBatchData, ...compBacklinks] = await Promise.all([
       researchDomain(website),
-      allCompetitorUrls.length > 0 ? researchCompetitors(allCompetitorUrls) : Promise.resolve([])
+      allCompetitorUrls.length > 0 ? researchCompetitors(allCompetitorUrls) : Promise.resolve([]),
+      isDataForSEOConfigured() ? getDomainBacklinks(compBrandDomain).catch(() => ({ available: false })) : Promise.resolve({ available: false }),
+      isMozConfigured() ? getMozBatchDA(compBrandDomain, competitorDomains).catch(() => ({ available: false })) : Promise.resolve({ available: false }),
+      ...(isDataForSEOConfigured() ? competitorDomains.map(d => getDomainBacklinks(d).catch(() => ({ available: false }))) : []),
     ]);
 
     const siteData = formatSiteResearch(siteResearch);
     let competitorData = '';
+    // Format backlink comparison data
+    let backlinkComparisonText = '';
+    if (brandBacklinks?.available) {
+      const bs = brandBacklinks.summary || {};
+      backlinkComparisonText = `\n=== REAL BACKLINK COMPARISON (DataForSEO — verified) ===\n`;
+      backlinkComparisonText += `YOUR SITE (${compBrandDomain}): ${(bs.totalBacklinks || 0).toLocaleString()} backlinks, ${(bs.referringDomains || 0).toLocaleString()} referring domains, rank ${bs.domainRank || 0}\n`;
+      competitorDomains.forEach((d, i) => {
+        const cb = compBacklinks[i]?.summary || {};
+        if (compBacklinks[i]?.available) {
+          backlinkComparisonText += `${d}: ${(cb.totalBacklinks || 0).toLocaleString()} backlinks, ${(cb.referringDomains || 0).toLocaleString()} referring domains, rank ${cb.domainRank || 0}\n`;
+        }
+      });
+    }
+    // Format Moz DA comparison
+    const mozComparisonText = formatMozDataForPrompt(mozBatchData);
     
     if (competitorResults.length > 0) {
       competitorData = formatCompetitorResearch(competitorResults);
@@ -905,6 +1130,10 @@ ${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
 ${siteData}
 
 ${competitorData}
+
+${backlinkComparisonText}
+
+${mozComparisonText}
 
 Respond in JSON:
 {
@@ -1461,19 +1690,21 @@ router.post('/backlinks', protect, requireStudio('seoStudio'), requireCredits('s
 
     console.log(`\n🔗 === BACKLINK INTELLIGENCE: ${brandDomain} ===`);
 
-    // ── PHASE 1 & 2: Parallel Research (Brand Site + Competitors) ──
+    // ── PHASE 1 & 2: Parallel Research (Brand Site + Competitors + Real Backlinks) ──
     const storedCompetitors = (brand?.competitors || []).map(c => c.url).filter(Boolean);
     console.log(`🔗 Phase 1 & 2: Start parallel research for ${brandDomain} and ${storedCompetitors.length} competitors...`);
     
-    const [siteResearch, competitorLinkProfiles] = await Promise.all([
+    const [siteResearch, competitorLinkProfiles, realBacklinkData] = await Promise.all([
       researchDomain(normalizedUrl),
-      storedCompetitors.length > 0 ? analyzeCompetitorLinkProfile(storedCompetitors, brandDomain) : Promise.resolve([])
+      storedCompetitors.length > 0 ? analyzeCompetitorLinkProfile(storedCompetitors, brandDomain) : Promise.resolve([]),
+      isDataForSEOConfigured() ? getDomainBacklinks(brandDomain).catch(e => ({ available: false, error: e.message })) : Promise.resolve({ available: false }),
     ]);
 
     const siteData = formatSiteResearch(siteResearch);
     const si = siteResearch.siteIntelligence || {};
     const outboundDomains = si.externalDomains || [];
     const internalLinkCount = si.internalLinkCount || 0;
+    const realBacklinkText = formatBacklinkDataForPrompt(realBacklinkData);
 
     // Build competitor link data for prompt
     let competitorLinkData = '';
@@ -1491,7 +1722,7 @@ router.post('/backlinks', protect, requireStudio('seoStudio'), requireCredits('s
     }
 
     // ── PHASE 3: AI-Powered backlink discovery + analysis ──
-    console.log(`🔗 Phase 3: AI backlink discovery and analysis...`);
+    console.log(`🔗 Phase 3: AI backlink discovery and analysis (DataForSEO: ${realBacklinkData?.available ? 'AVAILABLE' : 'not configured'})...`);
 
     const systemPrompt = `You are an expert backlink analyst. Use the provided crawl data to:
 1. DISCOVER real pages linking to or mentioning ${brandDomain}.
@@ -1520,6 +1751,8 @@ Brand outbound links (external domains the brand links TO): ${outboundDomains.sl
 Brand internal link count: ${internalLinkCount}
 
 ${competitorLinkData || 'No competitor data available — identify likely competitors and analyze their link strategies.'}
+
+${realBacklinkText}
 
 Respond in STRICT JSON:
 {
@@ -1697,6 +1930,17 @@ Generate 5-15 discovered backlinks, 5-10 competitor link gaps, 8-15 link opportu
       ...(siteResearch.pages?.map(p => p.url) || [normalizedUrl]),
       ...competitorLinkProfiles.filter(c => c.success).map(c => c.url),
     ];
+    // Attach real DataForSEO backlink data if available
+    if (realBacklinkData?.available) {
+      parsed.realBacklinkData = {
+        provider: 'dataforseo',
+        summary: realBacklinkData.summary || {},
+        topReferringDomains: (realBacklinkData.topReferringDomains || []).slice(0, 15),
+      };
+      parsed.dataSource = 'crawl+dataforseo';
+    } else {
+      parsed.dataSource = 'crawl+ai';
+    }
     // Log token usage from the AI call
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: req.creditAction || 'seoBacklinks', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
 
