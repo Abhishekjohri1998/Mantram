@@ -318,6 +318,50 @@ function countResources(html) {
     };
 }
 
+/** Extract all external JS/CSS resource URLs (for cache/minification scanning — Semrush parity) */
+function extractResourceUrls(html, baseUrl) {
+    const resources = [];
+    // External CSS stylesheets
+    const cssPattern = /<link[^>]*rel\s*=\s*["']stylesheet["'][^>]*href\s*=\s*["']([^"']+)["'][^>]*>/gi;
+    let m;
+    while ((m = cssPattern.exec(html)) !== null && resources.length < 50) {
+        const href = m[1].trim();
+        if (href && !href.startsWith('data:')) {
+            try {
+                const fullUrl = new URL(href, baseUrl).href;
+                resources.push({ url: fullUrl, type: 'css', isMinified: /\.min\.css/i.test(href) });
+            } catch { /* skip invalid */ }
+        }
+    }
+    // Also try reversed attribute order (href before rel)
+    const cssPattern2 = /<link[^>]*href\s*=\s*["']([^"']+)["'][^>]*rel\s*=\s*["']stylesheet["'][^>]*>/gi;
+    while ((m = cssPattern2.exec(html)) !== null && resources.length < 50) {
+        const href = m[1].trim();
+        if (href && !href.startsWith('data:')) {
+            try {
+                const fullUrl = new URL(href, baseUrl).href;
+                if (!resources.find(r => r.url === fullUrl)) {
+                    resources.push({ url: fullUrl, type: 'css', isMinified: /\.min\.css/i.test(href) });
+                }
+            } catch { /* skip invalid */ }
+        }
+    }
+    // External JS scripts
+    const jsPattern = /<script[^>]*src\s*=\s*["']([^"']+)["'][^>]*>/gi;
+    while ((m = jsPattern.exec(html)) !== null && resources.length < 100) {
+        const src = m[1].trim();
+        if (src && !src.startsWith('data:') && !src.includes('application/ld+json')) {
+            try {
+                const fullUrl = new URL(src, baseUrl).href;
+                if (!resources.find(r => r.url === fullUrl)) {
+                    resources.push({ url: fullUrl, type: 'js', isMinified: /\.min\.js/i.test(src) });
+                }
+            } catch { /* skip invalid */ }
+        }
+    }
+    return resources;
+}
+
 /** Validate heading hierarchy (no skipped levels) */
 function validateHeadingHierarchy(headings) {
     const issues = [];
@@ -482,6 +526,8 @@ export async function crawlPage(url) {
             nofollowInternalLinks: links.nofollowInternalLinks || 0,
             externalUrls: links.externalUrls || [],
             hasCacheControl: !!(fetchResult.headers?.cacheControl),
+            // ── Resource URLs for cache/minification scanning (Semrush parity) ──
+            resourceUrls: extractResourceUrls(html, url),
         };
     } catch (e) {
         return { url, success: false, error: e.message, statusCode: 0, responseTimeMs: 0 };
@@ -561,16 +607,16 @@ async function fetchSitemap(baseUrl) {
                 const locPattern = /<sitemap>\s*<loc>([^<]+)<\/loc>/gi;
                 let m;
                 const childSitemaps = [];
-                while ((m = locPattern.exec(xml)) !== null && childSitemaps.length < 3) {
+                while ((m = locPattern.exec(xml)) !== null && childSitemaps.length < 10) {
                     childSitemaps.push(m[1].trim());
                 }
-                // Fetch first 2 child sitemaps
-                for (const childUrl of childSitemaps.slice(0, 2)) {
+                // Fetch first 5 child sitemaps (was 2 — needed for Semrush-level sitemap coverage)
+                for (const childUrl of childSitemaps.slice(0, 5)) {
                     try {
                         const childXml = await safeFetch(childUrl);
                         const childLocPattern = /<url>\s*<loc>([^<]+)<\/loc>/gi;
                         let cm;
-                        while ((cm = childLocPattern.exec(childXml)) !== null && urls.length < 50) {
+                        while ((cm = childLocPattern.exec(childXml)) !== null && urls.length < 500) {
                             urls.push(cm[1].trim());
                         }
                     } catch { /* skip failed child sitemap */ }
@@ -579,7 +625,7 @@ async function fetchSitemap(baseUrl) {
                 // Standard sitemap — extract URLs
                 const locPattern = /<url>\s*<loc>([^<]+)<\/loc>/gi;
                 let m;
-                while ((m = locPattern.exec(xml)) !== null && urls.length < 50) {
+                while ((m = locPattern.exec(xml)) !== null && urls.length < 500) {
                     urls.push(m[1].trim());
                 }
             }
@@ -691,36 +737,47 @@ function jaccardSimilarity(setA, setB) {
 }
 
 function computeDuplicates(pages) {
-    // Strip first/last 150 words (header/footer boilerplate) to avoid false positives
+    // Aggressive boilerplate stripping — shared nav/footer/sidebar causes false positives
+    // Strip first/last 200 words AND remove common boilerplate patterns
     const stripBoilerplate = (text) => {
         const words = text.split(/\s+/);
-        if (words.length < 400) return text; // Short pages: use as-is
-        return words.slice(150, words.length - 150).join(' ');
+        if (words.length < 500) return ''; // Pages under 500 words: skip content comparison entirely (too short for reliable fingerprinting)
+        // Strip 200 words from each end (header/nav + footer/CTA)
+        const core = words.slice(200, words.length - 200).join(' ');
+        // Remove common boilerplate phrases that inflate similarity
+        return core
+            .replace(/copyright\s*\d{4}.*$/gi, '')
+            .replace(/all rights reserved/gi, '')
+            .replace(/privacy policy|terms of service|cookie policy/gi, '')
+            .replace(/\s+/g, ' ').trim();
     };
 
-    const fingerprints = pages.map(p => ({
-        url: p.url,
-        fp: contentFingerprint(stripBoilerplate(p.bodyTextFull || p.contentSnippet || '')),
-    }));
+    // Only fingerprint pages with sufficient content (500+ words)
+    const fingerprints = pages
+        .map(p => {
+            const stripped = stripBoilerplate(p.bodyTextFull || p.contentSnippet || '');
+            return { url: p.url, fp: stripped ? contentFingerprint(stripped) : new Set(), wordCount: p.wordCount || 0 };
+        })
+        .filter(p => p.fp.size > 0); // Exclude pages with empty fingerprints
 
-    // Content duplicates (95%+ similarity = true duplicate, matching Semrush's strict threshold)
-    // Semrush reports near-0 content duplicates for most sites — 85% was far too aggressive
+    // Content duplicates — 99%+ similarity ONLY (Semrush reports near-0 for most sites)
+    // 95% was catching templated pages (same layout, different products) as duplicates
     const contentDuplicates = [];
     for (let i = 0; i < fingerprints.length; i++) {
         for (let j = i + 1; j < fingerprints.length; j++) {
             const sim = jaccardSimilarity(fingerprints[i].fp, fingerprints[j].fp);
-            if (sim > 0.95) {
+            if (sim > 0.99) {
                 contentDuplicates.push({
                     page1: fingerprints[i].url,
                     page2: fingerprints[j].url,
                     similarity: Math.round(sim * 100),
-                    level: sim > 0.99 ? 'exact-duplicate' : 'near-duplicate',
+                    level: 'exact-duplicate',
                 });
             }
         }
     }
 
-    // Duplicate titles (exact match, non-empty)
+    // Duplicate titles (exact match, non-empty) — Semrush reports these separately
     const titleMap = new Map();
     for (const p of pages) {
         const t = (p.title || '').trim().toLowerCase();
@@ -732,7 +789,7 @@ function computeDuplicates(pages) {
         .filter(([, urls]) => urls.length > 1)
         .map(([title, urls]) => ({ title, count: urls.length, urls: urls.slice(0, 5) }));
 
-    // Duplicate meta descriptions (exact match, non-empty)
+    // Duplicate meta descriptions (exact match, non-empty) — Semrush reports these separately
     const metaMap = new Map();
     for (const p of pages) {
         const d = (p.metaDescription || '').trim().toLowerCase();
@@ -744,13 +801,19 @@ function computeDuplicates(pages) {
         .filter(([, urls]) => urls.length > 1)
         .map(([desc, urls]) => ({ description: desc.substring(0, 80) + '...', count: urls.length, urls: urls.slice(0, 5) }));
 
+    // Total duplicate count: Semrush-style (separate categories)
+    const titleDuplicateCount = duplicateTitles.reduce((s, d) => s + d.count, 0);
+    const metaDuplicateCount = duplicateMetaDescriptions.reduce((s, d) => s + d.count, 0);
+
     return {
         contentDuplicates,
         duplicateTitles,
         duplicateMetaDescriptions,
         contentDuplicateCount: contentDuplicates.length,
-        titleDuplicateCount: duplicateTitles.reduce((s, d) => s + d.count, 0),
-        metaDuplicateCount: duplicateMetaDescriptions.reduce((s, d) => s + d.count, 0),
+        titleDuplicateCount,
+        metaDuplicateCount,
+        // Semrush-parity: combined count reported as "X duplicate content issues"
+        totalDuplicateIssues: contentDuplicates.length + titleDuplicateCount + metaDuplicateCount,
     };
 }
 
@@ -1074,6 +1137,53 @@ export async function researchDomain(baseUrl) {
             if (r.broken) brokenInternal.push({ url: r.url, statusCode: r.status, linkedFrom: r.sources });
         }
         console.log(`🔗  Internal links: ${uncrawledInternal.length} probed, ${brokenInternal.length} total broken`);
+    }
+
+    // PHASE 4.7: JS/CSS Resource Scanning (Semrush parity: blocked resources, uncached, unminified)
+    const resourceStats = { totalResources: 0, blockedResources: [], uncachedResources: [], unminifiedResources: [], probedCount: 0 };
+    const allResourceUrls = new Map(); // url → { type, isMinified, pages }
+    for (const p of allPages) {
+        for (const r of (p.resourceUrls || [])) {
+            if (!allResourceUrls.has(r.url)) {
+                allResourceUrls.set(r.url, { ...r, pages: [p.url] });
+            } else {
+                allResourceUrls.get(r.url).pages.push(p.url);
+            }
+        }
+    }
+    resourceStats.totalResources = allResourceUrls.size;
+    // HEAD-probe up to 50 unique resources (2s timeout each, parallel)
+    const resourcesToProbe = [...allResourceUrls.entries()].slice(0, 50);
+    if (resourcesToProbe.length > 0) {
+        console.log(`📦  Probing ${resourcesToProbe.length} JS/CSS resources for cache/minification...`);
+        const resourceProbes = await Promise.all(
+            resourcesToProbe.map(async ([url, info]) => {
+                const ctrl = new AbortController();
+                const t = setTimeout(() => ctrl.abort(), 2000);
+                try {
+                    const r = await fetch(url, { method: 'HEAD', signal: ctrl.signal, headers: { 'User-Agent': USER_AGENT }, redirect: 'follow' });
+                    clearTimeout(t);
+                    const cacheControl = r.headers.get('cache-control') || '';
+                    const contentLength = parseInt(r.headers.get('content-length') || '0', 10);
+                    return {
+                        url, type: info.type, status: r.status, blocked: r.status === 403,
+                        hasCacheControl: !!cacheControl, cacheControl,
+                        isMinified: info.isMinified, contentLength,
+                        // Heuristic: >50KB and not .min. = probably unminified
+                        likelyUnminified: contentLength > 50000 && !info.isMinified,
+                        pages: info.pages.slice(0, 3),
+                    };
+                } catch (e) {
+                    clearTimeout(t);
+                    return { url, type: info.type, status: 0, blocked: false, error: e.message, pages: info.pages.slice(0, 3) };
+                }
+            })
+        );
+        resourceStats.probedCount = resourceProbes.length;
+        resourceStats.blockedResources = resourceProbes.filter(r => r.blocked).map(r => ({ url: r.url, type: r.type, pages: r.pages }));
+        resourceStats.uncachedResources = resourceProbes.filter(r => r.status === 200 && !r.hasCacheControl).map(r => ({ url: r.url, type: r.type, pages: r.pages }));
+        resourceStats.unminifiedResources = resourceProbes.filter(r => r.likelyUnminified).map(r => ({ url: r.url, type: r.type, sizeKB: Math.round(r.contentLength / 1024), pages: r.pages }));
+        console.log(`📦  Resources: ${resourceStats.blockedResources.length} blocked, ${resourceStats.uncachedResources.length} uncached, ${resourceStats.unminifiedResources.length} unminified`);
     }
 
     // PHASE 5: Build comprehensive site intelligence
@@ -1429,6 +1539,18 @@ export async function researchDomain(baseUrl) {
             // Broken internal links (Semrush parity)
             brokenInternalLinks: brokenInternal,
             brokenInternalCount: brokenInternal.length,
+
+            // ── JS/CSS Resource Scanning (Semrush: Blocked Resources, Uncached/Unminified JS/CSS) ──
+            resourceScanning: {
+                totalResources: resourceStats.totalResources,
+                probedCount: resourceStats.probedCount,
+                blockedResources: resourceStats.blockedResources,
+                blockedResourceCount: resourceStats.blockedResources.length,
+                uncachedResources: resourceStats.uncachedResources,
+                uncachedResourceCount: resourceStats.uncachedResources.length,
+                unminifiedResources: resourceStats.unminifiedResources,
+                unminifiedResourceCount: resourceStats.unminifiedResources.length,
+            },
         },
     };
 }

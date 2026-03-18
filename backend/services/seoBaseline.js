@@ -239,6 +239,42 @@ function computeTechnicalScore(siteIntelligence, robotsTxt, sitemap, pageSpeed, 
             howToFix: 'Fix or remove each broken internal link. Update links to point to the correct URLs or add 301 redirects for moved pages.' });
     }
 
+    // ── Blocked External Resources (403 — Semrush parity) ──
+    const blockedCount = siteIntelligence.resourceScanning?.blockedResourceCount || 0;
+    if (blockedCount > 0) {
+        const blockedPenalty = Math.min(3, Math.ceil(blockedCount / 5));
+        score -= blockedPenalty;
+        details.push({ check: 'Blocked External Resources (403)', issueType: 'warning', score: -blockedPenalty, max: 0, status: 'warning',
+            value: `${blockedCount} JS/CSS resources are blocked (403 Forbidden)`,
+            affectedUrls: (siteIntelligence.resourceScanning.blockedResources || []).slice(0, 10).map(r => r.url),
+            aboutThisIssue: 'Blocked resources (HTTP 403) prevent the browser from loading JS/CSS files needed for proper page rendering. This can affect how search engines see and index your pages.',
+            howToFix: 'Check your CDN/server configuration for access restrictions on static assets. Ensure CORS headers allow cross-origin loading of your JS and CSS files. Remove or replace references to third-party resources that are blocking access.' });
+    }
+
+    // ── Uncached JS/CSS Resources (Semrush parity) ──
+    const uncachedCount = siteIntelligence.resourceScanning?.uncachedResourceCount || 0;
+    if (uncachedCount > 0) {
+        const cachePenalty = Math.min(2, Math.ceil(uncachedCount / 10));
+        score -= cachePenalty;
+        details.push({ check: 'Uncached JS/CSS Resources', issueType: 'warning', score: -cachePenalty, max: 0, status: 'warning',
+            value: `${uncachedCount} JS/CSS resources have no cache-control headers`,
+            affectedUrls: (siteIntelligence.resourceScanning.uncachedResources || []).slice(0, 10).map(r => r.url),
+            aboutThisIssue: 'Without cache-control headers, browsers must re-download JS and CSS assets on every page visit, slowing load times and increasing server costs.',
+            howToFix: 'Add Cache-Control headers to your JS and CSS assets. Use long cache lifetimes (e.g., max-age=31536000) with filename hashing for cache busting. Check your CDN or web server configuration.' });
+    }
+
+    // ── Unminified JS/CSS Resources (Semrush parity) ──
+    const unminifiedCount = siteIntelligence.resourceScanning?.unminifiedResourceCount || 0;
+    if (unminifiedCount > 0) {
+        const minPenalty = Math.min(2, Math.ceil(unminifiedCount / 5));
+        score -= minPenalty;
+        details.push({ check: 'Unminified JS/CSS Resources', issueType: 'notice', score: -minPenalty, max: 0, status: 'warning',
+            value: `${unminifiedCount} JS/CSS files appear unminified (>50KB without .min. in filename)`,
+            affectedUrls: (siteIntelligence.resourceScanning.unminifiedResources || []).slice(0, 10).map(r => `${r.url} (${r.sizeKB}KB)`),
+            aboutThisIssue: 'Unminified JS and CSS files contain unnecessary whitespace, comments, and long variable names that increase download times.',
+            howToFix: 'Use build tools (Webpack, Vite, esbuild) to minify all JS and CSS files. Enable your CDN\'s auto-minification feature if available. Consider using code-splitting to reduce bundle sizes.' });
+    }
+
     // ── Text-to-HTML Ratio (penalty, -2 max) ──
     const lowTextRatioCount = siteIntelligence.lowTextRatioCount || 0;
     if (lowTextRatioCount > 0) {
@@ -765,6 +801,241 @@ function computeAuthorityScore(backlinkData) {
 
 
 // ============================================================================
+// HISTORICAL TRENDS — Compare with previous audit (Semrush parity: ↑/↓ arrows)
+// ============================================================================
+
+/**
+ * Compare current audit metrics with the most recent previous audit.
+ * Returns trend data with direction arrows and delta values for every key metric.
+ */
+async function computeHistoricalTrends(brandId, currentSiteStats, currentScores, currentIssuesSummary) {
+    try {
+        const previousAudit = await SeoAudit.findOne({
+            brand: brandId,
+            type: 'onboarding-baseline',
+            status: 'completed',
+        }).sort({ createdAt: -1 }).lean();
+
+        if (!previousAudit?.results) return null;
+
+        const prev = previousAudit.results;
+        const prevStats = prev.siteStats || {};
+        const prevScores = prev.scores || {};
+        const prevIssues = prev.issuesSummary || {};
+
+        // Helper: compute delta with direction
+        const delta = (current, previous, lowerIsBetter = false) => {
+            const diff = (current || 0) - (previous || 0);
+            if (diff === 0) return { current, previous, delta: 0, direction: '—', improved: null };
+            const direction = diff > 0 ? '↑' : '↓';
+            // For metrics where lower is better (e.g., broken links), ↓ is improvement
+            const improved = lowerIsBetter ? diff < 0 : diff > 0;
+            return { current, previous: previous || 0, delta: diff, direction, improved, label: `${direction}${Math.abs(diff)}` };
+        };
+
+        return {
+            previousAuditDate: previousAudit.createdAt,
+            previousAuditId: previousAudit._id,
+            // ── Score trends ──
+            scores: {
+                seoHealth: delta(currentScores.seoHealth, prevScores.seoHealth),
+                technicalScore: delta(currentScores.technicalScore, prevScores.technicalScore),
+                onPageScore: delta(currentScores.onPageScore, prevScores.onPageScore),
+                contentScore: delta(currentScores.contentScore, prevScores.contentScore),
+                authorityScore: delta(currentScores.authorityScore, prevScores.authorityScore),
+            },
+            // ── Issue count trends ──
+            issues: {
+                total: delta(currentIssuesSummary.total, prevIssues.total, true),
+                critical: delta(currentIssuesSummary.critical, prevIssues.critical, true),
+                high: delta(currentIssuesSummary.high, prevIssues.high, true),
+                medium: delta(currentIssuesSummary.medium, prevIssues.medium, true),
+            },
+            // ── Key metric trends (Semrush shows ↑/↓ on every metric) ──
+            metrics: {
+                pagesCrawled: delta(currentSiteStats.pagesCrawled, prevStats.pagesCrawled),
+                brokenInternalCount: delta(currentSiteStats.brokenInternalCount, prevStats.brokenInternalCount, true),
+                duplicateContentCount: delta(currentSiteStats.duplicateContentCount, prevStats.duplicateContentCount, true),
+                titleDuplicateCount: delta(currentSiteStats.titleDuplicateCount, prevStats.titleDuplicateCount, true),
+                metaDescDuplicateCount: delta(currentSiteStats.metaDescDuplicateCount, prevStats.metaDescDuplicateCount, true),
+                imagesWithoutAlt: delta(currentSiteStats.imagesWithoutAlt, prevStats.imagesWithoutAlt, true),
+                thinPageCount: delta(currentSiteStats.thinPageCount, prevStats.thinPageCount, true),
+                orphanPageCount: delta(currentSiteStats.orphanPageCount, prevStats.orphanPageCount, true),
+                mixedContentCount: delta(currentSiteStats.mixedContentCount, prevStats.mixedContentCount, true),
+                slowPageCount: delta(currentSiteStats.slowPageCount, prevStats.slowPageCount, true),
+                multipleH1Count: delta(currentSiteStats.multipleH1Count, prevStats.multipleH1Count, true),
+                headingSkippedCount: delta(currentSiteStats.headingSkippedCount, prevStats.headingSkippedCount, true),
+                redirectChainCount: delta(currentSiteStats.redirectChainCount, prevStats.redirectChainCount, true),
+                urlTooLongCount: delta(currentSiteStats.urlTooLongCount, prevStats.urlTooLongCount, true),
+                noindexPageCount: delta(currentSiteStats.noindexPageCount, prevStats.noindexPageCount, true),
+            },
+        };
+    } catch (err) {
+        console.warn('  ⚠️ Could not compute historical trends:', err.message);
+        return null;
+    }
+}
+
+
+// ============================================================================
+// AI-POWERED PREMIUM FEATURES (Competitive Moat vs Semrush)
+// ============================================================================
+
+/**
+ * AI Duplicate Validation — Uses Gemini Flash to verify content duplicates.
+ * Eliminates false positives by asking AI if pages are genuinely duplicate
+ * vs just similar templates (e.g., product pages with same layout).
+ */
+async function aiValidateDuplicates(contentDuplicates) {
+    if (!contentDuplicates?.length || !process.env.GEMINI_API_KEY) return null;
+
+    const top10 = contentDuplicates.slice(0, 10);
+    const pairsText = top10.map((d, i) =>
+        `${i + 1}. Page A: ${d.page1}\n   Page B: ${d.page2}\n   Similarity: ${d.similarity}%`
+    ).join('\n');
+
+    const prompt = `You are an SEO expert analyzing potential duplicate content on a website.
+Below are ${top10.length} pairs of pages flagged as potential duplicates by automated similarity analysis.
+For each pair, determine if they are:
+- TRUE DUPLICATE: Pages with essentially the same content that would confuse Google
+- FALSE POSITIVE: Pages with similar templates but genuinely different content (e.g., different products, different blog posts with same layout)
+
+${pairsText}
+
+Respond with a JSON array of objects: [{"pair": 1, "verdict": "true_duplicate" or "false_positive", "reason": "brief explanation"}]
+Only return the JSON array, no other text.`;
+
+    try {
+        const resp = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
+                }),
+                signal: AbortSignal.timeout(15000),
+            }
+        );
+        if (!resp.ok) return null;
+        const data = await resp.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        // Extract JSON from response
+        const jsonMatch = text.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) return null;
+        const validations = JSON.parse(jsonMatch[0]);
+        const trueDuplicates = validations.filter(v => v.verdict === 'true_duplicate').length;
+        const falsePositives = validations.filter(v => v.verdict === 'false_positive').length;
+        return {
+            validations,
+            summary: `AI verified ${validations.length} pairs: ${trueDuplicates} true duplicates, ${falsePositives} false positives`,
+            trueDuplicateCount: trueDuplicates,
+            falsePositiveCount: falsePositives,
+        };
+    } catch (e) {
+        console.warn('  ⚠️ AI duplicate validation failed:', e.message);
+        return null;
+    }
+}
+
+/**
+ * AI Fix Priority Ranking — Uses GPT-4o to rank all audit issues by traffic impact.
+ * Produces an actionable "fix these first" list that Semrush can never offer.
+ */
+async function aiRankFixPriorities(issues, siteStats, scores) {
+    if (!issues?.length || !process.env.OPENAI_API_KEY) return null;
+
+    const issuesSummary = issues.slice(0, 20).map((issue, i) =>
+        `${i + 1}. [${issue.severity}] ${issue.title}: ${issue.description}`
+    ).join('\n');
+
+    const prompt = `You are a senior SEO consultant. A website audit found these issues:
+
+Overall SEO Score: ${scores.seoHealth}/100
+Pages Crawled: ${siteStats.pagesCrawled}
+Broken Internal Links: ${siteStats.brokenInternalCount}
+Duplicate Content Issues: ${siteStats.duplicateContentCount}
+
+ISSUES:
+${issuesSummary}
+
+Rank the TOP 5 fixes by traffic impact. For each, explain WHY it should be prioritized and estimate the score improvement.
+
+Respond with a JSON array: [{"rank": 1, "title": "issue title", "impact": "high/medium/low", "reason": "why this fix matters most", "estimatedScoreGain": 5}]
+Only return the JSON array, no other text.`;
+
+    try {
+        const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+            body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                messages: [{ role: 'user', content: prompt }],
+                temperature: 0.2, max_tokens: 1024,
+            }),
+            signal: AbortSignal.timeout(15000),
+        });
+        if (!resp.ok) return null;
+        const data = await resp.json();
+        const text = data?.choices?.[0]?.message?.content || '';
+        const jsonMatch = text.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) return null;
+        return JSON.parse(jsonMatch[0]);
+    } catch (e) {
+        console.warn('  ⚠️ AI fix priority ranking failed:', e.message);
+        return null;
+    }
+}
+
+/**
+ * AI Trend Summary — Uses Gemini Flash to explain significant changes between audits.
+ * Example: "Your broken internal links increased by 69 this week, likely due to the /products/ URL migration."
+ */
+async function aiTrendSummary(trends) {
+    if (!trends || !process.env.GEMINI_API_KEY) return null;
+
+    // Only summarize if there are significant changes
+    const significantChanges = [];
+    if (trends.scores?.seoHealth?.delta && Math.abs(trends.scores.seoHealth.delta) >= 3) {
+        significantChanges.push(`SEO Health score changed by ${trends.scores.seoHealth.label}`);
+    }
+    for (const [key, val] of Object.entries(trends.metrics || {})) {
+        if (val?.delta && Math.abs(val.delta) >= 5) {
+            significantChanges.push(`${key}: ${val.label} (from ${val.previous} to ${val.current})`);
+        }
+    }
+    if (significantChanges.length === 0) return null;
+
+    const prompt = `You are an SEO analyst. Between two website audits, these changes occurred:
+${significantChanges.join('\n')}
+
+Write 2-3 concise sentences explaining the most likely causes and what action the site owner should take. Be specific and actionable.`;
+
+    try {
+        const resp = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { temperature: 0.3, maxOutputTokens: 256 },
+                }),
+                signal: AbortSignal.timeout(10000),
+            }
+        );
+        if (!resp.ok) return null;
+        const data = await resp.json();
+        return data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
+    } catch (e) {
+        console.warn('  ⚠️ AI trend summary failed:', e.message);
+        return null;
+    }
+}
+
+
+// ============================================================================
 // MAIN FUNCTION — Run SEO Baseline Audit
 // ============================================================================
 
@@ -841,18 +1112,36 @@ export async function runSEOBaseline(brand) {
     const issues = allDetails
         .filter(d => d.status === 'fail' || d.status === 'warning')
         .sort((a, b) => {
+            // Sort by issueType: error > warning > notice, then by severity
+            const typeOrder = { error: 0, warning: 1, notice: 2 };
+            const aType = typeOrder[a.issueType] ?? 2;
+            const bType = typeOrder[b.issueType] ?? 2;
+            if (aType !== bType) return aType - bType;
             const severityOrder = { fail: 0, warning: 1 };
             return (severityOrder[a.status] || 2) - (severityOrder[b.status] || 2);
         })
         .map(d => ({
             severity: d.status === 'fail' ? (d.max >= 10 ? 'critical' : 'high') : 'medium',
+            // ── Semrush parity: issue classification for Errors/Warnings/Notices UI ──
+            issueType: d.issueType || (d.status === 'fail' ? 'error' : 'warning'),
             category: d.category,
             title: d.check,
             description: d.value || '',
             fix: d.fix || '',
+            // ── Semrush parity: rich detail fields ──
+            aboutThisIssue: d.aboutThisIssue || '',
+            howToFix: d.howToFix || '',
+            affectedUrls: d.affectedUrls || [],
             currentScore: d.score,
             maxScore: d.max,
         }));
+
+    // ── Categorized issues for Semrush-style Errors/Warnings/Notices sections ──
+    const categorizedIssues = {
+        errors: issues.filter(i => i.issueType === 'error'),
+        warnings: issues.filter(i => i.issueType === 'warning'),
+        notices: issues.filter(i => i.issueType === 'notice'),
+    };
 
     // ── Step 4: Build results ──
     const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -884,6 +1173,15 @@ export async function runSEOBaseline(brand) {
             high: issues.filter(i => i.severity === 'high').length,
             medium: issues.filter(i => i.severity === 'medium').length,
             total: issues.length,
+        },
+        // ── Semrush parity: Errors/Warnings/Notices categorization ──
+        categorizedIssues: {
+            errors: categorizedIssues.errors,
+            errorCount: categorizedIssues.errors.length,
+            warnings: categorizedIssues.warnings,
+            warningCount: categorizedIssues.warnings.length,
+            notices: categorizedIssues.notices,
+            noticeCount: categorizedIssues.notices.length,
         },
         // ── Per-page report cards (like Semrush/Ahrefs) ──
         pageReports: pages.slice(0, 20).map(p => ({
@@ -945,6 +1243,11 @@ export async function runSEOBaseline(brand) {
             avgJsResources: si.resourceBloat?.avgJs || 0,
             brokenInternalCount: si.brokenInternalCount || 0,
             brokenInternalLinks: (si.brokenInternalLinks || []).slice(0, 20),
+            // ── Resource Scanning (Semrush parity) ──
+            resourceScanning: si.resourceScanning || {},
+            blockedResourceCount: si.resourceScanning?.blockedResourceCount || 0,
+            uncachedResourceCount: si.resourceScanning?.uncachedResourceCount || 0,
+            unminifiedResourceCount: si.resourceScanning?.unminifiedResourceCount || 0,
         },
         pageSpeed: pageSpeed?.success ? {
             scores: pageSpeed.scores,
@@ -972,6 +1275,36 @@ export async function runSEOBaseline(brand) {
         },
     };
 
+    // ── Step 4.5: Compute historical trends (↑/↓ arrows — Semrush parity) ──
+    const trends = await computeHistoricalTrends(brand._id, results.siteStats, results.scores, results.issuesSummary);
+    if (trends) {
+        results.trends = trends;
+        console.log(`  📈 Historical trends computed: previous audit from ${new Date(trends.previousAuditDate).toLocaleDateString()}`);
+    } else {
+        results.trends = null;
+        console.log('  📈 No previous audit found — trends will appear after next audit run');
+    }
+
+    // ── Step 4.6: AI-Powered Premium Features (run in parallel for speed) ──
+    console.log('  🤖 Running AI premium analysis (duplicate validation + fix priorities + trend summary)...');
+    const [aiDuplicates, aiPriorities, aiTrends] = await Promise.all([
+        aiValidateDuplicates(si.duplicateContent || []),
+        aiRankFixPriorities(issues, results.siteStats, results.scores),
+        aiTrendSummary(trends),
+    ]);
+
+    results.aiInsights = {
+        duplicateValidation: aiDuplicates,
+        fixPriorities: aiPriorities,
+        trendSummary: aiTrends,
+        poweredBy: [
+            aiDuplicates ? 'Gemini Flash (duplicate validation)' : null,
+            aiPriorities ? 'GPT-4o (fix priority ranking)' : null,
+            aiTrends ? 'Gemini Flash (trend analysis)' : null,
+        ].filter(Boolean),
+    };
+    console.log(`  🤖 AI insights: ${results.aiInsights.poweredBy.length} features active`);
+
     // ── Step 5: Save to SeoAudit collection ──
     try {
         await SeoAudit.create({
@@ -983,6 +1316,7 @@ export async function runSEOBaseline(brand) {
                 seoHealth: overallScore,
                 aiVisibility: 0, // Not computed at onboarding
                 technicalScore: technicalResult.score,
+                onPageScore: onPageResult.score,
                 contentScore: contentResult.score,
                 authorityScore: authorityResult.score,
             },

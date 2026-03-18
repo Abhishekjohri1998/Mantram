@@ -857,10 +857,27 @@ ul,ol{padding-left:20px}li{margin:4px 0}
 function HealthCheckResults({ results }) {
     const [issueFilter, setIssueFilter] = useState('all')
     const [showPageCards, setShowPageCards] = useState(false)
+    const [showAiInsights, setShowAiInsights] = useState(true)
     const issues = results.issues || []
     const filtered = issueFilter === 'all' ? issues : issues.filter(i => i.severity === issueFilter)
     const stats = results.siteStats || {}
     const pageReports = results.pageReports || []
+
+    // ── Bridge backend data names to existing UI (Semrush parity) ──
+    // Use local variables instead of mutating React state
+    const groupedIssues = results.groupedIssues || results.categorizedIssues || null
+    const trends = results.trends || null
+    const trendDelta = results.trendDelta || (trends ? {
+        previousDate: trends.previousAuditDate,
+        scoreChange: trends.scores?.seoHealth?.delta || 0,
+        technicalChange: trends.scores?.technicalScore?.delta || 0,
+        newIssueCount: trends.issues?.total?.delta > 0 ? trends.issues.total.delta : 0,
+        resolvedIssueCount: trends.issues?.total?.delta < 0 ? Math.abs(trends.issues.total.delta) : 0,
+        pagesCrawledChange: trends.metrics?.pagesCrawled?.delta || 0,
+        brokenInternalChange: trends.metrics?.brokenInternalCount?.delta || 0,
+        thinPageChange: trends.metrics?.thinPageCount?.delta || 0,
+        duplicateTitleChange: trends.metrics?.duplicateContentCount?.delta || 0,
+    } : null)
 
     return (<>
         {/* Summary */}
@@ -870,34 +887,44 @@ function HealthCheckResults({ results }) {
             {results.strategicBrief && <p className="text-xs text-slate-400 mt-3 leading-relaxed">{results.strategicBrief}</p>}
         </div>
 
-        {/* Score Cards */}
+        {/* Score Cards — with trend arrows ↑/↓ when available */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-            {[{ s: results.seoHealthScore, l: 'SEO Health', c: 'emerald' }, { s: results.aiVisibilityScore, l: 'AI Visibility', c: 'violet' },
-            { s: results.technicalScore, l: 'Technical', c: 'blue' }, { s: results.contentScore, l: 'Content', c: 'amber' },
-            { s: results.authorityScore, l: 'Authority', c: 'rose' }].map(x => (
-                <div key={x.l} className="glass-panel rounded-2xl p-4 flex flex-col items-center">
-                    <ScoreRing score={x.s || 0} size={80} label={x.l} color={x.c} />
-                </div>
-            ))}
+            {[{ s: results.seoHealthScore, l: 'SEO Health', c: 'emerald', tk: 'seoHealth' },
+              { s: results.aiVisibilityScore, l: 'AI Visibility', c: 'violet', tk: null },
+              { s: results.technicalScore, l: 'Technical', c: 'blue', tk: 'technicalScore' },
+              { s: results.contentScore, l: 'Content', c: 'amber', tk: 'contentScore' },
+              { s: results.authorityScore, l: 'Authority', c: 'rose', tk: 'authorityScore' }].map(x => {
+                const trendData = x.tk && trends?.scores?.[x.tk]
+                return (
+                    <div key={x.l} className="glass-panel rounded-2xl p-4 flex flex-col items-center relative">
+                        <ScoreRing score={x.s || 0} size={80} label={x.l} color={x.c} />
+                        {trendData && trendData.delta !== 0 && (
+                            <span className={`absolute top-2 right-2 text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                                trendData.improved ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'
+                            }`}>{trendData.label}</span>
+                        )}
+                    </div>
+                )
+            })}
         </div>
 
         {/* ── Trend Delta (since last audit) ── */}
-        {results.trendDelta && (
+        {trendDelta && (
             <div className="glass-panel rounded-2xl p-5 mb-6 border border-primary/10">
                 <h4 className="text-xs font-bold text-primary uppercase tracking-wider mb-3 flex items-center gap-2">
                     <span className="material-symbols-outlined text-sm">trending_up</span> Changes Since Last Audit
-                    <span className="ml-auto text-[9px] text-slate-500 font-normal normal-case">{new Date(results.trendDelta.previousDate).toLocaleDateString()}</span>
+                    <span className="ml-auto text-[9px] text-slate-500 font-normal normal-case">{new Date(trendDelta.previousDate).toLocaleDateString()}</span>
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {[
-                        { label: 'Score', value: results.trendDelta.scoreChange, suffix: '' },
-                        { label: 'Technical', value: results.trendDelta.technicalChange, suffix: '' },
-                        { label: 'New Issues', value: results.trendDelta.newIssueCount, suffix: '', isCount: true },
-                        { label: 'Resolved', value: results.trendDelta.resolvedIssueCount, suffix: '', isCount: true, isPositive: true },
-                        { label: 'Pages Crawled', value: results.trendDelta.pagesCrawledChange, suffix: '' },
-                        { label: 'Broken Internal', value: results.trendDelta.brokenInternalChange, suffix: '', isNegative: true },
-                        { label: 'Thin Pages', value: results.trendDelta.thinPageChange, suffix: '', isNegative: true },
-                        { label: 'Dup. Titles', value: results.trendDelta.duplicateTitleChange, suffix: '', isNegative: true },
+                        { label: 'Score', value: trendDelta.scoreChange, suffix: '' },
+                        { label: 'Technical', value: trendDelta.technicalChange, suffix: '' },
+                        { label: 'New Issues', value: trendDelta.newIssueCount, suffix: '', isCount: true },
+                        { label: 'Resolved', value: trendDelta.resolvedIssueCount, suffix: '', isCount: true, isPositive: true },
+                        { label: 'Pages Crawled', value: trendDelta.pagesCrawledChange, suffix: '' },
+                        { label: 'Broken Internal', value: trendDelta.brokenInternalChange, suffix: '', isNegative: true },
+                        { label: 'Thin Pages', value: trendDelta.thinPageChange, suffix: '', isNegative: true },
+                        { label: 'Dup. Titles', value: trendDelta.duplicateTitleChange, suffix: '', isNegative: true },
                     ].map(d => (
                         <div key={d.label} className="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
                             <span className={`text-base font-black ${d.isCount ? (d.isPositive ? 'text-emerald-400' : (d.value > 0 ? 'text-red-400' : 'text-slate-400')) : (d.isNegative ? (d.value > 0 ? 'text-red-400' : d.value < 0 ? 'text-emerald-400' : 'text-slate-400') : (d.value > 0 ? 'text-emerald-400' : d.value < 0 ? 'text-red-400' : 'text-slate-400'))}`}>
@@ -908,11 +935,11 @@ function HealthCheckResults({ results }) {
                     ))}
                 </div>
                 {/* Per-issue deltas */}
-                {results.trendDelta.issueDeltas?.length > 0 && (
+                {trendDelta.issueDeltas?.length > 0 && (
                     <div className="mt-4 border-t border-white/[0.06] pt-3">
                         <p className="text-[9px] font-bold text-slate-500 uppercase mb-2">Issue-Level Changes</p>
                         <div className="space-y-1.5">
-                            {results.trendDelta.issueDeltas.slice(0, 12).map((d, idx) => (
+                            {trendDelta.issueDeltas.slice(0, 12).map((d, idx) => (
                                 <div key={idx} className="flex items-center gap-2 text-[10px]">
                                     {d.status === 'new' && <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 font-black">NEW</span>}
                                     {d.status === 'resolved' && <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-black">✓ RESOLVED</span>}
@@ -948,6 +975,12 @@ function HealthCheckResults({ results }) {
                     { label: 'Canon. Conflicts', value: stats.conflictingCanonicalCount || 0, icon: 'content_copy', color: (stats.conflictingCanonicalCount || 0) > 0 ? '#f43f5e' : '#10b981' },
                     { label: 'Browser Cache', value: stats.cacheControlPresent ? 'Yes' : 'No', icon: 'cached', color: stats.cacheControlPresent ? '#10b981' : '#f59e0b' },
                     { label: 'AI Crawl (llms.txt)', value: stats.llmsTxtFound ? 'Found' : 'Missing', icon: 'smart_toy', color: stats.llmsTxtFound ? '#10b981' : '#f59e0b' },
+                    // ── Resource Scanning (Semrush parity) ──
+                    ...(stats.blockedResourceCount > 0 || stats.uncachedResourceCount > 0 || stats.unminifiedResourceCount > 0 ? [
+                        { label: 'Blocked Resources', value: stats.blockedResourceCount || 0, icon: 'block', color: (stats.blockedResourceCount || 0) > 0 ? '#f43f5e' : '#10b981' },
+                        { label: 'Uncached JS/CSS', value: stats.uncachedResourceCount || 0, icon: 'cloud_off', color: (stats.uncachedResourceCount || 0) > 0 ? '#f59e0b' : '#10b981' },
+                        { label: 'Unminified JS/CSS', value: stats.unminifiedResourceCount || 0, icon: 'compress', color: (stats.unminifiedResourceCount || 0) > 0 ? '#f59e0b' : '#10b981' },
+                    ] : []),
                 ].map(s => (
                     <div key={s.label} className="flex items-center gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
                         <span className="material-symbols-outlined text-lg" style={{ color: s.color }}>{s.icon}</span>
@@ -1003,6 +1036,87 @@ function HealthCheckResults({ results }) {
                         </div>
                     ))}
                 </div>
+            </div>
+        )}
+
+        {/* ── AI Insights Panel (Competitive Moat — only Mantram has this) ── */}
+        {results.aiInsights && results.aiInsights.poweredBy?.length > 0 && (
+            <div className="glass-panel rounded-2xl p-5 mb-6 border border-violet-500/15">
+                <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider flex items-center gap-2">
+                        <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Insights
+                        <span className="text-[8px] text-violet-400/60 bg-violet-500/10 px-1.5 py-0.5 rounded-full ml-1">★ Mantram AI Exclusive</span>
+                    </h4>
+                    <button onClick={() => setShowAiInsights(!showAiInsights)}
+                        className="text-[10px] font-bold text-violet-400 px-2 py-1 rounded-lg bg-violet-500/10 hover:bg-violet-500/15 cursor-pointer transition-all flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs">{showAiInsights ? 'expand_less' : 'expand_more'}</span>
+                        {showAiInsights ? 'Hide' : 'Show'}
+                    </button>
+                </div>
+                {showAiInsights && (
+                    <div className="space-y-4 animate-fade-in">
+                        {/* AI Trend Summary */}
+                        {results.aiInsights.trendSummary && (
+                            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-xs text-amber-400">trending_up</span> AI Trend Analysis
+                                </p>
+                                <p className="text-xs text-slate-300 leading-relaxed">{results.aiInsights.trendSummary}</p>
+                            </div>
+                        )}
+
+                        {/* AI Fix Priorities */}
+                        {results.aiInsights.fixPriorities?.length > 0 && (
+                            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-2 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-xs text-emerald-400">priority_high</span> Top Fixes by Traffic Impact
+                                </p>
+                                <div className="space-y-2">
+                                    {results.aiInsights.fixPriorities.map((fix, i) => (
+                                        <div key={i} className="flex items-start gap-2.5 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] transition-all">
+                                            <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${
+                                                fix.impact === 'high' ? 'bg-rose-500/20 text-rose-400' : fix.impact === 'medium' ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-500/20 text-slate-400'
+                                            }`}>#{fix.rank}</span>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-[11px] font-bold text-white">{fix.title}</p>
+                                                <p className="text-[10px] text-slate-400 mt-0.5">{fix.reason}</p>
+                                            </div>
+                                            {fix.estimatedScoreGain > 0 && (
+                                                <span className="flex-shrink-0 text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">+{fix.estimatedScoreGain} pts</span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* AI Duplicate Validation */}
+                        {results.aiInsights.duplicateValidation && (
+                            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-xs text-blue-400">content_copy</span> AI Duplicate Validation
+                                </p>
+                                <p className="text-xs text-slate-300 mb-2">{results.aiInsights.duplicateValidation.summary}</p>
+                                <div className="flex gap-3">
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400">
+                                        {results.aiInsights.duplicateValidation.trueDuplicateCount} True Duplicates
+                                    </span>
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">
+                                        {results.aiInsights.duplicateValidation.falsePositiveCount} False Positives
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Powered By */}
+                        <div className="flex items-center gap-2 pt-2 border-t border-white/[0.04]">
+                            <span className="text-[8px] text-slate-600 uppercase font-bold">Powered by</span>
+                            {results.aiInsights.poweredBy.map((model, i) => (
+                                <span key={i} className="text-[8px] text-violet-400/60 bg-violet-500/8 px-1.5 py-0.5 rounded-full">{model}</span>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
         )}
 
@@ -1075,12 +1189,12 @@ function HealthCheckResults({ results }) {
         )}
 
         {/* ── ERRORS / WARNINGS / NOTICES (Semrush-style) ── */}
-        {results.groupedIssues && (results.groupedIssues.errorCount > 0 || results.groupedIssues.warningCount > 0 || results.groupedIssues.noticeCount > 0) && (
+        {groupedIssues && (groupedIssues.errorCount > 0 || groupedIssues.warningCount > 0 || groupedIssues.noticeCount > 0) && (
             <div className="space-y-4 mb-6">
                 {[
-                    { key: 'errors', label: 'Errors', items: results.groupedIssues?.errors || [], color: '#f43f5e', bg: 'bg-rose-500', icon: 'error' },
-                    { key: 'warnings', label: 'Warnings', items: results.groupedIssues?.warnings || [], color: '#f59e0b', bg: 'bg-amber-500', icon: 'warning' },
-                    { key: 'notices', label: 'Notices', items: results.groupedIssues?.notices || [], color: '#3b82f6', bg: 'bg-blue-500', icon: 'info' },
+                    { key: 'errors', label: 'Errors', items: groupedIssues?.errors || [], color: '#f43f5e', bg: 'bg-rose-500', icon: 'error' },
+                    { key: 'warnings', label: 'Warnings', items: groupedIssues?.warnings || [], color: '#f59e0b', bg: 'bg-amber-500', icon: 'warning' },
+                    { key: 'notices', label: 'Notices', items: groupedIssues?.notices || [], color: '#3b82f6', bg: 'bg-blue-500', icon: 'info' },
                 ].filter(g => g.items.length > 0).map(group => (
                     <details key={group.key} open={group.key === 'errors'} className="glass-panel rounded-2xl overflow-hidden">
                         <summary className="cursor-pointer p-4 flex items-center gap-3 hover:bg-white/[0.02] transition-all">
@@ -1591,6 +1705,31 @@ function IssueCard({ issue }) {
                     {issue.impact && <p className="text-[11px] text-amber-400">⚡ Impact: {issue.impact}</p>}
                     {issue.fix && <p className="text-[11px] text-emerald-400">✓ Fix: {issue.fix}</p>}
                     {issue.effort && <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${issue.effort === 'quick-fix' ? 'bg-emerald-500/10 text-emerald-400' : issue.effort === 'moderate' ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-400'}`}>{issue.effort}</span>}
+                    {/* ── Semrush parity: About this issue + How to fix ── */}
+                    {issue.aboutThisIssue && (
+                        <div className="mt-2 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                            <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">About this issue</p>
+                            <p className="text-[11px] text-slate-300 leading-relaxed">{issue.aboutThisIssue}</p>
+                        </div>
+                    )}
+                    {issue.howToFix && (
+                        <div className="p-2.5 rounded-lg bg-emerald-500/[0.03] border border-emerald-500/[0.08]">
+                            <p className="text-[9px] font-bold text-emerald-400 uppercase mb-1">How to fix</p>
+                            <p className="text-[11px] text-slate-300 leading-relaxed">{issue.howToFix}</p>
+                        </div>
+                    )}
+                    {issue.affectedUrls?.length > 0 && (
+                        <div>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Affected Pages ({issue.affectedUrls.length})</p>
+                            <div className="space-y-0.5">
+                                {issue.affectedUrls.slice(0, 5).map((url, j) => (
+                                    <a key={j} href={url} target="_blank" rel="noopener noreferrer"
+                                        className="block text-[10px] text-primary/60 hover:text-primary truncate transition-colors">{url}</a>
+                                ))}
+                                {issue.affectedUrls.length > 5 && <p className="text-[9px] text-slate-600">+{issue.affectedUrls.length - 5} more</p>}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

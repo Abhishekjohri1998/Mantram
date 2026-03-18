@@ -395,6 +395,10 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
       avgTextToHtmlRatio: si.avgTextToHtmlRatio || 0,
       oversizedPageCount: si.oversizedPageCount || 0,
       singleIncomingCount: si.singleIncomingCount || 0,
+      // Resource scanning (Semrush parity: blocked/uncached/unminified JS/CSS)
+      blockedResourceCount: si.resourceScanning?.blockedResourceCount || 0,
+      uncachedResourceCount: si.resourceScanning?.uncachedResourceCount || 0,
+      unminifiedResourceCount: si.resourceScanning?.unminifiedResourceCount || 0,
     };
     parsed.pageReports = pages.slice(0, 50).map(p => ({
       url: p.url,
@@ -417,9 +421,21 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
     }));
 
     // ── GROUP ISSUES BY TYPE: Errors / Warnings / Notices (Semrush parity) ──
+    // Try deterministic baseline details first, fall back to AI-generated issues
     const baselineDetails = parsed.baselineScores?.technical?.details || [];
     const onPageDetails = parsed.baselineScores?.onPage?.details || [];
-    const allDeterministicIssues = [...baselineDetails, ...onPageDetails].filter(d => d.issueType);
+    let allDeterministicIssues = [...baselineDetails, ...onPageDetails].filter(d => d.issueType);
+    // If no deterministic issues (health-check flow), build from AI issues
+    if (allDeterministicIssues.length === 0 && parsed.issues?.length > 0) {
+      allDeterministicIssues = parsed.issues.map(i => ({
+        check: i.title,
+        value: i.description || '',
+        issueType: i.severity === 'critical' ? 'error' : i.severity === 'high' ? 'error' : i.severity === 'medium' ? 'warning' : 'notice',
+        aboutThisIssue: i.whyItMatters || i.description || '',
+        howToFix: i.fix || '',
+        affectedUrls: [],
+      }));
+    }
     parsed.groupedIssues = {
       errors: allDeterministicIssues.filter(d => d.issueType === 'error'),
       warnings: allDeterministicIssues.filter(d => d.issueType === 'warning'),
