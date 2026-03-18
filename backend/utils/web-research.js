@@ -787,69 +787,99 @@ export async function researchDomain(baseUrl) {
     const homepage = homepageResult;
     const internalLinks = homepage.links?.internal || [];
 
-    // PHASE 2: Build priority crawl queue (sitemap URLs first, then key paths, then discovery)
+    // PHASE 2: Build priority crawl queue (expanded for Semrush-level coverage)
+    const MAX_PAGES = 150; // Semrush-level coverage for reliable data
+    const CRAWL_TIMEOUT_MS = 45000; // 45s max crawl time
+    const crawlStartTime = Date.now();
     const crawled = new Set([cleanBase, homepage.url]);
     const toCrawl = [];
 
-    // Priority 1: Sitemap URLs (up to 15)
+    // Helper: add URL to queue if not already seen
+    const enqueue = (url) => {
+        if (crawled.size >= MAX_PAGES) return;
+        try {
+            const resolved = new URL(url).href;
+            if (!crawled.has(resolved)) {
+                toCrawl.push(resolved);
+                crawled.add(resolved);
+            }
+        } catch { /* skip invalid */ }
+    };
+
+    // Helper: check if URL is crawlable (not a file, fragment, or query)
+    const isCrawlable = (link) => {
+        if (!link || link === '/' || link.includes('#')) return false;
+        const lower = link.toLowerCase();
+        if (['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.zip', '.mp4', '.mp3', '.css', '.js'].some(ext => lower.endsWith(ext))) return false;
+        return true;
+    };
+
+    // Priority 1: Sitemap URLs (up to 200 — covers most of the site)
     if (sitemap.found) {
-        for (const sUrl of sitemap.urls.slice(0, 15)) {
-            try {
-                const resolved = new URL(sUrl).href;
-                if (!crawled.has(resolved)) {
-                    toCrawl.push(resolved);
-                    crawled.add(resolved);
-                }
-            } catch { /* skip invalid */ }
+        for (const sUrl of sitemap.urls.slice(0, 200)) {
+            enqueue(sUrl);
         }
     }
 
     // Priority 2: Key structural pages
-    const keyPaths = ['/about', '/about-us', '/services', '/products', '/contact', '/blog', '/faq', '/pricing', '/team', '/case-studies', '/portfolio', '/news', '/careers', '/features'];
+    const keyPaths = ['/about', '/about-us', '/services', '/products', '/contact', '/blog', '/faq', '/pricing', '/team', '/case-studies', '/portfolio', '/news', '/careers', '/features', '/terms', '/privacy', '/shop', '/store', '/testimonials', '/reviews'];
     for (const path of keyPaths) {
-        if (toCrawl.length >= 25) break;
+        if (crawled.size >= MAX_PAGES) break;
         const match = internalLinks.find(l => l.toLowerCase().includes(path));
         if (match) {
-            try {
-                const fullUrl = new URL(match, cleanBase).href;
-                if (!crawled.has(fullUrl)) {
-                    toCrawl.push(fullUrl);
-                    crawled.add(fullUrl);
-                }
-            } catch { /* skip */ }
+            try { enqueue(new URL(match, cleanBase).href); } catch { /* skip */ }
         }
     }
 
-    // Priority 3: Discovery from internal links (fill up to 20)
+    // Priority 3: All homepage internal links
     for (const link of internalLinks) {
-        if (toCrawl.length >= 20) break;
-        if (link === '/' || link.includes('#') || link.includes('?') || link.endsWith('.pdf') || link.endsWith('.jpg') || link.endsWith('.png')) continue;
-        try {
-            const fullUrl = new URL(link, cleanBase).href;
-            if (!crawled.has(fullUrl)) {
-                toCrawl.push(fullUrl);
-                crawled.add(fullUrl);
-            }
-        } catch { /* skip */ }
+        if (crawled.size >= MAX_PAGES) break;
+        if (!isCrawlable(link)) continue;
+        try { enqueue(new URL(link, cleanBase).href); } catch { /* skip */ }
     }
 
-    console.log(`🕷️  Crawl queue: ${toCrawl.length} pages (sitemap: ${sitemap.found ? sitemap.count : 0}, robots: ${robotsTxt.found})`);
+    console.log(`🕷️  Initial crawl queue: ${toCrawl.length} pages (sitemap: ${sitemap.found ? sitemap.count : 0}, robots: ${robotsTxt.found})`);
 
-    // PHASE 3: Crawl in batches of 5 to avoid overwhelming the server
+    // PHASE 3: Crawl with recursive link discovery (batch size 8)
     const allSubPages = [];
-    const BATCH_SIZE = 5;
-    for (let i = 0; i < toCrawl.length; i += BATCH_SIZE) {
-        const batch = toCrawl.slice(i, i + BATCH_SIZE);
+    const BATCH_SIZE = 8;
+    let queueIndex = 0;
+
+    while (queueIndex < toCrawl.length) {
+        // Safety: stop if we hit timeout or max pages
+        if (Date.now() - crawlStartTime > CRAWL_TIMEOUT_MS) {
+            console.log(`🕷️  Crawl timeout (${CRAWL_TIMEOUT_MS / 1000}s) — stopping with ${allSubPages.length + 1} pages`);
+            break;
+        }
+        if (allSubPages.length + 1 >= MAX_PAGES) break;
+
+        const batch = toCrawl.slice(queueIndex, queueIndex + BATCH_SIZE);
+        queueIndex += BATCH_SIZE;
+
         const batchResults = await Promise.all(
             batch.map(url => crawlPage(url).catch(e => ({ url, success: false, error: e.message })))
         );
-        allSubPages.push(...batchResults.filter(p => p.success));
-        // Stop if we've taken too long (keep total under 15s for sub-crawl)
-        if (i + BATCH_SIZE >= 15 && allSubPages.length >= 10) break;
+
+        const successPages = batchResults.filter(p => p.success);
+        allSubPages.push(...successPages);
+
+        // Recursive discovery: extract internal links from newly crawled pages and add to queue
+        for (const page of successPages) {
+            const pageLinks = page.links?.internal || [];
+            for (const link of pageLinks) {
+                if (crawled.size >= MAX_PAGES) break;
+                if (!isCrawlable(link)) continue;
+                try { enqueue(new URL(link, cleanBase).href); } catch { /* skip */ }
+            }
+        }
+
+        // Rate limit: small delay between batches to avoid 429
+        if (queueIndex < toCrawl.length) await new Promise(r => setTimeout(r, 100));
     }
 
     const allPages = [homepage, ...allSubPages];
-    console.log(`🕷️  Crawl complete: ${allPages.length} pages successfully crawled`);
+    const crawlElapsed = ((Date.now() - crawlStartTime) / 1000).toFixed(1);
+    console.log(`🕷️  Crawl complete: ${allPages.length} pages in ${crawlElapsed}s (queue had ${toCrawl.length} URLs)`);
 
     // PHASE 4: Compute duplicate content
     const duplicateContent = computeDuplicates(allPages);
@@ -883,6 +913,53 @@ export async function researchDomain(baseUrl) {
         );
         brokenExternal.push(...probeResults.filter(r => r.broken).map(r => ({ url: r.url, linkedFrom: r.from, statusCode: r.status })));
         console.log(`🔗  External links: ${probeResults.length} probed, ${brokenExternal.length} broken`);
+    }
+
+    // PHASE 4.6: Broken internal links detection (like Semrush)
+    const brokenInternal = [];
+    const crawledUrls = new Set(allPages.map(p => p.url));
+    const internalUrlGraph = new Map(); // url → Set of source pages
+    for (const p of allPages) {
+        for (const link of (p.links?.internal || [])) {
+            if (!isCrawlable(link)) continue;
+            try {
+                const fullUrl = new URL(link, cleanBase).href;
+                if (!internalUrlGraph.has(fullUrl)) internalUrlGraph.set(fullUrl, new Set());
+                internalUrlGraph.get(fullUrl).add(p.url);
+            } catch { /* skip */ }
+        }
+    }
+    // Check pages that returned non-200 status during crawl
+    for (const p of allPages) {
+        if (p.statusCode && p.statusCode >= 400) {
+            const sources = internalUrlGraph.get(p.url);
+            brokenInternal.push({ url: p.url, statusCode: p.statusCode, linkedFrom: sources ? [...sources].slice(0, 3) : [] });
+        }
+    }
+    // HEAD-probe uncrawled internal URLs (max 30, 2s timeout each)
+    const uncrawledInternal = [...internalUrlGraph.entries()]
+        .filter(([url]) => !crawledUrls.has(url))
+        .slice(0, 30);
+    if (uncrawledInternal.length > 0) {
+        console.log(`🔗  Probing ${uncrawledInternal.length} uncrawled internal URLs for broken links...`);
+        const internalProbeResults = await Promise.all(
+            uncrawledInternal.map(async ([url, sources]) => {
+                const ctrl = new AbortController();
+                const t = setTimeout(() => ctrl.abort(), 2000);
+                try {
+                    const r = await fetch(url, { method: 'HEAD', signal: ctrl.signal, headers: { 'User-Agent': USER_AGENT }, redirect: 'follow' });
+                    clearTimeout(t);
+                    return { url, status: r.status, broken: r.status >= 400, sources: [...sources].slice(0, 3) };
+                } catch (e) {
+                    clearTimeout(t);
+                    return { url, status: 0, broken: true, error: e.message, sources: [...sources].slice(0, 3) };
+                }
+            })
+        );
+        for (const r of internalProbeResults) {
+            if (r.broken) brokenInternal.push({ url: r.url, statusCode: r.status, linkedFrom: r.sources });
+        }
+        console.log(`🔗  Internal links: ${uncrawledInternal.length} probed, ${brokenInternal.length} total broken`);
     }
 
     // PHASE 5: Build comprehensive site intelligence
@@ -1173,6 +1250,10 @@ export async function researchDomain(baseUrl) {
             // Broken external links (probed after crawl)
             brokenExternalLinks: brokenExternal,
             brokenExternalCount: brokenExternal.length,
+
+            // Broken internal links (Semrush parity)
+            brokenInternalLinks: brokenInternal,
+            brokenInternalCount: brokenInternal.length,
         },
     };
 }

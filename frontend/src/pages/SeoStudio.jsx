@@ -881,7 +881,36 @@ function HealthCheckResults({ results }) {
             ))}
         </div>
 
-        {/* ── Crawl Intelligence Dashboard (NEW) ── */}
+        {/* ── Trend Delta (since last audit) ── */}
+        {results.trendDelta && (
+            <div className="glass-panel rounded-2xl p-5 mb-6 border border-primary/10">
+                <h4 className="text-xs font-bold text-primary uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm">trending_up</span> Changes Since Last Audit
+                    <span className="ml-auto text-[9px] text-slate-500 font-normal normal-case">{new Date(results.trendDelta.previousDate).toLocaleDateString()}</span>
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                        { label: 'Score', value: results.trendDelta.scoreChange, suffix: '' },
+                        { label: 'Technical', value: results.trendDelta.technicalChange, suffix: '' },
+                        { label: 'New Issues', value: results.trendDelta.newIssueCount, suffix: '', isCount: true },
+                        { label: 'Resolved', value: results.trendDelta.resolvedIssueCount, suffix: '', isCount: true, isPositive: true },
+                        { label: 'Pages Crawled', value: results.trendDelta.pagesCrawledChange, suffix: '' },
+                        { label: 'Broken Internal', value: results.trendDelta.brokenInternalChange, suffix: '', isNegative: true },
+                        { label: 'Thin Pages', value: results.trendDelta.thinPageChange, suffix: '', isNegative: true },
+                        { label: 'Dup. Titles', value: results.trendDelta.duplicateTitleChange, suffix: '', isNegative: true },
+                    ].map(d => (
+                        <div key={d.label} className="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                            <span className={`text-base font-black ${d.isCount ? (d.isPositive ? 'text-emerald-400' : (d.value > 0 ? 'text-red-400' : 'text-slate-400')) : (d.isNegative ? (d.value > 0 ? 'text-red-400' : d.value < 0 ? 'text-emerald-400' : 'text-slate-400') : (d.value > 0 ? 'text-emerald-400' : d.value < 0 ? 'text-red-400' : 'text-slate-400'))}`}>
+                                {d.isCount ? d.value : (d.value > 0 ? '+' : '')}{d.value}{d.suffix}
+                            </span>
+                            <span className="text-[9px] text-slate-500 font-bold uppercase">{d.label}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+
+        {/* ── Crawl Intelligence Dashboard ── */}
         <div className="glass-panel rounded-2xl p-5 mb-6">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-sm text-primary">monitoring</span> Crawl Intelligence
@@ -895,6 +924,7 @@ function HealthCheckResults({ results }) {
                     { label: 'Orphan Pages', value: stats.orphanPageCount || 0, icon: 'link_off', color: (stats.orphanPageCount || 0) > 0 ? '#f43f5e' : '#10b981' },
                     { label: 'Security', value: stats.securityHeaderScore || '0/7', icon: 'shield', color: '#6366f1' },
                     { label: 'Broken External', value: stats.brokenExternalCount || 0, icon: 'broken_image', color: (stats.brokenExternalCount || 0) > 0 ? '#f43f5e' : '#10b981' },
+                    { label: 'Broken Internal', value: stats.brokenInternalCount || 0, icon: 'link_off', color: (stats.brokenInternalCount || 0) > 0 ? '#f43f5e' : '#10b981' },
                     { label: 'Empty Anchors', value: stats.emptyAnchorCount || 0, icon: 'text_fields', color: (stats.emptyAnchorCount || 0) > 0 ? '#f59e0b' : '#10b981' },
                     { label: 'Nofollow Internal', value: stats.nofollowInternalCount || 0, icon: 'block', color: (stats.nofollowInternalCount || 0) > 0 ? '#f59e0b' : '#10b981' },
                     { label: 'Canon. Conflicts', value: stats.conflictingCanonicalCount || 0, icon: 'content_copy', color: (stats.conflictingCanonicalCount || 0) > 0 ? '#f43f5e' : '#10b981' },
@@ -1203,12 +1233,195 @@ function AIVisibilityResults({ results }) {
     return (<>
         <div className="glass-panel rounded-2xl p-6 mb-6">
             <div className="flex items-center gap-6">
-                <ScoreRing score={results.aiVisibilityScore || 0} size={100} label="AI Visibility" color="violet" />
-                <p className="text-sm text-slate-300 leading-relaxed flex-1">{results.summary}</p>
+            <ScoreRing score={results.aiVisibilityScore || 0} size={100} label="AI Visibility" color="violet" />
+                <div className="flex-1">
+                    <p className="text-sm text-slate-300 leading-relaxed">{results.summary}</p>
+                    {results.scoreBreakdown && <p className="text-[10px] text-slate-600 mt-2">Score: {results.scoreBreakdown.formula} — On-page: {results.scoreBreakdown.onPageAnalysis}, Probe: {results.scoreBreakdown.realProbeScore}{results.scoreBreakdown.margin > 0 ? ` ±${results.scoreBreakdown.margin}` : ''} <span className={`ml-2 px-1.5 py-0.5 rounded-full ${results.scoreBreakdown.confidence === 'high' ? 'bg-emerald-500/15 text-emerald-400' : results.scoreBreakdown.confidence === 'medium' ? 'bg-amber-500/15 text-amber-400' : 'bg-red-500/15 text-red-400'}`}>{results.scoreBreakdown.confidence || 'unknown'} confidence</span></p>}
+                </div>
             </div>
         </div>
 
-        {/* Breakdown */}
+        {/* ═══ Live AI Probe Results (Real LLM Data) ═══ */}
+        {results.geoProbe && (
+            <div className="glass-panel rounded-2xl p-5 mb-6 border border-violet-500/10">
+                <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm">smart_toy</span> Live AI Probe — Real LLM Responses
+                    {results.geoProbe.samplesPerPrompt > 1 && <span className="ml-auto text-[9px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300 font-medium">{results.geoProbe.samplesPerPrompt}x Multi-Sample</span>}
+                    {results.geoProbe.sentimentMethod === 'llm' && <span className="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 font-medium">LLM Sentiment</span>}
+                </h4>
+
+                {/* Probe Stats */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                    {[
+                        { label: 'Mention Rate', value: `${results.geoProbe.mentionRate}%`, icon: 'trending_up', color: results.geoProbe.mentionRate > 50 ? '#10b981' : results.geoProbe.mentionRate > 20 ? '#f59e0b' : '#f43f5e' },
+                        { label: 'Weighted Rate', value: `${results.geoProbe.weightedMentionRate || results.geoProbe.mentionRate}%`, icon: 'balance', color: '#a78bfa' },
+                        { label: 'Total Probes', value: results.geoProbe.totalProbes, icon: 'query_stats', color: '#8b5cf6' },
+                        { label: 'Score', value: results.geoProbe.scoreCI ? `${results.geoProbe.realScore}±${results.geoProbe.scoreCI.margin}` : results.geoProbe.realScore, icon: 'verified', color: results.geoProbe.realScore > 50 ? '#10b981' : '#f59e0b' },
+                    ].map(s => (
+                        <div key={s.label} className="flex items-center gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                            <span className="material-symbols-outlined text-lg" style={{ color: s.color }}>{s.icon}</span>
+                            <div>
+                                <p className="text-base font-black text-white leading-tight">{s.value}</p>
+                                <p className="text-[9px] text-slate-500 font-bold uppercase">{s.label}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Per-Model Breakdown */}
+                {results.geoProbe.modelBreakdown && (
+                    <div className="flex gap-3 mb-4 flex-wrap">
+                        {Object.entries(results.geoProbe.modelBreakdown).map(([model, data]) => (
+                            <div key={model} className="flex-1 min-w-[140px] p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                                <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">{model}</p>
+                                <p className="text-lg font-black text-white">{data.mentionRate}%</p>
+                                <p className="text-[9px] text-slate-600">{data.mentioned}/{data.probed} probes mentioned brand</p>
+                                <div className="flex gap-1 mt-1">
+                                    {data.sentiment.positive > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">{data.sentiment.positive} positive</span>}
+                                    {data.sentiment.neutral > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-500/10 text-slate-400">{data.sentiment.neutral} neutral</span>}
+                                    {data.sentiment.negative > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400">{data.sentiment.negative} negative</span>}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Sentiment Distribution */}
+                {results.geoProbe.sentimentDistribution && (
+                    <div className="mb-4">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">Sentiment Distribution</p>
+                        <div className="h-3 rounded-full overflow-hidden flex bg-slate-800">
+                            {(() => { const sd = results.geoProbe.sentimentDistribution; const total = Math.max(1, (sd.positive || 0) + (sd.neutral || 0) + (sd.negative || 0)); return (<>
+                                {sd.positive > 0 && <div className="bg-emerald-500 transition-all" style={{ width: `${(sd.positive / total) * 100}%` }} />}
+                                {sd.neutral > 0 && <div className="bg-slate-500 transition-all" style={{ width: `${(sd.neutral / total) * 100}%` }} />}
+                                {sd.negative > 0 && <div className="bg-red-500 transition-all" style={{ width: `${(sd.negative / total) * 100}%` }} />}
+                            </>); })()}
+                        </div>
+                        <div className="flex gap-4 mt-1">
+                            <span className="text-[9px] text-emerald-400">● Positive: {results.geoProbe.sentimentDistribution.positive}</span>
+                            <span className="text-[9px] text-slate-400">● Neutral: {results.geoProbe.sentimentDistribution.neutral}</span>
+                            <span className="text-[9px] text-red-400">● Negative: {results.geoProbe.sentimentDistribution.negative}</span>
+                        </div>
+                    </div>
+                )}
+
+                {/* Share of Voice */}
+                {results.geoProbe.shareOfVoice && Object.keys(results.geoProbe.shareOfVoice).length > 0 && (
+                    <div className="mb-4">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">Share of Voice (across AI models)</p>
+                        <div className="space-y-1.5">
+                            {Object.entries(results.geoProbe.shareOfVoice).sort((a, b) => b[1] - a[1]).map(([name, pct]) => (
+                                <div key={name} className="flex items-center gap-2">
+                                    <span className="text-[10px] text-slate-400 w-24 truncate">{name}</span>
+                                    <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+                                        <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${pct}%` }} />
+                                    </div>
+                                    <span className="text-[10px] text-white font-bold w-8 text-right">{pct}%</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                {/* Citation Drift (vs previous probe) */}
+                {results.geoProbe.citationDrift && (
+                    <div className="mb-4">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">Citation Drift (vs Previous Probe)</p>
+                        <div className="flex gap-3 mb-2">
+                            <span className="text-[9px] px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-400">{results.geoProbe.citationDrift.newCitations?.length || 0} new</span>
+                            <span className="text-[9px] px-2 py-1 rounded-lg bg-red-500/10 text-red-400">{results.geoProbe.citationDrift.lostCitations?.length || 0} lost</span>
+                            <span className="text-[9px] px-2 py-1 rounded-lg bg-slate-500/10 text-slate-400">{results.geoProbe.citationDrift.retained || 0} retained</span>
+                            <span className={`text-[9px] px-2 py-1 rounded-lg ${results.geoProbe.citationDrift.driftRate > 50 ? 'bg-red-500/10 text-red-400' : results.geoProbe.citationDrift.driftRate > 20 ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}`}>{results.geoProbe.citationDrift.driftRate}% drift rate</span>
+                        </div>
+                        {results.geoProbe.citationDrift.newCitations?.length > 0 && (
+                            <div className="text-[9px] text-slate-500 mb-1">
+                                <strong className="text-emerald-400">New citations:</strong> {results.geoProbe.citationDrift.newCitations.slice(0, 5).join(', ')}
+                            </div>
+                        )}
+                        {results.geoProbe.citationDrift.lostCitations?.length > 0 && (
+                            <div className="text-[9px] text-slate-500">
+                                <strong className="text-red-400">Lost citations:</strong> {results.geoProbe.citationDrift.lostCitations.slice(0, 5).join(', ')}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Real AI Snippets */}
+                {results.geoProbe.topSnippets?.length > 0 && (
+                    <div>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">What AI Models Say About Your Brand</p>
+                        <div className="space-y-2">
+                            {results.geoProbe.topSnippets.map((s, i) => (
+                                <div key={i} className="p-3 rounded-lg bg-violet-500/5 border border-violet-500/10">
+                                    <p className="text-[9px] text-violet-400 font-bold mb-1">{s.model} — "{s.prompt}"</p>
+                                    <p className="text-[11px] text-slate-300 italic leading-relaxed">"{s.snippet}"</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        )}
+
+        {/* ═══ Competitive Position + Entity Confidence + Citations ═══ */}
+        {results.geoProbe && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                {/* Competitive Position */}
+                <div className="glass-panel rounded-2xl p-4 text-center">
+                    <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">AI Market Position</p>
+                    <span className={`text-lg font-black px-4 py-1.5 rounded-full ${
+                        results.geoProbe.competitivePosition === 'Leader' ? 'bg-emerald-500/15 text-emerald-400' :
+                        results.geoProbe.competitivePosition === 'Challenger' ? 'bg-amber-500/15 text-amber-400' :
+                        'bg-slate-500/15 text-slate-400'
+                    }`}>{results.geoProbe.competitivePosition || 'Niche'}</span>
+                    <p className="text-[9px] text-slate-600 mt-2">{
+                        results.geoProbe.competitivePosition === 'Leader' ? 'Dominant AI visibility (40%+ SoV)' :
+                        results.geoProbe.competitivePosition === 'Challenger' ? 'Growing AI presence (20-40% SoV)' :
+                        'Low AI visibility (<20% SoV) — needs optimization'
+                    }</p>
+                </div>
+
+                {/* Entity Confidence */}
+                {results.geoProbe.entityConfidence && (
+                    <div className="glass-panel rounded-2xl p-4 text-center">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">Entity Recognition</p>
+                        <p className="text-2xl font-black text-white">{results.geoProbe.entityConfidence.recognitionRate}%</p>
+                        <p className="text-[9px] text-slate-600">AI recognizes your brand in {results.geoProbe.entityConfidence.recognized}/{results.geoProbe.entityConfidence.probed} brand-specific probes</p>
+                    </div>
+                )}
+
+                {/* Citations Found */}
+                {results.geoProbe.citations?.length > 0 && (
+                    <div className="glass-panel rounded-2xl p-4">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">Citation Sources ({results.geoProbe.citations.length})</p>
+                        <div className="space-y-1 max-h-24 overflow-y-auto">
+                            {results.geoProbe.citations.map((url, i) => (
+                                <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="block text-[10px] text-violet-400 hover:text-violet-300 truncate">{url.replace(/^https?:\/\//, '')}</a>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        )}
+
+        {/* ═══ Content Gaps — prompts where competitors appear but brand doesn't ═══ */}
+        {results.geoProbe?.contentGaps?.length > 0 && (
+            <div className="glass-panel rounded-2xl p-5 mb-6 border border-amber-500/10">
+                <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm">warning</span> Content Gaps — Your Competitors Appear, You Don't
+                </h4>
+                <div className="space-y-2">
+                    {results.geoProbe.contentGaps.map((gap, i) => (
+                        <div key={i} className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
+                            <p className="text-[11px] text-white font-bold">"{gap.prompt}"</p>
+                            <p className="text-[9px] text-slate-500 mt-1">
+                                <span className="text-amber-400">{(gap.models || [gap.model]).join(', ')}</span> — Competitors found: <span className="text-red-400">{gap.competitorsFound.join(', ')}</span>
+                            </p>
+                            <p className="text-[9px] text-emerald-400 mt-0.5">{gap.opportunity}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
             {sections.map(s => bd[s.key] && (
                 <div key={s.key} className="glass-panel rounded-2xl p-4 text-center">

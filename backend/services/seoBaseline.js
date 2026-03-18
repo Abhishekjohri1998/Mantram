@@ -166,7 +166,16 @@ function computeTechnicalScore(siteIntelligence, robotsTxt, sitemap, pageSpeed, 
     if (siteIntelligence.brokenExternalCount > 0) {
         const extPenalty = Math.min(3, siteIntelligence.brokenExternalCount);
         score -= extPenalty;
-        details.push({ check: 'Broken External Links', score: -extPenalty, max: 0, status: 'fail', value: `${siteIntelligence.brokenExternalCount} outgoing links return errors`, fix: 'Remove or update broken external links — they harm user experience and signal low maintenance' });
+        const brokenExtUrls = (siteIntelligence.brokenExternalLinks || []).slice(0, 5).map(b => b.url).join(', ');
+        details.push({ check: 'Broken External Links', score: -extPenalty, max: 0, status: 'fail', value: `${siteIntelligence.brokenExternalCount} outgoing links return errors`, fix: `Fix ${siteIntelligence.brokenExternalCount} broken external links: ${brokenExtUrls || 'check report for details'}` });
+    }
+
+    // ── NEW: Broken Internal Links (penalty, -5 max — critical for Semrush parity) ──
+    if (siteIntelligence.brokenInternalCount > 0) {
+        const intPenalty = Math.min(5, Math.ceil(siteIntelligence.brokenInternalCount / 2));
+        score -= intPenalty;
+        const brokenIntUrls = (siteIntelligence.brokenInternalLinks || []).slice(0, 5).map(b => b.url).join(', ');
+        details.push({ check: 'Broken Internal Links', score: -intPenalty, max: 0, status: 'fail', value: `${siteIntelligence.brokenInternalCount} internal links return 404/error status`, fix: `Fix ${siteIntelligence.brokenInternalCount} broken internal links: ${brokenIntUrls}. These create dead ends for users and waste crawl budget.` });
     }
 
     // ── NEW R2: Cache-Control Header (bonus, +1 pt) ──
@@ -212,7 +221,7 @@ function computeOnPageScore(siteIntelligence, pages) {
         max: 20,
         status: titleScore >= 16 ? 'pass' : titleScore >= 10 ? 'warning' : 'fail',
         value: `${titledPages.length}/${totalPages} pages have titles`,
-        fix: titleScore < 16 ? `${totalPages - titledPages.length} pages missing titles. ${titledPages.length - goodTitles.length} titles outside optimal 30-60 char range.` : undefined,
+        fix: titleScore < 16 ? `${totalPages - titledPages.length} pages missing titles (${pages.filter(p => !p.title).slice(0, 5).map(p => p.url).join(', ')}). ${titledPages.length - goodTitles.length} titles outside optimal 30-60 char range.` : undefined,
     });
 
     // Meta descriptions (15 pts)
@@ -227,7 +236,7 @@ function computeOnPageScore(siteIntelligence, pages) {
         max: 15,
         status: metaScore >= 12 ? 'pass' : metaScore >= 7 ? 'warning' : 'fail',
         value: `${metaPages.length}/${totalPages} pages have meta descriptions`,
-        fix: metaScore < 12 ? `Add meta descriptions to ${totalPages - metaPages.length} pages. Aim for 120-160 characters.` : undefined,
+        fix: metaScore < 12 ? `Add meta descriptions to ${totalPages - metaPages.length} pages (${pages.filter(p => !p.metaDescription).slice(0, 5).map(p => p.url).join(', ')}). Aim for 120-160 characters.` : undefined,
     });
 
     // H1 tags (15 pts) — exactly 1 per page
@@ -242,7 +251,7 @@ function computeOnPageScore(siteIntelligence, pages) {
         max: 15,
         status: h1Score >= 12 ? 'pass' : h1Score >= 7 ? 'warning' : 'fail',
         value: `${h1Pages.length}/${totalPages} pages have H1 tags`,
-        fix: h1Score < 12 ? `${totalPages - h1Pages.length} pages missing H1 tags. Each page should have exactly one H1.` : undefined,
+        fix: h1Score < 12 ? `${totalPages - h1Pages.length} pages missing H1 tags (${pages.filter(p => !p.h1?.length).slice(0, 5).map(p => p.url).join(', ')}). ${pages.filter(p => p.h1?.length > 1).length} pages have multiple H1s. Each page should have exactly one H1.` : undefined,
     });
 
     // Image alt tags (15 pts)
@@ -306,7 +315,7 @@ function computeOnPageScore(siteIntelligence, pages) {
     const hierarchyScore = Math.max(0, 8 - hierarchyProblems * 2);
     score += hierarchyScore;
     if (hierarchyProblems > 0) {
-        details.push({ check: 'Heading Hierarchy', score: hierarchyScore, max: 8, status: hierarchyScore <= 3 ? 'fail' : 'warning', value: `${skippedCount} pages skip heading levels, ${multiH1Count} have multiple H1s`, fix: 'Fix heading hierarchy — use H1→H2→H3 sequentially. Each page should have exactly one H1.' });
+        details.push({ check: 'Heading Hierarchy', score: hierarchyScore, max: 8, status: hierarchyScore <= 3 ? 'fail' : 'warning', value: `${skippedCount} pages skip heading levels, ${multiH1Count} have multiple H1s`, fix: `Fix heading hierarchy: ${skippedCount} pages skip levels (${(hierarchyIssues.skippedLevels || []).slice(0, 3).map(p => p.url).join(', ')}), ${multiH1Count} have multiple H1s (${(hierarchyIssues.multipleH1 || []).slice(0, 3).map(p => p.url).join(', ')}). Use H1→H2→H3 sequentially.` });
     } else {
         details.push({ check: 'Heading Hierarchy', score: 8, max: 8, status: 'pass', value: 'All pages have proper heading structures' });
     }
@@ -683,6 +692,8 @@ export async function runSEOBaseline(brand) {
             urlTooLongCount: si.urlIssues?.tooLongCount || 0,
             avgCssResources: si.resourceBloat?.avgCss || 0,
             avgJsResources: si.resourceBloat?.avgJs || 0,
+            brokenInternalCount: si.brokenInternalCount || 0,
+            brokenInternalLinks: (si.brokenInternalLinks || []).slice(0, 20),
         },
         pageSpeed: pageSpeed?.success ? {
             scores: pageSpeed.scores,

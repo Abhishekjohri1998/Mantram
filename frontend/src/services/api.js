@@ -571,6 +571,10 @@ export const seoStudio = {
     jsCrawl: (data) => apiFetch('/seo-studio/js-crawl', { method: 'POST', body: JSON.stringify(data), timeout: 240000 }),
     contentScore: (data) => apiFetch('/seo-studio/content-score', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
     competitorMonitor: (data) => apiFetch('/seo-studio/competitor-monitor', { method: 'POST', body: JSON.stringify(data), timeout: 300000 }),
+    geoHistory: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/seo-studio/geo-history?${query}`);
+    },
 };
 
 // ============ Skills System API ============
