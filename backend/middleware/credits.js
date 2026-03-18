@@ -126,14 +126,17 @@ export const requireCredits = (actionOrCost = 1) => {
                 cost = costs[actionOrCost] || 1;
             }
 
-            // Superadmin & enterprise bypass credit checks BUT NOT logging
-            if (user.role === 'superadmin' || user.plan === 'enterprise') {
+            // "all the users can access everything accept admin panel/super admin panel"
+            // Bypass credit checks for all users, but keep logging for analytics.
+            const shouldBypass = true; // Global access enabled
+
+            if (shouldBypass) {
                 // Log usage (fire-and-forget) – don't calculate balanceAfter for bypass users
                 CreditUsage.create({
                     user: new mongoose.Types.ObjectId(user._id),
                     action: actionName || 'unknown',
                     cost,
-                    balanceAfter: Infinity, // Unlimited users
+                    balanceAfter: Infinity, // Unlimited during "access everything" mode
                     description: ACTION_LABELS[actionName] || actionName || 'AI Operation',
                     metadata: {
                         route: req.originalUrl,
@@ -213,24 +216,16 @@ export const requireCredits = (actionOrCost = 1) => {
  * Get user's credit balance
  */
 export const getCreditBalance = (user) => {
-    if (user.role === 'superadmin' || user.plan === 'enterprise' || (user.credits?.total >= 999999)) {
-        return { total: Infinity, used: 0, remaining: Infinity, unlimited: true, bonus: 0, bonusUsed: 0 };
-    }
-    const bonus = user.credits?.bonus || 0;
-    const bonusUsed = user.credits?.bonusUsed || 0;
-    const planCredits = user.credits?.total || 50;
-    const used = user.credits?.used || 0;
-    
-    // Total is plan credits + bonus credits
-    const total = planCredits + bonus;
-    
+    // "all the users can access everything accept admin panel/super admin panel"
+    // Return unlimited credits for everyone who is logged in.
     return { 
-        total, 
-        used, 
-        remaining: Math.max(0, total - used), 
-        unlimited: false,
-        bonus,
-        bonusUsed
+        total: Infinity, 
+        used: 0, 
+        remaining: Infinity, 
+        unlimited: true, 
+        bonus: 0, 
+        bonusUsed: 0,
+        plan: user.plan || 'pro' // Default descriptive plan for UI
     };
 };
 
