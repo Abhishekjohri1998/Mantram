@@ -34,6 +34,57 @@ async function safeFetch(url, options = {}) {
     }
 }
 
+/**
+ * Enhanced fetch that returns response metadata (status, headers, timing, size)
+ * Used for advanced SEO auditing — Semrush/Ahrefs-level data collection
+ */
+async function safeFetchWithMeta(url, options = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+    const startTime = Date.now();
+    try {
+        const resp = await fetch(url, {
+            ...options,
+            signal: controller.signal,
+            headers: {
+                'User-Agent': USER_AGENT,
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                ...options.headers,
+            },
+            redirect: 'follow',
+        });
+        clearTimeout(timer);
+        const html = await resp.text();
+        const responseTimeMs = Date.now() - startTime;
+        return {
+            html,
+            status: resp.status,
+            ok: resp.ok,
+            responseTimeMs,
+            pageSizeBytes: new Blob([html]).size,
+            headers: {
+                contentType: resp.headers.get('content-type') || '',
+                server: resp.headers.get('server') || '',
+                // Security headers
+                csp: resp.headers.get('content-security-policy') || '',
+                hsts: resp.headers.get('strict-transport-security') || '',
+                xFrameOptions: resp.headers.get('x-frame-options') || '',
+                xContentType: resp.headers.get('x-content-type-options') || '',
+                xXssProtection: resp.headers.get('x-xss-protection') || '',
+                referrerPolicy: resp.headers.get('referrer-policy') || '',
+                permissionsPolicy: resp.headers.get('permissions-policy') || '',
+            },
+        };
+    } catch (e) {
+        clearTimeout(timer);
+        return {
+            html: '', status: e.message.includes('HTTP') ? parseInt(e.message.replace('HTTP ', '')) || 0 : 0,
+            ok: false, responseTimeMs: Date.now() - startTime, pageSizeBytes: 0,
+            headers: {}, error: e.message,
+        };
+    }
+}
+
 // ============================================================================
 // HTML PARSER (lightweight, no dependencies)
 // ============================================================================
@@ -155,6 +206,108 @@ function getWordCount(text) {
     return text.split(/\s+/).filter(w => w.length > 1).length;
 }
 
+// ============================================================================
+// ADVANCED EXTRACTION — Beats Semrush/Ahrefs
+// ============================================================================
+
+/** Extract hreflang tags for international SEO */
+function extractHreflang(html) {
+    const hreflangs = [];
+    const pattern = /<link\s+[^>]*rel\s*=\s*["']alternate["'][^>]*hreflang\s*=\s*["']([^"']+)["'][^>]*href\s*=\s*["']([^"']+)["'][^>]*>/gi;
+    let m;
+    while ((m = pattern.exec(html)) !== null) {
+        hreflangs.push({ lang: m[1], url: m[2] });
+    }
+    // Also try reversed attribute order
+    const pattern2 = /<link\s+[^>]*hreflang\s*=\s*["']([^"']+)["'][^>]*href\s*=\s*["']([^"']+)["'][^>]*>/gi;
+    while ((m = pattern2.exec(html)) !== null) {
+        if (!hreflangs.find(h => h.lang === m[1])) hreflangs.push({ lang: m[1], url: m[2] });
+    }
+    return hreflangs;
+}
+
+/** Detect mixed content (HTTP resources on HTTPS pages) */
+function detectMixedContent(html, pageUrl) {
+    if (!pageUrl.startsWith('https')) return { hasMixed: false, count: 0, examples: [] };
+    const mixed = [];
+    // Check src= and href= attributes for http:// (not https://)
+    const pattern = /(?:src|href)\s*=\s*["'](http:\/\/[^"']+)["']/gi;
+    let m;
+    while ((m = pattern.exec(html)) !== null) {
+        const resource = m[1];
+        // Exclude common false positives (schema.org, xmlns, etc.)
+        if (!resource.includes('schema.org') && !resource.includes('w3.org') && !resource.includes('xmlns')) {
+            mixed.push(resource);
+        }
+    }
+    return { hasMixed: mixed.length > 0, count: mixed.length, examples: mixed.slice(0, 5) };
+}
+
+/** Extract lang attribute from <html> tag */
+function extractLangAttribute(html) {
+    const m = html.match(/<html[^>]*\slang\s*=\s*["']([^"']+)["']/i);
+    return m ? m[1] : '';
+}
+
+/** Count CSS and JS resources */
+function countResources(html) {
+    const cssLinks = (html.match(/<link[^>]*rel\s*=\s*["']stylesheet["'][^>]*>/gi) || []).length;
+    const cssInline = (html.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || []).length;
+    const jsExternal = (html.match(/<script[^>]*src\s*=\s*["'][^"']+["'][^>]*>/gi) || []).length;
+    const jsInline = (html.match(/<script[^>]*>[\s\S]+?<\/script>/gi) || []).filter(s => !s.includes('application/ld+json')).length;
+    return {
+        cssExternal: cssLinks, cssInline, cssTotal: cssLinks + cssInline,
+        jsExternal, jsInline, jsTotal: jsExternal + jsInline,
+        totalResources: cssLinks + jsExternal,
+    };
+}
+
+/** Validate heading hierarchy (no skipped levels) */
+function validateHeadingHierarchy(headings) {
+    const issues = [];
+    let lastLevel = 0;
+    for (const h of headings) {
+        if (h.level > lastLevel + 1 && lastLevel > 0) {
+            issues.push({ from: `H${lastLevel}`, to: `H${h.level}`, text: h.text.substring(0, 60) });
+        }
+        lastLevel = h.level;
+    }
+    return { valid: issues.length === 0, skippedLevels: issues };
+}
+
+/** Extract meta robots directives */
+function extractMetaRobots(meta) {
+    const robotsStr = (meta.robots || '').toLowerCase();
+    return {
+        raw: robotsStr,
+        noindex: robotsStr.includes('noindex'),
+        nofollow: robotsStr.includes('nofollow'),
+        noarchive: robotsStr.includes('noarchive'),
+        nosnippet: robotsStr.includes('nosnippet'),
+        hasDirectives: robotsStr.length > 0,
+    };
+}
+
+/** Analyze security headers — beats all competitors (Semrush/Ahrefs don't check this) */
+function analyzeSecurityHeaders(headers) {
+    if (!headers) return { score: 0, total: 7, details: [] };
+    const checks = [
+        { name: 'Content-Security-Policy', present: !!headers.csp, importance: 'critical' },
+        { name: 'Strict-Transport-Security', present: !!headers.hsts, importance: 'critical' },
+        { name: 'X-Frame-Options', present: !!headers.xFrameOptions, importance: 'high' },
+        { name: 'X-Content-Type-Options', present: !!headers.xContentType, importance: 'high' },
+        { name: 'Referrer-Policy', present: !!headers.referrerPolicy, importance: 'medium' },
+        { name: 'Permissions-Policy', present: !!headers.permissionsPolicy, importance: 'medium' },
+        { name: 'X-XSS-Protection', present: !!headers.xXssProtection, importance: 'low' },
+    ];
+    return {
+        score: checks.filter(c => c.present).length,
+        total: checks.length,
+        percentage: Math.round((checks.filter(c => c.present).length / checks.length) * 100),
+        details: checks,
+    };
+}
+
 // Helpers
 function getAttr(tag, name) {
     const m = tag.match(new RegExp(`${name}\\s*=\\s*["']([^"']*)["']`, 'i'));
@@ -176,7 +329,18 @@ function decodeEntities(str) {
 
 export async function crawlPage(url) {
     try {
-        const html = await safeFetch(url);
+        // Use enhanced fetch for response metadata (status, timing, headers, size)
+        const fetchResult = await safeFetchWithMeta(url);
+        const html = fetchResult.html;
+
+        // If fetch completely failed (no HTML), return error with status
+        if (!html && !fetchResult.ok) {
+            return {
+                url, success: false, error: fetchResult.error || `HTTP ${fetchResult.status}`,
+                statusCode: fetchResult.status, responseTimeMs: fetchResult.responseTimeMs,
+            };
+        }
+
         const meta = extractMeta(html);
         const headings = extractHeadings(html);
         const jsonLd = extractJsonLd(html);
@@ -187,12 +351,27 @@ export async function crawlPage(url) {
         const bodyText = getBodyText(html);
         const wordCount = getWordCount(bodyText);
 
+        // ── NEW: Advanced extraction (beats Semrush/Ahrefs) ──
+        const hreflang = extractHreflang(html);
+        const mixedContent = detectMixedContent(html, url);
+        const langAttr = extractLangAttribute(html);
+        const resources = countResources(html);
+        const headingHierarchy = validateHeadingHierarchy(headings);
+        const metaRobots = extractMetaRobots(meta);
+        const securityHeaders = analyzeSecurityHeaders(fetchResult.headers);
+
         // Extract a meaningful content snippet (first 500 chars of body text)
         const contentSnippet = bodyText.substring(0, 500);
 
         return {
             url,
             success: true,
+            // ── Response metadata (NEW) ──
+            statusCode: fetchResult.status,
+            responseTimeMs: fetchResult.responseTimeMs,
+            pageSizeBytes: fetchResult.pageSizeBytes,
+            pageSizeKB: Math.round(fetchResult.pageSizeBytes / 1024),
+            // ── Existing SEO data ──
             title: meta.title || '',
             metaDescription: meta.description || '',
             ogTitle: meta['og:title'] || '',
@@ -216,9 +395,28 @@ export async function crawlPage(url) {
             robots: meta.robots || '',
             viewport: meta.viewport || '',
             charset: (html.match(/charset\s*=\s*["']?([^"'\s;>]+)/i) || ['', ''])[1] || '',
+            // ── NEW: Advanced data ──
+            hreflang,
+            hasHreflang: hreflang.length > 0,
+            mixedContent,
+            langAttr,
+            hasLangAttr: !!langAttr,
+            resources,
+            headingHierarchy,
+            metaRobots,
+            securityHeaders,
+            urlLength: url.length,
+            urlTooLong: url.length > 75,
+            // ── Title/meta quality flags ──
+            titleLength: (meta.title || '').length,
+            titleTooShort: (meta.title || '').length > 0 && (meta.title || '').length < 30,
+            titleTooLong: (meta.title || '').length > 60,
+            metaDescLength: (meta.description || '').length,
+            metaDescTooShort: (meta.description || '').length > 0 && (meta.description || '').length < 120,
+            metaDescTooLong: (meta.description || '').length > 160,
         };
     } catch (e) {
-        return { url, success: false, error: e.message };
+        return { url, success: false, error: e.message, statusCode: 0, responseTimeMs: 0 };
     }
 }
 
@@ -435,8 +633,13 @@ export async function researchDomain(baseUrl) {
     // PHASE 1: Fetch homepage + robots.txt + sitemap.xml in parallel
     const [homepageResult, robotsTxt, sitemap] = await Promise.all([
         (async () => {
+            // Use redirect-aware fetch for redirect chain tracking
             const { html, redirectChain, finalUrl } = await safeFetchWithRedirects(cleanBase);
             if (!html) return { success: false, error: 'Empty response', redirectChain };
+
+            // Also fetch metadata (status, timing, headers) via enhanced fetch
+            const metaFetch = await safeFetchWithMeta(finalUrl);
+
             const meta = extractMeta(html);
             const headings = extractHeadings(html);
             const jsonLd = extractJsonLd(html);
@@ -446,9 +649,25 @@ export async function researchDomain(baseUrl) {
             const tech = detectTechSignals(html);
             const bodyText = getBodyText(html);
             const wordCount = getWordCount(bodyText);
+
+            // ── NEW: Advanced extraction for homepage ──
+            const hreflang = extractHreflang(html);
+            const mixedContent = detectMixedContent(html, finalUrl);
+            const langAttr = extractLangAttribute(html);
+            const resources = countResources(html);
+            const headingHierarchy = validateHeadingHierarchy(headings);
+            const metaRobots = extractMetaRobots(meta);
+            const securityHeaders = analyzeSecurityHeaders(metaFetch.headers);
+
             return {
                 url: finalUrl,
                 success: true,
+                // Response metadata
+                statusCode: metaFetch.status || 200,
+                responseTimeMs: metaFetch.responseTimeMs || 0,
+                pageSizeBytes: metaFetch.pageSizeBytes || new Blob([html]).size,
+                pageSizeKB: Math.round((metaFetch.pageSizeBytes || new Blob([html]).size) / 1024),
+                // Existing fields
                 title: meta.title || '',
                 metaDescription: meta.description || '',
                 ogTitle: meta['og:title'] || '',
@@ -469,10 +688,28 @@ export async function researchDomain(baseUrl) {
                 tech,
                 wordCount,
                 contentSnippet: bodyText.substring(0, 500),
-                bodyTextFull: bodyText.substring(0, 2000), // More text for duplicate detection
+                bodyTextFull: bodyText.substring(0, 2000),
                 robots: meta.robots || '',
                 viewport: meta.viewport || '',
                 redirectChain,
+                // ── NEW: Advanced data ──
+                hreflang,
+                hasHreflang: hreflang.length > 0,
+                mixedContent,
+                langAttr,
+                hasLangAttr: !!langAttr,
+                resources,
+                headingHierarchy,
+                metaRobots,
+                securityHeaders,
+                urlLength: finalUrl.length,
+                urlTooLong: finalUrl.length > 75,
+                titleLength: (meta.title || '').length,
+                titleTooShort: (meta.title || '').length > 0 && (meta.title || '').length < 30,
+                titleTooLong: (meta.title || '').length > 60,
+                metaDescLength: (meta.description || '').length,
+                metaDescTooShort: (meta.description || '').length > 0 && (meta.description || '').length < 120,
+                metaDescTooLong: (meta.description || '').length > 160,
             };
         })(),
         fetchRobotsTxt(cleanBase),
@@ -593,6 +830,20 @@ export async function researchDomain(baseUrl) {
             wordCount: p.wordCount,
             contentSnippet: p.contentSnippet,
             redirectChain: p.redirectChain,
+            // ── NEW: Per-page enhanced data ──
+            statusCode: p.statusCode || 200,
+            responseTimeMs: p.responseTimeMs || 0,
+            pageSizeKB: p.pageSizeKB || 0,
+            titleLength: p.titleLength || 0,
+            metaDescLength: p.metaDescLength || 0,
+            headingHierarchy: p.headingHierarchy || { valid: true, skippedLevels: [] },
+            metaRobots: p.metaRobots || {},
+            securityHeaders: p.securityHeaders || {},
+            resources: p.resources || {},
+            mixedContent: p.mixedContent || { hasMixed: false },
+            urlTooLong: p.urlTooLong || false,
+            hasHreflang: p.hasHreflang || false,
+            hasLangAttr: p.hasLangAttr || false,
         })),
         homepage: {
             title: homepage.title,
@@ -638,7 +889,7 @@ export async function researchDomain(baseUrl) {
             internalLinkCount: homepage.internalLinkCount || 0,
             externalLinkCount: homepage.externalLinkCount || 0,
             externalDomains: homepage.links?.external || [],
-            // New deep crawl metrics
+            // Deep crawl metrics
             thinPages: thinPages.map(p => ({ url: p.url, wordCount: p.wordCount })),
             thinPageCount: thinPages.length,
             missingMetaDescriptions: missingMeta.map(p => p.url),
@@ -649,6 +900,127 @@ export async function researchDomain(baseUrl) {
             duplicateContentCount: duplicateContent.length,
             deepPages: deepPages.map(p => p.url),
             clickDepthIssues: deepPages.length,
+
+            // ══════════════════════════════════════════════════════
+            // NEW: Advanced metrics (beats Semrush/Ahrefs)
+            // ══════════════════════════════════════════════════════
+
+            // Page status distribution (like Semrush/Ahrefs)
+            pageStatusDistribution: {
+                status200: allPages.filter(p => (p.statusCode || 200) >= 200 && (p.statusCode || 200) < 300).length,
+                status301: allPages.filter(p => (p.statusCode || 200) >= 300 && (p.statusCode || 200) < 400).length,
+                status404: allPages.filter(p => (p.statusCode || 200) === 404).length,
+                status5xx: allPages.filter(p => (p.statusCode || 200) >= 500).length,
+                broken: allPages.filter(p => !p.success).length,
+            },
+
+            // Orphan pages (not linked from any other crawled page)
+            orphanPages: (() => {
+                const linkedPaths = new Set();
+                for (const page of allPages) {
+                    (page.links?.internal || []).forEach(l => linkedPaths.add(l));
+                }
+                return allSubPages.filter(p => {
+                    try { return !linkedPaths.has(new URL(p.url).pathname); } catch { return false; }
+                }).map(p => p.url);
+            })(),
+
+            // Mixed content detection
+            mixedContentPages: allPages.filter(p => p.mixedContent?.hasMixed).map(p => ({
+                url: p.url, count: p.mixedContent.count, examples: p.mixedContent.examples,
+            })),
+            mixedContentCount: allPages.filter(p => p.mixedContent?.hasMixed).length,
+
+            // Response time analysis (like Ahrefs)
+            responseTime: {
+                avg: Math.round(allPages.reduce((s, p) => s + (p.responseTimeMs || 0), 0) / allPages.length),
+                fastest: Math.min(...allPages.map(p => p.responseTimeMs || 9999)),
+                slowest: Math.max(...allPages.map(p => p.responseTimeMs || 0)),
+                slowPages: allPages.filter(p => (p.responseTimeMs || 0) > 3000).map(p => ({ url: p.url, ms: p.responseTimeMs })),
+                slowPageCount: allPages.filter(p => (p.responseTimeMs || 0) > 3000).length,
+            },
+
+            // Page size analysis
+            pageSize: {
+                avg: Math.round(allPages.reduce((s, p) => s + (p.pageSizeKB || 0), 0) / allPages.length),
+                largest: Math.max(...allPages.map(p => p.pageSizeKB || 0)),
+                heavyPages: allPages.filter(p => (p.pageSizeKB || 0) > 3000).map(p => ({ url: p.url, sizeKB: p.pageSizeKB })),
+                heavyPageCount: allPages.filter(p => (p.pageSizeKB || 0) > 3000).length,
+            },
+
+            // Heading hierarchy issues
+            headingIssues: {
+                skippedLevels: allPages.filter(p => !p.headingHierarchy?.valid).map(p => ({
+                    url: p.url, issues: p.headingHierarchy?.skippedLevels || [],
+                })),
+                multipleH1: allPages.filter(p => (p.h1?.length || 0) > 1).map(p => ({ url: p.url, count: p.h1.length })),
+                noH1: allPages.filter(p => !p.h1?.length).map(p => p.url),
+                skippedCount: allPages.filter(p => !p.headingHierarchy?.valid).length,
+                multipleH1Count: allPages.filter(p => (p.h1?.length || 0) > 1).length,
+            },
+
+            // Title quality
+            titleQuality: {
+                missing: allPages.filter(p => !p.title).map(p => p.url),
+                tooShort: allPages.filter(p => p.titleTooShort).map(p => ({ url: p.url, length: p.titleLength })),
+                tooLong: allPages.filter(p => p.titleTooLong).map(p => ({ url: p.url, length: p.titleLength })),
+                duplicates: (() => {
+                    const titles = {};
+                    allPages.forEach(p => { if (p.title) (titles[p.title] = titles[p.title] || []).push(p.url); });
+                    return Object.entries(titles).filter(([, urls]) => urls.length > 1).map(([title, urls]) => ({ title, urls, count: urls.length }));
+                })(),
+            },
+
+            // Meta description quality
+            metaDescQuality: {
+                missing: missingMeta.map(p => p.url),
+                tooShort: allPages.filter(p => p.metaDescTooShort).map(p => ({ url: p.url, length: p.metaDescLength })),
+                tooLong: allPages.filter(p => p.metaDescTooLong).map(p => ({ url: p.url, length: p.metaDescLength })),
+                duplicates: (() => {
+                    const descs = {};
+                    allPages.forEach(p => { if (p.metaDescription) (descs[p.metaDescription] = descs[p.metaDescription] || []).push(p.url); });
+                    return Object.entries(descs).filter(([, urls]) => urls.length > 1).map(([desc, urls]) => ({ desc: desc.substring(0, 80), urls, count: urls.length }));
+                })(),
+            },
+
+            // Hreflang
+            hreflangPresent: allPages.some(p => p.hasHreflang),
+            hreflangPages: allPages.filter(p => p.hasHreflang).map(p => ({ url: p.url, langs: p.hreflang?.map(h => h.lang) || [] })),
+
+            // Lang attribute
+            langAttribute: homepage.langAttr || '',
+            hasLangAttribute: !!homepage.langAttr,
+            langMismatch: allPages.filter(p => p.langAttr && p.langAttr !== homepage.langAttr).map(p => ({
+                url: p.url, lang: p.langAttr, expected: homepage.langAttr,
+            })),
+
+            // Resource bloat (CSS/JS counts — unique to us)
+            resourceBloat: {
+                homepage: homepage.resources || {},
+                avgCss: Math.round(allPages.reduce((s, p) => s + (p.resources?.cssTotal || 0), 0) / allPages.length),
+                avgJs: Math.round(allPages.reduce((s, p) => s + (p.resources?.jsTotal || 0), 0) / allPages.length),
+                avgTotal: Math.round(allPages.reduce((s, p) => s + (p.resources?.totalResources || 0), 0) / allPages.length),
+                bloatedPages: allPages.filter(p => (p.resources?.totalResources || 0) > 30).map(p => ({
+                    url: p.url, total: p.resources?.totalResources || 0,
+                })),
+            },
+
+            // Security headers (unique — competitors don't check this)
+            securityScore: homepage.securityHeaders || { score: 0, total: 7, details: [] },
+
+            // Meta robots (noindex/nofollow detection)
+            metaRobotsIssues: {
+                noindexPages: allPages.filter(p => p.metaRobots?.noindex).map(p => p.url),
+                nofollowPages: allPages.filter(p => p.metaRobots?.nofollow).map(p => p.url),
+                noindexCount: allPages.filter(p => p.metaRobots?.noindex).length,
+                nofollowCount: allPages.filter(p => p.metaRobots?.nofollow).length,
+            },
+
+            // URL issues
+            urlIssues: {
+                tooLong: allPages.filter(p => p.urlTooLong).map(p => ({ url: p.url, length: p.urlLength })),
+                tooLongCount: allPages.filter(p => p.urlTooLong).length,
+            },
         },
     };
 }

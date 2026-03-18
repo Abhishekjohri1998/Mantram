@@ -581,8 +581,26 @@ ul,ol{padding-left:20px}li{margin:4px 0}
                             </div>
                         )}
 
+                        {/* ─── Baseline data indicator ─── */}
+                        {isWorkflow && !loading && results && results._isBaseline && (
+                            <div className="flex items-center justify-between p-3 rounded-xl mb-4 animate-fade-in" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}>
+                                <div className="flex items-center gap-2 text-xs text-emerald-400">
+                                    <span className="material-symbols-outlined text-sm">auto_awesome</span>
+                                    <span>Auto-generated during brand onboarding • <strong className="text-white">Deterministic scoring — no AI hallucination</strong></span>
+                                </div>
+                                <CreditTooltipWrapper action={currentItem?.creditAction}>
+                                    <button onClick={() => runWorkflow(activeSection)} disabled={loading}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white cursor-pointer hover:brightness-110 transition-all"
+                                        style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+                                        <span className="material-symbols-outlined text-xs">play_arrow</span> Run Full Health Check
+                                        <CreditBadge action={currentItem?.creditAction} />
+                                    </button>
+                                </CreditTooltipWrapper>
+                            </div>
+                        )}
+
                         {/* ─── Saved-data indicator ─── */}
-                        {isWorkflow && !loading && results && savedAt && (
+                        {isWorkflow && !loading && results && savedAt && !results._isBaseline && (
                             <div className="flex items-center justify-between p-3 rounded-xl mb-4 animate-fade-in" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.12)' }}>
                                 <div className="flex items-center gap-2 text-xs text-slate-400">
                                     <span className="material-symbols-outlined text-primary text-sm">history</span>
@@ -731,14 +749,18 @@ ul,ol{padding-left:20px}li{margin:4px 0}
 
 function HealthCheckResults({ results }) {
     const [issueFilter, setIssueFilter] = useState('all')
+    const [showPageCards, setShowPageCards] = useState(false)
     const issues = results.issues || []
     const filtered = issueFilter === 'all' ? issues : issues.filter(i => i.severity === issueFilter)
+    const stats = results.siteStats || {}
+    const pageReports = results.pageReports || []
 
     return (<>
         {/* Summary */}
         <div className="glass-panel rounded-2xl p-6 mb-6">
             <p className="text-sm text-slate-300 leading-relaxed">{results.summary}</p>
-            <p className="text-sm text-primary font-bold mt-2">{results.topOpportunity}</p>
+            {results.topOpportunity && <p className="text-sm text-primary font-bold mt-2">{results.topOpportunity}</p>}
+            {results.strategicBrief && <p className="text-xs text-slate-400 mt-3 leading-relaxed">{results.strategicBrief}</p>}
         </div>
 
         {/* Score Cards */}
@@ -752,12 +774,144 @@ function HealthCheckResults({ results }) {
             ))}
         </div>
 
+        {/* ── Crawl Intelligence Dashboard (NEW) ── */}
+        <div className="glass-panel rounded-2xl p-5 mb-6">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-sm text-primary">monitoring</span> Crawl Intelligence
+            </h4>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+                {[
+                    { label: 'Pages Crawled', value: stats.pagesCrawled || 0, icon: 'description', color: '#6366f1' },
+                    { label: 'Avg Response', value: `${stats.responseTimeAvg || 0}ms`, icon: 'speed', color: (stats.responseTimeAvg || 0) > 2000 ? '#f43f5e' : '#10b981' },
+                    { label: 'Avg Page Size', value: `${stats.pageSizeAvg || 0}KB`, icon: 'data_usage', color: (stats.pageSizeAvg || 0) > 2000 ? '#f59e0b' : '#10b981' },
+                    { label: 'Thin Pages', value: stats.thinPageCount || 0, icon: 'short_text', color: (stats.thinPageCount || 0) > 0 ? '#f59e0b' : '#10b981' },
+                    { label: 'Orphan Pages', value: stats.orphanPageCount || 0, icon: 'link_off', color: (stats.orphanPageCount || 0) > 0 ? '#f43f5e' : '#10b981' },
+                    { label: 'Security', value: stats.securityHeaderScore || '0/7', icon: 'shield', color: '#6366f1' },
+                ].map(s => (
+                    <div key={s.label} className="flex items-center gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                        <span className="material-symbols-outlined text-lg" style={{ color: s.color }}>{s.icon}</span>
+                        <div>
+                            <p className="text-base font-black text-white leading-tight">{s.value}</p>
+                            <p className="text-[9px] text-slate-500 font-bold uppercase">{s.label}</p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Page Status Distribution */}
+            {stats.pageStatusDistribution && (
+                <div className="flex items-center gap-2 mt-4 flex-wrap">
+                    <span className="text-[9px] text-slate-600 font-bold uppercase">Status:</span>
+                    {[
+                        { label: '2xx', count: stats.pageStatusDistribution.status200, color: '#10b981' },
+                        { label: '3xx', count: stats.pageStatusDistribution.status301, color: '#f59e0b' },
+                        { label: '404', count: stats.pageStatusDistribution.status404, color: '#f43f5e' },
+                        { label: '5xx', count: stats.pageStatusDistribution.status5xx, color: '#dc2626' },
+                    ].filter(s => s.count > 0).map(s => (
+                        <span key={s.label} className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${s.color}15`, color: s.color }}>
+                            {s.label}: {s.count}
+                        </span>
+                    ))}
+                    {(stats.mixedContentCount || 0) > 0 && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400">⚠️ {stats.mixedContentCount} mixed content</span>
+                    )}
+                    {(stats.noindexPageCount || 0) > 0 && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400">🚫 {stats.noindexPageCount} noindex</span>
+                    )}
+                </div>
+            )}
+        </div>
+
+        {/* ── Security Headers (NEW — unique feature) ── */}
+        {stats.securityHeaders?.length > 0 && (
+            <div className="glass-panel rounded-2xl p-5 mb-6">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm text-violet-400">shield</span> Security Headers
+                    <span className="text-[9px] text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded-full ml-auto">★ Unique to Mantram AI</span>
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                    {stats.securityHeaders.map((h, i) => (
+                        <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${h.present ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-rose-500/5 border-rose-500/10'}`}>
+                            <span className={`material-symbols-outlined text-sm ${h.present ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                {h.present ? 'check_circle' : 'cancel'}
+                            </span>
+                            <div>
+                                <p className={`text-[10px] font-bold ${h.present ? 'text-emerald-400' : 'text-rose-400'}`}>{h.name}</p>
+                                <p className="text-[8px] text-slate-600 uppercase">{h.importance}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+
         {/* Action Board */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <ActionBucket title="🔧 Fix Now" items={results.fixNow} color="rose" />
             <ActionBucket title="✏️ Create Next" items={results.createNext} color="emerald" />
             <ActionBucket title="👁️ Monitor" items={results.monitor} color="blue" />
         </div>
+
+        {/* ── Per-Page Report Cards (NEW — like Semrush) ── */}
+        {pageReports.length > 0 && (
+            <div className="glass-panel rounded-2xl p-5 mb-6">
+                <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                        <span className="material-symbols-outlined text-sm text-blue-400">analytics</span> Per-Page Report ({pageReports.length} pages)
+                    </h4>
+                    <button onClick={() => setShowPageCards(!showPageCards)}
+                        className="text-[10px] font-bold text-primary px-2 py-1 rounded-lg bg-primary/10 hover:bg-primary/15 cursor-pointer transition-all flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs">{showPageCards ? 'expand_less' : 'expand_more'}</span>
+                        {showPageCards ? 'Collapse' : 'Expand'}
+                    </button>
+                </div>
+                {showPageCards && (
+                    <div className="space-y-2 animate-fade-in">
+                        {pageReports.map((page, i) => {
+                            const pageIssueTags = []
+                            if (!page.hasH1) pageIssueTags.push('No H1')
+                            if (page.h1Count > 1) pageIssueTags.push(`${page.h1Count} H1s`)
+                            if (!page.headingHierarchyValid) pageIssueTags.push('Heading Skip')
+                            if (page.titleLength === 0) pageIssueTags.push('No Title')
+                            if (page.titleLength > 60) pageIssueTags.push('Title Too Long')
+                            if (page.metaDescLength === 0) pageIssueTags.push('No Meta Desc')
+                            if (page.imagesWithoutAlt > 0) pageIssueTags.push(`${page.imagesWithoutAlt} No-Alt Imgs`)
+                            if (page.urlTooLong) pageIssueTags.push('URL >75 chars')
+                            if (page.metaRobots?.noindex) pageIssueTags.push('noindex')
+                            if (page.wordCount < 300 && page.wordCount > 0) pageIssueTags.push('Thin')
+                            if (page.responseTimeMs > 3000) pageIssueTags.push('Slow')
+
+                            return (
+                                <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] transition-all">
+                                    {/* Status dot */}
+                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${pageIssueTags.length === 0 ? 'bg-emerald-400' : pageIssueTags.length <= 2 ? 'bg-amber-400' : 'bg-rose-400'}`} />
+                                    {/* URL + title */}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[11px] font-bold text-white truncate">{page.title || page.url}</p>
+                                        <p className="text-[9px] text-slate-600 truncate">{page.url}</p>
+                                    </div>
+                                    {/* Stats */}
+                                    <div className="flex items-center gap-3 flex-shrink-0">
+                                        <span className="text-[9px] text-slate-500">{page.responseTimeMs}ms</span>
+                                        <span className="text-[9px] text-slate-500">{page.pageSizeKB}KB</span>
+                                        <span className="text-[9px] text-slate-500">{page.wordCount}w</span>
+                                    </div>
+                                    {/* Issue tags */}
+                                    {pageIssueTags.length > 0 && (
+                                        <div className="flex gap-1 flex-shrink-0">
+                                            {pageIssueTags.slice(0, 3).map((tag, ti) => (
+                                                <span key={ti} className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500/10 text-rose-400">{tag}</span>
+                                            ))}
+                                            {pageIssueTags.length > 3 && <span className="text-[8px] text-slate-600">+{pageIssueTags.length - 3}</span>}
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
+            </div>
+        )}
 
         {/* Issues List */}
         <div className="glass-panel rounded-2xl p-6">

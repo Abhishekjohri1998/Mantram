@@ -55,6 +55,14 @@ router.post('/scan-website', optionalAuth, async (req, res) => {
                     }
                 } catch (e) { console.warn('⚠️ Background Visual DNA analysis failed:', e.message); }
             });
+
+            // Auto-trigger SEO Baseline Audit in background (fire-and-forget)
+            import('../services/seoBaseline.js').then(async ({ runSEOBaseline }) => {
+                try {
+                    const seoResults = await runSEOBaseline(brand);
+                    console.log(`✅ SEO Baseline complete for ${brand.name}: score=${seoResults.overallScore} (${seoResults.grading.overall})`);
+                } catch (e) { console.warn('⚠️ Background SEO Baseline failed:', e.message); }
+            });
         } else {
             // Return scan result as if it's a brand (for preview before signup)
             brand = {

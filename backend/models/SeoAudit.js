@@ -5,7 +5,7 @@ const seoAuditSchema = new mongoose.Schema({
     brand: { type: mongoose.Schema.Types.ObjectId, ref: 'Brand', required: true },
     type: {
         type: String,
-        enum: ['health-check', 'traffic', 'competitors', 'ai-visibility', 'page-audit', 'ask', 'competitor-warroom', 'llm-probe', 'prompt-mining', 'auto-fix', 'backlinks'],
+        enum: ['health-check', 'traffic', 'competitors', 'ai-visibility', 'page-audit', 'ask', 'competitor-warroom', 'llm-probe', 'prompt-mining', 'auto-fix', 'backlinks', 'onboarding-baseline'],
         required: true,
     },
     url: { type: String, default: '' },
