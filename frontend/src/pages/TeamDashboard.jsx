@@ -203,7 +203,7 @@ export default function TeamDashboard() {
             <div className="flex items-end justify-between mb-6">
                 <div>
                     <p className="text-slate-400 text-sm">
-                        {planLimits ? `${planLimits.currentMembers}/${planLimits.maxMembers} members · ${planLimits.currentBrands}/${planLimits.maxBrands} brands · ${planLimits.plan} plan` : 'Manage your team, chat, and approvals.'}
+                         Manage your team, chat, and approvals.
                     </p>
                 </div>
                 {isAdmin && (
@@ -320,13 +320,9 @@ export default function TeamDashboard() {
                                 <span className="material-symbols-outlined text-primary">diamond</span>Plan
                             </h3>
                             <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-purple-500/10 border border-primary/20 mb-3">
-                                <p className="text-lg font-extrabold text-white capitalize">{planLimits?.plan || 'Starter'}</p>
-                                <p className="text-sm text-slate-400">{planLimits?.currentMembers || 1}/{planLimits?.maxMembers || 1} members</p>
+                                <p className="text-lg font-extrabold text-white capitalize">Mantram Unlimited</p>
+                                <p className="text-sm text-slate-400">Unlimited team members & brands</p>
                             </div>
-                            {!planLimits?.canInvite && (
-                                <p className="text-xs text-amber-400 mb-2">⚡ Team limit reached. Upgrade for more seats.</p>
-                            )}
-                            <button className="w-full py-2.5 rounded-xl border border-primary/30 text-primary text-sm font-bold hover:bg-primary/10 transition-all cursor-pointer">Upgrade Plan</button>
                         </div>
 
                         <div className="glass-panel rounded-2xl p-6">
