@@ -8,107 +8,116 @@ const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 const FETCH_TIMEOUT = 12000; // 12s
 
 // ============================================================================
-// PLAYWRIGHT JS RENDERING (for accurate H1 + alt-text detection)
+// BOT CHALLENGE DETECTION (Cloudflare, hCaptcha, etc.)
 // ============================================================================
 
-let _playwrightAvailable = null;
-async function getPlaywright() {
-  if (_playwrightAvailable !== null) return _playwrightAvailable;
-  try {
-    const pw = await import('playwright');
-    _playwrightAvailable = pw.default || pw;
-    return _playwrightAvailable;
-  } catch {
-    _playwrightAvailable = false;
-    console.warn('⚠️  Playwright not available — falling back to static HTML parsing');
-    return false;
-  }
+function isBotChallengePage(html) {
+  if (!html || html.length < 100) return false;
+  // Cloudflare challenge indicators
+  const cfIndicators = [
+    'Verifying your connection',
+    'cf-browser-verification',
+    'cf_chl_opt',
+    'cf-challenge-running',
+    'Just a moment...',
+    'Checking if the site connection is secure',
+    'Enable JavaScript and cookies to continue',
+    'Attention Required! | Cloudflare',
+    'ray ID',
+  ];
+  const lowerHtml = html.toLowerCase();
+  return cfIndicators.some(indicator => lowerHtml.includes(indicator.toLowerCase()));
 }
 
-/**
- * Render pages with Chromium JS and extract accurate H1 + visible image data.
- * Uses a SINGLE shared browser with concurrent tabs for performance.
- * @param {string[]} urls - URLs to render
- * @param {number} concurrency - Number of parallel browser tabs
- * @returns {Map<string, { h1: string[], imageCount: number, imagesWithoutAlt: number }>}
- */
-async function renderPagesWithJS(urls, concurrency = 3) {
-  const pw = await getPlaywright();
-  if (!pw) return new Map();
+// ============================================================================
+// CLOUDFLARE SOLVER (FlareSolverr-style — solve once, reuse cookies)
+// ============================================================================
 
-  const results = new Map();
+let _cfSession = null; // { cookies: string, userAgent: string, solved: boolean }
+
+/**
+ * Solve Cloudflare challenge for a domain using Playwright.
+ * Launches Chromium ONCE, navigates to the site, waits for challenge to pass,
+ * then extracts cookies + UA for all subsequent HTTP requests.
+ */
+async function solveCloudflare(url) {
+  if (_cfSession?.solved) return _cfSession;
+
+  let pw;
+  try {
+    pw = await import('playwright');
+    pw = pw.default || pw;
+  } catch {
+    console.warn('⚠️  Playwright not available — cannot solve Cloudflare');
+    return { cookies: '', userAgent: USER_AGENT, solved: false };
+  }
+
   let browser;
   try {
-    browser = await pw.chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'] });
+    console.log(`🛡️  Cloudflare Solver: launching Chromium for ${url}...`);
+    browser = await pw.chromium.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage']
+    });
     const context = await browser.newContext({
-      userAgent: USER_AGENT,
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
       viewport: { width: 1280, height: 800 },
       ignoreHTTPSErrors: true,
     });
 
-    console.log(`🎭 Playwright: rendering ${urls.length} pages (${concurrency} concurrent tabs)...`);
-    const startTime = Date.now();
+    const page = await context.newPage();
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
 
-    // Process in batches
-    for (let i = 0; i < urls.length; i += concurrency) {
-      const batch = urls.slice(i, i + concurrency);
-      const batchResults = await Promise.all(batch.map(async (url) => {
-        let page;
-        try {
-          page = await context.newPage();
-          await page.goto(url, { waitUntil: 'networkidle', timeout: 8000 });
-          
-          // Wait briefly for any late JS rendering
-          await page.waitForTimeout(500);
-
-          // Extract H1 tags from rendered DOM
-          const h1Tags = await page.evaluate(() => {
-            const h1s = document.querySelectorAll('h1');
-            return Array.from(h1s).map(h => h.textContent?.trim()).filter(Boolean);
-          });
-
-          // Extract visible images and check alt text
-          const imageData = await page.evaluate(() => {
-            const imgs = document.querySelectorAll('img');
-            let total = 0;
-            let withoutAlt = 0;
-            for (const img of imgs) {
-              // Only count visible images (not hidden, not 0-size, not tracking pixels)
-              const rect = img.getBoundingClientRect();
-              const style = window.getComputedStyle(img);
-              if (rect.width < 2 || rect.height < 2) continue;
-              if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') continue;
-              // Skip tracking pixels and tiny icons
-              if (img.naturalWidth < 2 && img.naturalHeight < 2) continue;
-              total++;
-              if (!img.alt || img.alt.trim() === '') withoutAlt++;
-            }
-            return { total, withoutAlt };
-          });
-
-          return { url, h1: h1Tags, imageCount: imageData.total, imagesWithoutAlt: imageData.withoutAlt };
-        } catch (e) {
-          return { url, h1: null, imageCount: null, imagesWithoutAlt: null, error: e.message };
-        } finally {
-          if (page) await page.close().catch(() => {});
-        }
-      }));
-
-      for (const r of batchResults) {
-        if (r.h1 !== null) results.set(r.url, r);
+    // Wait for Cloudflare challenge to be solved (poll up to 30s)
+    const solveStart = Date.now();
+    let solved = false;
+    for (let i = 0; i < 30; i++) {
+      await page.waitForTimeout(1000);
+      const title = await page.title();
+      const hasCfChallenge = await page.evaluate(() => {
+        return !!(document.querySelector('#cf-challenge-running') ||
+                  document.querySelector('.cf-browser-verification') ||
+                  document.title.includes('Just a moment') ||
+                  document.title.includes('Verifying'));
+      });
+      if (!hasCfChallenge && !title.includes('Verifying') && !title.includes('Just a moment')) {
+        solved = true;
+        console.log(`🛡️  Cloudflare solved in ${((Date.now() - solveStart) / 1000).toFixed(1)}s — title: "${title.substring(0, 60)}"`);
+        break;
       }
     }
 
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`🎭 Playwright: rendered ${results.size}/${urls.length} pages in ${elapsed}s`);
-  } catch (e) {
-    console.error('🎭 Playwright error:', e.message);
-  } finally {
-    if (browser) await browser.close().catch(() => {});
-  }
+    if (!solved) {
+      console.warn('🛡️  Cloudflare challenge NOT solved after 30s');
+      await browser.close();
+      return { cookies: '', userAgent: USER_AGENT, solved: false };
+    }
 
-  return results;
+    // Extract cookies and user-agent
+    const cookies = await context.cookies();
+    const cookieStr = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+    const ua = await page.evaluate(() => navigator.userAgent);
+
+    // Also extract H1 from the rendered page as bonus data
+    const h1Data = await page.evaluate(() => {
+      const h1s = document.querySelectorAll('h1');
+      return Array.from(h1s).map(h => h.textContent?.trim()).filter(Boolean);
+    });
+
+    console.log(`🛡️  Extracted ${cookies.length} cookies, UA: ${ua.substring(0, 50)}...`);
+    console.log(`🛡️  Homepage H1 (JS rendered): ${h1Data.length > 0 ? h1Data.join(', ').substring(0, 80) : 'NONE'}`);
+
+    _cfSession = { cookies: cookieStr, userAgent: ua, solved: true, homepageH1: h1Data };
+    await browser.close();
+    return _cfSession;
+  } catch (e) {
+    console.error('🛡️  Cloudflare solver error:', e.message);
+    if (browser) await browser.close().catch(() => {});
+    return { cookies: '', userAgent: USER_AGENT, solved: false };
+  }
 }
+
+function resetCfSession() { _cfSession = null; }
 
 // ============================================================================
 // FETCH HELPER
@@ -116,6 +125,9 @@ async function renderPagesWithJS(urls, concurrency = 3) {
 
 async function safeFetch(url, options = {}) {
     const MAX_RETRIES = 3;
+    // Use CF session cookies/UA if available
+    const effectiveUA = _cfSession?.solved ? _cfSession.userAgent : USER_AGENT;
+    const cfCookies = _cfSession?.solved ? _cfSession.cookies : '';
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
@@ -124,9 +136,10 @@ async function safeFetch(url, options = {}) {
                 ...options,
                 signal: controller.signal,
                 headers: {
-                    'User-Agent': USER_AGENT,
+                    'User-Agent': effectiveUA,
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                     'Accept-Language': 'en-US,en;q=0.9',
+                    ...(cfCookies ? { 'Cookie': cfCookies } : {}),
                     ...options.headers,
                 },
                 redirect: 'follow',
@@ -544,6 +557,15 @@ export async function crawlPage(url) {
             };
         }
 
+        // Detect Cloudflare/bot challenge pages — these look like real pages but have fake H1/content
+        if (isBotChallengePage(html)) {
+            return {
+                url, success: false, error: 'Bot challenge page (Cloudflare)',
+                statusCode: fetchResult.status, responseTimeMs: fetchResult.responseTimeMs,
+                isBotChallenge: true,
+            };
+        }
+
         const meta = extractMeta(html);
         const headings = extractHeadings(html);
         const jsonLd = extractJsonLd(html);
@@ -934,6 +956,11 @@ export async function researchDomain(baseUrl) {
 
     console.log(`🕷️  Deep crawl starting: ${cleanBase}`);
 
+    // PHASE 0: Solve Cloudflare challenge (if present) — takes ~5-30s
+    // This extracts cookies that let all subsequent HTTP requests bypass the challenge
+    resetCfSession(); // Fresh session for each domain
+    await solveCloudflare(cleanBase);
+
     // PHASE 1: Fetch homepage + robots.txt + sitemap.xml in parallel
     const [homepageResult, robotsTxt, sitemap, llmsTxt] = await Promise.all([
         (async () => {
@@ -1161,34 +1188,10 @@ export async function researchDomain(baseUrl) {
     const crawlElapsed = ((Date.now() - crawlStartTime) / 1000).toFixed(1);
     console.log(`🕷️  Crawl complete: ${allPages.length} pages in ${crawlElapsed}s (queue had ${toCrawl.length} URLs)`);
 
-    // PHASE 3.5: Playwright JS rendering for accurate H1 + visible image detection
-    // This overrides static HTML headings with fully-rendered DOM headings
-    try {
-      const pageUrls = allPages.filter(p => p.success !== false).map(p => p.url);
-      const jsRendered = await renderPagesWithJS(pageUrls, 5);
-      if (jsRendered.size > 0) {
-        let h1Overrides = 0;
-        let imgOverrides = 0;
-        for (const page of allPages) {
-          const rendered = jsRendered.get(page.url);
-          if (rendered) {
-            // Override H1 with JS-rendered H1
-            page.h1 = rendered.h1;
-            // Override headings array h1 entries
-            const nonH1Headings = (page.headings || []).filter(h => h.level !== 1);
-            page.headings = [...rendered.h1.map(text => ({ level: 1, text })), ...nonH1Headings];
-            h1Overrides++;
-            // Override image data with visible-only counts
-            if (rendered.imageCount !== null) {
-              page.images = { ...page.images, total: rendered.imageCount, withoutAlt: rendered.imagesWithoutAlt };
-              imgOverrides++;
-            }
-          }
-        }
-        console.log(`🎭 Overrode H1 on ${h1Overrides} pages, images on ${imgOverrides} pages`);
-      }
-    } catch (pwErr) {
-      console.warn('🎭 Playwright pass failed (non-fatal, using static HTML):', pwErr.message);
+    // PHASE 3.5: Bot challenge detection summary
+    const botChallengePages = allPages.filter(p => p.isBotChallenge);
+    if (botChallengePages.length > 0) {
+      console.log(`🛡️  ${botChallengePages.length} pages returned bot challenge pages (Cloudflare) — excluded from H1/content analysis`);
     }
 
     // PHASE 4: Compute duplicate content

@@ -305,12 +305,12 @@ export default function SeoStudio() {
             <div class="cover-gradient">
                 <div class="cover-logos">
                     <div class="cover-mantram">
-                        <img src="${mantramLogo}" class="cover-mantram-logo" alt="Mantram AI" onerror="this.outerHTML='<span class=\\'cover-mantram-text\\'>Mantram AI</span>'" />
+                        <img src="${mantramLogo}" class="cover-mantram-logo" alt="Mantram AI" onerror="this.style.display='none'" />
                         <span class="cover-mantram-label">Mantram AI</span>
                     </div>
                     <span class="cover-x">×</span>
                     <div class="cover-brand">
-                        ${brandLogo ? `<img src="${brandLogo}" class="cover-brand-logo" alt="${brandName}" onerror="this.outerHTML='<div class=\\'cover-brand-initial\\'>${brandName.charAt(0)}</div>'" />` : `<div class="cover-brand-initial">${brandName.charAt(0)}</div>`}
+                        ${brandLogo ? `<img src="${brandLogo}" class="cover-brand-logo" alt="${brandName}" onerror="this.style.display='none'" />` : `<div class="cover-brand-initial">${brandName.charAt(0)}</div>`}
                         <span class="cover-brand-name">${brandName}</span>
                     </div>
                 </div>
@@ -330,7 +330,7 @@ export default function SeoStudio() {
         <div class="report-masthead">
             <div class="masthead-bar">
                 <div class="masthead-left">
-                    <img src="${mantramLogo}" class="mantram-header-logo" alt="Mantram AI" onerror="this.outerHTML='<span class=\\'mantram-text-logo\\'>Mantram AI</span>'" />
+                    <img src="${mantramLogo}" class="mantram-header-logo" alt="Mantram AI" onerror="this.style.display='none'" />
                     <span class="masthead-divider">|</span>
                     <span class="masthead-studio">SEO Studio</span>
                 </div>
