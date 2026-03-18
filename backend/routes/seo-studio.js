@@ -4,6 +4,7 @@ import { requireStudio } from '../middleware/studioAccess.js';
 import { requireCredits, logTokenUsage } from '../middleware/credits.js';
 import Brand from '../models/Brand.js';
 import SeoAudit from '../models/SeoAudit.js';
+import GeoProbeHistory from '../models/GeoProbeHistory.js';
 import GscSnapshot from '../models/GscSnapshot.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import {
@@ -12,6 +13,7 @@ import {
   discoverBacklinks, analyzeCompetitorLinkProfile,
 } from '../utils/web-research.js';
 import { runRealLLMProbe, generateProbePrompts } from '../utils/llm-probe.js';
+import { probeAIVisibility } from '../services/geoProbe.js';
 import { getPageSpeed, formatPageSpeedForPrompt } from '../utils/pagespeed.js';
 import { mineAutocomplete, formatAutocompleteForPrompt } from '../utils/autocomplete.js';
 import { runKeywordIntelligence } from '../utils/keyword-intelligence.js';
@@ -263,11 +265,9 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
     const siteData = formatSiteResearch(siteResearch);
     const pageSpeedText = formatPageSpeedForPrompt(pageSpeedData);
 
-    // Timing Safeguard: Check if we have enough time left for AI
-    const elapsed = Date.now() - (req.startTime || Date.now());
-    const budget = 55000; // Increased to 55s to allow for all fallbacks (ALB/CloudFront limit usually 60s)
-    const remainingBudget = Math.max(10000, budget - elapsed);
-    console.log(`⏱️ Health Check research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
+    // AI gets a generous timeout — full-site crawl (800 pages) takes up to 180s first
+    const aiTimeout = 90000; // 90s for AI call — crawl takes the bulk of the time
+    console.log(`⏱️ Crawl + research complete (${siteResearch.totalPages || 0} pages). AI timeout: ${aiTimeout / 1000}s`);
 
     const systemPrompt = `You are a SENIOR SEO STRATEGIST (not just an auditor). You think like a CMO + technical SEO expert combined. You have REAL CRAWL DATA — use it as ground truth. Never guess or contradict the crawl.
 
@@ -327,7 +327,7 @@ Respond in STRICT JSON:
 Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' that connects to business outcomes. Think like a consultant, not a checklist tool.`;
 
     const userPrompt = `Analyze site: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget });
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: aiTimeout });
     // Log token usage from this AI call
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: req.creditAction || 'seoHealthCheck', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
@@ -377,6 +377,8 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
       // Round 2 additions
       brokenExternalCount: si.brokenExternalCount || 0,
       brokenExternalLinks: si.brokenExternalLinks || [],
+      brokenInternalCount: si.brokenInternalCount || 0,
+      brokenInternalLinks: si.brokenInternalLinks || [],
       emptyAnchorCount: si.emptyAnchorCount || 0,
       nofollowInternalCount: si.nofollowInternalCount || 0,
       conflictingCanonicalCount: si.conflictingCanonicals?.length || 0,
@@ -384,8 +386,17 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
       llmsTxtFound: si.llmsTxt?.found || false,
       llmsTxtSections: si.llmsTxt?.sections?.length || 0,
       sitemapCoverage: si.sitemapCoverage || {},
+      // New Semrush-parity metrics
+      titleDuplicateCount: si.titleDuplicateCount || 0,
+      metaDuplicateCount: si.metaDuplicateCount || 0,
+      multipleH1Count: si.multipleH1Count || 0,
+      missingH1Count: si.missingH1Count || 0,
+      lowTextRatioCount: si.lowTextRatioCount || 0,
+      avgTextToHtmlRatio: si.avgTextToHtmlRatio || 0,
+      oversizedPageCount: si.oversizedPageCount || 0,
+      singleIncomingCount: si.singleIncomingCount || 0,
     };
-    parsed.pageReports = pages.slice(0, 20).map(p => ({
+    parsed.pageReports = pages.slice(0, 50).map(p => ({
       url: p.url,
       title: p.title || 'Untitled',
       statusCode: p.statusCode || 200,
@@ -401,8 +412,22 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
       hasSchema: p.hasSchemaOrg || false,
       hasCanonical: !!p.canonical,
       urlTooLong: p.urlTooLong || false,
+      textToHtmlRatio: p.textToHtmlRatio || 0,
       metaRobots: p.metaRobots || {},
     }));
+
+    // ── GROUP ISSUES BY TYPE: Errors / Warnings / Notices (Semrush parity) ──
+    const baselineDetails = parsed.baselineScores?.technical?.details || [];
+    const onPageDetails = parsed.baselineScores?.onPage?.details || [];
+    const allDeterministicIssues = [...baselineDetails, ...onPageDetails].filter(d => d.issueType);
+    parsed.groupedIssues = {
+      errors: allDeterministicIssues.filter(d => d.issueType === 'error'),
+      warnings: allDeterministicIssues.filter(d => d.issueType === 'warning'),
+      notices: allDeterministicIssues.filter(d => d.issueType === 'notice'),
+      errorCount: allDeterministicIssues.filter(d => d.issueType === 'error').length,
+      warningCount: allDeterministicIssues.filter(d => d.issueType === 'warning').length,
+      noticeCount: allDeterministicIssues.filter(d => d.issueType === 'notice').length,
+    };
 
     // Attach real PageSpeed data to response
     if (pageSpeedData?.success) {
@@ -413,6 +438,80 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
         failedAudits: pageSpeedData.failedAudits,
         dataSource: pageSpeedData.dataSource,
       };
+    }
+
+    // ── Trend Delta: Compare with previous audit (like Semrush's "since last audit") ──
+    let trendDelta = null;
+    if (req.user && (brand?._id || brandPayload?._id)) {
+      try {
+        const prevAudit = await SeoAudit.findOne({
+          user: req.user._id,
+          brand: brand?._id || brandPayload?._id,
+          type: { $in: ['health-check', 'onboarding-baseline'] },
+          status: 'completed',
+        }).sort({ createdAt: -1 }).lean();
+
+        if (prevAudit?.scores && prevAudit?.results) {
+          const prev = prevAudit.scores;
+          const prevStats = prevAudit.results?.siteStats || {};
+          const currStats = parsed.siteStats || {};
+          trendDelta = {
+            previousDate: prevAudit.createdAt,
+            scoreChange: (parsed.seoHealthScore || 0) - (prev.seoHealth || 0),
+            technicalChange: (parsed.technicalScore || 0) - (prev.technicalScore || 0),
+            contentChange: (parsed.contentScore || 0) - (prev.contentScore || 0),
+            authorityChange: (parsed.authorityScore || 0) - (prev.authorityScore || 0),
+            pagesCrawledChange: (currStats.pagesCrawled || 0) - (prevStats.pagesCrawled || 0),
+            brokenInternalChange: (currStats.brokenInternalCount || 0) - (prevStats.brokenInternalCount || 0),
+            thinPageChange: (currStats.thinPageCount || 0) - (prevStats.thinPageCount || 0),
+            duplicateTitleChange: (currStats.titleDuplicateCount || 0) - (prevStats.titleDuplicateCount || 0),
+            multipleH1Change: (currStats.multipleH1Count || 0) - (prevStats.multipleH1Count || 0),
+            // Count new vs resolved AI issues
+            newIssueCount: (parsed.issues || []).filter(i => {
+              const prevIssues = prevAudit.results?.issues || [];
+              return !prevIssues.some(pi => pi.title === i.title);
+            }).length,
+            resolvedIssueCount: (prevAudit.results?.issues || []).filter(pi => {
+              const currIssues = parsed.issues || [];
+              return !currIssues.some(i => i.title === pi.title);
+            }).length,
+          };
+
+          // ── Per-issue deltas (compare grouped deterministic issues) ──
+          const prevSnapshot = prevAudit.results?.issueCountSnapshot || {};
+          const currGrouped = parsed.groupedIssues || {};
+          const allCurrentIssues = [...(currGrouped.errors || []), ...(currGrouped.warnings || []), ...(currGrouped.notices || [])];
+          const issueDeltas = [];
+          for (const issue of allCurrentIssues) {
+            const prevValue = prevSnapshot[issue.check];
+            if (prevValue === undefined) {
+              issueDeltas.push({ check: issue.check, issueType: issue.issueType, status: 'new', currentValue: issue.value });
+            } else if (prevValue !== issue.value) {
+              issueDeltas.push({ check: issue.check, issueType: issue.issueType, status: 'changed', currentValue: issue.value, previousValue: prevValue });
+            }
+          }
+          // Check for resolved issues
+          for (const [checkName, prevValue] of Object.entries(prevSnapshot)) {
+            if (!allCurrentIssues.some(i => i.check === checkName)) {
+              issueDeltas.push({ check: checkName, status: 'resolved', previousValue: prevValue });
+            }
+          }
+          trendDelta.issueDeltas = issueDeltas;
+          trendDelta.newDetectedCount = issueDeltas.filter(d => d.status === 'new').length;
+          trendDelta.resolvedDetectedCount = issueDeltas.filter(d => d.status === 'resolved').length;
+
+          console.log(`📊 Trend: score ${trendDelta.scoreChange >= 0 ? '+' : ''}${trendDelta.scoreChange}, ${trendDelta.newDetectedCount} new checks, ${trendDelta.resolvedDetectedCount} resolved checks`);
+        }
+      } catch (e) { console.warn('Trend delta computation failed:', e.message); }
+    }
+    if (trendDelta) parsed.trendDelta = trendDelta;
+
+    // Build issueCountSnapshot for future trend comparisons
+    const currGroupedIssues = parsed.groupedIssues || {};
+    const allDetectedIssues = [...(currGroupedIssues.errors || []), ...(currGroupedIssues.warnings || []), ...(currGroupedIssues.notices || [])];
+    parsed.issueCountSnapshot = {};
+    for (const issue of allDetectedIssues) {
+      parsed.issueCountSnapshot[issue.check] = issue.value;
     }
 
     // Save audit
@@ -895,7 +994,7 @@ Be STRATEGIC and SPECIFIC. Every insight must have a WHY and an actionable HOW. 
 
 router.post('/ai-visibility', protect, requireStudio('seoStudio'), requireCredits('seoAiVisibility'), async (req, res) => {
   try {
-    const { url, brand: brandPayload, brandId } = req.body;
+    const { url, brand: brandPayload, brandId, customPrompts } = req.body;
 
     const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
     const website = brand?.website || url || brandPayload?.website;
@@ -1024,9 +1123,72 @@ STRATEGIC RULES (MANDATORY):
 5. Think like a consultant billing $500/hour — every recommendation must justify its existence with data`;
 
     const userPrompt = `AI Visibility audit for: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget });
+
+    // Run AI on-page analysis AND real LLM probing in parallel
+    const brandName = brand?.name || brandPayload?.name || new URL(website).hostname.replace(/^www\./, '').split('.')[0];
+    const industry = brand?.industry || brand?.businessCategory || brandPayload?.industry || '';
+    const location = brand?.location || brandPayload?.location || '';
+    const competitors = brand?.competitors?.map(c => c.name || c) || [];
+
+    console.log(`🔮 Starting parallel: AI analysis + GEO probe v3 for "${brandName}" in "${industry}"`);
+
+    // Fetch previous probe for citation drift detection
+    let previousProbe = null;
+    if (req.user && brand?._id) {
+      try {
+        const prevHistory = await GeoProbeHistory.findOne({ brand: brand._id, user: req.user._id })
+          .sort({ createdAt: -1 }).lean();
+        if (prevHistory) previousProbe = { citations: prevHistory.citations || [] };
+      } catch (_) { /* ignore */ }
+    }
+
+    const [result, geoProbeResult] = await Promise.all([
+      aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget }),
+      probeAIVisibility(brandName, industry, location, website, competitors, customPrompts || [], previousProbe).catch(err => {
+        console.warn('GEO Probe failed (non-blocking):', err.message);
+        return null;
+      }),
+    ]);
+
     const parsed = parseJSON(result);
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
+
+    // Merge real GEO probe data into response
+    if (geoProbeResult) {
+      parsed.geoProbe = {
+        realScore: geoProbeResult.score,
+        scoreCI: geoProbeResult.scoreCI,
+        mentionRate: geoProbeResult.mentionRate,
+        weightedMentionRate: geoProbeResult.weightedMentionRate,
+        totalProbes: geoProbeResult.totalProbes,
+        totalMentions: geoProbeResult.totalMentions,
+        samplesPerPrompt: geoProbeResult.samplesPerPrompt,
+        sentimentDistribution: geoProbeResult.sentimentDistribution,
+        sentimentMethod: geoProbeResult.sentimentMethod,
+        shareOfVoice: geoProbeResult.shareOfVoice,
+        competitivePosition: geoProbeResult.competitivePosition,
+        modelBreakdown: geoProbeResult.modelBreakdown,
+        topSnippets: geoProbeResult.topSnippets,
+        contentGaps: geoProbeResult.contentGaps,
+        entityConfidence: geoProbeResult.entityConfidence,
+        citations: geoProbeResult.citations,
+        citationDrift: geoProbeResult.citationDrift,
+        promptsUsed: geoProbeResult.promptsUsed,
+        probeDetails: geoProbeResult.probeDetails,
+      };
+      // Blend: 40% on-page analysis + 60% real probe data
+      const onPageScore = parsed.aiVisibilityScore || 50;
+      parsed.aiVisibilityScore = Math.round(onPageScore * 0.4 + geoProbeResult.score * 0.6);
+      parsed.scoreBreakdown = {
+        onPageAnalysis: onPageScore,
+        realProbeScore: geoProbeResult.score,
+        blendedScore: parsed.aiVisibilityScore,
+        confidence: geoProbeResult.scoreCI?.confidence || 'unknown',
+        margin: geoProbeResult.scoreCI?.margin || 0,
+        formula: '40% on-page + 60% real LLM probe (3x multi-sample)',
+      };
+      console.log(`🔮 GEO Score: on-page=${onPageScore}, probe=${geoProbeResult.score}±${geoProbeResult.scoreCI?.margin || 0}, blended=${parsed.aiVisibilityScore}`);
+    }
 
     // Save to SeoAudit for persistence
     if (req.user && brand?._id) {
@@ -1038,11 +1200,72 @@ STRATEGIC RULES (MANDATORY):
         );
         console.log(`✅ AI Visibility Successful: ${website}`);
       } catch (dbErr) { console.warn('Could not save AI visibility audit:', dbErr.message); }
+
+      // Save GEO probe history for trend tracking
+      if (geoProbeResult) {
+        try {
+          await GeoProbeHistory.create({
+            user: req.user._id,
+            brand: brand._id,
+            website,
+            score: geoProbeResult.score,
+            mentionRate: geoProbeResult.mentionRate,
+            totalProbes: geoProbeResult.totalProbes,
+            totalMentions: geoProbeResult.totalMentions,
+            competitivePosition: geoProbeResult.competitivePosition,
+            modelBreakdown: geoProbeResult.modelBreakdown,
+            sentimentDistribution: geoProbeResult.sentimentDistribution,
+            shareOfVoice: geoProbeResult.shareOfVoice,
+            entityConfidence: geoProbeResult.entityConfidence,
+            modelsUsed: geoProbeResult.modelsUsed,
+            modelCoverage: geoProbeResult.modelCoverage,
+            contentGapsCount: geoProbeResult.contentGaps?.length || 0,
+            citationsCount: geoProbeResult.citations?.length || 0,
+            citations: geoProbeResult.citations || [],
+            samplesPerPrompt: geoProbeResult.samplesPerPrompt || 1,
+            onPageScore: parsed.scoreBreakdown?.onPageAnalysis || 0,
+            blendedScore: parsed.aiVisibilityScore || 0,
+          });
+          console.log('📊 GEO Probe history saved for trend tracking');
+        } catch (histErr) { console.warn('Could not save GEO history:', histErr.message); }
+      }
     }
 
     res.json({ success: true, ...parsed });
   } catch (error) {
     console.error('AI Visibility error:', error);
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+// ── GEO History / Trends ──
+router.get('/geo-history', protect, async (req, res) => {
+  try {
+    const { brandId, limit } = req.query;
+    if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
+
+    const history = await GeoProbeHistory.find({ brand: brandId, user: req.user._id })
+      .sort({ createdAt: -1 })
+      .limit(Math.min(parseInt(limit) || 30, 100))
+      .lean();
+
+    // Compute trend deltas
+    const latest = history[0];
+    const previous = history[1];
+    let trend = null;
+    if (latest && previous) {
+      trend = {
+        scoreDelta: latest.score - previous.score,
+        mentionRateDelta: latest.mentionRate - previous.mentionRate,
+        positionChange: latest.competitivePosition !== previous.competitivePosition
+          ? `${previous.competitivePosition} → ${latest.competitivePosition}` : null,
+        daysBetween: Math.round((new Date(latest.createdAt) - new Date(previous.createdAt)) / 86400000),
+      };
+    }
+
+    res.json({ success: true, history, trend, total: history.length });
+  } catch (error) {
+    console.error('GEO History error:', error);
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });

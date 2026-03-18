@@ -184,12 +184,27 @@ function extractLinks(html, baseUrl) {
 }
 
 function extractImages(html) {
+    // Strip <noscript> blocks first — images inside them aren't rendered
+    const cleanHtml = html.replace(/<noscript[\s\S]*?<\/noscript>/gi, '');
     const imgs = [];
     const imgPattern = /<img\s+[^>]*>/gi;
     let m;
-    while ((m = imgPattern.exec(html)) !== null) {
-        const alt = getAttr(m[0], 'alt') || '';
-        imgs.push({ hasAlt: alt.length > 0 });
+    while ((m = imgPattern.exec(cleanHtml)) !== null) {
+        const tag = m[0];
+        const src = getAttr(tag, 'src') || '';
+        const alt = getAttr(tag, 'alt') || '';
+        const width = parseInt(getAttr(tag, 'width') || '999', 10);
+        const height = parseInt(getAttr(tag, 'height') || '999', 10);
+
+        // Skip tracking pixels, spacers, beacons, data URIs, hidden images
+        if (width < 3 || height < 3) continue; // 1×1 or 2×2 tracking pixels
+        if (src.startsWith('data:')) continue; // inline data URIs (icons, placeholders)
+        if (/pixel|beacon|track|spacer|blank\.gif|1x1|transparent/i.test(src)) continue;
+        if (/aria-hidden\s*=\s*["']true["']/i.test(tag)) continue;
+        if (/display\s*:\s*none|visibility\s*:\s*hidden/i.test(getAttr(tag, 'style') || '')) continue;
+        if (!src || src === '#') continue; // no real source
+
+        imgs.push({ src, hasAlt: alt.trim().length > 0 });
     }
     return { total: imgs.length, withAlt: imgs.filter(i => i.hasAlt).length, withoutAlt: imgs.filter(i => !i.hasAlt).length };
 }
@@ -384,18 +399,23 @@ export async function crawlPage(url) {
         const metaRobots = extractMetaRobots(meta);
         const securityHeaders = analyzeSecurityHeaders(fetchResult.headers);
 
-        // Extract a meaningful content snippet (first 500 chars of body text)
+        // Full body text for duplicate detection + text-to-HTML ratio (capped at 10K for memory)
         const contentSnippet = bodyText.substring(0, 500);
+        const bodyTextFull = bodyText.substring(0, 10000);
+        const textToHtmlRatio = html.length > 0 ? Math.round((bodyText.length / html.length) * 100) : 0;
 
         return {
             url,
             success: true,
-            // ── Response metadata (NEW) ──
+            // ── Response metadata ──
             statusCode: fetchResult.status,
             responseTimeMs: fetchResult.responseTimeMs,
             pageSizeBytes: fetchResult.pageSizeBytes,
             pageSizeKB: Math.round(fetchResult.pageSizeBytes / 1024),
-            // ── Existing SEO data ──
+            htmlSizeOver2MB: fetchResult.pageSizeBytes > 2 * 1024 * 1024,
+            redirectChain: fetchResult.redirectChain || [],
+            redirectCount: (fetchResult.redirectChain || []).length,
+            // ── SEO data ──
             title: meta.title || '',
             metaDescription: meta.description || '',
             ogTitle: meta['og:title'] || '',
@@ -416,10 +436,12 @@ export async function crawlPage(url) {
             tech,
             wordCount,
             contentSnippet,
+            bodyTextFull,
+            textToHtmlRatio,
             robots: meta.robots || '',
             viewport: meta.viewport || '',
             charset: (html.match(/charset\s*=\s*["']?([^"'\s;>]+)/i) || ['', ''])[1] || '',
-            // ── NEW: Advanced data ──
+            // ── Advanced data ──
             hreflang,
             hasHreflang: hreflang.length > 0,
             mixedContent,
@@ -434,11 +456,11 @@ export async function crawlPage(url) {
             // ── Title/meta quality flags ──
             titleLength: (meta.title || '').length,
             titleTooShort: (meta.title || '').length > 0 && (meta.title || '').length < 30,
-            titleTooLong: (meta.title || '').length > 60,
+            titleTooLong: (meta.title || '').length > 70,
             metaDescLength: (meta.description || '').length,
             metaDescTooShort: (meta.description || '').length > 0 && (meta.description || '').length < 120,
             metaDescTooLong: (meta.description || '').length > 160,
-            // ── NEW: Enhanced link data ──
+            // ── Enhanced link data ──
             emptyAnchors: links.emptyAnchors || 0,
             nofollowInternalLinks: links.nofollowInternalLinks || 0,
             externalUrls: links.externalUrls || [],
@@ -652,26 +674,67 @@ function jaccardSimilarity(setA, setB) {
 }
 
 function computeDuplicates(pages) {
+    // Strip first/last 150 words (header/footer boilerplate) to avoid false positives
+    const stripBoilerplate = (text) => {
+        const words = text.split(/\s+/);
+        if (words.length < 400) return text; // Short pages: use as-is
+        return words.slice(150, words.length - 150).join(' ');
+    };
+
     const fingerprints = pages.map(p => ({
         url: p.url,
-        fp: contentFingerprint(p.contentSnippet || p.bodyTextFull || ''),
+        fp: contentFingerprint(stripBoilerplate(p.bodyTextFull || p.contentSnippet || '')),
     }));
 
-    const duplicates = [];
+    // Content duplicates (95%+ similarity = true duplicate, matching Semrush's strict threshold)
+    // Semrush reports near-0 content duplicates for most sites — 85% was far too aggressive
+    const contentDuplicates = [];
     for (let i = 0; i < fingerprints.length; i++) {
         for (let j = i + 1; j < fingerprints.length; j++) {
             const sim = jaccardSimilarity(fingerprints[i].fp, fingerprints[j].fp);
-            if (sim > 0.6) { // 60%+ similarity = near-duplicate
-                duplicates.push({
+            if (sim > 0.95) {
+                contentDuplicates.push({
                     page1: fingerprints[i].url,
                     page2: fingerprints[j].url,
                     similarity: Math.round(sim * 100),
-                    level: sim > 0.85 ? 'duplicate' : 'near-duplicate',
+                    level: sim > 0.99 ? 'exact-duplicate' : 'near-duplicate',
                 });
             }
         }
     }
-    return duplicates;
+
+    // Duplicate titles (exact match, non-empty)
+    const titleMap = new Map();
+    for (const p of pages) {
+        const t = (p.title || '').trim().toLowerCase();
+        if (t.length < 5) continue; // skip empty/too-short
+        if (!titleMap.has(t)) titleMap.set(t, []);
+        titleMap.get(t).push(p.url);
+    }
+    const duplicateTitles = [...titleMap.entries()]
+        .filter(([, urls]) => urls.length > 1)
+        .map(([title, urls]) => ({ title, count: urls.length, urls: urls.slice(0, 5) }));
+
+    // Duplicate meta descriptions (exact match, non-empty)
+    const metaMap = new Map();
+    for (const p of pages) {
+        const d = (p.metaDescription || '').trim().toLowerCase();
+        if (d.length < 10) continue;
+        if (!metaMap.has(d)) metaMap.set(d, []);
+        metaMap.get(d).push(p.url);
+    }
+    const duplicateMetaDescriptions = [...metaMap.entries()]
+        .filter(([, urls]) => urls.length > 1)
+        .map(([desc, urls]) => ({ description: desc.substring(0, 80) + '...', count: urls.length, urls: urls.slice(0, 5) }));
+
+    return {
+        contentDuplicates,
+        duplicateTitles,
+        duplicateMetaDescriptions,
+        contentDuplicateCount: contentDuplicates.length,
+        titleDuplicateCount: duplicateTitles.reduce((s, d) => s + d.count, 0),
+        metaDuplicateCount: duplicateMetaDescriptions.reduce((s, d) => s + d.count, 0),
+    };
 }
 
 
@@ -784,72 +847,136 @@ export async function researchDomain(baseUrl) {
         return { url: cleanBase, pages: [homepageResult], summary: null, error: homepageResult.error, robotsTxt, sitemap, llmsTxt };
     }
 
-    const homepage = homepageResult;
+    let homepage = homepageResult;
+
+    // ── Puppeteer JS-rendering fallback for SPA sites ──
+    // If fetch() gets <300 words, the site is likely JS-rendered (React/Angular/Vue)
+    // Re-render with headless Chrome to get the actual DOM content
+    if ((homepage.wordCount || 0) < 300) {
+        try {
+            console.log(`🖥️  Homepage has ${homepage.wordCount} words — likely SPA. Trying Puppeteer JS rendering (12s timeout)...`);
+            const puppeteerTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Puppeteer timeout (12s)')), 12000));
+            const puppeteerRender = (async () => {
+                const { jsRenderCrawl } = await import('./js-crawler.js');
+                return jsRenderCrawl(cleanBase, { maxPages: 1, mobile: false });
+            })();
+            const jsResult = await Promise.race([puppeteerRender, puppeteerTimeout]);
+            if (jsResult?.pages?.[0]?.wordCount > homepage.wordCount) {
+                const jp = jsResult.pages[0];
+                console.log(`🖥️  Puppeteer got ${jp.wordCount} words (vs ${homepage.wordCount} from fetch). Using rendered content.`);
+                // Merge Puppeteer data into homepage
+                homepage = {
+                    ...homepage,
+                    wordCount: jp.wordCount,
+                    bodyTextFull: jp.bodyText || homepage.bodyTextFull,
+                    contentSnippet: (jp.bodyText || '').substring(0, 500),
+                    title: jp.title || homepage.title,
+                    h1: jp.h1s || homepage.h1,
+                    h2: jp.h2s || homepage.h2,
+                    images: jp.images ? { total: jp.images.length, withAlt: jp.images.filter(i => i.hasAlt).length, withoutAlt: jp.imagesWithoutAlt || 0 } : homepage.images,
+                    jsRendered: true,
+                };
+            }
+        } catch (puppeteerErr) {
+            console.warn(`🖥️  Puppeteer fallback skipped: ${puppeteerErr.message}`);
+        }
+    }
+
     const internalLinks = homepage.links?.internal || [];
 
-    // PHASE 2: Build priority crawl queue (sitemap URLs first, then key paths, then discovery)
+    // PHASE 2: Build priority crawl queue (expanded for Semrush-level coverage)
+    const MAX_PAGES = 800; // Semrush crawls 800+ pages — must match
+    const CRAWL_TIMEOUT_MS = 180000; // 180s crawl time for full-site coverage
+    const crawlStartTime = Date.now();
     const crawled = new Set([cleanBase, homepage.url]);
     const toCrawl = [];
 
-    // Priority 1: Sitemap URLs (up to 15)
+    // Helper: add URL to queue if not already seen
+    const enqueue = (url) => {
+        if (crawled.size >= MAX_PAGES) return;
+        try {
+            const resolved = new URL(url).href;
+            if (!crawled.has(resolved)) {
+                toCrawl.push(resolved);
+                crawled.add(resolved);
+            }
+        } catch { /* skip invalid */ }
+    };
+
+    // Helper: check if URL is crawlable (not a file, fragment, or query)
+    const isCrawlable = (link) => {
+        if (!link || link === '/' || link.includes('#')) return false;
+        const lower = link.toLowerCase();
+        if (['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.zip', '.mp4', '.mp3', '.css', '.js'].some(ext => lower.endsWith(ext))) return false;
+        return true;
+    };
+
+    // Priority 1: Sitemap URLs (up to 200 — covers most of the site)
     if (sitemap.found) {
-        for (const sUrl of sitemap.urls.slice(0, 15)) {
-            try {
-                const resolved = new URL(sUrl).href;
-                if (!crawled.has(resolved)) {
-                    toCrawl.push(resolved);
-                    crawled.add(resolved);
-                }
-            } catch { /* skip invalid */ }
+        for (const sUrl of sitemap.urls) {
+            enqueue(sUrl);
         }
     }
 
     // Priority 2: Key structural pages
-    const keyPaths = ['/about', '/about-us', '/services', '/products', '/contact', '/blog', '/faq', '/pricing', '/team', '/case-studies', '/portfolio', '/news', '/careers', '/features'];
+    const keyPaths = ['/about', '/about-us', '/services', '/products', '/contact', '/blog', '/faq', '/pricing', '/team', '/case-studies', '/portfolio', '/news', '/careers', '/features', '/terms', '/privacy', '/shop', '/store', '/testimonials', '/reviews'];
     for (const path of keyPaths) {
-        if (toCrawl.length >= 25) break;
+        if (crawled.size >= MAX_PAGES) break;
         const match = internalLinks.find(l => l.toLowerCase().includes(path));
         if (match) {
-            try {
-                const fullUrl = new URL(match, cleanBase).href;
-                if (!crawled.has(fullUrl)) {
-                    toCrawl.push(fullUrl);
-                    crawled.add(fullUrl);
-                }
-            } catch { /* skip */ }
+            try { enqueue(new URL(match, cleanBase).href); } catch { /* skip */ }
         }
     }
 
-    // Priority 3: Discovery from internal links (fill up to 20)
+    // Priority 3: All homepage internal links
     for (const link of internalLinks) {
-        if (toCrawl.length >= 20) break;
-        if (link === '/' || link.includes('#') || link.includes('?') || link.endsWith('.pdf') || link.endsWith('.jpg') || link.endsWith('.png')) continue;
-        try {
-            const fullUrl = new URL(link, cleanBase).href;
-            if (!crawled.has(fullUrl)) {
-                toCrawl.push(fullUrl);
-                crawled.add(fullUrl);
-            }
-        } catch { /* skip */ }
+        if (crawled.size >= MAX_PAGES) break;
+        if (!isCrawlable(link)) continue;
+        try { enqueue(new URL(link, cleanBase).href); } catch { /* skip */ }
     }
 
-    console.log(`🕷️  Crawl queue: ${toCrawl.length} pages (sitemap: ${sitemap.found ? sitemap.count : 0}, robots: ${robotsTxt.found})`);
+    console.log(`🕷️  Initial crawl queue: ${toCrawl.length} pages (sitemap: ${sitemap.found ? sitemap.count : 0}, robots: ${robotsTxt.found})`);
 
-    // PHASE 3: Crawl in batches of 5 to avoid overwhelming the server
+    // PHASE 3: Crawl with recursive link discovery (batch size 8)
     const allSubPages = [];
-    const BATCH_SIZE = 5;
-    for (let i = 0; i < toCrawl.length; i += BATCH_SIZE) {
-        const batch = toCrawl.slice(i, i + BATCH_SIZE);
+    const BATCH_SIZE = 12;
+    let queueIndex = 0;
+
+    while (queueIndex < toCrawl.length) {
+        // Safety: stop if we hit timeout or max pages
+        if (Date.now() - crawlStartTime > CRAWL_TIMEOUT_MS) {
+            console.log(`🕷️  Crawl timeout (${CRAWL_TIMEOUT_MS / 1000}s) — stopping with ${allSubPages.length + 1} pages`);
+            break;
+        }
+        if (allSubPages.length + 1 >= MAX_PAGES) break;
+
+        const batch = toCrawl.slice(queueIndex, queueIndex + BATCH_SIZE);
+        queueIndex += BATCH_SIZE;
+
         const batchResults = await Promise.all(
             batch.map(url => crawlPage(url).catch(e => ({ url, success: false, error: e.message })))
         );
-        allSubPages.push(...batchResults.filter(p => p.success));
-        // Stop if we've taken too long (keep total under 15s for sub-crawl)
-        if (i + BATCH_SIZE >= 15 && allSubPages.length >= 10) break;
+
+        const successPages = batchResults.filter(p => p.success);
+        allSubPages.push(...successPages);
+
+        // Recursive discovery: extract internal links from newly crawled pages and add to queue
+        for (const page of successPages) {
+            const pageLinks = page.links?.internal || [];
+            for (const link of pageLinks) {
+                if (crawled.size >= MAX_PAGES) break;
+                if (!isCrawlable(link)) continue;
+                try { enqueue(new URL(link, cleanBase).href); } catch { /* skip */ }
+            }
+        }
+
+        // Rate limit: small delay between batches to avoid 429
+        if (queueIndex < toCrawl.length) await new Promise(r => setTimeout(r, 50));
     }
 
     const allPages = [homepage, ...allSubPages];
-    console.log(`🕷️  Crawl complete: ${allPages.length} pages successfully crawled`);
+    const crawlElapsed = ((Date.now() - crawlStartTime) / 1000).toFixed(1);
+    console.log(`🕷️  Crawl complete: ${allPages.length} pages in ${crawlElapsed}s (queue had ${toCrawl.length} URLs)`);
 
     // PHASE 4: Compute duplicate content
     const duplicateContent = computeDuplicates(allPages);
@@ -859,9 +986,9 @@ export async function researchDomain(baseUrl) {
     for (const p of allPages) {
         for (const u of (p.externalUrls || [])) {
             externalUrlSet.add(JSON.stringify({ url: u, from: p.url }));
-            if (externalUrlSet.size >= 15) break;
+            if (externalUrlSet.size >= 50) break;
         }
-        if (externalUrlSet.size >= 15) break;
+        if (externalUrlSet.size >= 50) break;
     }
     const brokenExternal = [];
     const externalToProbe = [...externalUrlSet].map(s => JSON.parse(s));
@@ -885,6 +1012,53 @@ export async function researchDomain(baseUrl) {
         console.log(`🔗  External links: ${probeResults.length} probed, ${brokenExternal.length} broken`);
     }
 
+    // PHASE 4.6: Broken internal links detection (like Semrush)
+    const brokenInternal = [];
+    const crawledUrls = new Set(allPages.map(p => p.url));
+    const internalUrlGraph = new Map(); // url → Set of source pages
+    for (const p of allPages) {
+        for (const link of (p.links?.internal || [])) {
+            if (!isCrawlable(link)) continue;
+            try {
+                const fullUrl = new URL(link, cleanBase).href;
+                if (!internalUrlGraph.has(fullUrl)) internalUrlGraph.set(fullUrl, new Set());
+                internalUrlGraph.get(fullUrl).add(p.url);
+            } catch { /* skip */ }
+        }
+    }
+    // Check pages that returned non-200 status during crawl
+    for (const p of allPages) {
+        if (p.statusCode && p.statusCode >= 400) {
+            const sources = internalUrlGraph.get(p.url);
+            brokenInternal.push({ url: p.url, statusCode: p.statusCode, linkedFrom: sources ? [...sources].slice(0, 3) : [] });
+        }
+    }
+    // HEAD-probe uncrawled internal URLs (max 30, 2s timeout each)
+    const uncrawledInternal = [...internalUrlGraph.entries()]
+        .filter(([url]) => !crawledUrls.has(url))
+        .slice(0, 200);
+    if (uncrawledInternal.length > 0) {
+        console.log(`🔗  Probing ${uncrawledInternal.length} uncrawled internal URLs for broken links...`);
+        const internalProbeResults = await Promise.all(
+            uncrawledInternal.map(async ([url, sources]) => {
+                const ctrl = new AbortController();
+                const t = setTimeout(() => ctrl.abort(), 2000);
+                try {
+                    const r = await fetch(url, { method: 'HEAD', signal: ctrl.signal, headers: { 'User-Agent': USER_AGENT }, redirect: 'follow' });
+                    clearTimeout(t);
+                    return { url, status: r.status, broken: r.status >= 400, sources: [...sources].slice(0, 3) };
+                } catch (e) {
+                    clearTimeout(t);
+                    return { url, status: 0, broken: true, error: e.message, sources: [...sources].slice(0, 3) };
+                }
+            })
+        );
+        for (const r of internalProbeResults) {
+            if (r.broken) brokenInternal.push({ url: r.url, statusCode: r.status, linkedFrom: r.sources });
+        }
+        console.log(`🔗  Internal links: ${uncrawledInternal.length} probed, ${brokenInternal.length} total broken`);
+    }
+
     // PHASE 5: Build comprehensive site intelligence
     const allHeadings = allPages.flatMap(p => p.headings || []);
     const allSchemaTypes = [...new Set(allPages.flatMap(p => p.schemaTypes || []))];
@@ -900,7 +1074,23 @@ export async function researchDomain(baseUrl) {
     const thinPages = allPages.filter(p => (p.wordCount || 0) < 300);
     const missingMeta = allPages.filter(p => !p.metaDescription);
     const missingH1 = allPages.filter(p => !p.h1?.length);
+    const multipleH1 = allPages.filter(p => (p.h1?.length || 0) > 1);
     const pagesWithRedirects = allPages.filter(p => p.redirectChain?.length > 0);
+    const lowTextRatioPages = allPages.filter(p => (p.textToHtmlRatio || 100) < 10);
+    const oversizedPages = allPages.filter(p => p.htmlSizeOver2MB);
+    const avgTextToHtmlRatio = allPages.length > 0 ? Math.round(allPages.reduce((s, p) => s + (p.textToHtmlRatio || 0), 0) / allPages.length) : 0;
+
+    // Incoming internal link count per page (for single-incoming-link detection)
+    const incomingLinkCount = new Map();
+    for (const p of allPages) {
+        for (const link of (p.links?.internal || [])) {
+            try {
+                const target = new URL(link, cleanBase).href;
+                incomingLinkCount.set(target, (incomingLinkCount.get(target) || 0) + 1);
+            } catch { /* skip */ }
+        }
+    }
+    const singleIncomingPages = allSubPages.filter(p => (incomingLinkCount.get(p.url) || 0) <= 1);
 
     // Compute click depth (how many clicks from homepage)
     const clickDepthMap = {};
@@ -991,10 +1181,55 @@ export async function researchDomain(baseUrl) {
             missingH1Tags: missingH1.map(p => p.url),
             redirectChains: pagesWithRedirects.map(p => ({ url: p.url, chain: p.redirectChain })),
             redirectChainCount: pagesWithRedirects.length,
-            duplicateContent,
-            duplicateContentCount: duplicateContent.length,
+            // Duplicate detection (structured — separate content vs title vs meta)
+            duplicateContent: duplicateContent.contentDuplicates || [],
+            duplicateContentCount: duplicateContent.contentDuplicateCount || 0,
+            duplicateTitles: duplicateContent.duplicateTitles || [],
+            titleDuplicateCount: duplicateContent.titleDuplicateCount || 0,
+            duplicateMetaDescriptions: duplicateContent.duplicateMetaDescriptions || [],
+            metaDuplicateCount: duplicateContent.metaDuplicateCount || 0,
+            // H1 issues (split — Semrush reports separately)
+            missingH1Count: missingH1.length,
+            multipleH1Pages: multipleH1.map(p => ({ url: p.url, h1Count: p.h1.length, h1s: p.h1.slice(0, 3) })),
+            multipleH1Count: multipleH1.length,
+            // Deep page analysis
             deepPages: deepPages.map(p => p.url),
             clickDepthIssues: deepPages.length,
+            // New metrics
+            avgTextToHtmlRatio,
+            lowTextRatioPages: lowTextRatioPages.map(p => ({ url: p.url, ratio: p.textToHtmlRatio })),
+            lowTextRatioCount: lowTextRatioPages.length,
+            oversizedPages: oversizedPages.map(p => ({ url: p.url, sizeKB: p.pageSizeKB })),
+            oversizedPageCount: oversizedPages.length,
+            singleIncomingPages: singleIncomingPages.map(p => p.url).slice(0, 20),
+            singleIncomingCount: singleIncomingPages.length,
+
+            // ── Broken Internal Links (Semrush critical metric — was completely missing) ──
+            brokenInternalLinks: brokenInternal,
+            brokenInternalCount: brokenInternal.length,
+            // ── Broken External Links ──
+            brokenExternalLinks: brokenExternal,
+            brokenExternalCount: brokenExternal.length,
+            // ── Permanent Redirects (301/308 — Semrush shows 636 for acwo.com) ──
+            permanentRedirects: allPages.filter(p => p.statusCode === 301 || p.statusCode === 308 || (p.redirectChain?.length > 0)).map(p => ({
+                url: p.url, statusCode: p.statusCode, finalUrl: p.redirectChain?.[p.redirectChain.length - 1] || p.url,
+            })),
+            permanentRedirectCount: allPages.filter(p => p.statusCode === 301 || p.statusCode === 308 || (p.redirectChain?.length > 0)).length,
+            // ── Blocked by robots.txt (internal pages disallowed) ──
+            blockedByRobotsTxt: (() => {
+                if (!robotsTxt.found || !robotsTxt.disallowRules?.length) return { internal: [], external: [], internalCount: 0, externalCount: 0 };
+                const blockedInternal = allPages.filter(p => {
+                    try {
+                        const path = new URL(p.url).pathname;
+                        return robotsTxt.disallowRules.some(rule => path.startsWith(rule));
+                    } catch { return false; }
+                });
+                return {
+                    internal: blockedInternal.map(p => p.url),
+                    internalCount: blockedInternal.length,
+                    rules: (robotsTxt.disallowRules || []).slice(0, 30),
+                };
+            })(),
 
             // ══════════════════════════════════════════════════════
             // NEW: Advanced metrics (beats Semrush/Ahrefs)
@@ -1173,6 +1408,10 @@ export async function researchDomain(baseUrl) {
             // Broken external links (probed after crawl)
             brokenExternalLinks: brokenExternal,
             brokenExternalCount: brokenExternal.length,
+
+            // Broken internal links (Semrush parity)
+            brokenInternalLinks: brokenInternal,
+            brokenInternalCount: brokenInternal.length,
         },
     };
 }
@@ -1283,7 +1522,13 @@ export function formatSiteResearch(research) {
     if (si.missingMetaDescriptions?.length > 0) issues.push(`${si.missingMetaDescriptions.length} pages MISSING meta descriptions: ${si.missingMetaDescriptions.slice(0, 3).join(', ')}`);
     if (si.missingH1Tags?.length > 0) issues.push(`${si.missingH1Tags.length} pages MISSING H1 tags: ${si.missingH1Tags.slice(0, 3).join(', ')}`);
     if (si.redirectChainCount > 0) issues.push(`${si.redirectChainCount} pages have REDIRECT CHAINS: ${si.redirectChains.slice(0, 2).map(r => `${r.url} (${r.chain.length} hops)`).join(', ')}`);
-    if (si.duplicateContentCount > 0) issues.push(`${si.duplicateContentCount} DUPLICATE/NEAR-DUPLICATE content pairs: ${si.duplicateContent.slice(0, 2).map(d => `${d.page1} ↔ ${d.page2} (${d.similarity}% ${d.level})`).join(', ')}`);
+    if (si.duplicateContentCount > 0) issues.push(`${si.duplicateContentCount} DUPLICATE content pairs (85%+ similarity): ${(si.duplicateContent || []).slice(0, 2).map(d => `${d.page1} ↔ ${d.page2} (${d.similarity}%)`).join(', ')}`);
+    if (si.titleDuplicateCount > 0) issues.push(`${si.titleDuplicateCount} pages with DUPLICATE TITLE TAGS: ${(si.duplicateTitles || []).slice(0, 2).map(d => `"${d.title}" (${d.count} pages)`).join(', ')}`);
+    if (si.metaDuplicateCount > 0) issues.push(`${si.metaDuplicateCount} pages with DUPLICATE META DESCRIPTIONS`);
+    if (si.multipleH1Count > 0) issues.push(`${si.multipleH1Count} pages with MULTIPLE H1 TAGS: ${(si.multipleH1Pages || []).slice(0, 3).map(p => `${p.url} (${p.h1Count} H1s)`).join(', ')}`);
+    if (si.lowTextRatioCount > 0) issues.push(`${si.lowTextRatioCount} pages with LOW TEXT-TO-HTML RATIO (<10%): ${(si.lowTextRatioPages || []).slice(0, 3).map(p => `${p.url} (${p.ratio}%)`).join(', ')}`);
+    if (si.oversizedPageCount > 0) issues.push(`${si.oversizedPageCount} pages LARGER THAN 2MB`);
+    if (si.singleIncomingCount > 0) issues.push(`${si.singleIncomingCount} pages with ONLY 1 INCOMING INTERNAL LINK (low link equity)`);
     if (si.clickDepthIssues > 0) issues.push(`${si.clickDepthIssues} pages have DEEP CLICK DEPTH (not directly linked from homepage)`);
 
     if (issues.length > 0) {
