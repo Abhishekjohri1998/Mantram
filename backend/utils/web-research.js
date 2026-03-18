@@ -686,17 +686,18 @@ function computeDuplicates(pages) {
         fp: contentFingerprint(stripBoilerplate(p.bodyTextFull || p.contentSnippet || '')),
     }));
 
-    // Content duplicates (85%+ similarity = true duplicate, not just "similar")
+    // Content duplicates (95%+ similarity = true duplicate, matching Semrush's strict threshold)
+    // Semrush reports near-0 content duplicates for most sites — 85% was far too aggressive
     const contentDuplicates = [];
     for (let i = 0; i < fingerprints.length; i++) {
         for (let j = i + 1; j < fingerprints.length; j++) {
             const sim = jaccardSimilarity(fingerprints[i].fp, fingerprints[j].fp);
-            if (sim > 0.85) {
+            if (sim > 0.95) {
                 contentDuplicates.push({
                     page1: fingerprints[i].url,
                     page2: fingerprints[j].url,
                     similarity: Math.round(sim * 100),
-                    level: sim > 0.95 ? 'exact-duplicate' : 'near-duplicate',
+                    level: sim > 0.99 ? 'exact-duplicate' : 'near-duplicate',
                 });
             }
         }
@@ -884,8 +885,8 @@ export async function researchDomain(baseUrl) {
     const internalLinks = homepage.links?.internal || [];
 
     // PHASE 2: Build priority crawl queue (expanded for Semrush-level coverage)
-    const MAX_PAGES = 150; // Semrush-level coverage for reliable data
-    const CRAWL_TIMEOUT_MS = 45000; // 45s max crawl time
+    const MAX_PAGES = 800; // Semrush crawls 800+ pages — must match
+    const CRAWL_TIMEOUT_MS = 180000; // 180s crawl time for full-site coverage
     const crawlStartTime = Date.now();
     const crawled = new Set([cleanBase, homepage.url]);
     const toCrawl = [];
@@ -912,7 +913,7 @@ export async function researchDomain(baseUrl) {
 
     // Priority 1: Sitemap URLs (up to 200 — covers most of the site)
     if (sitemap.found) {
-        for (const sUrl of sitemap.urls.slice(0, 200)) {
+        for (const sUrl of sitemap.urls) {
             enqueue(sUrl);
         }
     }
@@ -938,7 +939,7 @@ export async function researchDomain(baseUrl) {
 
     // PHASE 3: Crawl with recursive link discovery (batch size 8)
     const allSubPages = [];
-    const BATCH_SIZE = 8;
+    const BATCH_SIZE = 12;
     let queueIndex = 0;
 
     while (queueIndex < toCrawl.length) {
@@ -970,7 +971,7 @@ export async function researchDomain(baseUrl) {
         }
 
         // Rate limit: small delay between batches to avoid 429
-        if (queueIndex < toCrawl.length) await new Promise(r => setTimeout(r, 100));
+        if (queueIndex < toCrawl.length) await new Promise(r => setTimeout(r, 50));
     }
 
     const allPages = [homepage, ...allSubPages];
@@ -985,9 +986,9 @@ export async function researchDomain(baseUrl) {
     for (const p of allPages) {
         for (const u of (p.externalUrls || [])) {
             externalUrlSet.add(JSON.stringify({ url: u, from: p.url }));
-            if (externalUrlSet.size >= 15) break;
+            if (externalUrlSet.size >= 50) break;
         }
-        if (externalUrlSet.size >= 15) break;
+        if (externalUrlSet.size >= 50) break;
     }
     const brokenExternal = [];
     const externalToProbe = [...externalUrlSet].map(s => JSON.parse(s));
@@ -1035,7 +1036,7 @@ export async function researchDomain(baseUrl) {
     // HEAD-probe uncrawled internal URLs (max 30, 2s timeout each)
     const uncrawledInternal = [...internalUrlGraph.entries()]
         .filter(([url]) => !crawledUrls.has(url))
-        .slice(0, 30);
+        .slice(0, 200);
     if (uncrawledInternal.length > 0) {
         console.log(`🔗  Probing ${uncrawledInternal.length} uncrawled internal URLs for broken links...`);
         const internalProbeResults = await Promise.all(
@@ -1202,6 +1203,33 @@ export async function researchDomain(baseUrl) {
             oversizedPageCount: oversizedPages.length,
             singleIncomingPages: singleIncomingPages.map(p => p.url).slice(0, 20),
             singleIncomingCount: singleIncomingPages.length,
+
+            // ── Broken Internal Links (Semrush critical metric — was completely missing) ──
+            brokenInternalLinks: brokenInternal,
+            brokenInternalCount: brokenInternal.length,
+            // ── Broken External Links ──
+            brokenExternalLinks: brokenExternal,
+            brokenExternalCount: brokenExternal.length,
+            // ── Permanent Redirects (301/308 — Semrush shows 636 for acwo.com) ──
+            permanentRedirects: allPages.filter(p => p.statusCode === 301 || p.statusCode === 308 || (p.redirectChain?.length > 0)).map(p => ({
+                url: p.url, statusCode: p.statusCode, finalUrl: p.redirectChain?.[p.redirectChain.length - 1] || p.url,
+            })),
+            permanentRedirectCount: allPages.filter(p => p.statusCode === 301 || p.statusCode === 308 || (p.redirectChain?.length > 0)).length,
+            // ── Blocked by robots.txt (internal pages disallowed) ──
+            blockedByRobotsTxt: (() => {
+                if (!robotsTxt.found || !robotsTxt.disallowRules?.length) return { internal: [], external: [], internalCount: 0, externalCount: 0 };
+                const blockedInternal = allPages.filter(p => {
+                    try {
+                        const path = new URL(p.url).pathname;
+                        return robotsTxt.disallowRules.some(rule => path.startsWith(rule));
+                    } catch { return false; }
+                });
+                return {
+                    internal: blockedInternal.map(p => p.url),
+                    internalCount: blockedInternal.length,
+                    rules: (robotsTxt.disallowRules || []).slice(0, 30),
+                };
+            })(),
 
             // ══════════════════════════════════════════════════════
             // NEW: Advanced metrics (beats Semrush/Ahrefs)

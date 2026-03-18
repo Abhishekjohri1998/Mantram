@@ -190,6 +190,33 @@ function computeTechnicalScore(siteIntelligence, robotsTxt, sitemap, pageSpeed, 
             howToFix: 'Review each noindexed page. If it should be indexable, remove the meta robots noindex tag. Common causes: staging settings left on, CMS defaults, or security plugins.' });
     }
 
+    // ── Permanent Redirects (301/308) — Semrush critical metric ──
+    if (siteIntelligence.permanentRedirectCount > 0) {
+        details.push({ check: 'Permanent Redirects (301/308)', issueType: 'notice', score: 0, max: 0, status: 'warning',
+            value: `${siteIntelligence.permanentRedirectCount} pages return permanent redirects`,
+            affectedUrls: (siteIntelligence.permanentRedirects || []).slice(0, 10).map(r => r.url),
+            aboutThisIssue: 'Permanent redirects (301/308) are not errors, but having many indicates URL structure changes. Internal links should point directly to final URLs to avoid unnecessary redirect hops and preserve crawl budget.',
+            howToFix: 'Update internal links to point to the final destination URL instead of the redirect source. Clean up old URLs from sitemaps and navigation menus.' });
+    }
+
+    // ── Blocked by robots.txt ──
+    if (siteIntelligence.blockedByRobotsTxt?.internalCount > 0) {
+        details.push({ check: 'Pages Blocked by robots.txt', issueType: 'warning', score: 0, max: 0, status: 'warning',
+            value: `${siteIntelligence.blockedByRobotsTxt.internalCount} internal pages are blocked by robots.txt rules`,
+            affectedUrls: (siteIntelligence.blockedByRobotsTxt.internal || []).slice(0, 10),
+            aboutThisIssue: 'Pages blocked by robots.txt cannot be crawled by search engines, making them invisible in search results. If these pages contain important content, they are being excluded from indexing.',
+            howToFix: 'Review your robots.txt file. Remove Disallow rules for pages you want indexed. Use meta robots noindex instead if you want pages crawlable but not indexed.' });
+    }
+
+    // ── Crawl Depth >3 clicks from homepage ──
+    if (siteIntelligence.clickDepthIssues > 0) {
+        details.push({ check: 'Pages Too Deep (>3 Clicks)', issueType: 'notice', score: 0, max: 0, status: 'warning',
+            value: `${siteIntelligence.clickDepthIssues} pages are 3+ clicks from homepage`,
+            affectedUrls: (siteIntelligence.deepPages || []).slice(0, 10),
+            aboutThisIssue: 'Pages buried deep in the site hierarchy (3+ clicks from homepage) are harder for search engines to discover and crawl. They also receive less PageRank, making them harder to rank.',
+            howToFix: 'Flatten your site architecture. Add internal links from popular pages to deep content. Use breadcrumbs, category pages, and hub pages to reduce click depth. Aim for all key pages within 3 clicks of the homepage.' });
+    }
+
     // ── Broken External Links (penalty, -3 max) ──
     if (siteIntelligence.brokenExternalCount > 0) {
         const extPenalty = Math.min(3, siteIntelligence.brokenExternalCount);
