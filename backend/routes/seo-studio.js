@@ -1946,9 +1946,57 @@ router.get('/reports/:type', protect, async (req, res) => {
     const { brandId } = req.query;
     if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
 
-    const audit = await SeoAudit.findOne(
+    let audit = await SeoAudit.findOne(
       { user: req.user._id, brand: brandId, type, status: 'completed' }
     ).sort('-updatedAt').lean();
+
+    // ── Fallback: if no health-check exists, use onboarding-baseline ──
+    if (!audit && type === 'health-check') {
+      audit = await SeoAudit.findOne(
+        { user: req.user._id, brand: brandId, type: 'onboarding-baseline', status: 'completed' }
+      ).sort('-updatedAt').lean();
+
+      if (audit) {
+        // Map baseline field names → health-check field names so HealthCheckResults renders correctly
+        const r = audit.results || {};
+        const mappedReport = {
+          ...r,
+          // HealthCheckResults reads these top-level field names
+          seoHealthScore: r.overallScore || r.scores?.seoHealth || 0,
+          aiVisibilityScore: 0, // Not computed at onboarding
+          technicalScore: r.scores?.technicalScore || 0,
+          contentScore: r.scores?.contentScore || 0,
+          authorityScore: r.scores?.authorityScore || 0,
+          onPageScore: r.scores?.onPageScore || 0,
+          // Issues — already in the right format
+          issues: r.issues || [],
+          // Summary
+          summary: `SEO Baseline Audit (generated automatically during brand onboarding). Overall score: ${r.overallScore || 0}/100 (${r.grading?.overall || 'N/A'}). Run a full Health Check for AI-powered strategic analysis.`,
+          topOpportunity: r.issues?.[0] ? `Top priority: ${r.issues[0].title} — ${r.issues[0].fix}` : 'Run a full Health Check for detailed recommendations.',
+          // Action buckets from issues
+          fixNow: (r.issues || []).filter(i => i.severity === 'critical').slice(0, 5).map(i => i.title + (i.fix ? ': ' + i.fix : '')),
+          createNext: (r.issues || []).filter(i => i.severity === 'high').slice(0, 5).map(i => i.title + (i.fix ? ': ' + i.fix : '')),
+          monitor: (r.issues || []).filter(i => i.severity === 'medium').slice(0, 5).map(i => i.title),
+          // Per-page report cards (NEW)
+          pageReports: r.pageReports || [],
+          // Crawl intelligence + enhanced siteStats (NEW)
+          siteStats: r.siteStats || {},
+          crawlIntelligence: r.siteStats || {},
+          researchSources: r.siteStats ? [{ url: audit.url, pages: r.siteStats.pagesCrawled }] : [],
+          // Metadata
+          _isBaseline: true,
+          _baselineNote: 'This data was generated automatically during brand onboarding using deterministic scoring. Run a full Health Check for AI-powered strategic recommendations.',
+        };
+        return res.json({
+          success: true,
+          found: true,
+          report: mappedReport,
+          generatedAt: audit.updatedAt || audit.createdAt,
+          scores: audit.scores,
+          isBaseline: true,
+        });
+      }
+    }
 
     if (!audit) return res.json({ success: true, found: false });
 
