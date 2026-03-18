@@ -1056,10 +1056,71 @@ function HealthCheckResults({ results }) {
             </div>
         )}
 
-        {/* Issues List */}
+        {/* ── ERRORS / WARNINGS / NOTICES (Semrush-style) ── */}
+        {results.groupedIssues && (results.groupedIssues.errorCount > 0 || results.groupedIssues.warningCount > 0 || results.groupedIssues.noticeCount > 0) && (
+            <div className="space-y-4 mb-6">
+                {[
+                    { key: 'errors', label: 'Errors', items: results.groupedIssues?.errors || [], color: '#f43f5e', bg: 'bg-rose-500', icon: 'error' },
+                    { key: 'warnings', label: 'Warnings', items: results.groupedIssues?.warnings || [], color: '#f59e0b', bg: 'bg-amber-500', icon: 'warning' },
+                    { key: 'notices', label: 'Notices', items: results.groupedIssues?.notices || [], color: '#3b82f6', bg: 'bg-blue-500', icon: 'info' },
+                ].filter(g => g.items.length > 0).map(group => (
+                    <details key={group.key} open={group.key === 'errors'} className="glass-panel rounded-2xl overflow-hidden">
+                        <summary className="cursor-pointer p-4 flex items-center gap-3 hover:bg-white/[0.02] transition-all">
+                            <span className="material-symbols-outlined text-lg" style={{ color: group.color }}>{group.icon}</span>
+                            <span className="text-sm font-bold text-white">{group.label}</span>
+                            <span className={`text-xs px-2.5 py-0.5 rounded-full font-black text-white ${group.bg}/20`} style={{ background: `${group.color}20`, color: group.color }}>
+                                {group.items.length}
+                            </span>
+                            <span className="material-symbols-outlined text-sm text-slate-600 ml-auto">expand_more</span>
+                        </summary>
+                        <div className="px-4 pb-4 space-y-2">
+                            {group.items.map((issue, idx) => (
+                                <details key={idx} className="rounded-xl bg-white/[0.02] border border-white/[0.06] overflow-hidden">
+                                    <summary className="cursor-pointer p-3 flex items-center gap-3 hover:bg-white/[0.02] transition-all">
+                                        <span className="w-1 h-6 rounded-full shrink-0" style={{ background: group.color }} />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-bold text-white truncate">{issue.check}</p>
+                                            <p className="text-[10px] text-slate-500">{issue.value}</p>
+                                        </div>
+                                        <span className="material-symbols-outlined text-sm text-slate-600">chevron_right</span>
+                                    </summary>
+                                    <div className="px-4 pb-3 border-t border-white/[0.04] mt-1 pt-3 space-y-2">
+                                        {issue.aboutThisIssue && (
+                                            <div>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">About this issue</p>
+                                                <p className="text-xs text-slate-300 leading-relaxed">{issue.aboutThisIssue}</p>
+                                            </div>
+                                        )}
+                                        {issue.howToFix && (
+                                            <div>
+                                                <p className="text-[10px] font-bold text-emerald-400 uppercase mb-1">How to fix</p>
+                                                <p className="text-xs text-slate-300 leading-relaxed">{issue.howToFix}</p>
+                                            </div>
+                                        )}
+                                        {issue.affectedUrls?.length > 0 && (
+                                            <div>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Affected Pages ({issue.affectedUrls.length})</p>
+                                                <div className="space-y-1">
+                                                    {issue.affectedUrls.slice(0, 10).map((url, j) => (
+                                                        <a key={j} href={url} target="_blank" rel="noopener noreferrer"
+                                                            className="block text-[10px] text-primary/60 hover:text-primary truncate transition-colors">{url}</a>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </details>
+                            ))}
+                        </div>
+                    </details>
+                ))}
+            </div>
+        )}
+
+        {/* AI-Generated Issues List */}
         <div className="glass-panel rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-bold text-white">{issues.length} Issues Found</h3>
+                <h3 className="text-base font-bold text-white">{issues.length} AI-Identified Issues</h3>
                 <div className="flex gap-1">
                     {['all', ...SEVERITY_ORDER].map(s => (
                         <button key={s} onClick={() => setIssueFilter(s)}

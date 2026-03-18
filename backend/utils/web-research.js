@@ -184,12 +184,27 @@ function extractLinks(html, baseUrl) {
 }
 
 function extractImages(html) {
+    // Strip <noscript> blocks first — images inside them aren't rendered
+    const cleanHtml = html.replace(/<noscript[\s\S]*?<\/noscript>/gi, '');
     const imgs = [];
     const imgPattern = /<img\s+[^>]*>/gi;
     let m;
-    while ((m = imgPattern.exec(html)) !== null) {
-        const alt = getAttr(m[0], 'alt') || '';
-        imgs.push({ hasAlt: alt.length > 0 });
+    while ((m = imgPattern.exec(cleanHtml)) !== null) {
+        const tag = m[0];
+        const src = getAttr(tag, 'src') || '';
+        const alt = getAttr(tag, 'alt') || '';
+        const width = parseInt(getAttr(tag, 'width') || '999', 10);
+        const height = parseInt(getAttr(tag, 'height') || '999', 10);
+
+        // Skip tracking pixels, spacers, beacons, data URIs, hidden images
+        if (width < 3 || height < 3) continue; // 1×1 or 2×2 tracking pixels
+        if (src.startsWith('data:')) continue; // inline data URIs (icons, placeholders)
+        if (/pixel|beacon|track|spacer|blank\.gif|1x1|transparent/i.test(src)) continue;
+        if (/aria-hidden\s*=\s*["']true["']/i.test(tag)) continue;
+        if (/display\s*:\s*none|visibility\s*:\s*hidden/i.test(getAttr(tag, 'style') || '')) continue;
+        if (!src || src === '#') continue; // no real source
+
+        imgs.push({ src, hasAlt: alt.trim().length > 0 });
     }
     return { total: imgs.length, withAlt: imgs.filter(i => i.hasAlt).length, withoutAlt: imgs.filter(i => !i.hasAlt).length };
 }
@@ -384,18 +399,23 @@ export async function crawlPage(url) {
         const metaRobots = extractMetaRobots(meta);
         const securityHeaders = analyzeSecurityHeaders(fetchResult.headers);
 
-        // Extract a meaningful content snippet (first 500 chars of body text)
+        // Full body text for duplicate detection + text-to-HTML ratio (capped at 10K for memory)
         const contentSnippet = bodyText.substring(0, 500);
+        const bodyTextFull = bodyText.substring(0, 10000);
+        const textToHtmlRatio = html.length > 0 ? Math.round((bodyText.length / html.length) * 100) : 0;
 
         return {
             url,
             success: true,
-            // ── Response metadata (NEW) ──
+            // ── Response metadata ──
             statusCode: fetchResult.status,
             responseTimeMs: fetchResult.responseTimeMs,
             pageSizeBytes: fetchResult.pageSizeBytes,
             pageSizeKB: Math.round(fetchResult.pageSizeBytes / 1024),
-            // ── Existing SEO data ──
+            htmlSizeOver2MB: fetchResult.pageSizeBytes > 2 * 1024 * 1024,
+            redirectChain: fetchResult.redirectChain || [],
+            redirectCount: (fetchResult.redirectChain || []).length,
+            // ── SEO data ──
             title: meta.title || '',
             metaDescription: meta.description || '',
             ogTitle: meta['og:title'] || '',
@@ -416,10 +436,12 @@ export async function crawlPage(url) {
             tech,
             wordCount,
             contentSnippet,
+            bodyTextFull,
+            textToHtmlRatio,
             robots: meta.robots || '',
             viewport: meta.viewport || '',
             charset: (html.match(/charset\s*=\s*["']?([^"'\s;>]+)/i) || ['', ''])[1] || '',
-            // ── NEW: Advanced data ──
+            // ── Advanced data ──
             hreflang,
             hasHreflang: hreflang.length > 0,
             mixedContent,
@@ -434,11 +456,11 @@ export async function crawlPage(url) {
             // ── Title/meta quality flags ──
             titleLength: (meta.title || '').length,
             titleTooShort: (meta.title || '').length > 0 && (meta.title || '').length < 30,
-            titleTooLong: (meta.title || '').length > 60,
+            titleTooLong: (meta.title || '').length > 70,
             metaDescLength: (meta.description || '').length,
             metaDescTooShort: (meta.description || '').length > 0 && (meta.description || '').length < 120,
             metaDescTooLong: (meta.description || '').length > 160,
-            // ── NEW: Enhanced link data ──
+            // ── Enhanced link data ──
             emptyAnchors: links.emptyAnchors || 0,
             nofollowInternalLinks: links.nofollowInternalLinks || 0,
             externalUrls: links.externalUrls || [],
@@ -652,26 +674,66 @@ function jaccardSimilarity(setA, setB) {
 }
 
 function computeDuplicates(pages) {
+    // Strip first/last 150 words (header/footer boilerplate) to avoid false positives
+    const stripBoilerplate = (text) => {
+        const words = text.split(/\s+/);
+        if (words.length < 400) return text; // Short pages: use as-is
+        return words.slice(150, words.length - 150).join(' ');
+    };
+
     const fingerprints = pages.map(p => ({
         url: p.url,
-        fp: contentFingerprint(p.contentSnippet || p.bodyTextFull || ''),
+        fp: contentFingerprint(stripBoilerplate(p.bodyTextFull || p.contentSnippet || '')),
     }));
 
-    const duplicates = [];
+    // Content duplicates (85%+ similarity = true duplicate, not just "similar")
+    const contentDuplicates = [];
     for (let i = 0; i < fingerprints.length; i++) {
         for (let j = i + 1; j < fingerprints.length; j++) {
             const sim = jaccardSimilarity(fingerprints[i].fp, fingerprints[j].fp);
-            if (sim > 0.6) { // 60%+ similarity = near-duplicate
-                duplicates.push({
+            if (sim > 0.85) {
+                contentDuplicates.push({
                     page1: fingerprints[i].url,
                     page2: fingerprints[j].url,
                     similarity: Math.round(sim * 100),
-                    level: sim > 0.85 ? 'duplicate' : 'near-duplicate',
+                    level: sim > 0.95 ? 'exact-duplicate' : 'near-duplicate',
                 });
             }
         }
     }
-    return duplicates;
+
+    // Duplicate titles (exact match, non-empty)
+    const titleMap = new Map();
+    for (const p of pages) {
+        const t = (p.title || '').trim().toLowerCase();
+        if (t.length < 5) continue; // skip empty/too-short
+        if (!titleMap.has(t)) titleMap.set(t, []);
+        titleMap.get(t).push(p.url);
+    }
+    const duplicateTitles = [...titleMap.entries()]
+        .filter(([, urls]) => urls.length > 1)
+        .map(([title, urls]) => ({ title, count: urls.length, urls: urls.slice(0, 5) }));
+
+    // Duplicate meta descriptions (exact match, non-empty)
+    const metaMap = new Map();
+    for (const p of pages) {
+        const d = (p.metaDescription || '').trim().toLowerCase();
+        if (d.length < 10) continue;
+        if (!metaMap.has(d)) metaMap.set(d, []);
+        metaMap.get(d).push(p.url);
+    }
+    const duplicateMetaDescriptions = [...metaMap.entries()]
+        .filter(([, urls]) => urls.length > 1)
+        .map(([desc, urls]) => ({ description: desc.substring(0, 80) + '...', count: urls.length, urls: urls.slice(0, 5) }));
+
+    return {
+        contentDuplicates,
+        duplicateTitles,
+        duplicateMetaDescriptions,
+        contentDuplicateCount: contentDuplicates.length,
+        titleDuplicateCount: duplicateTitles.reduce((s, d) => s + d.count, 0),
+        metaDuplicateCount: duplicateMetaDescriptions.reduce((s, d) => s + d.count, 0),
+    };
 }
 
 
@@ -977,7 +1039,23 @@ export async function researchDomain(baseUrl) {
     const thinPages = allPages.filter(p => (p.wordCount || 0) < 300);
     const missingMeta = allPages.filter(p => !p.metaDescription);
     const missingH1 = allPages.filter(p => !p.h1?.length);
+    const multipleH1 = allPages.filter(p => (p.h1?.length || 0) > 1);
     const pagesWithRedirects = allPages.filter(p => p.redirectChain?.length > 0);
+    const lowTextRatioPages = allPages.filter(p => (p.textToHtmlRatio || 100) < 10);
+    const oversizedPages = allPages.filter(p => p.htmlSizeOver2MB);
+    const avgTextToHtmlRatio = allPages.length > 0 ? Math.round(allPages.reduce((s, p) => s + (p.textToHtmlRatio || 0), 0) / allPages.length) : 0;
+
+    // Incoming internal link count per page (for single-incoming-link detection)
+    const incomingLinkCount = new Map();
+    for (const p of allPages) {
+        for (const link of (p.links?.internal || [])) {
+            try {
+                const target = new URL(link, cleanBase).href;
+                incomingLinkCount.set(target, (incomingLinkCount.get(target) || 0) + 1);
+            } catch { /* skip */ }
+        }
+    }
+    const singleIncomingPages = allSubPages.filter(p => (incomingLinkCount.get(p.url) || 0) <= 1);
 
     // Compute click depth (how many clicks from homepage)
     const clickDepthMap = {};
@@ -1068,10 +1146,28 @@ export async function researchDomain(baseUrl) {
             missingH1Tags: missingH1.map(p => p.url),
             redirectChains: pagesWithRedirects.map(p => ({ url: p.url, chain: p.redirectChain })),
             redirectChainCount: pagesWithRedirects.length,
-            duplicateContent,
-            duplicateContentCount: duplicateContent.length,
+            // Duplicate detection (structured — separate content vs title vs meta)
+            duplicateContent: duplicateContent.contentDuplicates || [],
+            duplicateContentCount: duplicateContent.contentDuplicateCount || 0,
+            duplicateTitles: duplicateContent.duplicateTitles || [],
+            titleDuplicateCount: duplicateContent.titleDuplicateCount || 0,
+            duplicateMetaDescriptions: duplicateContent.duplicateMetaDescriptions || [],
+            metaDuplicateCount: duplicateContent.metaDuplicateCount || 0,
+            // H1 issues (split — Semrush reports separately)
+            missingH1Count: missingH1.length,
+            multipleH1Pages: multipleH1.map(p => ({ url: p.url, h1Count: p.h1.length, h1s: p.h1.slice(0, 3) })),
+            multipleH1Count: multipleH1.length,
+            // Deep page analysis
             deepPages: deepPages.map(p => p.url),
             clickDepthIssues: deepPages.length,
+            // New metrics
+            avgTextToHtmlRatio,
+            lowTextRatioPages: lowTextRatioPages.map(p => ({ url: p.url, ratio: p.textToHtmlRatio })),
+            lowTextRatioCount: lowTextRatioPages.length,
+            oversizedPages: oversizedPages.map(p => ({ url: p.url, sizeKB: p.pageSizeKB })),
+            oversizedPageCount: oversizedPages.length,
+            singleIncomingPages: singleIncomingPages.map(p => p.url).slice(0, 20),
+            singleIncomingCount: singleIncomingPages.length,
 
             // ══════════════════════════════════════════════════════
             // NEW: Advanced metrics (beats Semrush/Ahrefs)
@@ -1364,7 +1460,13 @@ export function formatSiteResearch(research) {
     if (si.missingMetaDescriptions?.length > 0) issues.push(`${si.missingMetaDescriptions.length} pages MISSING meta descriptions: ${si.missingMetaDescriptions.slice(0, 3).join(', ')}`);
     if (si.missingH1Tags?.length > 0) issues.push(`${si.missingH1Tags.length} pages MISSING H1 tags: ${si.missingH1Tags.slice(0, 3).join(', ')}`);
     if (si.redirectChainCount > 0) issues.push(`${si.redirectChainCount} pages have REDIRECT CHAINS: ${si.redirectChains.slice(0, 2).map(r => `${r.url} (${r.chain.length} hops)`).join(', ')}`);
-    if (si.duplicateContentCount > 0) issues.push(`${si.duplicateContentCount} DUPLICATE/NEAR-DUPLICATE content pairs: ${si.duplicateContent.slice(0, 2).map(d => `${d.page1} ↔ ${d.page2} (${d.similarity}% ${d.level})`).join(', ')}`);
+    if (si.duplicateContentCount > 0) issues.push(`${si.duplicateContentCount} DUPLICATE content pairs (85%+ similarity): ${(si.duplicateContent || []).slice(0, 2).map(d => `${d.page1} ↔ ${d.page2} (${d.similarity}%)`).join(', ')}`);
+    if (si.titleDuplicateCount > 0) issues.push(`${si.titleDuplicateCount} pages with DUPLICATE TITLE TAGS: ${(si.duplicateTitles || []).slice(0, 2).map(d => `"${d.title}" (${d.count} pages)`).join(', ')}`);
+    if (si.metaDuplicateCount > 0) issues.push(`${si.metaDuplicateCount} pages with DUPLICATE META DESCRIPTIONS`);
+    if (si.multipleH1Count > 0) issues.push(`${si.multipleH1Count} pages with MULTIPLE H1 TAGS: ${(si.multipleH1Pages || []).slice(0, 3).map(p => `${p.url} (${p.h1Count} H1s)`).join(', ')}`);
+    if (si.lowTextRatioCount > 0) issues.push(`${si.lowTextRatioCount} pages with LOW TEXT-TO-HTML RATIO (<10%): ${(si.lowTextRatioPages || []).slice(0, 3).map(p => `${p.url} (${p.ratio}%)`).join(', ')}`);
+    if (si.oversizedPageCount > 0) issues.push(`${si.oversizedPageCount} pages LARGER THAN 2MB`);
+    if (si.singleIncomingCount > 0) issues.push(`${si.singleIncomingCount} pages with ONLY 1 INCOMING INTERNAL LINK (low link equity)`);
     if (si.clickDepthIssues > 0) issues.push(`${si.clickDepthIssues} pages have DEEP CLICK DEPTH (not directly linked from homepage)`);
 
     if (issues.length > 0) {

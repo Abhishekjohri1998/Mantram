@@ -377,6 +377,8 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
       // Round 2 additions
       brokenExternalCount: si.brokenExternalCount || 0,
       brokenExternalLinks: si.brokenExternalLinks || [],
+      brokenInternalCount: si.brokenInternalCount || 0,
+      brokenInternalLinks: si.brokenInternalLinks || [],
       emptyAnchorCount: si.emptyAnchorCount || 0,
       nofollowInternalCount: si.nofollowInternalCount || 0,
       conflictingCanonicalCount: si.conflictingCanonicals?.length || 0,
@@ -384,8 +386,17 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
       llmsTxtFound: si.llmsTxt?.found || false,
       llmsTxtSections: si.llmsTxt?.sections?.length || 0,
       sitemapCoverage: si.sitemapCoverage || {},
+      // New Semrush-parity metrics
+      titleDuplicateCount: si.titleDuplicateCount || 0,
+      metaDuplicateCount: si.metaDuplicateCount || 0,
+      multipleH1Count: si.multipleH1Count || 0,
+      missingH1Count: si.missingH1Count || 0,
+      lowTextRatioCount: si.lowTextRatioCount || 0,
+      avgTextToHtmlRatio: si.avgTextToHtmlRatio || 0,
+      oversizedPageCount: si.oversizedPageCount || 0,
+      singleIncomingCount: si.singleIncomingCount || 0,
     };
-    parsed.pageReports = pages.slice(0, 20).map(p => ({
+    parsed.pageReports = pages.slice(0, 50).map(p => ({
       url: p.url,
       title: p.title || 'Untitled',
       statusCode: p.statusCode || 200,
@@ -401,8 +412,22 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
       hasSchema: p.hasSchemaOrg || false,
       hasCanonical: !!p.canonical,
       urlTooLong: p.urlTooLong || false,
+      textToHtmlRatio: p.textToHtmlRatio || 0,
       metaRobots: p.metaRobots || {},
     }));
+
+    // ── GROUP ISSUES BY TYPE: Errors / Warnings / Notices (Semrush parity) ──
+    const baselineDetails = parsed.baselineScores?.technical?.details || [];
+    const onPageDetails = parsed.baselineScores?.onPage?.details || [];
+    const allDeterministicIssues = [...baselineDetails, ...onPageDetails].filter(d => d.issueType);
+    parsed.groupedIssues = {
+      errors: allDeterministicIssues.filter(d => d.issueType === 'error'),
+      warnings: allDeterministicIssues.filter(d => d.issueType === 'warning'),
+      notices: allDeterministicIssues.filter(d => d.issueType === 'notice'),
+      errorCount: allDeterministicIssues.filter(d => d.issueType === 'error').length,
+      warningCount: allDeterministicIssues.filter(d => d.issueType === 'warning').length,
+      noticeCount: allDeterministicIssues.filter(d => d.issueType === 'notice').length,
+    };
 
     // Attach real PageSpeed data to response
     if (pageSpeedData?.success) {
