@@ -332,6 +332,78 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: req.creditAction || 'seoHealthCheck', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
+
+    // ── Inject REAL crawl data into AI results (AI only generates scores/strategy) ──
+    const si = siteResearch?.siteIntelligence || {};
+    const pages = siteResearch?.pages || [];
+    parsed.siteStats = {
+      pagesCrawled: si.totalPages || 0,
+      totalWordCount: si.totalWordCount || 0,
+      avgWordCount: si.avgWordCount || 0,
+      totalImages: si.totalImages || 0,
+      imagesWithoutAlt: si.imagesWithoutAlt || 0,
+      thinPageCount: si.thinPageCount || 0,
+      schemaTypes: si.schemaTypes || [],
+      hasSitemap: si.hasSitemap || false,
+      hasRobotsTxt: si.hasRobotsTxt || false,
+      hasCanonical: si.hasCanonical || false,
+      duplicateContentCount: si.duplicateContentCount || 0,
+      redirectChainCount: si.redirectChainCount || 0,
+      techStack: si.techStack || [],
+      // Enhanced stats
+      pageStatusDistribution: si.pageStatusDistribution || {},
+      orphanPageCount: si.orphanPages?.length || 0,
+      mixedContentCount: si.mixedContentCount || 0,
+      responseTimeAvg: si.responseTime?.avg || 0,
+      responseTimeSlowest: si.responseTime?.slowest || 0,
+      slowPageCount: si.responseTime?.slowPageCount || 0,
+      pageSizeAvg: si.pageSize?.avg || 0,
+      pageSizeLargest: si.pageSize?.largest || 0,
+      heavyPageCount: si.pageSize?.heavyPageCount || 0,
+      headingSkippedCount: si.headingIssues?.skippedCount || 0,
+      multipleH1Count: si.headingIssues?.multipleH1Count || 0,
+      titleDuplicateCount: si.titleQuality?.duplicates?.length || 0,
+      metaDescDuplicateCount: si.metaDescQuality?.duplicates?.length || 0,
+      securityHeaderScore: `${si.securityScore?.score || 0}/${si.securityScore?.total || 7}`,
+      securityHeaders: si.securityScore?.details || [],
+      hasLangAttribute: si.hasLangAttribute || false,
+      langAttribute: si.langAttribute || '',
+      hreflangPresent: si.hreflangPresent || false,
+      noindexPageCount: si.metaRobotsIssues?.noindexCount || 0,
+      nofollowPageCount: si.metaRobotsIssues?.nofollowCount || 0,
+      urlTooLongCount: si.urlIssues?.tooLongCount || 0,
+      avgCssResources: si.resourceBloat?.avgCss || 0,
+      avgJsResources: si.resourceBloat?.avgJs || 0,
+      // Round 2 additions
+      brokenExternalCount: si.brokenExternalCount || 0,
+      brokenExternalLinks: si.brokenExternalLinks || [],
+      emptyAnchorCount: si.emptyAnchorCount || 0,
+      nofollowInternalCount: si.nofollowInternalCount || 0,
+      conflictingCanonicalCount: si.conflictingCanonicals?.length || 0,
+      cacheControlPresent: si.cacheControlPresent || false,
+      llmsTxtFound: si.llmsTxt?.found || false,
+      llmsTxtSections: si.llmsTxt?.sections?.length || 0,
+      sitemapCoverage: si.sitemapCoverage || {},
+    };
+    parsed.pageReports = pages.slice(0, 20).map(p => ({
+      url: p.url,
+      title: p.title || 'Untitled',
+      statusCode: p.statusCode || 200,
+      responseTimeMs: p.responseTimeMs || 0,
+      pageSizeKB: p.pageSizeKB || 0,
+      wordCount: p.wordCount || 0,
+      titleLength: p.titleLength || 0,
+      metaDescLength: p.metaDescLength || 0,
+      hasH1: !!(p.h1?.length),
+      h1Count: p.h1?.length || 0,
+      imagesWithoutAlt: p.images?.withoutAlt || 0,
+      headingHierarchyValid: p.headingHierarchy?.valid ?? true,
+      hasSchema: p.hasSchemaOrg || false,
+      hasCanonical: !!p.canonical,
+      urlTooLong: p.urlTooLong || false,
+      metaRobots: p.metaRobots || {},
+    }));
+
     // Attach real PageSpeed data to response
     if (pageSpeedData?.success) {
       parsed.realPageSpeed = {

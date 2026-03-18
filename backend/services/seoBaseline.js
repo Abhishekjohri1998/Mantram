@@ -162,6 +162,21 @@ function computeTechnicalScore(siteIntelligence, robotsTxt, sitemap, pageSpeed, 
         details.push({ check: 'Noindex Pages Detected', score: 0, max: 0, status: 'warning', value: `${siteIntelligence.metaRobotsIssues.noindexCount} pages have noindex — verify this is intentional` });
     }
 
+    // ── NEW R2: Broken External Links (penalty, -3 max) ──
+    if (siteIntelligence.brokenExternalCount > 0) {
+        const extPenalty = Math.min(3, siteIntelligence.brokenExternalCount);
+        score -= extPenalty;
+        details.push({ check: 'Broken External Links', score: -extPenalty, max: 0, status: 'fail', value: `${siteIntelligence.brokenExternalCount} outgoing links return errors`, fix: 'Remove or update broken external links — they harm user experience and signal low maintenance' });
+    }
+
+    // ── NEW R2: Cache-Control Header (bonus, +1 pt) ──
+    if (siteIntelligence.cacheControlPresent) {
+        score += 1;
+        details.push({ check: 'Browser Caching', score: 1, max: 1, status: 'pass', value: 'Cache-Control header present on homepage' });
+    } else {
+        details.push({ check: 'Browser Caching', score: 0, max: 1, status: 'warning', value: 'No Cache-Control header detected', fix: 'Add Cache-Control headers to enable browser caching for faster repeat visits' });
+    }
+
     // Lighthouse SEO score (15 pts)
     if (pageSpeed?.success && pageSpeed.scores?.seo !== undefined) {
         const seoLhScore = Math.round(pageSpeed.scores.seo * 0.15);
@@ -319,6 +334,28 @@ function computeOnPageScore(siteIntelligence, pages) {
         details.push({ check: 'Duplicate Titles', score: -Math.min(2, titleDupes), max: 0, status: 'fail', value: `${titleDupes} sets of pages share the same title tag`, fix: 'Give each page a unique, descriptive title tag' });
     }
 
+    // ── NEW R2: Empty Anchor Text (penalty, -2 max) ──
+    const emptyAnchors = siteIntelligence.emptyAnchorCount || 0;
+    if (emptyAnchors > 0) {
+        const anchorPenalty = Math.min(2, Math.ceil(emptyAnchors / 3));
+        score -= anchorPenalty;
+        details.push({ check: 'Empty Anchor Text', score: -anchorPenalty, max: 0, status: 'warning', value: `${emptyAnchors} links have empty anchor text`, fix: 'Add descriptive anchor text to all links for better accessibility and SEO' });
+    }
+
+    // ── NEW R2: Nofollow Internal Links (warning) ──
+    const nofollowInternal = siteIntelligence.nofollowInternalCount || 0;
+    if (nofollowInternal > 0) {
+        details.push({ check: 'Nofollow Internal Links', score: 0, max: 0, status: 'warning', value: `${nofollowInternal} internal links use rel="nofollow"`, fix: 'Remove nofollow from internal links — it wastes crawl budget and blocks link equity flow' });
+    }
+
+    // ── NEW R2: Conflicting Canonicals (penalty, -2 max) ──
+    const canonConflicts = siteIntelligence.conflictingCanonicals?.length || 0;
+    if (canonConflicts > 0) {
+        const canonPenalty = Math.min(2, canonConflicts);
+        score -= canonPenalty;
+        details.push({ check: 'Conflicting Canonical Tags', score: -canonPenalty, max: 0, status: 'fail', value: `${canonConflicts} pages have canonical pointing to different URL`, fix: 'Ensure canonical tags point to the correct/preferred version of each page' });
+    }
+
     return { score: Math.min(100, Math.max(0, score)), details };
 }
 
@@ -399,6 +436,24 @@ function computeContentScore(siteIntelligence, homepage) {
         const bloatPenalty = Math.min(3, Math.floor((avgResources - 30) / 10));
         score -= bloatPenalty;
         details.push({ check: 'Resource Bloat', score: -bloatPenalty, max: 0, status: 'warning', value: `Avg ${avgResources} external CSS/JS resources per page`, fix: 'Reduce external resources — combine CSS/JS files, remove unused scripts' });
+    }
+
+    // ── NEW R2: llms.txt (AI crawlability, bonus +2 pts) ──
+    if (siteIntelligence.llmsTxt?.found) {
+        score += 2;
+        details.push({ check: 'AI Crawlability (llms.txt)', score: 2, max: 2, status: 'pass', value: `llms.txt found with ${siteIntelligence.llmsTxt.sections?.length || 0} sections` });
+    } else {
+        details.push({ check: 'AI Crawlability (llms.txt)', score: 0, max: 2, status: 'warning', value: 'No llms.txt file found', fix: 'Create a /llms.txt file to help AI models (ChatGPT, Claude, Perplexity) understand your site content' });
+    }
+
+    // ── NEW R2: Sitemap Coverage (penalty, -2 max) ──
+    const coverage = siteIntelligence.sitemapCoverage;
+    if (coverage?.available && coverage.pagesNotInSitemapCount > 0) {
+        const sitemapPenalty = Math.min(2, Math.ceil(coverage.pagesNotInSitemapCount / 3));
+        score -= sitemapPenalty;
+        details.push({ check: 'Sitemap Coverage', score: -sitemapPenalty, max: 0, status: 'warning', value: `${coverage.pagesNotInSitemapCount} crawled pages missing from sitemap`, fix: 'Add all important pages to your sitemap.xml for better crawl coverage' });
+    } else if (coverage?.available) {
+        details.push({ check: 'Sitemap Coverage', score: 0, max: 0, status: 'pass', value: 'All crawled pages found in sitemap' });
     }
 
     return { score: Math.min(100, Math.max(0, score)), details };
