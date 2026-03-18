@@ -265,9 +265,9 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
     const siteData = formatSiteResearch(siteResearch);
     const pageSpeedText = formatPageSpeedForPrompt(pageSpeedData);
 
-    // AI gets a fixed generous timeout — deep crawl takes whatever it needs
-    const aiTimeout = 60000; // 60s for AI call — no longer squeezed by crawl time
-    console.log(`⏱️ Crawl + research complete. AI timeout: ${aiTimeout / 1000}s`);
+    // AI gets a generous timeout — full-site crawl (800 pages) takes up to 180s first
+    const aiTimeout = 90000; // 90s for AI call — crawl takes the bulk of the time
+    console.log(`⏱️ Crawl + research complete (${siteResearch.totalPages || 0} pages). AI timeout: ${aiTimeout / 1000}s`);
 
     const systemPrompt = `You are a SENIOR SEO STRATEGIST (not just an auditor). You think like a CMO + technical SEO expert combined. You have REAL CRAWL DATA — use it as ground truth. Never guess or contradict the crawl.
 

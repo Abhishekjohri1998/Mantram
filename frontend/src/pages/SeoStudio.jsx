@@ -176,7 +176,7 @@ export default function SeoStudio() {
 
     // ── Workflow runners ──────────────────────────────────────────────────
     const STAGE_MESSAGES = {
-        'health-check': ['Crawling your website...', 'Analyzing page structure & meta tags...', 'Checking schema & structured data...', 'Running AI SEO analysis...', 'Building action plan...'],
+        'health-check': ['Crawling your website (800+ pages)...', 'Discovering pages from sitemap...', 'Deep-crawling subpages (batch 1/70)...', 'Analyzing page structure & meta tags...', 'Probing internal links for broken URLs...', 'Detecting duplicate content & headings...', 'Checking schema & structured data...', 'Running AI SEO analysis...', 'Building action plan & trend deltas...'],
         'traffic': ['Crawling your website content...', 'Analyzing existing topics & gaps...', 'Researching keyword opportunities...', 'Building traffic strategy...'],
         'competitors': ['Crawling your website...', 'Researching competitor sites...', 'Comparing content & structure...', 'Building outrank plan...'],
         'ai-visibility': ['Crawling your website...', 'Checking schema & JSON-LD...', 'Analyzing heading structure & FAQs...', 'Evaluating AI discoverability...', 'Generating optimization templates...'],
@@ -228,7 +228,7 @@ export default function SeoStudio() {
         const stages = STAGE_MESSAGES[workflowId] || ['Processing...']
         let stageIdx = 0
         setLoadingStage(stages[0])
-        const stageInterval = setInterval(() => { stageIdx = Math.min(stageIdx + 1, stages.length - 1); setLoadingStage(stages[stageIdx]) }, 5000)
+        const stageInterval = setInterval(() => { stageIdx = Math.min(stageIdx + 1, stages.length - 1); setLoadingStage(stages[stageIdx]) }, 8000)
         elapsedTimerRef.current = setInterval(() => setLoadingElapsed(prev => prev + 1), 1000)
 
         try {
@@ -679,7 +679,7 @@ ul,ol{padding-left:20px}li{margin:4px 0}
                                 ))}</div>
                                 <p className="text-[10px] text-slate-600 mt-4">
                                     {loadingElapsed > 0 && `${Math.floor(loadingElapsed / 60)}:${String(loadingElapsed % 60).padStart(2, '0')} elapsed`}
-                                    {loadingElapsed > 15 && ' — AI analysis can take up to 3 minutes for complex sites'}
+                                    {loadingElapsed > 15 && ' — full-site crawl (800+ pages) takes 3-5 minutes'}
                                 </p>
                                 <button onClick={cancelWorkflow}
                                     className="mt-4 px-4 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-white bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] cursor-pointer transition-all flex items-center gap-1.5">

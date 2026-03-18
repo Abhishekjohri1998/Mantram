@@ -533,7 +533,7 @@ export const pmStudio = {
 };
 
 export const seoStudio = {
-    healthCheck: (data) => apiFetch('/seo-studio/health-check', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
+    healthCheck: (data) => apiFetch('/seo-studio/health-check', { method: 'POST', body: JSON.stringify(data), timeout: 360000 }),
     traffic: (data) => apiFetch('/seo-studio/traffic', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
     competitors: (data) => apiFetch('/seo-studio/competitors', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
     aiVisibility: (data) => apiFetch('/seo-studio/ai-visibility', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
