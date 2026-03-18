@@ -11,6 +11,7 @@ import Product from '../models/Product.js';
 import Brand from '../models/Brand.js';
 import { getOrchestrator } from '../agents/orchestrator.js';
 import { safeErrorMessage } from '../utils/safeError.js';
+import { mirrorUrlToS3 } from '../utils/s3.js';
 
 const router = Router();
 
@@ -141,6 +142,26 @@ router.get('/meta/platforms', protect, async (req, res) => {
     }));
     res.json({ success: true, platforms });
 });
+
+// Helper: Mirror a list of images to S3 in parallel
+async function mirrorProductImages(images, brandId, productTitle) {
+    if (!images || images.length === 0) return [];
+    
+    // Clean product title for S3 key
+    const safeTitle = productTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase().slice(0, 30);
+    const timestamp = Date.now();
+    
+    return await Promise.all(images.map(async (img, idx) => {
+        if (!img.url || img.url.includes('s3.amazonaws.com')) return img; // Already mirrored or invalid
+        
+        const extension = img.url.split('?')[0].split('.').pop().toLowerCase();
+        const validExt = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(extension) ? extension : 'png';
+        const targetKey = `products/${brandId}/${safeTitle}_${timestamp}_${idx}.${validExt}`;
+        
+        const s3Url = await mirrorUrlToS3(img.url, targetKey);
+        return s3Url ? { url: s3Url, alt: img.alt || productTitle } : img;
+    }));
+}
 
 // POST /api/products/scan-website — Agentic product sync from brand website
 router.post('/scan-website', protect, async (req, res) => {
@@ -470,9 +491,12 @@ RULES:
                 continue;
             }
 
-            const images = p.allImages && p.allImages.length > 0
+            const initialImages = p.allImages && p.allImages.length > 0
                 ? p.allImages
                 : p.imageUrl ? [{ url: p.imageUrl, alt: p.imgAlt || p.title }] : [];
+
+            // Mirror images to S3 before creating product
+            const images = await mirrorProductImages(initialImages, brandId, p.title);
 
             const product = await Product.create({
                 user: req.user._id,

@@ -22,7 +22,7 @@ import {
     fetchPostAnalytics
 } from '../services/socialService.js';
 import config from '../config/env.js';
-import { uploadToS3 } from '../utils/s3.js';
+import { uploadToS3, mirrorUrlToS3 } from '../utils/s3.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = express.Router();
@@ -494,6 +494,11 @@ router.post('/publish', protect, async (req, res) => {
         }
     } else if (!isCarousel && imageUrl) {
         console.log(`[SOCIAL] Using provided absolute URL: ${imageUrl}`);
+        // Mirror external URLs to S3 for persistence
+        if (!imageUrl.includes('s3.amazonaws.com') || !imageUrl.includes(process.env.AWS_S3_BUCKET)) {
+            const s3Url = await mirrorUrlToS3(imageUrl, `social-posts/${req.user._id}/${Date.now()}.png`);
+            if (s3Url) absoluteImageUrl = s3Url;
+        }
     }
 
     // For carousel: resolve all URLs to absolute (upload data: URIs to S3 if possible)
@@ -502,7 +507,13 @@ router.post('/publish', protect, async (req, res) => {
         for (const url of imageUrls) {
             if (!url) continue;
             if (url.startsWith('http')) {
-                carouselUrls.push(url);
+                // Mirror external URLs to S3
+                if (!url.includes('s3.amazonaws.com') || !url.includes(process.env.AWS_S3_BUCKET)) {
+                    const s3Url = await mirrorUrlToS3(url, `social-carousel/${req.user._id}/${Date.now()}-${carouselUrls.length}.png`);
+                    carouselUrls.push(s3Url || url);
+                } else {
+                    carouselUrls.push(url);
+                }
             } else if (url.startsWith('data:')) {
                 try {
                     const userId = req.user._id;
