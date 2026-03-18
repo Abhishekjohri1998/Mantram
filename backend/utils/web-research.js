@@ -12,25 +12,42 @@ const FETCH_TIMEOUT = 12000; // 12s
 // ============================================================================
 
 async function safeFetch(url, options = {}) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
-    try {
-        const resp = await fetch(url, {
-            ...options,
-            signal: controller.signal,
-            headers: {
-                'User-Agent': USER_AGENT,
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                ...options.headers,
-            },
-            redirect: 'follow',
-        });
-        clearTimeout(timer);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        return await resp.text();
-    } catch (e) {
-        clearTimeout(timer);
-        throw e;
+    const MAX_RETRIES = 3;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+        try {
+            const resp = await fetch(url, {
+                ...options,
+                signal: controller.signal,
+                headers: {
+                    'User-Agent': USER_AGENT,
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    ...options.headers,
+                },
+                redirect: 'follow',
+            });
+            clearTimeout(timer);
+            // Retry on 429 (rate limit) and 503 (service unavailable) with backoff
+            if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
+                const delay = Math.pow(2, attempt + 1) * 1000; // 2s, 4s, 8s
+                console.log(`⏳ HTTP ${resp.status} on ${url} — retrying in ${delay / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
+                await new Promise(r => setTimeout(r, delay));
+                continue;
+            }
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            return await resp.text();
+        } catch (e) {
+            clearTimeout(timer);
+            if (attempt < MAX_RETRIES && (e.name === 'AbortError' || e.message?.includes('429') || e.message?.includes('503'))) {
+                const delay = Math.pow(2, attempt + 1) * 1000;
+                console.log(`⏳ Fetch error on ${url}: ${e.message} — retrying in ${delay / 1000}s`);
+                await new Promise(r => setTimeout(r, delay));
+                continue;
+            }
+            throw e;
+        }
     }
 }
 
