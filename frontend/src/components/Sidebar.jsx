@@ -26,25 +26,10 @@ const bottomItems = [
 
 // Filter nav items based on team member's studio access
 function getVisibleNavItems(user) {
-    // 1. Superadmins see everything
-    if (user?.role === 'superadmin') return navItems;
-
-    // 2. Filter by Plan (Applies to everyone else)
-    let filtered = navItems;
-    if (user?.planDetails?.studios) {
-        filtered = filtered.filter(item =>
-            !item.studioKey || user.planDetails.studios[item.studioKey] !== false
-        );
-    }
-
-    // 3. Filter by Team Member specific permissions (if applicable)
-    if (user?.organization && user.role !== 'admin' && user.teamRole !== 'owner') {
-        filtered = filtered.filter(item =>
-            !item.studioKey || user.studioAccess?.[item.studioKey] !== false
-        );
-    }
-
-    return filtered;
+    // "all the users can access everything accept admin panel/super admin panel"
+    // Return all navigation items for any logged-in user.
+    if (!user) return [];
+    return navItems;
 }
 
 export default function Sidebar({ mobileOpen, onClose }) {

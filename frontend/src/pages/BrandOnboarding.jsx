@@ -1189,9 +1189,9 @@ export default function BrandOnboarding() {
         }
     }, [isAuthenticated])
 
-    // Limit check
-    const maxBrands = user?.planDetails?.limits?.maxBrands || 1
-    const atLimit = isAuthenticated && brandCount >= maxBrands
+    // Brand limits are removed for all users
+    const maxBrands = Infinity
+    const atLimit = false
 
     // If scanUrl param is present, auto-navigate to website scan step
     useEffect(() => {

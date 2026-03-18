@@ -8,9 +8,8 @@ const PlanGatedRoute = ({ studioKey, children }) => {
 
     if (loading) return null;
 
-    // Superadmin has access to everything
-    const hasAccess = user?.role === 'superadmin' || 
-                    (user?.planDetails?.studios && user.planDetails.studios[studioKey] !== false);
+    // Every authenticated user has access to all studios now
+    const hasAccess = !!user;
 
     if (!hasAccess) {
         return (

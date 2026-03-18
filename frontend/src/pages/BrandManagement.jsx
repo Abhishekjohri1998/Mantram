@@ -80,7 +80,7 @@ export default function BrandManagement() {
     const [statusFilter, setStatusFilter] = useState('all') // 'all', 'active', 'archived'
     const [deleteTarget, setDeleteTarget] = useState(null)
     const [togglingId, setTogglingId] = useState(null)
-    const planLimits = user?.planDetails?.limits
+    const planLimits = { maxBrands: Infinity, plan: 'Mantram Unlimited' }
 
     // Fetch ALL brands (including archived) for this management page
     const fetchAllBrands = useCallback(async () => {
@@ -149,7 +149,7 @@ export default function BrandManagement() {
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
                 <div>
                     <p className="text-slate-400 text-sm">
-                        {planLimits ? `${allBrands.length}/${planLimits.maxBrands} brands · ${planLimits.plan} plan` : `${allBrands.length} brand${allBrands.length !== 1 ? 's' : ''} · Manage your brand portfolio`}
+                        {allBrands.length} brand{allBrands.length !== 1 ? 's' : ''} · Manage your brand portfolio
                     </p>
                 </div>
                 <button onClick={() => navigate('/onboarding')}
@@ -229,8 +229,8 @@ export default function BrandManagement() {
                             .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
                         
                         const brandIndex = activeBrandsSorted.findIndex(b => b._id === brand._id)
-                        const maxBrands = planLimits?.maxBrands || 1
-                        const isLocked = !isArchived && brandIndex >= maxBrands
+                        const maxBrands = Infinity
+                        const isLocked = false
 
                         const primaryColor = brand.dna?.colors?.[0]?.hex || '#8b5cf6'
                         const secondaryColor = brand.dna?.colors?.[1]?.hex || '#6366f1'

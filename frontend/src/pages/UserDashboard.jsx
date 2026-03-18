@@ -1350,12 +1350,9 @@ export default function UserDashboard() {
                             <span className="material-symbols-outlined text-amber-400">diamond</span>Plan
                         </h3>
                         <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-purple-500/10 border border-primary/20">
-                            <p className="text-lg font-extrabold text-white capitalize">{user?.plan || 'Starter'}</p>
-                            <p className="text-sm text-slate-400 mt-1">{user?.plan === 'enterprise' ? 'Unlimited access' : user?.plan === 'professional' ? '50 generations/month' : '10 generations/month'}</p>
+                            <p className="text-lg font-extrabold text-white capitalize">Mantram Unlimited</p>
+                            <p className="text-sm text-slate-400 mt-1">Full access to all AI studios & features</p>
                         </div>
-                        {user?.plan !== 'enterprise' && (
-                            <button className="w-full mt-3 py-2.5 rounded-xl border border-primary/30 text-primary text-sm font-bold hover:bg-primary/10 transition-all cursor-pointer">Upgrade Plan</button>
-                        )}
                     </div>
 
                     {/* ── RECENT WORK ── */}

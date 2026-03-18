@@ -96,23 +96,23 @@ function App() {
                   <Route path="/dashboard" element={<ProtectedRoute><UserDashboard /></ProtectedRoute>} />
                   <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin', 'superadmin']}><AdminDashboard /></ProtectedRoute>} />
                   <Route path="/team" element={<ProtectedRoute><TeamDashboard /></ProtectedRoute>} />
-                  <Route path="/content-studio" element={<ProtectedRoute><PlanGatedRoute studioKey="contentStudio"><ContentStudio /></PlanGatedRoute></ProtectedRoute>} />
-                  <Route path="/creative-studio" element={<ProtectedRoute><PlanGatedRoute studioKey="creativeStudio"><CreativeStudio /></PlanGatedRoute></ProtectedRoute>} />
-                  <Route path="/creative-studio/editor" element={<ProtectedRoute><PlanGatedRoute studioKey="creativeStudio"><CanvasEditor /></PlanGatedRoute></ProtectedRoute>} />
-                  <Route path="/video-studio" element={<ProtectedRoute><PlanGatedRoute studioKey="videoStudio"><VideoStudio /></PlanGatedRoute></ProtectedRoute>} />
-                  <Route path="/performance-marketing" element={<ProtectedRoute><PlanGatedRoute studioKey="adStudio"><PerformanceMarketing /></PlanGatedRoute></ProtectedRoute>} />
-                  <Route path="/d2c-analytics" element={<ProtectedRoute><PlanGatedRoute studioKey="d2cAnalytics"><D2CAnalytics /></PlanGatedRoute></ProtectedRoute>} />
+                  <Route path="/content-studio" element={<ProtectedRoute><ContentStudio /></ProtectedRoute>} />
+                  <Route path="/creative-studio" element={<ProtectedRoute><CreativeStudio /></ProtectedRoute>} />
+                  <Route path="/creative-studio/editor" element={<ProtectedRoute><CanvasEditor /></ProtectedRoute>} />
+                  <Route path="/video-studio" element={<ProtectedRoute><VideoStudio /></ProtectedRoute>} />
+                  <Route path="/performance-marketing" element={<ProtectedRoute><PerformanceMarketing /></ProtectedRoute>} />
+                  <Route path="/d2c-analytics" element={<ProtectedRoute><D2CAnalytics /></ProtectedRoute>} />
                   <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
-                  <Route path="/funnel-studio" element={<ProtectedRoute><PlanGatedRoute studioKey="funnelStudio"><FunnelStudio /></PlanGatedRoute></ProtectedRoute>} />
-                  <Route path="/social-media-studio" element={<ProtectedRoute><PlanGatedRoute studioKey="socialMediaStudio"><SocialMediaStudio /></PlanGatedRoute></ProtectedRoute>} />
+                  <Route path="/funnel-studio" element={<ProtectedRoute><FunnelStudio /></ProtectedRoute>} />
+                  <Route path="/social-media-studio" element={<ProtectedRoute><SocialMediaStudio /></ProtectedRoute>} />
                   <Route path="/smart-calendar" element={<Navigate to="/social-media-studio" replace />} />
                   <Route path="/publish" element={<Navigate to="/social-media-studio" replace />} />
-                  <Route path="/brainstorm" element={<ProtectedRoute><PlanGatedRoute studioKey="brainstormStudio"><BrainstormStudio /></PlanGatedRoute></ProtectedRoute>} />
-                  <Route path="/seo-studio" element={<ProtectedRoute><PlanGatedRoute studioKey="seoStudio"><SeoStudio /></PlanGatedRoute></ProtectedRoute>} />
-                  <Route path="/conversations" element={<ProtectedRoute><PlanGatedRoute studioKey="conversationStudio"><ConversationStudio /></PlanGatedRoute></ProtectedRoute>} />
-                  <Route path="/conversations/automations" element={<ProtectedRoute><PlanGatedRoute studioKey="conversationStudio"><Automations /></PlanGatedRoute></ProtectedRoute>} />
-                  <Route path="/conversations/ai-settings" element={<ProtectedRoute><PlanGatedRoute studioKey="conversationStudio"><AISettings /></PlanGatedRoute></ProtectedRoute>} />
-                  <Route path="/conversations/insights" element={<ProtectedRoute><PlanGatedRoute studioKey="conversationStudio"><Insights /></PlanGatedRoute></ProtectedRoute>} />
+                  <Route path="/brainstorm" element={<ProtectedRoute><BrainstormStudio /></ProtectedRoute>} />
+                  <Route path="/seo-studio" element={<ProtectedRoute><SeoStudio /></ProtectedRoute>} />
+                  <Route path="/conversations" element={<ProtectedRoute><ConversationStudio /></ProtectedRoute>} />
+                  <Route path="/conversations/automations" element={<ProtectedRoute><Automations /></ProtectedRoute>} />
+                  <Route path="/conversations/ai-settings" element={<ProtectedRoute><AISettings /></ProtectedRoute>} />
+                  <Route path="/conversations/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
                   <Route path="/credits" element={<ProtectedRoute><CreditsPage /></ProtectedRoute>} />
                   <Route path="/skills" element={<ProtectedRoute><SkillsHub /></ProtectedRoute>} />
                   <Route path="/superadmin" element={<ProtectedRoute allowedRoles={['superadmin']}><SuperAdminDashboard /></ProtectedRoute>} />
