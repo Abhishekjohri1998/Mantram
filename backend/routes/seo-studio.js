@@ -261,22 +261,137 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
     console.log(`🔍 SEO Health Check: crawling ${website} + fetching PageSpeed + backlinks...`);
     let brandDomain;
     try { brandDomain = new URL(website.startsWith('http') ? website : `https://${website}`).hostname.replace(/^www\./, ''); } catch { brandDomain = website; }
-    const [siteResearch, pageSpeedData, backlinkData, mozData] = await Promise.all([
-      researchDomain(website),
+    let [siteResearch, pageSpeedData, backlinkData, mozData] = await Promise.all([
+      researchDomain(website).catch(e => {
+        console.error(`❌ Crawl failed: ${e.message}`);
+        return { url: website, pages: [], homepage: {}, siteIntelligence: { totalPages: 0 }, error: e.message };
+      }),
       getPageSpeed(website, 'mobile').catch(e => ({ success: false, error: e.message })),
       isDataForSEOConfigured() ? getDomainBacklinks(brandDomain).catch(e => ({ available: false, error: e.message })) : Promise.resolve({ available: false }),
       isMozConfigured() ? getMozDomainAuthority(brandDomain).catch(e => ({ available: false, error: e.message })) : Promise.resolve({ available: false }),
     ]);
+
+    // ── 429 FALLBACK: If crawl failed, use previous successful audit data ──
+    let crawlFailed = false;
+    if (siteResearch.error || !siteResearch.pages?.length) {
+      console.log('⚠️  Crawl returned 0 pages — checking for previous successful audit...');
+      try {
+        // Try a broad query first — look for any completed audit with real data
+        let prevAudit = await SeoAudit.findOne({
+          user: req.user?._id,
+          type: 'health-check',
+          'results.siteStats.pagesCrawled': { $gt: 0 }
+        }).sort({ createdAt: -1 }).lean();
+
+        // If no match with pagesCrawled > 0, try looking for totalPages > 0 or any siteStats
+        if (!prevAudit) {
+          prevAudit = await SeoAudit.findOne({
+            user: req.user?._id,
+            type: 'health-check',
+            'results.siteStats': { $exists: true }
+          }).sort({ createdAt: -1 }).lean();
+          console.log(`🔍 Fallback broad search: found=${!!prevAudit}, pagesCrawled=${prevAudit?.results?.siteStats?.pagesCrawled || 'N/A'}`);
+        }
+
+        if (prevAudit?.results?.siteStats) {
+          console.log(`✅ Found previous audit with ${prevAudit.results.siteStats.pagesCrawled} pages — using as fallback`);
+          crawlFailed = true;
+          // Reconstruct siteResearch from stored data
+          const ps = prevAudit.results.siteStats;
+          siteResearch = {
+            url: website,
+            pages: prevAudit.results.researchSources?.map(u => ({ url: u, title: '', h1: [] })) || [],
+            homepage: { title: ps.title || '', metaDescription: ps.metaDescription || '', h1: [], h2: [] },
+            siteIntelligence: {
+              totalPages: ps.totalPages || 0,
+              totalWordCount: ps.totalWordCount || 0,
+              avgWordCount: ps.avgWordCount || 0,
+              totalImages: ps.totalImages || 0,
+              imagesWithoutAlt: ps.imagesWithoutAlt || 0,
+              schemaTypes: ps.schemaTypes || [],
+              hasSchemaOrg: ps.hasSchemaOrg || false,
+              techStack: ps.techStack || [],
+              hasCanonical: ps.hasCanonical || false,
+              hasViewport: ps.hasViewport || false,
+              hasSitemap: ps.hasSitemap || false,
+              hasRobotsTxt: ps.hasRobotsTxt || false,
+              thinPageCount: ps.thinPageCount || 0,
+              duplicateContentCount: ps.duplicateContentCount || 0,
+              titleDuplicateCount: ps.titleDuplicateCount || 0,
+              metaDuplicateCount: ps.metaDuplicateCount || 0,
+              redirectChainCount: ps.redirectChainCount || 0,
+              missingH1Count: ps.missingH1Count || 0,
+              multipleH1Count: ps.multipleH1Count || 0,
+              missingH1Tags: ps.missingH1Tags || [],
+              multipleH1Pages: ps.multipleH1Pages || [],
+              missingMetaDescriptions: ps.missingMetaDescriptions || [],
+              brokenInternalCount: ps.brokenInternalCount || 0,
+              brokenInternalLinks: ps.brokenInternalLinks || [],
+              brokenExternalCount: ps.brokenExternalCount || 0,
+              permanentRedirectCount: ps.permanentRedirectCount || 0,
+              blockedByRobotsTxt: ps.blockedByRobotsTxt || { internalCount: 0 },
+              resourceScanning: ps.resourceScanning || { blockedResourceCount: 0, uncachedResourceCount: 0, unminifiedResourceCount: 0 },
+              emptyAnchorCount: ps.emptyAnchorCount || 0,
+              nofollowInternalCount: ps.nofollowInternalCount || 0,
+              headingIssues: { skippedCount: ps.skippedHeadingCount || 0, multipleH1Count: ps.multipleH1Count || 0 },
+              singleIncomingCount: ps.singleIncomingCount || 0,
+              orphanPages: ps.orphanPages || [],
+              lowTextRatioCount: ps.lowTextRatioCount || 0,
+              avgTextToHtmlRatio: ps.avgTextToHtmlRatio || 0,
+              metaRobotsIssues: { noindexCount: ps.noindexCount || 0 },
+            },
+            _fallbackFromPrevious: true,
+          };
+        }
+      } catch (fallbackErr) {
+        console.error('⚠️  Fallback lookup failed:', fallbackErr.message);
+      }
+    }
+
     const siteData = formatSiteResearch(siteResearch);
     const pageSpeedText = formatPageSpeedForPrompt(pageSpeedData);
     const backlinkText = formatBacklinkDataForPrompt(backlinkData);
     const mozText = formatMozDataForPrompt(mozData);
+    // ── Build deterministic metrics summary for AI prompt (prevents hallucination) ──
+    const siMetrics = siteResearch?.siteIntelligence || {};
+    const deterministicMetricsText = `
+=== DETERMINISTIC CRAWL METRICS (EXACT — DO NOT CONTRADICT) ===
+Pages crawled: ${siMetrics.totalPages || 0}
+Missing H1 tags: ${siMetrics.missingH1Count || (siMetrics.missingH1Tags?.length || 0)} pages
+Multiple H1 tags: ${siMetrics.multipleH1Count || 0} pages
+Broken internal links: ${siMetrics.brokenInternalCount || 0}
+Broken external links: ${siMetrics.brokenExternalCount || 0}
+Permanent redirects (301/308): ${siMetrics.permanentRedirectCount || 0}
+Redirect chains: ${siMetrics.redirectChainCount || 0}
+Thin pages (<300 words): ${siMetrics.thinPageCount || 0}
+Duplicate titles: ${siMetrics.titleDuplicateCount || 0}
+Duplicate meta descriptions: ${siMetrics.metaDuplicateCount || 0}
+Missing meta descriptions: ${siMetrics.missingMetaDescriptions?.length || 0}
+Missing alt text: ${siMetrics.imagesWithoutAlt || 0} images
+Blocked by robots.txt: ${siMetrics.blockedByRobotsTxt?.internalCount || 0} internal pages
+Blocked JS/CSS resources: ${siMetrics.resourceScanning?.blockedResourceCount || 0}
+Uncached JS/CSS: ${siMetrics.resourceScanning?.uncachedResourceCount || 0}
+Unminified JS/CSS: ${siMetrics.resourceScanning?.unminifiedResourceCount || 0}
+Noindex pages: ${siMetrics.metaRobotsIssues?.noindexCount || 0}
+Nofollow internal links: ${siMetrics.nofollowInternalCount || 0}
+Empty anchor text links: ${siMetrics.emptyAnchorCount || 0}
+Pages with skipped heading levels: ${siMetrics.headingIssues?.skippedCount || 0}
+Single incoming internal link: ${siMetrics.singleIncomingCount || 0}
+Orphan pages: ${siMetrics.orphanPages?.length || 0}
+Schema types found: ${(siMetrics.schemaTypes || []).join(', ') || 'NONE'}
+Sitemap found: ${siMetrics.hasSitemap ? 'Yes' : 'No'}
+Robots.txt found: ${siMetrics.hasRobotsTxt ? 'Yes' : 'No'}
+Low text-to-HTML ratio pages: ${siMetrics.lowTextRatioCount || 0}
+Average text-to-HTML ratio: ${siMetrics.avgTextToHtmlRatio || 0}%
+`;
 
     // AI gets a generous timeout — full-site crawl (800 pages) takes up to 180s first
-    const aiTimeout = 90000; // 90s for AI call — crawl takes the bulk of the time
-    console.log(`⏱️ Crawl + research complete (${siteResearch.totalPages || 0} pages). AI timeout: ${aiTimeout / 1000}s`);
+    const aiTimeout = 180000; // 180s for AI call — large crawl data needs more time
+    console.log(`⏱️ Crawl + research complete (${siMetrics.totalPages || siteResearch?.pages?.length || 0} pages). AI timeout: ${aiTimeout / 1000}s`);
 
     const systemPrompt = `You are a SENIOR SEO STRATEGIST (not just an auditor). You think like a CMO + technical SEO expert combined. You have REAL CRAWL DATA — use it as ground truth. Never guess or contradict the crawl.
+
+CRITICAL RULE: The "DETERMINISTIC CRAWL METRICS" section below contains EXACT counts from the real crawl. You MUST use these exact numbers in your issues. DO NOT make up your own H1, broken link, redirect, or other counts — use ONLY the numbers given. For example, if the data says "Missing H1 tags: N pages", you must report exactly N, not "homepage + 2 pages".
 
 ${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
 
@@ -287,6 +402,8 @@ ${pageSpeedText}
 ${backlinkText}
 
 ${mozText}
+
+${deterministicMetricsText}
 
 Respond in STRICT JSON:
 {
@@ -461,6 +578,7 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
     // ── BUILD DETERMINISTIC GROUPED ISSUES FROM CRAWL DATA (Semrush parity) ──
     // Each issue has: check, value, issueType, aboutThisIssue, howToFix, affectedUrls
     const st = parsed.siteStats;
+    console.log(`🔍 DEBUG siteStats: missingH1=${st.missingH1Count}, multipleH1=${st.multipleH1Count}, brokenInt=${st.brokenInternalCount}, permRedirects=${st.permanentRedirectCount}, blockedRobots=${st.blockedByRobotsTxtCount}, blockedRes=${st.blockedResourceCount}, uncached=${st.uncachedResourceCount}, missingAlt=${st.missingAltCount}, totalPages=${st.pagesCrawled}`);
     const deterministicChecks = [];
 
     if (st.missingH1Count > 0) deterministicChecks.push({
@@ -647,6 +765,7 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
       warningCount: allGroupedIssues.filter(d => d.issueType === 'warning').length,
       noticeCount: allGroupedIssues.filter(d => d.issueType === 'notice').length,
     };
+    console.log(`🔍 DEBUG groupedIssues: ${parsed.groupedIssues.errorCount} errors, ${parsed.groupedIssues.warningCount} warnings, ${parsed.groupedIssues.noticeCount} notices, deterministicChecks=${deterministicChecks.length}, aiIssues=${aiIssues.length}`);
 
     // Attach real PageSpeed data to response
     if (pageSpeedData?.success) {

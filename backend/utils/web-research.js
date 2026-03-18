@@ -1343,24 +1343,31 @@ export async function researchDomain(baseUrl) {
             // ── Broken External Links ──
             brokenExternalLinks: brokenExternal,
             brokenExternalCount: brokenExternal.length,
-            // ── Permanent Redirects (301/308 — Semrush shows 636 for acwo.com) ──
-            permanentRedirects: allPages.filter(p => p.statusCode === 301 || p.statusCode === 308 || (p.redirectChain?.length > 0)).map(p => ({
-                url: p.url, statusCode: p.statusCode, finalUrl: p.redirectChain?.[p.redirectChain.length - 1]?.to || p.url,
+            // ── Permanent Redirects (301/308 — pages that followed redirects to reach final URL) ──
+            permanentRedirects: allPages.filter(p => (p.redirectChain?.length || 0) > 0).map(p => ({
+                url: p.url, statusCode: p.redirectChain?.[0]?.status || 301, finalUrl: p.redirectChain?.[p.redirectChain.length - 1]?.to || p.url,
+                chainLength: p.redirectChain?.length || 0,
             })),
-            permanentRedirectCount: allPages.filter(p => p.statusCode === 301 || p.statusCode === 308 || (p.redirectChain?.length > 0)).length,
-            // ── Blocked by robots.txt (internal pages disallowed) ──
+            permanentRedirectCount: allPages.filter(p => (p.redirectChain?.length || 0) > 0).length,
+            // ── Blocked by robots.txt (only Googlebot / * agent rules — SEO relevant) ──
             blockedByRobotsTxt: (() => {
                 if (!robotsTxt.found || !robotsTxt.disallowRules?.length) return { internal: [], external: [], internalCount: 0, externalCount: 0 };
+                // Only consider rules for Googlebot or * (all bots) — not bot-specific rules like AhrefsBot, SemrushBot
+                const seoRules = robotsTxt.disallowRules.filter(rule => {
+                    const agent = (rule.agent || '*').toLowerCase();
+                    return agent === '*' || agent === 'googlebot' || agent === 'googlebot-mobile';
+                });
+                if (!seoRules.length) return { internal: [], external: [], internalCount: 0, externalCount: 0 };
                 const blockedInternal = allPages.filter(p => {
                     try {
                         const path = new URL(p.url).pathname;
-                        return robotsTxt.disallowRules.some(rule => path.startsWith(rule.path || rule));
+                        return seoRules.some(rule => path.startsWith(rule.path || rule));
                     } catch { return false; }
                 });
                 return {
                     internal: blockedInternal.map(p => p.url),
                     internalCount: blockedInternal.length,
-                    rules: (robotsTxt.disallowRules || []).slice(0, 30),
+                    rules: seoRules.slice(0, 30),
                 };
             })(),
 
@@ -1663,18 +1670,20 @@ export function formatSiteResearch(research) {
 
     // NEW: Issues detected
     const issues = [];
-    if (si.thinPageCount > 0) issues.push(`${si.thinPageCount} THIN PAGES (<300 words): ${si.thinPages.slice(0, 3).map(p => p.url).join(', ')}`);
+    if (si.thinPageCount > 0) issues.push(`${si.thinPageCount} THIN PAGES (<300 words): ${(si.thinPages || []).slice(0, 3).map(p => p.url).join(', ')}`);
     if (si.missingMetaDescriptions?.length > 0) issues.push(`${si.missingMetaDescriptions.length} pages MISSING meta descriptions: ${si.missingMetaDescriptions.slice(0, 3).join(', ')}`);
     if (si.missingH1Tags?.length > 0) issues.push(`${si.missingH1Tags.length} pages MISSING H1 tags: ${si.missingH1Tags.slice(0, 3).join(', ')}`);
-    if (si.redirectChainCount > 0) issues.push(`${si.redirectChainCount} pages have REDIRECT CHAINS: ${si.redirectChains.slice(0, 2).map(r => `${r.url} (${r.chain.length} hops)`).join(', ')}`);
+    if (si.redirectChainCount > 0) issues.push(`${si.redirectChainCount} pages have REDIRECT CHAINS: ${(si.redirectChains || []).slice(0, 2).map(r => `${r.url} (${r.chain?.length || 0} hops)`).join(', ')}`);
     if (si.duplicateContentCount > 0) issues.push(`${si.duplicateContentCount} DUPLICATE content pairs (85%+ similarity): ${(si.duplicateContent || []).slice(0, 2).map(d => `${d.page1} ↔ ${d.page2} (${d.similarity}%)`).join(', ')}`);
     if (si.titleDuplicateCount > 0) issues.push(`${si.titleDuplicateCount} pages with DUPLICATE TITLE TAGS: ${(si.duplicateTitles || []).slice(0, 2).map(d => `"${d.title}" (${d.count} pages)`).join(', ')}`);
     if (si.metaDuplicateCount > 0) issues.push(`${si.metaDuplicateCount} pages with DUPLICATE META DESCRIPTIONS`);
-    if (si.multipleH1Count > 0) issues.push(`${si.multipleH1Count} pages with MULTIPLE H1 TAGS: ${(si.multipleH1Pages || []).slice(0, 3).map(p => `${p.url} (${p.h1Count} H1s)`).join(', ')}`);
-    if (si.lowTextRatioCount > 0) issues.push(`${si.lowTextRatioCount} pages with LOW TEXT-TO-HTML RATIO (<10%): ${(si.lowTextRatioPages || []).slice(0, 3).map(p => `${p.url} (${p.ratio}%)`).join(', ')}`);
+    if (si.multipleH1Count > 0) issues.push(`${si.multipleH1Count} pages with MULTIPLE H1 TAGS: ${(si.multipleH1Pages || []).slice(0, 3).map(p => `${p.url || p} (${p.h1Count || '?'} H1s)`).join(', ')}`);
+    if (si.lowTextRatioCount > 0) issues.push(`${si.lowTextRatioCount} pages with LOW TEXT-TO-HTML RATIO (<10%): ${(si.lowTextRatioPages || []).slice(0, 3).map(p => `${p.url || p} (${p.ratio || '?'}%)`).join(', ')}`);
     if (si.oversizedPageCount > 0) issues.push(`${si.oversizedPageCount} pages LARGER THAN 2MB`);
     if (si.singleIncomingCount > 0) issues.push(`${si.singleIncomingCount} pages with ONLY 1 INCOMING INTERNAL LINK (low link equity)`);
     if (si.clickDepthIssues > 0) issues.push(`${si.clickDepthIssues} pages have DEEP CLICK DEPTH (not directly linked from homepage)`);
+
+
 
     if (issues.length > 0) {
         text += `\n--- ISSUES DETECTED ---\n`;
@@ -1686,9 +1695,9 @@ export function formatSiteResearch(research) {
     text += `\n`;
 
     // Sub-pages
-    if (research.pages.length > 1) {
+    if ((research.pages || []).length > 1) {
         text += `Sub-pages crawled:\n`;
-        for (const p of research.pages.slice(1, 15)) { // Show up to 15
+        for (const p of (research.pages || []).slice(1, 15)) { // Show up to 15
             text += `- ${p.url}: "${p.title}" (${p.wordCount} words)`;
             if (p.h1?.length) text += ` | H1: ${p.h1.join(', ')}`;
             if (!p.metaDescription) text += ` | ⚠️ no meta desc`;

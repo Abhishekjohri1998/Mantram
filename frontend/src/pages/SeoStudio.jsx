@@ -292,7 +292,8 @@ export default function SeoStudio() {
         const brandName = brand?.name || 'Brand'
         const brandLogo = brand?.dna?.logo?.url || ''
         const brandWebsite = brand?.website || ''
-        const mantramLogo = '/mantram-logo.png'
+        const appOrigin = window.location.origin
+        const mantramLogo = `${appOrigin}/mantram-logo.png`
 
         // Score color grading
         const scoreColor = (s) => s >= 80 ? '#16a34a' : s >= 60 ? '#f59e0b' : s >= 40 ? '#f97316' : '#e11d48'
