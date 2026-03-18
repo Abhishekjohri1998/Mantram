@@ -298,9 +298,115 @@ export default function SeoStudio() {
         if (type === 'health-check') {
             body += `<div class="scores">`
             ;[['SEO Health', data.seoHealthScore], ['AI Visibility', data.aiVisibilityScore], ['Technical', data.technicalScore], ['Content', data.contentScore], ['Authority', data.authorityScore]].forEach(([l, s]) => {
-                if (s) body += `<div class="score-card"><div class="score-value">${s}</div><div class="score-label">${l}</div></div>`
+                if (s !== undefined) body += `<div class="score-card"><div class="score-value">${s}</div><div class="score-label">${l}</div></div>`
             })
             body += `</div>`
+
+            // Strategic Brief
+            if (data.strategicBrief) {
+                body += `<div class="summary" style="border-left-color:#8b5cf6;margin-top:16px"><strong style="color:#7c3aed">Strategic Brief</strong><br>${data.strategicBrief}</div>`
+            }
+
+            // Crawl Intelligence
+            const stats = data.siteStats || {}
+            if (stats.pagesCrawled) {
+                body += `<h2>Crawl Intelligence</h2><div class="stats-grid">`
+                ;[
+                    ['Pages Crawled', stats.pagesCrawled],
+                    ['Avg Response Time', `${stats.responseTimeAvg || 0}ms`],
+                    ['Avg Page Size', `${stats.pageSizeAvg || 0}KB`],
+                    ['Thin Pages', stats.thinPageCount || 0],
+                    ['Orphan Pages', stats.orphanPageCount || 0],
+                    ['Security Headers', stats.securityHeaderScore || '0/7'],
+                    ['Avg Words/Page', stats.avgWordCount || 0],
+                    ['Mixed Content', stats.mixedContentCount || 0],
+                    ['Redirect Chains', stats.redirectChainCount || 0],
+                    ['Duplicate Content', stats.duplicateContentCount || 0],
+                    ['Noindex Pages', stats.noindexPageCount || 0],
+                    ['Long URLs (>75)', stats.urlTooLongCount || 0],
+                    ['Broken External', stats.brokenExternalCount || 0],
+                    ['Empty Anchors', stats.emptyAnchorCount || 0],
+                    ['Nofollow Internal', stats.nofollowInternalCount || 0],
+                    ['Canon. Conflicts', stats.conflictingCanonicalCount || 0],
+                    ['Browser Cache', stats.cacheControlPresent ? 'Yes' : 'No'],
+                    ['llms.txt', stats.llmsTxtFound ? 'Found' : 'Missing'],
+                ].forEach(([l, v]) => {
+                    body += `<div class="stat-card"><div class="stat-value">${v}</div><div class="stat-label">${l}</div></div>`
+                })
+                body += `</div>`
+
+                // Page Status Distribution
+                const psd = stats.pageStatusDistribution || {}
+                if (psd.status200 || psd.status301 || psd.status404 || psd.status5xx) {
+                    body += `<p style="margin:8px 0;font-size:11px;color:#64748b"><strong>Page Status:</strong> `
+                    if (psd.status200) body += `<span class="badge" style="background:#d1fae5;color:#059669">${psd.status200} × 2xx</span> `
+                    if (psd.status301) body += `<span class="badge" style="background:#fef3c7;color:#d97706">${psd.status301} × 3xx</span> `
+                    if (psd.status404) body += `<span class="badge" style="background:#fee2e2;color:#dc2626">${psd.status404} × 404</span> `
+                    if (psd.status5xx) body += `<span class="badge" style="background:#fee2e2;color:#dc2626">${psd.status5xx} × 5xx</span> `
+                    body += `</p>`
+                }
+            }
+
+            // Security Headers
+            if (stats.securityHeaders?.length) {
+                body += `<h2>Security Headers</h2><div class="stats-grid">`
+                stats.securityHeaders.forEach(h => {
+                    body += `<div class="stat-card" style="background:${h.present ? '#f0fdf4' : '#fef2f2'}"><div class="stat-value" style="font-size:16px;color:${h.present ? '#16a34a' : '#dc2626'}">${h.present ? '✅' : '❌'}</div><div class="stat-label">${h.name}</div></div>`
+                })
+                body += `</div>`
+            }
+
+            // Action Buckets
+            const hasActions = data.fixNow?.length || data.createNext?.length || data.monitor?.length
+            if (hasActions) {
+                body += `<h2>Action Plan</h2><div style="display:flex;gap:12px;flex-wrap:wrap">`
+                if (data.fixNow?.length) {
+                    body += `<div class="cluster" style="flex:1;min-width:200px;border-color:#fecaca"><h3 style="color:#dc2626">🔧 Fix Now</h3><ul>`
+                    data.fixNow.forEach(f => { body += `<li>${typeof f === 'string' ? f : f.title}</li>` })
+                    body += `</ul></div>`
+                }
+                if (data.createNext?.length) {
+                    body += `<div class="cluster" style="flex:1;min-width:200px;border-color:#bbf7d0"><h3 style="color:#16a34a">✏️ Create Next</h3><ul>`
+                    data.createNext.forEach(c => { body += `<li>${typeof c === 'string' ? c : c.title}</li>` })
+                    body += `</ul></div>`
+                }
+                if (data.monitor?.length) {
+                    body += `<div class="cluster" style="flex:1;min-width:200px;border-color:#bfdbfe"><h3 style="color:#2563eb">👁️ Monitor</h3><ul>`
+                    data.monitor.forEach(m => { body += `<li>${typeof m === 'string' ? m : m.title}</li>` })
+                    body += `</ul></div>`
+                }
+                body += `</div>`
+            }
+
+            // Per-Page Report Cards
+            const pr = data.pageReports || []
+            if (pr.length) {
+                body += `<h2>Per-Page Analysis (${pr.length} pages)</h2><table><tr><th>Page</th><th>Response</th><th>Size</th><th>Words</th><th>Issues</th></tr>`
+                pr.forEach(p => {
+                    const issues = []
+                    if (!p.hasH1) issues.push('No H1')
+                    if (p.h1Count > 1) issues.push(`${p.h1Count} H1s`)
+                    if (!p.headingHierarchyValid) issues.push('Heading Skip')
+                    if (p.titleLength === 0) issues.push('No Title')
+                    if (p.titleLength > 60) issues.push('Title Long')
+                    if (p.metaDescLength === 0) issues.push('No Meta')
+                    if (p.wordCount < 300 && p.wordCount > 0) issues.push('Thin')
+                    if (p.responseTimeMs > 3000) issues.push('Slow')
+                    body += `<tr><td><strong>${(p.title || '').substring(0, 40)}</strong><br><small>${(p.url || '').substring(0, 60)}</small></td><td>${p.responseTimeMs}ms</td><td>${p.pageSizeKB}KB</td><td>${p.wordCount}</td><td>${issues.length ? `<span class="sev-high">${issues.join(', ')}</span>` : '<span style="color:#16a34a">✅ OK</span>'}</td></tr>`
+                })
+                body += `</table>`
+            }
+
+            // Algorithm Risks
+            if (data.algorithmRisks?.length) {
+                body += `<h2>Algorithm Risk Assessment</h2><table><tr><th>Algorithm</th><th>Risk</th><th>Why</th><th>Action</th></tr>`
+                data.algorithmRisks.forEach(r => {
+                    body += `<tr><td><strong>${r.algorithm}</strong></td><td class="sev-${r.riskLevel === 'high' ? 'critical' : r.riskLevel}">${r.riskLevel}</td><td>${r.why || ''}</td><td>${r.action || ''}</td></tr>`
+                })
+                body += `</table>`
+            }
+
+            // Issues
             if (data.issues?.length) {
                 body += `<h2>Issues (${data.issues.length})</h2><table><tr><th>Severity</th><th>Title</th><th>Fix</th></tr>`
                 data.issues.forEach(i => { body += `<tr><td class="sev-${i.severity}">${i.severity}</td><td>${i.title}<br><small>${i.description || ''}</small></td><td>${i.fix || ''}</td></tr>` })
@@ -375,6 +481,7 @@ table{width:100%;border-collapse:collapse;margin:12px 0}th{background:#f1f5f9;pa
 td{padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:12px}small{color:#94a3b8}
 .sev-critical{color:#e11d48;font-weight:700}.sev-high{color:#f97316;font-weight:700}.sev-medium{color:#f59e0b}.sev-low{color:#64748b}
 .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#f1f5f9;color:#475569;margin-left:6px}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}.stat-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;text-align:center}.stat-value{font-size:18px;font-weight:900;color:#1e293b}.stat-label{font-size:9px;color:#64748b;font-weight:600;text-transform:uppercase;margin-top:2px}
 .cluster,.comp,.section,.week{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin:8px 0}
 ul,ol{padding-left:20px}li{margin:4px 0}
 @media print{body{padding:20px}h1{font-size:20px}}
@@ -787,6 +894,12 @@ function HealthCheckResults({ results }) {
                     { label: 'Thin Pages', value: stats.thinPageCount || 0, icon: 'short_text', color: (stats.thinPageCount || 0) > 0 ? '#f59e0b' : '#10b981' },
                     { label: 'Orphan Pages', value: stats.orphanPageCount || 0, icon: 'link_off', color: (stats.orphanPageCount || 0) > 0 ? '#f43f5e' : '#10b981' },
                     { label: 'Security', value: stats.securityHeaderScore || '0/7', icon: 'shield', color: '#6366f1' },
+                    { label: 'Broken External', value: stats.brokenExternalCount || 0, icon: 'broken_image', color: (stats.brokenExternalCount || 0) > 0 ? '#f43f5e' : '#10b981' },
+                    { label: 'Empty Anchors', value: stats.emptyAnchorCount || 0, icon: 'text_fields', color: (stats.emptyAnchorCount || 0) > 0 ? '#f59e0b' : '#10b981' },
+                    { label: 'Nofollow Internal', value: stats.nofollowInternalCount || 0, icon: 'block', color: (stats.nofollowInternalCount || 0) > 0 ? '#f59e0b' : '#10b981' },
+                    { label: 'Canon. Conflicts', value: stats.conflictingCanonicalCount || 0, icon: 'content_copy', color: (stats.conflictingCanonicalCount || 0) > 0 ? '#f43f5e' : '#10b981' },
+                    { label: 'Browser Cache', value: stats.cacheControlPresent ? 'Yes' : 'No', icon: 'cached', color: stats.cacheControlPresent ? '#10b981' : '#f59e0b' },
+                    { label: 'AI Crawl (llms.txt)', value: stats.llmsTxtFound ? 'Found' : 'Missing', icon: 'smart_toy', color: stats.llmsTxtFound ? '#10b981' : '#f59e0b' },
                 ].map(s => (
                     <div key={s.label} className="flex items-center gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
                         <span className="material-symbols-outlined text-lg" style={{ color: s.color }}>{s.icon}</span>

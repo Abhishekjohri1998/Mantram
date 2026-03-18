@@ -65,6 +65,7 @@ async function safeFetchWithMeta(url, options = {}) {
             headers: {
                 contentType: resp.headers.get('content-type') || '',
                 server: resp.headers.get('server') || '',
+                cacheControl: resp.headers.get('cache-control') || '',
                 // Security headers
                 csp: resp.headers.get('content-security-policy') || '',
                 hsts: resp.headers.get('strict-transport-security') || '',
@@ -138,25 +139,48 @@ function extractJsonLd(html) {
 function extractLinks(html, baseUrl) {
     const internal = new Set();
     const external = new Set();
-    const linkPattern = /<a\s+[^>]*href\s*=\s*["']([^"'#]+)["'][^>]*>/gi;
+    const externalUrls = []; // full URLs for broken link checking
+    let emptyAnchors = 0;
+    let nofollowInternalLinks = 0;
+    // Capture full anchor tag including inner text
+    const linkPattern = /<a\s+([^>]*)href\s*=\s*["']([^"'#]+)["']([^>]*)>(.*?)<\/a>/gis;
     let m;
     let baseDomain;
-    try { baseDomain = new URL(baseUrl).hostname.replace(/^www\./, ''); } catch { return { internal: [], external: [] }; }
+    try { baseDomain = new URL(baseUrl).hostname.replace(/^www\./, ''); } catch { return { internal: [], external: [], externalUrls: [], emptyAnchors: 0, nofollowInternalLinks: 0 }; }
 
     while ((m = linkPattern.exec(html)) !== null) {
-        let href = m[1].trim();
+        const preAttrs = m[1] || '';
+        let href = m[2].trim();
+        const postAttrs = m[3] || '';
+        const anchorText = stripTags(m[4] || '').trim();
         if (href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:')) continue;
+
+        // Check for empty anchor text
+        if (!anchorText && !m[0].includes('<img')) emptyAnchors++;
+
+        // Check for rel="nofollow"
+        const allAttrs = preAttrs + ' ' + postAttrs;
+        const hasNofollow = /rel\s*=\s*["'][^"']*nofollow[^"']*["']/i.test(allAttrs);
+
         try {
             const resolved = new URL(href, baseUrl);
             const linkDomain = resolved.hostname.replace(/^www\./, '');
             if (linkDomain === baseDomain) {
                 internal.add(resolved.pathname);
+                if (hasNofollow) nofollowInternalLinks++;
             } else {
                 external.add(resolved.hostname);
+                if (externalUrls.length < 30) externalUrls.push(resolved.href);
             }
         } catch { /* skip invalid href */ }
     }
-    return { internal: [...internal].slice(0, 50), external: [...external].slice(0, 30) };
+    return {
+        internal: [...internal].slice(0, 50),
+        external: [...external].slice(0, 30),
+        externalUrls: externalUrls.slice(0, 30),
+        emptyAnchors,
+        nofollowInternalLinks,
+    };
 }
 
 function extractImages(html) {
@@ -414,6 +438,11 @@ export async function crawlPage(url) {
             metaDescLength: (meta.description || '').length,
             metaDescTooShort: (meta.description || '').length > 0 && (meta.description || '').length < 120,
             metaDescTooLong: (meta.description || '').length > 160,
+            // ── NEW: Enhanced link data ──
+            emptyAnchors: links.emptyAnchors || 0,
+            nofollowInternalLinks: links.nofollowInternalLinks || 0,
+            externalUrls: links.externalUrls || [],
+            hasCacheControl: !!(fetchResult.headers?.cacheControl),
         };
     } catch (e) {
         return { url, success: false, error: e.message, statusCode: 0, responseTimeMs: 0 };
@@ -570,6 +599,35 @@ async function fetchRobotsTxt(baseUrl) {
     }
 }
 
+/**
+ * Fetch /llms.txt — AI crawler accessibility file (like robots.txt for LLMs)
+ * Semrush 2025 checks for this. We beat them by also parsing its sections.
+ */
+async function fetchLlmsTxt(baseUrl) {
+    try {
+        const text = await safeFetch(`${baseUrl}/llms.txt`);
+        if (!text || text.length < 10 || text.includes('<html')) {
+            return { found: false, content: '', sections: [] };
+        }
+        // Parse sections (# headers)
+        const sections = [];
+        const lines = text.split('\n');
+        let currentSection = null;
+        for (const line of lines) {
+            if (line.startsWith('#')) {
+                if (currentSection) sections.push(currentSection);
+                currentSection = { title: line.replace(/^#+\s*/, ''), content: '' };
+            } else if (currentSection) {
+                currentSection.content += line + '\n';
+            }
+        }
+        if (currentSection) sections.push(currentSection);
+        return { found: true, content: text.substring(0, 2000), sections, lineCount: lines.length };
+    } catch {
+        return { found: false, content: '', sections: [] };
+    }
+}
+
 
 // ============================================================================
 // DUPLICATE CONTENT DETECTION (3-gram shingling + Jaccard)
@@ -631,7 +689,7 @@ export async function researchDomain(baseUrl) {
     console.log(`🕷️  Deep crawl starting: ${cleanBase}`);
 
     // PHASE 1: Fetch homepage + robots.txt + sitemap.xml in parallel
-    const [homepageResult, robotsTxt, sitemap] = await Promise.all([
+    const [homepageResult, robotsTxt, sitemap, llmsTxt] = await Promise.all([
         (async () => {
             // Use redirect-aware fetch for redirect chain tracking
             const { html, redirectChain, finalUrl } = await safeFetchWithRedirects(cleanBase);
@@ -710,14 +768,20 @@ export async function researchDomain(baseUrl) {
                 metaDescLength: (meta.description || '').length,
                 metaDescTooShort: (meta.description || '').length > 0 && (meta.description || '').length < 120,
                 metaDescTooLong: (meta.description || '').length > 160,
+                // ── NEW: Enhanced link data ──
+                emptyAnchors: links.emptyAnchors || 0,
+                nofollowInternalLinks: links.nofollowInternalLinks || 0,
+                externalUrls: links.externalUrls || [],
+                hasCacheControl: !!(metaFetch.headers?.cacheControl),
             };
         })(),
         fetchRobotsTxt(cleanBase),
         fetchSitemap(cleanBase),
+        fetchLlmsTxt(cleanBase),
     ]);
 
     if (!homepageResult.success) {
-        return { url: cleanBase, pages: [homepageResult], summary: null, error: homepageResult.error, robotsTxt, sitemap };
+        return { url: cleanBase, pages: [homepageResult], summary: null, error: homepageResult.error, robotsTxt, sitemap, llmsTxt };
     }
 
     const homepage = homepageResult;
@@ -789,6 +853,37 @@ export async function researchDomain(baseUrl) {
 
     // PHASE 4: Compute duplicate content
     const duplicateContent = computeDuplicates(allPages);
+
+    // PHASE 4.5: Probe external links for broken ones (HEAD, 2s timeout, max 15)
+    const externalUrlSet = new Set();
+    for (const p of allPages) {
+        for (const u of (p.externalUrls || [])) {
+            externalUrlSet.add(JSON.stringify({ url: u, from: p.url }));
+            if (externalUrlSet.size >= 15) break;
+        }
+        if (externalUrlSet.size >= 15) break;
+    }
+    const brokenExternal = [];
+    const externalToProbe = [...externalUrlSet].map(s => JSON.parse(s));
+    if (externalToProbe.length > 0) {
+        console.log(`🔗  Probing ${externalToProbe.length} external links...`);
+        const probeResults = await Promise.all(
+            externalToProbe.map(async ({ url, from }) => {
+                const ctrl = new AbortController();
+                const t = setTimeout(() => ctrl.abort(), 2000);
+                try {
+                    const r = await fetch(url, { method: 'HEAD', signal: ctrl.signal, headers: { 'User-Agent': USER_AGENT }, redirect: 'follow' });
+                    clearTimeout(t);
+                    return { url, from, status: r.status, broken: r.status >= 400 };
+                } catch (e) {
+                    clearTimeout(t);
+                    return { url, from, status: 0, broken: true, error: e.message };
+                }
+            })
+        );
+        brokenExternal.push(...probeResults.filter(r => r.broken).map(r => ({ url: r.url, linkedFrom: r.from, statusCode: r.status })));
+        console.log(`🔗  External links: ${probeResults.length} probed, ${brokenExternal.length} broken`);
+    }
 
     // PHASE 5: Build comprehensive site intelligence
     const allHeadings = allPages.flatMap(p => p.headings || []);
@@ -1021,6 +1116,63 @@ export async function researchDomain(baseUrl) {
                 tooLong: allPages.filter(p => p.urlTooLong).map(p => ({ url: p.url, length: p.urlLength })),
                 tooLongCount: allPages.filter(p => p.urlTooLong).length,
             },
+
+            // ══════════════════════════════════════════════════════
+            // NEW ROUND 2: Missing Semrush checks
+            // ══════════════════════════════════════════════════════
+
+            // llms.txt (AI crawler accessibility — Semrush 2025)
+            llmsTxt: llmsTxt || { found: false },
+
+            // Empty anchor text
+            emptyAnchorCount: allPages.reduce((s, p) => s + (p.emptyAnchors || 0), 0),
+            emptyAnchorPages: allPages.filter(p => (p.emptyAnchors || 0) > 0).map(p => ({ url: p.url, count: p.emptyAnchors })),
+
+            // Nofollow internal links
+            nofollowInternalCount: allPages.reduce((s, p) => s + (p.nofollowInternalLinks || 0), 0),
+            nofollowInternalPages: allPages.filter(p => (p.nofollowInternalLinks || 0) > 0).map(p => ({ url: p.url, count: p.nofollowInternalLinks })),
+
+            // Cache-Control headers
+            cacheControlPresent: !!(homepage.hasCacheControl),
+
+            // Conflicting canonicals — pages where canonical doesn't point to self
+            conflictingCanonicals: (() => {
+                const conflicts = [];
+                for (const p of allPages) {
+                    if (p.canonical && p.url) {
+                        try {
+                            const canonUrl = new URL(p.canonical, p.url).href;
+                            const pageUrl = new URL(p.url).href;
+                            if (canonUrl !== pageUrl && !canonUrl.endsWith(new URL(p.url).pathname)) {
+                                conflicts.push({ url: p.url, canonical: canonUrl });
+                            }
+                        } catch { /* skip */ }
+                    }
+                }
+                return conflicts;
+            })(),
+
+            // Sitemap coverage — cross-reference
+            sitemapCoverage: (() => {
+                if (!sitemap.found) return { available: false };
+                const sitemapUrls = new Set(sitemap.urls.map(u => { try { return new URL(u).pathname; } catch { return u; } }));
+                const crawledPaths = new Set(allPages.map(p => { try { return new URL(p.url).pathname; } catch { return p.url; } }));
+                const pagesNotInSitemap = [...crawledPaths].filter(p => !sitemapUrls.has(p) && p !== '/');
+                const sitemapUrlsNotCrawled = [...sitemapUrls].filter(u => !crawledPaths.has(u));
+                const totalUnique = new Set([...sitemapUrls, ...crawledPaths]).size;
+                return {
+                    available: true,
+                    pagesNotInSitemap,
+                    pagesNotInSitemapCount: pagesNotInSitemap.length,
+                    sitemapUrlsNotCrawled,
+                    sitemapUrlsNotCrawledCount: sitemapUrlsNotCrawled.length,
+                    coveragePercent: totalUnique > 0 ? Math.round((sitemapUrls.size / totalUnique) * 100) : 0,
+                };
+            })(),
+
+            // Broken external links (probed after crawl)
+            brokenExternalLinks: brokenExternal,
+            brokenExternalCount: brokenExternal.length,
         },
     };
 }
