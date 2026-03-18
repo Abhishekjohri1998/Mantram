@@ -846,7 +846,37 @@ export async function researchDomain(baseUrl) {
         return { url: cleanBase, pages: [homepageResult], summary: null, error: homepageResult.error, robotsTxt, sitemap, llmsTxt };
     }
 
-    const homepage = homepageResult;
+    let homepage = homepageResult;
+
+    // ── Puppeteer JS-rendering fallback for SPA sites ──
+    // If fetch() gets <300 words, the site is likely JS-rendered (React/Angular/Vue)
+    // Re-render with headless Chrome to get the actual DOM content
+    if ((homepage.wordCount || 0) < 300) {
+        try {
+            console.log(`🖥️  Homepage has ${homepage.wordCount} words — likely SPA. Trying Puppeteer JS rendering...`);
+            const { jsRenderCrawl } = await import('./js-crawler.js');
+            const jsResult = await jsRenderCrawl(cleanBase, { maxPages: 1, mobile: false });
+            if (jsResult?.pages?.[0]?.wordCount > homepage.wordCount) {
+                const jp = jsResult.pages[0];
+                console.log(`🖥️  Puppeteer got ${jp.wordCount} words (vs ${homepage.wordCount} from fetch). Using rendered content.`);
+                // Merge Puppeteer data into homepage
+                homepage = {
+                    ...homepage,
+                    wordCount: jp.wordCount,
+                    bodyTextFull: jp.bodyText || homepage.bodyTextFull,
+                    contentSnippet: (jp.bodyText || '').substring(0, 500),
+                    title: jp.title || homepage.title,
+                    h1: jp.h1s || homepage.h1,
+                    h2: jp.h2s || homepage.h2,
+                    images: jp.images ? { total: jp.images.length, withAlt: jp.images.filter(i => i.hasAlt).length, withoutAlt: jp.imagesWithoutAlt || 0 } : homepage.images,
+                    jsRendered: true,
+                };
+            }
+        } catch (puppeteerErr) {
+            console.warn(`🖥️  Puppeteer fallback skipped: ${puppeteerErr.message}`);
+        }
+    }
+
     const internalLinks = homepage.links?.internal || [];
 
     // PHASE 2: Build priority crawl queue (expanded for Semrush-level coverage)

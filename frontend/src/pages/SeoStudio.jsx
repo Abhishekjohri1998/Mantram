@@ -907,6 +907,24 @@ function HealthCheckResults({ results }) {
                         </div>
                     ))}
                 </div>
+                {/* Per-issue deltas */}
+                {results.trendDelta.issueDeltas?.length > 0 && (
+                    <div className="mt-4 border-t border-white/[0.06] pt-3">
+                        <p className="text-[9px] font-bold text-slate-500 uppercase mb-2">Issue-Level Changes</p>
+                        <div className="space-y-1.5">
+                            {results.trendDelta.issueDeltas.slice(0, 12).map((d, idx) => (
+                                <div key={idx} className="flex items-center gap-2 text-[10px]">
+                                    {d.status === 'new' && <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 font-black">NEW</span>}
+                                    {d.status === 'resolved' && <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-black">✓ RESOLVED</span>}
+                                    {d.status === 'changed' && <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 font-black">CHANGED</span>}
+                                    <span className="text-slate-300 truncate flex-1">{d.check}</span>
+                                    {d.status === 'changed' && <span className="text-slate-500 text-[9px]">{d.previousValue} → {d.currentValue}</span>}
+                                    {d.status === 'new' && <span className="text-slate-500 text-[9px]">{d.currentValue}</span>}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
         )}
 

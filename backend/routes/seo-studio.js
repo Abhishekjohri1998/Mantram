@@ -466,7 +466,7 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
             thinPageChange: (currStats.thinPageCount || 0) - (prevStats.thinPageCount || 0),
             duplicateTitleChange: (currStats.titleDuplicateCount || 0) - (prevStats.titleDuplicateCount || 0),
             multipleH1Change: (currStats.multipleH1Count || 0) - (prevStats.multipleH1Count || 0),
-            // Count new vs resolved issues
+            // Count new vs resolved AI issues
             newIssueCount: (parsed.issues || []).filter(i => {
               const prevIssues = prevAudit.results?.issues || [];
               return !prevIssues.some(pi => pi.title === i.title);
@@ -476,11 +476,43 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
               return !currIssues.some(i => i.title === pi.title);
             }).length,
           };
-          console.log(`📊 Trend: score ${trendDelta.scoreChange >= 0 ? '+' : ''}${trendDelta.scoreChange}, ${trendDelta.newIssueCount} new issues, ${trendDelta.resolvedIssueCount} resolved`);
+
+          // ── Per-issue deltas (compare grouped deterministic issues) ──
+          const prevSnapshot = prevAudit.results?.issueCountSnapshot || {};
+          const currGrouped = parsed.groupedIssues || {};
+          const allCurrentIssues = [...(currGrouped.errors || []), ...(currGrouped.warnings || []), ...(currGrouped.notices || [])];
+          const issueDeltas = [];
+          for (const issue of allCurrentIssues) {
+            const prevValue = prevSnapshot[issue.check];
+            if (prevValue === undefined) {
+              issueDeltas.push({ check: issue.check, issueType: issue.issueType, status: 'new', currentValue: issue.value });
+            } else if (prevValue !== issue.value) {
+              issueDeltas.push({ check: issue.check, issueType: issue.issueType, status: 'changed', currentValue: issue.value, previousValue: prevValue });
+            }
+          }
+          // Check for resolved issues
+          for (const [checkName, prevValue] of Object.entries(prevSnapshot)) {
+            if (!allCurrentIssues.some(i => i.check === checkName)) {
+              issueDeltas.push({ check: checkName, status: 'resolved', previousValue: prevValue });
+            }
+          }
+          trendDelta.issueDeltas = issueDeltas;
+          trendDelta.newDetectedCount = issueDeltas.filter(d => d.status === 'new').length;
+          trendDelta.resolvedDetectedCount = issueDeltas.filter(d => d.status === 'resolved').length;
+
+          console.log(`📊 Trend: score ${trendDelta.scoreChange >= 0 ? '+' : ''}${trendDelta.scoreChange}, ${trendDelta.newDetectedCount} new checks, ${trendDelta.resolvedDetectedCount} resolved checks`);
         }
       } catch (e) { console.warn('Trend delta computation failed:', e.message); }
     }
     if (trendDelta) parsed.trendDelta = trendDelta;
+
+    // Build issueCountSnapshot for future trend comparisons
+    const currGroupedIssues = parsed.groupedIssues || {};
+    const allDetectedIssues = [...(currGroupedIssues.errors || []), ...(currGroupedIssues.warnings || []), ...(currGroupedIssues.notices || [])];
+    parsed.issueCountSnapshot = {};
+    for (const issue of allDetectedIssues) {
+      parsed.issueCountSnapshot[issue.check] = issue.value;
+    }
 
     // Save audit
     if (req.user) {

@@ -244,7 +244,26 @@ function computeTechnicalScore(siteIntelligence, robotsTxt, sitemap, pageSpeed, 
         score += 1;
         details.push({ check: 'Browser Caching', score: 1, max: 1, status: 'pass', value: 'Cache-Control header present on homepage' });
     } else {
-        details.push({ check: 'Browser Caching', score: 0, max: 1, status: 'warning', value: 'No Cache-Control header detected', fix: 'Add Cache-Control headers to enable browser caching for faster repeat visits' });
+        details.push({ check: 'Browser Caching', issueType: 'notice', score: 0, max: 1, status: 'warning', value: 'No Cache-Control header detected',
+            aboutThisIssue: 'Without Cache-Control headers, browsers re-download resources on every visit, increasing load times for returning users.',
+            howToFix: 'Add Cache-Control headers to your server config. For static assets: `Cache-Control: public, max-age=31536000`. For HTML: `Cache-Control: public, max-age=3600`.' });
+    }
+
+    // ── Sitemap Orphans (pages in sitemap but not internally linked — Semrush critical metric) ──
+    const sitemapCoverage = siteIntelligence.sitemapCoverage || {};
+    if (sitemapCoverage.available && sitemapCoverage.sitemapUrlsNotCrawledCount > 0) {
+        details.push({ check: 'Sitemap Orphan Pages', issueType: 'warning', score: 0, max: 0, status: 'warning',
+            value: `${sitemapCoverage.sitemapUrlsNotCrawledCount} pages in sitemap but not internally linked`,
+            affectedUrls: (sitemapCoverage.sitemapUrlsNotCrawled || []).slice(0, 15),
+            aboutThisIssue: 'Pages listed in your sitemap but not linked from anywhere on the site are "sitemap orphans." Search engines can find them through the sitemap, but they receive zero internal link equity, making them very hard to rank.',
+            howToFix: 'Add internal links to these pages from relevant content pages. If pages are no longer needed, remove them from the sitemap. Orphan pages often indicate outdated or abandoned content.' });
+    }
+    if (sitemapCoverage.available && sitemapCoverage.pagesNotInSitemapCount > 0) {
+        details.push({ check: 'Crawled Pages Not in Sitemap', issueType: 'notice', score: 0, max: 0, status: 'warning',
+            value: `${sitemapCoverage.pagesNotInSitemapCount} pages found by crawler but not in sitemap.xml`,
+            affectedUrls: (sitemapCoverage.pagesNotInSitemap || []).slice(0, 15),
+            aboutThisIssue: 'Pages that exist on your site but are missing from the sitemap may not be discovered or prioritized by search engines.',
+            howToFix: 'Add these pages to your sitemap.xml. If they are intentionally excluded (e.g., utility pages), ensure they have appropriate meta robots directives.' });
     }
 
     // Lighthouse SEO score (15 pts)
