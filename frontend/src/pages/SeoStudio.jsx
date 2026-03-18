@@ -299,16 +299,44 @@ export default function SeoStudio() {
         const scoreColor = (s) => s >= 80 ? '#16a34a' : s >= 60 ? '#f59e0b' : s >= 40 ? '#f97316' : '#e11d48'
         const scoreGrade = (s) => s >= 80 ? 'A' : s >= 60 ? 'B' : s >= 40 ? 'C' : 'D'
 
-        // ── Build Header — Professional Dual-Brand ──
+        // ── Build Cover Page — Dedicated First Page with Dual Branding ──
         let body = `
+        <div class="cover-page">
+            <div class="cover-gradient">
+                <div class="cover-logos">
+                    <div class="cover-mantram">
+                        <img src="${mantramLogo}" class="cover-mantram-logo" alt="Mantram AI" onerror="this.outerHTML='<span class=\\'cover-mantram-text\\'>Mantram AI</span>'" />
+                        <span class="cover-mantram-label">Mantram AI</span>
+                    </div>
+                    <span class="cover-x">×</span>
+                    <div class="cover-brand">
+                        ${brandLogo ? `<img src="${brandLogo}" class="cover-brand-logo" alt="${brandName}" onerror="this.outerHTML='<div class=\\'cover-brand-initial\\'>${brandName.charAt(0)}</div>'" />` : `<div class="cover-brand-initial">${brandName.charAt(0)}</div>`}
+                        <span class="cover-brand-name">${brandName}</span>
+                    </div>
+                </div>
+                <div class="cover-title-block">
+                    <h1 class="cover-title">${title}</h1>
+                    <p class="cover-subtitle">${brandWebsite}</p>
+                </div>
+                <div class="cover-meta">
+                    <span class="cover-date">${date}</span>
+                    <span class="cover-confidential">Confidential</span>
+                </div>
+                <div class="cover-powered">Powered by Mantram AI — SEO Studio</div>
+            </div>
+        </div>
+        <div class="section-break"></div>
+
         <div class="report-masthead">
             <div class="masthead-bar">
                 <div class="masthead-left">
-                    <img src="${mantramLogo}" class="mantram-header-logo" alt="Mantram AI" onerror="this.outerHTML='<span class=\'mantram-text-logo\'>Mantram AI</span>'" />
+                    <img src="${mantramLogo}" class="mantram-header-logo" alt="Mantram AI" onerror="this.outerHTML='<span class=\\'mantram-text-logo\\'>Mantram AI</span>'" />
                     <span class="masthead-divider">|</span>
                     <span class="masthead-studio">SEO Studio</span>
                 </div>
                 <div class="masthead-right">
+                    ${brandLogo ? `<img src="${brandLogo}" class="masthead-brand-logo" alt="${brandName}" onerror="this.style.display='none'" />` : ''}
+                    <span class="masthead-brand-name">${brandName}</span>
                     <span class="masthead-date">${date}</span>
                 </div>
             </div>
@@ -732,6 +760,25 @@ small{color:#94a3b8;font-size:10px}
 .ai-breakdown{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px 18px;margin:8px 0}
 .ai-breakdown h3{font-size:12px;font-weight:700;color:#334155;text-transform:capitalize}
 
+/* ── Cover Page ── */
+.cover-page{page-break-after:always;margin:-24px -32px 0 -32px;padding:0}
+.cover-gradient{min-height:92vh;background:linear-gradient(160deg,#0f0a2e 0%,#1e1b4b 30%,#312e81 60%,#4338ca 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:60px 40px;border-radius:0}
+.cover-logos{display:flex;align-items:center;gap:28px;margin-bottom:48px}
+.cover-mantram,.cover-brand{display:flex;flex-direction:column;align-items:center;gap:10px}
+.cover-mantram-logo{height:48px;filter:brightness(10)}
+.cover-mantram-text{font-size:28px;font-weight:900;color:#fff;letter-spacing:1px}
+.cover-mantram-label{font-size:14px;font-weight:700;color:rgba(255,255,255,0.8);letter-spacing:1px;text-transform:uppercase}
+.cover-brand-logo{height:48px;max-width:140px;object-fit:contain;border-radius:8px}
+.cover-brand-initial{width:56px;height:56px;border-radius:14px;background:rgba(255,255,255,0.15);color:#fff;font-size:28px;font-weight:900;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(10px)}
+.cover-brand-name{font-size:14px;font-weight:700;color:rgba(255,255,255,0.8);letter-spacing:0.5px}
+.cover-x{font-size:24px;color:rgba(255,255,255,0.25);font-weight:300;margin:0 8px}
+.cover-title-block{margin-bottom:40px}
+.cover-title{font-size:34px;font-weight:900;color:#fff;letter-spacing:-0.5px;margin:0 0 8px 0;text-shadow:0 2px 4px rgba(0,0,0,0.2)}
+.cover-subtitle{font-size:14px;color:rgba(255,255,255,0.5);margin:0;letter-spacing:0.5px}
+.cover-meta{display:flex;gap:20px;margin-bottom:48px}
+.cover-date,.cover-confidential{font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.5px;font-weight:600}
+.cover-powered{font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1.5px;text-transform:uppercase}
+
 /* ── Mantram Masthead ── */
 .report-masthead{margin:-32px -40px 20px -40px;padding:0}
 .masthead-bar{display:flex;justify-content:space-between;align-items:center;padding:10px 40px;background:linear-gradient(135deg,#1e1b4b,#312e81);border-radius:12px 12px 0 0}
@@ -740,8 +787,10 @@ small{color:#94a3b8;font-size:10px}
 .mantram-text-logo{font-size:14px;font-weight:900;color:#fff;letter-spacing:0.5px}
 .masthead-divider{color:rgba(255,255,255,0.3);font-size:16px}
 .masthead-studio{font-size:11px;font-weight:700;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:1px}
+.masthead-brand-logo{height:18px;max-width:80px;object-fit:contain;border-radius:4px;margin-right:6px}
+.masthead-brand-name{font-size:11px;font-weight:700;color:rgba(255,255,255,0.7);margin-right:10px}
 .masthead-date{font-size:10px;color:rgba(255,255,255,0.5)}
-.masthead-right{text-align:right}
+.masthead-right{display:flex;align-items:center;text-align:right}
 
 /* ── Trend Arrows ── */
 .trend-up{color:#16a34a;font-size:10px;font-weight:800;margin-left:4px}
@@ -779,6 +828,8 @@ small{color:#94a3b8;font-size:10px}
 @media print{
     body{padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     .page{padding:24px 32px}
+    .cover-page{page-break-after:always;margin:0;padding:0}
+    .cover-gradient{min-height:100vh;border-radius:0}
     .section-break{page-break-before:auto}
     table{page-break-inside:auto}
     tr{page-break-inside:avoid}

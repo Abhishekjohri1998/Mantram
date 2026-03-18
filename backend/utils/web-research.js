@@ -4,8 +4,111 @@
  * Crawls pages, extracts structured data, and builds site intelligence.
  */
 
-const USER_AGENT = 'MantramAI-SEOBot/1.0 (+https://mantram.ai)';
+const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 const FETCH_TIMEOUT = 12000; // 12s
+
+// ============================================================================
+// PLAYWRIGHT JS RENDERING (for accurate H1 + alt-text detection)
+// ============================================================================
+
+let _playwrightAvailable = null;
+async function getPlaywright() {
+  if (_playwrightAvailable !== null) return _playwrightAvailable;
+  try {
+    const pw = await import('playwright');
+    _playwrightAvailable = pw.default || pw;
+    return _playwrightAvailable;
+  } catch {
+    _playwrightAvailable = false;
+    console.warn('⚠️  Playwright not available — falling back to static HTML parsing');
+    return false;
+  }
+}
+
+/**
+ * Render pages with Chromium JS and extract accurate H1 + visible image data.
+ * Uses a SINGLE shared browser with concurrent tabs for performance.
+ * @param {string[]} urls - URLs to render
+ * @param {number} concurrency - Number of parallel browser tabs
+ * @returns {Map<string, { h1: string[], imageCount: number, imagesWithoutAlt: number }>}
+ */
+async function renderPagesWithJS(urls, concurrency = 3) {
+  const pw = await getPlaywright();
+  if (!pw) return new Map();
+
+  const results = new Map();
+  let browser;
+  try {
+    browser = await pw.chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'] });
+    const context = await browser.newContext({
+      userAgent: USER_AGENT,
+      viewport: { width: 1280, height: 800 },
+      ignoreHTTPSErrors: true,
+    });
+
+    console.log(`🎭 Playwright: rendering ${urls.length} pages (${concurrency} concurrent tabs)...`);
+    const startTime = Date.now();
+
+    // Process in batches
+    for (let i = 0; i < urls.length; i += concurrency) {
+      const batch = urls.slice(i, i + concurrency);
+      const batchResults = await Promise.all(batch.map(async (url) => {
+        let page;
+        try {
+          page = await context.newPage();
+          await page.goto(url, { waitUntil: 'networkidle', timeout: 8000 });
+          
+          // Wait briefly for any late JS rendering
+          await page.waitForTimeout(500);
+
+          // Extract H1 tags from rendered DOM
+          const h1Tags = await page.evaluate(() => {
+            const h1s = document.querySelectorAll('h1');
+            return Array.from(h1s).map(h => h.textContent?.trim()).filter(Boolean);
+          });
+
+          // Extract visible images and check alt text
+          const imageData = await page.evaluate(() => {
+            const imgs = document.querySelectorAll('img');
+            let total = 0;
+            let withoutAlt = 0;
+            for (const img of imgs) {
+              // Only count visible images (not hidden, not 0-size, not tracking pixels)
+              const rect = img.getBoundingClientRect();
+              const style = window.getComputedStyle(img);
+              if (rect.width < 2 || rect.height < 2) continue;
+              if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') continue;
+              // Skip tracking pixels and tiny icons
+              if (img.naturalWidth < 2 && img.naturalHeight < 2) continue;
+              total++;
+              if (!img.alt || img.alt.trim() === '') withoutAlt++;
+            }
+            return { total, withoutAlt };
+          });
+
+          return { url, h1: h1Tags, imageCount: imageData.total, imagesWithoutAlt: imageData.withoutAlt };
+        } catch (e) {
+          return { url, h1: null, imageCount: null, imagesWithoutAlt: null, error: e.message };
+        } finally {
+          if (page) await page.close().catch(() => {});
+        }
+      }));
+
+      for (const r of batchResults) {
+        if (r.h1 !== null) results.set(r.url, r);
+      }
+    }
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`🎭 Playwright: rendered ${results.size}/${urls.length} pages in ${elapsed}s`);
+  } catch (e) {
+    console.error('🎭 Playwright error:', e.message);
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+  }
+
+  return results;
+}
 
 // ============================================================================
 // FETCH HELPER
@@ -1057,6 +1160,36 @@ export async function researchDomain(baseUrl) {
     const allPages = [homepage, ...allSubPages];
     const crawlElapsed = ((Date.now() - crawlStartTime) / 1000).toFixed(1);
     console.log(`🕷️  Crawl complete: ${allPages.length} pages in ${crawlElapsed}s (queue had ${toCrawl.length} URLs)`);
+
+    // PHASE 3.5: Playwright JS rendering for accurate H1 + visible image detection
+    // This overrides static HTML headings with fully-rendered DOM headings
+    try {
+      const pageUrls = allPages.filter(p => p.success !== false).map(p => p.url);
+      const jsRendered = await renderPagesWithJS(pageUrls, 5);
+      if (jsRendered.size > 0) {
+        let h1Overrides = 0;
+        let imgOverrides = 0;
+        for (const page of allPages) {
+          const rendered = jsRendered.get(page.url);
+          if (rendered) {
+            // Override H1 with JS-rendered H1
+            page.h1 = rendered.h1;
+            // Override headings array h1 entries
+            const nonH1Headings = (page.headings || []).filter(h => h.level !== 1);
+            page.headings = [...rendered.h1.map(text => ({ level: 1, text })), ...nonH1Headings];
+            h1Overrides++;
+            // Override image data with visible-only counts
+            if (rendered.imageCount !== null) {
+              page.images = { ...page.images, total: rendered.imageCount, withoutAlt: rendered.imagesWithoutAlt };
+              imgOverrides++;
+            }
+          }
+        }
+        console.log(`🎭 Overrode H1 on ${h1Overrides} pages, images on ${imgOverrides} pages`);
+      }
+    } catch (pwErr) {
+      console.warn('🎭 Playwright pass failed (non-fatal, using static HTML):', pwErr.message);
+    }
 
     // PHASE 4: Compute duplicate content
     const duplicateContent = computeDuplicates(allPages);
