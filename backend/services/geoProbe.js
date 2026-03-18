@@ -205,32 +205,87 @@ async function probePerplexity(prompt) {
 }
 
 // ============================================================================
-// LLM-BASED SENTIMENT ANALYSIS (replaces keyword counting)
+// LLM-BASED SENTIMENT ANALYSIS (multi-model fallback chain)
+// Priority: Perplexity (grounded) → OpenAI (fast) → Gemini (fallback)
 // ============================================================================
 
 async function analyzeSentimentViaLLM(text, brandName) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey || !text || text.length < 20) return 'neutral';
+    if (!text || text.length < 20) return 'neutral';
+    const sentimentPrompt = `Analyze the sentiment about "${brandName}" in this text. Respond with ONLY one word: positive, neutral, or negative.\n\nText: "${text.substring(0, 500)}"`;
 
-    try {
-        const resp = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-            {
+    // Try Perplexity first (grounded, web-aware sentiment)
+    const perplexityKey = process.env.PERPLEXITY_API_KEY;
+    if (perplexityKey) {
+        try {
+            const resp = await fetch('https://api.perplexity.ai/chat/completions', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${perplexityKey}` },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: `Analyze the sentiment about "${brandName}" in this text. Respond with ONLY one word: positive, neutral, or negative.\n\nText: "${text.substring(0, 500)}"` }] }],
-                    generationConfig: { temperature: 0, maxOutputTokens: 10 },
+                    model: 'sonar', max_tokens: 10, temperature: 0,
+                    messages: [{ role: 'user', content: sentimentPrompt }],
                 }),
+                signal: AbortSignal.timeout(5000),
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                const result = (data?.choices?.[0]?.message?.content || '').toLowerCase().trim();
+                if (result.includes('positive')) return 'positive';
+                if (result.includes('negative')) return 'negative';
+                if (result.includes('neutral')) return 'neutral';
             }
-        );
-        if (!resp.ok) return 'neutral';
-        const data = await resp.json();
-        const result = (data?.candidates?.[0]?.content?.parts?.[0]?.text || '').toLowerCase().trim();
-        if (result.includes('positive')) return 'positive';
-        if (result.includes('negative')) return 'negative';
-        return 'neutral';
-    } catch (e) { return 'neutral'; }
+        } catch (_) { /* fallthrough */ }
+    }
+
+    // Try OpenAI (fast, reliable classification)
+    const openaiKey = process.env.OPENAI_API_KEY;
+    if (openaiKey) {
+        try {
+            const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
+                body: JSON.stringify({
+                    model: 'gpt-4o-mini', max_tokens: 10, temperature: 0,
+                    messages: [{ role: 'user', content: sentimentPrompt }],
+                }),
+                signal: AbortSignal.timeout(5000),
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                const result = (data?.choices?.[0]?.message?.content || '').toLowerCase().trim();
+                if (result.includes('positive')) return 'positive';
+                if (result.includes('negative')) return 'negative';
+                if (result.includes('neutral')) return 'neutral';
+            }
+        } catch (_) { /* fallthrough */ }
+    }
+
+    // Fallback: Gemini Flash
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (geminiKey) {
+        try {
+            const resp = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: sentimentPrompt }] }],
+                        generationConfig: { temperature: 0, maxOutputTokens: 10 },
+                    }),
+                    signal: AbortSignal.timeout(5000),
+                }
+            );
+            if (resp.ok) {
+                const data = await resp.json();
+                const result = (data?.candidates?.[0]?.content?.parts?.[0]?.text || '').toLowerCase().trim();
+                if (result.includes('positive')) return 'positive';
+                if (result.includes('negative')) return 'negative';
+                return 'neutral';
+            }
+        } catch (_) { /* fallthrough */ }
+    }
+
+    return 'neutral';
 }
 
 // ============================================================================

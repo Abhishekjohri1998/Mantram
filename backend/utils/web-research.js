@@ -853,9 +853,13 @@ export async function researchDomain(baseUrl) {
     // Re-render with headless Chrome to get the actual DOM content
     if ((homepage.wordCount || 0) < 300) {
         try {
-            console.log(`🖥️  Homepage has ${homepage.wordCount} words — likely SPA. Trying Puppeteer JS rendering...`);
-            const { jsRenderCrawl } = await import('./js-crawler.js');
-            const jsResult = await jsRenderCrawl(cleanBase, { maxPages: 1, mobile: false });
+            console.log(`🖥️  Homepage has ${homepage.wordCount} words — likely SPA. Trying Puppeteer JS rendering (12s timeout)...`);
+            const puppeteerTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Puppeteer timeout (12s)')), 12000));
+            const puppeteerRender = (async () => {
+                const { jsRenderCrawl } = await import('./js-crawler.js');
+                return jsRenderCrawl(cleanBase, { maxPages: 1, mobile: false });
+            })();
+            const jsResult = await Promise.race([puppeteerRender, puppeteerTimeout]);
             if (jsResult?.pages?.[0]?.wordCount > homepage.wordCount) {
                 const jp = jsResult.pages[0];
                 console.log(`🖥️  Puppeteer got ${jp.wordCount} words (vs ${homepage.wordCount} from fetch). Using rendered content.`);

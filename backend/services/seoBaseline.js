@@ -57,7 +57,9 @@ function computeTechnicalScore(siteIntelligence, robotsTxt, sitemap, pageSpeed, 
         score += 5;
         details.push({ check: 'Mobile Viewport', score: 5, max: 5, status: 'pass' });
     } else {
-        details.push({ check: 'Mobile Viewport', score: 0, max: 5, status: 'fail', fix: 'Add <meta name="viewport" content="width=device-width, initial-scale=1"> to all pages' });
+        details.push({ check: 'Mobile Viewport', issueType: 'error', score: 0, max: 5, status: 'fail',
+            aboutThisIssue: 'Without a viewport meta tag, mobile devices render the page at desktop width, making text unreadable and navigation impossible. Google uses mobile-first indexing, so this directly impacts rankings.',
+            howToFix: 'Add <meta name="viewport" content="width=device-width, initial-scale=1"> to the <head> of every page.' });
     }
 
     // Canonical tags (5 pts)
@@ -65,7 +67,9 @@ function computeTechnicalScore(siteIntelligence, robotsTxt, sitemap, pageSpeed, 
         score += 5;
         details.push({ check: 'Canonical Tags', score: 5, max: 5, status: 'pass' });
     } else {
-        details.push({ check: 'Canonical Tags', score: 0, max: 5, status: 'fail', fix: 'Add <link rel="canonical"> to prevent duplicate content issues' });
+        details.push({ check: 'Canonical Tags', issueType: 'warning', score: 0, max: 5, status: 'fail',
+            aboutThisIssue: 'Without canonical tags, search engines may treat URL variations (with/without trailing slashes, query parameters) as separate pages, splitting ranking signals.',
+            howToFix: 'Add <link rel="canonical" href="preferred-url"> to every page. Self-referencing canonicals are a best practice.' });
     }
 
     // PageSpeed Performance (20 pts) — scaled from 0-100 Lighthouse score
@@ -92,21 +96,27 @@ function computeTechnicalScore(siteIntelligence, robotsTxt, sitemap, pageSpeed, 
             const lcpMs = cwv.lcp.value;
             const lcpScore = lcpMs <= 2500 ? 5 : lcpMs <= 4000 ? 3 : 1;
             score += lcpScore;
-            details.push({ check: 'LCP (Largest Contentful Paint)', score: lcpScore, max: 5, status: lcpScore === 5 ? 'pass' : lcpScore === 3 ? 'warning' : 'fail', value: `${lcpMs}ms` });
+            details.push({ check: 'LCP (Largest Contentful Paint)', issueType: lcpScore <= 1 ? 'error' : lcpScore <= 3 ? 'warning' : undefined, score: lcpScore, max: 5, status: lcpScore === 5 ? 'pass' : lcpScore === 3 ? 'warning' : 'fail', value: `${lcpMs}ms`,
+                aboutThisIssue: lcpScore < 5 ? 'LCP measures how long it takes for the largest visible element to render. Poor LCP (>2.5s) directly hurts Core Web Vitals ranking signal.' : undefined,
+                howToFix: lcpScore < 5 ? 'Optimize images (use WebP/AVIF), preload critical resources, reduce server response time, and minimize render-blocking CSS/JS.' : undefined });
         }
         // CLS — Good: <0.1, Needs Improvement: <0.25, Poor: >=0.25
         if (cwv.cls) {
             const clsVal = cwv.cls.value;
             const clsScore = clsVal <= 0.1 ? 5 : clsVal <= 0.25 ? 3 : 1;
             score += clsScore;
-            details.push({ check: 'CLS (Cumulative Layout Shift)', score: clsScore, max: 5, status: clsScore === 5 ? 'pass' : clsScore === 3 ? 'warning' : 'fail', value: `${clsVal}` });
+            details.push({ check: 'CLS (Cumulative Layout Shift)', issueType: clsScore <= 1 ? 'error' : clsScore <= 3 ? 'warning' : undefined, score: clsScore, max: 5, status: clsScore === 5 ? 'pass' : clsScore === 3 ? 'warning' : 'fail', value: `${clsVal}`,
+                aboutThisIssue: clsScore < 5 ? 'CLS measures visual stability. High CLS (>0.1) means page elements shift while loading, creating a frustrating user experience and hurting rankings.' : undefined,
+                howToFix: clsScore < 5 ? 'Set explicit width/height on images and videos. Avoid inserting content above existing content. Use CSS contain for dynamic elements.' : undefined });
         }
         // INP — Good: <200ms, Needs Improvement: <500ms, Poor: >=500ms
         if (cwv.inp) {
             const inpMs = cwv.inp.value;
             const inpScore = inpMs <= 200 ? 5 : inpMs <= 500 ? 3 : 1;
             score += inpScore;
-            details.push({ check: 'INP (Interaction to Next Paint)', score: inpScore, max: 5, status: inpScore === 5 ? 'pass' : inpScore === 3 ? 'warning' : 'fail', value: `${inpMs}ms` });
+            details.push({ check: 'INP (Interaction to Next Paint)', issueType: inpScore <= 1 ? 'error' : inpScore <= 3 ? 'warning' : undefined, score: inpScore, max: 5, status: inpScore === 5 ? 'pass' : inpScore === 3 ? 'warning' : 'fail', value: `${inpMs}ms`,
+                aboutThisIssue: inpScore < 5 ? 'INP measures responsiveness to user interactions. Poor INP (>200ms) means buttons and links feel sluggish, hurting user engagement and rankings.' : undefined,
+                howToFix: inpScore < 5 ? 'Break up long JavaScript tasks, defer non-critical scripts, optimize event handlers, and use web workers for heavy computation.' : undefined });
         }
     }
 
@@ -115,7 +125,10 @@ function computeTechnicalScore(siteIntelligence, robotsTxt, sitemap, pageSpeed, 
     const redirectScore = 8 - redirectPenalty;
     score += Math.max(0, redirectScore);
     if (siteIntelligence.redirectChainCount > 0) {
-        details.push({ check: 'Redirect Chains', score: Math.max(0, redirectScore), max: 8, status: redirectScore <= 3 ? 'fail' : 'warning', value: `${siteIntelligence.redirectChainCount} chains found`, fix: 'Fix redirect chains — each hop adds latency and dilutes link equity' });
+        details.push({ check: 'Redirect Chains', issueType: 'warning', score: Math.max(0, redirectScore), max: 8, status: redirectScore <= 3 ? 'fail' : 'warning',
+            value: `${siteIntelligence.redirectChainCount} chains found`,
+            aboutThisIssue: 'Redirect chains (A→B→C→D) add latency with each hop and dilute PageRank by ~10-15% per redirect. Search engines may stop following after 5 redirects.',
+            howToFix: 'Update redirects to point directly to the final destination URL. Replace chains with single 301 redirects. Check .htaccess, nginx config, and CMS redirect plugins.' });
     } else {
         details.push({ check: 'Redirect Chains', score: 8, max: 8, status: 'pass' });
     }
@@ -127,7 +140,9 @@ function computeTechnicalScore(siteIntelligence, robotsTxt, sitemap, pageSpeed, 
         score += schemaScore;
         details.push({ check: 'Structured Data (Schema.org)', score: schemaScore, max: 7, status: schemaScore >= 5 ? 'pass' : 'warning', value: siteIntelligence.schemaTypes.join(', ') });
     } else {
-        details.push({ check: 'Structured Data (Schema.org)', score: 0, max: 7, status: 'fail', fix: 'Add JSON-LD structured data (Organization, LocalBusiness, Product, FAQ) for rich results' });
+        details.push({ check: 'Structured Data (Schema.org)', issueType: 'warning', score: 0, max: 7, status: 'fail',
+            aboutThisIssue: 'Without structured data, search engines cannot display rich results (stars, prices, FAQs, events) and AI models have difficulty understanding your entity type and offerings.',
+            howToFix: 'Add JSON-LD structured data: Organization schema on homepage, Product/Service on product pages, FAQ on Q&A pages, BreadcrumbList for navigation. Use Google Rich Results Test to validate.' });
     }
 
     // Security Headers (5 pts — unique: Semrush/Ahrefs don't check this)
@@ -136,30 +151,43 @@ function computeTechnicalScore(siteIntelligence, robotsTxt, sitemap, pageSpeed, 
     score += securityPts;
     details.push({
         check: 'Security Headers',
+        issueType: securityPts < 2 ? 'warning' : securityPts < 4 ? 'notice' : undefined,
         score: securityPts,
         max: 5,
         status: securityPts >= 4 ? 'pass' : securityPts >= 2 ? 'warning' : 'fail',
         value: `${secScore.score || 0}/${secScore.total || 7} headers present (${secScore.percentage || 0}%)`,
-        fix: securityPts < 4 ? 'Add security headers: Content-Security-Policy, Strict-Transport-Security, X-Frame-Options, X-Content-Type-Options' : undefined,
+        aboutThisIssue: securityPts < 4 ? 'Missing security headers expose your site to XSS, clickjacking, and MIME-type attacks. Google considers site security a trust signal.' : undefined,
+        howToFix: securityPts < 4 ? 'Add headers in your server config: Strict-Transport-Security, Content-Security-Policy, X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy, Permissions-Policy.' : undefined,
     });
 
     // Mixed Content (penalty from HTTPS score, -3 max)
     if (siteIntelligence.mixedContentCount > 0) {
         const mixPenalty = Math.min(3, siteIntelligence.mixedContentCount);
         score -= mixPenalty;
-        details.push({ check: 'Mixed Content', score: -mixPenalty, max: 0, status: 'fail', value: `${siteIntelligence.mixedContentCount} pages load HTTP resources on HTTPS`, fix: 'Update all resource URLs to HTTPS to fix mixed content warnings' });
+        details.push({ check: 'Mixed Content (HTTPS→HTTP)', issueType: 'error', score: -mixPenalty, max: 0, status: 'fail',
+            value: `${siteIntelligence.mixedContentCount} pages load HTTP resources on HTTPS`,
+            affectedUrls: (siteIntelligence.mixedContentPages || []).slice(0, 10).map(p => p.url),
+            aboutThisIssue: 'Mixed content occurs when HTTPS pages load resources (images, scripts, stylesheets) over insecure HTTP. Browsers may block these resources, breaking page functionality and showing security warnings.',
+            howToFix: 'Update all resource URLs from http:// to https://. Use protocol-relative URLs (//example.com/file.js) or absolute HTTPS URLs. Check CSS, JavaScript, and image embeds.' });
     }
 
     // Response Time (penalty, -3 max)
     if (siteIntelligence.responseTime?.slowPageCount > 0) {
         const rtPenalty = Math.min(3, siteIntelligence.responseTime.slowPageCount);
         score -= rtPenalty;
-        details.push({ check: 'Slow Response Time', score: -rtPenalty, max: 0, status: 'fail', value: `${siteIntelligence.responseTime.slowPageCount} pages >3s TTFB (avg: ${siteIntelligence.responseTime.avg}ms)`, fix: 'Optimize server response time — enable caching, upgrade hosting, optimize database queries' });
+        details.push({ check: 'Slow Server Response Time', issueType: 'warning', score: -rtPenalty, max: 0, status: 'fail',
+            value: `${siteIntelligence.responseTime.slowPageCount} pages >3s TTFB (avg: ${siteIntelligence.responseTime.avg}ms)`,
+            affectedUrls: (siteIntelligence.responseTime.slowPages || []).slice(0, 10).map(p => p.url),
+            aboutThisIssue: 'Server response time (TTFB) >3s means users and search bots wait too long before seeing any content. Google recommends TTFB under 200ms for optimal experience.',
+            howToFix: 'Enable server-side caching (Redis, Varnish), optimize database queries, upgrade to faster hosting, use a CDN for static assets, and enable gzip/brotli compression.' });
     }
 
-    // Meta Robots Issues (penalty, -3 max)
+    // Meta Robots Issues
     if (siteIntelligence.metaRobotsIssues?.noindexCount > 0) {
-        details.push({ check: 'Noindex Pages Detected', score: 0, max: 0, status: 'warning', value: `${siteIntelligence.metaRobotsIssues.noindexCount} pages have noindex — verify this is intentional` });
+        details.push({ check: 'Noindex Pages Detected', issueType: 'notice', score: 0, max: 0, status: 'warning',
+            value: `${siteIntelligence.metaRobotsIssues.noindexCount} pages have noindex — verify this is intentional`,
+            aboutThisIssue: 'Pages with noindex are excluded from search results. If this is unintentional, important content is invisible to search engines.',
+            howToFix: 'Review each noindexed page. If it should be indexable, remove the meta robots noindex tag. Common causes: staging settings left on, CMS defaults, or security plugins.' });
     }
 
     // ── Broken External Links (penalty, -3 max) ──
@@ -471,21 +499,94 @@ function computeOnPageScore(siteIntelligence, pages) {
     if (emptyAnchors > 0) {
         const anchorPenalty = Math.min(2, Math.ceil(emptyAnchors / 3));
         score -= anchorPenalty;
-        details.push({ check: 'Empty Anchor Text', score: -anchorPenalty, max: 0, status: 'warning', value: `${emptyAnchors} links have empty anchor text`, fix: 'Add descriptive anchor text to all links for better accessibility and SEO' });
+        details.push({ check: 'Empty Anchor Text', issueType: 'notice', score: -anchorPenalty, max: 0, status: 'warning',
+            value: `${emptyAnchors} links have empty anchor text`,
+            aboutThisIssue: 'Links without anchor text provide no context to search engines about the destination page, wasting an opportunity to pass keyword relevance.',
+            howToFix: 'Add descriptive, keyword-relevant anchor text to all internal links. Replace generic text like "click here" with topic-specific descriptions.' });
     }
 
-    // ── NEW R2: Nofollow Internal Links (warning) ──
+    // ── Nofollow Internal Links (warning) ──
     const nofollowInternal = siteIntelligence.nofollowInternalCount || 0;
     if (nofollowInternal > 0) {
-        details.push({ check: 'Nofollow Internal Links', score: 0, max: 0, status: 'warning', value: `${nofollowInternal} internal links use rel="nofollow"`, fix: 'Remove nofollow from internal links — it wastes crawl budget and blocks link equity flow' });
+        details.push({ check: 'Nofollow Internal Links', issueType: 'warning', score: 0, max: 0, status: 'warning',
+            value: `${nofollowInternal} internal links use rel="nofollow"`,
+            aboutThisIssue: 'Nofollow on internal links tells search engines not to follow or pass equity. This wastes crawl budget and prevents PageRank from flowing to important pages.',
+            howToFix: 'Remove rel="nofollow" from internal links unless intentionally blocking specific pages (e.g., login pages). Internal links should always pass equity.' });
     }
 
-    // ── NEW R2: Conflicting Canonicals (penalty, -2 max) ──
+    // ── Conflicting Canonicals (penalty, -2 max) ──
     const canonConflicts = siteIntelligence.conflictingCanonicals?.length || 0;
     if (canonConflicts > 0) {
         const canonPenalty = Math.min(2, canonConflicts);
         score -= canonPenalty;
-        details.push({ check: 'Conflicting Canonical Tags', score: -canonPenalty, max: 0, status: 'fail', value: `${canonConflicts} pages have canonical pointing to different URL`, fix: 'Ensure canonical tags point to the correct/preferred version of each page' });
+        details.push({ check: 'Conflicting Canonical Tags', issueType: 'error', score: -canonPenalty, max: 0, status: 'fail',
+            value: `${canonConflicts} pages have canonical pointing to different URL`,
+            affectedUrls: (siteIntelligence.conflictingCanonicals || []).slice(0, 10).map(c => c.url),
+            aboutThisIssue: 'When a canonical tag points to a different URL, search engines may consolidate signals to the canonical target, effectively de-indexing the current page.',
+            howToFix: 'Ensure canonical tags are self-referencing unless you intentionally want to consolidate pages. Check for CMS plugins auto-adding wrong canonicals.' });
+    }
+
+    // ── NEW: Pages With Too Many Links (>100) ──
+    const tooManyLinksPages = pages.filter(p => ((p.internalLinkCount || 0) + (p.externalLinkCount || 0)) > 100);
+    if (tooManyLinksPages.length > 0) {
+        const linkPenalty = Math.min(2, tooManyLinksPages.length);
+        score -= linkPenalty;
+        details.push({ check: 'Pages With Too Many Links (>100)', issueType: 'warning', score: -linkPenalty, max: 0, status: 'warning',
+            value: `${tooManyLinksPages.length} pages have more than 100 links`,
+            affectedUrls: tooManyLinksPages.slice(0, 10).map(p => p.url),
+            aboutThisIssue: 'Pages with excessive links dilute the PageRank passed to each linked page and may confuse search engine crawlers about page hierarchy.',
+            howToFix: 'Reduce the number of links per page to under 100. Prioritize the most important internal links and consolidate navigation menus. Use nofollow for non-essential external links.' });
+    }
+
+    // ── NEW: Canonical + Noindex Conflict ──
+    const canonNoindexConflict = pages.filter(p => {
+        const hasNoindex = (p.robots || '').toLowerCase().includes('noindex') || (p.metaRobots?.noindex);
+        const hasCanonical = !!(p.canonicalUrl || p.canonical);
+        return hasNoindex && hasCanonical;
+    });
+    if (canonNoindexConflict.length > 0) {
+        details.push({ check: 'Canonical + Noindex Conflict', issueType: 'error', score: 0, max: 0, status: 'fail',
+            value: `${canonNoindexConflict.length} pages have both canonical and noindex`,
+            affectedUrls: canonNoindexConflict.slice(0, 10).map(p => p.url),
+            aboutThisIssue: 'Having both a canonical tag and noindex directive sends conflicting signals to search engines. The canonical says "index the preferred version" while noindex says "don\'t index this page." Google may ignore one or both.',
+            howToFix: 'Remove the noindex directive if the page should be indexed (keep canonical). Or remove the canonical if the page should genuinely be noindexed.' });
+    }
+
+    // ── NEW: Duplicate H2 Tags Across Pages ──
+    const h2Map = {};
+    for (const p of pages) {
+        for (const h2 of (p.h2 || [])) {
+            const h2Lower = h2.toLowerCase().trim();
+            if (h2Lower.length > 5) {
+                (h2Map[h2Lower] = h2Map[h2Lower] || []).push(p.url);
+            }
+        }
+    }
+    const duplicateH2s = Object.entries(h2Map).filter(([, urls]) => urls.length > 2);
+    if (duplicateH2s.length > 0) {
+        details.push({ check: 'Duplicate H2 Headings', issueType: 'notice', score: 0, max: 0, status: 'warning',
+            value: `${duplicateH2s.length} H2 headings are repeated across 3+ pages`,
+            aboutThisIssue: 'Identical H2 headings across multiple pages suggest templated or boilerplate content. Unique headings help search engines understand each page\'s distinct focus.',
+            howToFix: 'Write unique, page-specific H2 headings that reflect each page\'s content. Replace generic headings like "Our Services" with specific ones like "Digital Marketing Services for Healthcare."' });
+    }
+
+    // ── NEW: Missing OG Tags Per Page (not just homepage) ──
+    const missingOgPages = pages.filter(p => !p.ogTitle && !p.ogDescription);
+    if (missingOgPages.length > pages.length * 0.5 && pages.length > 3) {
+        details.push({ check: 'Missing Open Graph Tags', issueType: 'notice', score: 0, max: 0, status: 'warning',
+            value: `${missingOgPages.length}/${pages.length} pages lack OG tags`,
+            aboutThisIssue: 'Without Open Graph tags, social media platforms generate poor previews when pages are shared, reducing click-through rates from social traffic.',
+            howToFix: 'Add og:title, og:description, and og:image meta tags to every page. Most CMS platforms have SEO plugins that auto-generate OG tags from page content.' });
+    }
+
+    // ── NEW: Unoptimized Images ──
+    const imgTotal = siteIntelligence.totalImages || 0;
+    const imgNoAlt = siteIntelligence.imagesWithoutAlt || 0;
+    if (imgTotal > 50 && imgNoAlt > imgTotal * 0.3) {
+        details.push({ check: 'Unoptimized Images', issueType: 'warning', score: 0, max: 0, status: 'warning',
+            value: `${imgNoAlt} of ${imgTotal} images lack alt text (${Math.round(imgNoAlt / imgTotal * 100)}%)`,
+            aboutThisIssue: 'Large numbers of images without alt text suggests images are not optimized for SEO. Alt text helps search engines understand image content and improves accessibility.',
+            howToFix: 'Add descriptive alt text to all images. Use image compression tools (TinyPNG, Squoosh) to reduce file sizes. Convert to modern formats (WebP/AVIF) for 25-50% size reduction.' });
     }
 
     return { score: Math.min(100, Math.max(0, score)), details };
