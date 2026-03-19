@@ -248,7 +248,7 @@ async function loadBrand(brandId, userId) {
 // HEALTH CHECK — Real crawl + AI analysis
 // ============================================================================
 
-router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits('seoHealthCheck'), async (req, res) => {
+router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits('seoHealthCheck'), async (req, res, next) => {
   try {
     const { url, brand: brandPayload, brandId } = req.body;
 
@@ -887,7 +887,7 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
 // GET ME TRAFFIC — Real crawl + keyword research
 // ============================================================================
 
-router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seoTraffic'), async (req, res) => {
+router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seoTraffic'), async (req, res, next) => {
   try {
     const { url, brand: brandPayload, brandId, industry, country } = req.body;
 
@@ -1173,7 +1173,7 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
 // BEAT COMPETITORS — Real competitor research
 // ============================================================================
 
-router.post('/competitors', protect, requireStudio('seoStudio'), requireCredits('seoCompetitors'), async (req, res) => {
+router.post('/competitors', protect, requireStudio('seoStudio'), requireCredits('seoCompetitors'), async (req, res, next) => {
   try {
     const { url, brand: brandPayload, brandId, competitorUrls } = req.body;
 
@@ -1356,7 +1356,7 @@ Be STRATEGIC and SPECIFIC. Every insight must have a WHY and an actionable HOW. 
 // AI VISIBILITY — Real structured data audit
 // ============================================================================
 
-router.post('/ai-visibility', protect, requireStudio('seoStudio'), requireCredits('seoAiVisibility'), async (req, res) => {
+router.post('/ai-visibility', protect, requireStudio('seoStudio'), requireCredits('seoAiVisibility'), async (req, res, next) => {
   try {
     const { url, brand: brandPayload, brandId, customPrompts } = req.body;
 
@@ -1602,7 +1602,7 @@ STRATEGIC RULES (MANDATORY):
 });
 
 // ── GEO History / Trends ──
-router.get('/geo-history', protect, async (req, res) => {
+router.get('/geo-history', protect, async (req, res, next) => {
   try {
     const { brandId, limit } = req.query;
     if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
@@ -1637,7 +1637,7 @@ router.get('/geo-history', protect, async (req, res) => {
 // ON-PAGE AUDIT
 // ============================================================================
 
-router.post('/audit-page', protect, requireStudio('seoStudio'), requireCredits('seoAuditPage'), async (req, res) => {
+router.post('/audit-page', protect, requireStudio('seoStudio'), requireCredits('seoAuditPage'), async (req, res, next) => {
   try {
     const { pageUrl, brand: brandPayload, brandId, keyword } = req.body;
     if (!pageUrl) return res.status(400).json({ success: false, error: 'Page URL is required' });
@@ -1702,7 +1702,7 @@ Respond in JSON:
 // ============================================================================
 
 // POST /api/seo-studio/competitors/manage — Add/remove competitors
-router.post('/competitors/manage', protect, async (req, res) => {
+router.post('/competitors/manage', protect, async (req, res, next) => {
   try {
     const { brandId, action, competitor } = req.body;
     if (!brandId) return res.status(400).json({ success: false, error: 'Brand ID required' });
@@ -1739,7 +1739,7 @@ router.post('/competitors/manage', protect, async (req, res) => {
 });
 
 // POST /api/seo-studio/competitors/discover — AI auto-discover competitors
-router.post('/competitors/discover', protect, requireCredits('seoCompetitorDiscover'), async (req, res) => {
+router.post('/competitors/discover', protect, requireCredits('seoCompetitorDiscover'), async (req, res, next) => {
   try {
     const { brandId } = req.body;
     if (!brandId) return res.status(400).json({ success: false, error: 'Brand ID required' });
@@ -1789,7 +1789,7 @@ CRITICAL: Only include REAL existing companies. Do not make up fictional compani
 // BACKLINK INTELLIGENCE — Agentic multi-phase backlink crawler
 // ============================================================================
 
-router.post('/backlinks', protect, requireStudio('seoStudio'), requireCredits('seoBacklinks'), async (req, res) => {
+router.post('/backlinks', protect, requireStudio('seoStudio'), requireCredits('seoBacklinks'), async (req, res, next) => {
   let brandDomain;
   try {
     const { url, brand: brandPayload, brandId } = req.body;
@@ -2104,7 +2104,7 @@ Generate 5-15 discovered backlinks, 5-10 competitor link gaps, 8-15 link opportu
 // COMPETITOR WAR ROOM — 90-day battle plan
 // ============================================================================
 
-router.post('/competitor-warroom', protect, requireStudio('seoStudio'), requireCredits('seoWarRoom'), async (req, res) => {
+router.post('/competitor-warroom', protect, requireStudio('seoStudio'), requireCredits('seoWarRoom'), async (req, res, next) => {
   try {
     const { url, brand: brandPayload, brandId, competitorUrls } = req.body;
 
@@ -2202,7 +2202,7 @@ Respond in STRICT JSON:
 // LLM PROBE — Multi-model brand mention check
 // ============================================================================
 
-router.post('/llm-probe', protect, requireStudio('seoStudio'), requireCredits('seoLlmProbe'), async (req, res) => {
+router.post('/llm-probe', protect, requireStudio('seoStudio'), requireCredits('seoLlmProbe'), async (req, res, next) => {
   try {
     const { url, brand: brandPayload, brandId } = req.body;
 
@@ -2342,7 +2342,7 @@ CRITICAL: Use the REAL mention rate (${probeData.aggregate.mentionRate}%) as the
 // AUTO-FIX — Generate copy-paste code fixes
 // ============================================================================
 
-router.post('/auto-fix', protect, requireStudio('seoStudio'), requireCredits('seoAutoFix'), async (req, res) => {
+router.post('/auto-fix', protect, requireStudio('seoStudio'), requireCredits('seoAutoFix'), async (req, res, next) => {
   try {
     const { url, brand: brandPayload, brandId, issues } = req.body;
 
@@ -2430,7 +2430,7 @@ Generate production-ready code. Every fix must be copy-paste ready. Use the bran
 // PROMPT MINING — Discover AI prompts for citation
 // ============================================================================
 
-router.post('/prompt-mining', protect, requireStudio('seoStudio'), requireCredits('seoPromptMining'), async (req, res) => {
+router.post('/prompt-mining', protect, requireStudio('seoStudio'), requireCredits('seoPromptMining'), async (req, res, next) => {
   try {
     const { url, brand: brandPayload, brandId } = req.body;
 
@@ -2577,7 +2577,7 @@ Generate 15-20 mined prompts. Be specific to this brand's industry. Think about 
 // HISTORY — List past audits & get individual audit
 // ============================================================================
 
-router.get('/history', protect, async (req, res) => {
+router.get('/history', protect, async (req, res, next) => {
   try {
     const { brandId, type, limit = 20 } = req.query;
     const filter = { user: req.user._id };
@@ -2596,7 +2596,7 @@ router.get('/history', protect, async (req, res) => {
   }
 });
 
-router.get('/history/:id', protect, async (req, res) => {
+router.get('/history/:id', protect, async (req, res, next) => {
   try {
     const audit = await SeoAudit.findOne({ _id: req.params.id, user: req.user._id }).lean();
     if (!audit) return res.status(404).json({ success: false, error: 'Audit not found' });
@@ -2611,7 +2611,7 @@ router.get('/history/:id', protect, async (req, res) => {
 // SAVED REPORTS — Fetch last generated report per type
 // ============================================================================
 
-router.get('/reports/:type', protect, async (req, res) => {
+router.get('/reports/:type', protect, async (req, res, next) => {
   try {
     const { type } = req.params;
     const { brandId } = req.query;
@@ -2687,7 +2687,7 @@ router.get('/reports/:type', protect, async (req, res) => {
 // HISTORY COMPARISON — Score trends over time
 // ============================================================================
 
-router.get('/history/compare', protect, async (req, res) => {
+router.get('/history/compare', protect, async (req, res, next) => {
   try {
     const { brandId, type } = req.query;
     if (!brandId || !type) return res.status(400).json({ success: false, error: 'brandId and type required' });
@@ -2744,7 +2744,7 @@ router.get('/history/compare', protect, async (req, res) => {
 // JS RENDERING CRAWL — Puppeteer-based SPA crawling
 // ============================================================================
 
-router.post('/js-crawl', protect, requireCredits('seoHealthCheck'), async (req, res) => {
+router.post('/js-crawl', protect, requireCredits('seoHealthCheck'), async (req, res, next) => {
   try {
     const { brand, url, maxPages = 20, mobile = false } = req.body;
     const website = url || brand?.website;
@@ -2765,7 +2765,7 @@ router.post('/js-crawl', protect, requireCredits('seoHealthCheck'), async (req, 
 // CONTENT SCORING — Grade existing pages for SEO quality
 // ============================================================================
 
-router.post('/content-score', protect, requireCredits('seoHealthCheck'), async (req, res) => {
+router.post('/content-score', protect, requireCredits('seoHealthCheck'), async (req, res, next) => {
   try {
     const { brand, url, targetKeywords = [] } = req.body;
     const website = url || brand?.website;
@@ -2798,7 +2798,7 @@ router.post('/content-score', protect, requireCredits('seoHealthCheck'), async (
 // COMPETITOR MONITORING — Track competitor content changes
 // ============================================================================
 
-router.post('/competitor-monitor', protect, requireCredits('seoCompetitors'), async (req, res) => {
+router.post('/competitor-monitor', protect, requireCredits('seoCompetitors'), async (req, res, next) => {
   try {
     const { brand, competitors = [], brandKeywords = [] } = req.body;
     if (!brand?._id) return res.status(400).json({ success: false, error: 'Brand required' });
@@ -2859,7 +2859,7 @@ router.post('/competitor-monitor', protect, requireCredits('seoCompetitors'), as
 // ============================================================================
 
 // POST /api/seo-studio/gsc/snapshot — Take a position snapshot from GSC
-router.post('/gsc/snapshot', protect, async (req, res) => {
+router.post('/gsc/snapshot', protect, async (req, res, next) => {
   try {
     const { brandId, siteUrl } = req.body;
     if (!brandId || !siteUrl) return res.status(400).json({ success: false, error: 'brandId and siteUrl required' });
@@ -2922,7 +2922,7 @@ router.post('/gsc/snapshot', protect, async (req, res) => {
 });
 
 // GET /api/seo-studio/gsc/snapshots — Get snapshot history
-router.get('/gsc/snapshots', protect, async (req, res) => {
+router.get('/gsc/snapshots', protect, async (req, res, next) => {
   try {
     const { brandId, siteUrl } = req.query;
     if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
@@ -2943,7 +2943,7 @@ router.get('/gsc/snapshots', protect, async (req, res) => {
 });
 
 // GET /api/seo-studio/gsc/rank-changes — Compare latest vs previous snapshot
-router.get('/gsc/rank-changes', protect, async (req, res) => {
+router.get('/gsc/rank-changes', protect, async (req, res, next) => {
   try {
     const { brandId, siteUrl } = req.query;
     if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
@@ -3009,7 +3009,7 @@ router.get('/gsc/rank-changes', protect, async (req, res) => {
 // ASK BAR — Universal intent router
 // ============================================================================
 
-router.post('/ask', protect, requireCredits('seoAsk'), async (req, res) => {
+router.post('/ask', protect, requireCredits('seoAsk'), async (req, res, next) => {
   try {
     const { question, brand, url } = req.body;
     if (!question) return res.status(400).json({ success: false, error: 'Question is required' });
