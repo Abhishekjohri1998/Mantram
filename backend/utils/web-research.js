@@ -1318,10 +1318,10 @@ export async function researchDomain(baseUrl) {
                 }
 
                 // Use N_TABS parallel pages for speed
-                const N_TABS = 4;
-                const PW_BATCH_LIMIT = 600;
+                const N_TABS = 6;
+                const PW_BATCH_LIMIT = 800;
                 const PW_PAGE_TIMEOUT = 6000;
-                const PW_TOTAL_TIMEOUT = 120000;
+                const PW_TOTAL_TIMEOUT = 150000; // 2.5 minutes
                 const pwStart = Date.now();
                 let pwSuccess = 0;
 
@@ -1345,7 +1345,7 @@ export async function researchDomain(baseUrl) {
                 // Process URLs in parallel batches of N_TABS
                 for (let i = 0; i < urlsToReCrawl.length; i += N_TABS) {
                     if (Date.now() - pwStart > PW_TOTAL_TIMEOUT) {
-                        console.log(`🖥️  Playwright re-crawl timeout (120s) — got ${pwSuccess} pages`);
+                        console.log(`🖥️  Playwright re-crawl timeout (150s) — got ${pwSuccess} pages`);
                         break;
                     }
 
@@ -1675,25 +1675,28 @@ export async function researchDomain(baseUrl) {
     const allSchemaTypes = [...new Set(analysisPages.flatMap(p => p.schemaTypes || []))];
     const allTech = [...new Set(analysisPages.flatMap(p => p.tech || []))];
     const totalWordCount = analysisPages.reduce((s, p) => s + (p.wordCount || 0), 0);
-    // Image dedup: count UNIQUE image src URLs missing alt, not total instances
-    const uniqueImgSrcs = new Set();
-    const uniqueImgNoAlt = new Set();
-    for (const p of analysisPages) {
-        // We need to re-extract images for dedup, but images obj only has counts
-        // So use total/withoutAlt as a proxy per page, but cap at unique estimate
-        // For accurate dedup, track per-page image data
-    }
     // Image dedup: count UNIQUE image src URLs missing alt across all pages
+    // Normalize URLs: strip query params, fragments, CDN version hashes
+    const normalizeImgSrc = (src) => {
+        try {
+            const u = new URL(src);
+            // Keep only protocol + host + pathname (strip ?v=123, #fragment, etc.)
+            return u.origin + u.pathname;
+        } catch {
+            // Not a full URL — strip query/fragment with regex
+            return src.replace(/[?#].*$/, '');
+        }
+    };
     const globalMissingAltSrcs = new Set();
     for (const p of analysisPages) {
         const srcs = p.images?.srcsMissingAlt || [];
-        for (const src of srcs) globalMissingAltSrcs.add(src);
+        for (const src of srcs) globalMissingAltSrcs.add(normalizeImgSrc(src));
     }
     const totalImages = analysisPages.reduce((s, p) => s + (p.images?.total || 0), 0);
     const rawImagesWithoutAlt = analysisPages.reduce((s, p) => s + (p.images?.withoutAlt || 0), 0);
-    // Use unique src count if we have src data, otherwise fall back to raw count
+    // Use normalized unique src count
     const imagesWithoutAlt = globalMissingAltSrcs.size > 0 ? globalMissingAltSrcs.size : rawImagesWithoutAlt;
-    console.log(`🖼️  Images: ${totalImages} total, ${rawImagesWithoutAlt} raw missing alt, ${imagesWithoutAlt} unique src URLs missing alt (${globalMissingAltSrcs.size} unique srcs)`);
+    console.log(`🖼️  Images: ${totalImages} total, ${rawImagesWithoutAlt} raw missing alt, ${imagesWithoutAlt} unique normalized URLs missing alt`);
 
     const hasCanonical = analysisPages.some(p => p.canonical);
     const hasViewport = analysisPages.every(p => p.viewport);
@@ -1703,8 +1706,37 @@ export async function researchDomain(baseUrl) {
     // Thin pages: exclude soft-404 pages (they're not real pages)
     const thinPages = analysisPages.filter(p => (p.wordCount || 0) < 300);
     const missingMeta = analysisPages.filter(p => !p.metaDescription);
-    const missingH1 = analysisPages.filter(p => !p.h1?.length);
-    const multipleH1 = analysisPages.filter(p => (p.h1?.length || 0) > 1);
+    // H1 SEMRUSH PARITY: count H1 from raw HTML only (not JS-rendered Playwright pages)
+    // Semrush is a static crawler — it doesn't execute JS, so SPA pages appear as "missing H1"
+    // Playwright pages have jsRendered=true and their H1 comes from rendered DOM
+    // For the H1 metric, use fetch-based pages' H1 data only
+    const fetchPages = analysisPages.filter(p => !p.jsRendered);
+    const pwPages = analysisPages.filter(p => p.jsRendered);
+    // Fetch-based pages: count as normal
+    const fetchMissingH1 = fetchPages.filter(p => !p.h1?.length);
+    const fetchMultipleH1 = fetchPages.filter(p => (p.h1?.length || 0) > 1);
+    // Playwright pages: assume they mirror the SPA pattern — if the fetch crawl shows
+    // that the site uses JS-rendered H1s (i.e., fetch pages mostly have H1), then
+    // Playwright pages likely also have H1 from JS. Otherwise, they're static H1s.
+    // For Semrush parity: treat JS-rendered pages as having the same H1 miss rate as fetch pages
+    const fetchH1Rate = fetchPages.length > 0 ? fetchPages.filter(p => p.h1?.length > 0).length / fetchPages.length : 1;
+    // If >80% of fetch pages have H1 in raw HTML, the site has static H1s — Playwright pages are fine
+    // If <80% have H1, site uses JS-rendered H1s — scale the miss rate to Playwright pages
+    let estimatedPwMissing = 0;
+    let estimatedPwMultiple = 0;
+    if (fetchH1Rate < 0.8 && pwPages.length > 0) {
+        // Site uses JS H1s — Playwright pages would be "missing" in static crawl
+        estimatedPwMissing = pwPages.length;
+    } else {
+        // Site has static H1s — count Playwright pages normally
+        estimatedPwMissing = pwPages.filter(p => !p.h1?.length).length;
+        estimatedPwMultiple = pwPages.filter(p => (p.h1?.length || 0) > 1).length;
+    }
+    const missingH1 = [...fetchMissingH1, ...pwPages.filter(p => !p.h1?.length)];
+    const missingH1Count = fetchMissingH1.length + estimatedPwMissing;
+    const multipleH1 = [...fetchMultipleH1, ...pwPages.filter(p => (p.h1?.length || 0) > 1)];
+    const multipleH1Count = fetchMultipleH1.length + estimatedPwMultiple;
+    console.log(`🏷️  H1 stats: ${fetchPages.length} fetch pages (${fetchMissingH1.length} missing, ${fetchMultipleH1.length} multiple), ${pwPages.length} PW pages (est. ${estimatedPwMissing} missing, ${estimatedPwMultiple} multiple), fetchH1Rate=${(fetchH1Rate*100).toFixed(0)}%`);
     const pagesWithRedirects = analysisPages.filter(p => p.redirectChain?.length > 0);
     const lowTextRatioPages = analysisPages.filter(p => (p.textToHtmlRatio || 100) < 10);
     const oversizedPages = analysisPages.filter(p => p.htmlSizeOver2MB);
@@ -1824,10 +1856,10 @@ export async function researchDomain(baseUrl) {
             titleDuplicateCount: duplicateContent.titleDuplicateCount || 0,
             duplicateMetaDescriptions: duplicateContent.duplicateMetaDescriptions || [],
             metaDuplicateCount: duplicateContent.metaDuplicateCount || 0,
-            // H1 issues (split — Semrush reports separately)
-            missingH1Count: missingH1.length,
+            // H1 issues (split — Semrush reports separately, uses fetch-based H1 for parity)
+            missingH1Count,
             multipleH1Pages: multipleH1.map(p => ({ url: p.url, h1Count: p.h1.length, h1s: p.h1.slice(0, 3) })),
-            multipleH1Count: multipleH1.length,
+            multipleH1Count,
             // Deep page analysis
             deepPages: deepPages.map(p => p.url),
             clickDepthIssues: deepPages.length,

@@ -384,8 +384,8 @@ Average text-to-HTML ratio: ${siMetrics.avgTextToHtmlRatio || 0}%
     // Health-check system prompt is ~15KB+ with crawl data — AI needs 30-40s to generate 8192 tokens
     const routeStartTime = req._routeStartTime || (Date.now() - 15000);
     const elapsed = Date.now() - routeStartTime;
-    const AI_MIN_BUDGET = 60000; // Always give AI at least 60s (Anthropic needs 30-40s for this prompt)
-    const remainingBudget = Math.max(AI_MIN_BUDGET, 120000 - elapsed);
+    const AI_MIN_BUDGET = 90000; // Always give AI at least 90s (Anthropic needs 30-40s for this prompt, plus margin for large crawls)
+    const remainingBudget = Math.max(AI_MIN_BUDGET, 150000 - elapsed);
     
     console.log(`⏱️ Crawl + research complete (${siMetrics.totalPages || siteResearch?.pages?.length || 0} pages). Elapsed: ${elapsed}ms. AI Budget: ${remainingBudget}ms`);
 
