@@ -5,12 +5,17 @@
  * 
  * Credit costs are loaded from SystemSettings (managed by super admin).
  * Falls back to defaults if DB settings not found.
+ * 
+ * Video credits are DYNAMIC — calculated per request based on model, duration,
+ * resolution, and quality mode using: credits = ceil(USD_cost × 34)
+ * This ensures ≥50% margin at the ₹5/credit floor price.
  */
 
 import mongoose from 'mongoose';
 import User from '../models/User.js';
 import SystemSettings from '../models/SystemSettings.js';
 import CreditUsage from '../models/CreditUsage.js';
+import { estimateCost } from '../agents/videoStudio/falClient.js';
 
 // Human-readable labels for actions
 const ACTION_LABELS = {
@@ -37,37 +42,37 @@ const DEFAULT_CREDIT_COSTS = {
     content: 3,
     contentRefine: 2,
     creative: 5,
-    photoshoot: 8,
-    seoHealthCheck: 3,
+    photoshoot: 10,               // ↑ from 8 (multi-image + AI calls)
+    seoHealthCheck: 5,             // ↑ from 3 (crawls 600+ pages, heavy)
     seoTraffic: 3,
     seoCompetitors: 3,
     seoAiVisibility: 3,
     seoAsk: 1,
     seoAuditPage: 1,
     seoCompetitorDiscover: 1,
-    seoBacklinks: 4,
-    seoWarRoom: 4,
+    seoBacklinks: 5,               // ↑ from 4 (heavy analysis)
+    seoWarRoom: 5,                 // ↑ from 4 (heavy analysis)
     seoLlmProbe: 3,
     seoAutoFix: 2,
     seoPromptMining: 3,
-    brainstorm: 4,
-    brainstormRefine: 2,
-    brainstormChat: 2,
+    brainstorm: 3,                 // ↓ from 4 (1 text call — lower cost)
+    brainstormRefine: 1,           // ↓ from 2 (lightweight)
+    brainstormChat: 1,             // ↓ from 2 (single short response)
     brainstormScreenplay: 5,
     trendRefresh: 1,
     videoBrainstorm: 2,
-    videoGenerate: 15,
-    videoEdit: 5,
+    videoGenerate: 'dynamic',      // DYNAMIC — calculated per request
+    videoEdit: 10,                 // ↑ from 5 (re-renders video via PiAPI)
     socialMedia: 3,
     socialMediaCalendar: 3,
     socialMediaAudit: 4,
     socialMediaCompetitor: 4,
     socialMediaScore: 2,
-    canvasGenerate: 2,
+    canvasGenerate: 3,             // ↑ from 2 (same image model cost)
     canvasBgRemove: 2,
-    canvasExtend: 2,
+    canvasExtend: 3,               // ↑ from 2
     adCreative: 5,
-    voiceClone: 3,
+    voiceClone: 5,                 // ↑ from 3 (Minimax cost + storage)
     voiceTranscribe: 1,
 };
 
@@ -123,7 +128,19 @@ export const requireCredits = (actionOrCost = 1) => {
                 cost = actionOrCost;
             } else {
                 const costs = await getCreditCosts();
-                cost = costs[actionOrCost] || 1;
+                const rawCost = costs[actionOrCost];
+
+                // Dynamic video credits — calculated per request
+                if (rawCost === 'dynamic' && actionOrCost === 'videoGenerate') {
+                    const { model = 'kling-3.0', duration = 5,
+                            resolution = '1080p', qualityMode = 'fast' } = req.body;
+                    const estimate = estimateCost(model, duration, resolution, qualityMode);
+                    // ceil(USD × 34) ensures 50% margin at ₹5/credit floor
+                    cost = Math.max(Math.ceil(estimate.usd * 34), 5);
+                    console.log(`🎬 Dynamic video credits: ${model} ${duration}s ${resolution} ${qualityMode} → $${estimate.usd} → ${cost} credits`);
+                } else {
+                    cost = (typeof rawCost === 'number' ? rawCost : null) || 1;
+                }
             }
 
             // Bypass credit checks ONLY for superadmins
