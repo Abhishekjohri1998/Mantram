@@ -451,7 +451,7 @@ Respond in STRICT JSON:
   "crawlSummary": "What the live crawl revealed"
 }
 
-Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' that connects to business outcomes. Think like a consultant, not a checklist tool.`;
+Generate 3-6 critical, high-impact issues. Be STRATEGIC — every issue must have a 'whyItMatters' that connects to business outcomes. Keep descriptions incredibly concise to ensure fast generation! Think like a consultant, not a checklist tool.`;
 
     const userPrompt = `Analyze site: ${website}`;
     const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget });
