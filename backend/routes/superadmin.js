@@ -1636,6 +1636,196 @@ router.post('/packages/seed-defaults', async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════
+// 8.5 CREDIT PACK MANAGEMENT (Super Admin)
+// ══════════════════════════════════════════════════════════════
+
+import CreditPack from '../models/CreditPack.js';
+
+// GET /superadmin/credit-packs — List all credit packs
+router.get('/credit-packs', async (req, res) => {
+    try {
+        const packs = await CreditPack.find()
+            .sort({ displayOrder: 1 })
+            .populate('createdBy', 'name email')
+            .lean();
+        res.json({ success: true, packs });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// POST /superadmin/credit-packs — Create a credit pack
+router.post('/credit-packs', async (req, res) => {
+    try {
+        const pack = await CreditPack.create({
+            ...req.body,
+            createdBy: req.user._id,
+        });
+
+        await logAudit(req, {
+            action: 'CREATE_CREDIT_PACK',
+            targetModel: 'CreditPack',
+            targetId: pack._id,
+            changes: { after: pack.toJSON() },
+        });
+
+        res.status(201).json({ success: true, pack });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// PUT /superadmin/credit-packs/:id — Update a credit pack
+router.put('/credit-packs/:id', async (req, res) => {
+    try {
+        const previous = await CreditPack.findById(req.params.id);
+        if (!previous) return res.status(404).json({ success: false, error: 'Pack not found' });
+
+        const pack = await CreditPack.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
+
+        await logAudit(req, {
+            action: 'UPDATE_CREDIT_PACK',
+            targetModel: 'CreditPack',
+            targetId: pack._id,
+            changes: { before: previous.toJSON(), after: pack.toJSON() },
+        });
+
+        res.json({ success: true, pack });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// DELETE /superadmin/credit-packs/:id — Delete a credit pack
+router.delete('/credit-packs/:id', async (req, res) => {
+    try {
+        const pack = await CreditPack.findById(req.params.id);
+        if (!pack) return res.status(404).json({ success: false, error: 'Pack not found' });
+
+        await CreditPack.findByIdAndDelete(req.params.id);
+
+        await logAudit(req, {
+            action: 'DELETE_CREDIT_PACK',
+            targetModel: 'CreditPack',
+            targetId: pack._id,
+            severity: 'warning',
+            metadata: { name: pack.name, slug: pack.slug },
+        });
+
+        res.json({ success: true, message: 'Credit pack deleted' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// POST /superadmin/credit-packs/:id/toggle — Enable/disable a pack
+router.post('/credit-packs/:id/toggle', async (req, res) => {
+    try {
+        const pack = await CreditPack.findById(req.params.id);
+        if (!pack) return res.status(404).json({ success: false, error: 'Pack not found' });
+
+        pack.isActive = !pack.isActive;
+        await pack.save();
+
+        await logAudit(req, {
+            action: pack.isActive ? 'ENABLE_CREDIT_PACK' : 'DISABLE_CREDIT_PACK',
+            targetModel: 'CreditPack',
+            targetId: pack._id,
+            metadata: { name: pack.name },
+        });
+
+        res.json({ success: true, pack, message: `Pack ${pack.isActive ? 'enabled' : 'disabled'}` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// POST /superadmin/credit-packs/seed-defaults — Seed 8 default packs
+router.post('/credit-packs/seed-defaults', async (req, res) => {
+    try {
+        const existing = await CreditPack.countDocuments();
+        if (existing > 0 && !req.body.force) {
+            return res.json({ success: false, error: 'Credit packs already exist. Send force: true to reset.' });
+        }
+        if (req.body.force) await CreditPack.deleteMany({});
+
+        const defaults = [
+            {
+                name: '🔹 Micro', slug: 'micro',
+                credits: 20, bonusCredits: 0, price: 149,
+                icon: 'token', badge: '', displayOrder: 1,
+                validityDays: 180, description: 'Try it out',
+                createdBy: req.user._id,
+            },
+            {
+                name: '⚡ Spark', slug: 'spark',
+                credits: 50, bonusCredits: 0, price: 349,
+                icon: 'bolt', badge: '', displayOrder: 2,
+                validityDays: 180, description: 'Quick power-up',
+                createdBy: req.user._id,
+            },
+            {
+                name: '🚀 Boost', slug: 'boost',
+                credits: 150, bonusCredits: 15, price: 899,
+                icon: 'rocket_launch', badge: '', displayOrder: 3,
+                validityDays: 180, description: '+15 bonus credits',
+                createdBy: req.user._id,
+            },
+            {
+                name: '💪 Power', slug: 'power',
+                credits: 300, bonusCredits: 45, price: 1699,
+                icon: 'fitness_center', badge: 'Flash Sale', badgeColor: '#ef4444', displayOrder: 4,
+                validityDays: 180, description: '+45 bonus credits',
+                createdBy: req.user._id,
+            },
+            {
+                name: '🔥 Ultra', slug: 'ultra',
+                credits: 600, bonusCredits: 90, price: 3299,
+                icon: 'whatshot', badge: 'Flash Sale', badgeColor: '#ef4444', displayOrder: 5,
+                validityDays: 180, description: '+90 bonus credits',
+                createdBy: req.user._id,
+            },
+            {
+                name: '⭐ Pro', slug: 'pro',
+                credits: 1500, bonusCredits: 300, price: 7999,
+                icon: 'star', badge: 'Flash Sale', badgeColor: '#ef4444', displayOrder: 6,
+                validityDays: 180, description: '+300 bonus credits',
+                color: '#6366f1',
+                createdBy: req.user._id,
+            },
+            {
+                name: '💎 Mega', slug: 'mega',
+                credits: 4000, bonusCredits: 1000, price: 22499,
+                icon: 'diamond', badge: 'Flash Sale', badgeColor: '#ef4444', displayOrder: 7,
+                validityDays: 180, description: '+1,000 bonus credits',
+                color: '#8b5cf6',
+                createdBy: req.user._id,
+            },
+            {
+                name: '👑 Supreme', slug: 'supreme',
+                credits: 10000, bonusCredits: 3500, price: 53999,
+                icon: 'workspace_premium', badge: 'Best Value', badgeColor: '#f59e0b', displayOrder: 8,
+                validityDays: 180, description: '+3,500 bonus credits',
+                color: '#f59e0b',
+                createdBy: req.user._id,
+            },
+        ];
+
+        const created = await CreditPack.insertMany(defaults);
+
+        await logAudit(req, {
+            action: 'SEED_CREDIT_PACKS',
+            targetModel: 'CreditPack',
+            metadata: { count: created.length },
+        });
+
+        res.json({ success: true, packs: created, message: `${created.length} default credit packs created` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════
 // 9. CREDIT COST MANAGEMENT (Super Admin)
 // ══════════════════════════════════════════════════════════════
 

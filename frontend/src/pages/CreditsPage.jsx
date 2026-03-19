@@ -42,8 +42,9 @@ export default function CreditsPage() {
     const [loading, setLoading] = useState(true)
     const [tab, setTab] = useState('overview')
 
-    // Top-up state
-    const [topupPacks, setTopupPacks] = useState([])
+    // Top-up state (Kling-style promo + standard sections)
+    const [promoPacks, setPromoPacks] = useState([])
+    const [standardPacks, setStandardPacks] = useState([])
     const [isFirstPurchase, setIsFirstPurchase] = useState(false)
 
     // Rewards state
@@ -92,7 +93,7 @@ export default function CreditsPage() {
 
     useEffect(() => {
         if (tab === 'plans' && packages.length === 0) loadPackages()
-        if (tab === 'topup' && topupPacks.length === 0) loadTopupPacks()
+        if (tab === 'topup' && standardPacks.length === 0) loadTopupPacks()
         if (tab === 'rewards' && !rewardStatus) loadRewards()
     }, [tab])
 
@@ -107,7 +108,8 @@ export default function CreditsPage() {
     const loadTopupPacks = async () => {
         try {
             const data = await paymentsAPI.getTopupPacks()
-            setTopupPacks(data.packs || [])
+            setPromoPacks(data.promoPacks || [])
+            setStandardPacks(data.standardPacks || [])
             setIsFirstPurchase(data.isFirstPurchase || false)
         } catch (e) { console.error(e) }
     }
@@ -380,7 +382,7 @@ export default function CreditsPage() {
                         </div>
 
                     ) : tab === 'topup' ? (
-                        /* ══════════ Top-Up Store (v3 Packs) ══════════ */
+                        /* ══════════ Top-Up Store (Kling-inspired) ══════════ */
                         <div className="space-y-6">
                             {/* First Purchase Banner */}
                             {isFirstPurchase && (
@@ -393,42 +395,94 @@ export default function CreditsPage() {
                                 </div>
                             )}
 
-                            <div className="bg-gradient-to-br from-amber-500/10 to-amber-600/5 border border-amber-500/20 p-5 rounded-2xl">
-                                <h3 className="text-lg font-bold text-amber-400 flex items-center gap-2 mb-1">
-                                    <span className="material-symbols-outlined text-xl">bolt</span>
-                                    Credit Top-Up Store
-                                </h3>
-                                <p className="text-sm text-slate-400">Purchased credits are valid for 90 days and are used after your plan credits are exhausted.</p>
-                            </div>
+                            {/* ── Promo Section (Kling-style green border) ── */}
+                            {promoPacks.length > 0 && (
+                                <div className="bg-gradient-to-r from-emerald-500/10 to-green-500/5 border border-emerald-500/30 rounded-2xl p-6">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <span className="material-symbols-outlined text-2xl text-emerald-400">diamond</span>
+                                        <div>
+                                            <h3 className="text-lg font-black text-emerald-400">◆ Exclusive Promo For You ◆</h3>
+                                            <p className="text-xs text-slate-400">Limited time offers. Credits purchased via promo are valid for 31 days.</p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        {promoPacks.map(pack => (
+                                            <div key={pack.id} className="bg-emerald-500/5 border-2 border-emerald-500/30 rounded-xl p-5 flex flex-col hover:border-emerald-400/50 transition-all">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="material-symbols-outlined text-2xl text-emerald-400">{pack.icon}</span>
+                                                        <span className="text-2xl font-black text-emerald-400">{pack.total?.toLocaleString()}</span>
+                                                    </div>
+                                                    {pack.promoLabel && (
+                                                        <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-[10px] font-black text-white uppercase tracking-wider">
+                                                            {pack.promoLabel}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-slate-400 mb-2">
+                                                    ₹{pack.perCredit} / credit, valid for {pack.validityDays} days
+                                                </p>
+                                                {pack.promoOriginalPrice > 0 && (
+                                                    <p className="text-xs text-slate-600 line-through mb-1">₹{pack.promoOriginalPrice?.toLocaleString()}</p>
+                                                )}
+                                                <div className="flex items-center justify-between mt-auto pt-3">
+                                                    <span className="text-xl font-black text-white">₹ {pack.price?.toLocaleString()}</span>
+                                                    <button
+                                                        onClick={() => handleTopup(pack)}
+                                                        className="px-5 py-2 rounded-lg text-sm font-bold bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all"
+                                                    >
+                                                        Purchase
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                                {topupPacks.map(pack => (
-                                    <div key={pack.id} className={`glass-panel p-5 rounded-2xl border transition-all hover:scale-[1.02] flex flex-col ${pack.popular ? 'border-amber-400 ring-1 ring-amber-400/20 bg-amber-400/[0.03]' : 'border-white/[0.08]'}`}>
+                            {/* Note */}
+                            <p className="text-xs text-slate-500 text-center">
+                                Credits cannot be exchanged for memberships, nor refunded, transferred, or withdrawn.
+                                {' '}<span className="text-primary cursor-pointer hover:underline">Credits Policy</span>
+                            </p>
+
+                            {/* ── Standard Packs (8-tier grid) ── */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                {standardPacks.map(pack => (
+                                    <div key={pack.id} className={`glass-panel p-5 rounded-2xl border transition-all hover:scale-[1.02] flex flex-col ${pack.badge === 'Best Value' ? 'border-amber-400 ring-1 ring-amber-400/20 bg-amber-400/[0.03]' : 'border-white/[0.08]'}`}>
                                         <div className="flex-1">
                                             <div className="flex items-center justify-between mb-3">
-                                                <span className="material-symbols-outlined text-2xl text-amber-400">{pack.icon}</span>
-                                                {pack.popular && <span className="px-2 py-0.5 rounded-full bg-amber-400 text-[10px] font-black uppercase text-slate-900 tracking-wider">Best Value</span>}
-                                            </div>
-                                            <h3 className="text-lg font-bold text-white mb-1">{pack.name}</h3>
-                                            <div className="flex items-baseline gap-1 mb-1">
-                                                <span className="text-2xl font-black text-white">₹{pack.price?.toLocaleString()}</span>
-                                            </div>
-                                            <div className="space-y-1.5 mb-4">
-                                                <p className="text-sm text-slate-300 font-medium">
-                                                    {pack.credits} credits {pack.bonus > 0 && <span className="text-amber-400 font-bold">+ {pack.bonus} bonus</span>}
-                                                </p>
-                                                {isFirstPurchase && pack.firstPurchaseTotal && (
-                                                    <p className="text-xs text-amber-400 font-bold">→ 2× = {pack.firstPurchaseTotal} credits!</p>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="material-symbols-outlined text-2xl text-amber-400">{pack.icon}</span>
+                                                    <span className="text-xl font-black text-white">{pack.total?.toLocaleString()}</span>
+                                                </div>
+                                                {pack.badge && (
+                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase text-white tracking-wider" style={{ backgroundColor: pack.badgeColor || '#ef4444' }}>
+                                                        {pack.badge}
+                                                    </span>
                                                 )}
-                                                <p className="text-xs text-slate-500">₹{pack.perCredit}/credit • 90-day validity</p>
                                             </div>
+                                            {pack.bonus > 0 && (
+                                                <p className="text-xs text-emerald-400 font-bold mb-2">
+                                                    Total: {pack.credits?.toLocaleString()} + <span className="text-amber-400">{pack.bonus?.toLocaleString()} Bonus</span>
+                                                </p>
+                                            )}
+                                            {isFirstPurchase && pack.firstPurchaseTotal && (
+                                                <p className="text-xs text-amber-400 font-bold mb-2">→ 2× = {pack.firstPurchaseTotal?.toLocaleString()} credits!</p>
+                                            )}
                                         </div>
-                                        <button
-                                            onClick={() => handleTopup(pack)}
-                                            className="w-full py-2.5 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 transition-all"
-                                        >
-                                            Buy Now
-                                        </button>
+                                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/[0.06]">
+                                            <div>
+                                                <span className="text-lg font-black text-white">₹ {pack.price?.toLocaleString()}</span>
+                                                <p className="text-[10px] text-slate-500">₹{pack.perCredit}/cr • {pack.validityDays}d</p>
+                                            </div>
+                                            <button
+                                                onClick={() => handleTopup(pack)}
+                                                className="px-5 py-2 rounded-lg text-sm font-bold bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all"
+                                            >
+                                                Purchase
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>

@@ -168,40 +168,79 @@ router.post('/verify', protect, async (req, res) => {
 });
 
 /**
- * ── Credit Top-Up Packs (v3 — cost-plus pricing) ──
- * Floor: ₹5/credit. First purchase = 2× bonus. 90-day validity.
+ * ── Credit Top-Up Packs (DB-driven, admin-managed) ──
+ * Packs are stored in CreditPack collection, managed by super admin.
+ * Supports: standard packs, promo packs with time-limited discounts,
+ * flash sale badges, first-purchase 2× bonus, configurable validity.
  */
-const TOPUP_PACKS = {
-    spark:  { name: '⚡ Spark',  credits: 30,    bonus: 0,    price: 249,    icon: 'bolt',        popular: false },
-    boost:  { name: '🚀 Boost',  credits: 100,   bonus: 10,   price: 699,    icon: 'rocket',      popular: false },
-    power:  { name: '💪 Power',  credits: 300,   bonus: 45,   price: 1999,   icon: 'fitness_center', popular: true },
-    ultra:  { name: '🔥 Ultra',  credits: 750,   bonus: 150,  price: 4999,   icon: 'whatshot',    popular: false },
-    mega:   { name: '💎 Mega',   credits: 2000,  bonus: 500,  price: 12499,  icon: 'diamond',     popular: false },
-};
-
-const TOPUP_VALIDITY_DAYS = 90;
+import CreditPack from '../models/CreditPack.js';
 
 /**
- * @desc    Get available top-up packs
+ * @desc    Get available top-up packs (public store view)
  * @route   GET /api/payments/topup-packs
  * @access  Private
  */
 router.get('/topup-packs', protect, async (req, res) => {
     try {
-        // Check if this is user's first top-up purchase
         const user = req.user;
         const isFirstPurchase = !user.credits?.topUpExpiry;
+        const now = new Date();
 
-        const packs = Object.entries(TOPUP_PACKS).map(([id, pack]) => ({
-            id,
-            ...pack,
-            total: pack.credits + pack.bonus,
-            perCredit: (pack.price / (pack.credits + pack.bonus)).toFixed(2),
-            firstPurchaseTotal: isFirstPurchase ? (pack.credits + pack.bonus) * 2 : null,
-            validityDays: TOPUP_VALIDITY_DAYS,
-        }));
+        // Fetch active packs
+        const allPacks = await CreditPack.find({ isActive: true })
+            .sort({ displayOrder: 1 })
+            .lean();
 
-        res.json({ success: true, packs, isFirstPurchase });
+        // Split into promo (active, not expired) and standard
+        const promoPacks = [];
+        const standardPacks = [];
+
+        for (const pack of allPacks) {
+            // Check plan restriction
+            if (pack.minPlanRequired && pack.minPlanRequired !== user.plan) continue;
+
+            const total = pack.credits + (pack.bonusCredits || 0);
+            const packData = {
+                id: pack._id,
+                slug: pack.slug,
+                name: pack.name,
+                credits: pack.credits,
+                bonus: pack.bonusCredits || 0,
+                total,
+                price: pack.price,
+                currency: pack.currency || 'INR',
+                perCredit: total > 0 ? parseFloat((pack.price / total).toFixed(2)) : 0,
+                icon: pack.icon,
+                badge: pack.badge,
+                badgeColor: pack.badgeColor,
+                color: pack.color,
+                description: pack.description,
+                validityDays: pack.validityDays || 180,
+                firstPurchaseTotal: isFirstPurchase && pack.isFirstPurchaseEligible ? total * 2 : null,
+                popular: pack.badge === 'Popular' || pack.badge === 'Best Value',
+            };
+
+            if (pack.isPromo) {
+                // Only include if promo hasn't expired
+                if (!pack.promoExpiresAt || new Date(pack.promoExpiresAt) > now) {
+                    packData.isPromo = true;
+                    packData.promoDiscount = pack.promoDiscount || 0;
+                    packData.promoOriginalPrice = pack.promoOriginalPrice || 0;
+                    packData.promoLabel = pack.promoLabel || '';
+                    packData.promoExpiresAt = pack.promoExpiresAt;
+                    promoPacks.push(packData);
+                }
+            } else {
+                standardPacks.push(packData);
+            }
+        }
+
+        res.json({
+            success: true,
+            promoPacks,
+            standardPacks,
+            isFirstPurchase,
+        });
     } catch (error) {
         console.error('❌ Get Top-up Packs Error:', error);
         res.status(500).json({ success: false, error: 'Failed to fetch packs' });
@@ -217,26 +256,39 @@ router.post('/create-topup-order', protect, async (req, res) => {
     try {
         const { packId } = req.body;
 
-        const pack = TOPUP_PACKS[packId];
-        if (!pack) {
-            return res.status(400).json({ success: false, error: 'Invalid credit pack' });
+        // Look up pack from DB
+        const pack = await CreditPack.findById(packId);
+        if (!pack || !pack.isActive) {
+            return res.status(400).json({ success: false, error: 'Invalid or inactive credit pack' });
         }
 
-        // Check if first purchase for 2× bonus
+        // Check promo expiry
+        if (pack.isPromo && pack.promoExpiresAt && new Date(pack.promoExpiresAt) < new Date()) {
+            return res.status(400).json({ success: false, error: 'This promo has expired' });
+        }
+
+        // Check plan restriction
+        if (pack.minPlanRequired && pack.minPlanRequired !== req.user.plan) {
+            return res.status(403).json({ success: false, error: `This pack requires the ${pack.minPlanRequired} plan` });
+        }
+
+        // Calculate credits
         const isFirstPurchase = !req.user.credits?.topUpExpiry;
-        const totalCredits = pack.credits + pack.bonus;
-        const finalCredits = isFirstPurchase ? totalCredits * 2 : totalCredits;
+        const totalCredits = pack.credits + (pack.bonusCredits || 0);
+        const finalCredits = (isFirstPurchase && pack.isFirstPurchaseEligible) ? totalCredits * 2 : totalCredits;
 
         const options = {
             amount: pack.price * 100, // paise
-            currency: 'INR',
+            currency: pack.currency || 'INR',
             receipt: `topup_${Date.now()}`,
             notes: {
                 userId: req.user._id.toString(),
-                packId,
+                packId: pack._id.toString(),
+                packSlug: pack.slug,
                 credits: finalCredits,
+                validityDays: pack.validityDays || 180,
                 isFirstPurchase: isFirstPurchase ? 'true' : 'false',
-                type: 'credit_topup'
+                type: 'credit_topup',
             },
         };
 
@@ -281,10 +333,11 @@ router.post('/verify-topup', protect, async (req, res) => {
         }
 
         const credits = parseInt(order.notes.credits);
+        const validityDays = parseInt(order.notes.validityDays) || 180;
         const expiry = new Date();
-        expiry.setDate(expiry.getDate() + TOPUP_VALIDITY_DAYS);
+        expiry.setDate(expiry.getDate() + validityDays);
 
-        // Add to topUp credits with 90-day expiry
+        // Add to topUp credits with validity
         const user = await User.findByIdAndUpdate(
             req.user._id,
             {
@@ -293,6 +346,13 @@ router.post('/verify-topup', protect, async (req, res) => {
             },
             { new: true }
         );
+
+        // Update pack purchase stats
+        if (order.notes.packId) {
+            await CreditPack.findByIdAndUpdate(order.notes.packId, {
+                $inc: { purchaseCount: 1, totalRevenue: order.amount / 100 },
+            });
+        }
 
         console.log(`💎 Top-up verified: +${credits} credits for ${user.email}, expires ${expiry.toISOString()}`);
 

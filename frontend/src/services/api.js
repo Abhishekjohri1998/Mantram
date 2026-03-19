@@ -408,6 +408,13 @@ export const superadmin = {
     deletePackage: (id) => apiFetch(`/superadmin/packages/${id}`, { method: 'DELETE' }),
     aiSuggestPackages: () => apiFetch('/superadmin/packages/ai-suggest', { method: 'POST' }),
     seedDefaultPackages: (force) => apiFetch('/superadmin/packages/seed-defaults', { method: 'POST', body: JSON.stringify({ force }) }),
+    // Credit Packs (Top-Up Store Management)
+    getCreditPacks: () => apiFetch('/superadmin/credit-packs'),
+    createCreditPack: (data) => apiFetch('/superadmin/credit-packs', { method: 'POST', body: JSON.stringify(data) }),
+    updateCreditPack: (id, data) => apiFetch(`/superadmin/credit-packs/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteCreditPack: (id) => apiFetch(`/superadmin/credit-packs/${id}`, { method: 'DELETE' }),
+    toggleCreditPack: (id) => apiFetch(`/superadmin/credit-packs/${id}/toggle`, { method: 'POST' }),
+    seedCreditPacks: (force) => apiFetch('/superadmin/credit-packs/seed-defaults', { method: 'POST', body: JSON.stringify({ force }) }),
     // Credit Costs
     getCreditCosts: () => apiFetch('/superadmin/credit-costs'),
     updateCreditCosts: (costs) => apiFetch('/superadmin/credit-costs', { method: 'PUT', body: JSON.stringify({ costs }) }),
