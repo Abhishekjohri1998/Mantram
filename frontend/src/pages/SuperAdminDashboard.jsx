@@ -81,6 +81,14 @@ export default function SuperAdminDashboard() {
     const [providerUsageData, setProviderUsageData] = useState(null)
     const [providerUsageDays, setProviderUsageDays] = useState(30)
     const [providerUsageLoading, setProviderUsageLoading] = useState(false)
+    // Pricing Command Center state
+    const [policyData, setPolicyData] = useState(null)
+    const [monitorData, setMonitorData] = useState(null)
+    const [monitorChecking, setMonitorChecking] = useState(false)
+    const [calcCreditPrice, setCalcCreditPrice] = useState(5)
+    const [calcMargin, setCalcMargin] = useState(60)
+    const [calcExRate, setCalcExRate] = useState(85)
+    const [policySection, setPolicySection] = useState('calculator')
 
     if (user?.role !== 'superadmin') {
         return <DashboardLayout><div className="flex items-center justify-center h-screen"><div className="text-center"><span className="material-symbols-outlined text-6xl text-rose-500 mb-4">shield</span><h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2><p className="text-slate-500">Super Admin access required</p></div></div></DashboardLayout>
@@ -101,6 +109,7 @@ export default function SuperAdminDashboard() {
         { id: 'ai', label: 'AI & System', icon: 'smart_toy' },
         { id: 'integrations', label: 'Integrations', icon: 'hub' },
         { id: 'logs', label: 'Audit Logs', icon: 'history' },
+        { id: 'pricing', label: 'Pricing', icon: 'calculate' },
     ]
 
     useEffect(() => { loadStats(); loadPackages(); loadTokenUsage() }, [])
@@ -125,6 +134,7 @@ export default function SuperAdminDashboard() {
         if (tab === 'integrations') loadIntegrations()
         if (tab === 'packages') loadPackages()
         if (tab === 'logs') loadLogs()
+        if (tab === 'pricing') { loadPolicyData(); loadMonitorData(); loadPricingData(calcCreditPrice) }
     }, [tab, debouncedSearch, planFilter, userPage, logsPage])
 
     const loadStats = async () => { try { const d = await API.getStats(); setStats(d.stats) } catch (e) { console.error(e) } finally { setLoading(false) } }
@@ -151,7 +161,11 @@ export default function SuperAdminDashboard() {
     const handleSaveCosts = async () => { try { await API.updateCreditCosts(editingCosts); showToast('Credit costs updated'); setEditingCosts(null); loadCreditCosts() } catch (e) { showToast(e.error || 'Failed', 'error') } }
     const handleResetCosts = async () => { if (!confirm('Reset all credit costs to defaults?')) return; try { await API.resetCreditCosts(); showToast('Reset to defaults'); setEditingCosts(null); loadCreditCosts() } catch { showToast('Failed', 'error') } }
     const creditCostLabels = { content: 'Content Generate', contentRefine: 'Content Refine/Regen', creative: 'Creative (Image)', photoshoot: 'AI Photoshoot', seoHealthCheck: 'SEO Health Check', seoTraffic: 'SEO Traffic', seoCompetitors: 'SEO Competitors', seoAiVisibility: 'SEO AI Visibility', seoAsk: 'SEO Ask', seoAuditPage: 'SEO Page Audit', seoCompetitorDiscover: 'SEO Discover', seoBacklinks: 'SEO Backlinks', seoWarRoom: 'SEO War Room', seoLlmProbe: 'SEO LLM Probe', seoAutoFix: 'SEO Auto-Fix', seoPromptMining: 'SEO Prompt Mining', brainstorm: 'Brainstorm Generate', brainstormRefine: 'Brainstorm Refine', brainstormChat: 'Brainstorm Chat', brainstormScreenplay: 'Screenplay', trendRefresh: 'Trend Refresh', videoBrainstorm: 'Video Brainstorm', videoGenerate: 'Video Generate', videoEdit: 'Video Edit', socialMedia: 'Social Strategy', socialMediaCalendar: 'Social Calendar', socialMediaAudit: 'Social Audit', socialMediaCompetitor: 'Social Competitor', socialMediaScore: 'Social Score', canvasGenerate: 'Canvas AI Gen', canvasBgRemove: 'Canvas BG Remove', canvasExtend: 'Canvas Extend', adCreative: 'Ad Creative', voiceClone: 'Voice Clone', voiceTranscribe: 'Voice Transcribe' }
-    const loadPricingData = async (price) => { setPricingLoading(true); try { const d = await API.getPricingCalculator({ creditPriceINR: price || pricingPrice, usdToInr: 85, targetMargin: 60 }); setPricingData(d) } catch (e) { console.error('Pricing calc error:', e) } finally { setPricingLoading(false) } }
+    const loadPricingData = async (price, margin, exRate) => { setPricingLoading(true); try { const d = await API.getPricingCalculator({ creditPriceINR: price || calcCreditPrice, usdToInr: exRate || calcExRate, targetMargin: margin || calcMargin }); setPricingData(d) } catch (e) { console.error('Pricing calc error:', e) } finally { setPricingLoading(false) } }
+    const loadPolicyData = async () => { try { const d = await API.getPricingPolicy(); setPolicyData(d.policy) } catch (e) { console.error(e) } }
+    const loadMonitorData = async () => { try { const d = await API.getPricingMonitor(); setMonitorData(d) } catch (e) { console.error(e) } }
+    const handlePricingCheck = async () => { setMonitorChecking(true); try { const d = await API.triggerPricingCheck(); showToast(d.message); loadMonitorData() } catch (e) { showToast(e.error || 'Check failed', 'error') } finally { setMonitorChecking(false) } }
+    const handleDismissAlerts = async () => { try { await API.dismissPricingAlerts(); showToast('Alerts dismissed'); loadMonitorData() } catch { showToast('Failed', 'error') } }
     // API Key Management functions
     const loadApiKeys = async () => { try { const d = await API.getApiKeys(); setApiProviders(d.providers || []) } catch (e) { console.error(e) } }
     const handleSaveApiKey = async (provider) => { try { await API.updateApiKeys(provider, editProviderKeys); showToast('API key updated'); setEditingProvider(null); setEditProviderKeys({}); loadApiKeys() } catch (e) { showToast(e.error || 'Failed', 'error') } }
@@ -2378,6 +2392,430 @@ export default function SuperAdminDashboard() {
                                 </div>
                             </form>
                         </div>
+                    </div>
+                )}
+
+                {/* ════════════ PRICING STRATEGY COMMAND CENTER ════════════ */}
+                {tab === 'pricing' && (
+                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-amber-400">calculate</span>
+                                    Pricing Strategy Command Center
+                                </h3>
+                                <p className="text-sm text-slate-500 mt-1">Policy, margin calculator, and LLM price monitoring</p>
+                            </div>
+                        </div>
+
+                        {/* Sub-nav */}
+                        <div className="flex gap-2 mb-6">
+                            {[{ id: 'calculator', label: '🧮 Margin Calculator', icon: 'tune' },
+                              { id: 'policy', label: '📋 Pricing Policy', icon: 'description' },
+                              { id: 'monitor', label: '🤖 Price Monitor', icon: 'monitoring' }].map(s => (
+                                <button key={s.id} onClick={() => setPolicySection(s.id)}
+                                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                        policySection === s.id ? 'bg-amber-500/20 text-amber-400' : 'bg-white/[0.04] text-slate-400 hover:text-white'}`}>
+                                    {s.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* ─── SECTION 1: INTERACTIVE MARGIN CALCULATOR ─── */}
+                        {policySection === 'calculator' && (
+                            <div className="space-y-6">
+                                {/* Slider Controls */}
+                                <div className="glass-panel rounded-2xl p-6 border border-amber-500/10">
+                                    <h4 className="text-sm font-black text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-amber-400">tune</span>
+                                        Adjust Parameters — See Real-Time Impact
+                                    </h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <label className="text-xs font-bold text-slate-400">₹ per Credit</label>
+                                                <span className="text-lg font-black text-amber-400">₹{calcCreditPrice}</span>
+                                            </div>
+                                            <input type="range" min="1" max="10" step="0.5" value={calcCreditPrice}
+                                                onChange={e => { setCalcCreditPrice(parseFloat(e.target.value)); loadPricingData(parseFloat(e.target.value), calcMargin, calcExRate) }}
+                                                className="w-full accent-amber-500" />
+                                            <div className="flex justify-between text-[9px] text-slate-600 mt-1"><span>₹1</span><span>₹5 (floor)</span><span>₹10</span></div>
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <label className="text-xs font-bold text-slate-400">Target Margin %</label>
+                                                <span className="text-lg font-black text-emerald-400">{calcMargin}%</span>
+                                            </div>
+                                            <input type="range" min="20" max="80" step="5" value={calcMargin}
+                                                onChange={e => { setCalcMargin(parseInt(e.target.value)); loadPricingData(calcCreditPrice, parseInt(e.target.value), calcExRate) }}
+                                                className="w-full accent-emerald-500" />
+                                            <div className="flex justify-between text-[9px] text-slate-600 mt-1"><span>20%</span><span>50% (target)</span><span>80%</span></div>
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <label className="text-xs font-bold text-slate-400">USD/INR Rate</label>
+                                                <span className="text-lg font-black text-blue-400">₹{calcExRate}</span>
+                                            </div>
+                                            <input type="range" min="80" max="95" step="1" value={calcExRate}
+                                                onChange={e => { setCalcExRate(parseInt(e.target.value)); loadPricingData(calcCreditPrice, calcMargin, parseInt(e.target.value)) }}
+                                                className="w-full accent-blue-500" />
+                                            <div className="flex justify-between text-[9px] text-slate-600 mt-1"><span>₹80</span><span>₹85 (default)</span><span>₹95</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Summary Cards */}
+                                {pricingData?.summary && (
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                        <div className="glass-panel rounded-xl p-4 border border-emerald-500/10">
+                                            <p className="text-[10px] text-slate-500 uppercase font-bold">Profitable</p>
+                                            <p className="text-2xl font-black text-emerald-400">{pricingData.summary.profitableActions}</p>
+                                        </div>
+                                        <div className="glass-panel rounded-xl p-4 border border-amber-500/10">
+                                            <p className="text-[10px] text-slate-500 uppercase font-bold">Breakeven</p>
+                                            <p className="text-2xl font-black text-amber-400">{pricingData.summary.breakevenActions}</p>
+                                        </div>
+                                        <div className="glass-panel rounded-xl p-4 border border-rose-500/10">
+                                            <p className="text-[10px] text-slate-500 uppercase font-bold">Loss</p>
+                                            <p className="text-2xl font-black text-rose-400">{pricingData.summary.lossActions}</p>
+                                        </div>
+                                        <div className="glass-panel rounded-xl p-4">
+                                            <p className="text-[10px] text-slate-500 uppercase font-bold">Est Monthly API Cost</p>
+                                            <p className="text-2xl font-black text-white">₹{(pricingData.summary.estimatedMonthlyAPICostINR || 0).toLocaleString()}</p>
+                                        </div>
+                                        <div className="glass-panel rounded-xl p-4">
+                                            <p className="text-[10px] text-slate-500 uppercase font-bold">Overall Margin</p>
+                                            <p className={`text-2xl font-black ${pricingData.summary.overallMarginPct >= 50 ? 'text-emerald-400' : pricingData.summary.overallMarginPct >= 20 ? 'text-amber-400' : 'text-rose-400'}`}>
+                                                {pricingData.summary.overallMarginPct}%
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Studio Summary */}
+                                {pricingData?.studioSummary && (
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        {Object.entries(pricingData.studioSummary).map(([studio, s]) => (
+                                            <div key={studio} className={`glass-panel rounded-xl p-4 border ${s.avgMargin >= 50 ? 'border-emerald-500/10' : s.avgMargin >= 20 ? 'border-amber-500/10' : 'border-rose-500/10'}`}>
+                                                <p className="text-xs font-bold text-white truncate">{studio}</p>
+                                                <div className="flex items-center justify-between mt-2">
+                                                    <span className={`text-lg font-black ${s.avgMargin >= 50 ? 'text-emerald-400' : s.avgMargin >= 20 ? 'text-amber-400' : 'text-rose-400'}`}>{s.avgMargin}%</span>
+                                                    <span className="text-[10px] text-slate-500">{s.actions} actions{s.losses > 0 ? `, ${s.losses} loss` : ''}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Per-Action Table */}
+                                {pricingData?.actions && (
+                                    <div className="glass-panel rounded-2xl overflow-hidden border border-white/[0.06]">
+                                        <div className="flex items-center justify-between p-4 border-b border-white/[0.04]">
+                                            <h4 className="text-sm font-black text-white flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-primary text-lg">table_chart</span>
+                                                Per-Action Cost vs Revenue
+                                            </h4>
+                                            <select value={pricingStudioFilter} onChange={e => setPricingStudioFilter(e.target.value)}
+                                                className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-xs text-white cursor-pointer">
+                                                <option value="all">All Studios</option>
+                                                {Object.keys(pricingData.studioSummary || {}).map(s => <option key={s} value={s}>{s}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left">
+                                                <thead>
+                                                    <tr className="text-[10px] text-slate-500 font-black uppercase tracking-wider border-b border-white/[0.04] bg-white/[0.02]">
+                                                        <th className="px-4 py-3">Action</th>
+                                                        <th className="px-4 py-3">Studio</th>
+                                                        <th className="px-4 py-3 text-right">Credits</th>
+                                                        <th className="px-4 py-3 text-right">API Cost</th>
+                                                        <th className="px-4 py-3 text-right">Revenue</th>
+                                                        <th className="px-4 py-3 text-right">Profit</th>
+                                                        <th className="px-4 py-3 text-right">Margin</th>
+                                                        <th className="px-4 py-3 text-center">Status</th>
+                                                        <th className="px-4 py-3 text-right">30d Uses</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-white/[0.03]">
+                                                    {pricingData.actions
+                                                        .filter(a => pricingStudioFilter === 'all' || a.studio === pricingStudioFilter)
+                                                        .map(a => (
+                                                        <tr key={a.action} className="text-sm hover:bg-white/[0.02] transition-all">
+                                                            <td className="px-4 py-2.5 font-medium text-white text-xs">{a.label}</td>
+                                                            <td className="px-4 py-2.5 text-[10px] text-slate-500">{a.studio}</td>
+                                                            <td className="px-4 py-2.5 text-right font-bold text-white text-xs">{a.creditCost}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs text-slate-400">₹{a.apiCostINR}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs text-emerald-400">₹{a.revenueINR}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs font-bold" style={{ color: a.profitINR >= 0 ? '#34d399' : '#f87171' }}>₹{a.profitINR}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs font-bold" style={{ color: a.marginPct >= 50 ? '#34d399' : a.marginPct >= 20 ? '#fbbf24' : '#f87171' }}>{a.marginPct}%</td>
+                                                            <td className="px-4 py-2.5 text-center">
+                                                                <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${
+                                                                    a.status === 'profitable' ? 'bg-emerald-500/15 text-emerald-400' :
+                                                                    a.status === 'breakeven' ? 'bg-amber-500/15 text-amber-400' :
+                                                                    'bg-rose-500/15 text-rose-400'}`}>
+                                                                    {a.status === 'profitable' ? '🟢' : a.status === 'breakeven' ? '🟡' : '🔴'} {a.status}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-4 py-2.5 text-right text-[10px] text-slate-500">{a.last30d?.count || 0}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* ─── SECTION 2: PRICING POLICY DOCUMENT ─── */}
+                        {policySection === 'policy' && policyData && (
+                            <div className="space-y-6">
+                                {/* Formula */}
+                                <div className="glass-panel rounded-2xl p-6 border border-indigo-500/10">
+                                    <h4 className="text-sm font-black text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-indigo-400">function</span>
+                                        Pricing Formula & Guardrails
+                                    </h4>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                        <div className="bg-indigo-500/5 rounded-xl p-4 border border-indigo-500/10">
+                                            <p className="text-[10px] text-slate-500 uppercase font-bold">Formula</p>
+                                            <p className="text-sm font-black text-indigo-400 mt-1">{policyData.formula?.text}</p>
+                                        </div>
+                                        <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/10">
+                                            <p className="text-[10px] text-slate-500 uppercase font-bold">Floor Price</p>
+                                            <p className="text-sm font-black text-emerald-400 mt-1">{policyData.formula?.floorPrice}</p>
+                                        </div>
+                                        <div className="bg-amber-500/5 rounded-xl p-4 border border-amber-500/10">
+                                            <p className="text-[10px] text-slate-500 uppercase font-bold">Target Margin</p>
+                                            <p className="text-sm font-black text-amber-400 mt-1">{policyData.formula?.targetMargin}</p>
+                                        </div>
+                                        <div className="bg-blue-500/5 rounded-xl p-4 border border-blue-500/10">
+                                            <p className="text-[10px] text-slate-500 uppercase font-bold">Exchange Rate</p>
+                                            <p className="text-sm font-black text-blue-400 mt-1">{policyData.formula?.exchangeRate}</p>
+                                        </div>
+                                    </div>
+                                    {policyData.guardrails && (
+                                        <div className="space-y-2">
+                                            {policyData.guardrails.map((g, i) => (
+                                                <div key={i} className="flex items-center gap-3 bg-white/[0.02] rounded-lg p-3">
+                                                    <span className="material-symbols-outlined text-amber-400 text-base">shield</span>
+                                                    <div className="flex-1">
+                                                        <span className="text-xs font-bold text-white">{g.rule}: </span>
+                                                        <span className="text-xs text-amber-400 font-bold">{g.value}</span>
+                                                        <span className="text-xs text-slate-500"> — {g.reason}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Credit Costs by Studio */}
+                                {policyData.creditCostsByStudio && (
+                                    <div className="glass-panel rounded-2xl p-6">
+                                        <h4 className="text-sm font-black text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-emerald-400">token</span>
+                                            Credit Costs by Studio
+                                        </h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {Object.entries(policyData.creditCostsByStudio).map(([studio, actions]) => (
+                                                <div key={studio} className="bg-white/[0.02] rounded-xl p-4 border border-white/[0.04]">
+                                                    <h5 className="text-xs font-black text-primary uppercase mb-3">{studio}</h5>
+                                                    <div className="space-y-1.5">
+                                                        {actions.map(a => (
+                                                            <div key={a.action} className="flex items-center justify-between">
+                                                                <span className="text-xs text-slate-400">{a.label}</span>
+                                                                <span className="text-xs font-bold text-white bg-white/[0.05] px-2 py-0.5 rounded">
+                                                                    {typeof a.credits === 'string' ? a.credits : `${a.credits} cr`}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Video Model Matrix */}
+                                {policyData.videoMatrix?.length > 0 && (
+                                    <div className="glass-panel rounded-2xl overflow-hidden border border-white/[0.06]">
+                                        <div className="p-4 border-b border-white/[0.04]">
+                                            <h4 className="text-sm font-black text-white flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-rose-400">videocam</span>
+                                                Video Model Cost Matrix
+                                            </h4>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left">
+                                                <thead>
+                                                    <tr className="text-[10px] text-slate-500 font-black uppercase tracking-wider border-b border-white/[0.04] bg-white/[0.02]">
+                                                        <th className="px-4 py-3">Model</th>
+                                                        <th className="px-4 py-3 text-right">Fast $/sec</th>
+                                                        <th className="px-4 py-3 text-right">Quality $/sec</th>
+                                                        <th className="px-4 py-3 text-right">5s Fast 1080p</th>
+                                                        <th className="px-4 py-3 text-right">10s Fast 1080p</th>
+                                                        <th className="px-4 py-3 text-right">15s Fast 1080p</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-white/[0.03]">
+                                                    {policyData.videoMatrix.map(v => (
+                                                        <tr key={v.model} className="text-sm hover:bg-white/[0.02] transition-all">
+                                                            <td className="px-4 py-2.5 font-bold text-white text-xs">{v.name}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs text-slate-400">${v.fastPerSec}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs text-slate-400">${v.qualityPerSec}</td>
+                                                            {v.examples.map(ex => (
+                                                                <td key={ex.duration} className="px-4 py-2.5 text-right text-xs">
+                                                                    <span className="text-white font-bold">{ex.fast1080?.credits || '—'} cr</span>
+                                                                    <span className="text-[9px] text-slate-600 ml-1">(${ex.fast1080?.usd || '—'})</span>
+                                                                </td>
+                                                            ))}
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Top-Up Packs */}
+                                {policyData.creditPacks?.length > 0 && (
+                                    <div className="glass-panel rounded-2xl overflow-hidden border border-white/[0.06]">
+                                        <div className="p-4 border-b border-white/[0.04]">
+                                            <h4 className="text-sm font-black text-white flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-amber-400">shopping_cart</span>
+                                                Credit Top-Up Packs ({policyData.creditPacks.length} tiers)
+                                            </h4>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left">
+                                                <thead>
+                                                    <tr className="text-[10px] text-slate-500 font-black uppercase tracking-wider border-b border-white/[0.04] bg-white/[0.02]">
+                                                        <th className="px-4 py-3">Pack</th>
+                                                        <th className="px-4 py-3 text-right">Credits</th>
+                                                        <th className="px-4 py-3 text-right">Bonus</th>
+                                                        <th className="px-4 py-3 text-right">Total</th>
+                                                        <th className="px-4 py-3 text-right">Price</th>
+                                                        <th className="px-4 py-3 text-right">₹/Credit</th>
+                                                        <th className="px-4 py-3 text-right">Validity</th>
+                                                        <th className="px-4 py-3">Badge</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-white/[0.03]">
+                                                    {policyData.creditPacks.map(p => (
+                                                        <tr key={p.slug} className="text-sm hover:bg-white/[0.02] transition-all">
+                                                            <td className="px-4 py-2.5 font-bold text-white text-xs">{p.name}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs text-white">{p.credits?.toLocaleString()}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs text-amber-400 font-bold">{p.bonus > 0 ? `+${p.bonus?.toLocaleString()}` : '—'}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs text-emerald-400 font-bold">{p.total?.toLocaleString()}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs text-white font-bold">₹{p.price?.toLocaleString()}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs text-slate-400">₹{p.perCredit}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs text-slate-500">{p.validity}d</td>
+                                                            <td className="px-4 py-2.5 text-xs">{p.badge ? <span className="px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 text-[9px] font-bold">{p.badge}</span> : '—'}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* ─── SECTION 3: LLM PRICE MONITOR ─── */}
+                        {policySection === 'monitor' && (
+                            <div className="space-y-6">
+                                {/* Controls */}
+                                <div className="flex items-center gap-3">
+                                    <button onClick={handlePricingCheck} disabled={monitorChecking}
+                                        className="px-5 py-2.5 rounded-xl bg-amber-500 text-slate-950 text-xs font-black uppercase tracking-wider hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50 cursor-pointer flex items-center gap-2">
+                                        {monitorChecking ? <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> : <span className="material-symbols-outlined text-sm">radar</span>}
+                                        {monitorChecking ? 'Checking...' : 'Check Now'}
+                                    </button>
+                                    {monitorData?.lastCheck && (
+                                        <span className="text-xs text-slate-500">
+                                            Last checked: {new Date(monitorData.lastCheck).toLocaleString('en-IN')}
+                                        </span>
+                                    )}
+                                    {monitorData?.alertCount > 0 && (
+                                        <button onClick={handleDismissAlerts} className="px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 text-[10px] font-bold border border-rose-500/20 hover:bg-rose-500/20 transition-all cursor-pointer">
+                                            Dismiss {monitorData.alertCount} alerts
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Alerts */}
+                                {monitorData?.alerts?.length > 0 && (
+                                    <div className="bg-rose-500/5 border border-rose-500/20 rounded-2xl p-5">
+                                        <h4 className="text-sm font-black text-rose-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-rose-400">emergency</span>
+                                            Price Change Alerts ({monitorData.alerts.length})
+                                        </h4>
+                                        <div className="space-y-2">
+                                            {monitorData.alerts.slice(0, 10).map((a, i) => (
+                                                <div key={i} className="flex items-center gap-3 bg-rose-500/5 rounded-lg p-3">
+                                                    <span className={`material-symbols-outlined text-base ${a.type === 'price_increase' ? 'text-rose-400' : a.type === 'price_decrease' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                                        {a.type === 'price_increase' ? 'trending_up' : a.type === 'price_decrease' ? 'trending_down' : 'new_releases'}
+                                                    </span>
+                                                    <div className="flex-1">
+                                                        <span className="text-xs font-bold text-white">{a.model}: </span>
+                                                        <span className="text-xs text-slate-400">{a.details}</span>
+                                                    </div>
+                                                    <span className="text-[9px] text-slate-600">{a.detectedAt ? new Date(a.detectedAt).toLocaleDateString('en-IN') : ''}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Provider Grid */}
+                                {monitorData?.providers && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {Object.entries(monitorData.providers).map(([providerId, provider]) => (
+                                            <div key={providerId} className="glass-panel rounded-2xl p-5 border border-white/[0.06]">
+                                                <div className="flex items-center gap-2 mb-4">
+                                                    <span className="text-xl">{provider.icon}</span>
+                                                    <h5 className="text-sm font-black text-white">{provider.provider}</h5>
+                                                </div>
+                                                <div className="space-y-3">
+                                                    {Object.entries(provider.models).map(([modelId, model]) => (
+                                                        <div key={modelId} className="bg-white/[0.02] rounded-lg p-3">
+                                                            <p className="text-xs font-bold text-white mb-1">{model.name}</p>
+                                                            <div className="flex flex-wrap gap-2 text-[10px]">
+                                                                {model.inputPer1M !== undefined && (
+                                                                    <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400">In: ${model.inputPer1M}/1M</span>
+                                                                )}
+                                                                {model.outputPer1M !== undefined && (
+                                                                    <span className="px-2 py-0.5 rounded bg-violet-500/10 text-violet-400">Out: ${model.outputPer1M}/1M</span>
+                                                                )}
+                                                                {model.flatCostUSD !== undefined && (
+                                                                    <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400">${model.flatCostUSD}/image</span>
+                                                                )}
+                                                                {model.costPerSecFast !== undefined && (
+                                                                    <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400">Fast: ${model.costPerSecFast}/s</span>
+                                                                )}
+                                                                {model.costPerSecQuality !== undefined && (
+                                                                    <span className="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400">Qual: ${model.costPerSecQuality}/s</span>
+                                                                )}
+                                                                {model.costPerMinute !== undefined && (
+                                                                    <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400">${model.costPerMinute}/min</span>
+                                                                )}
+                                                                {model.costPerSecond !== undefined && (
+                                                                    <span className="px-2 py-0.5 rounded bg-pink-500/10 text-pink-400">${model.costPerSecond}/sec</span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-[9px] text-slate-600 mt-1.5">
+                                                                <a href={model.pricingUrl} target="_blank" rel="noopener" className="hover:text-amber-400 transition-colors">View pricing →</a>
+                                                            </p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

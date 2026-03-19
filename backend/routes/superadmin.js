@@ -1826,6 +1826,167 @@ router.post('/credit-packs/seed-defaults', async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════
+// 8.7 PRICING STRATEGY COMMAND CENTER (Super Admin)
+// ══════════════════════════════════════════════════════════════
+
+import { PROVIDER_PRICING, checkPricingChanges, simulateImpact } from '../agents/pricingMonitor.js';
+import { COST_PER_SECOND, MODEL_CAPABILITIES, estimateCost } from '../agents/videoStudio/falClient.js';
+
+// GET /superadmin/pricing-policy — Full pricing policy document
+router.get('/pricing-policy', async (req, res) => {
+    try {
+        const costs = await getCreditCosts();
+        const creditPacks = await CreditPack.find({ isActive: true }).sort({ displayOrder: 1 }).lean();
+        const packages = await (await import('../models/SubscriptionPackage.js')).default
+            .find({ isDeleted: { $ne: true } }).sort({ tier: 1 }).lean();
+
+        // Group credit costs by studio
+        const studioOf = (a) => {
+            if (a.startsWith('seo')) return 'SEO Studio';
+            if (a.startsWith('brainstorm') || a === 'trendRefresh') return 'Brainstorm Studio';
+            if (a.startsWith('video')) return 'Video Studio';
+            if (a.startsWith('social')) return 'Social Media Studio';
+            if (a.startsWith('canvas')) return 'Creative Studio (Canvas)';
+            if (['content', 'contentRefine'].includes(a)) return 'Content Studio';
+            if (['creative', 'photoshoot'].includes(a)) return 'Creative Studio';
+            if (a === 'adCreative') return 'Performance Marketing';
+            if (a.startsWith('voice')) return 'Voice Studio';
+            return 'Other';
+        };
+
+        const ACTION_LABELS = {
+            content: 'Content Generate', contentRefine: 'Content Refine',
+            creative: 'Creative Image', photoshoot: 'AI Photoshoot',
+            seoHealthCheck: 'SEO Health Check', seoTraffic: 'SEO Traffic', seoCompetitors: 'SEO Competitors',
+            seoAiVisibility: 'SEO AI Visibility', seoAsk: 'SEO Ask', seoAuditPage: 'SEO Page Audit',
+            seoCompetitorDiscover: 'SEO Discover', seoBacklinks: 'SEO Backlinks', seoWarRoom: 'SEO War Room',
+            seoLlmProbe: 'SEO LLM Probe', seoAutoFix: 'SEO Auto-Fix', seoPromptMining: 'SEO Prompt Mining',
+            brainstorm: 'Brainstorm Generate', brainstormRefine: 'Brainstorm Refine', brainstormChat: 'Brainstorm Chat',
+            brainstormScreenplay: 'Screenplay', trendRefresh: 'Trend Refresh',
+            videoBrainstorm: 'Video Brainstorm', videoGenerate: 'Video Generate (dynamic)', videoEdit: 'Video Edit',
+            socialMedia: 'Social Strategy', socialMediaCalendar: 'Social Calendar', socialMediaAudit: 'Social Audit',
+            socialMediaCompetitor: 'Social Competitor', socialMediaScore: 'Social Score',
+            canvasGenerate: 'Canvas AI Gen', canvasBgRemove: 'Canvas BG Remove', canvasExtend: 'Canvas Extend',
+            adCreative: 'Ad Creative', voiceClone: 'Voice Clone', voiceTranscribe: 'Voice Transcribe',
+        };
+
+        const creditCostsByStudio = {};
+        for (const [action, creditCost] of Object.entries(costs)) {
+            const studio = studioOf(action);
+            if (!creditCostsByStudio[studio]) creditCostsByStudio[studio] = [];
+            creditCostsByStudio[studio].push({
+                action,
+                label: ACTION_LABELS[action] || action,
+                credits: creditCost === 'dynamic' ? 'Dynamic (ceil(USD×34))' : creditCost,
+            });
+        }
+
+        // Video model cost matrix
+        const videoMatrix = Object.entries(COST_PER_SECOND || {}).map(([model, rates]) => {
+            const caps = MODEL_CAPABILITIES?.[model] || {};
+            return {
+                model, name: caps.name || model,
+                fastPerSec: rates.fast, qualityPerSec: rates.quality,
+                // Cost examples at different durations
+                examples: [5, 10, 15].map(dur => ({
+                    duration: dur,
+                    fast720: estimateCost(model, dur, '720p', 'fast'),
+                    fast1080: estimateCost(model, dur, '1080p', 'fast'),
+                })),
+            };
+        });
+
+        res.json({
+            success: true,
+            policy: {
+                formula: {
+                    text: 'credits = max(ceil(USD_cost × 34), floor)',
+                    floorPrice: '₹5/credit minimum',
+                    targetMargin: '≥50% gross margin on all actions',
+                    exchangeRate: 'USD/INR = 85 (configurable)',
+                },
+                creditCostsByStudio,
+                videoMatrix,
+                creditPacks: creditPacks.map(p => ({
+                    name: p.name, slug: p.slug,
+                    credits: p.credits, bonus: p.bonusCredits,
+                    total: p.credits + (p.bonusCredits || 0),
+                    price: p.price, perCredit: ((p.price) / (p.credits + (p.bonusCredits || 0))).toFixed(2),
+                    validity: p.validityDays, badge: p.badge,
+                })),
+                subscriptionPlans: packages.map(p => ({
+                    name: p.name, tier: p.tier,
+                    monthlyCredits: p.credits?.monthly,
+                    monthlyPrice: p.pricing?.monthly,
+                })),
+                guardrails: [
+                    { rule: 'Minimum credit floor', value: '₹5/credit', reason: 'Ensures profitability on all actions' },
+                    { rule: 'Video pricing formula', value: 'ceil(USD × 34)', reason: '≥50% margin at floor price' },
+                    { rule: 'Minimum video credits', value: '5 credits', reason: 'Prevents sub-₹25 video generations' },
+                    { rule: 'Top-up validity', value: '180 days (standard) / 31 days (promo)', reason: 'Encourages usage, deferred revenue recognition' },
+                    { rule: 'First purchase bonus', value: '2× credits', reason: 'Acquisition incentive, one-time only' },
+                ],
+            },
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// GET /superadmin/pricing-monitor — Provider baselines + alerts
+router.get('/pricing-monitor', async (req, res) => {
+    try {
+        const baselines = await getSetting('pricing_baselines', null);
+        const lastCheck = await getSetting('pricing_last_check', null);
+        const alerts = await getSetting('pricing_alerts', []);
+
+        res.json({
+            success: true,
+            providers: PROVIDER_PRICING,
+            baselines,
+            lastCheck,
+            alerts: alerts.slice(0, 50),
+            alertCount: alerts.length,
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// POST /superadmin/pricing-monitor/check — Trigger manual check
+router.post('/pricing-monitor/check', async (req, res) => {
+    try {
+        const changes = await checkPricingChanges();
+
+        await logAudit(req, {
+            action: 'PRICING_MONITOR_CHECK',
+            targetModel: 'SystemSettings',
+            metadata: { changesFound: changes.length },
+        });
+
+        res.json({
+            success: true,
+            changes,
+            message: changes.length > 0
+                ? `⚠️ ${changes.length} pricing change(s) detected!`
+                : '✅ No pricing changes detected — all costs match baselines.',
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// POST /superadmin/pricing-monitor/dismiss — Clear alerts
+router.post('/pricing-monitor/dismiss', async (req, res) => {
+    try {
+        await setSetting('pricing_alerts', []);
+        res.json({ success: true, message: 'All pricing alerts dismissed' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════
 // 9. CREDIT COST MANAGEMENT (Super Admin)
 // ══════════════════════════════════════════════════════════════
 

@@ -317,6 +317,11 @@ const server = app.listen(config.port, () => {
         console.log('🕵️ Agent Intelligence active');
     }).catch(err => console.error('❌ Failed to load intelligenceAgent.js:', err));
 
+    // Start pricing monitor (24h checks)
+    import('./agents/pricingMonitor.js').then(({ startPricingMonitor }) => {
+        startPricingMonitor();
+    }).catch(err => console.error('❌ Failed to load pricingMonitor.js:', err));
+
     // Start scheduled post publisher
     import('./services/scheduledPostPublisher.js').then(({ startScheduledPostPublisher }) => {
         startScheduledPostPublisher();

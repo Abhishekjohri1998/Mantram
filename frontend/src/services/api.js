@@ -417,6 +417,11 @@ export const superadmin = {
     seedCreditPacks: (force) => apiFetch('/superadmin/credit-packs/seed-defaults', { method: 'POST', body: JSON.stringify({ force }) }),
     // Credit Costs
     getCreditCosts: () => apiFetch('/superadmin/credit-costs'),
+    // Pricing Strategy Command Center
+    getPricingPolicy: () => apiFetch('/superadmin/pricing-policy'),
+    getPricingMonitor: () => apiFetch('/superadmin/pricing-monitor'),
+    triggerPricingCheck: () => apiFetch('/superadmin/pricing-monitor/check', { method: 'POST' }),
+    dismissPricingAlerts: () => apiFetch('/superadmin/pricing-monitor/dismiss', { method: 'POST' }),
     updateCreditCosts: (costs) => apiFetch('/superadmin/credit-costs', { method: 'PUT', body: JSON.stringify({ costs }) }),
     resetCreditCosts: () => apiFetch('/superadmin/credit-costs/reset', { method: 'POST' }),
     getPricingCalculator: (params = {}) => { const q = new URLSearchParams(params).toString(); return apiFetch(`/superadmin/pricing-calculator?${q}`); },

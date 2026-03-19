@@ -64,7 +64,7 @@ const MODEL_AVAILABLE = {
 };
 
 // ── Cost table (USD per second of video) ──
-const COST_PER_SECOND = {
+export const COST_PER_SECOND = {
     'kling-3.0': { fast: 0.07, quality: 0.12 },
     'veo-3.1': { fast: 0.15, quality: 0.40 },
     'veo-3.1-fast': { fast: 0.08, quality: 0.15 },
