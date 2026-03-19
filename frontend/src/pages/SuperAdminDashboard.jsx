@@ -2940,6 +2940,198 @@ export default function SuperAdminDashboard() {
                         )}
                     </div>
                 )}
+
+                {/* ════════════ CREDIT STORE MANAGEMENT ════════════ */}
+                {tab === 'creditPacks' && (
+                    <div>
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-amber-400">shopping_cart</span>
+                                    Credit Store Management
+                                </h3>
+                                <p className="text-sm text-slate-500 mt-1">Manage additional credit packs users can purchase</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={handleSeedPacks} className="px-3 py-2 rounded-lg bg-white/[0.04] text-slate-400 text-xs font-bold hover:bg-white/[0.08] transition-all cursor-pointer border border-white/[0.06]">
+                                    <span className="material-symbols-outlined text-sm mr-1 align-middle">database</span>Seed Defaults
+                                </button>
+                                <button onClick={() => { setEditingPack(null); setPackForm({ name: '', slug: '', credits: 100, bonusCredits: 0, price: 499, validityDays: 180, icon: 'bolt', badge: '', description: '', isPromo: false, promoDiscount: 0, promoOriginalPrice: 0, promoLabel: '', displayOrder: 0, isActive: true, isFirstPurchaseEligible: true }); setShowPackForm(true) }}
+                                    className="px-4 py-2 rounded-lg bg-amber-500 text-slate-950 text-xs font-black uppercase tracking-wider hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/20 cursor-pointer">
+                                    + New Pack
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Pack Grid */}
+                        {creditPacksList.length > 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+                            {creditPacksList.map(p => (
+                                <div key={p._id} className={`glass-panel rounded-2xl overflow-hidden border transition-all ${p.isActive ? 'border-white/[0.06]' : 'border-rose-500/20 opacity-60'}`}>
+                                    {/* Pack Header */}
+                                    <div className="p-4 border-b border-white/[0.04]" style={{ background: `linear-gradient(135deg, ${p.color || '#f59e0b'}15, transparent)` }}>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-xl" style={{ color: p.color || '#f59e0b' }}>{p.icon || 'bolt'}</span>
+                                                <h4 className="text-sm font-black text-white">{p.name}</h4>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                {p.badge && <span className="text-[9px] px-2 py-0.5 rounded-full font-bold" style={{ background: `${p.badgeColor || '#f59e0b'}20`, color: p.badgeColor || '#f59e0b' }}>{p.badge}</span>}
+                                                {p.isPromo && <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-bold">PROMO</span>}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-2xl font-black text-white">₹{p.price?.toLocaleString()}</span>
+                                            {p.isPromo && p.promoOriginalPrice > 0 && <span className="text-sm text-slate-500 line-through">₹{p.promoOriginalPrice}</span>}
+                                        </div>
+                                    </div>
+                                    {/* Pack Details */}
+                                    <div className="p-4 space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] text-slate-500 uppercase font-bold">Credits</span>
+                                            <span className="text-sm font-bold text-white">{p.credits?.toLocaleString()}{p.bonusCredits > 0 && <span className="text-amber-400"> +{p.bonusCredits}</span>}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] text-slate-500 uppercase font-bold">₹/Credit</span>
+                                            <span className="text-xs text-slate-400">₹{(p.price / ((p.credits || 1) + (p.bonusCredits || 0))).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] text-slate-500 uppercase font-bold">Validity</span>
+                                            <span className="text-xs text-slate-400">{p.validityDays || 180} days</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] text-slate-500 uppercase font-bold">Sales</span>
+                                            <span className="text-xs text-emerald-400 font-bold">{p.purchaseCount || 0} sold · ₹{(p.totalRevenue || 0).toLocaleString()}</span>
+                                        </div>
+                                    </div>
+                                    {/* Pack Actions */}
+                                    <div className="p-3 border-t border-white/[0.04] flex gap-2">
+                                        <button onClick={() => handleEditPack(p)} className="flex-1 py-1.5 rounded-lg bg-white/[0.04] text-xs text-slate-400 hover:text-white hover:bg-white/[0.08] transition-all cursor-pointer">Edit</button>
+                                        <button onClick={() => handleTogglePack(p._id)} className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${p.isActive ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20' : 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20'}`}>
+                                            {p.isActive ? 'Active' : 'Inactive'}
+                                        </button>
+                                        <button onClick={() => handleDeletePack(p._id, p.name)} className="py-1.5 px-3 rounded-lg bg-rose-500/10 text-rose-400 text-xs hover:bg-rose-500/20 transition-all cursor-pointer">
+                                            <span className="material-symbols-outlined text-sm">delete</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        )}
+
+                        {creditPacksList.length === 0 && (
+                            <div className="text-center py-16 glass-panel rounded-2xl">
+                                <span className="material-symbols-outlined text-5xl text-slate-600 mb-3 block">shopping_cart</span>
+                                <p className="text-slate-400 text-sm font-bold mb-1">No credit packs yet</p>
+                                <p className="text-slate-600 text-xs mb-4">Create packs or seed defaults to get started</p>
+                                <button onClick={handleSeedPacks} className="px-5 py-2.5 rounded-xl bg-amber-500 text-slate-950 text-xs font-black uppercase hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/20 cursor-pointer">
+                                    Seed Default Packs
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Create/Edit Pack Modal */}
+                        {showPackForm && (
+                            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={e => e.target === e.currentTarget && setShowPackForm(false)}>
+                                <div className="bg-slate-900 border border-white/[0.08] rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl" style={{ scrollbarWidth: 'thin' }}>
+                                    <div className="p-5 border-b border-white/[0.06] flex items-center justify-between sticky top-0 bg-slate-900 z-10">
+                                        <h4 className="text-sm font-black text-white uppercase tracking-wider">{editingPack ? 'Edit Pack' : 'New Credit Pack'}</h4>
+                                        <button onClick={() => setShowPackForm(false)} className="p-1 rounded-lg hover:bg-white/[0.06] text-slate-500 cursor-pointer"><span className="material-symbols-outlined">close</span></button>
+                                    </div>
+                                    <form onSubmit={handleSavePack} className="p-5 space-y-4">
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Name *</label>
+                                                <input value={packForm.name} onChange={e => setPackForm(f => ({ ...f, name: e.target.value }))} required className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none focus:border-amber-500/30" placeholder="⚡ Spark" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Slug *</label>
+                                                <input value={packForm.slug} onChange={e => setPackForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') }))} required className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none focus:border-amber-500/30" placeholder="spark" />
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            <div>
+                                                <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Credits *</label>
+                                                <input type="number" value={packForm.credits} onChange={e => setPackForm(f => ({ ...f, credits: parseInt(e.target.value) || 0 }))} required className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Bonus</label>
+                                                <input type="number" value={packForm.bonusCredits} onChange={e => setPackForm(f => ({ ...f, bonusCredits: parseInt(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Price (₹) *</label>
+                                                <input type="number" value={packForm.price} onChange={e => setPackForm(f => ({ ...f, price: parseInt(e.target.value) || 0 }))} required className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" />
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            <div>
+                                                <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Validity (days)</label>
+                                                <input type="number" value={packForm.validityDays} onChange={e => setPackForm(f => ({ ...f, validityDays: parseInt(e.target.value) || 180 }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Icon</label>
+                                                <input value={packForm.icon} onChange={e => setPackForm(f => ({ ...f, icon: e.target.value }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" placeholder="bolt" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Display Order</label>
+                                                <input type="number" value={packForm.displayOrder} onChange={e => setPackForm(f => ({ ...f, displayOrder: parseInt(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" />
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Badge</label>
+                                                <input value={packForm.badge} onChange={e => setPackForm(f => ({ ...f, badge: e.target.value }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" placeholder="Best Value, Popular..." />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Description</label>
+                                                <input value={packForm.description} onChange={e => setPackForm(f => ({ ...f, description: e.target.value }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" placeholder="Great for casual creators" />
+                                            </div>
+                                        </div>
+                                        {/* Promo Section */}
+                                        <div className="border border-white/[0.06] rounded-xl p-4">
+                                            <label className="flex items-center gap-2 cursor-pointer mb-3">
+                                                <input type="checkbox" checked={packForm.isPromo} onChange={e => setPackForm(f => ({ ...f, isPromo: e.target.checked }))} className="accent-amber-500" />
+                                                <span className="text-xs font-bold text-white">Enable Promo Mode</span>
+                                            </label>
+                                            {packForm.isPromo && (
+                                                <div className="grid grid-cols-3 gap-3">
+                                                    <div>
+                                                        <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Discount %</label>
+                                                        <input type="number" value={packForm.promoDiscount} onChange={e => setPackForm(f => ({ ...f, promoDiscount: parseInt(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Original ₹</label>
+                                                        <input type="number" value={packForm.promoOriginalPrice} onChange={e => setPackForm(f => ({ ...f, promoOriginalPrice: parseInt(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Promo Label</label>
+                                                        <input value={packForm.promoLabel} onChange={e => setPackForm(f => ({ ...f, promoLabel: e.target.value }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-white outline-none" placeholder="33% off!" />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        {/* Toggles */}
+                                        <div className="flex gap-4">
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input type="checkbox" checked={packForm.isActive} onChange={e => setPackForm(f => ({ ...f, isActive: e.target.checked }))} className="accent-emerald-500" />
+                                                <span className="text-xs text-slate-400">Active</span>
+                                            </label>
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input type="checkbox" checked={packForm.isFirstPurchaseEligible} onChange={e => setPackForm(f => ({ ...f, isFirstPurchaseEligible: e.target.checked }))} className="accent-amber-500" />
+                                                <span className="text-xs text-slate-400">2× First Purchase</span>
+                                            </label>
+                                        </div>
+                                        <div className="flex gap-3 pt-2">
+                                            <button type="button" onClick={() => setShowPackForm(false)} className="flex-1 py-3 bg-white/[0.04] text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-white/[0.08] transition-all border border-white/[0.06] cursor-pointer">Cancel</button>
+                                            <button type="submit" className="flex-1 py-3 bg-amber-500 text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/20 cursor-pointer">{editingPack ? 'Update Pack' : 'Create Pack'}</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
             </div>{/* end flex-1 content */}
             </div>{/* end flex min-h-screen */}
         </DashboardLayout>
