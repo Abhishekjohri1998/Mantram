@@ -75,7 +75,9 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
 
       try {
         const providerController = new AbortController();
-        const providerTimeout = Math.min(150000, timeout); // Increased from 50s to 150s for heavy SEO/Claude thinking
+        // CloudFront has a 60s hard limit. Setting provider timeout to 55s 
+        // to ensure we return a response before the CDN cuts the connection.
+        const providerTimeout = Math.min(55000, timeout); 
         const pTimer = setTimeout(() => providerController.abort(), providerTimeout);
 
         if (provider.name === 'anthropic') {
@@ -385,8 +387,8 @@ Low text-to-HTML ratio pages: ${siMetrics.lowTextRatioCount || 0}
 Average text-to-HTML ratio: ${siMetrics.avgTextToHtmlRatio || 0}%
 `;
 
-    // AI gets a generous timeout — full-site crawl (800 pages) takes up to 180s first
-    const aiTimeout = 180000; // 180s for AI call — large crawl data needs more time
+    // AI timeout reduced to 40s to fit in CloudFront's 60s window (Crawl + AI)
+    const aiTimeout = 40000; 
     console.log(`⏱️ Crawl + research complete (${siMetrics.totalPages || siteResearch?.pages?.length || 0} pages). AI timeout: ${aiTimeout / 1000}s`);
 
     const systemPrompt = `You are a SENIOR SEO STRATEGIST (not just an auditor). You think like a CMO + technical SEO expert combined. You have REAL CRAWL DATA — use it as ground truth. Never guess or contradict the crawl.
