@@ -44,7 +44,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
   lastTokenUsage = null;
 
   const overallController = new AbortController();
-  const overallTimer = setTimeout(() => overallController.abort(), Math.max(timeout, 60000));
+  const overallTimer = setTimeout(() => overallController.abort(), timeout);
 
   const defaultProvider = process.env.DEFAULT_TEXT_PROVIDER || 'anthropic';
   const defaultModel = process.env.DEFAULT_TEXT_MODEL;
@@ -74,11 +74,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
       console.log(`🤖 aiCall: Trying ${provider.name}...`);
 
       try {
-        const providerController = new AbortController();
-        // CloudFront has a 60s hard limit. Setting provider timeout to 55s 
-        // to ensure we return a response before the CDN cuts the connection.
-        const providerTimeout = Math.min(55000, timeout); 
-        const pTimer = setTimeout(() => providerController.abort(), providerTimeout);
+        // We rely entirely on the overallController to enforce strict global budgets.
 
         if (provider.name === 'anthropic') {
           const modelId = (defaultProvider === 'anthropic' && defaultModel) ? defaultModel : 'claude-3-5-sonnet-20240620';
@@ -96,9 +92,8 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
               messages: [{ role: 'user', content: userPrompt }],
               temperature,
             }),
-            signal: providerController.signal,
+            signal: overallController.signal,
           });
-          clearTimeout(pTimer);
           const data = await resp.json();
           if (resp.ok && data.content?.[0]?.text) {
             lastTokenUsage = { inputTokens: data.usage?.input_tokens || 0, outputTokens: data.usage?.output_tokens || 0, model: modelId, provider: 'anthropic' };
@@ -120,9 +115,8 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
               temperature, max_tokens: maxTokens,
               ...(json ? { response_format: { type: 'json_object' } } : {}),
             }),
-            signal: providerController.signal,
+            signal: overallController.signal,
           });
-          clearTimeout(pTimer);
           const data = await resp.json();
           if (resp.ok && data.choices?.[0]?.message?.content) {
             lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'gpt-4o-mini', provider: 'openai' };
@@ -144,9 +138,8 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
               temperature, max_tokens: maxTokens,
               ...(json ? { response_format: { type: 'json_object' } } : {}),
             }),
-            signal: providerController.signal,
+            signal: overallController.signal,
           });
-          clearTimeout(pTimer);
           const data = await resp.json();
           if (resp.ok && data.choices?.[0]?.message?.content) {
             lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'grok-3-mini-fast', provider: 'xai' };
@@ -159,7 +152,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
         if (provider.name === 'gemini') {
           const models = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-2.0-flash'];
           for (const modelId of models) {
-            if (overallController.signal.aborted || providerController.signal.aborted) break;
+            if (overallController.signal.aborted) break;
             try {
               const resp = await fetch(
                 `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${provider.key}`,
@@ -174,12 +167,11 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
                       ...(json ? { responseMimeType: 'application/json' } : {}),
                     },
                   }),
-                  signal: providerController.signal,
+                  signal: overallController.signal,
                 }
               );
               const data = await resp.json();
               if (resp.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-                clearTimeout(pTimer);
                 const text = data.candidates[0].content.parts[0].text;
                 lastTokenUsage = { inputTokens: data.usageMetadata?.promptTokenCount || 0, outputTokens: data.usageMetadata?.candidatesTokenCount || 0, model: modelId, provider: 'gemini' };
                 return text;
@@ -192,7 +184,6 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
               console.warn(`Gemini ${modelId} request fail: ${e.message}`);
             }
           }
-          clearTimeout(pTimer);
         }
       } catch (e) {
         console.warn(`${provider.name} provider error: ${e.message}`);
