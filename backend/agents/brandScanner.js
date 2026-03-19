@@ -53,42 +53,39 @@ export async function scanWebsite(url, aiRouter) {
     console.log(`  🖼️  Banner images found: ${bannerImages.length}`);
     console.log(`  📷 Total homepage images found: ${allImages.length}`);
 
-    // ── Phase 1b: AI Vision Analysis (Puppeteer screenshot → Gemini) ────
-    // Skip for SPAs — we already used Puppeteer for content extraction above
-    let visionAnalysis = null;
-    if (!isSPA) {
-        try {
-            visionAnalysis = await captureAndAnalyze(url, allImages, selectorLogos);
-            console.log(`  🧠 Vision analysis: logo=${visionAnalysis?.logo ? '✅' : '❌'}, colors=${visionAnalysis?.colors?.length || 0}`);
-        } catch (err) {
-            console.warn('  ⚠️ Vision analysis failed (falling back to selectors):', err.message);
-        }
-    } else {
-        console.log('  ⏭️ Skipping Vision analysis (SPA — Puppeteer already used for content)');
-    }
-
-    // ── Phase 2: Social Media Intelligence ────────────────────────────────
+    // ── Phase 1b+2+3: PARALLEL — Vision + Social + SubPages ────────────
+    // These 3 expensive operations are independent — run concurrently
     const socialLinks = extractSocialLinks($, url);
     console.log(`  🔗 Social links found: ${Object.values(socialLinks).filter(Boolean).length}`);
 
-    let socialVoice = {};
-    try {
-        if (Object.values(socialLinks).some(Boolean) && aiRouter) {
-            socialVoice = await analyzeSocialMedia(socialLinks, aiRouter);
-            console.log(`  📱 Social voice analysis: ${socialVoice.captionStyle ? '✅' : '❌'}`);
-        }
-    } catch (err) {
-        console.warn('  ⚠️ Social media analysis failed:', err.message);
-    }
+    const [visionResult, subPageResult, socialResult] = await Promise.allSettled([
+        // Vision analysis (Puppeteer screenshot → Gemini)
+        (!isSPA ? captureAndAnalyze(url, allImages, selectorLogos).catch(err => {
+            console.warn('  ⚠️ Vision analysis failed:', err.message);
+            return null;
+        }) : Promise.resolve(null)),
+        // Sub-page crawl
+        crawlSubPages($, url, isSPA, sharedBrowser).catch(err => {
+            console.warn('  ⚠️ Sub-page crawl failed:', err.message);
+            return [];
+        }),
+        // Social media analysis
+        (Object.values(socialLinks).some(Boolean) && aiRouter
+            ? analyzeSocialMedia(socialLinks, aiRouter).catch(err => {
+                console.warn('  ⚠️ Social media analysis failed:', err.message);
+                return {};
+            })
+            : Promise.resolve({})),
+    ]);
 
-    // ── Phase 3: Deep Multi-Page Crawl ───────────────────────────────────
-    let subPageContent = [];
-    try {
-        subPageContent = await crawlSubPages($, url, isSPA, sharedBrowser);
-        console.log(`  📄 Sub-pages crawled: ${subPageContent.length} content pieces`);
-    } catch (err) {
-        console.warn('  ⚠️ Sub-page crawl failed:', err.message);
-    }
+    const visionAnalysis = visionResult.status === 'fulfilled' ? visionResult.value : null;
+    const subPageContent = subPageResult.status === 'fulfilled' ? subPageResult.value : [];
+    const socialVoice = socialResult.status === 'fulfilled' ? socialResult.value : {};
+
+    if (visionAnalysis) console.log(`  🧠 Vision analysis: logo=${visionAnalysis?.logo ? '✅' : '❌'}, colors=${visionAnalysis?.colors?.length || 0}`);
+    if (isSPA) console.log('  ⏭️ Skipping Vision analysis (SPA — Puppeteer already used for content)');
+    console.log(`  📄 Sub-pages crawled: ${subPageContent.length} content pieces`);
+    if (socialVoice.captionStyle) console.log(`  📱 Social voice analysis: ✅`);
 
     // Close shared Puppeteer browser if we opened one
     if (sharedBrowser) {
@@ -102,10 +99,11 @@ export async function scanWebsite(url, aiRouter) {
         ...(socialVoice.sampleCaptions || []).map(c => `[Social Media] ${c}`),
     ];
 
-    // ── Enhanced AI Voice/Tone Analysis (with social context) ────────────
-    let voiceAnalysis = {};
-    try {
-        if (aiRouter && allContentSamples.length > 0) {
+    // ── Enhanced AI Voice/Tone Analysis + Brand Name — PARALLEL ───────────
+    // These 2 AI calls are independent — run concurrently
+    const [voiceResult, nameResult] = await Promise.allSettled([
+        // Voice/tone analysis
+        (aiRouter && allContentSamples.length > 0 ? (async () => {
             const colorContext = cssColors.length > 0
                 ? `\nAll colors extracted from website CSS: ${cssColors.slice(0, 12).map(c => `${c.hex} (score:${c.score}, sources:${c.sources.join(',')})`).join(', ')}`
                 : '';
@@ -113,15 +111,10 @@ export async function scanWebsite(url, aiRouter) {
                 ? `\nBanner/hero images found: ${bannerImages.map(b => b.url).join(', ')}`
                 : '';
             const socialContext = socialVoice.captionStyle
-                ? `\n\nSOCIAL MEDIA ANALYSIS:
-Caption style: ${socialVoice.captionStyle || 'unknown'}
-Hashtag strategy: ${socialVoice.hashtagStrategy || 'unknown'}
-Emoji usage: ${socialVoice.emojiUsage || 'unknown'}
-CTA style: ${socialVoice.ctaStyle || 'unknown'}
-Sample captions: ${(socialVoice.sampleCaptions || []).slice(0, 3).join(' | ')}`
+                ? `\n\nSOCIAL MEDIA ANALYSIS:\nCaption style: ${socialVoice.captionStyle || 'unknown'}\nHashtag strategy: ${socialVoice.hashtagStrategy || 'unknown'}\nEmoji usage: ${socialVoice.emojiUsage || 'unknown'}\nCTA style: ${socialVoice.ctaStyle || 'unknown'}\nSample captions: ${(socialVoice.sampleCaptions || []).slice(0, 3).join(' | ')}`
                 : '';
 
-            voiceAnalysis = await aiRouter.analyzeText({
+            return aiRouter.analyzeText({
                 text: allContentSamples.join('\n\n') + colorContext + bannerContext + socialContext,
                 task: `You are a brand strategist and visual identity expert. Analyze this website's brand identity using ALL the content provided — including sub-page content from About, Team, Products, Services, Values pages.
 Return ONLY valid JSON (no markdown, no explanation) with these fields:
@@ -174,10 +167,35 @@ IMPORTANT: The content includes data from multiple pages [About], [Team], [Produ
 
 ${socialContext ? 'IMPORTANT: Social media data is provided — use it to deeply understand the brand voice and content style. The social captions reveal the TRUE brand personality more than website copy.' : ''}`,
             });
-        }
-    } catch (err) {
-        console.error('Voice analysis failed:', err.message);
-    }
+        })() : Promise.resolve({})),
+
+        // Brand name extraction (independent of voice analysis)
+        (aiRouter ? (async () => {
+            const result = await aiRouter.generateText({
+                systemPrompt: 'You are a brand naming expert. Return ONLY the brand name, nothing else. No quotes, no explanation.',
+                userPrompt: `Extract the actual brand name from this website info:
+Page Title: "${meta.title || ''}"
+URL: ${url}
+Description: "${(meta.description || '').substring(0, 200)}"
+OG Image URL: "${meta.ogImage || ''}"
+
+Rules:
+- Return ONLY the brand/company name (e.g., "Nike", "ACwO", "Apple")
+- Remove taglines, product descriptions, separators (|, -, –)
+- If unclear, extract from the domain name
+- Return just the name, nothing else`,
+                temperature: 0.1,
+                maxTokens: 30,
+            });
+            return result.text?.trim().replace(/['"]/g, '') || '';
+        })() : Promise.resolve('')),
+    ]);
+
+    const voiceAnalysis = voiceResult.status === 'fulfilled' ? voiceResult.value : {};
+    let brandName = nameResult.status === 'fulfilled' ? nameResult.value : '';
+
+    if (voiceResult.status === 'rejected') console.error('Voice analysis failed:', voiceResult.reason?.message);
+    if (nameResult.status === 'rejected') console.error('Brand name extraction failed:', nameResult.reason?.message);
 
     // ── Merge brand colors: Vision > AI-curated > CSS fallback ───────────
     let namedColors;
@@ -199,9 +217,9 @@ ${socialContext ? 'IMPORTANT: Social media data is provided — use it to deeply
     // Priority 3: Separate focused AI call
     else if (aiRouter && cssColors.length > 0) {
         try {
-            const brandName = voiceAnalysis.brandName || meta.title || '';
+            const bn = voiceAnalysis.brandName || meta.title || '';
             const colorResult = await aiRouter.analyzeText({
-                text: `Website: ${url}\nBrand: ${brandName}\nIndustry: ${voiceAnalysis.industry || 'unknown'}\nCSS Colors found: ${cssColors.slice(0, 15).map(c => c.hex).join(', ')}`,
+                text: `Website: ${url}\nBrand: ${bn}\nIndustry: ${voiceAnalysis.industry || 'unknown'}\nCSS Colors found: ${cssColors.slice(0, 15).map(c => c.hex).join(', ')}`,
                 task: `Pick EXACTLY 4-5 TRUE brand identity colors from the CSS colors list.\nReturn ONLY JSON: {"brandColors": [{"hex": "#000000", "name": "Jet Black", "usage": "primary"}]}\n\nRules:\n- Pick ONLY colors that represent the brand identity (logo, accent, background)\n- Give descriptive names ("Electric Lime" not "Green")\n- usage: primary/secondary/accent/background\n- Order: primary first\n- EXCLUDE generic UI/framework colors`,
             });
             if (colorResult.brandColors?.length >= 3) {
@@ -266,32 +284,6 @@ ${socialContext ? 'IMPORTANT: Social media data is provided — use it to deeply
         sentenceLength: 'mixed',
         captionLengthPreference: 'medium',
     };
-
-    // Use AI to extract the actual brand name
-    let brandName = '';
-    try {
-        if (aiRouter) {
-            const nameResult = await aiRouter.generateText({
-                systemPrompt: 'You are a brand naming expert. Return ONLY the brand name, nothing else. No quotes, no explanation.',
-                userPrompt: `Extract the actual brand name from this website info:
-Page Title: "${meta.title || ''}"
-URL: ${url}
-Description: "${(meta.description || '').substring(0, 200)}"
-OG Image URL: "${meta.ogImage || ''}"
-
-Rules:
-- Return ONLY the brand/company name (e.g., "Nike", "ACwO", "Apple")
-- Remove taglines, product descriptions, separators (|, -, –)
-- If unclear, extract from the domain name
-- Return just the name, nothing else`,
-                temperature: 0.1,
-                maxTokens: 30,
-            });
-            brandName = nameResult.text?.trim().replace(/['"]/g, '') || '';
-        }
-    } catch (err) {
-        console.error('Brand name extraction failed:', err.message);
-    }
 
     // Fallback: extract from domain
     if (!brandName) {
