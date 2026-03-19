@@ -170,9 +170,47 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
             }
         } catch (e) { console.error(`❌ Model ${modelId} exception:`, e.message); continue; }
     }
-    if (!imageUrl) console.error('❌ All Gemini models failed to generate an image');
-    console.log(`══════ END IMAGE GENERATION ══════\n`);
+    if (!imageUrl) {
+        console.error('❌ All Gemini models failed — trying DALL-E 3 fallback...');
+        try {
+            const openaiKey = process.env.OPENAI_API_KEY;
+            if (!openaiKey) throw new Error('No OpenAI key configured');
 
+            // DALL-E 3 only supports: 1024x1024, 1792x1024, 1024x1792
+            const dalleSize = aspectRatio === '16:9' ? '1792x1024'
+                : aspectRatio === '9:16' ? '1024x1792'
+                : '1024x1024';
+
+            const dalleResp = await fetch('https://api.openai.com/v1/images/generations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${openaiKey}`,
+                },
+                body: JSON.stringify({
+                    model: 'dall-e-3',
+                    prompt: promptText.substring(0, 4000), // DALL-E has 4000 char limit
+                    size: dalleSize,
+                    n: 1,
+                    quality: 'standard',
+                }),
+            });
+
+            const dalleData = await dalleResp.json();
+            if (dalleData.error) throw new Error(dalleData.error.message);
+
+            const dalleUrl = dalleData.data?.[0]?.url;
+            if (dalleUrl) {
+                imageUrl = dalleUrl;
+                usedModel = 'dall-e-3';
+                console.log(`✅ DALL-E 3 fallback succeeded: ${dalleUrl.substring(0, 80)}...`);
+            }
+        } catch (dalleErr) {
+            console.error('❌ DALL-E 3 fallback also failed:', dalleErr.message);
+        }
+    }
+
+    console.log(`══════ END IMAGE GENERATION ══════\n`);
     return { imageUrl, model: usedModel, textResponse };
 }
 
