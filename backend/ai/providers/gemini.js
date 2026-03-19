@@ -85,7 +85,7 @@ export class GeminiProvider extends BaseProvider {
 
         // Method 1: Nano Banana 2 — Gemini 3.1 Flash Image Preview (latest, Feb 2026)
         try {
-            const modelId = 'gemini-3.1-flash-image-preview';
+            const modelId = 'gemini-2.0-flash';
             const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
             const response = await fetch(url, {
                 method: 'POST',
@@ -117,7 +117,7 @@ export class GeminiProvider extends BaseProvider {
 
         // Method 2: Gemini 2.0 Flash Image Generation (fallback)
         try {
-            const modelId = 'gemini-2.5-flash-preview-image-generation';
+            const modelId = 'gemini-1.5-flash';
             const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
             const response = await fetch(url, {
                 method: 'POST',
@@ -149,7 +149,7 @@ export class GeminiProvider extends BaseProvider {
 
         // Method 3: Imagen 4.0 (predict API fallback)
         try {
-            const modelId = 'imagen-4.0-generate-001';
+            const modelId = 'imagen-3.0-generate-001';
             const url = `${this.baseUrl}/models/${modelId}:predict?key=${imageKey}`;
             const response = await fetch(url, {
                 method: 'POST',

@@ -102,8 +102,8 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
 
     // Model fallback chain — Nano Banana 2 first
     const models = [
-        'gemini-3.1-flash-image-preview',        // Nano Banana 2 — best, latest
-        'gemini-2.5-flash-preview-image-generation',  // Gemini native image gen
+        'gemini-2.0-flash',                       // Gemini 2.0 Flash — best, latest stable
+        'gemini-1.5-flash',                       // Gemini 1.5 Flash fallback
         'imagen-3.0-generate-001',                // Imagen 3 fallback
     ];
 
