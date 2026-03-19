@@ -44,7 +44,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
   lastTokenUsage = null;
 
   const overallController = new AbortController();
-  const overallTimer = setTimeout(() => overallController.abort(), Math.max(timeout, 60000));
+  const overallTimer = setTimeout(() => overallController.abort(), timeout);
 
   const defaultProvider = process.env.DEFAULT_TEXT_PROVIDER || 'anthropic';
   const defaultModel = process.env.DEFAULT_TEXT_MODEL;
@@ -74,9 +74,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
       console.log(`🤖 aiCall: Trying ${provider.name}...`);
 
       try {
-        const providerController = new AbortController();
-        const providerTimeout = Math.min(50000, timeout); 
-        const pTimer = setTimeout(() => providerController.abort(), providerTimeout);
+        // We rely entirely on the overallController to enforce strict global budgets.
 
         if (provider.name === 'anthropic') {
           const modelId = (defaultProvider === 'anthropic' && defaultModel) ? defaultModel : 'claude-3-5-sonnet-20240620';
@@ -94,9 +92,8 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
               messages: [{ role: 'user', content: userPrompt }],
               temperature,
             }),
-            signal: providerController.signal,
+            signal: overallController.signal,
           });
-          clearTimeout(pTimer);
           const data = await resp.json();
           if (resp.ok && data.content?.[0]?.text) {
             lastTokenUsage = { inputTokens: data.usage?.input_tokens || 0, outputTokens: data.usage?.output_tokens || 0, model: modelId, provider: 'anthropic' };
@@ -118,9 +115,8 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
               temperature, max_tokens: maxTokens,
               ...(json ? { response_format: { type: 'json_object' } } : {}),
             }),
-            signal: providerController.signal,
+            signal: overallController.signal,
           });
-          clearTimeout(pTimer);
           const data = await resp.json();
           if (resp.ok && data.choices?.[0]?.message?.content) {
             lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'gpt-4o-mini', provider: 'openai' };
@@ -142,9 +138,8 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
               temperature, max_tokens: maxTokens,
               ...(json ? { response_format: { type: 'json_object' } } : {}),
             }),
-            signal: providerController.signal,
+            signal: overallController.signal,
           });
-          clearTimeout(pTimer);
           const data = await resp.json();
           if (resp.ok && data.choices?.[0]?.message?.content) {
             lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'grok-3-mini-fast', provider: 'xai' };
@@ -157,7 +152,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
         if (provider.name === 'gemini') {
           const models = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-2.0-flash'];
           for (const modelId of models) {
-            if (overallController.signal.aborted || providerController.signal.aborted) break;
+            if (overallController.signal.aborted) break;
             try {
               const resp = await fetch(
                 `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${provider.key}`,
@@ -172,12 +167,11 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
                       ...(json ? { responseMimeType: 'application/json' } : {}),
                     },
                   }),
-                  signal: providerController.signal,
+                  signal: overallController.signal,
                 }
               );
               const data = await resp.json();
               if (resp.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-                clearTimeout(pTimer);
                 const text = data.candidates[0].content.parts[0].text;
                 lastTokenUsage = { inputTokens: data.usageMetadata?.promptTokenCount || 0, outputTokens: data.usageMetadata?.candidatesTokenCount || 0, model: modelId, provider: 'gemini' };
                 return text;
@@ -190,7 +184,6 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
               console.warn(`Gemini ${modelId} request fail: ${e.message}`);
             }
           }
-          clearTimeout(pTimer);
         }
       } catch (e) {
         console.warn(`${provider.name} provider error: ${e.message}`);
@@ -246,7 +239,8 @@ async function loadBrand(brandId, userId) {
 // HEALTH CHECK — Real crawl + AI analysis
 // ============================================================================
 
-router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits('seoHealthCheck'), async (req, res) => {
+router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits('seoHealthCheck'), async (req, res, next) => {
+  req._routeStartTime = Date.now();
   try {
     const { url, brand: brandPayload, brandId } = req.body;
 
@@ -385,9 +379,14 @@ Low text-to-HTML ratio pages: ${siMetrics.lowTextRatioCount || 0}
 Average text-to-HTML ratio: ${siMetrics.avgTextToHtmlRatio || 0}%
 `;
 
-    // AI gets a generous timeout — full-site crawl (800 pages) takes up to 180s first
-    const aiTimeout = 180000; // 180s for AI call — large crawl data needs more time
-    console.log(`⏱️ Crawl + research complete (${siMetrics.totalPages || siteResearch?.pages?.length || 0} pages). AI timeout: ${aiTimeout / 1000}s`);
+    // AI timeout reduced to 40s to fit in CloudFront's 60s window (Crawl + AI)
+    // Strict Global Request Budget of 27 seconds to stay under CloudFront's 30s limit
+    const routeStartTime = req._routeStartTime || (Date.now() - 15000); // Approximate 15s crawl if req._routeStartTime isn't set
+    const elapsed = Date.now() - routeStartTime;
+    const globalBudget = 27000; 
+    const remainingBudget = Math.max(5000, globalBudget - elapsed); // Give AI at least 5s
+    
+    console.log(`⏱️ Crawl + research complete (${siMetrics.totalPages || siteResearch?.pages?.length || 0} pages). Elapsed: ${elapsed}ms. AI Budget: ${remainingBudget}ms`);
 
     const systemPrompt = `You are a SENIOR SEO STRATEGIST (not just an auditor). You think like a CMO + technical SEO expert combined. You have REAL CRAWL DATA — use it as ground truth. Never guess or contradict the crawl.
 
@@ -455,7 +454,7 @@ Respond in STRICT JSON:
 Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' that connects to business outcomes. Think like a consultant, not a checklist tool.`;
 
     const userPrompt = `Analyze site: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: aiTimeout });
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget });
     // Log token usage from this AI call
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: req.creditAction || 'seoHealthCheck', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
@@ -875,8 +874,7 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
 
     res.json({ success: true, ...parsed });
   } catch (error) {
-    console.error('SEO Health Check error:', error);
-    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    next(error);
   }
 });
 
@@ -885,7 +883,7 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
 // GET ME TRAFFIC — Real crawl + keyword research
 // ============================================================================
 
-router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seoTraffic'), async (req, res) => {
+router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seoTraffic'), async (req, res, next) => {
   try {
     const { url, brand: brandPayload, brandId, industry, country } = req.body;
 
@@ -1139,7 +1137,6 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
     if (siteResearch.siteIntelligence) {
       parsed.crawlIntelligence = {
         totalPages: siteResearch.siteIntelligence.totalPages,
-        hasSitemap: siteResearch.siteIntelligence.hasSitemap,
         hasRobotsTxt: siteResearch.siteIntelligence.hasRobotsTxt,
         thinPageCount: siteResearch.siteIntelligence.thinPageCount,
         duplicateContentCount: siteResearch.siteIntelligence.duplicateContentCount,
@@ -1163,8 +1160,7 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
 
     res.json({ success: true, ...parsed });
   } catch (error) {
-    console.error('SEO Traffic error:', error);
-    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    next(error);
   }
 });
 
@@ -1173,7 +1169,7 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
 // BEAT COMPETITORS — Real competitor research
 // ============================================================================
 
-router.post('/competitors', protect, requireStudio('seoStudio'), requireCredits('seoCompetitors'), async (req, res) => {
+router.post('/competitors', protect, requireStudio('seoStudio'), requireCredits('seoCompetitors'), async (req, res, next) => {
   try {
     const { url, brand: brandPayload, brandId, competitorUrls } = req.body;
 
@@ -1356,7 +1352,7 @@ Be STRATEGIC and SPECIFIC. Every insight must have a WHY and an actionable HOW. 
 // AI VISIBILITY — Real structured data audit
 // ============================================================================
 
-router.post('/ai-visibility', protect, requireStudio('seoStudio'), requireCredits('seoAiVisibility'), async (req, res) => {
+router.post('/ai-visibility', protect, requireStudio('seoStudio'), requireCredits('seoAiVisibility'), async (req, res, next) => {
   try {
     const { url, brand: brandPayload, brandId, customPrompts } = req.body;
 
@@ -1597,13 +1593,12 @@ STRATEGIC RULES (MANDATORY):
 
     res.json({ success: true, ...parsed });
   } catch (error) {
-    console.error('AI Visibility error:', error);
-    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    next(error);
   }
 });
 
 // ── GEO History / Trends ──
-router.get('/geo-history', protect, async (req, res) => {
+router.get('/geo-history', protect, async (req, res, next) => {
   try {
     const { brandId, limit } = req.query;
     if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
@@ -1629,8 +1624,7 @@ router.get('/geo-history', protect, async (req, res) => {
 
     res.json({ success: true, history, trend, total: history.length });
   } catch (error) {
-    console.error('GEO History error:', error);
-    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    next(error);
   }
 });
 
@@ -1639,7 +1633,7 @@ router.get('/geo-history', protect, async (req, res) => {
 // ON-PAGE AUDIT
 // ============================================================================
 
-router.post('/audit-page', protect, requireStudio('seoStudio'), requireCredits('seoAuditPage'), async (req, res) => {
+router.post('/audit-page', protect, requireStudio('seoStudio'), requireCredits('seoAuditPage'), async (req, res, next) => {
   try {
     const { pageUrl, brand: brandPayload, brandId, keyword } = req.body;
     if (!pageUrl) return res.status(400).json({ success: false, error: 'Page URL is required' });
@@ -1694,8 +1688,7 @@ Respond in JSON:
 
     res.json({ success: true, ...parsed });
   } catch (error) {
-    console.error('Page audit error:', error);
-    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    next(error);
   }
 });
 
@@ -1705,7 +1698,7 @@ Respond in JSON:
 // ============================================================================
 
 // POST /api/seo-studio/competitors/manage — Add/remove competitors
-router.post('/competitors/manage', protect, async (req, res) => {
+router.post('/competitors/manage', protect, async (req, res, next) => {
   try {
     const { brandId, action, competitor } = req.body;
     if (!brandId) return res.status(400).json({ success: false, error: 'Brand ID required' });
@@ -1742,7 +1735,7 @@ router.post('/competitors/manage', protect, async (req, res) => {
 });
 
 // POST /api/seo-studio/competitors/discover — AI auto-discover competitors
-router.post('/competitors/discover', protect, requireCredits('seoCompetitorDiscover'), async (req, res) => {
+router.post('/competitors/discover', protect, requireCredits('seoCompetitorDiscover'), async (req, res, next) => {
   try {
     const { brandId } = req.body;
     if (!brandId) return res.status(400).json({ success: false, error: 'Brand ID required' });
@@ -1792,7 +1785,7 @@ CRITICAL: Only include REAL existing companies. Do not make up fictional compani
 // BACKLINK INTELLIGENCE — Agentic multi-phase backlink crawler
 // ============================================================================
 
-router.post('/backlinks', protect, requireStudio('seoStudio'), requireCredits('seoBacklinks'), async (req, res) => {
+router.post('/backlinks', protect, requireStudio('seoStudio'), requireCredits('seoBacklinks'), async (req, res, next) => {
   let brandDomain;
   try {
     const { url, brand: brandPayload, brandId } = req.body;
@@ -2107,7 +2100,7 @@ Generate 5-15 discovered backlinks, 5-10 competitor link gaps, 8-15 link opportu
 // COMPETITOR WAR ROOM — 90-day battle plan
 // ============================================================================
 
-router.post('/competitor-warroom', protect, requireStudio('seoStudio'), requireCredits('seoWarRoom'), async (req, res) => {
+router.post('/competitor-warroom', protect, requireStudio('seoStudio'), requireCredits('seoWarRoom'), async (req, res, next) => {
   try {
     const { url, brand: brandPayload, brandId, competitorUrls } = req.body;
 
@@ -2205,7 +2198,7 @@ Respond in STRICT JSON:
 // LLM PROBE — Multi-model brand mention check
 // ============================================================================
 
-router.post('/llm-probe', protect, requireStudio('seoStudio'), requireCredits('seoLlmProbe'), async (req, res) => {
+router.post('/llm-probe', protect, requireStudio('seoStudio'), requireCredits('seoLlmProbe'), async (req, res, next) => {
   try {
     const { url, brand: brandPayload, brandId } = req.body;
 
@@ -2345,7 +2338,7 @@ CRITICAL: Use the REAL mention rate (${probeData.aggregate.mentionRate}%) as the
 // AUTO-FIX — Generate copy-paste code fixes
 // ============================================================================
 
-router.post('/auto-fix', protect, requireStudio('seoStudio'), requireCredits('seoAutoFix'), async (req, res) => {
+router.post('/auto-fix', protect, requireStudio('seoStudio'), requireCredits('seoAutoFix'), async (req, res, next) => {
   try {
     const { url, brand: brandPayload, brandId, issues } = req.body;
 
@@ -2433,7 +2426,7 @@ Generate production-ready code. Every fix must be copy-paste ready. Use the bran
 // PROMPT MINING — Discover AI prompts for citation
 // ============================================================================
 
-router.post('/prompt-mining', protect, requireStudio('seoStudio'), requireCredits('seoPromptMining'), async (req, res) => {
+router.post('/prompt-mining', protect, requireStudio('seoStudio'), requireCredits('seoPromptMining'), async (req, res, next) => {
   try {
     const { url, brand: brandPayload, brandId } = req.body;
 
@@ -2580,7 +2573,7 @@ Generate 15-20 mined prompts. Be specific to this brand's industry. Think about 
 // HISTORY — List past audits & get individual audit
 // ============================================================================
 
-router.get('/history', protect, async (req, res) => {
+router.get('/history', protect, async (req, res, next) => {
   try {
     const { brandId, type, limit = 20 } = req.query;
     const filter = { user: req.user._id };
@@ -2599,7 +2592,7 @@ router.get('/history', protect, async (req, res) => {
   }
 });
 
-router.get('/history/:id', protect, async (req, res) => {
+router.get('/history/:id', protect, async (req, res, next) => {
   try {
     const audit = await SeoAudit.findOne({ _id: req.params.id, user: req.user._id }).lean();
     if (!audit) return res.status(404).json({ success: false, error: 'Audit not found' });
@@ -2614,7 +2607,7 @@ router.get('/history/:id', protect, async (req, res) => {
 // SAVED REPORTS — Fetch last generated report per type
 // ============================================================================
 
-router.get('/reports/:type', protect, async (req, res) => {
+router.get('/reports/:type', protect, async (req, res, next) => {
   try {
     const { type } = req.params;
     const { brandId } = req.query;
@@ -2690,7 +2683,7 @@ router.get('/reports/:type', protect, async (req, res) => {
 // HISTORY COMPARISON — Score trends over time
 // ============================================================================
 
-router.get('/history/compare', protect, async (req, res) => {
+router.get('/history/compare', protect, async (req, res, next) => {
   try {
     const { brandId, type } = req.query;
     if (!brandId || !type) return res.status(400).json({ success: false, error: 'brandId and type required' });
@@ -2747,7 +2740,7 @@ router.get('/history/compare', protect, async (req, res) => {
 // JS RENDERING CRAWL — Puppeteer-based SPA crawling
 // ============================================================================
 
-router.post('/js-crawl', protect, requireCredits('seoHealthCheck'), async (req, res) => {
+router.post('/js-crawl', protect, requireCredits('seoHealthCheck'), async (req, res, next) => {
   try {
     const { brand, url, maxPages = 20, mobile = false } = req.body;
     const website = url || brand?.website;
@@ -2768,7 +2761,7 @@ router.post('/js-crawl', protect, requireCredits('seoHealthCheck'), async (req, 
 // CONTENT SCORING — Grade existing pages for SEO quality
 // ============================================================================
 
-router.post('/content-score', protect, requireCredits('seoHealthCheck'), async (req, res) => {
+router.post('/content-score', protect, requireCredits('seoHealthCheck'), async (req, res, next) => {
   try {
     const { brand, url, targetKeywords = [] } = req.body;
     const website = url || brand?.website;
@@ -2801,7 +2794,7 @@ router.post('/content-score', protect, requireCredits('seoHealthCheck'), async (
 // COMPETITOR MONITORING — Track competitor content changes
 // ============================================================================
 
-router.post('/competitor-monitor', protect, requireCredits('seoCompetitors'), async (req, res) => {
+router.post('/competitor-monitor', protect, requireCredits('seoCompetitors'), async (req, res, next) => {
   try {
     const { brand, competitors = [], brandKeywords = [] } = req.body;
     if (!brand?._id) return res.status(400).json({ success: false, error: 'Brand required' });
@@ -2862,7 +2855,7 @@ router.post('/competitor-monitor', protect, requireCredits('seoCompetitors'), as
 // ============================================================================
 
 // POST /api/seo-studio/gsc/snapshot — Take a position snapshot from GSC
-router.post('/gsc/snapshot', protect, async (req, res) => {
+router.post('/gsc/snapshot', protect, async (req, res, next) => {
   try {
     const { brandId, siteUrl } = req.body;
     if (!brandId || !siteUrl) return res.status(400).json({ success: false, error: 'brandId and siteUrl required' });
@@ -2925,7 +2918,7 @@ router.post('/gsc/snapshot', protect, async (req, res) => {
 });
 
 // GET /api/seo-studio/gsc/snapshots — Get snapshot history
-router.get('/gsc/snapshots', protect, async (req, res) => {
+router.get('/gsc/snapshots', protect, async (req, res, next) => {
   try {
     const { brandId, siteUrl } = req.query;
     if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
@@ -2946,7 +2939,7 @@ router.get('/gsc/snapshots', protect, async (req, res) => {
 });
 
 // GET /api/seo-studio/gsc/rank-changes — Compare latest vs previous snapshot
-router.get('/gsc/rank-changes', protect, async (req, res) => {
+router.get('/gsc/rank-changes', protect, async (req, res, next) => {
   try {
     const { brandId, siteUrl } = req.query;
     if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
@@ -3003,7 +2996,7 @@ router.get('/gsc/rank-changes', protect, async (req, res) => {
       changes: changes.slice(0, 50),
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    next(error);
   }
 });
 
@@ -3012,7 +3005,7 @@ router.get('/gsc/rank-changes', protect, async (req, res) => {
 // ASK BAR — Universal intent router
 // ============================================================================
 
-router.post('/ask', protect, requireCredits('seoAsk'), async (req, res) => {
+router.post('/ask', protect, requireCredits('seoAsk'), async (req, res, next) => {
   try {
     const { question, brand, url } = req.body;
     if (!question) return res.status(400).json({ success: false, error: 'Question is required' });
@@ -3045,8 +3038,7 @@ Respond in JSON:
 
     res.json({ success: true, ...parsed });
   } catch (error) {
-    console.error('SEO Ask error:', error);
-    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    next(error);
   }
 });
 

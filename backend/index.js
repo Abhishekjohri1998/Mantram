@@ -90,7 +90,12 @@ app.use(cors({
         const allowedOrigins = config.frontendUrl.map(url => url.toLowerCase().replace(/\/$/, ''));
         
         // Ensure production domains are allowed even if not in .env (fail-safe for live URL)
-        const productionOrigins = ['https://mantram.ai', 'https://www.mantram.ai', 'https://api.mantram.ai'];
+        const productionOrigins = [
+            'https://mantram.ai', 
+            'https://www.mantram.ai', 
+            'https://api.mantram.ai',
+            'https://djty1w4l0681b.cloudfront.net'
+        ];
         
         // Match exact or any subdomain of mantram.ai
         const isMantramDomain = cleanOrigin.endsWith('.mantram.ai') || cleanOrigin === 'https://mantram.ai';
@@ -255,20 +260,37 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Error handler
+// Global Error Handler
 app.use((err, req, res, next) => {
-    console.error('Server Error:', err.stack);
+    console.error('[Global Error]:', err.stack);
 
     // Ensure CORS headers are present even on errors
     const origin = req.headers.origin;
     if (origin) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        // Standardize origin for matching
+        const cleanOrigin = origin.toLowerCase().replace(/\/$/, '');
+        const allowedOrigins = (Array.isArray(config.frontendUrl) ? config.frontendUrl : [config.frontendUrl])
+            .map(url => url.toLowerCase().replace(/\/$/, ''));
+        
+        const productionOrigins = [
+            'https://mantram.ai', 
+            'https://www.mantram.ai', 
+            'https://api.mantram.ai',
+            'https://djty1w4l0681b.cloudfront.net'
+        ];
+        const isMantramDomain = cleanOrigin.endsWith('.mantram.ai') || cleanOrigin.endsWith('.cloudfront.net') || cleanOrigin === 'https://mantram.ai';
+
+        if (allowedOrigins.includes(cleanOrigin) || productionOrigins.includes(cleanOrigin) || isMantramDomain) {
+            res.header('Access-Control-Allow-Origin', origin);
+            res.header('Access-Control-Allow-Credentials', 'true');
+        }
     }
 
-    res.status(err.statusCode || 500).json({
+    const statusCode = err.statusCode || 500;
+    res.status(statusCode).json({
         success: false,
         error: config.nodeEnv === 'development' ? err.message : 'Server Error',
+        message: err.message || 'Internal Server Error',
     });
 });
 

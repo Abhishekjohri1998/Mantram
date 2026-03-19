@@ -43,11 +43,17 @@ export default function Auth() {
         if (!authLoading && isAuthenticated) {
             if (pollingRef.current) clearInterval(pollingRef.current)
             let dest = redirect
+            
+            if (dest === '/dashboard' && (!user?.brandCount || user.brandCount === 0)) {
+                dest = '/onboarding';
+            }
+
             if (scanUrl) {
                 dest = `/onboarding?scanUrl=${encodeURIComponent(scanUrl)}`
             }
             navigate(dest, { replace: true })
         }
+
         return () => {
             if (pollingRef.current) clearInterval(pollingRef.current)
         }
@@ -58,20 +64,30 @@ export default function Auth() {
         setLoading(true)
         setError('')
         try {
+            let res;
             if (isLogin) {
-                await login(form.email, form.password)
+                res = await login(form.email, form.password)
             } else {
-                await register(form.name, form.email, form.password, form.company)
+                res = await register(form.name, form.email, form.password, form.company)
             }
+
             // After auth, redirect to intended destination
-            let dest = redirect
-            if (!isLogin && redirect === '/dashboard') {
-                dest = '/onboarding'
+            let dest = redirect;
+            
+            // Logic for "New user vs Older user" redirection
+            // If the destination is the default dashboard...
+            if (dest === '/dashboard') {
+                // If they have no brands, they MUST go to onboarding
+                if (!res?.user?.brandCount || res.user.brandCount === 0) {
+                    dest = '/onboarding';
+                }
             }
+
             if (scanUrl) {
                 dest = `/onboarding?scanUrl=${encodeURIComponent(scanUrl)}`
             }
             navigate(dest, { replace: true })
+
         } catch (err) {
             setError(err.message || 'Something went wrong')
         } finally {
