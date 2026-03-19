@@ -83,7 +83,7 @@ export class GeminiProvider extends BaseProvider {
         // Use dedicated image API key (billed)
         const imageKey = this.imageApiKey;
 
-        // Method 1: Nano Banana 2 — Gemini 3.1 Flash Image Preview (latest, Feb 2026)
+        // Method 1: Gemini 3.1 Flash Image Preview (primary)
         try {
             const modelId = 'gemini-3.1-flash-image-preview';
             const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
@@ -92,7 +92,7 @@ export class GeminiProvider extends BaseProvider {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     contents: [{ role: 'user', parts: [{ text: `Generate an image: ${prompt}` }] }],
-                    generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+                    generationConfig: { responseModalities: ['IMAGE'] },
                 }),
             });
 
@@ -112,12 +112,12 @@ export class GeminiProvider extends BaseProvider {
             }
             throw new Error('No image in response');
         } catch (err) {
-            console.error('Nanobanana 2 (Gemini 3.1 Flash) failed:', err.message);
+            console.error('Gemini 3.1 Flash Image Preview failed:', err.message);
         }
 
         // Method 2: Gemini 2.0 Flash Image Generation (fallback)
         try {
-            const modelId = 'gemini-2.5-flash-preview-image-generation';
+            const modelId = 'gemini-2.0-flash-preview-image-generation';
             const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
             const response = await fetch(url, {
                 method: 'POST',
@@ -147,9 +147,9 @@ export class GeminiProvider extends BaseProvider {
             console.error('Gemini 2.0 Flash image gen failed:', err.message);
         }
 
-        // Method 3: Imagen 4.0 (predict API fallback)
+        // Method 3: Imagen 3.0 (generateImages API fallback)
         try {
-            const modelId = 'imagen-4.0-generate-001';
+            const modelId = 'imagen-3.0-generate-002';
             const url = `${this.baseUrl}/models/${modelId}:predict?key=${imageKey}`;
             const response = await fetch(url, {
                 method: 'POST',
@@ -173,7 +173,7 @@ export class GeminiProvider extends BaseProvider {
             }
             throw new Error('No image in Imagen response');
         } catch (err) {
-            console.error('Imagen 4.0 failed:', err.message);
+            console.error('Imagen 3.0 failed:', err.message);
         }
 
         throw new Error('Gemini image generation requires a billed API key. Please enable billing at https://ai.google.dev/pricing or the system will use DALL-E as fallback.');
