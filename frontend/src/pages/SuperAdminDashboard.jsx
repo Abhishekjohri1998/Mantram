@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext'
 
 export default function SuperAdminDashboard() {
     const navigate = useNavigate()
-    const { user, login } = useAuth()
+    const { user, loginWithToken, logout } = useAuth()
     const [tab, setTab] = useState('overview')
     const [stats, setStats] = useState(null)
     const [users, setUsers] = useState([])
@@ -212,7 +212,28 @@ export default function SuperAdminDashboard() {
     const studioNames = { contentStudio: 'Content Studio', creativeStudio: 'Creative Studio', seoStudio: 'SEO Studio', brainstormStudio: 'Brainstorm Studio' }
 
     // Actions
-    const handleImpersonate = async (id, name) => { if (!confirm(`Login as ${name}?`)) return; try { const d = await API.impersonateUser(id); login(d.token, d.user); navigate('/dashboard') } catch { showToast('Failed', 'error') } }
+    const handleImpersonate = async (id, name) => {
+        if (!confirm(`View platform as ${name}?`)) return;
+        try {
+            // Save current superadmin token so we can return later
+            const currentToken = localStorage.getItem('mantram_token');
+            if (currentToken) sessionStorage.setItem('mantram_superadmin_token', currentToken);
+            const d = await API.impersonateUser(id);
+            loginWithToken(d.token, { ...d.user, isImpersonated: true });
+            navigate('/dashboard');
+        } catch { showToast('Impersonation failed', 'error') }
+    }
+    const handleExitImpersonation = () => {
+        const superadminToken = sessionStorage.getItem('mantram_superadmin_token');
+        if (superadminToken) {
+            sessionStorage.removeItem('mantram_superadmin_token');
+            localStorage.setItem('mantram_token', superadminToken);
+            window.location.href = '/superadmin';
+        } else {
+            logout();
+            navigate('/login');
+        }
+    }
     const handleAddCredits = async () => { if (!creditModal || !creditAmount) return; try { await API.addCredits(creditModal._id, { amount: parseInt(creditAmount), reason: 'Super admin' }); showToast(`+${creditAmount} credits`); setCreditModal(null); setCreditAmount(''); loadUsers() } catch { showToast('Failed', 'error') } }
     const handleResetCredits = async (id) => { if (!confirm('Reset used credits to 0?')) return; try { await API.resetCredits(id); showToast('Reset done'); loadUsers() } catch { showToast('Failed', 'error') } }
     const handleChangePlan = async (id, plan) => { try { await API.updateUser(id, { plan }); showToast(`Plan → ${plan}`); setPlanModal(null); loadUsers(); loadStats() } catch { showToast('Failed', 'error') } }
@@ -465,7 +486,10 @@ export default function SuperAdminDashboard() {
                                     <p className="text-white/80 text-xs">You are currently viewing the platform as <strong>{user.name}</strong>. All actions are logged.</p>
                                 </div>
                             </div>
-                            <button onClick={() => window.location.reload()} className="px-4 py-2 bg-white text-rose-500 rounded-xl text-xs font-black uppercase hover:bg-slate-100 transition-all cursor-pointer">Exit Session</button>
+                            <button onClick={handleExitImpersonation} className="px-4 py-2 bg-white text-rose-500 rounded-xl text-xs font-black uppercase hover:bg-slate-100 transition-all cursor-pointer flex items-center gap-2">
+                                <span className="material-symbols-outlined text-sm">arrow_back</span>
+                                Back to SuperAdmin
+                            </button>
                         </div>
                     )}
 
