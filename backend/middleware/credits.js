@@ -167,7 +167,10 @@ export const requireCredits = (actionOrCost = 1) => {
             }
 
 
-            const remaining = (user.credits?.total || 0) + (user.credits?.bonus || 0) - (user.credits?.used || 0);
+            // Include topUp credits if not expired
+            const topUp = (user.credits?.topUp > 0 && user.credits?.topUpExpiry && new Date(user.credits.topUpExpiry) > new Date())
+                ? user.credits.topUp : 0;
+            const remaining = (user.credits?.total || 0) + (user.credits?.bonus || 0) + topUp - (user.credits?.used || 0);
 
             if (remaining < cost) {
                 return res.status(403).json({
@@ -193,7 +196,8 @@ export const requireCredits = (actionOrCost = 1) => {
             const [updated] = await Promise.all(updateOps);
 
             // Log usage (fire-and-forget)
-            const balanceAfter = (updated.credits?.total || 0) + (updated.credits?.bonus || 0) - (updated.credits?.used || 0);
+            const updTopUp = (updated.credits?.topUp > 0 && updated.credits?.topUpExpiry && new Date(updated.credits.topUpExpiry) > new Date()) ? updated.credits.topUp : 0;
+            const balanceAfter = (updated.credits?.total || 0) + (updated.credits?.bonus || 0) + updTopUp - (updated.credits?.used || 0);
             // Detect studio from action name
             const studioMap = { content: 'content', contentRefine: 'content', creative: 'creative', photoshoot: 'creative', brainstorm: 'brainstorm', brainstormRefine: 'brainstorm', brainstormChat: 'brainstorm', brainstormScreenplay: 'brainstorm', trendRefresh: 'brainstorm', videoBrainstorm: 'video', videoGenerate: 'video', videoEdit: 'video', socialMedia: 'social', socialMediaCalendar: 'social', socialMediaAudit: 'social', socialMediaCompetitor: 'social', socialMediaScore: 'social', canvasGenerate: 'creative', canvasBgRemove: 'creative', canvasExtend: 'creative', adCreative: 'performance', voiceClone: 'voice', voiceTranscribe: 'voice' };
             const studio = studioMap[actionName] || (actionName?.startsWith('seo') ? 'seo' : 'unknown');
@@ -240,6 +244,7 @@ export const getCreditBalance = (user) => {
             remaining: Infinity, 
             unlimited: true, 
             bonus: user.credits?.bonus || 0,
+            topUp: user.credits?.topUp || 0,
             plan: user.plan || 'enterprise'
         };
     }
@@ -247,7 +252,10 @@ export const getCreditBalance = (user) => {
     const total = user.credits?.total || 0;
     const bonus = user.credits?.bonus || 0;
     const used = user.credits?.used || 0;
-    const remaining = Math.max(0, (total + bonus) - used);
+    // Include topUp only if not expired
+    const topUp = (user.credits?.topUp > 0 && user.credits?.topUpExpiry && new Date(user.credits.topUpExpiry) > new Date())
+        ? user.credits.topUp : 0;
+    const remaining = Math.max(0, (total + bonus + topUp) - used);
 
     return { 
         total, 
@@ -255,6 +263,8 @@ export const getCreditBalance = (user) => {
         remaining, 
         unlimited: false, 
         bonus,
+        topUp,
+        topUpExpiry: user.credits?.topUpExpiry || null,
         plan: user.plan || 'starter'
     };
 };
