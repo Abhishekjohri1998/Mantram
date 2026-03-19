@@ -90,7 +90,12 @@ app.use(cors({
         const allowedOrigins = config.frontendUrl.map(url => url.toLowerCase().replace(/\/$/, ''));
         
         // Ensure production domains are allowed even if not in .env (fail-safe for live URL)
-        const productionOrigins = ['https://mantram.ai', 'https://www.mantram.ai', 'https://api.mantram.ai'];
+        const productionOrigins = [
+            'https://mantram.ai', 
+            'https://www.mantram.ai', 
+            'https://api.mantram.ai',
+            'https://djty1w4l0681b.cloudfront.net'
+        ];
         
         // Match exact or any subdomain of mantram.ai
         const isMantramDomain = cleanOrigin.endsWith('.mantram.ai') || cleanOrigin === 'https://mantram.ai';
@@ -267,8 +272,13 @@ app.use((err, req, res, next) => {
         const allowedOrigins = (Array.isArray(config.frontendUrl) ? config.frontendUrl : [config.frontendUrl])
             .map(url => url.toLowerCase().replace(/\/$/, ''));
         
-        const productionOrigins = ['https://mantram.ai', 'https://www.mantram.ai', 'https://api.mantram.ai'];
-        const isMantramDomain = cleanOrigin.endsWith('.mantram.ai') || cleanOrigin === 'https://mantram.ai';
+        const productionOrigins = [
+            'https://mantram.ai', 
+            'https://www.mantram.ai', 
+            'https://api.mantram.ai',
+            'https://djty1w4l0681b.cloudfront.net'
+        ];
+        const isMantramDomain = cleanOrigin.endsWith('.mantram.ai') || cleanOrigin.endsWith('.cloudfront.net') || cleanOrigin === 'https://mantram.ai';
 
         if (allowedOrigins.includes(cleanOrigin) || productionOrigins.includes(cleanOrigin) || isMantramDomain) {
             res.header('Access-Control-Allow-Origin', origin);

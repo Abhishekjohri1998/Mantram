@@ -75,7 +75,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
 
       try {
         const providerController = new AbortController();
-        const providerTimeout = Math.min(50000, timeout); 
+        const providerTimeout = Math.min(150000, timeout); // Increased from 50s to 150s for heavy SEO/Claude thinking
         const pTimer = setTimeout(() => providerController.abort(), providerTimeout);
 
         if (provider.name === 'anthropic') {
