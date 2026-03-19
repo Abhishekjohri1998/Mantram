@@ -379,12 +379,12 @@ Low text-to-HTML ratio pages: ${siMetrics.lowTextRatioCount || 0}
 Average text-to-HTML ratio: ${siMetrics.avgTextToHtmlRatio || 0}%
 `;
 
-    // AI timeout reduced to 40s to fit in CloudFront's 60s window (Crawl + AI)
-    // Strict Global Request Budget of 27 seconds to stay under CloudFront's 30s limit
-    const routeStartTime = req._routeStartTime || (Date.now() - 15000); // Approximate 15s crawl if req._routeStartTime isn't set
+    // AI timeout: deep crawls with Playwright H1 re-scan can take 120s+
+    // Give AI a fixed minimum budget rather than subtracting from a global budget
+    const routeStartTime = req._routeStartTime || (Date.now() - 15000);
     const elapsed = Date.now() - routeStartTime;
-    const globalBudget = 27000; 
-    const remainingBudget = Math.max(5000, globalBudget - elapsed); // Give AI at least 5s
+    const AI_MIN_BUDGET = 35000; // Always give AI at least 35s (enough for any provider)
+    const remainingBudget = Math.max(AI_MIN_BUDGET, 60000 - elapsed);
     
     console.log(`⏱️ Crawl + research complete (${siMetrics.totalPages || siteResearch?.pages?.length || 0} pages). Elapsed: ${elapsed}ms. AI Budget: ${remainingBudget}ms`);
 
