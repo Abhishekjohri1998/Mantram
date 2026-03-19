@@ -249,6 +249,7 @@ async function loadBrand(brandId, userId) {
 // ============================================================================
 
 router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits('seoHealthCheck'), async (req, res, next) => {
+  req._routeStartTime = Date.now();
   try {
     const { url, brand: brandPayload, brandId } = req.body;
 
@@ -388,9 +389,13 @@ Average text-to-HTML ratio: ${siMetrics.avgTextToHtmlRatio || 0}%
 `;
 
     // AI timeout reduced to 40s to fit in CloudFront's 60s window (Crawl + AI)
-    // AI timeout reduced to 25s to safely fit in default 30s infrastructure windows
-    const aiTimeout = 25000; 
-    console.log(`⏱️ Crawl + research complete (${siMetrics.totalPages || siteResearch?.pages?.length || 0} pages). AI timeout: ${aiTimeout / 1000}s`);
+    // Strict Global Request Budget of 27 seconds to stay under CloudFront's 30s limit
+    const routeStartTime = req._routeStartTime || (Date.now() - 15000); // Approximate 15s crawl if req._routeStartTime isn't set
+    const elapsed = Date.now() - routeStartTime;
+    const globalBudget = 27000; 
+    const remainingBudget = Math.max(5000, globalBudget - elapsed); // Give AI at least 5s
+    
+    console.log(`⏱️ Crawl + research complete (${siMetrics.totalPages || siteResearch?.pages?.length || 0} pages). Elapsed: ${elapsed}ms. AI Budget: ${remainingBudget}ms`);
 
     const systemPrompt = `You are a SENIOR SEO STRATEGIST (not just an auditor). You think like a CMO + technical SEO expert combined. You have REAL CRAWL DATA — use it as ground truth. Never guess or contradict the crawl.
 
@@ -458,7 +463,7 @@ Respond in STRICT JSON:
 Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' that connects to business outcomes. Think like a consultant, not a checklist tool.`;
 
     const userPrompt = `Analyze site: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: aiTimeout });
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget });
     // Log token usage from this AI call
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: req.creditAction || 'seoHealthCheck', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
