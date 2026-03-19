@@ -38,7 +38,7 @@ async function queryGemini(prompt) {
   if (!key) return { model: 'Gemini', success: false, error: 'No API key' };
   try {
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -51,7 +51,7 @@ async function queryGemini(prompt) {
     );
     const data = await resp.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    return { model: 'Gemini', modelId: 'gemini-2.0-flash', success: true, response: text, tokens: data.usageMetadata?.totalTokenCount || 0 };
+    return { model: 'Gemini', modelId: 'gemini-2.5-flash', success: true, response: text, tokens: data.usageMetadata?.totalTokenCount || 0 };
   } catch (e) {
     return { model: 'Gemini', success: false, error: e.message };
   }

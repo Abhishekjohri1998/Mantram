@@ -150,7 +150,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
         }
 
         if (provider.name === 'gemini') {
-          const models = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-2.0-flash'];
+          const models = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-2.5-flash'];
           for (const modelId of models) {
             if (overallController.signal.aborted) break;
             try {
@@ -452,7 +452,7 @@ Respond in STRICT JSON:
   "crawlSummary": "What the live crawl revealed"
 }
 
-Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' that connects to business outcomes. Think like a consultant, not a checklist tool.`;
+Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must have a 'whyItMatters' that connects to business outcomes. Think like a consultant, not a checklist tool.`;
 
     const userPrompt = `Analyze site: ${website}`;
     let parsed;

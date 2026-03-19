@@ -214,7 +214,7 @@ router.post('/ai-generate', protect, requireCredits('canvasGenerate'), async (re
 
         const baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
         // Nano Banana 2 (recommended for image gen/edit)
-        const models = ['gemini-2.0-flash-exp-image-generation']
+        const models = ['gemini-2.5-flash-preview-image-generation']
         let imageUrl = null
 
         for (const modelId of models) {
@@ -270,7 +270,7 @@ router.post('/ai-edit', protect, requireCredits('canvasGenerate'), async (req, r
         const base64Data = imageBase64.includes('base64,') ? imageBase64.split('base64,')[1] : imageBase64
         const mimeType = imageBase64.startsWith('data:') ? imageBase64.split(';')[0].split(':')[1] : 'image/png'
 
-        const models = ['gemini-2.0-flash-exp-image-generation']
+        const models = ['gemini-2.5-flash-preview-image-generation']
         let imageUrl = null
 
         for (const modelId of models) {
@@ -344,7 +344,7 @@ router.post('/ai-edit-visual', protect, requireCredits('canvasGenerate'), async 
             parts.push({ text: `Edit this image: ${prompt}. Keep all unaffected areas identical. Output the modified image.` })
         }
 
-        const modelId = 'gemini-2.0-flash-exp-image-generation'
+        const modelId = 'gemini-2.5-flash-preview-image-generation'
         const url = `${baseUrl}/models/${modelId}:generateContent?key=${imageKey}`
         const resp = await fetch(url, {
             method: 'POST',
@@ -407,7 +407,7 @@ router.post('/ai-retouch', protect, requireCredits('canvasGenerate'), async (req
             parts.push({ text: `RETOUCH TASK: I have provided an image and a black-and-white mask. WHITE areas in the mask indicate the region to retouch. ${prompt || 'Clean up and retouch the masked area to look seamless and natural'}. CRITICAL: Keep all pixels outside the white mask EXACTLY the same. Output the complete modified image.` })
         }
 
-        const modelId = 'gemini-2.0-flash-exp-image-generation'
+        const modelId = 'gemini-2.5-flash-preview-image-generation'
         const url = `${baseUrl}/models/${modelId}:generateContent?key=${imageKey}`
         const resp = await fetch(url, {
             method: 'POST',
@@ -460,7 +460,7 @@ router.post('/ai-background', protect, requireCredits('canvasBgRemove'), async (
             promptText = `Replace ONLY the background of this image with: ${bgPrompt || 'a clean, professional studio background'}. CRITICAL: Keep the foreground subject(s) completely identical — same pose, same colors, same details. Only change what is behind/around the subject. Blend the new background seamlessly. Output the full modified image.`
         }
 
-        const modelId = 'gemini-2.0-flash-exp-image-generation'
+        const modelId = 'gemini-2.5-flash-preview-image-generation'
         const url = `${baseUrl}/models/${modelId}:generateContent?key=${imageKey}`
         const resp = await fetch(url, {
             method: 'POST',
