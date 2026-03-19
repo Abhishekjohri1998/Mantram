@@ -100,11 +100,11 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
 
     const ai = new GoogleGenAI({ apiKey: imageKey });
 
-    // Model fallback chain — Nano Banana 2 first
+    // Model fallback chain — gemini-3.1-flash-image-preview first
     const models = [
-        'gemini-2.0-flash',                       // Gemini 2.0 Flash — best, latest stable
-        'gemini-1.5-flash',                       // Gemini 1.5 Flash fallback
-        'imagen-3.0-generate-001',                // Imagen 3 fallback
+        'gemini-3.1-flash-image-preview',         // Gemini 3.1 Flash Image Preview (primary)
+        'gemini-2.0-flash-preview-image-generation', // Gemini 2.0 Flash image gen (fallback)
+        'imagen-3.0-generate-002',                // Imagen 3 fallback
     ];
 
     // Build content parts — OFFICIAL GEMINI FORMAT:
