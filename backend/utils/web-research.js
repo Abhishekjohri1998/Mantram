@@ -994,23 +994,172 @@ function computeDuplicates(pages) {
 
 
 // ============================================================================
+// RESEARCH DOMAIN LIGHT — Homepage only (3-5s) for backlinks, warroom, etc.
+// Returns same shape as researchDomain() for compatibility with formatSiteResearch()
+// ============================================================================
+
+export async function researchDomainLight(baseUrl) {
+    let normalizedUrl = baseUrl.trim();
+    if (!/^https?:\/\//i.test(normalizedUrl)) normalizedUrl = `https://${normalizedUrl}`;
+    const cleanBase = normalizedUrl.replace(/\/+$/, '');
+
+    console.log(`🕷️  Light crawl (homepage only): ${cleanBase}`);
+    const startTime = Date.now();
+
+    // Fetch homepage + robots.txt + sitemap in parallel (no CF solving, no Playwright)
+    const [homepageHtml, robotsTxt, sitemap] = await Promise.all([
+        safeFetch(cleanBase).catch(() => ''),
+        fetchRobotsTxt(cleanBase),
+        fetchSitemap(cleanBase),
+    ]);
+
+    if (!homepageHtml) {
+        return { url: cleanBase, pages: [{ url: cleanBase, success: false, error: 'Empty response' }], homepage: {}, siteIntelligence: { totalPages: 0 }, robotsTxt, sitemap };
+    }
+
+    // Parse homepage
+    const meta = extractMeta(homepageHtml);
+    const headings = extractHeadings(homepageHtml);
+    const jsonLd = extractJsonLd(homepageHtml);
+    const links = extractLinks(homepageHtml, cleanBase);
+    const images = extractImages(homepageHtml);
+    const canonical = extractCanonical(homepageHtml);
+    const tech = detectTechSignals(homepageHtml);
+    const bodyText = getBodyText(homepageHtml);
+    const wordCount = getWordCount(bodyText);
+
+    const homepage = {
+        url: cleanBase,
+        success: true,
+        title: meta.title || '',
+        metaDescription: meta.description || '',
+        ogTitle: meta['og:title'] || '',
+        ogDescription: meta['og:description'] || '',
+        ogImage: meta['og:image'] || '',
+        canonical,
+        headings,
+        h1: headings.filter(h => h.level === 1).map(h => h.text),
+        h2: headings.filter(h => h.level === 2).map(h => h.text),
+        h3: headings.filter(h => h.level === 3).map(h => h.text),
+        jsonLd,
+        hasSchemaOrg: jsonLd.length > 0,
+        schemaTypes: jsonLd.map(s => s['@type']).filter(Boolean),
+        links,
+        internalLinkCount: links.internal.length,
+        externalLinkCount: links.external.length,
+        images,
+        tech,
+        wordCount,
+        contentSnippet: bodyText.substring(0, 500),
+        bodyTextFull: bodyText.substring(0, 2000),
+        robots: meta.robots || '',
+        viewport: meta.viewport || '',
+    };
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`🕷️  Light crawl complete: 1 page in ${elapsed}s (sitemap: ${sitemap.found ? sitemap.count + ' URLs' : 'not found'})`);
+
+    // Return same shape as researchDomain() — compatible with formatSiteResearch()
+    return {
+        url: normalizedUrl,
+        pages: [{
+            url: homepage.url,
+            title: homepage.title,
+            metaDescription: homepage.metaDescription,
+            h1: homepage.h1,
+            h2: homepage.h2,
+            wordCount: homepage.wordCount,
+            contentSnippet: homepage.contentSnippet,
+            statusCode: 200,
+            images: homepage.images,
+            canonical: homepage.canonical,
+            hasSchemaOrg: homepage.hasSchemaOrg,
+            textToHtmlRatio: 0,
+        }],
+        homepage: {
+            title: homepage.title,
+            metaDescription: homepage.metaDescription,
+            ogTitle: homepage.ogTitle,
+            ogDescription: homepage.ogDescription,
+            ogImage: homepage.ogImage,
+            h1: homepage.h1,
+            h2: homepage.h2,
+            h3: homepage.h3,
+            contentSnippet: homepage.contentSnippet,
+            redirectChain: [],
+        },
+        robotsTxt: {
+            found: robotsTxt.found,
+            disallowCount: robotsTxt.disallowRules?.length || 0,
+            disallowRules: (robotsTxt.disallowRules || []).slice(0, 20),
+            sitemapUrls: robotsTxt.sitemapUrls || [],
+            crawlDelay: robotsTxt.crawlDelay,
+            raw: robotsTxt.raw?.substring(0, 500) || '',
+        },
+        sitemap: {
+            found: sitemap.found,
+            urlCount: sitemap.count,
+            sampleUrls: sitemap.urls.slice(0, 10),
+        },
+        siteIntelligence: {
+            totalPages: 1,
+            totalWordCount: homepage.wordCount,
+            avgWordCount: homepage.wordCount,
+            totalImages: homepage.images?.total || 0,
+            imagesWithoutAlt: homepage.images?.withoutAlt || 0,
+            schemaTypes: homepage.schemaTypes || [],
+            hasSchemaOrg: homepage.hasSchemaOrg,
+            techStack: homepage.tech || [],
+            hasCanonical: !!homepage.canonical,
+            hasViewport: !!homepage.viewport,
+            hasFAQ: homepage.h2?.some(h => h.toLowerCase().includes('faq') || h.toLowerCase().includes('frequently')) || false,
+            hasRobots: !!homepage.robots,
+            hasRobotsTxt: robotsTxt.found,
+            hasSitemap: sitemap.found,
+            sitemapUrlCount: sitemap.count,
+            internalLinkCount: homepage.internalLinkCount || 0,
+            externalLinkCount: homepage.externalLinkCount || 0,
+            externalDomains: homepage.links?.external || [],
+            // Empty arrays for deep-crawl fields (not applicable in light mode)
+            thinPages: [], thinPageCount: 0,
+            missingMetaDescriptions: [], missingH1Tags: [],
+            redirectChains: [], redirectChainCount: 0,
+            duplicateContent: [], duplicateContentCount: 0,
+            duplicateTitles: [], titleDuplicateCount: 0,
+            duplicateMetaDescriptions: [], metaDuplicateCount: 0,
+            missingH1Count: 0, multipleH1Pages: [], multipleH1Count: 0,
+            deepPages: [], clickDepthIssues: 0,
+            brokenInternalLinks: [], brokenInternalCount: 0,
+            brokenExternalLinks: [], brokenExternalCount: 0,
+        },
+    };
+}
+
+
+// ============================================================================
 // RESEARCH DOMAIN — Deep crawl: sitemap + robots.txt + 20+ pages
 // ============================================================================
 
-export async function researchDomain(baseUrl) {
+export async function researchDomain(baseUrl, options = {}) {
     // Normalize URL
     let normalizedUrl = baseUrl.trim();
     if (!/^https?:\/\//i.test(normalizedUrl)) normalizedUrl = `https://${normalizedUrl}`;
     // Strip trailing slash for consistency
     const cleanBase = normalizedUrl.replace(/\/+$/, '');
 
-    console.log(`🕷️  Deep crawl starting: ${cleanBase}`);
+    // Configurable crawl limits — callers can reduce for speed
+    const MAX_PAGES = options.maxPages || 800;
+    const CRAWL_TIMEOUT_MS = options.timeout || 180000;
+    const skipCfSolve = options.skipCfSolve || false;
+
+    console.log(`🕷️  Deep crawl starting: ${cleanBase} (max ${MAX_PAGES} pages, timeout ${CRAWL_TIMEOUT_MS / 1000}s)`);
 
     // PHASE 0: Conditional Cloudflare challenge detection
     // Try a quick fetch first — only launch the expensive Playwright solver if CF is detected
     resetCfSession(); // Fresh session for each domain
     let _cfNeeded = false;
-    try {
+    if (!skipCfSolve) {
+      try {
         const probeCtrl = new AbortController();
         const probeTimer = setTimeout(() => probeCtrl.abort(), 8000);
         const probeResp = await fetch(cleanBase, {
@@ -1027,15 +1176,20 @@ export async function researchDomain(baseUrl) {
         } else {
             console.log(`🛡️  No Cloudflare challenge — skipping solver (saved 15-30s)`);
         }
-    } catch (probeErr) {
+      } catch (probeErr) {
         console.log(`🛡️  Homepage probe failed (${probeErr.message}) — trying solver as fallback`);
         await solveCloudflare(cleanBase);
+      }
+    } else {
+      console.log(`🛡️  CF solve skipped (fast mode)`);
     }
 
-    // PHASE 1: Fetch homepage + robots.txt + sitemap.xml in parallel
-    const [homepageResult, robotsTxt, sitemap, llmsTxt] = await Promise.all([
-        (async () => {
-            // Use redirect-aware fetch for redirect chain tracking
+    // PHASE 1: Fetch homepage + robots.txt + sitemap.xml
+    // For CF-protected sites: serialize with gaps to avoid 429 rate limiting
+    // For open sites: parallel for speed
+    let homepageResult, robotsTxt, sitemap, llmsTxt;
+
+    const _homepageFetchFn = async () => {
             const { html, redirectChain, finalUrl } = await safeFetchWithRedirects(cleanBase);
             if (!html) return { success: false, error: 'Empty response', redirectChain };
 
@@ -1118,11 +1272,28 @@ export async function researchDomain(baseUrl) {
                 externalUrls: links.externalUrls || [],
                 hasCacheControl: !!(metaFetch.headers?.cacheControl),
             };
-        })(),
-        fetchRobotsTxt(cleanBase),
-        fetchSitemap(cleanBase),
-        fetchLlmsTxt(cleanBase),
-    ]);
+    };
+
+    if (_cfNeeded) {
+        // CF-protected site: serialize with 500ms gaps to avoid thundering herd 429s
+        console.log(`🛡️  CF-protected site — serializing initial fetches with 500ms gaps...`);
+        await new Promise(r => setTimeout(r, 1000)); // 1s cooldown after CF solve
+        homepageResult = await _homepageFetchFn().catch(e => ({ success: false, error: e.message, url: cleanBase }));
+        await new Promise(r => setTimeout(r, 500));
+        robotsTxt = await fetchRobotsTxt(cleanBase).catch(() => ({ found: false }));
+        await new Promise(r => setTimeout(r, 500));
+        sitemap = await fetchSitemap(cleanBase).catch(() => ({ found: false, count: 0, urls: [] }));
+        await new Promise(r => setTimeout(r, 300));
+        llmsTxt = await fetchLlmsTxt(cleanBase).catch(() => ({ found: false }));
+    } else {
+        // Open site: parallel for speed
+        [homepageResult, robotsTxt, sitemap, llmsTxt] = await Promise.all([
+            _homepageFetchFn(),
+            fetchRobotsTxt(cleanBase),
+            fetchSitemap(cleanBase),
+            fetchLlmsTxt(cleanBase),
+        ]);
+    }
 
     if (!homepageResult.success) {
         return { url: cleanBase, pages: [homepageResult], summary: null, error: homepageResult.error, robotsTxt, sitemap, llmsTxt };
@@ -1166,8 +1337,6 @@ export async function researchDomain(baseUrl) {
     const internalLinks = homepage.links?.internal || [];
 
     // PHASE 2: Build priority crawl queue (expanded for Semrush-level coverage)
-    const MAX_PAGES = 800; // Semrush crawls 800+ pages — must match
-    const CRAWL_TIMEOUT_MS = 180000; // 180s crawl time for full-site coverage
     const crawlStartTime = Date.now();
     const crawled = new Set([cleanBase, homepage.url]);
     const toCrawl = [];
@@ -1220,8 +1389,8 @@ export async function researchDomain(baseUrl) {
 
     // PHASE 3: Crawl with recursive link discovery
     const allSubPages = [];
-    const BATCH_SIZE = _cfNeeded ? 6 : 12;
-    const BATCH_DELAY = _cfNeeded ? 300 : 50;
+    const BATCH_SIZE = _cfNeeded ? 4 : 20; // Lower concurrency for CF sites to avoid 429
+    const BATCH_DELAY = _cfNeeded ? 500 : 30; // Longer delay for CF-protected sites
     let queueIndex = 0;
     const allFailedUrls = [];
     let consecutiveFailedBatches = 0; // Track consecutive all-fail batches for early bail
@@ -1283,12 +1452,20 @@ export async function researchDomain(baseUrl) {
 
     // ═══════════════════════════════════════════════════════════════════════
     // PHASE 3.5: PLAYWRIGHT HYBRID RE-CRAWL
-    // If >50% of pages failed (CF/429/bot-challenge), use Playwright to
-    // re-crawl them with a real browser context that bypasses rate limits.
-    // This extracts: title, H1, meta, word count, images, links
+    // Fires when: (a) >50% of pages failed, OR (b) many pages have <300 words / no H1
+    // This catches SPA sites that return app-shell HTML without rendered content.
     // ═══════════════════════════════════════════════════════════════════════
     const fetchSuccessRate = allPages.filter(p => p.success).length / Math.max(toCrawl.length, 1);
-    if (allFailedUrls.length > 20 && fetchSuccessRate < 0.5) {
+    // Also identify pages that need JS rendering — low word count or missing H1
+    const pagesNeedingRender = allPages.filter(p => p.success && !p.isSoft404 && !p.jsRendered && ((p.wordCount || 0) < 300 || !p.h1?.length));
+    if (pagesNeedingRender.length > 10) {
+        // Add these to the re-crawl list so Playwright can render them properly
+        console.log(`🖥️  ${pagesNeedingRender.length} pages need JS rendering (<300 words or no H1) — adding to Playwright queue`);
+        for (const p of pagesNeedingRender) {
+            if (!allFailedUrls.includes(p.url)) allFailedUrls.push(p.url);
+        }
+    }
+    if (allFailedUrls.length > 10 && (fetchSuccessRate < 0.5 || pagesNeedingRender.length > 10)) {
         console.log(`🖥️  Hybrid re-crawl: ${allFailedUrls.length} pages failed (${(fetchSuccessRate * 100).toFixed(0)}% success rate) — launching Playwright batch...`);
         let pw;
         try { pw = await import('playwright'); pw = pw.default || pw; } catch { pw = null; }
@@ -1353,8 +1530,8 @@ export async function researchDomain(baseUrl) {
                     const chunkResults = await Promise.all(chunk.map(async (url, idx) => {
                         const tab = tabs[idx % tabs.length];
                         try {
-                            await tab.goto(url, { waitUntil: 'domcontentloaded', timeout: PW_PAGE_TIMEOUT });
-                            await tab.waitForTimeout(1500); // Must be 1500ms+ for CF to clear
+                            await tab.goto(url, { waitUntil: 'networkidle', timeout: 15000 });
+                            await tab.waitForSelector('h1', { timeout: 8000 }).catch(() => {}); // Wait for H1 to render
 
                             // CHECK FOR CLOUDFLARE CHALLENGE — skip if page is a CF interstitial
                             const pageTitle = await tab.title();
@@ -2097,6 +2274,220 @@ export async function researchDomain(baseUrl) {
                 unminifiedResources: resourceStats.unminifiedResources,
                 unminifiedResourceCount: resourceStats.unminifiedResources.length,
             },
+
+            // ══════════════════════════════════════════════════════
+            // PHASE 2: Full Redirect Chain Analysis (Semrush parity)
+            // ══════════════════════════════════════════════════════
+            redirectAnalysis: (() => {
+                const allRedirects = allPages.filter(p => p.redirectChain?.length > 0);
+                // Typed classification
+                const by301 = allRedirects.filter(p => p.redirectChain.some(r => r.status === 301));
+                const by302 = allRedirects.filter(p => p.redirectChain.some(r => r.status === 302));
+                const by307 = allRedirects.filter(p => p.redirectChain.some(r => r.status === 307));
+                const by308 = allRedirects.filter(p => p.redirectChain.some(r => r.status === 308));
+                // Chain length distribution
+                const longChains = allRedirects.filter(p => p.redirectChain.length >= 3);
+                // Loop detection
+                const loops = [];
+                for (const p of allRedirects) {
+                    const seen = new Set();
+                    for (const hop of p.redirectChain) {
+                        if (seen.has(hop.to)) { loops.push({ url: p.url, loopUrl: hop.to, chain: p.redirectChain }); break; }
+                        seen.add(hop.from); seen.add(hop.to);
+                    }
+                }
+                // Self-referencing redirects (A → A)
+                const selfRedirects = allRedirects.filter(p => p.redirectChain.some(r => r.from === r.to));
+                return {
+                    totalRedirects: allRedirects.length,
+                    permanent301: by301.map(p => ({ url: p.url, chain: p.redirectChain })),
+                    permanent301Count: by301.length,
+                    temporary302: by302.map(p => ({ url: p.url, chain: p.redirectChain })),
+                    temporary302Count: by302.length,
+                    temporary307: by307.map(p => ({ url: p.url, chain: p.redirectChain })).slice(0, 10),
+                    temporary307Count: by307.length,
+                    permanent308: by308.map(p => ({ url: p.url, chain: p.redirectChain })).slice(0, 10),
+                    permanent308Count: by308.length,
+                    longChains: longChains.map(p => ({ url: p.url, chainLength: p.redirectChain.length, chain: p.redirectChain })),
+                    longChainCount: longChains.length,
+                    loops,
+                    loopCount: loops.length,
+                    selfRedirects: selfRedirects.map(p => p.url),
+                    selfRedirectCount: selfRedirects.length,
+                    avgChainLength: allRedirects.length > 0 ? Math.round(allRedirects.reduce((s, p) => s + p.redirectChain.length, 0) / allRedirects.length * 10) / 10 : 0,
+                };
+            })(),
+
+            // ══════════════════════════════════════════════════════
+            // PHASE 2: Schema Validation (Semrush parity)
+            // ══════════════════════════════════════════════════════
+            schemaValidation: (() => {
+                const REQUIRED_FIELDS = {
+                    'Organization': ['name', 'url', 'logo'],
+                    'LocalBusiness': ['name', 'address', 'telephone', 'url'],
+                    'Product': ['name', 'image', 'description'],
+                    'Article': ['headline', 'author', 'datePublished', 'image'],
+                    'BlogPosting': ['headline', 'author', 'datePublished', 'image'],
+                    'FAQPage': ['mainEntity'],
+                    'HowTo': ['name', 'step'],
+                    'BreadcrumbList': ['itemListElement'],
+                    'WebSite': ['name', 'url'],
+                    'WebPage': ['name', 'url'],
+                    'Review': ['itemReviewed', 'author', 'reviewRating'],
+                    'Event': ['name', 'startDate', 'location'],
+                    'Course': ['name', 'description', 'provider'],
+                    'VideoObject': ['name', 'description', 'thumbnailUrl', 'uploadDate'],
+                };
+                const issues = [];
+                const typeCounts = {};
+                for (const page of analysisPages) {
+                    for (const schema of (page.jsonLd || [])) {
+                        const type = schema['@type'];
+                        if (!type) continue;
+                        typeCounts[type] = (typeCounts[type] || 0) + 1;
+                        const required = REQUIRED_FIELDS[type];
+                        if (required) {
+                            const missing = required.filter(f => !schema[f] && !schema[f.toLowerCase()]);
+                            if (missing.length > 0) {
+                                issues.push({ url: page.url, type, missingFields: missing });
+                            }
+                        }
+                    }
+                }
+                const pagesWithSchema = analysisPages.filter(p => p.jsonLd?.length > 0);
+                const pagesWithoutSchema = analysisPages.filter(p => !p.jsonLd?.length);
+                return {
+                    totalSchemas: Object.values(typeCounts).reduce((a, b) => a + b, 0),
+                    typeCounts,
+                    pagesWithSchema: pagesWithSchema.length,
+                    pagesWithoutSchema: pagesWithoutSchema.length,
+                    pagesWithoutSchemaUrls: pagesWithoutSchema.map(p => p.url).slice(0, 20),
+                    validationIssues: issues,
+                    validationIssueCount: issues.length,
+                    hasOrganization: !!typeCounts['Organization'],
+                    hasBreadcrumb: !!typeCounts['BreadcrumbList'],
+                    hasFAQ: !!typeCounts['FAQPage'],
+                    hasArticle: !!(typeCounts['Article'] || typeCounts['BlogPosting']),
+                    hasProduct: !!typeCounts['Product'],
+                    missingCritical: (() => {
+                        const missing = [];
+                        if (!typeCounts['Organization'] && !typeCounts['LocalBusiness']) missing.push('Organization/LocalBusiness');
+                        if (!typeCounts['BreadcrumbList']) missing.push('BreadcrumbList');
+                        if (!typeCounts['WebSite']) missing.push('WebSite');
+                        return missing;
+                    })(),
+                };
+            })(),
+
+            // ══════════════════════════════════════════════════════
+            // PHASE 2: Internal Link Flow & PageRank Distribution
+            // ══════════════════════════════════════════════════════
+            internalLinkFlow: (() => {
+                // Build full link graph
+                const linkGraph = new Map(); // url → { outgoing: [], incoming: [], pageRank: 1 }
+                for (const p of allPages) {
+                    if (!linkGraph.has(p.url)) linkGraph.set(p.url, { outgoing: [], incoming: [], pageRank: 1 });
+                    for (const link of (p.links?.internal || [])) {
+                        try {
+                            const target = new URL(link, cleanBase).href;
+                            if (!linkGraph.has(target)) linkGraph.set(target, { outgoing: [], incoming: [], pageRank: 1 });
+                            linkGraph.get(p.url).outgoing.push(target);
+                            linkGraph.get(target).incoming.push(p.url);
+                        } catch { /* skip */ }
+                    }
+                }
+                // Simple PageRank (3 iterations) — enough for distribution insight
+                const damping = 0.85;
+                const pages = [...linkGraph.keys()];
+                const n = pages.length || 1;
+                for (let iter = 0; iter < 3; iter++) {
+                    const newRanks = new Map();
+                    for (const url of pages) {
+                        let rank = (1 - damping) / n;
+                        const node = linkGraph.get(url);
+                        for (const src of node.incoming) {
+                            const srcNode = linkGraph.get(src);
+                            if (srcNode && srcNode.outgoing.length > 0) {
+                                rank += damping * (srcNode.pageRank / srcNode.outgoing.length);
+                            }
+                        }
+                        newRanks.set(url, rank);
+                    }
+                    for (const [url, rank] of newRanks) linkGraph.get(url).pageRank = rank;
+                }
+                // Build distribution: top pages, orphans, link juice concentration
+                const ranked = [...linkGraph.entries()]
+                    .map(([url, data]) => ({ url, pageRank: Math.round(data.pageRank * 1000) / 1000, incoming: data.incoming.length, outgoing: data.outgoing.length }))
+                    .sort((a, b) => b.pageRank - a.pageRank);
+                const topPages = ranked.slice(0, 15);
+                const bottomPages = ranked.filter(p => p.incoming === 0 && p.url !== homepage.url);
+                // Link juice concentration: what % of total PageRank do top 10% of pages hold
+                const totalPR = ranked.reduce((s, p) => s + p.pageRank, 0);
+                const top10pct = ranked.slice(0, Math.max(1, Math.floor(ranked.length * 0.1)));
+                const top10pctPR = top10pct.reduce((s, p) => s + p.pageRank, 0);
+                return {
+                    totalNodes: linkGraph.size,
+                    topPages,
+                    orphanPages: bottomPages.map(p => p.url).slice(0, 20),
+                    orphanCount: bottomPages.length,
+                    linkJuiceConcentration: totalPR > 0 ? Math.round((top10pctPR / totalPR) * 100) : 0,
+                    avgIncoming: Math.round(ranked.reduce((s, p) => s + p.incoming, 0) / Math.max(ranked.length, 1)),
+                    avgOutgoing: Math.round(ranked.reduce((s, p) => s + p.outgoing, 0) / Math.max(ranked.length, 1)),
+                    distribution: {
+                        noIncoming: ranked.filter(p => p.incoming === 0).length,
+                        oneIncoming: ranked.filter(p => p.incoming === 1).length,
+                        twoToFive: ranked.filter(p => p.incoming >= 2 && p.incoming <= 5).length,
+                        sixToTen: ranked.filter(p => p.incoming >= 6 && p.incoming <= 10).length,
+                        moreThanTen: ranked.filter(p => p.incoming > 10).length,
+                    },
+                };
+            })(),
+
+            // ══════════════════════════════════════════════════════
+            // PHASE 2: Enhanced Crawl Depth Analysis
+            // ══════════════════════════════════════════════════════
+            crawlDepthAnalysis: (() => {
+                // BFS from homepage to compute actual click depth
+                const depthMap = new Map();
+                depthMap.set(homepage.url, 0);
+                const queue = [homepage.url];
+                const visited = new Set([homepage.url]);
+                while (queue.length > 0) {
+                    const current = queue.shift();
+                    const currentDepth = depthMap.get(current);
+                    const page = allPages.find(p => p.url === current);
+                    if (!page) continue;
+                    for (const link of (page.links?.internal || [])) {
+                        try {
+                            const target = new URL(link, cleanBase).href;
+                            if (!visited.has(target)) {
+                                visited.add(target);
+                                depthMap.set(target, currentDepth + 1);
+                                queue.push(target);
+                            }
+                        } catch { /* skip */ }
+                    }
+                }
+                const depths = [...depthMap.entries()].map(([url, depth]) => ({ url, depth }));
+                const distribution = { depth0: 0, depth1: 0, depth2: 0, depth3: 0, depth4plus: 0 };
+                for (const { depth } of depths) {
+                    if (depth === 0) distribution.depth0++;
+                    else if (depth === 1) distribution.depth1++;
+                    else if (depth === 2) distribution.depth2++;
+                    else if (depth === 3) distribution.depth3++;
+                    else distribution.depth4plus++;
+                }
+                const deeperThan3 = depths.filter(d => d.depth > 3);
+                return {
+                    distribution,
+                    maxDepth: Math.max(...depths.map(d => d.depth), 0),
+                    avgDepth: depths.length > 0 ? Math.round(depths.reduce((s, d) => s + d.depth, 0) / depths.length * 10) / 10 : 0,
+                    deeperThan3: deeperThan3.map(d => ({ url: d.url, depth: d.depth })).slice(0, 20),
+                    deeperThan3Count: deeperThan3.length,
+                    unreachable: allPages.filter(p => !depthMap.has(p.url) && p.success).map(p => p.url),
+                    unreachableCount: allPages.filter(p => !depthMap.has(p.url) && p.success).length,
+                };
+            })(),
         },
     };
 }

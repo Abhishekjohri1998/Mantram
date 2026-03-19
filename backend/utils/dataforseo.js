@@ -211,13 +211,29 @@ async function fetchBacklinkSummary(domain) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify([{ target: domain, internal_list_limit: 0, backlinks_status_type: 'live' }]),
+            signal: AbortSignal.timeout(15000),
         });
 
-        if (!response.ok) return null;
+        if (!response.ok) return { _error: `HTTP ${response.status}`, _subscriptionNeeded: false };
         const data = await response.json();
-        if (data.status_code !== 20000) return null;
+        if (data.status_code !== 20000) return { _error: data.status_message, _subscriptionNeeded: false };
 
-        const r = data.tasks?.[0]?.result?.[0];
+        // Check task-level error (e.g., subscription not activated)
+        const task = data.tasks?.[0];
+        if (task?.status_code === 40204) {
+            console.warn('⚠️ DataForSEO Backlinks API: Subscription NOT activated — activate at https://app.dataforseo.com/backlinks-subscription');
+            return {
+                _error: 'Backlinks API subscription not activated',
+                _subscriptionNeeded: true,
+                _activateUrl: 'https://app.dataforseo.com/backlinks-subscription',
+            };
+        }
+        if (task?.status_code !== 20000) {
+            console.warn(`DataForSEO backlinks task error: ${task?.status_code} — ${task?.status_message}`);
+            return { _error: task?.status_message || 'Unknown error', _subscriptionNeeded: false };
+        }
+
+        const r = task?.result?.[0];
         if (!r) return null;
 
         return {
@@ -450,6 +466,238 @@ export function isDataForSEOConfigured() {
     return hasDataForSEO();
 }
 
+// ─── NEW: Advanced Backlink Endpoints ────────────────────────────────────
+
+/**
+ * Get backlink competitors — domains sharing backlink profile with target
+ * Endpoint: backlinks/competitors/live
+ */
+async function fetchBacklinkCompetitors(domain, limit = 20) {
+    if (!hasDataForSEO()) return null;
+    try {
+        const response = await fetch(`${DATAFORSEO_BASE}/backlinks/competitors/live`, {
+            method: 'POST',
+            headers: { 'Authorization': getAuthHeader(), 'Content-Type': 'application/json' },
+            body: JSON.stringify([{
+                target: domain,
+                limit,
+                order_by: ['intersections,desc'],
+                backlinks_status_type: 'live',
+            }]),
+            signal: AbortSignal.timeout(15000),
+        });
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (data.status_code !== 20000) return null;
+        const items = data.tasks?.[0]?.result?.[0]?.items || [];
+        return items.map(i => ({
+            domain: i.domain,
+            intersections: i.intersections || 0,
+            rank: i.rank || 0,
+            totalBacklinks: i.backlinks_count || 0,
+            referringDomains: i.referring_domains || 0,
+        }));
+    } catch (e) {
+        console.warn('DataForSEO competitors error:', e.message);
+        return null;
+    }
+}
+
+/**
+ * Get backlink anchors — anchor text distribution for a domain
+ * Endpoint: backlinks/anchors/live
+ */
+async function fetchBacklinkAnchors(domain, limit = 30) {
+    if (!hasDataForSEO()) return null;
+    try {
+        const response = await fetch(`${DATAFORSEO_BASE}/backlinks/anchors/live`, {
+            method: 'POST',
+            headers: { 'Authorization': getAuthHeader(), 'Content-Type': 'application/json' },
+            body: JSON.stringify([{
+                target: domain,
+                limit,
+                order_by: ['backlinks,desc'],
+                backlinks_status_type: 'live',
+            }]),
+            signal: AbortSignal.timeout(15000),
+        });
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (data.status_code !== 20000) return null;
+        const items = data.tasks?.[0]?.result?.[0]?.items || [];
+        return items.map(i => ({
+            anchor: i.anchor || '',
+            backlinks: i.backlinks || 0,
+            referringDomains: i.domains || 0,
+            firstSeen: i.first_seen || null,
+            dofollow: i.backlinks - (i.backlinks_nofollow || 0),
+        }));
+    } catch (e) {
+        console.warn('DataForSEO anchors error:', e.message);
+        return null;
+    }
+}
+
+/**
+ * Get page intersection — backlinks pointing to competitors but NOT to the brand
+ * Endpoint: backlinks/page_intersection/live
+ * This is the "Link Gap" analysis — the killer feature
+ */
+async function fetchPageIntersection(brandDomain, competitorDomains, limit = 30) {
+    if (!hasDataForSEO() || !competitorDomains.length) return null;
+    try {
+        // Build targets: first is the brand (exclude_targets), rest are competitors
+        const targets = {};
+        targets['1'] = brandDomain;
+        competitorDomains.slice(0, 4).forEach((d, i) => { targets[`${i + 2}`] = d; });
+
+        const response = await fetch(`${DATAFORSEO_BASE}/backlinks/page_intersection/live`, {
+            method: 'POST',
+            headers: { 'Authorization': getAuthHeader(), 'Content-Type': 'application/json' },
+            body: JSON.stringify([{
+                targets,
+                exclude_targets: ['1'], // Exclude brand — find links ONLY to competitors
+                limit,
+                order_by: ['1.rank,desc'],
+                backlinks_status_type: 'live',
+            }]),
+            signal: AbortSignal.timeout(20000),
+        });
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (data.status_code !== 20000) return null;
+        const items = data.tasks?.[0]?.result?.[0]?.items || [];
+        return items.map(item => {
+            // Each item has numbered keys matching the targets
+            const linkData = {};
+            for (const [key, val] of Object.entries(item)) {
+                if (typeof val === 'object' && val !== null && val.page_from_url) {
+                    linkData[key] = {
+                        sourceUrl: val.page_from_url,
+                        sourceDomain: val.domain_from || '',
+                        targetUrl: val.page_to_url || '',
+                        targetDomain: val.domain_to || '',
+                        anchorText: val.anchor || '',
+                        rank: val.rank || 0,
+                        isDofollow: !val.is_nofollow,
+                        firstSeen: val.first_seen || null,
+                    };
+                }
+            }
+            return linkData;
+        }).filter(item => Object.keys(item).length > 0);
+    } catch (e) {
+        console.warn('DataForSEO page intersection error:', e.message);
+        return null;
+    }
+}
+
+
+// ─── Unified Enriched Backlink Data ──────────────────────────────────────
+
+/**
+ * Get comprehensive backlink intelligence — all endpoints in parallel
+ * Returns summary + top domains + competitors + anchors + link gap
+ */
+export async function getEnrichedBacklinks(domain, competitorDomains = []) {
+    const isAvailable = hasDataForSEO();
+    if (!isAvailable) return { available: false, provider: 'none' };
+
+    console.log(`🔗 DataForSEO: Enriched backlink intelligence for ${domain} (+ ${competitorDomains.length} competitors)...`);
+
+    const [summary, topDomains, competitors, anchors, linkGap] = await Promise.all([
+        fetchBacklinkSummary(domain),
+        fetchTopReferringDomains(domain, 15),
+        fetchBacklinkCompetitors(domain, 15),
+        fetchBacklinkAnchors(domain, 20),
+        competitorDomains.length > 0
+            ? fetchPageIntersection(domain, competitorDomains, 20)
+            : Promise.resolve(null),
+    ]);
+
+    // Check if backlinks API subscription is needed
+    if (summary?._subscriptionNeeded) {
+        console.warn('⚠️ DataForSEO Backlinks API requires subscription activation');
+        return {
+            available: false,
+            provider: 'dataforseo',
+            subscriptionNeeded: true,
+            activateUrl: summary._activateUrl,
+            error: summary._error,
+            summary: {},
+            topReferringDomains: [],
+            backlinkCompetitors: [],
+            anchorDistribution: [],
+            linkGap: [],
+        };
+    }
+
+    return {
+        available: true,
+        provider: 'dataforseo',
+        summary: (summary && !summary._error) ? summary : {},
+        topReferringDomains: topDomains || [],
+        backlinkCompetitors: competitors || [],
+        anchorDistribution: anchors || [],
+        linkGap: linkGap || [],
+    };
+}
+
+/**
+ * Format enriched backlink data for AI prompt — structured and concise
+ */
+export function formatEnrichedBacklinkData(data) {
+    if (!data?.available) {
+        if (data?.subscriptionNeeded) {
+            return '\n=== BACKLINK DATA UNAVAILABLE ===\nDataForSEO Backlinks API subscription is NOT activated.\nActivate at: ' + (data.activateUrl || 'https://app.dataforseo.com/backlinks-subscription') + '\nThe Moz data below may still provide domain authority estimates.\n';
+        }
+        return '';
+    }
+
+    const s = data.summary;
+    let text = '\n=== BACKLINK INTELLIGENCE (DataForSEO — verified, 4.5T index) ===\n';
+    text += `Total backlinks: ${(s.totalBacklinks || 0).toLocaleString()}\n`;
+    text += `Referring domains: ${(s.referringDomains || 0).toLocaleString()}\n`;
+    text += `Domain rank: ${s.domainRank}\n`;
+    text += `Dofollow: ${(s.backlinksDofollow || 0).toLocaleString()} | Nofollow: ${(s.backlinksNofollow || 0).toLocaleString()}\n`;
+    text += `Broken backlinks: ${(s.brokenBacklinks || 0).toLocaleString()}\n`;
+
+    if (data.topReferringDomains?.length) {
+        text += `\nTop referring domains:\n`;
+        for (const d of data.topReferringDomains.slice(0, 10)) {
+            text += `  - ${d.domain} (rank: ${d.rank}, ${d.backlinks} links, ${d.dofollow} dofollow)\n`;
+        }
+    }
+
+    if (data.anchorDistribution?.length) {
+        text += `\nAnchor text distribution:\n`;
+        const totalAnchors = data.anchorDistribution.reduce((s, a) => s + a.backlinks, 0);
+        for (const a of data.anchorDistribution.slice(0, 10)) {
+            const pct = totalAnchors > 0 ? Math.round(a.backlinks / totalAnchors * 100) : 0;
+            text += `  - "${a.anchor}" — ${a.backlinks} links (${pct}%) from ${a.referringDomains} domains\n`;
+        }
+    }
+
+    if (data.backlinkCompetitors?.length) {
+        text += `\nBacklink competitors (shared link profile):\n`;
+        for (const c of data.backlinkCompetitors.slice(0, 8)) {
+            text += `  - ${c.domain} — ${c.intersections} shared backlinks, rank: ${c.rank}, ${c.referringDomains} referring domains\n`;
+        }
+    }
+
+    if (data.linkGap?.length) {
+        text += `\nLINK GAP (pages linking to competitors but NOT to brand):\n`;
+        for (const gap of data.linkGap.slice(0, 10)) {
+            const entries = Object.values(gap);
+            for (const entry of entries) {
+                text += `  - ${entry.sourceDomain} (rank: ${entry.rank}) links to ${entry.targetDomain} via "${entry.anchorText}" — ${entry.isDofollow ? 'dofollow' : 'nofollow'}\n`;
+            }
+        }
+    }
+
+    return text;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────
 function getToday() {
     return new Date().toISOString().slice(0, 10);
@@ -460,3 +708,4 @@ function getMonthsAgo(months) {
     d.setMonth(d.getMonth() - months);
     return d.toISOString().slice(0, 10);
 }
+

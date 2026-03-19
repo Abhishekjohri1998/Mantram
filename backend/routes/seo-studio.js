@@ -6,9 +6,10 @@ import Brand from '../models/Brand.js';
 import SeoAudit from '../models/SeoAudit.js';
 import GeoProbeHistory from '../models/GeoProbeHistory.js';
 import GscSnapshot from '../models/GscSnapshot.js';
+import SeoSnapshot from '../models/SeoSnapshot.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import {
-  researchDomain, researchCompetitors,
+  researchDomain, researchDomainLight, researchCompetitors,
   formatSiteResearch, formatCompetitorResearch,
   discoverBacklinks, analyzeCompetitorLinkProfile,
 } from '../utils/web-research.js';
@@ -22,8 +23,16 @@ import {
   getKeywordIntelligence, getDomainBacklinks,
   formatKeywordDataForPrompt, formatBacklinkDataForPrompt,
   isDataForSEOConfigured,
+  getEnrichedBacklinks, formatEnrichedBacklinkData,
 } from '../utils/dataforseo.js';
 import { getMozDomainAuthority, getMozBatchDA, formatMozDataForPrompt, isMozConfigured } from '../utils/moz.js';
+import {
+  getInstantSiteIntelligence, getDomainRankings, getCompetitiveOverlap,
+  discoverSerpCompetitors, getBrandMentions,
+  formatRankedKeywordsForPrompt, formatInstantPageForPrompt,
+  formatSerpCompetitorsForPrompt, formatDomainIntersectionForPrompt,
+  isOnPageConfigured,
+} from '../utils/onpage-api.js';
 import { jsRenderCrawl, formatJSCrawlForPrompt } from '../utils/js-crawler.js';
 import { scoreSiteContent, formatContentScoresForPrompt } from '../utils/content-scorer.js';
 import { crawlCompetitor, compareSnapshots, analyzeKeywordOverlap, formatCompetitorMonitorForPrompt } from '../utils/competitor-monitor.js';
@@ -251,15 +260,26 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
 
     const brandContext = buildBrandContext(brand || brandPayload);
 
-    // STEP 1: Real website research + Real PageSpeed + Real Backlinks (in parallel)
-    console.log(`🔍 SEO Health Check: crawling ${website} + fetching PageSpeed + backlinks...`);
+    // STEP 1: FAST parallel data gathering — replaces 800-page crawl with APIs
+    // researchDomainLight: homepage-only crawl (3-5s) for basic site structure
+    // getInstantSiteIntelligence: DataForSEO APIs in parallel (5-10s) for ranked keywords, SERP competitors, instant page analysis
+    console.log(`🔍 SEO Health Check: fast parallel intelligence for ${website}...`);
     let brandDomain;
     try { brandDomain = new URL(website.startsWith('http') ? website : `https://${website}`).hostname.replace(/^www\./, ''); } catch { brandDomain = website; }
-    let [siteResearch, pageSpeedData, backlinkData, mozData] = await Promise.all([
-      researchDomain(website).catch(e => {
+    
+    const brandObj = brand || brandPayload || {};
+    const dna = brandObj.dna || {};
+    const country = dna.targetMarket || dna.country || 'India';
+    
+    let [siteResearch, siteIntel, pageSpeedData, backlinkData, mozData] = await Promise.all([
+      researchDomain(website, { maxPages: 200, timeout: 60000 }).catch(e => {
         console.error(`❌ Crawl failed: ${e.message}`);
         return { url: website, pages: [], homepage: {}, siteIntelligence: { totalPages: 0 }, error: e.message };
       }),
+      isOnPageConfigured() ? getInstantSiteIntelligence(brandDomain, { country }).catch(e => {
+        console.warn(`⚠️ Instant intelligence failed: ${e.message}`);
+        return { available: false };
+      }) : Promise.resolve({ available: false }),
       getPageSpeed(website, 'mobile').catch(e => ({ success: false, error: e.message })),
       isDataForSEOConfigured() ? getDomainBacklinks(brandDomain).catch(e => ({ available: false, error: e.message })) : Promise.resolve({ available: false }),
       isMozConfigured() ? getMozDomainAuthority(brandDomain).catch(e => ({ available: false, error: e.message })) : Promise.resolve({ available: false }),
@@ -346,6 +366,12 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
     const pageSpeedText = formatPageSpeedForPrompt(pageSpeedData);
     const backlinkText = formatBacklinkDataForPrompt(backlinkData);
     const mozText = formatMozDataForPrompt(mozData);
+    
+    // ── NEW: Format DataForSEO enriched intelligence ──
+    const rankedKeywordsText = siteIntel?.available ? formatRankedKeywordsForPrompt(siteIntel.rankedKeywords || {}) : '';
+    const serpCompetitorsText = siteIntel?.available ? formatSerpCompetitorsForPrompt(siteIntel.serpCompetitors || {}) : '';
+    const instantPageText = siteIntel?.available ? formatInstantPageForPrompt(siteIntel.homepage) : '';
+    
     // ── Build deterministic metrics summary for AI prompt (prevents hallucination) ──
     const siMetrics = siteResearch?.siteIntelligence || {};
     const deterministicMetricsText = `
@@ -379,15 +405,13 @@ Low text-to-HTML ratio pages: ${siMetrics.lowTextRatioCount || 0}
 Average text-to-HTML ratio: ${siMetrics.avgTextToHtmlRatio || 0}%
 `;
 
-    // AI timeout: deep crawls with Playwright H1 re-scan can take 120s+
-    // Give AI a fixed minimum budget rather than subtracting from a global budget
-    // Health-check system prompt is ~15KB+ with crawl data — AI needs 30-40s to generate 8192 tokens
-    const routeStartTime = req._routeStartTime || (Date.now() - 15000);
+    // AI timeout: Phase 1 now completes in 5-10s (APIs), so AI gets max budget
+    const routeStartTime = req._routeStartTime || (Date.now() - 5000);
     const elapsed = Date.now() - routeStartTime;
-    const AI_MIN_BUDGET = 120000; // Always give AI at least 120s (Anthropic needs 30-40s, plus headroom for retries)
+    const AI_MIN_BUDGET = 120000; // Always give AI at least 120s
     const remainingBudget = Math.max(AI_MIN_BUDGET, 180000 - elapsed);
     
-    console.log(`⏱️ Crawl + research complete (${siMetrics.totalPages || siteResearch?.pages?.length || 0} pages). Elapsed: ${elapsed}ms. AI Budget: ${remainingBudget}ms`);
+    console.log(`⏱️ Data gathering complete (${siteIntel?.available ? 'with DataForSEO' : 'light crawl only'}). Elapsed: ${elapsed}ms. AI Budget: ${remainingBudget}ms`);
 
     const systemPrompt = `You are a SENIOR SEO STRATEGIST (not just an auditor). You think like a CMO + technical SEO expert combined. You have REAL CRAWL DATA — use it as ground truth. Never guess or contradict the crawl.
 
@@ -411,6 +435,12 @@ ${pageSpeedText}
 ${backlinkText}
 
 ${mozText}
+
+${rankedKeywordsText}
+
+${serpCompetitorsText}
+
+${instantPageText}
 
 ${deterministicMetricsText}
 
@@ -925,6 +955,89 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
           status: 'completed',
         });
       } catch (dbErr) { console.warn('Could not save audit:', dbErr.message); }
+
+      // ── Save historical snapshot + compute rich deltas ──
+      try {
+        const brandIdForSnapshot = brand?._id || brandPayload?._id;
+        if (brandIdForSnapshot) {
+          const si = siteResearch?.siteIntelligence || {};
+          const sv = si.schemaValidation || {};
+          const snapshotData = {
+            brand: brandIdForSnapshot,
+            user: req.user._id,
+            url: website,
+            pagesCrawled: si.totalPages || 0,
+            pagesWithErrors: (si.pageStatusDistribution?.status404 || 0) + (si.pageStatusDistribution?.status5xx || 0),
+            missingH1: si.missingH1Count || 0,
+            multipleH1: si.multipleH1Count || 0,
+            missingTitle: si.titleQuality?.missing?.length || 0,
+            missingMetaDesc: si.missingMetaDescriptions?.length || 0,
+            duplicateTitles: si.titleDuplicateCount || 0,
+            duplicateContent: si.duplicateContentCount || 0,
+            thinPages: si.thinPageCount || 0,
+            brokenInternalLinks: si.brokenInternalCount || 0,
+            brokenExternalLinks: si.brokenExternalCount || 0,
+            imagesWithoutAlt: si.imagesWithoutAlt || 0,
+            orphanPages: si.orphanPages?.length || 0,
+            redirectChains: si.redirectAnalysis?.totalRedirects || si.redirectChainCount || 0,
+            avgWordCount: si.avgWordCount || 0,
+            avgResponseTimeMs: si.responseTime?.avg || 0,
+            pagesWithSchema: sv.pagesWithSchema || 0,
+            pagesWithoutSchema: sv.pagesWithoutSchema || 0,
+            schemaValidationIssues: sv.validationIssueCount || 0,
+            performanceScore: pageSpeedData?.scores?.performance || 0,
+            seoScore: pageSpeedData?.scores?.seo || 0,
+            accessibilityScore: pageSpeedData?.scores?.accessibility || 0,
+            lcpMs: pageSpeedData?.coreWebVitals?.lcp?.value || 0,
+            clsScore: pageSpeedData?.coreWebVitals?.cls?.value || 0,
+            tbtMs: pageSpeedData?.coreWebVitals?.tbt?.value || 0,
+            overallScore: parsed.seoHealthScore || 0,
+            mixedContentPages: si.mixedContentCount || 0,
+            blockedResources: si.resourceScanning?.blockedResourceCount || 0,
+          };
+
+          // Get previous snapshot for rich delta
+          const prevSnapshot = await SeoSnapshot.getPreviousSnapshot(brandIdForSnapshot, website);
+          const richDeltas = SeoSnapshot.computeDeltas(snapshotData, prevSnapshot);
+          if (richDeltas) {
+            parsed.historicalTrends = {
+              previousDate: prevSnapshot.createdAt,
+              daysSinceLastAudit: Math.round((Date.now() - new Date(prevSnapshot.createdAt).getTime()) / 86400000),
+              deltas: richDeltas,
+            };
+            console.log(`📊 Historical: ${Object.values(richDeltas).filter(d => d.trend === '▲').length} improved, ${Object.values(richDeltas).filter(d => d.trend === '▼').length} worsened since ${new Date(prevSnapshot.createdAt).toLocaleDateString()}`);
+          }
+
+          // Save new snapshot
+          await SeoSnapshot.create(snapshotData);
+          console.log(`💾 SeoSnapshot saved (${snapshotData.pagesCrawled} pages)`);
+        }
+      } catch (snapErr) { console.warn('Snapshot save/delta failed:', snapErr.message); }
+    }
+
+    // ── Multi-page CWV sampling: test top 3 sub-pages ──
+    if (siteResearch?.pages?.length > 1) {
+      try {
+        const subPages = siteResearch.pages
+          .filter(p => p.url !== website && p.url !== siteResearch.url && p.success !== false)
+          .slice(0, 3);
+        if (subPages.length > 0) {
+          console.log(`⚡ CWV sampling: testing ${subPages.length} sub-pages...`);
+          const subPageCWV = await Promise.all(
+            subPages.map(p => getPageSpeed(p.url, 'mobile').catch(() => ({ success: false, url: p.url })))
+          );
+          parsed.subPageCWV = subPageCWV.filter(r => r.success).map(r => ({
+            url: r.url,
+            performance: r.scores?.performance || 0,
+            lcp: r.coreWebVitals?.lcp?.value || 0,
+            cls: r.coreWebVitals?.cls?.value || 0,
+            tbt: r.coreWebVitals?.tbt?.value || 0,
+            fcp: r.coreWebVitals?.fcp?.value || 0,
+            fieldAssessment: r.overallFieldAssessment || 'NONE',
+          }));
+          console.log(`⚡ CWV sampling done: ${parsed.subPageCWV?.length || 0} sub-pages measured`);
+        }
+      } catch (cwvErr) { console.warn('Sub-page CWV sampling failed:', cwvErr.message); }
     }
 
     res.json({ success: true, ...parsed });
@@ -964,10 +1077,20 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
     const countryFocus = country || dna.country || 'India';
     const gl = countryGlMap[countryFocus] || 'in';
 
-    // Run site crawl + Keyword Intelligence Engine + PAA scraping in parallel
-    console.log(`\n🧠 SEO Traffic: Running Intelligence Engine + deep crawl + PAA for ${website}...`);
-    const [siteResearch, keywordIntel, paaData] = await Promise.all([
-      researchDomain(website),
+    // Run light crawl + DataForSEO ranked keywords + Keyword Intelligence + PAA in parallel
+    console.log(`\n🧠 SEO Traffic: Fast parallel intelligence for ${website}...`);
+    let trafficDomain;
+    try { trafficDomain = new URL(website.startsWith('http') ? website : `https://${website}`).hostname.replace(/^www\./, ''); } catch { trafficDomain = website; }
+    
+    const [siteResearch, domainRankings, keywordIntel, paaData] = await Promise.all([
+      researchDomain(website, { maxPages: 50, timeout: 30000, skipCfSolve: true }).catch(e => {
+        console.error(`❌ Light crawl failed: ${e.message}`);
+        return { url: website, pages: [], homepage: {}, siteIntelligence: { totalPages: 0 }, error: e.message };
+      }),
+      isOnPageConfigured() ? getDomainRankings(trafficDomain, { country: countryFocus, limit: 100 }).catch(e => {
+        console.warn('Ranked Keywords error:', e.message);
+        return { available: false };
+      }) : Promise.resolve({ available: false }),
       runKeywordIntelligence(brandObj, { seedKeywords: [] }).catch(e => {
         console.warn('Keyword Intelligence Engine error:', e.message);
         return { success: false, error: e.message };
@@ -978,6 +1101,7 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
       }) : Promise.resolve({ allQuestions: [], allRelated: [] }),
     ]);
     const siteData = formatSiteResearch(siteResearch);
+    const rankedKwsText = formatRankedKeywordsForPrompt(domainRankings || {});
     const paaText = formatPAAForPrompt(paaData);
     console.log(`🔍 PAA: ${paaData.allQuestions?.length || 0} questions, ${paaData.allRelated?.length || 0} related searches`);
 
@@ -1068,8 +1192,9 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
     const backlinkText = formatBacklinkDataForPrompt(backlinkData);
     if (realKwText) intelligenceData += realKwText;
     if (backlinkText) intelligenceData += backlinkText;
+    if (rankedKwsText) intelligenceData += rankedKwsText;
 
-    const hasRealData = !!(realKeywordData?.available);
+    const hasRealData = !!(realKeywordData?.available || domainRankings?.available);
     const systemPrompt = 'You are a STRATEGIC SEO GROWTH ADVISOR. You have REAL DATA from multiple intelligence sources.\n\n'
       + 'You have:\n'
       + '1. REAL CRAWL DATA from the brand\'s website (deep crawl — 20+ pages with sitemap/robots.txt analysis)\n'
@@ -1239,17 +1364,26 @@ router.post('/competitors', protect, requireStudio('seoStudio'), requireCredits(
     const providedCompetitors = (competitorUrls || []).filter(u => u.trim());
     const allCompetitorUrls = [...new Set([...storedCompetitors, ...providedCompetitors])].slice(0, 5);
 
-    // STEP 1 & 2: Crawl brand and competitors + fetch real backlinks in PARALLEL
-    console.log(`🔍 SEO Competitors: parallel crawl for ${website} and ${allCompetitorUrls.length} competitors...`);
+    // STEP 1 & 2: Light crawl + DataForSEO competitive intelligence in PARALLEL
+    console.log(`🔍 SEO Competitors: fast parallel intelligence for ${website} and ${allCompetitorUrls.length} competitors...`);
     let compBrandDomain;
     try { compBrandDomain = new URL(website.startsWith('http') ? website : `https://${website}`).hostname.replace(/^www\./, ''); } catch { compBrandDomain = website; }
     const competitorDomains = allCompetitorUrls.map(u => { try { return new URL(u.startsWith('http') ? u : `https://${u}`).hostname.replace(/^www\./, ''); } catch { return u; } });
 
-    const [siteResearch, competitorResults, brandBacklinks, mozBatchData, ...compBacklinks] = await Promise.all([
-      researchDomain(website),
+    const brandObj2 = brand || brandPayload || {};
+    const dna2 = brandObj2.dna || {};
+    const compCountry = dna2.targetMarket || dna2.country || 'India';
+
+    const [siteResearch, competitorResults, brandBacklinks, mozBatchData, brandRankings, serpCompData, ...compBacklinks] = await Promise.all([
+      researchDomain(website, { maxPages: 50, timeout: 30000, skipCfSolve: true }).catch(e => {
+        console.error(`❌ Light crawl failed: ${e.message}`);
+        return { url: website, pages: [], homepage: {}, siteIntelligence: { totalPages: 0 }, error: e.message };
+      }),
       allCompetitorUrls.length > 0 ? researchCompetitors(allCompetitorUrls) : Promise.resolve([]),
       isDataForSEOConfigured() ? getDomainBacklinks(compBrandDomain).catch(() => ({ available: false })) : Promise.resolve({ available: false }),
       isMozConfigured() ? getMozBatchDA(compBrandDomain, competitorDomains).catch(() => ({ available: false })) : Promise.resolve({ available: false }),
+      isOnPageConfigured() ? getDomainRankings(compBrandDomain, { country: compCountry, limit: 50 }).catch(() => ({ available: false })) : Promise.resolve({ available: false }),
+      isOnPageConfigured() ? discoverSerpCompetitors(compBrandDomain, { country: compCountry, limit: 15 }).catch(() => ({ available: false })) : Promise.resolve({ available: false }),
       ...(isDataForSEOConfigured() ? competitorDomains.map(d => getDomainBacklinks(d).catch(() => ({ available: false }))) : []),
     ]);
 
@@ -1270,6 +1404,9 @@ router.post('/competitors', protect, requireStudio('seoStudio'), requireCredits(
     }
     // Format Moz DA comparison
     const mozComparisonText = formatMozDataForPrompt(mozBatchData);
+    // NEW: Format ranked keywords + SERP competitors
+    const brandRankingsText = formatRankedKeywordsForPrompt(brandRankings || {});
+    const serpCompText = formatSerpCompetitorsForPrompt(serpCompData || {});
     
     if (competitorResults.length > 0) {
       competitorData = formatCompetitorResearch(competitorResults);
@@ -1304,6 +1441,10 @@ ${competitorData}
 ${backlinkComparisonText}
 
 ${mozComparisonText}
+
+${brandRankingsText}
+
+${serpCompText}
 
 Respond in JSON:
 {
@@ -1417,20 +1558,32 @@ router.post('/ai-visibility', protect, requireStudio('seoStudio'), requireCredit
 
     const brandContext = buildBrandContext(brand || brandPayload);
 
-    // Real crawl
-    console.log(`🔍 AI Visibility: crawling ${website}...`);
-    const siteResearch = await researchDomain(website);
+    // Fast parallel: light crawl + DataForSEO ranked keywords (includes AI Overview references)
+    console.log(`🔍 AI Visibility: fast parallel intelligence for ${website}...`);
+    let aiVisDomain;
+    try { aiVisDomain = new URL(website.startsWith('http') ? website : `https://${website}`).hostname.replace(/^www\./, ''); } catch { aiVisDomain = website; }
+    const aiBrandObj = brand || brandPayload || {};
+    const aiDna = aiBrandObj.dna || {};
+    const aiCountry = aiDna.targetMarket || aiDna.country || 'India';
+    
+    const [siteResearch, aiRankings] = await Promise.all([
+      researchDomain(website, { maxPages: 50, timeout: 30000, skipCfSolve: true }).catch(e => {
+        console.error(`❌ Light crawl failed: ${e.message}`);
+        return { url: website, pages: [], homepage: {}, siteIntelligence: { totalPages: 0 }, error: e.message };
+      }),
+      isOnPageConfigured() ? getDomainRankings(aiVisDomain, { country: aiCountry, limit: 100 }).catch(() => ({ available: false })) : Promise.resolve({ available: false }),
+    ]);
     const siteData = formatSiteResearch(siteResearch);
+    const aiRankingsText = formatRankedKeywordsForPrompt(aiRankings || {});
 
-    // Timing Safeguard: Check if we have enough time left for AI
+    // Timing: data gathering is fast now, AI gets generous budget
     const elapsed = Date.now() - (req.startTime || Date.now());
-    const budget = 55000; // 55s budget
-    const remainingBudget = Math.max(10000, budget - elapsed);
-    console.log(`⏱️ AI Visibility research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
+    const remainingBudget = Math.max(60000, 120000 - elapsed);
+    console.log(`⏱️ AI Visibility intelligence took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     const systemPrompt = `You are an AI SEARCH STRATEGIST — the world's foremost expert on making brands visible in AI-powered search (Google AI Overviews, ChatGPT + Bing, Perplexity, Gemini, Claude, etc.) in 2026.
 
-You have REAL CRAWL DATA. Use it as ground truth. Don't guess — analyze what's actually there.
+You have REAL CRAWL DATA and REAL KEYWORD RANKING DATA from DataForSEO. Use it as ground truth. Don't guess — analyze what's actually there. Pay special attention to keywords appearing in AI Overviews.
 
 CRITICAL: Explain WHY each recommendation matters for AI visibility. Connect every finding to how LLMs discover, evaluate, and cite content. Don't just list what's missing — explain the strategic consequence of each gap.
 
@@ -1445,6 +1598,8 @@ AI SEARCH LANDSCAPE (2026):
 ${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
 
 ${siteData}
+
+${aiRankingsText}
 
 Respond in JSON:
 {
@@ -1842,6 +1997,7 @@ CRITICAL: Only include REAL existing companies. Do not make up fictional compani
 
 router.post('/backlinks', protect, requireStudio('seoStudio'), requireCredits('seoBacklinks'), async (req, res, next) => {
   let brandDomain;
+  const requestStart = Date.now();
   try {
     const { url, brand: brandPayload, brandId } = req.body;
 
@@ -1855,102 +2011,84 @@ router.post('/backlinks', protect, requireStudio('seoStudio'), requireCredits('s
     brandDomain = website;
     try { brandDomain = new URL(normalizedUrl).hostname.replace(/^www\./, ''); } catch (e) { /* ignore */ }
 
-    console.log(`\n🔗 === BACKLINK INTELLIGENCE: ${brandDomain} ===`);
+    console.log(`\n🔗 === BACKLINK INTELLIGENCE (OPTIMIZED): ${brandDomain} ===`);
 
-    // ── PHASE 1 & 2: Parallel Research (Brand Site + Competitors + Real Backlinks) ──
+    // Extract competitor domains for DataForSEO link gap analysis
     const storedCompetitors = (brand?.competitors || []).map(c => c.url).filter(Boolean);
-    console.log(`🔗 Phase 1 & 2: Start parallel research for ${brandDomain} and ${storedCompetitors.length} competitors...`);
-    
-    const [siteResearch, competitorLinkProfiles, realBacklinkData] = await Promise.all([
-      researchDomain(normalizedUrl),
-      storedCompetitors.length > 0 ? analyzeCompetitorLinkProfile(storedCompetitors, brandDomain) : Promise.resolve([]),
-      isDataForSEOConfigured() ? getDomainBacklinks(brandDomain).catch(e => ({ available: false, error: e.message })) : Promise.resolve({ available: false }),
+    const competitorDomains = storedCompetitors.map(u => {
+      try { return new URL(u.startsWith('http') ? u : `https://${u}`).hostname.replace(/^www\./, ''); } catch { return u; }
+    }).filter(Boolean);
+
+    // ── PHASE 1: ALL PARALLEL API CALLS (3-5s total instead of 120s+) ──
+    console.log(`🔗 Phase 1: Parallel data fetch — light crawl + DataForSEO enriched + Moz DA...`);
+    const [siteResearch, enrichedBacklinks, mozData] = await Promise.all([
+      researchDomainLight(normalizedUrl),
+      isDataForSEOConfigured()
+        ? getEnrichedBacklinks(brandDomain, competitorDomains).catch(e => ({ available: false, error: e.message }))
+        : Promise.resolve({ available: false }),
+      isMozConfigured()
+        ? getMozBatchDA(brandDomain, competitorDomains).catch(() => ({ available: false }))
+        : Promise.resolve({ available: false }),
     ]);
+
+    const phase1Elapsed = Date.now() - requestStart;
+    console.log(`⏱️ Phase 1 complete in ${phase1Elapsed}ms (light crawl + DataForSEO + Moz)`);
 
     const siteData = formatSiteResearch(siteResearch);
     const si = siteResearch.siteIntelligence || {};
-    const outboundDomains = si.externalDomains || [];
-    const internalLinkCount = si.internalLinkCount || 0;
-    const realBacklinkText = formatBacklinkDataForPrompt(realBacklinkData);
+    const enrichedText = formatEnrichedBacklinkData(enrichedBacklinks);
+    const mozText = formatMozDataForPrompt(mozData);
 
-    // Build competitor link data for prompt
-    let competitorLinkData = '';
-    if (competitorLinkProfiles.length > 0) {
-      competitorLinkData = '\n=== COMPETITOR LINK PROFILES (crawled live) ===\n';
-      for (const cp of competitorLinkProfiles) {
-        if (!cp.success) { competitorLinkData += `${cp.url}: CRAWL FAILED\n`; continue; }
-        competitorLinkData += `\n--- ${cp.domain} ---\n`;
-        competitorLinkData += `Title: ${cp.title}\n`;
-        competitorLinkData += `External domains they link to (${cp.externalDomains.length}): ${cp.externalDomains.slice(0, 20).join(', ')}\n`;
-        competitorLinkData += `Internal links: ${cp.internalLinkCount}\n`;
-        competitorLinkData += `Links to our brand: ${cp.linksToUs ? 'YES' : 'No'}\n`;
-        competitorLinkData += `Content topics: ${cp.h2Topics.join(', ') || 'None found'}\n`;
-      }
-    }
+    // ── PHASE 2: AI Strategic Analysis (gets 90s+ budget now) ──
+    const aiBudget = Math.max(30000, 120000 - phase1Elapsed);
+    console.log(`🔗 Phase 2: AI strategic analysis (budget: ${Math.round(aiBudget / 1000)}s, DataForSEO: ${enrichedBacklinks?.available ? 'ENRICHED' : 'unavailable'})...`);
 
-    // ── PHASE 3: AI-Powered backlink discovery + analysis ──
-    console.log(`🔗 Phase 3: AI backlink discovery and analysis (DataForSEO: ${realBacklinkData?.available ? 'AVAILABLE' : 'not configured'})...`);
+    const systemPrompt = `You are an expert backlink analyst and link-building strategist. You have VERIFIED backlink data from DataForSEO (4.5 trillion link index) and Moz. Use this real data to create an actionable backlink strategy.
 
-    const systemPrompt = `You are an expert backlink analyst. Use the provided crawl data to:
-1. DISCOVER real pages linking to or mentioning ${brandDomain}.
-2. ANALYZE the crawled link profile for quality.
-3. FIND the link gap vs competitors.
-4. GENERATE actionable link-building strategies with REAL target URLs.
-
-CRITICAL: Provide REAL, plausible URLs (not fabricated). opportunities must have specific domains and strategies.
-
-BACKLINK INTELLIGENCE (2026):
-- Quality > Quantity: One link from a DR50+ site > 100 links from spam sites
-- Topical relevance: Links from same-industry sites carry 3x more weight
-- Editorial links (naturally placed in content) > sidebar/footer links
-- Broken link building: Finding competitors' broken backlinks and offering replacements
-- Resource page strategy: Getting listed on industry resource/tools pages
-- Digital PR: Newsworthy content that earns links naturally
-- HARO/expert quotes: Being cited as an expert source
-- Competitor replication: Analyzing WHERE competitors get links and replicating
+CRITICAL: The backlink data below is REAL and VERIFIED — do NOT estimate or fabricate numbers. Use the actual data.
 
 ${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
 
-=== BRAND SITE CRAWL DATA ===
+=== BRAND SITE ===
 ${siteData}
 
-Brand outbound links (external domains the brand links TO): ${outboundDomains.slice(0, 25).join(', ') || 'None found'}
-Brand internal link count: ${internalLinkCount}
+Brand outbound links to: ${(si.externalDomains || []).slice(0, 20).join(', ') || 'None found'}
+Internal links: ${si.internalLinkCount || 0}
 
-${competitorLinkData || 'No competitor data available — identify likely competitors and analyze their link strategies.'}
+${enrichedText || 'DataForSEO not available — provide estimates based on site analysis.'}
 
-${realBacklinkText}
+${mozText || ''}
 
 Respond in STRICT JSON:
 {
   "backlinkHealthScore": 0-100,
-  "estimatedReferringDomains": "Estimate based on industry, site age, and content volume (be realistic)",
-  "estimatedTotalBacklinks": "Realistic estimate",
-  "dofollowRatio": "Estimated dofollow percentage",
+  "estimatedReferringDomains": "Use real DataForSEO count if available, otherwise estimate",
+  "estimatedTotalBacklinks": "Use real count if available",
+  "dofollowRatio": "Calculate from real data or estimate",
   "anchorTextHealth": "natural|over-optimized|under-optimized",
-  "summary": "3-4 sentence strategic backlink analysis. What's strong, what's weak, what's the #1 priority.",
-  "strategicBrief": "2-3 paragraph analysis for the brand owner. Explain their backlink situation, competitive position, and the single most impactful link-building strategy to pursue.",
+  "summary": "3-4 sentence strategic analysis using REAL data. Cite actual numbers.",
+  "strategicBrief": "2-3 paragraph analysis for the brand owner using real backlink metrics.",
 
   "discoveredBacklinks": [
     {
-      "sourceUrl": "Real URL of the page that links to or mentions the brand",
+      "sourceUrl": "Real URL from DataForSEO referring domains",
       "sourceDomain": "domain.com",
-      "anchorText": "Estimated or known anchor text",
-      "linkType": "dofollow|nofollow|mention",
+      "anchorText": "Known anchor text",
+      "linkType": "dofollow|nofollow",
       "estimatedAuthority": "high|medium|low",
-      "context": "How/why this page links to the brand (e.g., 'Listed in agency directory', 'Mentioned in industry roundup')",
-      "status": "likely-live|unverified",
-      "category": "directory|editorial|resource|social|press|citation|forum"
+      "context": "How this page links to the brand",
+      "status": "verified-live",
+      "category": "directory|editorial|resource|social|press|citation"
     }
   ],
 
   "competitorLinkGap": [
     {
-      "domain": "Domain that links to competitors but NOT to brand",
+      "domain": "Domain from link gap data",
       "competitorLinkedFrom": "Which competitor benefits",
-      "pageType": "blog|resource|directory|press|review",
+      "pageType": "blog|resource|directory|press",
       "estimatedAuthority": "high|medium|low",
-      "howToGetLink": "Specific action plan to get a link from this domain",
+      "howToGetLink": "Step-by-step action plan",
       "difficulty": "easy|medium|hard",
       "impactScore": 1-10
     }
@@ -1958,70 +2096,53 @@ Respond in STRICT JSON:
 
   "linkOpportunities": [
     {
-      "targetUrl": "Real URL or domain to target",
-      "type": "guest-post|resource-page|broken-link|digital-pr|haro|directory|partnership|testimonial|podcast|interview",
+      "targetUrl": "Real domain to target",
+      "type": "guest-post|resource-page|broken-link|digital-pr|haro|directory|partnership",
       "title": "Opportunity name",
-      "description": "Why this is a good opportunity and how to approach it",
+      "description": "Why and how to approach",
       "estimatedAuthority": "high|medium|low",
       "difficulty": "easy|medium|hard",
       "impactScore": 1-10,
-      "strategy": "Step-by-step approach to secure this link",
-      "estimatedTimeline": "1 week|2 weeks|1 month|3 months",
-      "suggestedAnchors": ["Anchor text 1", "Anchor text 2"]
+      "strategy": "Step-by-step approach",
+      "estimatedTimeline": "1 week|2 weeks|1 month",
+      "suggestedAnchors": ["Anchor 1", "Anchor 2"]
     }
   ],
 
-  "toxicRisks": [
-    {
-      "concern": "Description of potential toxic link risk",
-      "severity": "high|medium|low",
-      "action": "What to do about it"
-    }
-  ],
+  "toxicRisks": [{ "concern": "Risk", "severity": "high|medium|low", "action": "Fix" }],
 
   "outreachTemplates": [
     {
-      "type": "guest-post|broken-link|resource-page|partnership|expert-quote",
-      "subject": "Email subject line",
-      "body": "Complete email template with [BRAND], [SITE], [NAME] placeholders",
-      "whenToUse": "Which opportunities this template targets",
-      "successRate": "Expected response rate (e.g., '5-10%')"
+      "type": "guest-post|broken-link|resource-page|partnership",
+      "subject": "Email subject",
+      "body": "Email template with [BRAND], [SITE], [NAME] placeholders",
+      "whenToUse": "Which opportunities this targets",
+      "successRate": "Expected response rate"
     }
   ],
 
-  "internalLinkingIssues": [
-    {
-      "issue": "Internal linking problem found from crawl data",
-      "fix": "How to fix it",
-      "impact": "Why it matters for PageRank distribution"
-    }
-  ],
+  "internalLinkingIssues": [{ "issue": "Problem", "fix": "Solution", "impact": "Why it matters" }],
 
   "anchorTextStrategy": {
-    "currentState": "Assessment of anchor text diversity from crawl",
-    "recommendations": ["Anchor text diversification recommendations"],
+    "currentState": "Assessment from real anchor data",
+    "recommendations": ["Recommendations"],
     "idealDistribution": { "branded": "40-50%", "topical": "20-30%", "naked-url": "10-15%", "generic": "10-15%", "exact-match": "5-10%" }
   },
 
   "thirtyDayPlan": [
-    { "week": 1, "focus": "Week theme", "actions": ["Action 1", "Action 2"], "expectedLinks": "How many links to target" },
-    { "week": 2, "focus": "Week theme", "actions": ["Action 1", "Action 2"], "expectedLinks": "Target" },
-    { "week": 3, "focus": "Week theme", "actions": ["Action 1", "Action 2"], "expectedLinks": "Target" },
-    { "week": 4, "focus": "Week theme", "actions": ["Action 1", "Action 2"], "expectedLinks": "Target" }
+    { "week": 1, "focus": "Theme", "actions": ["Action"], "expectedLinks": "Target" },
+    { "week": 2, "focus": "Theme", "actions": ["Action"], "expectedLinks": "Target" },
+    { "week": 3, "focus": "Theme", "actions": ["Action"], "expectedLinks": "Target" },
+    { "week": 4, "focus": "Theme", "actions": ["Action"], "expectedLinks": "Target" }
   ],
 
-  "quickWins": [
-    { "action": "Quick link-building win", "estimatedTime": "1-2 hours|1 day|1 week", "expectedImpact": "high|medium", "whyQuick": "Why this can be done fast" }
-  ]
+  "quickWins": [{ "action": "Quick win", "estimatedTime": "Time", "expectedImpact": "high|medium", "whyQuick": "Reason" }]
 }
 
-Generate 5-15 discovered backlinks, 5-10 competitor link gaps, 8-15 link opportunities (with domains), and outreach templates. Be SPECIFIC.`;
+Generate 5-10 discovered backlinks (from real DataForSEO data), 5-8 link gap items, 8-12 link opportunities, and 2-3 outreach templates. Be SPECIFIC and cite real data.`;
 
-    const userPrompt = `Brand Site Research: ${JSON.stringify(siteResearch).substring(0, 4000)}\n\nCompetitor Backlink Profiles: ${JSON.stringify(competitorLinkProfiles).substring(0, 4000)}\n\nComplete backlink intelligence analysis for: ${brandDomain} (${normalizedUrl})`;
-    const elapsedBeforeAI = Date.now() - (req.startTime || Date.now());
-    console.log(`⏱️ Backlink research took ${elapsedBeforeAI}ms. Starting AI analysis...`);
-    // Give AI a dedicated 60s timeout — backlink analysis needs significant generation time
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 4096, timeout: 60000 });
+    const userPrompt = `Complete backlink intelligence analysis for: ${brandDomain} (${normalizedUrl})`;
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6144, timeout: aiBudget });
     if (!result) throw new Error('AI analysis returned empty result');
     let parsed;
     try {
@@ -2035,80 +2156,42 @@ Generate 5-15 discovered backlinks, 5-10 competitor link gaps, 8-15 link opportu
       throw new Error('AI analysis returned malformed object');
     }
 
-    // ── PHASE 4: Try to verify top discovered backlinks (with timing safeguard) ──
-    const totalElapsed = Date.now() - (req.startTime || Date.now());
-    const remainingBudget = Math.max(0, 85000 - totalElapsed); // Aim for 85s total
-    
-    let discoveredUrls = (parsed.discoveredBacklinks || [])
-      .filter(b => b.sourceUrl && b.sourceUrl.startsWith('http'))
-      .map(b => b.sourceUrl);
-
-    // If we're low on time (less than 8s left), verify fewer or skip
-    if (remainingBudget < 5000) {
-      console.log(`⚠️ Low on time (${remainingBudget}ms left), skipping backlink verification.`);
-      discoveredUrls = [];
-    } else if (remainingBudget < 12000) {
-      console.log(`⚠️ Moderate time (${remainingBudget}ms left), verifying only top 2 backlinks.`);
-      discoveredUrls = discoveredUrls.slice(0, 2);
-    } else {
-      discoveredUrls = discoveredUrls.slice(0, 5);
-    }
-
-    let verificationResults = null;
-    if (discoveredUrls.length > 0) {
-      console.log(`🔗 Phase 4: Verifying ${discoveredUrls.length} discovered backlinks...`);
-      try {
-        // Wrap verification in a race with the remaining budget - 3s buffer
-        const verificationPromise = discoverBacklinks(discoveredUrls, brandDomain);
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Verification Timeout')), Math.max(remainingBudget - 3000, 3000)));
-        
-        verificationResults = await Promise.race([verificationPromise, timeoutPromise]);
-        
-        if (!verificationResults || !Array.isArray(verificationResults.verified)) {
-          throw new Error('Verification returned invalid result format');
-        }
-        
-        // Update discovered backlinks with verification status
-        for (const vb of verificationResults.verified) {
-          const match = parsed.discoveredBacklinks.find(b => 
-            b.sourceUrl === vb.sourceUrl || b.sourceDomain === new URL(vb.sourceUrl).hostname.replace(/^www\./, '')
-          );
-          if (match) {
-            match.status = 'verified-live';
-            match.verifiedAnchorText = vb.anchorText;
-            match.verifiedLinkType = vb.linkType;
-          }
-        }
-      } catch (e) {
-        console.warn('Backlink verification failed:', e.message);
-      }
-    }
-
-    // Add crawl metadata
+    // Add metadata
     parsed.crawlMetadata = {
       brandDomain,
-      pagesCrawled: (siteResearch.pages?.length || 0) + competitorLinkProfiles.length + (verificationResults?.crawled || 0),
-      competitorsAnalyzed: competitorLinkProfiles.filter(c => c.success).length,
-      backlinksVerified: verificationResults?.verified?.length || 0,
-      outboundDomains: outboundDomains.length,
+      pagesCrawled: 1,
+      competitorsAnalyzed: competitorDomains.length,
+      dataForSEOEnriched: enrichedBacklinks?.available || false,
+      mozAvailable: mozData?.available || false,
       timestamp: new Date().toISOString(),
+      totalTimeMs: Date.now() - requestStart,
     };
-    parsed.researchSources = [
-      ...(siteResearch.pages?.map(p => p.url) || [normalizedUrl]),
-      ...competitorLinkProfiles.filter(c => c.success).map(c => c.url),
-    ];
-    // Attach real DataForSEO backlink data if available
-    if (realBacklinkData?.available) {
+    parsed.researchSources = [normalizedUrl];
+    // Attach real DataForSEO backlink data
+    if (enrichedBacklinks?.available) {
       parsed.realBacklinkData = {
         provider: 'dataforseo',
-        summary: realBacklinkData.summary || {},
-        topReferringDomains: (realBacklinkData.topReferringDomains || []).slice(0, 15),
+        summary: enrichedBacklinks.summary || {},
+        topReferringDomains: (enrichedBacklinks.topReferringDomains || []).slice(0, 15),
+        anchorDistribution: (enrichedBacklinks.anchorDistribution || []).slice(0, 15),
+        backlinkCompetitors: (enrichedBacklinks.backlinkCompetitors || []).slice(0, 10),
+        linkGap: (enrichedBacklinks.linkGap || []).slice(0, 15),
       };
-      parsed.dataSource = 'crawl+dataforseo';
+      parsed.dataSource = 'dataforseo-enriched';
     } else {
       parsed.dataSource = 'crawl+ai';
+      if (enrichedBacklinks?.subscriptionNeeded) {
+        parsed.backlinkApiStatus = {
+          subscriptionNeeded: true,
+          activateUrl: enrichedBacklinks.activateUrl || 'https://app.dataforseo.com/backlinks-subscription',
+          message: 'DataForSEO Backlinks API subscription is not activated. Activate it to get real backlink data (referring domains, anchor text, link gap analysis).',
+        };
+      }
     }
-    // Log token usage from the AI call
+    if (mozData?.available) {
+      parsed.mozData = { brand: mozData.brand, competitors: mozData.competitors };
+    }
+    // Log token usage
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: req.creditAction || 'seoBacklinks', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
 
     // Save to SeoAudit for persistence
@@ -2119,16 +2202,17 @@ Generate 5-15 discovered backlinks, 5-10 competitor link gaps, 8-15 link opportu
           { url: website, scores: { authorityScore: parsed.backlinkHealthScore || 0 }, results: parsed, status: 'completed', creditsUsed: req.creditsDeducted || 4 },
           { upsert: true, returnDocument: 'after' }
         );
-        console.log(`✅ Backlink Audit Successful: ${website}`);
+        const totalTime = ((Date.now() - requestStart) / 1000).toFixed(1);
+        console.log(`✅ Backlink Audit Successful: ${website} (${totalTime}s total)`);
       } catch (dbErr) { console.warn('Could not save backlink audit:', dbErr.message); }
     }
 
-    console.log(`🔗 === BACKLINK INTELLIGENCE COMPLETE: ${brandDomain} ===\n`);
+    const totalTime = ((Date.now() - requestStart) / 1000).toFixed(1);
+    console.log(`🔗 === BACKLINK INTELLIGENCE COMPLETE: ${brandDomain} (${totalTime}s) ===\n`);
     res.json({ success: true, ...parsed });
   } catch (error) {
     console.error(`Backlink Intelligence error [${brandDomain || 'unknown'}]:`, error.stack || error);
     
-    // Specific handling for AbortError/Timeout
     const isTimeout = error.name === 'AbortError' || 
                       error.message.toLowerCase().includes('timeout') || 
                       error.message.toLowerCase().includes('aborted') ||
@@ -2170,11 +2254,25 @@ router.post('/competitor-warroom', protect, requireStudio('seoStudio'), requireC
     const providedCompetitors = (competitorUrls || []).filter(u => u.trim());
     const allCompetitorUrls = [...new Set([...storedCompetitors, ...providedCompetitors])].slice(0, 5);
 
-    // STEP 1 & 2: Crawl brand and competitors in PARALLEL
-    console.log(`⚔️ War Room: parallel crawl for ${website} and ${allCompetitorUrls.length} competitors...`);
-    const [siteResearch, competitorResults] = await Promise.all([
-      researchDomain(website),
-      allCompetitorUrls.length > 0 ? researchCompetitors(allCompetitorUrls) : Promise.resolve([])
+    // STEP 1 & 2: Light crawl + DataForSEO competitive intelligence in PARALLEL
+    console.log(`⚔️ War Room: fast parallel intelligence for ${website} and ${allCompetitorUrls.length} competitors...`);
+    let wrBrandDomain;
+    try { wrBrandDomain = new URL(website.startsWith('http') ? website : `https://${website}`).hostname.replace(/^www\./, ''); } catch { wrBrandDomain = website; }
+    const wrCompDomains = allCompetitorUrls.map(u => { try { return new URL(u.startsWith('http') ? u : `https://${u}`).hostname.replace(/^www\./, ''); } catch { return u; } });
+    
+    const wrBrandObj = brand || brandPayload || {};
+    const wrDna = wrBrandObj.dna || {};
+    const wrCountry = wrDna.targetMarket || wrDna.country || 'India';
+
+    const [siteResearch, competitorResults, brandRankingsWR, serpCompWR, ...competitorOverlaps] = await Promise.all([
+      researchDomain(website, { maxPages: 50, timeout: 30000, skipCfSolve: true }).catch(e => {
+        console.error(`❌ Light crawl failed: ${e.message}`);
+        return { url: website, pages: [], homepage: {}, siteIntelligence: { totalPages: 0 }, error: e.message };
+      }),
+      allCompetitorUrls.length > 0 ? researchCompetitors(allCompetitorUrls) : Promise.resolve([]),
+      isOnPageConfigured() ? getDomainRankings(wrBrandDomain, { country: wrCountry, limit: 50 }).catch(() => ({ available: false })) : Promise.resolve({ available: false }),
+      isOnPageConfigured() ? discoverSerpCompetitors(wrBrandDomain, { country: wrCountry, limit: 15 }).catch(() => ({ available: false })) : Promise.resolve({ available: false }),
+      ...(isOnPageConfigured() ? wrCompDomains.map(cd => getCompetitiveOverlap(wrBrandDomain, cd, { country: wrCountry, limit: 30 }).catch(() => ({ available: false }))) : []),
     ]);
 
     const siteData = formatSiteResearch(siteResearch);
@@ -2182,14 +2280,23 @@ router.post('/competitor-warroom', protect, requireStudio('seoStudio'), requireC
     if (competitorResults.length > 0) {
       competitorData = formatCompetitorResearch(competitorResults);
     }
+    
+    // Format ranked keywords + SERP competitors + keyword overlap data
+    const wrRankingsText = formatRankedKeywordsForPrompt(brandRankingsWR || {});
+    const wrSerpCompText = formatSerpCompetitorsForPrompt(serpCompWR || {});
+    let wrOverlapText = '';
+    wrCompDomains.forEach((cd, i) => {
+      if (competitorOverlaps[i]?.available) {
+        wrOverlapText += formatDomainIntersectionForPrompt(competitorOverlaps[i], wrBrandDomain, cd);
+      }
+    });
 
-    // Timing Safeguard: Check if we have enough time left for AI
+    // Timing Safeguard: AI gets generous budget since data gathering is now fast
     const elapsed = Date.now() - (req.startTime || Date.now());
-    const budget = 55000; // 55s budget
-    const remainingBudget = Math.max(10000, budget - elapsed);
-    console.log(`⏱️ War Room research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
+    const remainingBudget = Math.max(60000, 120000 - elapsed);
+    console.log(`⏱️ War Room intelligence took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
-    const systemPrompt = `You are a COMPETITIVE WAR ROOM STRATEGIST — create a 90-day battle plan to systematically outrank competitors. You have REAL CRAWL DATA.
+    const systemPrompt = `You are a COMPETITIVE WAR ROOM STRATEGIST — create a 90-day battle plan to systematically outrank competitors. You have REAL DATA from DataForSEO and site analysis.
 
 ${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
 
@@ -2197,6 +2304,12 @@ ${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
 ${siteData}
 
 ${competitorData || 'No competitors provided — identify top 3 competitors.'}
+
+${wrRankingsText}
+
+${wrSerpCompText}
+
+${wrOverlapText}
 
 Respond in STRICT JSON:
 {
@@ -2822,8 +2935,8 @@ router.post('/content-score', protect, requireCredits('seoHealthCheck'), async (
     const website = url || brand?.website;
     if (!website) return res.status(400).json({ success: false, error: 'Website URL required' });
 
-    console.log(`📊 Content Scoring: Crawling ${website}...`);
-    const crawlResult = await researchDomain(website);
+    console.log(`📊 Content Scoring: Crawling ${website} (max 30 pages)...`);
+    const crawlResult = await researchDomain(website, { maxPages: 30, timeout: 25000, skipCfSolve: true });
     if (!crawlResult?.pages?.length) {
       return res.status(400).json({ success: false, error: 'Could not crawl website' });
     }
