@@ -670,6 +670,7 @@ export const routingRules = {
 // ============ Payments & Subscriptions API ============
 export const payments = {
     getPackages: () => apiFetch('/payments/packages'),
+    getTopupPacks: () => apiFetch('/payments/topup-packs'),
     createOrder: (packageId, billingCycle = 'monthly') =>
         apiFetch('/payments/create-order', {
             method: 'POST',
@@ -689,6 +690,26 @@ export const payments = {
         apiFetch('/payments/verify-topup', {
             method: 'POST',
             body: JSON.stringify(paymentData)
+        }),
+};
+
+// ============ Rewards & Gamification API ============
+export const rewards = {
+    status: () => apiFetch('/rewards/status'),
+    claimMilestone: (milestoneId) =>
+        apiFetch('/rewards/claim-milestone', {
+            method: 'POST',
+            body: JSON.stringify({ milestoneId }),
+        }),
+    applyReferral: (referralCode) =>
+        apiFetch('/rewards/apply-referral', {
+            method: 'POST',
+            body: JSON.stringify({ referralCode }),
+        }),
+    videoCostPreview: (data) =>
+        apiFetch('/rewards/video-cost-preview', {
+            method: 'POST',
+            body: JSON.stringify(data),
         }),
 };
 

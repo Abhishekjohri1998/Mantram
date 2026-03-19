@@ -168,6 +168,47 @@ router.post('/verify', protect, async (req, res) => {
 });
 
 /**
+ * ── Credit Top-Up Packs (v3 — cost-plus pricing) ──
+ * Floor: ₹5/credit. First purchase = 2× bonus. 90-day validity.
+ */
+const TOPUP_PACKS = {
+    spark:  { name: '⚡ Spark',  credits: 30,    bonus: 0,    price: 249,    icon: 'bolt',        popular: false },
+    boost:  { name: '🚀 Boost',  credits: 100,   bonus: 10,   price: 699,    icon: 'rocket',      popular: false },
+    power:  { name: '💪 Power',  credits: 300,   bonus: 45,   price: 1999,   icon: 'fitness_center', popular: true },
+    ultra:  { name: '🔥 Ultra',  credits: 750,   bonus: 150,  price: 4999,   icon: 'whatshot',    popular: false },
+    mega:   { name: '💎 Mega',   credits: 2000,  bonus: 500,  price: 12499,  icon: 'diamond',     popular: false },
+};
+
+const TOPUP_VALIDITY_DAYS = 90;
+
+/**
+ * @desc    Get available top-up packs
+ * @route   GET /api/payments/topup-packs
+ * @access  Private
+ */
+router.get('/topup-packs', protect, async (req, res) => {
+    try {
+        // Check if this is user's first top-up purchase
+        const user = req.user;
+        const isFirstPurchase = !user.credits?.topUpExpiry;
+
+        const packs = Object.entries(TOPUP_PACKS).map(([id, pack]) => ({
+            id,
+            ...pack,
+            total: pack.credits + pack.bonus,
+            perCredit: (pack.price / (pack.credits + pack.bonus)).toFixed(2),
+            firstPurchaseTotal: isFirstPurchase ? (pack.credits + pack.bonus) * 2 : null,
+            validityDays: TOPUP_VALIDITY_DAYS,
+        }));
+
+        res.json({ success: true, packs, isFirstPurchase });
+    } catch (error) {
+        console.error('❌ Get Top-up Packs Error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch packs' });
+    }
+});
+
+/**
  * @desc    Create Razorpay Order for Credit Top-up
  * @route   POST /api/payments/create-topup-order
  * @access  Private
@@ -176,18 +217,15 @@ router.post('/create-topup-order', protect, async (req, res) => {
     try {
         const { packId } = req.body;
 
-        // Define standard top-up packs - matching frontend IDs and values
-        const topupPacks = {
-            'small': { credits: 100, price: 50, name: '100 Credits Pack' },
-            'medium': { credits: 500, price: 200, name: '500 Credits Pack' },
-            'large': { credits: 1500, price: 500, name: '1500 Credits Pack' },
-            'enterprise': { credits: 5000, price: 1500, name: '5000 Credits Pack' },
-        };
-
-        const pack = topupPacks[packId];
+        const pack = TOPUP_PACKS[packId];
         if (!pack) {
             return res.status(400).json({ success: false, error: 'Invalid credit pack' });
         }
+
+        // Check if first purchase for 2× bonus
+        const isFirstPurchase = !req.user.credits?.topUpExpiry;
+        const totalCredits = pack.credits + pack.bonus;
+        const finalCredits = isFirstPurchase ? totalCredits * 2 : totalCredits;
 
         const options = {
             amount: pack.price * 100, // paise
@@ -196,7 +234,8 @@ router.post('/create-topup-order', protect, async (req, res) => {
             notes: {
                 userId: req.user._id.toString(),
                 packId,
-                credits: pack.credits,
+                credits: finalCredits,
+                isFirstPurchase: isFirstPurchase ? 'true' : 'false',
                 type: 'credit_topup'
             },
         };
@@ -208,7 +247,9 @@ router.post('/create-topup-order', protect, async (req, res) => {
             orderId: order.id,
             amount: order.amount,
             currency: order.currency,
-            packName: pack.name
+            packName: pack.name,
+            creditsToAdd: finalCredits,
+            isFirstPurchase,
         });
     } catch (error) {
         console.error('❌ Topup Order Error:', error);
@@ -240,19 +281,27 @@ router.post('/verify-topup', protect, async (req, res) => {
         }
 
         const credits = parseInt(order.notes.credits);
-        
-        // Update user: Increment bonus credits
+        const expiry = new Date();
+        expiry.setDate(expiry.getDate() + TOPUP_VALIDITY_DAYS);
+
+        // Add to topUp credits with 90-day expiry
         const user = await User.findByIdAndUpdate(
             req.user._id,
-            { $inc: { 'credits.bonus': credits } },
+            {
+                $inc: { 'credits.topUp': credits },
+                $set: { 'credits.topUpExpiry': expiry },
+            },
             { new: true }
         );
 
+        console.log(`💎 Top-up verified: +${credits} credits for ${user.email}, expires ${expiry.toISOString()}`);
+
         res.json({
             success: true,
-            message: `Successfully added ${credits} credits to your account.`,
-            newBalance: user.credits.total + user.credits.bonus - user.credits.used,
-            creditsAdded: credits
+            message: `Successfully added ${credits} credits to your account!`,
+            newBalance: user.creditsRemaining,
+            creditsAdded: credits,
+            expiresAt: expiry,
         });
     } catch (error) {
         console.error('❌ Topup Verification Error:', error);

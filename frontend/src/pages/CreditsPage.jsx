@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import DashboardLayout from '../components/DashboardLayout'
 import SEOHead from '../components/SEOHead'
-import { credits as creditsAPI, payments as paymentsAPI } from '../services/api'
+import { credits as creditsAPI, payments as paymentsAPI, rewards as rewardsAPI } from '../services/api'
 
 const ACTION_ICONS = {
     content: 'edit_note', contentRefine: 'auto_fix',
@@ -12,7 +12,12 @@ const ACTION_ICONS = {
     seoCompetitorDiscover: 'person_search',
     brainstorm: 'psychology', brainstormRefine: 'auto_fix_high',
     brainstormChat: 'chat', brainstormScreenplay: 'movie',
-    trendRefresh: 'trending_up',
+    trendRefresh: 'trending_up', videoGenerate: 'movie',
+    videoEdit: 'movie_edit', videoBrainstorm: 'movie',
+    voiceClone: 'mic', voiceTranscribe: 'record_voice_over',
+    canvasGenerate: 'brush', canvasBgRemove: 'auto_fix_high', canvasExtend: 'aspect_ratio',
+    adCreative: 'campaign', socialMedia: 'share', socialMediaCalendar: 'calendar_month',
+    socialMediaAudit: 'checklist', socialMediaCompetitor: 'groups', socialMediaScore: 'score',
 }
 
 const ACTION_COLORS = {
@@ -21,7 +26,11 @@ const ACTION_COLORS = {
     seoHealthCheck: 'emerald', seoTraffic: 'emerald', seoCompetitors: 'emerald',
     seoAiVisibility: 'emerald', seoAsk: 'emerald', seoAuditPage: 'emerald', seoCompetitorDiscover: 'emerald',
     brainstorm: 'amber', brainstormRefine: 'amber', brainstormChat: 'amber', brainstormScreenplay: 'amber',
-    trendRefresh: 'cyan',
+    trendRefresh: 'cyan', videoGenerate: 'purple', videoEdit: 'purple', videoBrainstorm: 'purple',
+    voiceClone: 'rose', voiceTranscribe: 'rose',
+    canvasGenerate: 'fuchsia', canvasBgRemove: 'fuchsia', canvasExtend: 'fuchsia',
+    adCreative: 'orange', socialMedia: 'sky', socialMediaCalendar: 'sky',
+    socialMediaAudit: 'sky', socialMediaCompetitor: 'sky', socialMediaScore: 'sky',
 }
 
 export default function CreditsPage() {
@@ -32,6 +41,18 @@ export default function CreditsPage() {
     const [pages, setPages] = useState(1)
     const [loading, setLoading] = useState(true)
     const [tab, setTab] = useState('overview')
+
+    // Top-up state
+    const [topupPacks, setTopupPacks] = useState([])
+    const [isFirstPurchase, setIsFirstPurchase] = useState(false)
+
+    // Rewards state
+    const [rewardStatus, setRewardStatus] = useState(null)
+    const [referralInput, setReferralInput] = useState('')
+    const [referralMsg, setReferralMsg] = useState('')
+
+    // Daily reward toast
+    const [dailyToast, setDailyToast] = useState(null)
 
     useEffect(() => { loadSummary(); loadUsage() }, [])
     useEffect(() => { loadUsage() }, [page])
@@ -52,13 +73,27 @@ export default function CreditsPage() {
         } catch (e) { console.error(e) }
     }
 
+    // Check for daily reward on mount
+    useEffect(() => {
+        (async () => {
+            try {
+                const data = await creditsAPI.balance()
+                if (data.dailyReward?.awarded) {
+                    setDailyToast(data.dailyReward)
+                    setTimeout(() => setDailyToast(null), 6000)
+                }
+            } catch { }
+        })()
+    }, [])
+
+    // Plans tab
     const [packages, setPackages] = useState([])
     const [packagesLoading, setPackagesLoading] = useState(false)
 
     useEffect(() => {
-        if (tab === 'plans' && packages.length === 0) {
-            loadPackages()
-        }
+        if (tab === 'plans' && packages.length === 0) loadPackages()
+        if (tab === 'topup' && topupPacks.length === 0) loadTopupPacks()
+        if (tab === 'rewards' && !rewardStatus) loadRewards()
     }, [tab])
 
     const loadPackages = async () => {
@@ -69,10 +104,24 @@ export default function CreditsPage() {
         } catch (e) { console.error(e) } finally { setPackagesLoading(false) }
     }
 
+    const loadTopupPacks = async () => {
+        try {
+            const data = await paymentsAPI.getTopupPacks()
+            setTopupPacks(data.packs || [])
+            setIsFirstPurchase(data.isFirstPurchase || false)
+        } catch (e) { console.error(e) }
+    }
+
+    const loadRewards = async () => {
+        try {
+            const data = await rewardsAPI.status()
+            setRewardStatus(data)
+        } catch (e) { console.error(e) }
+    }
+
     const handleUpgrade = async (pkg) => {
         try {
             const { orderId, amount, currency } = await paymentsAPI.createOrder(pkg._id)
-
             const options = {
                 key: import.meta.env.VITE_RAZORPAY_KEY_ID,
                 amount,
@@ -82,74 +131,63 @@ export default function CreditsPage() {
                 order_id: orderId,
                 handler: async (response) => {
                     try {
-                        await paymentsAPI.verify({
-                            ...response,
-                            packageId: pkg._id,
-                            billingCycle: 'monthly'
-                        })
+                        await paymentsAPI.verify({ ...response, packageId: pkg._id, billingCycle: 'monthly' })
                         alert(`Successfully upgraded to ${pkg.name}!`)
                         window.location.reload()
-                    } catch (e) {
-                        alert('Payment verification failed: ' + e.message)
-                    }
+                    } catch (e) { alert('Payment verification failed: ' + e.message) }
                 },
-                prefill: {
-                    name: summary?.userName,
-                    email: summary?.userEmail,
-                },
+                prefill: { name: summary?.userName, email: summary?.userEmail },
                 theme: { color: '#2b4bee' }
             }
-
             const rzp = new window.Razorpay(options)
             rzp.open()
-        } catch (e) {
-            alert('Failed to initialize payment: ' + e.message)
-        }
+        } catch (e) { alert('Failed to initialize payment: ' + e.message) }
     }
 
     const handleTopup = async (pack) => {
         try {
-            const { orderId, amount, currency } = await paymentsAPI.createTopupOrder(pack.id)
-
+            const { orderId, amount, currency, creditsToAdd } = await paymentsAPI.createTopupOrder(pack.id)
             const options = {
                 key: import.meta.env.VITE_RAZORPAY_KEY_ID,
                 amount,
                 currency,
                 name: 'Mantram AI',
-                description: `Buy ${pack.credits} AI Credits`,
+                description: `Buy ${creditsToAdd} AI Credits`,
                 order_id: orderId,
                 handler: async (response) => {
                     try {
-                        await paymentsAPI.verifyTopup({
-                            ...response,
-                            packId: pack.id
-                        })
-                        alert(`Successfully added ${pack.credits} credits to your account!`)
+                        await paymentsAPI.verifyTopup({ ...response, packId: pack.id })
+                        alert(`Successfully added ${creditsToAdd} credits!`)
                         window.location.reload()
-                    } catch (e) {
-                        alert('Top-up verification failed: ' + e.message)
-                    }
+                    } catch (e) { alert('Top-up verification failed: ' + e.message) }
                 },
-                prefill: {
-                    name: summary?.userName,
-                    email: summary?.userEmail,
-                },
-                theme: { color: '#2b4bee' }
+                prefill: { name: summary?.userName, email: summary?.userEmail },
+                theme: { color: '#f59e0b' }
             }
-
             const rzp = new window.Razorpay(options)
             rzp.open()
-        } catch (e) {
-            alert('Failed to initialize top-up: ' + e.message)
-        }
+        } catch (e) { alert('Failed to initialize top-up: ' + e.message) }
     }
 
-    const TOPUP_PACKS = [
-        { id: 'small', credits: 100, price: 50, priceUSD: 1, popular: false },
-        { id: 'medium', credits: 500, price: 200, priceUSD: 4, popular: true },
-        { id: 'large', credits: 1500, price: 500, priceUSD: 9, popular: false },
-        { id: 'enterprise', credits: 5000, price: 1500, priceUSD: 25, popular: false },
-    ]
+    const handleClaimMilestone = async (id) => {
+        try {
+            const data = await rewardsAPI.claimMilestone(id)
+            alert(data.message)
+            loadRewards()
+            loadSummary()
+        } catch (e) { alert(e.message) }
+    }
+
+    const handleApplyReferral = async () => {
+        if (!referralInput.trim()) return
+        try {
+            const data = await rewardsAPI.applyReferral(referralInput.trim())
+            setReferralMsg(data.message)
+            setReferralInput('')
+            loadRewards()
+            loadSummary()
+        } catch (e) { setReferralMsg(e.message) }
+    }
 
     const balance = summary?.balance
     const creditPercent = balance && !balance.unlimited ? Math.min(100, (balance.remaining / balance.total) * 100) : 100
@@ -169,6 +207,19 @@ export default function CreditsPage() {
     return (
         <DashboardLayout title="Credit Usage" subtitle="Track your AI generation credits">
             <SEOHead title="Credit Usage — Mantram AI" noIndex={true} />
+
+            {/* Daily Reward Toast */}
+            {dailyToast && (
+                <div className="fixed top-4 right-4 z-50 animate-slide-in bg-gradient-to-r from-amber-500/90 to-orange-500/90 text-white rounded-2xl px-6 py-4 shadow-2xl shadow-amber-500/30 flex items-center gap-3 max-w-sm">
+                    <span className="material-symbols-outlined text-2xl animate-pulse">local_fire_department</span>
+                    <div>
+                        <p className="font-bold text-sm">{dailyToast.message}</p>
+                        <p className="text-xs opacity-80">🔥 Streak: {dailyToast.streak} days</p>
+                    </div>
+                    <button onClick={() => setDailyToast(null)} className="ml-2 opacity-60 hover:opacity-100">✕</button>
+                </div>
+            )}
+
             {loading ? (
                 <div className="flex items-center justify-center h-64">
                     <div className="size-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -232,8 +283,8 @@ export default function CreditsPage() {
                     </div>
 
                     {/* Tabs */}
-                    <div className="flex gap-2">
-                        {['overview', 'plans', 'topup', 'history'].map(t => (
+                    <div className="flex gap-2 flex-wrap">
+                        {['overview', 'plans', 'topup', 'rewards', 'history'].map(t => (
                             <button
                                 key={t}
                                 onClick={() => setTab(t)}
@@ -242,7 +293,7 @@ export default function CreditsPage() {
                                     : 'text-slate-400 hover:bg-white/[0.04] border border-transparent'
                                     }`}
                             >
-                                {t === 'overview' ? '📊 Usage Breakdown' : t === 'plans' ? '💎 Upgrade Plans' : t === 'topup' ? '⚡ Quick Top-up' : '📋 Transaction History'}
+                                {t === 'overview' ? '📊 Usage Breakdown' : t === 'plans' ? '💎 Upgrade Plans' : t === 'topup' ? '⚡ Quick Top-up' : t === 'rewards' ? '🎯 Rewards' : '📋 History'}
                             </button>
                         ))}
                     </div>
@@ -327,49 +378,206 @@ export default function CreditsPage() {
                                 )}
                             </div>
                         </div>
+
                     ) : tab === 'topup' ? (
+                        /* ══════════ Top-Up Store (v3 Packs) ══════════ */
                         <div className="space-y-6">
-                            <div className="bg-gradient-to-br from-amber-500/10 to-amber-600/5 border border-amber-500/20 p-6 rounded-2xl">
-                                <h3 className="text-lg font-bold text-amber-400 flex items-center gap-2 mb-2">
+                            {/* First Purchase Banner */}
+                            {isFirstPurchase && (
+                                <div className="bg-gradient-to-r from-amber-500/15 to-orange-500/10 border border-amber-500/30 p-6 rounded-2xl flex items-center gap-4">
+                                    <span className="material-symbols-outlined text-4xl text-amber-400 animate-pulse">celebration</span>
+                                    <div>
+                                        <h3 className="text-lg font-black text-amber-400">🎉 First Purchase — 2× Credits!</h3>
+                                        <p className="text-sm text-slate-400">Your first top-up gets double credits. This offer applies once, on any pack.</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="bg-gradient-to-br from-amber-500/10 to-amber-600/5 border border-amber-500/20 p-5 rounded-2xl">
+                                <h3 className="text-lg font-bold text-amber-400 flex items-center gap-2 mb-1">
                                     <span className="material-symbols-outlined text-xl">bolt</span>
-                                    Low on credits? Get a Quick Top-up
+                                    Credit Top-Up Store
                                 </h3>
-                                <p className="text-sm text-slate-400">Purchased credits never expire and are used only after your plan credits are exhausted.</p>
+                                <p className="text-sm text-slate-400">Purchased credits are valid for 90 days and are used after your plan credits are exhausted.</p>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                {TOPUP_PACKS.map(pack => (
-                                    <div key={pack.id} className={`glass-panel p-6 rounded-2xl border transition-all hover:scale-[1.02] flex flex-col ${pack.popular ? 'border-amber-400 ring-1 ring-amber-400/20' : 'border-white/[0.08]'}`}>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                                {topupPacks.map(pack => (
+                                    <div key={pack.id} className={`glass-panel p-5 rounded-2xl border transition-all hover:scale-[1.02] flex flex-col ${pack.popular ? 'border-amber-400 ring-1 ring-amber-400/20 bg-amber-400/[0.03]' : 'border-white/[0.08]'}`}>
                                         <div className="flex-1">
-                                            <div className="flex items-center justify-between mb-4">
-                                                <h3 className="text-xl font-bold text-white">{pack.credits} Credits</h3>
-                                                {pack.popular && <span className="px-2 py-0.5 rounded-full bg-amber-400 text-[10px] font-black uppercase text-slate-900 tracking-wider">Popular</span>}
+                                            <div className="flex items-center justify-between mb-3">
+                                                <span className="material-symbols-outlined text-2xl text-amber-400">{pack.icon}</span>
+                                                {pack.popular && <span className="px-2 py-0.5 rounded-full bg-amber-400 text-[10px] font-black uppercase text-slate-900 tracking-wider">Best Value</span>}
                                             </div>
-                                            <div className="mb-6">
-                                                <span className="text-3xl font-black text-white">₹{pack.price}</span>
-                                                <span className="text-slate-500 text-sm ml-1">/ pack</span>
+                                            <h3 className="text-lg font-bold text-white mb-1">{pack.name}</h3>
+                                            <div className="flex items-baseline gap-1 mb-1">
+                                                <span className="text-2xl font-black text-white">₹{pack.price?.toLocaleString()}</span>
                                             </div>
-                                            <ul className="space-y-3 mb-8">
-                                                <li className="flex items-center gap-2 text-sm text-slate-400">
-                                                    <span className="material-symbols-outlined text-amber-400 text-lg">schedule</span>
-                                                    Never expires
-                                                </li>
-                                                <li className="flex items-center gap-2 text-sm text-slate-400">
-                                                    <span className="material-symbols-outlined text-amber-400 text-lg">rocket</span>
-                                                    Instant activation
-                                                </li>
-                                            </ul>
+                                            <div className="space-y-1.5 mb-4">
+                                                <p className="text-sm text-slate-300 font-medium">
+                                                    {pack.credits} credits {pack.bonus > 0 && <span className="text-amber-400 font-bold">+ {pack.bonus} bonus</span>}
+                                                </p>
+                                                {isFirstPurchase && pack.firstPurchaseTotal && (
+                                                    <p className="text-xs text-amber-400 font-bold">→ 2× = {pack.firstPurchaseTotal} credits!</p>
+                                                )}
+                                                <p className="text-xs text-slate-500">₹{pack.perCredit}/credit • 90-day validity</p>
+                                            </div>
                                         </div>
                                         <button
                                             onClick={() => handleTopup(pack)}
-                                            className="w-full py-3 rounded-xl font-bold text-sm bg-white text-slate-900 shadow-lg hover:bg-slate-100 transition-all"
+                                            className="w-full py-2.5 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 transition-all"
                                         >
-                                            Buy for ₹{pack.price}
+                                            Buy Now
                                         </button>
                                     </div>
                                 ))}
                             </div>
                         </div>
+
+                    ) : tab === 'rewards' ? (
+                        /* ══════════ Rewards & Gamification ══════════ */
+                        <div className="space-y-6">
+                            {!rewardStatus ? (
+                                <div className="flex items-center justify-center h-40">
+                                    <div className="size-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Streak Card */}
+                                    <div className="glass-panel rounded-2xl border border-white/[0.08] p-6">
+                                        <h3 className="text-base font-bold text-white flex items-center gap-2 mb-4">
+                                            <span className="material-symbols-outlined text-lg text-orange-400">local_fire_department</span>
+                                            Daily Login Streak
+                                        </h3>
+                                        <div className="flex items-center gap-8">
+                                            <div className="text-center">
+                                                <p className="text-5xl font-black text-orange-400">{rewardStatus.streak?.current || 0}</p>
+                                                <p className="text-sm text-slate-500 font-bold mt-1">day streak</p>
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <span className={`size-3 rounded-full ${rewardStatus.streak?.loggedInToday ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+                                                    <span className="text-sm text-slate-300">{rewardStatus.streak?.loggedInToday ? 'Logged in today ✓' : 'Log in daily to keep streak!'}</span>
+                                                </div>
+                                                <p className="text-xs text-slate-500">
+                                                    2 credits/day • +5 at 7-day streak • +25 at 30-day streak
+                                                </p>
+                                                {rewardStatus.streak?.nextReward && (
+                                                    <p className="text-xs text-amber-400 mt-1">
+                                                        Next bonus: +{rewardStatus.streak.nextReward.bonus} credits at day {rewardStatus.streak.nextReward.at}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Milestones */}
+                                    <div className="glass-panel rounded-2xl border border-white/[0.08] p-6">
+                                        <h3 className="text-base font-bold text-white flex items-center gap-2 mb-4">
+                                            <span className="material-symbols-outlined text-lg text-emerald-400">emoji_events</span>
+                                            First-Time Milestones
+                                            <span className="text-xs text-slate-500 font-normal ml-2">
+                                                {rewardStatus.totalMilestoneCredits} / {rewardStatus.totalMilestoneCredits + rewardStatus.availableMilestoneCredits} credits earned
+                                            </span>
+                                        </h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                            {(rewardStatus.milestones || []).map(m => (
+                                                <div key={m.id}
+                                                    className={`p-4 rounded-xl border transition-all ${m.claimed
+                                                        ? 'bg-emerald-500/5 border-emerald-500/20'
+                                                        : 'bg-white/[0.02] border-white/[0.06] hover:border-white/[0.12]'
+                                                        }`}
+                                                >
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <span className={`material-symbols-outlined text-xl ${m.claimed ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                                            {m.claimed ? 'check_circle' : m.icon}
+                                                        </span>
+                                                        <span className={`text-xs font-bold ${m.claimed ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                                            +{m.credits} cr
+                                                        </span>
+                                                    </div>
+                                                    <p className={`text-sm font-medium ${m.claimed ? 'text-emerald-300' : 'text-slate-300'}`}>{m.label}</p>
+                                                    {!m.claimed && (
+                                                        <button
+                                                            onClick={() => handleClaimMilestone(m.id)}
+                                                            className="mt-2 text-xs text-primary font-bold hover:underline"
+                                                        >
+                                                            Claim Reward →
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Referral */}
+                                    <div className="glass-panel rounded-2xl border border-white/[0.08] p-6">
+                                        <h3 className="text-base font-bold text-white flex items-center gap-2 mb-4">
+                                            <span className="material-symbols-outlined text-lg text-purple-400">group_add</span>
+                                            Referral Program
+                                        </h3>
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            {/* Your code */}
+                                            <div>
+                                                <p className="text-sm text-slate-400 mb-2">Share your code — earn <span className="font-bold text-amber-400">50 credits</span> per friend who subscribes!</p>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] font-mono text-amber-400 font-bold text-sm tracking-wider">
+                                                        {rewardStatus.referral?.code || '—'}
+                                                    </div>
+                                                    <button
+                                                        onClick={() => { navigator.clipboard.writeText(rewardStatus.referral?.code); alert('Copied!') }}
+                                                        className="px-4 py-2.5 rounded-xl bg-primary/10 text-primary font-bold text-sm border border-primary/20 hover:bg-primary/20 transition-all"
+                                                    >
+                                                        <span className="material-symbols-outlined text-lg">content_copy</span>
+                                                    </button>
+                                                </div>
+                                                <p className="text-xs text-slate-500 mt-2">
+                                                    {rewardStatus.referral?.count || 0} referrals • {rewardStatus.referral?.creditsEarned || 0} credits earned
+                                                </p>
+                                            </div>
+
+                                            {/* Apply a code */}
+                                            <div>
+                                                <p className="text-sm text-slate-400 mb-2">Have a referral code? Get <span className="font-bold text-emerald-400">30 bonus credits</span>!</p>
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={referralInput}
+                                                        onChange={e => setReferralInput(e.target.value)}
+                                                        placeholder="Enter code..."
+                                                        className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-primary/40"
+                                                    />
+                                                    <button
+                                                        onClick={handleApplyReferral}
+                                                        className="px-4 py-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 font-bold text-sm border border-emerald-500/20 hover:bg-emerald-500/20 transition-all"
+                                                    >
+                                                        Apply
+                                                    </button>
+                                                </div>
+                                                {referralMsg && <p className="text-xs text-amber-400 mt-2">{referralMsg}</p>}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Top-up Balance Info */}
+                                    {rewardStatus.topUp?.balance > 0 && (
+                                        <div className="glass-panel rounded-2xl border border-white/[0.08] p-4 flex items-center gap-4">
+                                            <span className="material-symbols-outlined text-2xl text-amber-400">account_balance_wallet</span>
+                                            <div>
+                                                <p className="text-sm text-white font-bold">{rewardStatus.topUp.balance} purchased credits</p>
+                                                <p className="text-xs text-slate-500">
+                                                    {rewardStatus.topUp.expired
+                                                        ? '⚠️ Expired — purchase new credits'
+                                                        : `Expires: ${new Date(rewardStatus.topUp.expiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                                                    }
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+
                     ) : tab === 'plans' ? (
                         <div className="space-y-6">
                             {packagesLoading ? (
@@ -382,7 +590,6 @@ export default function CreditsPage() {
                                         const isCurrent = pkg.slug === balance?.plan;
                                         const currentTier = packages.find(p => p.slug === balance?.plan)?.tier || 0;
                                         const isUpgrade = pkg.tier > currentTier;
-                                        const isDowngrade = pkg.tier < currentTier;
 
                                         return (
                                             <div key={pkg._id} className={`glass-panel p-6 rounded-2xl border transition-all hover:scale-[1.02] flex flex-col ${isCurrent ? 'border-primary ring-1 ring-primary/20 bg-primary/5' : 'border-white/[0.08]'}`}>
@@ -393,17 +600,13 @@ export default function CreditsPage() {
                                                     </div>
                                                     <p className="text-sm text-slate-500 mb-6">{pkg.description}</p>
                                                     <div className="mb-6">
-                                                        <span className="text-3xl font-black text-white">{pkg.pricing.currency === 'INR' ? '₹' : '$'}{pkg.pricing.monthly}</span>
+                                                        <span className="text-3xl font-black text-white">{pkg.pricing.currency === 'INR' ? '₹' : '$'}{pkg.pricing.monthly?.toLocaleString()}</span>
                                                         <span className="text-slate-500 text-sm">/mo</span>
                                                     </div>
                                                     <ul className="space-y-3 mb-8">
                                                         <li className="flex items-center gap-2 text-sm text-slate-300">
                                                             <span className="material-symbols-outlined text-primary text-lg">{pkg.credits?.monthly >= 999999 ? 'all_inclusive' : 'check_circle'}</span>
-                                                            {pkg.credits?.monthly >= 999999 ? 'Unlimited' : pkg.credits?.monthly} Credits / mo
-                                                        </li>
-                                                        <li className="flex items-center gap-2 text-sm text-slate-300">
-                                                            <span className="material-symbols-outlined text-primary text-lg">check_circle</span>
-                                                            {pkg.limits?.brands || 1} Brand Profiles
+                                                            {pkg.credits?.monthly >= 999999 ? 'Unlimited' : pkg.credits?.monthly?.toLocaleString()} Credits / mo
                                                         </li>
                                                         {pkg.features?.map((f, j) => (
                                                             <li key={j} className="flex items-center gap-2 text-sm text-slate-300">
@@ -423,7 +626,7 @@ export default function CreditsPage() {
                                                             : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'
                                                         }`}
                                                 >
-                                                    {isCurrent ? 'Current Plan' : isUpgrade ? `Upgrade to ${pkg.name}` : `Downgrade to ${pkg.name}`}
+                                                    {isCurrent ? 'Current Plan' : isUpgrade ? `Upgrade to ${pkg.name}` : `Switch to ${pkg.name}`}
                                                 </button>
                                             </div>
                                         )

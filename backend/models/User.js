@@ -36,6 +36,27 @@ const userSchema = new mongoose.Schema({
         used: { type: Number, default: 0 },
         bonus: { type: Number, default: 0 }, // extra credits from coupons/admin
         resetDate: { type: Date }, // next monthly reset date
+        topUp: { type: Number, default: 0 }, // purchased top-up credits
+        topUpExpiry: { type: Date }, // 90-day expiry for purchased credits
+    },
+
+    // Gamification — daily login streak
+    streak: { type: Number, default: 0 },
+    lastLoginDate: { type: String, default: '' }, // YYYY-MM-DD format for day comparison
+
+    // Referral
+    referralCode: { type: String, unique: true, sparse: true },
+    referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    referralCount: { type: Number, default: 0 },
+
+    // First-time milestone rewards (one-time claims)
+    milestones: {
+        addedBrand: { type: Boolean, default: false },        // +10 cr
+        firstContent: { type: Boolean, default: false },      // +5 cr
+        firstImage: { type: Boolean, default: false },        // +5 cr
+        firstVideo: { type: Boolean, default: false },        // +10 cr
+        connectedSocial: { type: Boolean, default: false },   // +5 cr
+        invitedTeam: { type: Boolean, default: false },       // +15 cr
     },
 
     // Active subscription
@@ -73,10 +94,12 @@ const userSchema = new mongoose.Schema({
     queueNumber: { type: Number },
 }, { timestamps: true });
 
-// Virtual: remaining credits
+// Virtual: remaining credits (includes non-expired top-up)
 userSchema.virtual('creditsRemaining').get(function () {
-    if (this.role === 'superadmin' || this.plan === 'enterprise' || (this.credits?.total >= 999999)) return Infinity;
-    return Math.max(0, (this.credits.total + this.credits.bonus) - this.credits.used);
+    if (this.role === 'superadmin' || this.plan === 'enterprise') return Infinity;
+    const topUp = (this.credits.topUp > 0 && this.credits.topUpExpiry && new Date(this.credits.topUpExpiry) > new Date())
+        ? this.credits.topUp : 0;
+    return Math.max(0, (this.credits.total + this.credits.bonus + topUp) - this.credits.used);
 });
 
 userSchema.set('toJSON', { virtuals: true });

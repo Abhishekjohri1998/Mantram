@@ -1859,11 +1859,21 @@ router.get('/pricing-calculator', async (req, res) => {
 
 export const creditRouter = Router();
 
-creditRouter.get('/balance', protect, async (req, res) => {
+// Import daily reward middleware
+import { trackDailyLogin } from '../middleware/dailyReward.js';
+
+creditRouter.get('/balance', protect, trackDailyLogin, async (req, res) => {
     try {
         const user = await User.findById(req.user._id);
         const costs = await getCreditCosts();
-        res.json({ success: true, ...getCreditBalance(user), plan: user.plan, costs });
+        res.json({
+            success: true,
+            ...getCreditBalance(user),
+            plan: user.plan,
+            costs,
+            streak: user.streak || 0,
+            dailyReward: req.dailyReward || null, // From trackDailyLogin middleware
+        });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
