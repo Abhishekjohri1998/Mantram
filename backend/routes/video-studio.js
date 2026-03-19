@@ -540,7 +540,7 @@ router.post('/ugc/voice-clone/upload', protect, audioUpload.single('audio'), asy
 // ══════════════════════════════════════════════════════════════════════════════
 const FAL_QUEUE_URL = 'https://queue.fal.run';
 
-router.post('/ugc/voice-clone/clone', protect, async (req, res) => {
+router.post('/ugc/voice-clone/clone', protect, requireCredits('voiceClone'), async (req, res) => {
     try {
         const { audioUrl, name, language, gender, brandId } = req.body;
         if (!audioUrl) return res.status(400).json({ success: false, error: 'Audio URL is required' });

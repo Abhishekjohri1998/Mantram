@@ -600,7 +600,7 @@ Respond in STRICT JSON:
 //  2. GENERATE CALENDAR — Monthly Content Calendar
 // ════════════════════════════════════════════════════════════════
 
-router.post('/generate-calendar', protect, requireStudio('socialMediaStudio'), requireCredits('socialMedia'), async (req, res) => {
+router.post('/generate-calendar', protect, requireStudio('socialMediaStudio'), requireCredits('socialMediaCalendar'), async (req, res) => {
     try {
         const { platforms, month, year, brand, themes, postsPerWeek } = req.body;
         if (!platforms?.length) return res.status(400).json({ success: false, error: 'Select at least one platform' });
@@ -690,7 +690,7 @@ Respond in STRICT JSON:
 //  3. ACCOUNT AUDIT — AI Health Check
 // ════════════════════════════════════════════════════════════════
 
-router.post('/account-audit', protect, requireStudio('socialMediaStudio'), requireCredits('socialMedia'), async (req, res) => {
+router.post('/account-audit', protect, requireStudio('socialMediaStudio'), requireCredits('socialMediaAudit'), async (req, res) => {
     try {
         const { platform, metrics, brand } = req.body;
         if (!platform) return res.status(400).json({ success: false, error: 'Platform is required' });
@@ -800,7 +800,7 @@ Respond in STRICT JSON:
 //  4. COMPETITOR ANALYSIS — AI Competitor Intelligence
 // ════════════════════════════════════════════════════════════════
 
-router.post('/competitor-analysis', protect, requireStudio('socialMediaStudio'), requireCredits('socialMedia'), async (req, res) => {
+router.post('/competitor-analysis', protect, requireStudio('socialMediaStudio'), requireCredits('socialMediaCompetitor'), async (req, res) => {
     try {
         const { competitors, platforms, brand } = req.body;
         if (!competitors?.length) return res.status(400).json({ success: false, error: 'Add at least one competitor' });
@@ -952,7 +952,7 @@ const PLATFORM_RUBRICS = {
     }
 };
 
-router.post('/profile-score', protect, requireStudio('socialMediaStudio'), requireCredits('socialMedia'), async (req, res) => {
+router.post('/profile-score', protect, requireStudio('socialMediaStudio'), requireCredits('socialMediaScore'), async (req, res) => {
     try {
         const { platform, profileData, brand } = req.body;
         if (!platform) return res.status(400).json({ success: false, error: 'Platform is required' });

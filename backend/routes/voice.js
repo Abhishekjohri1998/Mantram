@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { optionalAuth } from '../middleware/auth.js';
+import { protect, optionalAuth } from '../middleware/auth.js';
+import { requireCredits } from '../middleware/credits.js';
 import multer from 'multer';
 import { safeErrorMessage } from '../utils/safeError.js';
 
@@ -63,7 +64,7 @@ const WHISPER_LANGUAGES = {
  *   - Indian languages → Sarvam AI (Saaras v3) — best for Hindi, Tamil, Telugu etc.
  *   - English & foreign → OpenAI Whisper — best for global languages
  */
-router.post('/transcribe', optionalAuth, upload.single('audio'), async (req, res) => {
+router.post('/transcribe', protect, requireCredits('voiceTranscribe'), upload.single('audio'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ success: false, error: 'No audio file provided' });

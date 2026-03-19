@@ -356,7 +356,7 @@ router.post('/:id/rate', protect, async (req, res) => {
 // EXECUTE SKILL — The core engine
 // ============================================================================
 
-router.post('/:id/execute', protect, async (req, res) => {
+router.post('/:id/execute', protect, requireCredits('content'), async (req, res) => {
     try {
         const { inputs, brandId } = req.body;
 
@@ -487,7 +487,7 @@ router.post('/:id/execute', protect, async (req, res) => {
 // AI SKILL GENERATOR — Create skills via AI
 // ============================================================================
 
-router.post('/generate', protect, async (req, res) => {
+router.post('/generate', protect, requireCredits('contentRefine'), async (req, res) => {
     try {
         const { prompt } = req.body;
         if (!prompt?.trim()) return res.status(400).json({ success: false, error: 'Describe the skill you want to create' });
@@ -535,7 +535,7 @@ Make the skill highly specific to D2C marketing in India. Include Hinglish suppo
 // ENHANCE INSTRUCTIONS — Polish rough instructions with AI
 // ============================================================================
 
-router.post('/enhance-instructions', protect, async (req, res) => {
+router.post('/enhance-instructions', protect, requireCredits('contentRefine'), async (req, res) => {
     try {
         const { instructions, skillName, skillDescription } = req.body;
         if (!instructions?.trim()) return res.status(400).json({ success: false, error: 'Instructions text is required' });

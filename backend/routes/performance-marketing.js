@@ -181,7 +181,7 @@ router.get('/reports/:id', protect, async (req, res) => {
  * POST /api/pm-studio/strategy
  * Generate or refine a marketing strategy
  */
-router.post('/strategy', protect, async (req, res) => {
+router.post('/strategy', protect, requireCredits('adCreative'), async (req, res) => {
     try {
         const { reportId, query, objective, goals, budget, currency, duration, platforms, brandId, targetAudience, targetGeo, customKeywords } = req.body;
 
@@ -227,7 +227,7 @@ router.post('/strategy', protect, async (req, res) => {
  * POST /api/pm-studio/budget
  * Generate a budget plan
  */
-router.post('/budget', protect, async (req, res) => {
+router.post('/budget', protect, requireCredits('brainstorm'), async (req, res) => {
     try {
         const { reportId, budget, currency, duration, objective, brandId } = req.body;
 
@@ -421,7 +421,7 @@ router.post('/campaigns/:id/ab-test', protect, async (req, res) => {
  * POST /api/pm-studio/analyze
  * Run AI performance analysis on campaign data
  */
-router.post('/analyze', protect, async (req, res) => {
+router.post('/analyze', protect, requireCredits('adCreative'), async (req, res) => {
     try {
         const { campaignIds, brandId, dateRange } = req.body;
 
@@ -475,7 +475,7 @@ router.post('/analyze', protect, async (req, res) => {
  * POST /api/pm-studio/report
  * Generate an executive report
  */
-router.post('/report', protect, async (req, res) => {
+router.post('/report', protect, requireCredits('adCreative'), async (req, res) => {
     try {
         const { reportId, brandId } = req.body;
 
@@ -516,7 +516,7 @@ router.post('/report', protect, async (req, res) => {
  * POST /api/pm-studio/generate-creatives
  * AI-generate ad creatives for a campaign
  */
-router.post('/generate-creatives', protect, async (req, res) => {
+router.post('/generate-creatives', protect, requireCredits('adCreative'), async (req, res) => {
     try {
         const { objective, platforms, reportId, brandId, direction } = req.body;
 
