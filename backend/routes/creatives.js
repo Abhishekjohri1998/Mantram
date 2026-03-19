@@ -144,7 +144,7 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
                 model: modelId,
                 contents,
                 config: {
-                    responseModalities: ['TEXT', 'IMAGE'],
+                    responseModalities: ['IMAGE'],
                     temperature,
                     imageConfig: {
                         aspectRatio,

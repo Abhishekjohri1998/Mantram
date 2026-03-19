@@ -92,7 +92,7 @@ export class GeminiProvider extends BaseProvider {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     contents: [{ role: 'user', parts: [{ text: `Generate an image: ${prompt}` }] }],
-                    generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+                    generationConfig: { responseModalities: ['IMAGE'] },
                 }),
             });
 
