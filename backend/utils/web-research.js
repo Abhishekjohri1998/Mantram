@@ -1218,20 +1218,29 @@ export async function researchDomain(baseUrl) {
 
     console.log(`🕷️  Initial crawl queue: ${toCrawl.length} pages (sitemap: ${sitemap.found ? sitemap.count : 0}, robots: ${robotsTxt.found})`);
 
-    // PHASE 3: Crawl with recursive link discovery (batch size 8)
+    // PHASE 3: Crawl with recursive link discovery
     const allSubPages = [];
-    const BATCH_SIZE = _cfNeeded ? 6 : 12; // Smaller batches for CF sites to avoid 429
-    const BATCH_DELAY = _cfNeeded ? 300 : 50; // Longer delay for CF sites
+    const BATCH_SIZE = _cfNeeded ? 6 : 12;
+    const BATCH_DELAY = _cfNeeded ? 300 : 50;
     let queueIndex = 0;
-    const allFailedUrls = []; // Track failed URLs for Playwright re-crawl
+    const allFailedUrls = [];
+    let consecutiveFailedBatches = 0; // Track consecutive all-fail batches for early bail
 
     while (queueIndex < toCrawl.length) {
-        // Safety: stop if we hit timeout or max pages
         if (Date.now() - crawlStartTime > CRAWL_TIMEOUT_MS) {
             console.log(`🕷️  Crawl timeout (${CRAWL_TIMEOUT_MS / 1000}s) — stopping with ${allSubPages.length + 1} pages`);
             break;
         }
         if (allSubPages.length + 1 >= MAX_PAGES) break;
+
+        // EARLY BAIL: if 3 consecutive batches had 0 success, site is clearly rate-limiting — skip to Playwright
+        if (consecutiveFailedBatches >= 3 && allFailedUrls.length > 30) {
+            const remaining = toCrawl.length - queueIndex;
+            console.log(`🕷️  Early bail: ${consecutiveFailedBatches} consecutive failed batches — skipping ${remaining} remaining URLs (will use Playwright)`);
+            // Add ALL remaining URLs to failed list for Playwright re-crawl
+            allFailedUrls.push(...toCrawl.slice(queueIndex));
+            break;
+        }
 
         const batch = toCrawl.slice(queueIndex, queueIndex + BATCH_SIZE);
         queueIndex += BATCH_SIZE;
@@ -1245,17 +1254,23 @@ export async function researchDomain(baseUrl) {
         allSubPages.push(...successPages);
         allFailedUrls.push(...failedBatch.map(p => p.url).filter(Boolean));
 
-        // Recursive discovery: extract internal links from newly crawled pages and add to queue
+        // Track consecutive failures for early bail
+        if (successPages.length === 0) {
+            consecutiveFailedBatches++;
+        } else {
+            consecutiveFailedBatches = 0;
+        }
+
+        // Recursive discovery
         for (const page of successPages) {
             const pageLinks = page.links?.internal || [];
             for (const link of pageLinks) {
                 if (crawled.size >= MAX_PAGES) break;
                 if (!isCrawlable(link)) continue;
-                try { enqueue(new URL(link, cleanBase).href); } catch { /* skip */ }
+                try { enqueue(new URL(link, cleanBase).href); } catch {}
             }
         }
 
-        // Rate limit: delay between batches to avoid 429
         if (queueIndex < toCrawl.length) await new Promise(r => setTimeout(r, BATCH_DELAY));
     }
 
@@ -1302,132 +1317,114 @@ export async function researchDomain(baseUrl) {
                     } catch { /* skip cookie injection */ }
                 }
 
-                const page = await ctx.newPage();
-                // Block heavy resources to speed up
-                await page.route('**/*', (route) => {
-                    const type = route.request().resourceType();
-                    if (['image', 'media', 'font', 'stylesheet'].includes(type)) {
-                        route.abort().catch(() => {});
-                    } else {
-                        route.continue().catch(() => {});
-                    }
-                });
-
-                const PW_BATCH_LIMIT = 300;
-                const PW_PAGE_TIMEOUT = 8000;
-                const PW_TOTAL_TIMEOUT = 120000; // 2 minutes
+                // Use N_TABS parallel pages for speed
+                const N_TABS = 4;
+                const PW_BATCH_LIMIT = 600;
+                const PW_PAGE_TIMEOUT = 6000;
+                const PW_TOTAL_TIMEOUT = 120000;
                 const pwStart = Date.now();
                 let pwSuccess = 0;
 
+                // Create multiple page tabs for parallel crawling
+                const tabs = [];
+                for (let t = 0; t < N_TABS; t++) {
+                    const p = await ctx.newPage();
+                    await p.route('**/*', (route) => {
+                        const type = route.request().resourceType();
+                        if (['image', 'media', 'font', 'stylesheet'].includes(type)) {
+                            route.abort().catch(() => {});
+                        } else {
+                            route.continue().catch(() => {});
+                        }
+                    });
+                    tabs.push(p);
+                }
+
                 const urlsToReCrawl = allFailedUrls.slice(0, PW_BATCH_LIMIT);
-                for (let i = 0; i < urlsToReCrawl.length; i++) {
+
+                // Process URLs in parallel batches of N_TABS
+                for (let i = 0; i < urlsToReCrawl.length; i += N_TABS) {
                     if (Date.now() - pwStart > PW_TOTAL_TIMEOUT) {
                         console.log(`🖥️  Playwright re-crawl timeout (120s) — got ${pwSuccess} pages`);
                         break;
                     }
-                    const url = urlsToReCrawl[i];
-                    try {
-                        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: PW_PAGE_TIMEOUT });
-                        await page.waitForTimeout(1500); // Let JS render
 
-                        const pageData = await page.evaluate(() => {
-                            const title = document.title || '';
-                            const metaDesc = document.querySelector('meta[name="description"]')?.content || '';
-                            const h1Elements = document.querySelectorAll('h1');
-                            const h1 = Array.from(h1Elements).map(h => h.textContent?.trim()).filter(t => t && t.length > 0);
-                            const h2Elements = document.querySelectorAll('h2');
-                            const h2 = Array.from(h2Elements).map(h => h.textContent?.trim()).filter(t => t && t.length > 0);
-                            // Word count from body text
-                            const bodyText = document.body?.innerText || '';
-                            const wordCount = bodyText.split(/\s+/).filter(w => w.length > 1).length;
-                            // Images
-                            const imgs = document.querySelectorAll('img');
-                            let imgTotal = 0, imgNoAlt = 0;
-                            const srcsMissingAlt = [];
-                            imgs.forEach(img => {
-                                const src = img.src || img.getAttribute('src') || '';
-                                if (!src || src.startsWith('data:') || src === '#') return;
-                                if (img.width < 3 || img.height < 3) return;
-                                imgTotal++;
-                                if (!(img.alt || '').trim()) {
-                                    imgNoAlt++;
-                                    srcsMissingAlt.push(src);
-                                }
+                    const chunk = urlsToReCrawl.slice(i, i + N_TABS);
+                    const chunkResults = await Promise.all(chunk.map(async (url, idx) => {
+                        const tab = tabs[idx % tabs.length];
+                        try {
+                            await tab.goto(url, { waitUntil: 'domcontentloaded', timeout: PW_PAGE_TIMEOUT });
+                            await tab.waitForTimeout(800);
+
+                            const pageData = await tab.evaluate(() => {
+                                const title = document.title || '';
+                                const metaDesc = document.querySelector('meta[name="description"]')?.content || '';
+                                const h1 = Array.from(document.querySelectorAll('h1')).map(h => h.textContent?.trim()).filter(t => t && t.length > 0);
+                                const h2 = Array.from(document.querySelectorAll('h2')).map(h => h.textContent?.trim()).filter(t => t && t.length > 0);
+                                const bodyText = document.body?.innerText || '';
+                                const wordCount = bodyText.split(/\s+/).filter(w => w.length > 1).length;
+                                const imgs = document.querySelectorAll('img');
+                                let imgTotal = 0, imgNoAlt = 0;
+                                const srcsMissingAlt = [];
+                                imgs.forEach(img => {
+                                    const src = img.src || img.getAttribute('src') || '';
+                                    if (!src || src.startsWith('data:') || src === '#') return;
+                                    if (img.width < 3 || img.height < 3) return;
+                                    imgTotal++;
+                                    if (!(img.alt || '').trim()) { imgNoAlt++; srcsMissingAlt.push(src); }
+                                });
+                                const links = [];
+                                document.querySelectorAll('a[href]').forEach(a => {
+                                    try { const href = new URL(a.href, location.origin).href; if (href.startsWith(location.origin)) links.push(href); } catch {}
+                                });
+                                const canonical = document.querySelector('link[rel="canonical"]')?.href || '';
+                                return { title, metaDesc, h1, h2, wordCount, imgTotal, imgNoAlt, srcsMissingAlt, links, canonical, bodyText: bodyText.substring(0, 500) };
                             });
-                            // Internal links
-                            const links = [];
-                            document.querySelectorAll('a[href]').forEach(a => {
-                                try {
-                                    const href = new URL(a.href, location.origin).href;
-                                    if (href.startsWith(location.origin)) links.push(href);
-                                } catch {}
-                            });
-                            const canonical = document.querySelector('link[rel="canonical"]')?.href || '';
-                            return { title, metaDesc, h1, h2, wordCount, imgTotal, imgNoAlt, srcsMissingAlt, links, canonical, bodyText: bodyText.substring(0, 500) };
-                        });
 
-                        // Check if this is a soft-404
-                        const titleLower = (pageData.title || '').toLowerCase();
-                        const isSoft404 = titleLower === '404' || titleLower === '404 not found' ||
-                            titleLower === 'page not found' || titleLower === 'not found' ||
-                            (pageData.h1.length === 1 && /^(404|page not found|not found)$/i.test(pageData.h1[0]));
+                            const titleLower = (pageData.title || '').toLowerCase();
+                            const isSoft404 = titleLower === '404' || titleLower === '404 not found' ||
+                                titleLower === 'page not found' || titleLower === 'not found' ||
+                                (pageData.h1.length === 1 && /^(404|page not found|not found)$/i.test(pageData.h1[0]));
 
-                        const pwPage = {
-                            url,
-                            success: true,
-                            isSoft404,
-                            jsRendered: true,
-                            statusCode: 200,
-                            responseTimeMs: 0,
-                            pageSizeBytes: 0,
-                            pageSizeKB: 0,
-                            title: pageData.title,
-                            metaDescription: pageData.metaDesc,
-                            canonical: pageData.canonical,
-                            headings: [
-                                ...pageData.h1.map(t => ({ level: 1, text: t })),
-                                ...pageData.h2.map(t => ({ level: 2, text: t })),
-                            ],
-                            h1: pageData.h1,
-                            h2: pageData.h2,
-                            h3: [],
-                            images: { total: pageData.imgTotal, withAlt: pageData.imgTotal - pageData.imgNoAlt, withoutAlt: pageData.imgNoAlt, srcsMissingAlt: pageData.srcsMissingAlt },
-                            wordCount: pageData.wordCount,
-                            contentSnippet: pageData.bodyText,
-                            bodyTextFull: pageData.bodyText,
-                            textToHtmlRatio: 50, // approximate for rendered pages
-                            links: { internal: pageData.links, external: [] },
-                            internalLinkCount: pageData.links.length,
-                            externalLinkCount: 0,
-                            titleLength: (pageData.title || '').length,
-                            metaDescLength: (pageData.metaDesc || '').length,
-                            viewport: 'width=device-width',
-                        };
-
-                        allSubPages.push(pwPage);
-                        pwSuccess++;
-
-                        // Discover links from Playwright-crawled pages too
-                        for (const link of pageData.links) {
-                            if (crawled.size >= MAX_PAGES) break;
-                            if (!isCrawlable(link)) continue;
-                            try { enqueue(new URL(link, cleanBase).href); } catch {}
+                            return {
+                                url, success: true, isSoft404, jsRendered: true,
+                                statusCode: 200, responseTimeMs: 0, pageSizeBytes: 0, pageSizeKB: 0,
+                                title: pageData.title, metaDescription: pageData.metaDesc, canonical: pageData.canonical,
+                                headings: [...pageData.h1.map(t => ({ level: 1, text: t })), ...pageData.h2.map(t => ({ level: 2, text: t }))],
+                                h1: pageData.h1, h2: pageData.h2, h3: [],
+                                images: { total: pageData.imgTotal, withAlt: pageData.imgTotal - pageData.imgNoAlt, withoutAlt: pageData.imgNoAlt, srcsMissingAlt: pageData.srcsMissingAlt },
+                                wordCount: pageData.wordCount, contentSnippet: pageData.bodyText, bodyTextFull: pageData.bodyText,
+                                textToHtmlRatio: 50, links: { internal: pageData.links, external: [] },
+                                internalLinkCount: pageData.links.length, externalLinkCount: 0,
+                                titleLength: (pageData.title || '').length, metaDescLength: (pageData.metaDesc || '').length,
+                                viewport: 'width=device-width',
+                            };
+                        } catch {
+                            return null;
                         }
-                    } catch {
-                        // Timeout or error — skip
-                    }
+                    }));
 
-                    // Small delay between pages to be polite
-                    if (i % 4 === 3) await new Promise(r => setTimeout(r, 200));
+                    for (const result of chunkResults) {
+                        if (result && result.success) {
+                            allSubPages.push(result);
+                            pwSuccess++;
+                            // Discover links
+                            for (const link of (result.links?.internal || [])) {
+                                if (crawled.size >= MAX_PAGES) break;
+                                if (!isCrawlable(link)) continue;
+                                try { enqueue(new URL(link, cleanBase).href); } catch {}
+                            }
+                        }
+                    }
                 }
 
-                await page.close().catch(() => {});
+                for (const t of tabs) await t.close().catch(() => {});
                 await ctx.close().catch(() => {});
                 await browser.close().catch(() => {});
                 const pwElapsed = ((Date.now() - pwStart) / 1000).toFixed(1);
-                console.log(`🖥️  Playwright re-crawl complete: ${pwSuccess} pages recovered in ${pwElapsed}s`);
+                console.log(`🖥️  Playwright re-crawl complete: ${pwSuccess} pages recovered in ${pwElapsed}s (${N_TABS} parallel tabs)`);
 
-                // Rebuild allPages with the new Playwright results
+                // Rebuild allPages
                 allPages.length = 0;
                 allPages.push(homepage, ...allSubPages);
             } catch (pwErr) {
