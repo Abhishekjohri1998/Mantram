@@ -383,7 +383,7 @@ Average text-to-HTML ratio: ${siMetrics.avgTextToHtmlRatio || 0}%
     // Strict Global Request Budget of 27 seconds to stay under CloudFront's 30s limit
     const routeStartTime = req._routeStartTime || (Date.now() - 15000); // Approximate 15s crawl if req._routeStartTime isn't set
     const elapsed = Date.now() - routeStartTime;
-    const globalBudget = 55000;
+    const globalBudget = 110000;
     const remainingBudget = Math.max(5000, globalBudget - elapsed); // Give AI at least 5s
     
     console.log(`⏱️ Crawl + research complete (${siMetrics.totalPages || siteResearch?.pages?.length || 0} pages). Elapsed: ${elapsed}ms. AI Budget: ${remainingBudget}ms`);
@@ -451,10 +451,10 @@ Respond in STRICT JSON:
   "crawlSummary": "What the live crawl revealed"
 }
 
-Generate 3-6 critical, high-impact issues. Be STRATEGIC — every issue must have a 'whyItMatters' that connects to business outcomes. Keep descriptions incredibly concise to ensure fast generation! Think like a consultant, not a checklist tool.`;
+Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must have a 'whyItMatters' that connects to business outcomes. Think like a consultant, not a checklist tool.`;
 
     const userPrompt = `Analyze site: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 2000, timeout: remainingBudget });
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget });
     // Log token usage from this AI call
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: req.creditAction || 'seoHealthCheck', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
