@@ -13,6 +13,13 @@ class Orchestrator {
     }
 
     /**
+     * Backward compatibility: expose the underlying model router
+     */
+    get router() {
+        return this.smartRouter.modelRouter;
+    }
+
+    /**
      * Generate text content — full agentic pipeline
      */
     async generateContent({ brand, user, type, prompt, platform, options = {}, toneSettings = {} }) {
