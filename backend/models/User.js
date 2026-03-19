@@ -14,17 +14,22 @@ const userSchema = new mongoose.Schema({
     organization: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     teamRole: { type: String, enum: ['owner', 'manager', 'member', ''], default: '' },
 
-    // Per-studio access (for team members)
+    // Per-studio access overrides (SuperAdmin can grant/revoke per-user)
+    // undefined = no override (use portal/plan defaults)
+    // true = explicitly granted
+    // false = explicitly revoked
     studioAccess: {
-        contentStudio: { type: Boolean, default: true },
-        creativeStudio: { type: Boolean, default: true },
-        seoStudio: { type: Boolean, default: true },
-        brainstormStudio: { type: Boolean, default: true },
-        videoStudio: { type: Boolean, default: true },
-        d2cAnalytics: { type: Boolean, default: false },
-        adStudio: { type: Boolean, default: false },
-        smartCalendar: { type: Boolean, default: true },
-        conversationStudio: { type: Boolean, default: false },
+        contentStudio: { type: Boolean },
+        creativeStudio: { type: Boolean },
+        seoStudio: { type: Boolean },
+        brainstormStudio: { type: Boolean },
+        videoStudio: { type: Boolean },
+        socialMediaStudio: { type: Boolean },
+        conversationStudio: { type: Boolean },
+        adStudio: { type: Boolean },
+        funnelStudio: { type: Boolean },
+        d2cAnalytics: { type: Boolean },
+        skillsHub: { type: Boolean },
     },
 
     // Which brands this team member can access

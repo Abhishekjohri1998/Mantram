@@ -17,10 +17,12 @@ const teamInviteSchema = new mongoose.Schema({
         seoStudio: { type: Boolean, default: false },
         brainstormStudio: { type: Boolean, default: false },
         videoStudio: { type: Boolean, default: false },
-        d2cAnalytics: { type: Boolean, default: false },
-        adStudio: { type: Boolean, default: false },
-        smartCalendar: { type: Boolean, default: false },
+        socialMediaStudio: { type: Boolean, default: false },
         conversationStudio: { type: Boolean, default: false },
+        adStudio: { type: Boolean, default: false },
+        funnelStudio: { type: Boolean, default: false },
+        d2cAnalytics: { type: Boolean, default: false },
+        skillsHub: { type: Boolean, default: false },
     },
 
     // Which brands this member can access

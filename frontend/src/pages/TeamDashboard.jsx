@@ -12,10 +12,12 @@ const STUDIO_LABELS = {
     seoStudio: { label: 'SEO Studio', icon: 'travel_explore', color: '#f59e0b' },
     brainstormStudio: { label: 'Brainstorm', icon: 'psychology', color: '#8b5cf6' },
     videoStudio: { label: 'Video Studio', icon: 'movie', color: '#06b6d4' },
-    d2cAnalytics: { label: 'D2C Studio', icon: 'storefront', color: '#14b8a6' },
-    adStudio: { label: 'Performance Studio', icon: 'monitoring', color: '#f43f5e' },
-    smartCalendar: { label: 'Calendar', icon: 'calendar_month', color: '#a855f7' },
+    socialMediaStudio: { label: 'Social Media', icon: 'share', color: '#a855f7' },
     conversationStudio: { label: 'Conversations', icon: 'forum', color: '#3b82f6' },
+    adStudio: { label: 'Performance Studio', icon: 'monitoring', color: '#f43f5e' },
+    funnelStudio: { label: 'Funnel Studio', icon: 'filter_alt', color: '#f97316' },
+    d2cAnalytics: { label: 'D2C Studio', icon: 'storefront', color: '#14b8a6' },
+    skillsHub: { label: 'Skills Hub', icon: 'auto_awesome', color: '#eab308' },
 }
 
 const TABS = [

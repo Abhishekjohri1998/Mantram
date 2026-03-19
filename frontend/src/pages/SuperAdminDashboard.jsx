@@ -1988,19 +1988,24 @@ export default function SuperAdminDashboard() {
                                         <div className="space-y-2">
                                             {studioKeys.map(key => {
                                                 const status = studioVisibility[key] || 'public';
-                                                const colors = { public: 'emerald', private: 'amber', hidden: 'rose' };
-                                                const c = colors[status];
+                                                const rowBorder = { public: 'border-emerald-500/20', private: 'border-amber-500/20', hidden: 'border-rose-500/20' };
+                                                const dotColor = { public: 'bg-emerald-500', private: 'bg-amber-500', hidden: 'bg-rose-500' };
+                                                const activeClasses = {
+                                                    public: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40',
+                                                    private: 'bg-amber-500/20 text-amber-400 border border-amber-500/40',
+                                                    hidden: 'bg-rose-500/20 text-rose-400 border border-rose-500/40',
+                                                };
                                                 return (
-                                                    <div key={key} className={`flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.02] border border-${c}-500/20 transition-all`}>
+                                                    <div key={key} className={`flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.02] border ${rowBorder[status]} transition-all`}>
                                                         <div className="flex items-center gap-3">
-                                                            <span className={`w-2.5 h-2.5 rounded-full bg-${c}-500`} />
+                                                            <span className={`w-2.5 h-2.5 rounded-full ${dotColor[status]}`} />
                                                             <span className="text-sm font-bold text-white">{studioLabels[key] || key}</span>
                                                         </div>
                                                         <div className="flex gap-1">
                                                             {['public', 'private', 'hidden'].map(state => (
                                                                 <button key={state} onClick={() => handleStudioVisibilityChange(key, state)}
                                                                     className={`px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${status === state
-                                                                        ? `bg-${colors[state]}-500/20 text-${colors[state]}-400 border border-${colors[state]}-500/40`
+                                                                        ? activeClasses[state]
                                                                         : 'text-slate-600 hover:text-slate-400 border border-transparent'
                                                                     }`}
                                                                 >

@@ -90,10 +90,12 @@ export default function JoinTeam() {
         seoStudio: { name: 'SEO Studio', icon: 'search' },
         brainstormStudio: { name: 'Brainstorm Studio', icon: 'psychology' },
         videoStudio: { name: 'Video Studio', icon: 'videocam' },
-        d2cAnalytics: { name: 'D2C Studio', icon: 'storefront' },
-        adStudio: { name: 'Performance Studio', icon: 'ads_click' },
-        smartCalendar: { name: 'Smart Calendar', icon: 'calendar_month' },
+        socialMediaStudio: { name: 'Social Media Studio', icon: 'share' },
         conversationStudio: { name: 'Conversation Studio', icon: 'forum' },
+        adStudio: { name: 'Performance Studio', icon: 'ads_click' },
+        funnelStudio: { name: 'Funnel Studio', icon: 'filter_alt' },
+        d2cAnalytics: { name: 'D2C Studio', icon: 'storefront' },
+        skillsHub: { name: 'Skills Hub', icon: 'auto_awesome' },
     };
 
     const grantedStudios = invite?.studioAccess
