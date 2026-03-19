@@ -15,32 +15,42 @@ function isBotChallengePage(html) {
   if (!html || html.length < 100) return false;
   const lowerHtml = html.toLowerCase();
   
-  // Check the <title> — Cloudflare challenge pages have very specific titles
+  // Check the <title> — Cloudflare/bot challenge pages have specific titles
   const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   const title = (titleMatch?.[1] || '').trim().toLowerCase();
   
-  // HIGH-CONFIDENCE challenge titles — must also have CF markers in the body
-  // to avoid false positives on legitimate pages with similar titles
+  // Known challenge page titles (Cloudflare + similar WAFs)
   const cfChallengeTitles = [
     'just a moment...',
     'checking if the site connection is secure',
+    'verifying your connection',                     // NEW: seen in acwo.com logs
+    'attention required',                            // NEW: Cloudflare variant
+    'one more step',                                 // NEW: Cloudflare variant
+    'access denied',
+    'please wait...',
+    'checking your browser',
   ];
   
   // Cloudflare-specific HTML markers (only present on actual challenge pages)
   const hasCfMarkers = lowerHtml.includes('cf_chl_opt') ||
                        lowerHtml.includes('cf-challenge-running') ||
                        lowerHtml.includes('cf-browser-verification') ||
-                       lowerHtml.includes('cdn-cgi/challenge-platform');
+                       lowerHtml.includes('cdn-cgi/challenge-platform') ||
+                       lowerHtml.includes('_cf_chl_tk') ||
+                       lowerHtml.includes('challenge-form');
   
-  // Title match + CF markers = definitely a challenge page
+  // Title match + CF markers = definitely a challenge
   if (cfChallengeTitles.some(ct => title.includes(ct)) && hasCfMarkers) return true;
   
-  // CF markers alone (without title) = also a challenge page
+  // CF markers combo = definitely a challenge (even without title match)
   if (lowerHtml.includes('cf-challenge-running') && lowerHtml.includes('cf_chl_opt')) return true;
   if (lowerHtml.includes('cf-browser-verification') && lowerHtml.includes('cdn-cgi/challenge-platform')) return true;
   
-  // Very short page with CF title = challenge (no real content)
-  if (cfChallengeTitles.some(ct => title.includes(ct)) && html.length < 20000) return true;
+  // Challenge title + short/empty page = challenge (no real content on these pages)
+  if (cfChallengeTitles.some(ct => title.includes(ct)) && html.length < 50000) return true;
+  
+  // Fallback: title exactly matches + page has very few visible words (challenge pages are mostly JS)
+  if (cfChallengeTitles.some(ct => title === ct)) return true;
   
   return false;
 }
@@ -349,16 +359,18 @@ function extractImages(html) {
         const height = parseInt(getAttr(tag, 'height') || '999', 10);
 
         // Skip tracking pixels, spacers, beacons, data URIs, hidden images
-        if (width < 3 || height < 3) continue; // 1×1 or 2×2 tracking pixels
-        if (src.startsWith('data:')) continue; // inline data URIs (icons, placeholders)
+        if (width < 3 || height < 3) continue;
+        if (src.startsWith('data:')) continue;
         if (/pixel|beacon|track|spacer|blank\.gif|1x1|transparent/i.test(src)) continue;
         if (/aria-hidden\s*=\s*["']true["']/i.test(tag)) continue;
         if (/display\s*:\s*none|visibility\s*:\s*hidden/i.test(getAttr(tag, 'style') || '')) continue;
-        if (!src || src === '#') continue; // no real source
+        if (!src || src === '#') continue;
 
         imgs.push({ src, hasAlt: alt.trim().length > 0 });
     }
-    return { total: imgs.length, withAlt: imgs.filter(i => i.hasAlt).length, withoutAlt: imgs.filter(i => !i.hasAlt).length };
+    // Return src URLs of images missing alt for cross-page dedup
+    const srcsMissingAlt = imgs.filter(i => !i.hasAlt).map(i => i.src);
+    return { total: imgs.length, withAlt: imgs.filter(i => i.hasAlt).length, withoutAlt: srcsMissingAlt.length, srcsMissingAlt };
 }
 
 function extractCanonical(html) {
@@ -595,6 +607,18 @@ export async function crawlPage(url) {
         const bodyText = getBodyText(html);
         const wordCount = getWordCount(bodyText);
 
+        // ── Soft-404 detection (SPA sites return 200 with a 404 page body) ──
+        const titleLower = (meta.title || '').toLowerCase().trim();
+        const h1Texts = headings.filter(h => h.level === 1).map(h => h.text.trim());
+        const isSoft404 = (
+            titleLower === '404' ||
+            titleLower === '404 not found' ||
+            titleLower === 'page not found' ||
+            titleLower === 'not found' ||
+            (h1Texts.length === 1 && /^(404|page not found|not found)$/i.test(h1Texts[0])) ||
+            (titleLower === 'user' && h1Texts.some(h => /^404$/i.test(h)))
+        );
+
         // ── NEW: Advanced extraction (beats Semrush/Ahrefs) ──
         const hreflang = extractHreflang(html);
         const mixedContent = detectMixedContent(html, url);
@@ -612,6 +636,7 @@ export async function crawlPage(url) {
         return {
             url,
             success: true,
+            isSoft404,
             // ── Response metadata ──
             statusCode: fetchResult.status,
             responseTimeMs: fetchResult.responseTimeMs,
@@ -1193,18 +1218,29 @@ export async function researchDomain(baseUrl) {
 
     console.log(`🕷️  Initial crawl queue: ${toCrawl.length} pages (sitemap: ${sitemap.found ? sitemap.count : 0}, robots: ${robotsTxt.found})`);
 
-    // PHASE 3: Crawl with recursive link discovery (batch size 8)
+    // PHASE 3: Crawl with recursive link discovery
     const allSubPages = [];
-    const BATCH_SIZE = 12;
+    const BATCH_SIZE = _cfNeeded ? 6 : 12;
+    const BATCH_DELAY = _cfNeeded ? 300 : 50;
     let queueIndex = 0;
+    const allFailedUrls = [];
+    let consecutiveFailedBatches = 0; // Track consecutive all-fail batches for early bail
 
     while (queueIndex < toCrawl.length) {
-        // Safety: stop if we hit timeout or max pages
         if (Date.now() - crawlStartTime > CRAWL_TIMEOUT_MS) {
             console.log(`🕷️  Crawl timeout (${CRAWL_TIMEOUT_MS / 1000}s) — stopping with ${allSubPages.length + 1} pages`);
             break;
         }
         if (allSubPages.length + 1 >= MAX_PAGES) break;
+
+        // EARLY BAIL: if 3 consecutive batches had 0 success, site is clearly rate-limiting — skip to Playwright
+        if (consecutiveFailedBatches >= 3 && allFailedUrls.length > 30) {
+            const remaining = toCrawl.length - queueIndex;
+            console.log(`🕷️  Early bail: ${consecutiveFailedBatches} consecutive failed batches — skipping ${remaining} remaining URLs (will use Playwright)`);
+            // Add ALL remaining URLs to failed list for Playwright re-crawl
+            allFailedUrls.push(...toCrawl.slice(queueIndex));
+            break;
+        }
 
         const batch = toCrawl.slice(queueIndex, queueIndex + BATCH_SIZE);
         queueIndex += BATCH_SIZE;
@@ -1214,55 +1250,57 @@ export async function researchDomain(baseUrl) {
         );
 
         const successPages = batchResults.filter(p => p.success);
+        const failedBatch = batchResults.filter(p => !p.success);
         allSubPages.push(...successPages);
+        allFailedUrls.push(...failedBatch.map(p => p.url).filter(Boolean));
 
-        // Recursive discovery: extract internal links from newly crawled pages and add to queue
+        // Track consecutive failures for early bail
+        if (successPages.length === 0) {
+            consecutiveFailedBatches++;
+        } else {
+            consecutiveFailedBatches = 0;
+        }
+
+        // Recursive discovery
         for (const page of successPages) {
             const pageLinks = page.links?.internal || [];
             for (const link of pageLinks) {
                 if (crawled.size >= MAX_PAGES) break;
                 if (!isCrawlable(link)) continue;
-                try { enqueue(new URL(link, cleanBase).href); } catch { /* skip */ }
+                try { enqueue(new URL(link, cleanBase).href); } catch {}
             }
         }
 
-        // Rate limit: small delay between batches to avoid 429
-        if (queueIndex < toCrawl.length) await new Promise(r => setTimeout(r, 50));
+        if (queueIndex < toCrawl.length) await new Promise(r => setTimeout(r, BATCH_DELAY));
     }
 
     const allPages = [homepage, ...allSubPages];
     const crawlElapsed = ((Date.now() - crawlStartTime) / 1000).toFixed(1);
 
     // CRAWL TELEMETRY — detailed breakdown for debugging
-    const failedPages = allSubPages.filter(p => !p.success);
-    const botChallengePages = failedPages.filter(p => p.isBotChallenge);
-    const timeoutPages = failedPages.filter(p => p.error?.includes('timeout') || p.error?.includes('abort'));
-    const httpErrorPages = failedPages.filter(p => p.statusCode >= 400);
-    console.log(`🕷️  Crawl complete: ${allPages.length} pages in ${crawlElapsed}s (queue had ${toCrawl.length} URLs)`);
-    console.log(`🕷️  Breakdown: ${allPages.filter(p => p.success).length} success, ${failedPages.length} failed (${botChallengePages.length} bot-challenge, ${timeoutPages.length} timeout, ${httpErrorPages.length} HTTP error)`);
-    if (botChallengePages.length > 0) {
-      console.log(`🛡️  ${botChallengePages.length} pages returned bot challenge pages — excluded from analysis`);
-    }
+    console.log(`🕷️  Fetch crawl complete: ${allPages.length} pages in ${crawlElapsed}s (queue had ${toCrawl.length} URLs, ${allFailedUrls.length} failed)`);
+    console.log(`🕷️  Breakdown: ${allPages.filter(p => p.success).length} success, ${allFailedUrls.length} failed`);
 
-    // PHASE 3.5: Playwright H1 re-scan for pages with missing H1
-    // Many SPA/JS-rendered pages show no H1 in raw HTML but have H1 in rendered DOM
-    const pagesWithMissingH1 = allPages.filter(p => p.success && (!p.h1 || p.h1.length === 0));
-    if (pagesWithMissingH1.length > 0) {
-        console.log(`🖥️  H1 re-scan: ${pagesWithMissingH1.length} pages missing H1 — launching Playwright batch scan...`);
+    // ═══════════════════════════════════════════════════════════════════════
+    // PHASE 3.5: PLAYWRIGHT HYBRID RE-CRAWL
+    // If >50% of pages failed (CF/429/bot-challenge), use Playwright to
+    // re-crawl them with a real browser context that bypasses rate limits.
+    // This extracts: title, H1, meta, word count, images, links
+    // ═══════════════════════════════════════════════════════════════════════
+    const fetchSuccessRate = allPages.filter(p => p.success).length / Math.max(toCrawl.length, 1);
+    if (allFailedUrls.length > 20 && fetchSuccessRate < 0.5) {
+        console.log(`🖥️  Hybrid re-crawl: ${allFailedUrls.length} pages failed (${(fetchSuccessRate * 100).toFixed(0)}% success rate) — launching Playwright batch...`);
         let pw;
-        try {
-            pw = await import('playwright');
-            pw = pw.default || pw;
-        } catch { pw = null; }
+        try { pw = await import('playwright'); pw = pw.default || pw; } catch { pw = null; }
 
         if (pw) {
-            let h1Browser;
+            let browser;
             try {
-                h1Browser = await pw.chromium.launch({
+                browser = await pw.chromium.launch({
                     headless: true,
                     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
                 });
-                const h1Context = await h1Browser.newContext({
+                const ctx = await browser.newContext({
                     userAgent: _cfSession?.solved ? _cfSession.userAgent : 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
                     viewport: { width: 1280, height: 800 },
                     ignoreHTTPSErrors: true,
@@ -1275,67 +1313,230 @@ export async function researchDomain(baseUrl) {
                             const [name, ...rest] = c.split('=');
                             return { name, value: rest.join('='), domain, path: '/' };
                         });
-                        await h1Context.addCookies(cookiePairs);
+                        await ctx.addCookies(cookiePairs);
                     } catch { /* skip cookie injection */ }
                 }
 
-                const h1Page = await h1Context.newPage();
-                // Block heavy resources (images, fonts, CSS) to speed up
-                await h1Page.route('**/*', (route) => {
-                    const type = route.request().resourceType();
-                    if (['image', 'media', 'font', 'stylesheet'].includes(type)) {
-                        route.abort().catch(() => {});
-                    } else {
-                        route.continue().catch(() => {});
-                    }
-                });
+                // Use N_TABS parallel pages for speed
+                const N_TABS = 4;
+                const PW_BATCH_LIMIT = 600;
+                const PW_PAGE_TIMEOUT = 6000;
+                const PW_TOTAL_TIMEOUT = 120000;
+                const pwStart = Date.now();
+                let pwSuccess = 0;
 
-                const H1_BATCH_LIMIT = 50; // Max pages to re-scan
-                const H1_PAGE_TIMEOUT = 8000; // 8s per page
-                const H1_TOTAL_TIMEOUT = 60000; // 60s total
-                const h1ScanStart = Date.now();
-                let h1Found = 0;
+                // Create multiple page tabs for parallel crawling
+                const tabs = [];
+                for (let t = 0; t < N_TABS; t++) {
+                    const p = await ctx.newPage();
+                    await p.route('**/*', (route) => {
+                        const type = route.request().resourceType();
+                        if (['image', 'media', 'font', 'stylesheet'].includes(type)) {
+                            route.abort().catch(() => {});
+                        } else {
+                            route.continue().catch(() => {});
+                        }
+                    });
+                    tabs.push(p);
+                }
 
-                for (const page of pagesWithMissingH1.slice(0, H1_BATCH_LIMIT)) {
-                    if (Date.now() - h1ScanStart > H1_TOTAL_TIMEOUT) {
-                        console.log(`🖥️  H1 re-scan timeout (60s) — scanned ${h1Found} of ${pagesWithMissingH1.length} pages`);
+                const urlsToReCrawl = allFailedUrls.slice(0, PW_BATCH_LIMIT);
+
+                // Process URLs in parallel batches of N_TABS
+                for (let i = 0; i < urlsToReCrawl.length; i += N_TABS) {
+                    if (Date.now() - pwStart > PW_TOTAL_TIMEOUT) {
+                        console.log(`🖥️  Playwright re-crawl timeout (120s) — got ${pwSuccess} pages`);
                         break;
                     }
-                    try {
-                        await h1Page.goto(page.url, { waitUntil: 'domcontentloaded', timeout: H1_PAGE_TIMEOUT });
-                        await h1Page.waitForTimeout(1500); // Let JS render
 
-                        const h1Data = await h1Page.evaluate(() => {
-                            const h1Elements = document.querySelectorAll('h1');
-                            return Array.from(h1Elements).map(h => h.textContent?.trim()).filter(t => t && t.length > 0);
-                        });
+                    const chunk = urlsToReCrawl.slice(i, i + N_TABS);
+                    const chunkResults = await Promise.all(chunk.map(async (url, idx) => {
+                        const tab = tabs[idx % tabs.length];
+                        try {
+                            await tab.goto(url, { waitUntil: 'domcontentloaded', timeout: PW_PAGE_TIMEOUT });
+                            await tab.waitForTimeout(800);
 
-                        if (h1Data.length > 0) {
-                            // Update the page data with JS-rendered H1
-                            page.h1 = h1Data;
-                            page.headings = [
-                                ...h1Data.map(text => ({ level: 1, text })),
-                                ...(page.headings || []).filter(h => h.level !== 1),
-                            ];
-                            page.jsRenderedH1 = true;
-                            h1Found++;
+                            const pageData = await tab.evaluate(() => {
+                                const title = document.title || '';
+                                const metaDesc = document.querySelector('meta[name="description"]')?.content || '';
+                                const h1 = Array.from(document.querySelectorAll('h1')).map(h => h.textContent?.trim()).filter(t => t && t.length > 0);
+                                const h2 = Array.from(document.querySelectorAll('h2')).map(h => h.textContent?.trim()).filter(t => t && t.length > 0);
+                                const bodyText = document.body?.innerText || '';
+                                const wordCount = bodyText.split(/\s+/).filter(w => w.length > 1).length;
+                                const imgs = document.querySelectorAll('img');
+                                let imgTotal = 0, imgNoAlt = 0;
+                                const srcsMissingAlt = [];
+                                imgs.forEach(img => {
+                                    const src = img.src || img.getAttribute('src') || '';
+                                    if (!src || src.startsWith('data:') || src === '#') return;
+                                    if (img.width < 3 || img.height < 3) return;
+                                    imgTotal++;
+                                    if (!(img.alt || '').trim()) { imgNoAlt++; srcsMissingAlt.push(src); }
+                                });
+                                const links = [];
+                                document.querySelectorAll('a[href]').forEach(a => {
+                                    try { const href = new URL(a.href, location.origin).href; if (href.startsWith(location.origin)) links.push(href); } catch {}
+                                });
+                                const canonical = document.querySelector('link[rel="canonical"]')?.href || '';
+                                return { title, metaDesc, h1, h2, wordCount, imgTotal, imgNoAlt, srcsMissingAlt, links, canonical, bodyText: bodyText.substring(0, 500) };
+                            });
+
+                            const titleLower = (pageData.title || '').toLowerCase();
+                            const isSoft404 = titleLower === '404' || titleLower === '404 not found' ||
+                                titleLower === 'page not found' || titleLower === 'not found' ||
+                                (pageData.h1.length === 1 && /^(404|page not found|not found)$/i.test(pageData.h1[0]));
+
+                            return {
+                                url, success: true, isSoft404, jsRendered: true,
+                                statusCode: 200, responseTimeMs: 0, pageSizeBytes: 0, pageSizeKB: 0,
+                                title: pageData.title, metaDescription: pageData.metaDesc, canonical: pageData.canonical,
+                                headings: [...pageData.h1.map(t => ({ level: 1, text: t })), ...pageData.h2.map(t => ({ level: 2, text: t }))],
+                                h1: pageData.h1, h2: pageData.h2, h3: [],
+                                images: { total: pageData.imgTotal, withAlt: pageData.imgTotal - pageData.imgNoAlt, withoutAlt: pageData.imgNoAlt, srcsMissingAlt: pageData.srcsMissingAlt },
+                                wordCount: pageData.wordCount, contentSnippet: pageData.bodyText, bodyTextFull: pageData.bodyText,
+                                textToHtmlRatio: 50, links: { internal: pageData.links, external: [] },
+                                internalLinkCount: pageData.links.length, externalLinkCount: 0,
+                                titleLength: (pageData.title || '').length, metaDescLength: (pageData.metaDesc || '').length,
+                                viewport: 'width=device-width',
+                            };
+                        } catch {
+                            return null;
                         }
-                    } catch {
-                        // Timeout or navigation error — skip page
+                    }));
+
+                    for (const result of chunkResults) {
+                        if (result && result.success) {
+                            allSubPages.push(result);
+                            pwSuccess++;
+                            // Discover links
+                            for (const link of (result.links?.internal || [])) {
+                                if (crawled.size >= MAX_PAGES) break;
+                                if (!isCrawlable(link)) continue;
+                                try { enqueue(new URL(link, cleanBase).href); } catch {}
+                            }
+                        }
                     }
                 }
 
-                await h1Page.close().catch(() => {});
-                await h1Context.close().catch(() => {});
-                await h1Browser.close().catch(() => {});
-                const h1Elapsed = ((Date.now() - h1ScanStart) / 1000).toFixed(1);
-                console.log(`🖥️  H1 re-scan complete: ${h1Found} H1s found via JS rendering in ${h1Elapsed}s (of ${Math.min(pagesWithMissingH1.length, H1_BATCH_LIMIT)} pages scanned)`);
-            } catch (h1Err) {
-                console.warn(`🖥️  H1 re-scan error: ${h1Err.message}`);
-                if (h1Browser) await h1Browser.close().catch(() => {});
+                for (const t of tabs) await t.close().catch(() => {});
+                await ctx.close().catch(() => {});
+                await browser.close().catch(() => {});
+                const pwElapsed = ((Date.now() - pwStart) / 1000).toFixed(1);
+                console.log(`🖥️  Playwright re-crawl complete: ${pwSuccess} pages recovered in ${pwElapsed}s (${N_TABS} parallel tabs)`);
+
+                // Rebuild allPages
+                allPages.length = 0;
+                allPages.push(homepage, ...allSubPages);
+            } catch (pwErr) {
+                console.warn(`🖥️  Playwright re-crawl error: ${pwErr.message}`);
+                if (browser) await browser.close().catch(() => {});
             }
         } else {
-            console.warn(`🖥️  H1 re-scan skipped — Playwright not available`);
+            console.warn(`🖥️  Playwright re-crawl skipped — Playwright not available`);
+        }
+    }
+
+    // PHASE 3.5: SPA / Soft-404 Detection + Template Stripping
+    // On SPA sites, fetch() returns the app shell (same title/H1/content on every page)
+    // We must detect and strip this template data to get accurate metrics
+    const soft404Pages = allPages.filter(p => p.isSoft404);
+    if (soft404Pages.length > 0) {
+        console.log(`🔍  Soft-404 detected: ${soft404Pages.length} pages have 404 title/H1 (SPA shell returning 200 with 404 body)`);
+    }
+
+    // Filter to only "real" (non-soft-404) pages for content analysis
+    const realPages = allPages.filter(p => p.success && !p.isSoft404);
+    console.log(`🔍  Real pages for content analysis: ${realPages.length} (${soft404Pages.length} soft-404 excluded)`);
+
+    // Template title detection: if a title appears on >50% of real pages, it's a template
+    const titleFreq = {};
+    for (const p of realPages) {
+        const t = (p.title || '').trim().toLowerCase();
+        if (t) titleFreq[t] = (titleFreq[t] || 0) + 1;
+    }
+    const templateTitles = Object.entries(titleFreq)
+        .filter(([, count]) => count / Math.max(realPages.length, 1) > 0.5)
+        .map(([title]) => title);
+    if (templateTitles.length > 0) {
+        console.log(`🔍  Template title detected: "${templateTitles[0]}" (on ${titleFreq[templateTitles[0]]} pages) — stripping from analysis`);
+        for (const p of allPages) {
+            if (templateTitles.includes((p.title || '').trim().toLowerCase())) {
+                p._originalTitle = p.title; // preserve for reference
+                p.title = ''; // strip template title
+                p.titleLength = 0;
+            }
+        }
+    }
+
+    // Template H1 detection: if an H1 appears on >30% of real pages, it's a template
+    const h1Freq = {};
+    for (const p of realPages) {
+        for (const h of (p.h1 || [])) {
+            const ht = h.trim().toLowerCase();
+            if (ht) h1Freq[ht] = (h1Freq[ht] || 0) + 1;
+        }
+    }
+    const templateH1s = Object.entries(h1Freq)
+        .filter(([, count]) => count / Math.max(realPages.length, 1) > 0.3)
+        .map(([text]) => text);
+    if (templateH1s.length > 0) {
+        console.log(`🔍  Template H1 detected: ${templateH1s.map(h => `"${h}" (${h1Freq[h]} pages)`).join(', ')} — stripping`);
+        for (const p of allPages) {
+            if (p.h1) {
+                p._originalH1 = [...p.h1]; // preserve for reference
+                p.h1 = p.h1.filter(h => !templateH1s.includes(h.trim().toLowerCase()));
+                // Also strip from headings array
+                if (p.headings) {
+                    p.headings = p.headings.filter(h => {
+                        if (h.level !== 1) return true;
+                        return !templateH1s.includes(h.text.trim().toLowerCase());
+                    });
+                }
+            }
+        }
+    }
+
+    // PHASE 3.6: H1 re-scan for NON-Playwright pages that still have missing H1
+    // (Playwright pages already have rendered H1 — only need to re-scan fetch-based pages)
+    const pagesNeedingH1Scan = allPages.filter(p =>
+        p.success && !p.isSoft404 && !p.jsRendered && (!p.h1 || p.h1.length === 0)
+    );
+    if (pagesNeedingH1Scan.length > 0 && pagesNeedingH1Scan.length <= 50) {
+        // Only do H1-only re-scan if there are few pages (if many, the hybrid re-crawl above handles it)
+        console.log(`🖥️  H1 re-scan: ${pagesNeedingH1Scan.length} fetch-based pages need H1 check — launching Playwright...`);
+        let pw;
+        try { pw = await import('playwright'); pw = pw.default || pw; } catch { pw = null; }
+        if (pw) {
+            let h1Browser;
+            try {
+                h1Browser = await pw.chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'] });
+                const h1Context = await h1Browser.newContext({
+                    userAgent: _cfSession?.solved ? _cfSession.userAgent : 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                    viewport: { width: 1280, height: 800 }, ignoreHTTPSErrors: true,
+                });
+                if (_cfSession?.solved && _cfSession.cookies) {
+                    try {
+                        const domain = new URL(cleanBase).hostname;
+                        const cookiePairs = _cfSession.cookies.split('; ').map(c => { const [name, ...rest] = c.split('='); return { name, value: rest.join('='), domain, path: '/' }; });
+                        await h1Context.addCookies(cookiePairs);
+                    } catch {}
+                }
+                const h1Page = await h1Context.newPage();
+                await h1Page.route('**/*', (route) => { const type = route.request().resourceType(); if (['image', 'media', 'font', 'stylesheet'].includes(type)) { route.abort().catch(() => {}); } else { route.continue().catch(() => {}); } });
+                const h1ScanStart = Date.now();
+                let h1Found = 0;
+                for (const pg of pagesNeedingH1Scan.slice(0, 50)) {
+                    if (Date.now() - h1ScanStart > 60000) break;
+                    try {
+                        await h1Page.goto(pg.url, { waitUntil: 'domcontentloaded', timeout: 8000 });
+                        await h1Page.waitForTimeout(1500);
+                        const h1Data = await h1Page.evaluate(() => Array.from(document.querySelectorAll('h1')).map(h => h.textContent?.trim()).filter(t => t && t.length > 0));
+                        if (h1Data.length > 0) { pg.h1 = h1Data; pg.headings = [...h1Data.map(text => ({ level: 1, text })), ...(pg.headings || []).filter(h => h.level !== 1)]; pg.jsRenderedH1 = true; h1Found++; }
+                    } catch {}
+                }
+                await h1Page.close().catch(() => {}); await h1Context.close().catch(() => {}); await h1Browser.close().catch(() => {});
+                console.log(`🖥️  H1 re-scan complete: ${h1Found} H1s found in ${((Date.now() - h1ScanStart) / 1000).toFixed(1)}s`);
+            } catch (h1Err) { console.warn(`🖥️  H1 re-scan error: ${h1Err.message}`); if (h1Browser) await h1Browser.close().catch(() => {}); }
         }
     }
 
@@ -1394,10 +1595,10 @@ export async function researchDomain(baseUrl) {
             brokenInternal.push({ url: p.url, statusCode: p.statusCode, linkedFrom: sources ? [...sources].slice(0, 3) : [] });
         }
     }
-    // HEAD-probe uncrawled internal URLs (max 30, 2s timeout each)
+    // HEAD-probe uncrawled internal URLs (max 30, 2s timeout each) — reduced from 200 to avoid over-counting
     const uncrawledInternal = [...internalUrlGraph.entries()]
         .filter(([url]) => !crawledUrls.has(url))
-        .slice(0, 200);
+        .slice(0, 30);
     if (uncrawledInternal.length > 0) {
         console.log(`🔗  Probing ${uncrawledInternal.length} uncrawled internal URLs for broken links...`);
         const internalProbeResults = await Promise.all(
@@ -1468,25 +1669,46 @@ export async function researchDomain(baseUrl) {
     }
 
     // PHASE 5: Build comprehensive site intelligence
-    const allHeadings = allPages.flatMap(p => p.headings || []);
-    const allSchemaTypes = [...new Set(allPages.flatMap(p => p.schemaTypes || []))];
-    const allTech = [...new Set(allPages.flatMap(p => p.tech || []))];
-    const totalWordCount = allPages.reduce((s, p) => s + (p.wordCount || 0), 0);
-    const totalImages = allPages.reduce((s, p) => s + (p.images?.total || 0), 0);
-    const imagesWithoutAlt = allPages.reduce((s, p) => s + (p.images?.withoutAlt || 0), 0);
-    const hasCanonical = allPages.some(p => p.canonical);
-    const hasViewport = allPages.every(p => p.viewport);
+    // Use realPages (non-soft-404) for content analysis to avoid SPA shell pollution
+    const analysisPages = allPages.filter(p => p.success && !p.isSoft404);
+    const allHeadings = analysisPages.flatMap(p => p.headings || []);
+    const allSchemaTypes = [...new Set(analysisPages.flatMap(p => p.schemaTypes || []))];
+    const allTech = [...new Set(analysisPages.flatMap(p => p.tech || []))];
+    const totalWordCount = analysisPages.reduce((s, p) => s + (p.wordCount || 0), 0);
+    // Image dedup: count UNIQUE image src URLs missing alt, not total instances
+    const uniqueImgSrcs = new Set();
+    const uniqueImgNoAlt = new Set();
+    for (const p of analysisPages) {
+        // We need to re-extract images for dedup, but images obj only has counts
+        // So use total/withoutAlt as a proxy per page, but cap at unique estimate
+        // For accurate dedup, track per-page image data
+    }
+    // Image dedup: count UNIQUE image src URLs missing alt across all pages
+    const globalMissingAltSrcs = new Set();
+    for (const p of analysisPages) {
+        const srcs = p.images?.srcsMissingAlt || [];
+        for (const src of srcs) globalMissingAltSrcs.add(src);
+    }
+    const totalImages = analysisPages.reduce((s, p) => s + (p.images?.total || 0), 0);
+    const rawImagesWithoutAlt = analysisPages.reduce((s, p) => s + (p.images?.withoutAlt || 0), 0);
+    // Use unique src count if we have src data, otherwise fall back to raw count
+    const imagesWithoutAlt = globalMissingAltSrcs.size > 0 ? globalMissingAltSrcs.size : rawImagesWithoutAlt;
+    console.log(`🖼️  Images: ${totalImages} total, ${rawImagesWithoutAlt} raw missing alt, ${imagesWithoutAlt} unique src URLs missing alt (${globalMissingAltSrcs.size} unique srcs)`);
+
+    const hasCanonical = analysisPages.some(p => p.canonical);
+    const hasViewport = analysisPages.every(p => p.viewport);
     const hasFAQ = allHeadings.some(h => h.text.toLowerCase().includes('faq') || h.text.toLowerCase().includes('frequently'));
     const hasRobots = homepage.robots;
-    const avgWordCount = Math.round(totalWordCount / allPages.length);
-    const thinPages = allPages.filter(p => (p.wordCount || 0) < 300);
-    const missingMeta = allPages.filter(p => !p.metaDescription);
-    const missingH1 = allPages.filter(p => !p.h1?.length);
-    const multipleH1 = allPages.filter(p => (p.h1?.length || 0) > 1);
-    const pagesWithRedirects = allPages.filter(p => p.redirectChain?.length > 0);
-    const lowTextRatioPages = allPages.filter(p => (p.textToHtmlRatio || 100) < 10);
-    const oversizedPages = allPages.filter(p => p.htmlSizeOver2MB);
-    const avgTextToHtmlRatio = allPages.length > 0 ? Math.round(allPages.reduce((s, p) => s + (p.textToHtmlRatio || 0), 0) / allPages.length) : 0;
+    const avgWordCount = analysisPages.length > 0 ? Math.round(totalWordCount / analysisPages.length) : 0;
+    // Thin pages: exclude soft-404 pages (they're not real pages)
+    const thinPages = analysisPages.filter(p => (p.wordCount || 0) < 300);
+    const missingMeta = analysisPages.filter(p => !p.metaDescription);
+    const missingH1 = analysisPages.filter(p => !p.h1?.length);
+    const multipleH1 = analysisPages.filter(p => (p.h1?.length || 0) > 1);
+    const pagesWithRedirects = analysisPages.filter(p => p.redirectChain?.length > 0);
+    const lowTextRatioPages = analysisPages.filter(p => (p.textToHtmlRatio || 100) < 10);
+    const oversizedPages = analysisPages.filter(p => p.htmlSizeOver2MB);
+    const avgTextToHtmlRatio = analysisPages.length > 0 ? Math.round(analysisPages.reduce((s, p) => s + (p.textToHtmlRatio || 0), 0) / analysisPages.length) : 0;
 
     // Incoming internal link count per page (for single-incoming-link detection)
     const incomingLinkCount = new Map();

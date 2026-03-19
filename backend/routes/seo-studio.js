@@ -379,12 +379,13 @@ Low text-to-HTML ratio pages: ${siMetrics.lowTextRatioCount || 0}
 Average text-to-HTML ratio: ${siMetrics.avgTextToHtmlRatio || 0}%
 `;
 
-    // AI timeout reduced to 40s to fit in CloudFront's 60s window (Crawl + AI)
-    // Strict Global Request Budget of 27 seconds to stay under CloudFront's 30s limit
-    const routeStartTime = req._routeStartTime || (Date.now() - 15000); // Approximate 15s crawl if req._routeStartTime isn't set
+    // AI timeout: deep crawls with Playwright H1 re-scan can take 120s+
+    // Give AI a fixed minimum budget rather than subtracting from a global budget
+    // Health-check system prompt is ~15KB+ with crawl data — AI needs 30-40s to generate 8192 tokens
+    const routeStartTime = req._routeStartTime || (Date.now() - 15000);
     const elapsed = Date.now() - routeStartTime;
-    const globalBudget = 110000;
-    const remainingBudget = Math.max(5000, globalBudget - elapsed); // Give AI at least 5s
+    const globalBudget = 115000; // 5s safety buffer for CloudFront 120s limit
+    const remainingBudget = Math.max(30000, globalBudget - elapsed); // Ensure AI has at least 30s to think
     
     console.log(`⏱️ Crawl + research complete (${siMetrics.totalPages || siteResearch?.pages?.length || 0} pages). Elapsed: ${elapsed}ms. AI Budget: ${remainingBudget}ms`);
 
@@ -454,10 +455,36 @@ Respond in STRICT JSON:
 Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must have a 'whyItMatters' that connects to business outcomes. Think like a consultant, not a checklist tool.`;
 
     const userPrompt = `Analyze site: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget });
-    // Log token usage from this AI call
-    if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: req.creditAction || 'seoHealthCheck', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
-    const parsed = parseJSON(result);
+    let parsed;
+    try {
+        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget });
+        // Log token usage from this AI call
+        if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: req.creditAction || 'seoHealthCheck', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+        parsed = parseJSON(result);
+    } catch (aiErr) {
+        console.warn(`⚠️ AI analysis failed (${aiErr.message}) — returning deterministic data only`);
+        // Return a minimal AI result so the deterministic crawl data is still available
+        parsed = {
+            seoHealthScore: 50,
+            aiVisibilityScore: 50,
+            technicalScore: 50,
+            contentScore: 50,
+            authorityScore: 50,
+            summary: `SEO audit crawled ${siMetrics.totalPages || 0} pages. AI analysis timed out — the deterministic issue checks below are from real crawl data.`,
+            strategicBrief: 'AI analysis was unable to complete within the timeout window. All issue checks shown are based on real crawl data and are accurate.',
+            algorithmRisks: [],
+            issues: [],
+            fixNow: [],
+            createNext: [],
+            monitor: [],
+            aiSeoInsights: { schemaReadiness: { score: 0, issues: [], recommendations: [] }, qnaPresence: { score: 0, suggestions: [] }, entityCoverage: { score: 0, missingEntities: [], recommendations: [] }, snippetStructure: { score: 0, recommendations: [] }, trustSignals: { score: 0, recommendations: [] } },
+            topOpportunity: 'AI analysis timed out — review the deterministic checks for issue details.',
+            competitorHints: [],
+            industryBenchmark: '',
+            crawlSummary: `Crawled ${siMetrics.totalPages || 0} pages. AI could not complete analysis.`,
+            _aiTimedOut: true,
+        };
+    }
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
 
     // ── Inject REAL crawl data into AI results (AI only generates scores/strategy) ──
