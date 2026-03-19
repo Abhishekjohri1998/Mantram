@@ -388,7 +388,8 @@ Average text-to-HTML ratio: ${siMetrics.avgTextToHtmlRatio || 0}%
 `;
 
     // AI timeout reduced to 40s to fit in CloudFront's 60s window (Crawl + AI)
-    const aiTimeout = 40000; 
+    // AI timeout reduced to 25s to safely fit in default 30s infrastructure windows
+    const aiTimeout = 25000; 
     console.log(`⏱️ Crawl + research complete (${siMetrics.totalPages || siteResearch?.pages?.length || 0} pages). AI timeout: ${aiTimeout / 1000}s`);
 
     const systemPrompt = `You are a SENIOR SEO STRATEGIST (not just an auditor). You think like a CMO + technical SEO expert combined. You have REAL CRAWL DATA — use it as ground truth. Never guess or contradict the crawl.
@@ -877,8 +878,7 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
 
     res.json({ success: true, ...parsed });
   } catch (error) {
-    console.error('SEO Health Check error:', error);
-    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    next(error);
   }
 });
 
@@ -1141,7 +1141,6 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
     if (siteResearch.siteIntelligence) {
       parsed.crawlIntelligence = {
         totalPages: siteResearch.siteIntelligence.totalPages,
-        hasSitemap: siteResearch.siteIntelligence.hasSitemap,
         hasRobotsTxt: siteResearch.siteIntelligence.hasRobotsTxt,
         thinPageCount: siteResearch.siteIntelligence.thinPageCount,
         duplicateContentCount: siteResearch.siteIntelligence.duplicateContentCount,
@@ -1165,8 +1164,7 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
 
     res.json({ success: true, ...parsed });
   } catch (error) {
-    console.error('SEO Traffic error:', error);
-    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    next(error);
   }
 });
 
@@ -1599,8 +1597,7 @@ STRATEGIC RULES (MANDATORY):
 
     res.json({ success: true, ...parsed });
   } catch (error) {
-    console.error('AI Visibility error:', error);
-    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    next(error);
   }
 });
 
@@ -1631,8 +1628,7 @@ router.get('/geo-history', protect, async (req, res) => {
 
     res.json({ success: true, history, trend, total: history.length });
   } catch (error) {
-    console.error('GEO History error:', error);
-    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    next(error);
   }
 });
 
@@ -1696,8 +1692,7 @@ Respond in JSON:
 
     res.json({ success: true, ...parsed });
   } catch (error) {
-    console.error('Page audit error:', error);
-    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    next(error);
   }
 });
 
@@ -3005,7 +3000,7 @@ router.get('/gsc/rank-changes', protect, async (req, res) => {
       changes: changes.slice(0, 50),
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    next(error);
   }
 });
 
@@ -3047,8 +3042,7 @@ Respond in JSON:
 
     res.json({ success: true, ...parsed });
   } catch (error) {
-    console.error('SEO Ask error:', error);
-    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    next(error);
   }
 });
 
