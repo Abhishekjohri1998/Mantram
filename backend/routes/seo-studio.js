@@ -778,10 +778,28 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
     });
 
     // Merge deterministic checks with any AI-generated issues
+    // DEDUP: remove AI issues that overlap with deterministic checks
+    const deterministicKeywords = deterministicChecks.map(d => d.check.toLowerCase());
+    const overlapPatterns = [
+      /\bh1\b/i, /\bmissing.*h1\b/i, /\bh1.*missing\b/i, /\bh1.*tag\b/i,
+      /\balt.?text\b/i, /\balt.?attribute\b/i, /\bimage.*alt\b/i, /\bmissing.*alt\b/i,
+      /\bduplicate.*title\b/i, /\btitle.*duplicate\b/i,
+      /\bbroken.*link\b/i, /\b(4[0-9]{2}).*link\b/i, /\blink.*broken\b/i,
+      /\bredirect.*chain\b/i, /\bmeta.*description\b/i, /\bthin.*page\b/i, /\bthin.*content\b/i,
+    ];
     const aiIssues = (parsed.issues || []).map(i => ({
       check: i.title, value: i.description || '', issueType: i.severity === 'critical' ? 'error' : i.severity === 'high' ? 'error' : i.severity === 'medium' ? 'warning' : 'notice',
       aboutThisIssue: i.whyItMatters || i.description || '', howToFix: i.fix || '', affectedUrls: [],
-    }));
+    })).filter(aiIssue => {
+      // If a deterministic check already covers this topic, skip the AI duplicate
+      const aiTitle = (aiIssue.check || '').toLowerCase();
+      for (const pattern of overlapPatterns) {
+        if (pattern.test(aiTitle) && deterministicKeywords.some(dk => pattern.test(dk))) {
+          return false; // Deterministic already covers this
+        }
+      }
+      return true;
+    });
     const allGroupedIssues = [...deterministicChecks, ...aiIssues];
     parsed.groupedIssues = {
       errors: allGroupedIssues.filter(d => d.issueType === 'error'),
