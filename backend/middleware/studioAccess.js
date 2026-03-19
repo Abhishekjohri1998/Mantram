@@ -1,10 +1,50 @@
 /**
- * studioAccess.js — Middleware to enforce studio-level permissions for team members.
- * Team owners always have full access. Team members are checked against their studioAccess flags.
+ * studioAccess.js — 3-tier studio access control.
+ * 
+ * Resolution order:
+ *   1. SuperAdmin → always has access
+ *   2. Portal = "hidden" → no one can access
+ *   3. User has explicit studioAccess override → use it
+ *   4. Portal = "private" → whitelist only (no override = denied)
+ *   5. Portal = "public" → everyone (plan-based)
  */
 
-import SubscriptionPackage from '../models/SubscriptionPackage.js';
+import { getSetting } from '../models/SystemSettings.js';
 
+/**
+ * Complete list of studio keys — single source of truth.
+ */
+export const STUDIO_KEYS = [
+    'brainstormStudio',
+    'contentStudio',
+    'creativeStudio',
+    'videoStudio',
+    'socialMediaStudio',
+    'conversationStudio',
+    'seoStudio',
+    'adStudio',
+    'funnelStudio',
+    'd2cAnalytics',
+    'skillsHub',
+];
+
+export const STUDIO_LABELS = {
+    brainstormStudio: 'Brainstorm Studio',
+    contentStudio: 'Content Studio',
+    creativeStudio: 'Creative Studio',
+    videoStudio: 'Video Studio',
+    socialMediaStudio: 'Social Media Studio',
+    conversationStudio: 'Conversation Studio',
+    seoStudio: 'SEO Studio',
+    adStudio: 'Performance Studio',
+    funnelStudio: 'Funnel Studio',
+    d2cAnalytics: 'D2C Studio',
+    skillsHub: 'Skills Hub',
+};
+
+/**
+ * Map route-path segments to studio keys (for route-based middleware).
+ */
 const STUDIO_MAP = {
     'content-studio': 'contentStudio',
     'content': 'contentStudio',
@@ -18,37 +58,116 @@ const STUDIO_MAP = {
     'shopify-analytics': 'd2cAnalytics',
     'performance-marketing': 'adStudio',
     'pm-connections': 'adStudio',
-    'smart-calendar': 'smartCalendar',
+    'smart-calendar': 'socialMediaStudio',
+    'social-media-studio': 'socialMediaStudio',
     'conversations': 'conversationStudio',
+    'funnel-studio': 'funnelStudio',
+    'skills': 'skillsHub',
 };
 
-export function requireStudio(studioKey) {
+/**
+ * Default portal visibility — all public.
+ */
+const DEFAULT_PORTAL_VISIBILITY = Object.fromEntries(
+    STUDIO_KEYS.map(k => [k, 'public'])
+);
+
+/**
+ * Get portal-level visibility from SystemSettings.
+ * @returns {{ [studioKey: string]: 'public' | 'private' | 'hidden' }}
+ */
+export async function getPortalVisibility() {
+    const stored = await getSetting('studio_portal_visibility', {});
+    return { ...DEFAULT_PORTAL_VISIBILITY, ...stored };
+}
+
+/**
+ * Check if a user can access a specific studio.
+ */
+export function canAccessStudio(portalVisibility, user, studioKey) {
+    if (user?.role === 'superadmin') return true;
+
+    const status = portalVisibility[studioKey] || 'public';
+
+    if (status === 'hidden') return false;
+
+    // User-level override (explicit grant or revoke)
+    const override = user?.studioAccess?.[studioKey];
+    if (override === true) return true;
+    if (override === false) return false;
+
+    if (status === 'private') return false;
+
+    // public → everyone
+    return true;
+}
+
+/**
+ * Resolve studio access map for a user.
+ * Returns { access: { studioKey: boolean }, portalVisibility: { studioKey: status } }
+ */
+export async function resolveStudioAccess(user) {
+    const portalVisibility = await getPortalVisibility();
+    const access = {};
+
+    for (const key of STUDIO_KEYS) {
+        access[key] = canAccessStudio(portalVisibility, user, key);
+    }
+
+    return { access, portalVisibility };
+}
+
+/**
+ * Express middleware: require access to a specific studio.
+ * Usage: router.get('/...', protect, requireStudioAccess('seoStudio'), handler)
+ */
+export function requireStudioAccess(studioKey) {
     return async (req, res, next) => {
-        const user = req.user;
-        if (!user) return res.status(401).json({ error: 'Not authenticated' });
+        try {
+            if (req.user?.role === 'superadmin') return next();
 
-        // Resolve studio key for telemetry/logging if needed
-        const key = STUDIO_MAP[studioKey] || studioKey;
-        req.currentStudio = key;
+            const portalVisibility = await getPortalVisibility();
+            const key = STUDIO_MAP[studioKey] || studioKey;
+            const hasAccess = canAccessStudio(portalVisibility, req.user, key);
 
-        // "all the users can access everything accept admin panel/super admin panel"
-        // Admin panels are protected by role-based checks elsewhere.
-        // For studios, we allow everyone who is logged in.
-        next();
+            if (!hasAccess) {
+                const status = portalVisibility[key] || 'public';
+                return res.status(403).json({
+                    success: false,
+                    error: status === 'hidden'
+                        ? 'This studio is currently unavailable'
+                        : 'You do not have access to this studio',
+                    studioKey: key,
+                    studioStatus: status,
+                });
+            }
+
+            req.currentStudio = key;
+            next();
+        } catch (error) {
+            console.error('Studio access check error:', error);
+            next(); // fail open
+        }
     };
 }
 
-// Check if user has access to a specific brand
+/**
+ * Legacy alias for backward compatibility.
+ */
+export const requireStudio = requireStudioAccess;
+
+/**
+ * Check if user has access to a specific brand (team-member restriction).
+ */
 export function requireBrandAccess(req, res, next) {
     const user = req.user;
     if (!user) return res.status(401).json({ error: 'Not authenticated' });
 
-    // Owners, admins, superadmins always have access
     if (user.role === 'superadmin' || user.role === 'admin') return next();
     if (!user.organization || user.teamRole === 'owner') return next();
 
     const brandId = req.query.brandId || req.body.brandId || req.params.brandId;
-    if (!brandId) return next(); // no brand context, allow
+    if (!brandId) return next();
 
     const hasAccess = !user.brandAccess?.length || user.brandAccess.some(id => String(id) === String(brandId));
     if (!hasAccess) {
@@ -61,4 +180,4 @@ export function requireBrandAccess(req, res, next) {
     next();
 }
 
-export default { requireStudio, requireBrandAccess };
+export default { requireStudioAccess, requireStudio, requireBrandAccess, resolveStudioAccess, getPortalVisibility, STUDIO_KEYS, STUDIO_LABELS };

@@ -2514,4 +2514,140 @@ router.get('/system-logs', async (req, res) => {
     }
 });
 
+// ══════════════════════════════════════════════════════════════
+// STUDIO ACCESS CONTROL (Portal Visibility + Per-User Overrides)
+// ══════════════════════════════════════════════════════════════
+import { STUDIO_KEYS, STUDIO_LABELS, getPortalVisibility, resolveStudioAccess } from '../middleware/studioAccess.js';
+
+/**
+ * GET /api/superadmin/studio-visibility
+ * Returns portal-level visibility for all studios
+ */
+router.get('/studio-visibility', async (req, res) => {
+    try {
+        const portalVisibility = await getPortalVisibility();
+        res.json({ success: true, portalVisibility, studioKeys: STUDIO_KEYS, studioLabels: STUDIO_LABELS });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+/**
+ * PUT /api/superadmin/studio-visibility
+ * Update portal-level visibility for studios
+ * Body: { visibility: { brainstormStudio: 'public', videoStudio: 'hidden', ... } }
+ */
+router.put('/studio-visibility', async (req, res) => {
+    try {
+        const { visibility } = req.body;
+        if (!visibility || typeof visibility !== 'object') {
+            return res.status(400).json({ success: false, error: 'Missing visibility map' });
+        }
+
+        // Validate: only allow known keys and valid values
+        const validStates = ['public', 'private', 'hidden'];
+        const cleaned = {};
+        for (const [key, val] of Object.entries(visibility)) {
+            if (STUDIO_KEYS.includes(key) && validStates.includes(val)) {
+                cleaned[key] = val;
+            }
+        }
+
+        const before = await getPortalVisibility();
+        await setSetting('studio_portal_visibility', cleaned, req.user._id);
+        const after = await getPortalVisibility();
+
+        await logAudit(req, {
+            action: 'UPDATE_STUDIO_VISIBILITY',
+            targetModel: 'SystemSettings',
+            targetId: 'studio_portal_visibility',
+            severity: 'high',
+            changes: { before, after },
+        });
+
+        res.json({ success: true, message: 'Studio visibility updated', portalVisibility: after });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+/**
+ * PUT /api/superadmin/users/:id/studio-access
+ * Update per-user studio access overrides
+ * Body: { overrides: { videoStudio: true, funnelStudio: false, ... } }
+ * Pass null to remove an override (reset to portal default)
+ */
+router.put('/users/:id/studio-access', async (req, res) => {
+    try {
+        const { overrides } = req.body;
+        if (!overrides || typeof overrides !== 'object') {
+            return res.status(400).json({ success: false, error: 'Missing overrides map' });
+        }
+
+        const user = await User.findById(req.params.id);
+        if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+        if (user.role === 'superadmin') return res.status(400).json({ success: false, error: 'Cannot override SuperAdmin access' });
+
+        const before = { ...(user.studioAccess || {}) };
+
+        // Apply overrides: set true/false, or delete key to reset to default
+        for (const [key, val] of Object.entries(overrides)) {
+            if (!STUDIO_KEYS.includes(key)) continue;
+            if (val === null || val === undefined) {
+                // Reset to default (use plan/portal defaults)
+                user.studioAccess[key] = undefined;
+            } else {
+                user.studioAccess[key] = !!val;
+            }
+        }
+
+        user.markModified('studioAccess');
+        await user.save();
+
+        // Resolve the user's full access after update
+        const { access } = await resolveStudioAccess(user);
+
+        await logAudit(req, {
+            action: 'UPDATE_USER_STUDIO_ACCESS',
+            targetModel: 'User',
+            targetId: user._id,
+            severity: 'medium',
+            metadata: { userName: user.name, userEmail: user.email },
+            changes: { before, after: user.studioAccess },
+        });
+
+        res.json({ success: true, message: `Studio access updated for ${user.name}`, resolvedAccess: access });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+/**
+ * GET /api/superadmin/users/:id/studio-access
+ * Get resolved studio access for a specific user (for the per-user modal)
+ */
+router.get('/users/:id/studio-access', async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+        const { access, portalVisibility } = await resolveStudioAccess(user);
+        const userOverrides = user.studioAccess || {};
+
+        res.json({
+            success: true,
+            userName: user.name,
+            userEmail: user.email,
+            userPlan: user.plan,
+            resolvedAccess: access,
+            portalVisibility,
+            userOverrides,
+            studioKeys: STUDIO_KEYS,
+            studioLabels: STUDIO_LABELS,
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 export default router;

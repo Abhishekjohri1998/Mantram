@@ -99,6 +99,12 @@ export default function SuperAdminDashboard() {
     const [showPackForm, setShowPackForm] = useState(false)
     const [editingPack, setEditingPack] = useState(null)
     const [packForm, setPackForm] = useState({ name: '', slug: '', credits: 100, bonusCredits: 0, price: 499, validityDays: 180, icon: 'bolt', badge: '', description: '', isPromo: false, promoDiscount: 0, promoOriginalPrice: 0, promoLabel: '', displayOrder: 0, isActive: true, isFirstPurchaseEligible: true })
+    // Studio Visibility (3-tier access control)
+    const [studioVisibility, setStudioVisibility] = useState(null)
+    const [studioKeys, setStudioKeys] = useState([])
+    const [studioLabels, setStudioLabels] = useState({})
+    // Per-user studio access modal
+    const [userStudioModal, setUserStudioModal] = useState(null)
 
     if (user?.role !== 'superadmin') {
         return <DashboardLayout><div className="flex items-center justify-center h-screen"><div className="text-center"><span className="material-symbols-outlined text-6xl text-rose-500 mb-4">shield</span><h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2><p className="text-slate-500">Super Admin access required</p></div></div></DashboardLayout>
@@ -151,7 +157,7 @@ export default function SuperAdminDashboard() {
         if (tab === 'approvals') loadPendingUsers()
         if (tab === 'coupons') loadCoupons()
         if (tab === 'content') { loadBrands(); loadContent() }
-        if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts(); loadApiKeys() }
+        if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts(); loadApiKeys(); loadStudioVisibility() }
         if (tab === 'integrations') loadIntegrations()
         if (tab === 'packages') loadPackages()
         if (tab === 'logs') loadLogs()
@@ -188,6 +194,28 @@ export default function SuperAdminDashboard() {
     const loadMonitorData = async () => { try { const d = await API.getPricingMonitor(); setMonitorData(d) } catch (e) { console.error(e) } }
     const handlePricingCheck = async () => { setMonitorChecking(true); try { const d = await API.triggerPricingCheck(); showToast(d.message); loadMonitorData() } catch (e) { showToast(e.error || 'Check failed', 'error') } finally { setMonitorChecking(false) } }
     const handleDismissAlerts = async () => { try { await API.dismissPricingAlerts(); showToast('Alerts dismissed'); loadMonitorData() } catch { showToast('Failed', 'error') } }
+    // Studio visibility
+    const loadStudioVisibility = async () => { try { const d = await API.getStudioVisibility(); setStudioVisibility(d.portalVisibility); setStudioKeys(d.studioKeys || []); setStudioLabels(d.studioLabels || {}) } catch (e) { console.error(e) } }
+    const handleStudioVisibilityChange = async (key, newState) => {
+        const updated = { ...studioVisibility, [key]: newState }
+        setStudioVisibility(updated)
+        try { await API.updateStudioVisibility(updated); showToast(`${studioLabels[key] || key} → ${newState}`) } catch { showToast('Failed', 'error') }
+    }
+    const openUserStudioModal = async (userId) => {
+        try {
+            const d = await API.getUserStudioAccess(userId)
+            setUserStudioModal({ ...d, userId })
+        } catch { showToast('Failed to load studio access', 'error') }
+    }
+    const handleUserStudioOverride = async (key, val) => {
+        if (!userStudioModal) return
+        const userId = userStudioModal.userId
+        try {
+            const d = await API.updateUserStudioAccess(userId, { [key]: val })
+            setUserStudioModal(prev => ({ ...prev, resolvedAccess: d.resolvedAccess, userOverrides: { ...prev.userOverrides, [key]: val } }))
+            showToast(`${studioLabels[key] || key} → ${val === true ? 'granted' : val === false ? 'revoked' : 'reset'}`)
+        } catch { showToast('Failed', 'error') }
+    }
     // Credit Pack management
     const loadCreditPacks = async () => { try { const d = await API.getCreditPacks(); setCreditPacksList(d.packs || d.creditPacks || []) } catch (e) { console.error(e) } }
     const handleSavePack = async (e) => { e.preventDefault(); try { if (editingPack) { await API.updateCreditPack(editingPack._id, packForm); showToast('Pack updated') } else { await API.createCreditPack(packForm); showToast('Pack created') } setShowPackForm(false); setEditingPack(null); loadCreditPacks() } catch (e) { showToast(e.error || 'Failed', 'error') } }
@@ -377,6 +405,62 @@ export default function SuperAdminDashboard() {
             <SEOHead title="Super Admin — Mantram AI" noIndex={true} />
             <div className="flex min-h-screen">
                 {toast && <div className={`fixed top-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-bold shadow-xl ${toast.type === 'error' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}`}>{toast.msg}</div>}
+
+                {/* Per-User Studio Access Modal */}
+                {userStudioModal && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setUserStudioModal(null)}>
+                        <div className="w-full max-w-lg bg-[#0e1025] border border-white/[0.08] rounded-2xl shadow-2xl p-6 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-between mb-6">
+                                <div>
+                                    <h3 className="text-lg font-bold text-white flex items-center gap-2"><span className="material-symbols-outlined text-violet-400">shield_person</span>Studio Access</h3>
+                                    <p className="text-sm text-slate-500 mt-1">{userStudioModal.userName} ({userStudioModal.userEmail}) — {userStudioModal.userPlan} plan</p>
+                                </div>
+                                <button onClick={() => setUserStudioModal(null)} className="p-2 rounded-lg hover:bg-white/[0.08] text-slate-500 cursor-pointer"><span className="material-symbols-outlined">close</span></button>
+                            </div>
+                            <div className="space-y-2">
+                                {(userStudioModal.studioKeys || studioKeys).map(key => {
+                                    const portalStatus = userStudioModal.portalVisibility?.[key] || 'public';
+                                    const hasOverride = userStudioModal.userOverrides?.[key] !== undefined && userStudioModal.userOverrides?.[key] !== null;
+                                    const overrideVal = userStudioModal.userOverrides?.[key];
+                                    const resolved = userStudioModal.resolvedAccess?.[key];
+                                    const label = (userStudioModal.studioLabels || studioLabels)[key] || key;
+                                    const isHidden = portalStatus === 'hidden';
+
+                                    let statusBadge, statusColor;
+                                    if (isHidden) { statusBadge = '🔒 Hidden (global)'; statusColor = 'text-rose-400'; }
+                                    else if (hasOverride && overrideVal === true) { statusBadge = '✅ Granted'; statusColor = 'text-emerald-400'; }
+                                    else if (hasOverride && overrideVal === false) { statusBadge = '❌ Revoked'; statusColor = 'text-rose-400'; }
+                                    else if (portalStatus === 'private') { statusBadge = '🔐 Private (no access)'; statusColor = 'text-amber-400'; }
+                                    else { statusBadge = '✅ Plan (public)'; statusColor = 'text-emerald-400'; }
+
+                                    return (
+                                        <div key={key} className={`flex items-center justify-between px-4 py-3 rounded-xl ${resolved ? 'bg-white/[0.02]' : 'bg-rose-500/5'} border border-white/[0.06]`}>
+                                            <div>
+                                                <p className="text-sm font-bold text-white">{label}</p>
+                                                <p className={`text-xs ${statusColor}`}>{statusBadge}</p>
+                                            </div>
+                                            {!isHidden && (
+                                                <div className="flex gap-1">
+                                                    <button onClick={() => handleUserStudioOverride(key, true)}
+                                                        className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${hasOverride && overrideVal === true ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'text-slate-600 hover:text-emerald-400 border border-transparent'}`}
+                                                    >Grant</button>
+                                                    <button onClick={() => handleUserStudioOverride(key, false)}
+                                                        className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${hasOverride && overrideVal === false ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40' : 'text-slate-600 hover:text-rose-400 border border-transparent'}`}
+                                                    >Revoke</button>
+                                                    {hasOverride && (
+                                                        <button onClick={() => handleUserStudioOverride(key, null)}
+                                                            className="px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer text-slate-600 hover:text-amber-400 border border-transparent"
+                                                        >Reset</button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* ═══════ SIDEBAR NAVIGATION ═══════ */}
                 <aside className={`${sidebarCollapsed ? 'w-[60px]' : 'w-[240px]'} flex-shrink-0 bg-gradient-to-b from-white/[0.03] to-transparent border-r border-white/[0.06] transition-all duration-300 sticky top-0 self-start h-screen overflow-y-auto`} style={{ scrollbarWidth: 'none' }}>
@@ -942,6 +1026,7 @@ export default function SuperAdminDashboard() {
                                         )}
 
                                         <button onClick={() => handleImpersonate(u._id, u.name)} title="Login as User" className="p-2 rounded-lg hover:bg-amber-500/10 text-slate-500 hover:text-amber-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">login</span></button>
+                                        <button onClick={() => openUserStudioModal(u._id)} title="Studio Access" className="p-2 rounded-lg hover:bg-violet-500/10 text-slate-500 hover:text-violet-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">shield_person</span></button>
                                         <button onClick={() => handleDeleteUser(u._id, u.name)} title="Delete" className="p-2 rounded-lg hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 transition-all cursor-pointer"><span className="material-symbols-outlined text-base">delete</span></button>
                                     </div>
                                 </div>
@@ -1884,6 +1969,51 @@ export default function SuperAdminDashboard() {
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Studio Launch Control - 3-tier visibility */}
+                                {studioVisibility && (
+                                    <div className="pt-4 border-t border-white/[0.06]">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div className="flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-violet-400">rocket_launch</span>
+                                                <p className="text-base font-bold text-white">Studio Launch Control</p>
+                                            </div>
+                                            <div className="flex gap-3 text-xs">
+                                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" />Public</span>
+                                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" />Private</span>
+                                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500" />Hidden</span>
+                                            </div>
+                                        </div>
+                                        <p className="text-sm text-slate-500 mb-4">Control which studios are available portal-wide. <b className="text-slate-400">Public</b> = everyone (per plan), <b className="text-amber-400">Private</b> = whitelisted users only, <b className="text-rose-400">Hidden</b> = off for all.</p>
+                                        <div className="space-y-2">
+                                            {studioKeys.map(key => {
+                                                const status = studioVisibility[key] || 'public';
+                                                const colors = { public: 'emerald', private: 'amber', hidden: 'rose' };
+                                                const c = colors[status];
+                                                return (
+                                                    <div key={key} className={`flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.02] border border-${c}-500/20 transition-all`}>
+                                                        <div className="flex items-center gap-3">
+                                                            <span className={`w-2.5 h-2.5 rounded-full bg-${c}-500`} />
+                                                            <span className="text-sm font-bold text-white">{studioLabels[key] || key}</span>
+                                                        </div>
+                                                        <div className="flex gap-1">
+                                                            {['public', 'private', 'hidden'].map(state => (
+                                                                <button key={state} onClick={() => handleStudioVisibilityChange(key, state)}
+                                                                    className={`px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${status === state
+                                                                        ? `bg-${colors[state]}-500/20 text-${colors[state]}-400 border border-${colors[state]}-500/40`
+                                                                        : 'text-slate-600 hover:text-slate-400 border border-transparent'
+                                                                    }`}
+                                                                >
+                                                                    {state.charAt(0).toUpperCase() + state.slice(1)}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="flex items-center justify-between">
                                     <div><p className="text-base font-bold text-white">Default AI Provider</p><p className="text-sm text-slate-500">Primary model for content generation</p></div>
                                     <select value={systemSettings.defaultProvider || 'gemini'} onChange={e => handleToggleSetting('defaultProvider', e.target.value)}

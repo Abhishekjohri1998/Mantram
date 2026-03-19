@@ -100,6 +100,7 @@ export const auth = {
     google: () => apiFetch('/auth/google'),
     verifyEmail: (token) => apiFetch(`/auth/verify-email?token=${token}`),
     resendVerification: (email) => apiFetch('/auth/resend-verification', { method: 'POST', body: JSON.stringify({ email }) }),
+    getStudioAccess: () => apiFetch('/auth/studio-access'),
 };
 
 // ============ Brands API ============
@@ -415,6 +416,11 @@ export const superadmin = {
     deleteCreditPack: (id) => apiFetch(`/superadmin/credit-packs/${id}`, { method: 'DELETE' }),
     toggleCreditPack: (id) => apiFetch(`/superadmin/credit-packs/${id}/toggle`, { method: 'POST' }),
     seedCreditPacks: (force) => apiFetch('/superadmin/credit-packs/seed-defaults', { method: 'POST', body: JSON.stringify({ force }) }),
+    // Studio Access Control
+    getStudioVisibility: () => apiFetch('/superadmin/studio-visibility'),
+    updateStudioVisibility: (visibility) => apiFetch('/superadmin/studio-visibility', { method: 'PUT', body: JSON.stringify({ visibility }) }),
+    getUserStudioAccess: (userId) => apiFetch(`/superadmin/users/${userId}/studio-access`),
+    updateUserStudioAccess: (userId, overrides) => apiFetch(`/superadmin/users/${userId}/studio-access`, { method: 'PUT', body: JSON.stringify({ overrides }) }),
     // Credit Costs
     getCreditCosts: () => apiFetch('/superadmin/credit-costs'),
     // Pricing Strategy Command Center

@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { credits as creditsAPI } from '../services/api'
+import { credits as creditsAPI, auth as authAPI } from '../services/api'
 
 const navItems = [
     { icon: 'dashboard', label: 'Dashboard', to: '/dashboard' },
@@ -15,7 +15,7 @@ const navItems = [
     { icon: 'monitoring', label: 'Performance Studio', to: '/performance-marketing', studioKey: 'adStudio' },
     { icon: 'filter_alt', label: 'Funnel Studio', to: '/funnel-studio', studioKey: 'funnelStudio' },
     { icon: 'storefront', label: 'D2C Studio', to: '/d2c-analytics', studioKey: 'd2cAnalytics' },
-    { icon: 'auto_awesome', label: 'Skills Hub', to: '/skills' },
+    { icon: 'auto_awesome', label: 'Skills Hub', to: '/skills', studioKey: 'skillsHub' },
 ]
 
 const bottomItems = [
@@ -24,17 +24,19 @@ const bottomItems = [
     { icon: 'settings', label: 'Settings', to: '/team' },
 ]
 
-// Filter nav items based on team member's studio access
-function getVisibleNavItems(user) {
-    // "all the users can access everything accept admin panel/super admin panel"
-    // Return all navigation items for any logged-in user.
-    if (!user) return [];
-    return navItems;
+// Filter nav items based on studio access
+function filterNavByAccess(items, studioAccess) {
+    if (!studioAccess) return items; // fallback: show all
+    return items.filter(item => {
+        if (!item.studioKey) return true; // non-studio items always visible
+        return studioAccess[item.studioKey] !== false;
+    });
 }
 
 export default function Sidebar({ mobileOpen, onClose }) {
     const { user } = useAuth()
     const [creditBalance, setCreditBalance] = useState(null)
+    const [studioAccess, setStudioAccess] = useState(null)
 
     // Fetch credit balance
     useEffect(() => {
@@ -48,6 +50,21 @@ export default function Sidebar({ mobileOpen, onClose }) {
         const interval = setInterval(fetchCredits, 2 * 60 * 1000)
         return () => clearInterval(interval)
     }, [user])
+
+    // Fetch studio access (3-tier portal/user/plan resolution)
+    useEffect(() => {
+        if (!user) return
+        ;(async () => {
+            try {
+                const data = await authAPI.getStudioAccess()
+                if (data?.access) setStudioAccess(data.access)
+            } catch { /* fail open — show all */ }
+        })()
+    }, [user])
+
+    // SuperAdmin sees everything; others get filtered
+    const isSuperAdmin = user?.role?.trim() === 'superadmin'
+    const visibleNavItems = !user ? [] : isSuperAdmin ? navItems : filterNavByAccess(navItems, studioAccess)
 
     // Close sidebar on route change (mobile)
     const handleNavClick = () => {
@@ -71,7 +88,6 @@ export default function Sidebar({ mobileOpen, onClose }) {
         return () => { document.body.style.overflow = '' }
     }, [mobileOpen])
 
-    const isSuperAdmin = user?.role?.trim() === 'superadmin'
 
     const sidebarContent = (
         <>
@@ -96,7 +112,7 @@ export default function Sidebar({ mobileOpen, onClose }) {
             {/* Main Nav */}
             <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
                 <p className="px-3 pt-4 pb-2 text-xs text-slate-600 uppercase tracking-widest font-bold">Create</p>
-                {getVisibleNavItems(user).map((item) => (
+                {visibleNavItems.map((item) => (
                     <NavLink
                         key={item.label}
                         to={item.to}

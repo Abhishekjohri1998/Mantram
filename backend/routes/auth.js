@@ -443,4 +443,25 @@ ${error
 </body></html>`;
 }
 
+// ══════════════════════════════════════════════════════════════
+// STUDIO ACCESS — Public endpoint for frontend sidebar filtering
+// ══════════════════════════════════════════════════════════════
+import { resolveStudioAccess, STUDIO_KEYS, STUDIO_LABELS } from '../middleware/studioAccess.js';
+
+/**
+ * GET /api/auth/studio-access
+ * Returns the resolved studio access map for the current user.
+ * Called by the Sidebar on mount to filter navigation items.
+ */
+router.get('/studio-access', protect, async (req, res) => {
+    try {
+        const { access, portalVisibility } = await resolveStudioAccess(req.user);
+        res.json({ success: true, access, portalVisibility, studioKeys: STUDIO_KEYS, studioLabels: STUDIO_LABELS });
+    } catch (error) {
+        // Fail open — return all studios accessible to avoid blocking users
+        const allAccess = Object.fromEntries(STUDIO_KEYS.map(k => [k, true]));
+        res.json({ success: true, access: allAccess });
+    }
+});
+
 export default router;
