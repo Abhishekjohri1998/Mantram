@@ -94,6 +94,11 @@ export default function SuperAdminDashboard() {
     const [impersonateResults, setImpersonateResults] = useState([])
     const [impersonateLoading, setImpersonateLoading] = useState(false)
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+    // Credit Packs management
+    const [creditPacksList, setCreditPacksList] = useState([])
+    const [showPackForm, setShowPackForm] = useState(false)
+    const [editingPack, setEditingPack] = useState(null)
+    const [packForm, setPackForm] = useState({ name: '', slug: '', credits: 100, bonusCredits: 0, price: 499, validityDays: 180, icon: 'bolt', badge: '', description: '', isPromo: false, promoDiscount: 0, promoOriginalPrice: 0, promoLabel: '', displayOrder: 0, isActive: true, isFirstPurchaseEligible: true })
 
     if (user?.role !== 'superadmin') {
         return <DashboardLayout><div className="flex items-center justify-center h-screen"><div className="text-center"><span className="material-symbols-outlined text-6xl text-rose-500 mb-4">shield</span><h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2><p className="text-slate-500">Super Admin access required</p></div></div></DashboardLayout>
@@ -113,6 +118,7 @@ export default function SuperAdminDashboard() {
         ]},
         { label: 'Monetization', icon: 'monetization_on', items: [
             { id: 'packages', label: 'Plans & Packages', icon: 'inventory_2' },
+            { id: 'creditPacks', label: 'Credit Store', icon: 'shopping_cart' },
             { id: 'coupons', label: 'Coupons', icon: 'confirmation_number' },
             { id: 'pricing', label: 'Pricing Strategy', icon: 'calculate' },
         ]},
@@ -150,6 +156,7 @@ export default function SuperAdminDashboard() {
         if (tab === 'packages') loadPackages()
         if (tab === 'logs') loadLogs()
         if (tab === 'pricing') { loadPolicyData(); loadMonitorData(); loadPricingData(calcCreditPrice) }
+        if (tab === 'creditPacks') loadCreditPacks()
     }, [tab, debouncedSearch, planFilter, userPage, logsPage])
 
     const loadStats = async () => { try { const d = await API.getStats(); setStats(d.stats) } catch (e) { console.error(e) } finally { setLoading(false) } }
@@ -181,6 +188,13 @@ export default function SuperAdminDashboard() {
     const loadMonitorData = async () => { try { const d = await API.getPricingMonitor(); setMonitorData(d) } catch (e) { console.error(e) } }
     const handlePricingCheck = async () => { setMonitorChecking(true); try { const d = await API.triggerPricingCheck(); showToast(d.message); loadMonitorData() } catch (e) { showToast(e.error || 'Check failed', 'error') } finally { setMonitorChecking(false) } }
     const handleDismissAlerts = async () => { try { await API.dismissPricingAlerts(); showToast('Alerts dismissed'); loadMonitorData() } catch { showToast('Failed', 'error') } }
+    // Credit Pack management
+    const loadCreditPacks = async () => { try { const d = await API.getCreditPacks(); setCreditPacksList(d.packs || d.creditPacks || []) } catch (e) { console.error(e) } }
+    const handleSavePack = async (e) => { e.preventDefault(); try { if (editingPack) { await API.updateCreditPack(editingPack._id, packForm); showToast('Pack updated') } else { await API.createCreditPack(packForm); showToast('Pack created') } setShowPackForm(false); setEditingPack(null); loadCreditPacks() } catch (e) { showToast(e.error || 'Failed', 'error') } }
+    const handleDeletePack = async (id, name) => { if (!confirm(`Delete pack "${name}"?`)) return; try { await API.deleteCreditPack(id); showToast('Deleted'); loadCreditPacks() } catch { showToast('Failed', 'error') } }
+    const handleTogglePack = async (id) => { try { await API.toggleCreditPack(id); loadCreditPacks() } catch { showToast('Failed', 'error') } }
+    const handleSeedPacks = async () => { if (!confirm('Seed default credit packs? This will add standard packs.')) return; try { const d = await API.seedCreditPacks(creditPacksList.length > 0); showToast(d.message || 'Packs seeded'); loadCreditPacks() } catch (e) { showToast(e.error || 'Failed', 'error') } }
+    const handleEditPack = (p) => { setEditingPack(p); setPackForm({ name: p.name, slug: p.slug, credits: p.credits, bonusCredits: p.bonusCredits || 0, price: p.price, validityDays: p.validityDays || 180, icon: p.icon || 'bolt', badge: p.badge || '', description: p.description || '', isPromo: p.isPromo || false, promoDiscount: p.promoDiscount || 0, promoOriginalPrice: p.promoOriginalPrice || 0, promoLabel: p.promoLabel || '', displayOrder: p.displayOrder || 0, isActive: p.isActive !== false, isFirstPurchaseEligible: p.isFirstPurchaseEligible !== false }); setShowPackForm(true) }
     // API Key Management functions
     const loadApiKeys = async () => { try { const d = await API.getApiKeys(); setApiProviders(d.providers || []) } catch (e) { console.error(e) } }
     const handleSaveApiKey = async (provider) => { try { await API.updateApiKeys(provider, editProviderKeys); showToast('API key updated'); setEditingProvider(null); setEditProviderKeys({}); loadApiKeys() } catch (e) { showToast(e.error || 'Failed', 'error') } }
