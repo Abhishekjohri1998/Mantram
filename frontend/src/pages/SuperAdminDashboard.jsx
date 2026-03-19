@@ -219,8 +219,11 @@ export default function SuperAdminDashboard() {
             const currentToken = localStorage.getItem('mantram_token');
             if (currentToken) sessionStorage.setItem('mantram_superadmin_token', currentToken);
             const d = await API.impersonateUser(id);
-            loginWithToken(d.token, { ...d.user, isImpersonated: true });
-            navigate('/dashboard');
+            // Use hard reload to clear ALL cached React state (brands, credits, etc.)
+            localStorage.setItem('mantram_token', d.token);
+            // Store impersonation flag so the app knows to show the banner
+            sessionStorage.setItem('mantram_impersonated_user', JSON.stringify({ name: d.user.name, email: d.user.email }));
+            window.location.href = '/dashboard';
         } catch { showToast('Impersonation failed', 'error') }
     }
     const handleExitImpersonation = () => {

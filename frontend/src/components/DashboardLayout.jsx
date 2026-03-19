@@ -11,10 +11,22 @@ export default function DashboardLayout({ children, title, subtitle }) {
     const [mobileOpen, setMobileOpen] = useState(false)
     const { user } = useAuth()
 
+    // Detect impersonation: superadmin token is saved in sessionStorage
+    const isImpersonating = !!sessionStorage.getItem('mantram_superadmin_token')
+    let impersonatedName = user?.name || 'Unknown'
+    try {
+        const imp = sessionStorage.getItem('mantram_impersonated_user')
+        if (imp) {
+            const parsed = JSON.parse(imp)
+            impersonatedName = `${parsed.name} (${parsed.email})`
+        }
+    } catch {}
+
     const handleExitImpersonation = () => {
         const superadminToken = sessionStorage.getItem('mantram_superadmin_token');
         if (superadminToken) {
             sessionStorage.removeItem('mantram_superadmin_token');
+            sessionStorage.removeItem('mantram_impersonated_user');
             localStorage.setItem('mantram_token', superadminToken);
             window.location.href = '/superadmin';
         } else {
@@ -32,12 +44,12 @@ export default function DashboardLayout({ children, title, subtitle }) {
                     <div className="fixed bottom-0 left-64 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[100px] -mb-32 pointer-events-none" />
 
                     {/* Global Impersonation Banner */}
-                    {user?.isImpersonated && (
+                    {isImpersonating && (
                         <div className="sticky top-0 z-50 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-rose-500 shadow-lg shadow-amber-500/20 flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <span className="material-symbols-outlined text-white text-lg">visibility</span>
                                 <p className="text-white text-xs font-bold">
-                                    Viewing as <strong className="underline">{user.name}</strong> • All actions are logged
+                                    Viewing as <strong className="underline">{impersonatedName}</strong> — All actions are logged
                                 </p>
                             </div>
                             <button onClick={handleExitImpersonation} className="px-3 py-1.5 bg-white text-rose-600 rounded-lg text-[10px] font-black uppercase hover:bg-slate-100 transition-all cursor-pointer flex items-center gap-1.5">
