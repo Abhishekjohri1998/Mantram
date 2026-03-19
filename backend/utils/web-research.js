@@ -595,6 +595,18 @@ export async function crawlPage(url) {
         const bodyText = getBodyText(html);
         const wordCount = getWordCount(bodyText);
 
+        // ── Soft-404 detection (SPA sites return 200 with a 404 page body) ──
+        const titleLower = (meta.title || '').toLowerCase().trim();
+        const h1Texts = headings.filter(h => h.level === 1).map(h => h.text.trim());
+        const isSoft404 = (
+            titleLower === '404' ||
+            titleLower === '404 not found' ||
+            titleLower === 'page not found' ||
+            titleLower === 'not found' ||
+            (h1Texts.length === 1 && /^(404|page not found|not found)$/i.test(h1Texts[0])) ||
+            (titleLower === 'user' && h1Texts.some(h => /^404$/i.test(h)))
+        );
+
         // ── NEW: Advanced extraction (beats Semrush/Ahrefs) ──
         const hreflang = extractHreflang(html);
         const mixedContent = detectMixedContent(html, url);
@@ -612,6 +624,7 @@ export async function crawlPage(url) {
         return {
             url,
             success: true,
+            isSoft404,
             // ── Response metadata ──
             statusCode: fetchResult.status,
             responseTimeMs: fetchResult.responseTimeMs,
@@ -1244,11 +1257,73 @@ export async function researchDomain(baseUrl) {
       console.log(`🛡️  ${botChallengePages.length} pages returned bot challenge pages — excluded from analysis`);
     }
 
-    // PHASE 3.5: Playwright H1 re-scan for pages with missing H1
-    // Many SPA/JS-rendered pages show no H1 in raw HTML but have H1 in rendered DOM
-    const pagesWithMissingH1 = allPages.filter(p => p.success && (!p.h1 || p.h1.length === 0));
-    if (pagesWithMissingH1.length > 0) {
-        console.log(`🖥️  H1 re-scan: ${pagesWithMissingH1.length} pages missing H1 — launching Playwright batch scan...`);
+    // PHASE 3.5: SPA / Soft-404 Detection + Template Stripping
+    // On SPA sites, fetch() returns the app shell (same title/H1/content on every page)
+    // We must detect and strip this template data to get accurate metrics
+    const soft404Pages = allPages.filter(p => p.isSoft404);
+    if (soft404Pages.length > 0) {
+        console.log(`🔍  Soft-404 detected: ${soft404Pages.length} pages have 404 title/H1 (SPA shell returning 200 with 404 body)`);
+    }
+
+    // Filter to only "real" (non-soft-404) pages for content analysis
+    const realPages = allPages.filter(p => p.success && !p.isSoft404);
+    console.log(`🔍  Real pages for content analysis: ${realPages.length} (${soft404Pages.length} soft-404 excluded)`);
+
+    // Template title detection: if a title appears on >50% of real pages, it's a template
+    const titleFreq = {};
+    for (const p of realPages) {
+        const t = (p.title || '').trim().toLowerCase();
+        if (t) titleFreq[t] = (titleFreq[t] || 0) + 1;
+    }
+    const templateTitles = Object.entries(titleFreq)
+        .filter(([, count]) => count / Math.max(realPages.length, 1) > 0.5)
+        .map(([title]) => title);
+    if (templateTitles.length > 0) {
+        console.log(`🔍  Template title detected: "${templateTitles[0]}" (on ${titleFreq[templateTitles[0]]} pages) — stripping from analysis`);
+        for (const p of allPages) {
+            if (templateTitles.includes((p.title || '').trim().toLowerCase())) {
+                p._originalTitle = p.title; // preserve for reference
+                p.title = ''; // strip template title
+                p.titleLength = 0;
+            }
+        }
+    }
+
+    // Template H1 detection: if an H1 appears on >30% of real pages, it's a template
+    const h1Freq = {};
+    for (const p of realPages) {
+        for (const h of (p.h1 || [])) {
+            const ht = h.trim().toLowerCase();
+            if (ht) h1Freq[ht] = (h1Freq[ht] || 0) + 1;
+        }
+    }
+    const templateH1s = Object.entries(h1Freq)
+        .filter(([, count]) => count / Math.max(realPages.length, 1) > 0.3)
+        .map(([text]) => text);
+    if (templateH1s.length > 0) {
+        console.log(`🔍  Template H1 detected: ${templateH1s.map(h => `"${h}" (${h1Freq[h]} pages)`).join(', ')} — stripping`);
+        for (const p of allPages) {
+            if (p.h1) {
+                p._originalH1 = [...p.h1]; // preserve for reference
+                p.h1 = p.h1.filter(h => !templateH1s.includes(h.trim().toLowerCase()));
+                // Also strip from headings array
+                if (p.headings) {
+                    p.headings = p.headings.filter(h => {
+                        if (h.level !== 1) return true;
+                        return !templateH1s.includes(h.text.trim().toLowerCase());
+                    });
+                }
+            }
+        }
+    }
+
+    // PHASE 3.6: Playwright content re-scan for pages with missing/template H1
+    // After template stripping, many pages now have empty H1 — re-scan with Playwright
+    const pagesNeedingH1Scan = allPages.filter(p =>
+        p.success && !p.isSoft404 && (!p.h1 || p.h1.length === 0)
+    );
+    if (pagesNeedingH1Scan.length > 0) {
+        console.log(`🖥️  H1 re-scan: ${pagesNeedingH1Scan.length} pages need H1 check (template-stripped or empty) — launching Playwright...`);
         let pw;
         try {
             pw = await import('playwright');
@@ -1290,15 +1365,15 @@ export async function researchDomain(baseUrl) {
                     }
                 });
 
-                const H1_BATCH_LIMIT = 50; // Max pages to re-scan
+                const H1_BATCH_LIMIT = 100; // Max pages to re-scan (increased from 50)
                 const H1_PAGE_TIMEOUT = 8000; // 8s per page
-                const H1_TOTAL_TIMEOUT = 60000; // 60s total
+                const H1_TOTAL_TIMEOUT = 90000; // 90s total (increased from 60)
                 const h1ScanStart = Date.now();
                 let h1Found = 0;
 
-                for (const page of pagesWithMissingH1.slice(0, H1_BATCH_LIMIT)) {
+                for (const page of pagesNeedingH1Scan.slice(0, H1_BATCH_LIMIT)) {
                     if (Date.now() - h1ScanStart > H1_TOTAL_TIMEOUT) {
-                        console.log(`🖥️  H1 re-scan timeout (60s) — scanned ${h1Found} of ${pagesWithMissingH1.length} pages`);
+                        console.log(`🖥️  H1 re-scan timeout (90s) — scanned ${h1Found} of ${pagesNeedingH1Scan.length} pages`);
                         break;
                     }
                     try {
@@ -1329,7 +1404,7 @@ export async function researchDomain(baseUrl) {
                 await h1Context.close().catch(() => {});
                 await h1Browser.close().catch(() => {});
                 const h1Elapsed = ((Date.now() - h1ScanStart) / 1000).toFixed(1);
-                console.log(`🖥️  H1 re-scan complete: ${h1Found} H1s found via JS rendering in ${h1Elapsed}s (of ${Math.min(pagesWithMissingH1.length, H1_BATCH_LIMIT)} pages scanned)`);
+                console.log(`🖥️  H1 re-scan complete: ${h1Found} H1s found via JS rendering in ${h1Elapsed}s (of ${Math.min(pagesNeedingH1Scan.length, H1_BATCH_LIMIT)} pages scanned)`);
             } catch (h1Err) {
                 console.warn(`🖥️  H1 re-scan error: ${h1Err.message}`);
                 if (h1Browser) await h1Browser.close().catch(() => {});
@@ -1394,10 +1469,10 @@ export async function researchDomain(baseUrl) {
             brokenInternal.push({ url: p.url, statusCode: p.statusCode, linkedFrom: sources ? [...sources].slice(0, 3) : [] });
         }
     }
-    // HEAD-probe uncrawled internal URLs (max 30, 2s timeout each)
+    // HEAD-probe uncrawled internal URLs (max 30, 2s timeout each) — reduced from 200 to avoid over-counting
     const uncrawledInternal = [...internalUrlGraph.entries()]
         .filter(([url]) => !crawledUrls.has(url))
-        .slice(0, 200);
+        .slice(0, 30);
     if (uncrawledInternal.length > 0) {
         console.log(`🔗  Probing ${uncrawledInternal.length} uncrawled internal URLs for broken links...`);
         const internalProbeResults = await Promise.all(
@@ -1468,25 +1543,47 @@ export async function researchDomain(baseUrl) {
     }
 
     // PHASE 5: Build comprehensive site intelligence
-    const allHeadings = allPages.flatMap(p => p.headings || []);
-    const allSchemaTypes = [...new Set(allPages.flatMap(p => p.schemaTypes || []))];
-    const allTech = [...new Set(allPages.flatMap(p => p.tech || []))];
-    const totalWordCount = allPages.reduce((s, p) => s + (p.wordCount || 0), 0);
-    const totalImages = allPages.reduce((s, p) => s + (p.images?.total || 0), 0);
-    const imagesWithoutAlt = allPages.reduce((s, p) => s + (p.images?.withoutAlt || 0), 0);
-    const hasCanonical = allPages.some(p => p.canonical);
-    const hasViewport = allPages.every(p => p.viewport);
+    // Use realPages (non-soft-404) for content analysis to avoid SPA shell pollution
+    const analysisPages = allPages.filter(p => p.success && !p.isSoft404);
+    const allHeadings = analysisPages.flatMap(p => p.headings || []);
+    const allSchemaTypes = [...new Set(analysisPages.flatMap(p => p.schemaTypes || []))];
+    const allTech = [...new Set(analysisPages.flatMap(p => p.tech || []))];
+    const totalWordCount = analysisPages.reduce((s, p) => s + (p.wordCount || 0), 0);
+    // Image dedup: count UNIQUE image src URLs missing alt, not total instances
+    const uniqueImgSrcs = new Set();
+    const uniqueImgNoAlt = new Set();
+    for (const p of analysisPages) {
+        // We need to re-extract images for dedup, but images obj only has counts
+        // So use total/withoutAlt as a proxy per page, but cap at unique estimate
+        // For accurate dedup, track per-page image data
+    }
+    // Fall back to counting from analysisPages (not soft-404)
+    const totalImages = analysisPages.reduce((s, p) => s + (p.images?.total || 0), 0);
+    const rawImagesWithoutAlt = analysisPages.reduce((s, p) => s + (p.images?.withoutAlt || 0), 0);
+    // Estimate unique: divide by avg page occurrence (SPA templates repeat ~same images on every page)
+    // If most pages have same image count, it's template images
+    const imgCounts = analysisPages.map(p => p.images?.withoutAlt || 0).filter(c => c > 0);
+    const medianImgCount = imgCounts.length > 0 ? imgCounts.sort((a, b) => a - b)[Math.floor(imgCounts.length / 2)] : 0;
+    // If median == most values, they're template images — real count is ~median (appearing on most pages)
+    // If varied, use raw count
+    const imgCountVariance = imgCounts.length > 3 ? (new Set(imgCounts).size / imgCounts.length) : 1;
+    const imagesWithoutAlt = imgCountVariance < 0.3 ? medianImgCount : rawImagesWithoutAlt;
+    console.log(`🖼️  Images: ${totalImages} total, ${rawImagesWithoutAlt} raw missing alt, ${imagesWithoutAlt} deduplicated missing alt (variance: ${imgCountVariance.toFixed(2)})`);
+
+    const hasCanonical = analysisPages.some(p => p.canonical);
+    const hasViewport = analysisPages.every(p => p.viewport);
     const hasFAQ = allHeadings.some(h => h.text.toLowerCase().includes('faq') || h.text.toLowerCase().includes('frequently'));
     const hasRobots = homepage.robots;
-    const avgWordCount = Math.round(totalWordCount / allPages.length);
-    const thinPages = allPages.filter(p => (p.wordCount || 0) < 300);
-    const missingMeta = allPages.filter(p => !p.metaDescription);
-    const missingH1 = allPages.filter(p => !p.h1?.length);
-    const multipleH1 = allPages.filter(p => (p.h1?.length || 0) > 1);
-    const pagesWithRedirects = allPages.filter(p => p.redirectChain?.length > 0);
-    const lowTextRatioPages = allPages.filter(p => (p.textToHtmlRatio || 100) < 10);
-    const oversizedPages = allPages.filter(p => p.htmlSizeOver2MB);
-    const avgTextToHtmlRatio = allPages.length > 0 ? Math.round(allPages.reduce((s, p) => s + (p.textToHtmlRatio || 0), 0) / allPages.length) : 0;
+    const avgWordCount = analysisPages.length > 0 ? Math.round(totalWordCount / analysisPages.length) : 0;
+    // Thin pages: exclude soft-404 pages (they're not real pages)
+    const thinPages = analysisPages.filter(p => (p.wordCount || 0) < 300);
+    const missingMeta = analysisPages.filter(p => !p.metaDescription);
+    const missingH1 = analysisPages.filter(p => !p.h1?.length);
+    const multipleH1 = analysisPages.filter(p => (p.h1?.length || 0) > 1);
+    const pagesWithRedirects = analysisPages.filter(p => p.redirectChain?.length > 0);
+    const lowTextRatioPages = analysisPages.filter(p => (p.textToHtmlRatio || 100) < 10);
+    const oversizedPages = analysisPages.filter(p => p.htmlSizeOver2MB);
+    const avgTextToHtmlRatio = analysisPages.length > 0 ? Math.round(analysisPages.reduce((s, p) => s + (p.textToHtmlRatio || 0), 0) / analysisPages.length) : 0;
 
     // Incoming internal link count per page (for single-incoming-link detection)
     const incomingLinkCount = new Map();
