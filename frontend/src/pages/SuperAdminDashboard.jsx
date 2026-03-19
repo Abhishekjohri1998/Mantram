@@ -89,6 +89,11 @@ export default function SuperAdminDashboard() {
     const [calcMargin, setCalcMargin] = useState(60)
     const [calcExRate, setCalcExRate] = useState(85)
     const [policySection, setPolicySection] = useState('calculator')
+    // Impersonation search
+    const [impersonateSearch, setImpersonateSearch] = useState('')
+    const [impersonateResults, setImpersonateResults] = useState([])
+    const [impersonateLoading, setImpersonateLoading] = useState(false)
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
     if (user?.role !== 'superadmin') {
         return <DashboardLayout><div className="flex items-center justify-center h-screen"><div className="text-center"><span className="material-symbols-outlined text-6xl text-rose-500 mb-4">shield</span><h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2><p className="text-slate-500">Super Admin access required</p></div></div></DashboardLayout>
@@ -96,20 +101,30 @@ export default function SuperAdminDashboard() {
 
     const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
 
-    const tabs = [
-        { id: 'overview', label: 'Overview', icon: 'dashboard' },
-        { id: 'approvals', label: 'Approvals', icon: 'how_to_reg' },
-        { id: 'waitlist', label: 'Waitlist', icon: 'list_alt' },
-        { id: 'users', label: 'Users', icon: 'group' },
-        { id: 'ai-credits', label: 'AI Usage', icon: 'token' },
-        { id: 'tokenUsage', label: 'Token Usage', icon: 'monitoring' },
-        { id: 'packages', label: 'Packages', icon: 'inventory_2' },
-        { id: 'coupons', label: 'Coupons', icon: 'confirmation_number' },
-        { id: 'content', label: 'Content & Brands', icon: 'article' },
-        { id: 'ai', label: 'AI & System', icon: 'smart_toy' },
-        { id: 'integrations', label: 'Integrations', icon: 'hub' },
-        { id: 'logs', label: 'Audit Logs', icon: 'history' },
-        { id: 'pricing', label: 'Pricing', icon: 'calculate' },
+    const navGroups = [
+        { label: 'Command Center', icon: 'command_bar', items: [
+            { id: 'overview', label: 'Overview', icon: 'dashboard' },
+        ]},
+        { label: 'People', icon: 'group', items: [
+            { id: 'approvals', label: 'Approvals', icon: 'how_to_reg', badge: pendingUsers?.length },
+            { id: 'waitlist', label: 'Waitlist', icon: 'list_alt', badge: waitlist?.length },
+            { id: 'users', label: 'Users', icon: 'person_search' },
+            { id: 'ai-credits', label: 'AI Usage', icon: 'token' },
+        ]},
+        { label: 'Monetization', icon: 'monetization_on', items: [
+            { id: 'packages', label: 'Plans & Packages', icon: 'inventory_2' },
+            { id: 'coupons', label: 'Coupons', icon: 'confirmation_number' },
+            { id: 'pricing', label: 'Pricing Strategy', icon: 'calculate' },
+        ]},
+        { label: 'AI Operations', icon: 'smart_toy', items: [
+            { id: 'ai', label: 'AI & System', icon: 'psychology' },
+            { id: 'tokenUsage', label: 'Token Usage', icon: 'monitoring' },
+        ]},
+        { label: 'Platform', icon: 'settings', items: [
+            { id: 'content', label: 'Content & Brands', icon: 'article' },
+            { id: 'integrations', label: 'Integrations', icon: 'hub' },
+            { id: 'logs', label: 'Audit Logs', icon: 'history' },
+        ]},
     ]
 
     useEffect(() => { loadStats(); loadPackages(); loadTokenUsage() }, [])
@@ -297,6 +312,20 @@ export default function SuperAdminDashboard() {
 
     const platformIcons = { instagram: '📸', facebook: '📘', linkedin: '💼', twitter: '🐦', shopify: '🛍️', 'google-analytics': '📊', 'meta-ads': '📱', 'google-ads': '🔍', meta: '📱', google: '🔍' }
 
+    // Impersonation search handler
+    useEffect(() => {
+        if (!impersonateSearch || impersonateSearch.length < 2) { setImpersonateResults([]); return }
+        const timer = setTimeout(async () => {
+            setImpersonateLoading(true)
+            try {
+                const d = await API.getUsers({ search: impersonateSearch, limit: 5 })
+                setImpersonateResults(d.users || [])
+            } catch { setImpersonateResults([]) }
+            finally { setImpersonateLoading(false) }
+        }, 300)
+        return () => clearTimeout(timer)
+    }, [impersonateSearch])
+
     const Card = ({ icon, color, value, label }) => (
         <div className="glass-panel rounded-2xl p-5">
             <span className={`material-symbols-outlined text-2xl mb-3 block ${color}`}>{icon}</span>
@@ -308,44 +337,123 @@ export default function SuperAdminDashboard() {
     return (
         <DashboardLayout>
             <SEOHead title="Super Admin — Mantram AI" noIndex={true} />
-            <div className="p-8 max-w-[1400px] mx-auto">
+            <div className="flex min-h-screen">
                 {toast && <div className={`fixed top-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-bold shadow-xl ${toast.type === 'error' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}`}>{toast.msg}</div>}
 
-                <div className="flex items-center justify-between mb-8">
-                    <div>
-                        <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
-                            <span className="material-symbols-outlined text-amber-400 text-3xl">shield_person</span>
-                            Super Admin
-                        </h1>
-                        <p className="text-slate-500 text-sm mt-1">Complete platform management</p>
+                {/* ═══════ SIDEBAR NAVIGATION ═══════ */}
+                <aside className={`${sidebarCollapsed ? 'w-[60px]' : 'w-[240px]'} flex-shrink-0 bg-gradient-to-b from-white/[0.03] to-transparent border-r border-white/[0.06] transition-all duration-300 sticky top-0 self-start h-screen overflow-y-auto`} style={{ scrollbarWidth: 'none' }}>
+                    {/* Sidebar Header */}
+                    <div className="p-4 border-b border-white/[0.06]">
+                        <div className="flex items-center justify-between">
+                            {!sidebarCollapsed && (
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-amber-400 text-xl">shield_person</span>
+                                    <span className="text-sm font-black text-white uppercase tracking-wider">Admin</span>
+                                </div>
+                            )}
+                            <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-slate-500 hover:text-white transition-all cursor-pointer">
+                                <span className="material-symbols-outlined text-base">{sidebarCollapsed ? 'chevron_right' : 'chevron_left'}</span>
+                            </button>
+                        </div>
                     </div>
-                </div>
 
-                {/* Impersonation Warning Banner */}
-                {user?.isImpersonated && (
-                    <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-amber-500 to-rose-500 shadow-lg shadow-amber-500/20 flex items-center justify-between animate-pulse">
-                        <div className="flex items-center gap-3">
-                            <span className="material-symbols-outlined text-white text-2xl">error</span>
+                    {/* Nav Groups */}
+                    <nav className="p-2 space-y-1">
+                        {navGroups.map((group, gi) => (
+                            <div key={gi} className="mb-1">
+                                {!sidebarCollapsed && (
+                                    <p className="px-3 pt-4 pb-1 text-[9px] font-black text-slate-600 uppercase tracking-[0.15em]">{group.label}</p>
+                                )}
+                                {sidebarCollapsed && gi > 0 && <div className="border-t border-white/[0.04] mx-2 my-2" />}
+                                {group.items.map(item => (
+                                    <button key={item.id} onClick={() => setTab(item.id)}
+                                        title={sidebarCollapsed ? item.label : undefined}
+                                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer group relative
+                                            ${tab === item.id
+                                                ? 'bg-amber-500/15 text-amber-400 shadow-sm shadow-amber-500/10'
+                                                : 'text-slate-400 hover:bg-white/[0.04] hover:text-white'}`}>
+                                        <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
+                                        {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                                        {item.badge > 0 && (
+                                            <span className={`${sidebarCollapsed ? 'absolute -top-0.5 -right-0.5' : 'ml-auto'} min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-black px-1`}>
+                                                {item.badge > 99 ? '99+' : item.badge}
+                                            </span>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        ))}
+                    </nav>
+                </aside>
+
+                {/* ═══════ MAIN CONTENT ═══════ */}
+                <div className="flex-1 min-w-0 p-6 lg:p-8">
+                    {/* ─── TOP BAR: Header + View as User ─── */}
+                    <div className="mb-6">
+                        <div className="flex items-center justify-between mb-4">
                             <div>
-                                <p className="text-white font-black text-sm uppercase tracking-wider">Active Impersonation Session</p>
-                                <p className="text-white/80 text-xs">You are currently viewing the platform as <strong>{user.name}</strong>. All actions are logged.</p>
+                                <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-amber-400 text-2xl">shield_person</span>
+                                    Super Admin
+                                </h1>
+                                <p className="text-slate-500 text-xs mt-0.5">Platform management & operations</p>
                             </div>
                         </div>
-                        <button onClick={() => window.location.reload()} className="px-4 py-2 bg-white text-rose-500 rounded-xl text-xs font-black uppercase hover:bg-slate-100 transition-all cursor-pointer">Exit Session</button>
-                    </div>
-                )}
 
-                {/* Tabs */}
-                <div className="flex gap-1 mb-6 bg-white/[0.03] p-1 rounded-xl border border-white/[0.06] overflow-x-auto">
-                    {tabs.map(t => (
-                        <button key={t.id} onClick={() => setTab(t.id)}
-                            className={`px-4 py-2.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer
-                                ${tab === t.id ? 'bg-amber-500/20 text-amber-400 shadow-lg' : 'text-slate-400 hover:bg-white/[0.04]'}`}>
-                            <span className="material-symbols-outlined text-base">{t.icon}</span>
-                            {t.label}
-                        </button>
-                    ))}
-                </div>
+                        {/* ─── VIEW AS USER — Command Bar ─── */}
+                        <div className="relative">
+                            <div className="flex items-center gap-3 bg-white/[0.03] rounded-xl border border-white/[0.06] px-4 py-2.5 focus-within:border-amber-500/30 transition-all">
+                                <span className="material-symbols-outlined text-amber-400 text-lg">person_search</span>
+                                <input
+                                    type="text"
+                                    placeholder="Search user by name or email → View as User..."
+                                    value={impersonateSearch}
+                                    onChange={e => setImpersonateSearch(e.target.value)}
+                                    className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none"
+                                />
+                                {impersonateLoading && <span className="material-symbols-outlined text-sm animate-spin text-slate-500">progress_activity</span>}
+                                <span className="text-[9px] text-slate-600 bg-white/[0.04] px-2 py-1 rounded font-mono">⌘K</span>
+                            </div>
+                            {/* Results Dropdown */}
+                            {impersonateResults.length > 0 && impersonateSearch.length >= 2 && (
+                                <div className="absolute top-full left-0 right-0 mt-1 bg-slate-900/95 border border-white/[0.08] rounded-xl shadow-2xl shadow-black/40 overflow-hidden z-40 backdrop-blur-xl">
+                                    {impersonateResults.map(u => (
+                                        <div key={u._id} className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.04] transition-all cursor-pointer group" onClick={() => { handleImpersonate(u._id, u.name); setImpersonateSearch(''); setImpersonateResults([]) }}>
+                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-rose-500 flex items-center justify-center text-white text-xs font-black">
+                                                {u.name?.charAt(0)?.toUpperCase() || '?'}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-white truncate">{u.name}</p>
+                                                <p className="text-[10px] text-slate-500 truncate">{u.email}</p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-bold">{u.plan || 'free'}</span>
+                                                <span className="text-[10px] text-slate-500">{u.credits?.balance || 0} cr</span>
+                                                <span className="material-symbols-outlined text-base text-amber-400 opacity-0 group-hover:opacity-100 transition-all">login</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <div className="px-4 py-2 border-t border-white/[0.06] text-[9px] text-slate-600">
+                                        Click user to impersonate • See exactly what they see
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Impersonation Warning Banner */}
+                    {user?.isImpersonated && (
+                        <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-amber-500 to-rose-500 shadow-lg shadow-amber-500/20 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <span className="material-symbols-outlined text-white text-2xl">error</span>
+                                <div>
+                                    <p className="text-white font-black text-sm uppercase tracking-wider">Active Impersonation Session</p>
+                                    <p className="text-white/80 text-xs">You are currently viewing the platform as <strong>{user.name}</strong>. All actions are logged.</p>
+                                </div>
+                            </div>
+                            <button onClick={() => window.location.reload()} className="px-4 py-2 bg-white text-rose-500 rounded-xl text-xs font-black uppercase hover:bg-slate-100 transition-all cursor-pointer">Exit Session</button>
+                        </div>
+                    )}
 
                 {/* ════════════ OVERVIEW ════════════ */}
                 {tab === 'overview' && (
@@ -2818,7 +2926,8 @@ export default function SuperAdminDashboard() {
                         )}
                     </div>
                 )}
-            </div>
+            </div>{/* end flex-1 content */}
+            </div>{/* end flex min-h-screen */}
         </DashboardLayout>
     )
 }
