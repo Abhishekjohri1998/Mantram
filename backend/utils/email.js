@@ -33,7 +33,8 @@ export const sendEmail = async ({ to, subject, html }) => {
  * Template for Verification Email
  */
 export const sendVerificationEmail = async (user, token) => {
-    const frontendBase = Array.isArray(env.frontendUrl) ? env.frontendUrl[env.frontendUrl.length - 1] : (env.frontendUrl || 'https://mantram.ai');
+    const urls = Array.isArray(env.frontendUrl) ? env.frontendUrl : [env.frontendUrl || 'https://mantram.ai'];
+    const frontendBase = urls.find(u => u.startsWith('https://') && !u.includes('localhost') && !u.includes('cloudfront')) || urls[0];
     const verifyLink = `${frontendBase}/verify-email?token=${token}`;
 
     const html = `
@@ -131,7 +132,8 @@ export const sendQueueRegistrationEmails = async (user, queueNumber) => {
  * Send Approval Notification Email
  */
 export const sendApprovalEmail = async (user) => {
-    const frontendBase = Array.isArray(env.frontendUrl) ? env.frontendUrl[env.frontendUrl.length - 1] : (env.frontendUrl || 'https://mantram.ai');
+    const urls = Array.isArray(env.frontendUrl) ? env.frontendUrl : [env.frontendUrl || 'https://mantram.ai'];
+    const frontendBase = urls.find(u => u.startsWith('https://') && !u.includes('localhost') && !u.includes('cloudfront')) || urls[0];
     
     const html = `
         <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0f0f23; color: #e2e8f0; border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05);">

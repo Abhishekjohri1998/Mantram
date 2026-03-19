@@ -144,7 +144,8 @@ router.post('/invite', protect, async (req, res) => {
         });
 
         // Build invite link using production frontend URL
-        const frontendBase = Array.isArray(env.frontendUrl) ? env.frontendUrl[env.frontendUrl.length - 1] : (env.frontendUrl || 'https://mantram.ai');
+        const urls = Array.isArray(env.frontendUrl) ? env.frontendUrl : [env.frontendUrl || 'https://mantram.ai'];
+        const frontendBase = urls.find(u => u.startsWith('https://') && !u.includes('localhost') && !u.includes('cloudfront')) || urls[0];
         const inviteLink = `${frontendBase}/join/${invite.token}`;
 
         // Send invite email
