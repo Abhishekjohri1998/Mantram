@@ -362,7 +362,7 @@ Write a professional, value-driven LinkedIn post. Include a thought-provoking qu
 Each caption should be complete, polished, and ready to copy-paste. Do not include any analysis, metadata, or explanations — only the captions.`;
 
         // Model fallback chain — try multiple Gemini models, then fall back to GPT
-        const models = ['gemini-2.0-flash', 'gemini-2.5-flash-preview-05-20', 'gemini-1.5-flash'];
+        const models = ['gemini-2.5-flash', 'gemini-2.5-flash-preview-05-20', 'gemini-1.5-flash'];
         let analysis = null;
         let lastError = null;
 
@@ -619,7 +619,7 @@ Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhr
             'gemini-3.1-flash-image-preview',    // Nano Banana 2 (best, latest)
             'gemini-3-pro-image-preview',          // Nano Banana Pro
             'gemini-2.5-flash-image',              // Nano Banana (stable)
-            'gemini-2.0-flash-exp-image-generation', // Fallback (older)
+            'gemini-2.5-flash-preview-image-generation', // Fallback (newer)
         ];
 
         let resultImage = null;

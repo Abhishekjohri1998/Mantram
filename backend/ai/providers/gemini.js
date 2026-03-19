@@ -15,7 +15,7 @@ export class GeminiProvider extends BaseProvider {
     }
 
     async generateText({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 2048, model }) {
-        const modelId = model || this.config.defaultModel || 'gemini-2.0-flash';
+        const modelId = model || this.config.defaultModel || 'gemini-2.5-flash';
         const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${this.apiKey}`;
 
         const startTime = Date.now();
@@ -117,7 +117,7 @@ export class GeminiProvider extends BaseProvider {
 
         // Method 2: Gemini 2.0 Flash Image Generation (fallback)
         try {
-            const modelId = 'gemini-2.0-flash-exp-image-generation';
+            const modelId = 'gemini-2.5-flash-preview-image-generation';
             const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
             const response = await fetch(url, {
                 method: 'POST',
