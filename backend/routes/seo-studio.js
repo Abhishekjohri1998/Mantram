@@ -616,8 +616,9 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
     console.log(`🔍 DEBUG siteStats: missingH1=${st.missingH1Count}, multipleH1=${st.multipleH1Count}, brokenInt=${st.brokenInternalCount}, permRedirects=${st.permanentRedirectCount}, blockedRobots=${st.blockedByRobotsTxtCount}, blockedRes=${st.blockedResourceCount}, uncached=${st.uncachedResourceCount}, missingAlt=${st.missingAltCount}, totalPages=${st.pagesCrawled}`);
     const deterministicChecks = [];
 
-    if (st.missingH1Count > 5) deterministicChecks.push({
-      check: `${st.missingH1Count} pages without H1 tag`, value: st.missingH1Count, issueType: 'error',
+    if (st.missingH1Count > 0) deterministicChecks.push({
+      check: `${st.missingH1Count} pages without H1 tag`, value: st.missingH1Count,
+      issueType: st.missingH1Count > 5 ? 'error' : 'warning', // 1-5 = warning, >5 = error
       aboutThisIssue: 'The H1 tag is the most important heading on a page. It tells search engines what the page is about and is a critical on-page SEO signal. Pages without H1 tags are harder for Google to understand and rank.',
       howToFix: 'Add a unique, descriptive H1 tag to each page that includes the primary keyword. There should be exactly one H1 per page. Learn more: https://developers.google.com/search/docs/fundamentals/seo-starter-guide#use-heading-tags',
       affectedUrls: (st.missingH1Tags || []).slice(0, 10),
