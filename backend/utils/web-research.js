@@ -1354,7 +1354,19 @@ export async function researchDomain(baseUrl) {
                         const tab = tabs[idx % tabs.length];
                         try {
                             await tab.goto(url, { waitUntil: 'domcontentloaded', timeout: PW_PAGE_TIMEOUT });
-                            await tab.waitForTimeout(800);
+                            await tab.waitForTimeout(1500); // Must be 1500ms+ for CF to clear
+
+                            // CHECK FOR CLOUDFLARE CHALLENGE — skip if page is a CF interstitial
+                            const pageTitle = await tab.title();
+                            const titleLower = (pageTitle || '').toLowerCase();
+                            if (titleLower.includes('just a moment') ||
+                                titleLower.includes('attention required') ||
+                                titleLower.includes('checking your browser') ||
+                                titleLower.includes('please wait') ||
+                                titleLower.includes('verifying your connection') ||
+                                titleLower.includes('one more step')) {
+                                return null; // CF challenge page — skip
+                            }
 
                             const pageData = await tab.evaluate(() => {
                                 const title = document.title || '';
@@ -1381,9 +1393,19 @@ export async function researchDomain(baseUrl) {
                                 return { title, metaDesc, h1, h2, wordCount, imgTotal, imgNoAlt, srcsMissingAlt, links, canonical, bodyText: bodyText.substring(0, 500) };
                             });
 
-                            const titleLower = (pageData.title || '').toLowerCase();
-                            const isSoft404 = titleLower === '404' || titleLower === '404 not found' ||
-                                titleLower === 'page not found' || titleLower === 'not found' ||
+                            // Double-check: skip pages with CF challenge H1
+                            const h1Lower = (pageData.h1?.[0] || '').toLowerCase();
+                            if (h1Lower.includes('verify') || h1Lower.includes('checking') ||
+                                h1Lower.includes('just a moment') || h1Lower.includes('please wait')) {
+                                return null; // CF challenge in body
+                            }
+
+                            // Skip empty/broken pages (didn't render properly)
+                            if (pageData.wordCount < 5 && !pageData.title) return null;
+
+                            const titleLwr = (pageData.title || '').toLowerCase();
+                            const isSoft404 = titleLwr === '404' || titleLwr === '404 not found' ||
+                                titleLwr === 'page not found' || titleLwr === 'not found' ||
                                 (pageData.h1.length === 1 && /^(404|page not found|not found)$/i.test(pageData.h1[0]));
 
                             return {
@@ -1706,37 +1728,13 @@ export async function researchDomain(baseUrl) {
     // Thin pages: exclude soft-404 pages (they're not real pages)
     const thinPages = analysisPages.filter(p => (p.wordCount || 0) < 300);
     const missingMeta = analysisPages.filter(p => !p.metaDescription);
-    // H1 SEMRUSH PARITY: count H1 from raw HTML only (not JS-rendered Playwright pages)
-    // Semrush is a static crawler — it doesn't execute JS, so SPA pages appear as "missing H1"
-    // Playwright pages have jsRendered=true and their H1 comes from rendered DOM
-    // For the H1 metric, use fetch-based pages' H1 data only
-    const fetchPages = analysisPages.filter(p => !p.jsRendered);
-    const pwPages = analysisPages.filter(p => p.jsRendered);
-    // Fetch-based pages: count as normal
-    const fetchMissingH1 = fetchPages.filter(p => !p.h1?.length);
-    const fetchMultipleH1 = fetchPages.filter(p => (p.h1?.length || 0) > 1);
-    // Playwright pages: assume they mirror the SPA pattern — if the fetch crawl shows
-    // that the site uses JS-rendered H1s (i.e., fetch pages mostly have H1), then
-    // Playwright pages likely also have H1 from JS. Otherwise, they're static H1s.
-    // For Semrush parity: treat JS-rendered pages as having the same H1 miss rate as fetch pages
-    const fetchH1Rate = fetchPages.length > 0 ? fetchPages.filter(p => p.h1?.length > 0).length / fetchPages.length : 1;
-    // If >80% of fetch pages have H1 in raw HTML, the site has static H1s — Playwright pages are fine
-    // If <80% have H1, site uses JS-rendered H1s — scale the miss rate to Playwright pages
-    let estimatedPwMissing = 0;
-    let estimatedPwMultiple = 0;
-    if (fetchH1Rate < 0.8 && pwPages.length > 0) {
-        // Site uses JS H1s — Playwright pages would be "missing" in static crawl
-        estimatedPwMissing = pwPages.length;
-    } else {
-        // Site has static H1s — count Playwright pages normally
-        estimatedPwMissing = pwPages.filter(p => !p.h1?.length).length;
-        estimatedPwMultiple = pwPages.filter(p => (p.h1?.length || 0) > 1).length;
-    }
-    const missingH1 = [...fetchMissingH1, ...pwPages.filter(p => !p.h1?.length)];
-    const missingH1Count = fetchMissingH1.length + estimatedPwMissing;
-    const multipleH1 = [...fetchMultipleH1, ...pwPages.filter(p => (p.h1?.length || 0) > 1)];
-    const multipleH1Count = fetchMultipleH1.length + estimatedPwMultiple;
-    console.log(`🏷️  H1 stats: ${fetchPages.length} fetch pages (${fetchMissingH1.length} missing, ${fetchMultipleH1.length} multiple), ${pwPages.length} PW pages (est. ${estimatedPwMissing} missing, ${estimatedPwMultiple} multiple), fetchH1Rate=${(fetchH1Rate*100).toFixed(0)}%`);
+    // H1 metrics: simple direct count from all analysis pages
+    // Template stripping and CF detection already handle bad data
+    const missingH1 = analysisPages.filter(p => !p.h1?.length);
+    const multipleH1 = analysisPages.filter(p => (p.h1?.length || 0) > 1);
+    const missingH1Count = missingH1.length;
+    const multipleH1Count = multipleH1.length;
+    console.log(`🏷️  H1 stats: ${missingH1Count} missing, ${multipleH1Count} multiple (from ${analysisPages.length} analysis pages)`);
     const pagesWithRedirects = analysisPages.filter(p => p.redirectChain?.length > 0);
     const lowTextRatioPages = analysisPages.filter(p => (p.textToHtmlRatio || 100) < 10);
     const oversizedPages = analysisPages.filter(p => p.htmlSizeOver2MB);
