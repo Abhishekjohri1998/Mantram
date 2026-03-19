@@ -15,32 +15,42 @@ function isBotChallengePage(html) {
   if (!html || html.length < 100) return false;
   const lowerHtml = html.toLowerCase();
   
-  // Check the <title> — Cloudflare challenge pages have very specific titles
+  // Check the <title> — Cloudflare/bot challenge pages have specific titles
   const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   const title = (titleMatch?.[1] || '').trim().toLowerCase();
   
-  // HIGH-CONFIDENCE challenge titles — must also have CF markers in the body
-  // to avoid false positives on legitimate pages with similar titles
+  // Known challenge page titles (Cloudflare + similar WAFs)
   const cfChallengeTitles = [
     'just a moment...',
     'checking if the site connection is secure',
+    'verifying your connection',                     // NEW: seen in acwo.com logs
+    'attention required',                            // NEW: Cloudflare variant
+    'one more step',                                 // NEW: Cloudflare variant
+    'access denied',
+    'please wait...',
+    'checking your browser',
   ];
   
   // Cloudflare-specific HTML markers (only present on actual challenge pages)
   const hasCfMarkers = lowerHtml.includes('cf_chl_opt') ||
                        lowerHtml.includes('cf-challenge-running') ||
                        lowerHtml.includes('cf-browser-verification') ||
-                       lowerHtml.includes('cdn-cgi/challenge-platform');
+                       lowerHtml.includes('cdn-cgi/challenge-platform') ||
+                       lowerHtml.includes('_cf_chl_tk') ||
+                       lowerHtml.includes('challenge-form');
   
-  // Title match + CF markers = definitely a challenge page
+  // Title match + CF markers = definitely a challenge
   if (cfChallengeTitles.some(ct => title.includes(ct)) && hasCfMarkers) return true;
   
-  // CF markers alone (without title) = also a challenge page
+  // CF markers combo = definitely a challenge (even without title match)
   if (lowerHtml.includes('cf-challenge-running') && lowerHtml.includes('cf_chl_opt')) return true;
   if (lowerHtml.includes('cf-browser-verification') && lowerHtml.includes('cdn-cgi/challenge-platform')) return true;
   
-  // Very short page with CF title = challenge (no real content)
-  if (cfChallengeTitles.some(ct => title.includes(ct)) && html.length < 20000) return true;
+  // Challenge title + short/empty page = challenge (no real content on these pages)
+  if (cfChallengeTitles.some(ct => title.includes(ct)) && html.length < 50000) return true;
+  
+  // Fallback: title exactly matches + page has very few visible words (challenge pages are mostly JS)
+  if (cfChallengeTitles.some(ct => title === ct)) return true;
   
   return false;
 }
