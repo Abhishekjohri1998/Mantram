@@ -580,17 +580,19 @@ IMAGE 1: Full homepage screenshot (1440x900 viewport)
 IMAGE 2: Header/navigation crop (top 200px — where logos usually are)
 
 TASK 1 — LOGO IDENTIFICATION:
-Look at the header area. Identify the ACTUAL brand logo. It's usually:
+Look at the HEADER/NAVIGATION area ONLY (top 100-200px). Identify the ACTUAL brand logo of the website owner. It's usually:
 - In the top-left or center of the navigation bar
 - The most prominent brand mark/wordmark in the header
 - NOT a generic icon, social media icon, or navigation element
+
+⚠️ CRITICAL WARNING: Many websites display CLIENT logos, PARTNER logos, or "Trusted By" logos in their body sections. These are NOT the website's own logo! Ignore ANY logos outside the header/navigation. Only pick the logo that represents the WEBSITE OWNER (the company whose website this is).
 
 Describe the logo precisely: what it looks like, its colors, any text in it, and its approximate position.
 
 Then, from this list of images found on the page, identify which URL is the ACTUAL logo:
 ${imageList}
 
-Pick the URL that BEST matches what you see as the logo in the screenshot. If none match perfectly, pick the closest one.
+Pick the URL that BEST matches the logo you see IN THE HEADER/NAVIGATION BAR. Prefer images tagged as [SELECTOR-LOGO] from header/nav sources. Do NOT pick images from client/partner sections.
 
 TASK 2 — BRAND COLORS:
 Look at the VISUAL appearance of the website. Identify the 4-5 TRUE brand colors:
@@ -1209,6 +1211,15 @@ function extractLogos($, baseUrl) {
 
     for (const sel of logoSelectors) {
         $(sel).each((_, el) => {
+            // SKIP images inside client/partner/testimonial sections
+            // These are NOT the brand's own logo — they're client logos
+            const parentHtml = $(el).parents().map((_, p) => {
+                const cls = ($(p).attr('class') || '').toLowerCase();
+                const id = ($(p).attr('id') || '').toLowerCase();
+                return cls + ' ' + id;
+            }).get().join(' ');
+            const isClientSection = /\b(client|partner|trusted|customer|testimonial|sponsor|carousel|slider|marquee|brand[s]?-logo|our-client|our-partner)\b/.test(parentHtml);
+            
             const tag = el.tagName?.toLowerCase();
             if (tag === 'svg') {
                 // Inline SVG → encode as data URI
@@ -1216,7 +1227,8 @@ function extractLogos($, baseUrl) {
                 if (svgHtml.length < 50000) {
                     found.push({
                         url: `data:image/svg+xml;base64,${Buffer.from(svgHtml).toString('base64')}`,
-                        source: 'inline-svg', format: 'svg', priority: 1,
+                        source: 'inline-svg', format: 'svg',
+                        priority: isClientSection ? 8 : 1, // Deprioritize client section logos
                     });
                 }
             } else {
@@ -1224,13 +1236,19 @@ function extractLogos($, baseUrl) {
                 const srcset = $(el).attr('srcset');
                 if (src) {
                     const format = src.split('?')[0].split('.').pop()?.toLowerCase() || 'unknown';
-                    found.push({ url: src, source: 'logo-selector', format, priority: 1 });
+                    found.push({
+                        url: src, source: isClientSection ? 'client-logo' : 'logo-selector',
+                        format, priority: isClientSection ? 8 : 1,
+                    });
                 }
                 // Also check srcset for high-res logos
                 if (srcset) {
                     const bestSrc = srcset.split(',').pop()?.trim().split(/\s+/)[0];
                     const resolved = resolveUrl(bestSrc, baseUrl);
-                    if (resolved) found.push({ url: resolved, source: 'logo-srcset', format: 'image', priority: 2 });
+                    if (resolved) found.push({
+                        url: resolved, source: isClientSection ? 'client-logo-srcset' : 'logo-srcset',
+                        format: 'image', priority: isClientSection ? 8 : 2,
+                    });
                 }
             }
         });
