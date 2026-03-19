@@ -126,22 +126,20 @@ export const requireCredits = (actionOrCost = 1) => {
                 cost = costs[actionOrCost] || 1;
             }
 
-            // "all the users can access everything accept admin panel/super admin panel"
-            // Bypass credit checks for all users, but keep logging for analytics.
-            const shouldBypass = true; // Global access enabled
+            // Bypass credit checks ONLY for superadmins
+            const isSuperAdmin = user.role === 'superadmin' || user.plan === 'enterprise';
 
-            if (shouldBypass) {
-                // Log usage (fire-and-forget) – don't calculate balanceAfter for bypass users
+            if (isSuperAdmin) {
+                // Log usage (fire-and-forget) – don't block superadmins
                 CreditUsage.create({
                     user: new mongoose.Types.ObjectId(user._id),
                     action: actionName || 'unknown',
                     cost,
-                    balanceAfter: Infinity, // Unlimited during "access everything" mode
-                    description: ACTION_LABELS[actionName] || actionName || 'AI Operation',
+                    balanceAfter: Infinity,
+                    description: (ACTION_LABELS[actionName] || actionName || 'AI Operation') + ' (Superadmin Bypass)',
                     metadata: {
                         route: req.originalUrl,
                         brandId: req.body?.brandId || req.params?.brandId,
-                        brandName: req.body?.brandName,
                         subscriptionId: user.activeSubscription,
                         bypassed: true
                     },
@@ -150,6 +148,7 @@ export const requireCredits = (actionOrCost = 1) => {
                 req.creditsDeducted = cost;
                 return next();
             }
+
 
             const remaining = (user.credits?.total || 0) + (user.credits?.bonus || 0) - (user.credits?.used || 0);
 
@@ -216,18 +215,33 @@ export const requireCredits = (actionOrCost = 1) => {
  * Get user's credit balance
  */
 export const getCreditBalance = (user) => {
-    // "all the users can access everything accept admin panel/super admin panel"
-    // Return unlimited credits for everyone who is logged in.
+    // Superadmin and Enterprise plans have unlimited credits
+    if (user.role === 'superadmin' || user.plan === 'enterprise' || (user.credits?.total >= 999999)) {
+        return { 
+            total: Infinity, 
+            used: user.credits?.used || 0, 
+            remaining: Infinity, 
+            unlimited: true, 
+            bonus: user.credits?.bonus || 0,
+            plan: user.plan || 'enterprise'
+        };
+    }
+
+    const total = user.credits?.total || 0;
+    const bonus = user.credits?.bonus || 0;
+    const used = user.credits?.used || 0;
+    const remaining = Math.max(0, (total + bonus) - used);
+
     return { 
-        total: Infinity, 
-        used: 0, 
-        remaining: Infinity, 
-        unlimited: true, 
-        bonus: 0, 
-        bonusUsed: 0,
-        plan: user.plan || 'pro' // Default descriptive plan for UI
+        total, 
+        used, 
+        remaining, 
+        unlimited: false, 
+        bonus,
+        plan: user.plan || 'starter'
     };
 };
+
 
 // Export defaults for reference
 export const CREDIT_COSTS = DEFAULT_CREDIT_COSTS;

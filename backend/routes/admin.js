@@ -4,7 +4,13 @@ import Brand from '../models/Brand.js';
 import Content from '../models/Content.js';
 import Creative from '../models/Creative.js';
 import Feedback from '../models/Feedback.js';
+import CreditUsage from '../models/CreditUsage.js';
+import Subscription from '../models/Subscription.js';
+import SubscriptionPackage from '../models/SubscriptionPackage.js';
+import { getCreditBalance } from '../middleware/credits.js';
+import { logAudit } from '../utils/audit.js';
 import ExcelJS from 'exceljs';
+
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -77,10 +83,10 @@ router.get('/users', async (req, res) => {
     }
 });
 
-// PUT /api/admin/users/:id — update user role/plan
+// PUT /api/admin/users/:id — update user role/plan/credits
 router.put('/users/:id', async (req, res) => {
     try {
-        const { role, plan } = req.body;
+        const { role, plan, credits, company } = req.body;
         // BUG-13 FIX: Prevent admin from escalating to superadmin
         if (role === 'superadmin') {
             return res.status(403).json({ success: false, error: 'Cannot assign superadmin role' });
@@ -91,9 +97,111 @@ router.put('/users/:id', async (req, res) => {
             return res.status(403).json({ success: false, error: 'Cannot modify superadmin accounts' });
         }
 
-        const user = await User.findByIdAndUpdate(req.params.id, { role, plan }, { returnDocument: 'after' }).select('-password');
+        const update = {};
+        if (role) update.role = role;
+        if (plan) update.plan = plan;
+        if (company !== undefined) update.company = company;
+        
+        if (credits) {
+            if (credits.total !== undefined) update['credits.total'] = credits.total;
+            if (credits.used !== undefined) update['credits.used'] = credits.used;
+            if (credits.bonus !== undefined) update['credits.bonus'] = credits.bonus;
+        }
+
+        // Auto-update credits if plan changed and no explicit credits provided
+        if (plan && plan !== targetUser.plan && !credits) {
+            const pkg = await SubscriptionPackage.findOne({ slug: plan });
+            if (pkg) {
+                update['credits.total'] = pkg.credits?.monthly || 50;
+                update['credits.used'] = 0;
+            } else {
+                const legacyCredits = { starter: 50, professional: 500, enterprise: 999999 };
+                update['credits.total'] = legacyCredits[plan] || 50;
+                update['credits.used'] = 0;
+            }
+        }
+
+        const user = await User.findByIdAndUpdate(req.params.id, update, { returnDocument: 'after' }).select('-password');
+        
+        await logAudit(req, {
+            action: 'UPDATE_USER',
+            targetModel: 'User',
+            targetId: user._id,
+            changes: { before: targetUser.toJSON(), after: user.toJSON() }
+        });
+
+        res.json({ success: true, user: { ...user.toJSON(), creditBalance: getCreditBalance(user) } });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// POST /api/admin/users/:id/add-credits
+router.post('/users/:id/add-credits', async (req, res) => {
+    try {
+        const { amount, reason } = req.body;
+        if (!amount || amount <= 0) return res.status(400).json({ success: false, error: 'Amount must be positive' });
+        
+        const user = await User.findById(req.params.id).select('-password');
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
-        res.json({ success: true, user });
+        if (user.role === 'superadmin') return res.status(403).json({ success: false, error: 'Cannot modify superadmin credits' });
+
+        user.credits.bonus += amount;
+        await user.save();
+
+        // Create audit log
+        const balanceAfter = (user.credits?.total || 0) + (user.credits?.bonus || 0) - (user.credits?.used || 0);
+        await CreditUsage.create({
+            user: user._id,
+            action: 'admin_adjustment',
+            cost: -amount,
+            balanceAfter: Math.max(0, balanceAfter),
+            description: `Admin Adjustment: ${reason || 'Bonus credits added'}`,
+            metadata: {
+                adminId: req.user._id,
+                reason,
+                type: 'bonus'
+            }
+        }).catch(err => console.warn('Credit audit log failed:', err.message));
+
+        res.json({ success: true, user: { ...user.toJSON(), creditBalance: getCreditBalance(user) } });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// POST /api/admin/users/:id/reset-credits
+router.post('/users/:id/reset-credits', async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id).select('-password');
+        if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+        if (user.role === 'superadmin') return res.status(403).json({ success: false, error: 'Cannot reset superadmin credits' });
+
+        const previousUsed = user.credits.used;
+        user.credits.used = 0;
+        await user.save();
+
+        if (user.activeSubscription) {
+            await Subscription.findByIdAndUpdate(user.activeSubscription, { $set: { 'credits.used': 0 } });
+        }
+
+        // Create audit log
+        const balanceAfter = (user.credits?.total || 0) + (user.credits?.bonus || 0);
+        await CreditUsage.create({
+            user: user._id,
+            action: 'admin_adjustment',
+            cost: previousUsed,
+            balanceAfter: Math.max(0, balanceAfter),
+            description: 'Admin Adjustment: Manual Credit Reset',
+            metadata: {
+                adminId: req.user._id,
+                type: 'reset',
+                previousUsed
+            }
+        }).catch(err => console.warn('Credit audit log failed:', err.message));
+
+        res.json({ success: true, user: { ...user.toJSON(), creditBalance: getCreditBalance(user) } });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }

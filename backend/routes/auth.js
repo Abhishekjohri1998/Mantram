@@ -2,7 +2,9 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
 import User from '../models/User.js';
+import Brand from '../models/Brand.js';
 import Waitlist from '../models/Waitlist.js';
+
 import SubscriptionPackage from '../models/SubscriptionPackage.js';
 import { protect, generateToken } from '../middleware/auth.js';
 import config from '../config/env.js';
@@ -157,11 +159,23 @@ router.post('/login', async (req, res) => {
 
         const token = generateToken(user._id);
         const planDetails = await SubscriptionPackage.findOne({ slug: user.plan || 'starter' }).lean();
+        const brandCount = await Brand.countDocuments({ user: user._id });
+        
         res.json({
             success: true,
             token,
-            user: { id: user._id, name: user.name, email: user.email, role: user.role, plan: user.plan, company: user.company, planDetails },
+            user: { 
+                id: user._id, 
+                name: user.name, 
+                email: user.email, 
+                role: user.role, 
+                plan: user.plan, 
+                company: user.company, 
+                planDetails,
+                brandCount
+            },
         });
+
     } catch (error) {
         console.error('❌ Login Error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -228,7 +242,9 @@ router.get('/me', protect, async (req, res) => {
     const user = await User.findById(req.user._id).lean();
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
     const planDetails = await SubscriptionPackage.findOne({ slug: user.plan || 'starter' }).lean();
-    res.json({ success: true, user: { ...user, planDetails } });
+    const brandCount = await Brand.countDocuments({ user: user._id });
+    res.json({ success: true, user: { ...user, planDetails, brandCount } });
+
 });
 
 // PUT /api/auth/profile
@@ -380,6 +396,8 @@ router.get('/google/callback', async (req, res) => {
 
         const stringId = userId.toString();
         const token = generateToken(stringId);
+        const brandCount = await Brand.countDocuments({ user: userId });
+
         const userData = {
             id: stringId,
             name: user.name,
@@ -388,9 +406,11 @@ router.get('/google/callback', async (req, res) => {
             plan: user.plan || 'starter',
             company: user.company || '',
             planDetails: await SubscriptionPackage.findOne({ slug: user.plan || 'starter' }).lean(),
+            brandCount
         };
 
         res.send(closeAuthPopupScript(null, token, userData));
+
 
     } catch (error) {
         console.error('Google Auth callback error:', error);
