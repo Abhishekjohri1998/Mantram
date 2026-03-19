@@ -682,6 +682,7 @@ export const routingRules = {
 // ============ Payments & Subscriptions API ============
 export const payments = {
     getPackages: () => apiFetch('/payments/packages'),
+    getStoreVisibility: () => apiFetch('/payments/store-visibility'),
     getTopupPacks: () => apiFetch('/payments/topup-packs'),
     createOrder: (packageId, billingCycle = 'monthly') =>
         apiFetch('/payments/create-order', {

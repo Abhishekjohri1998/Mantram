@@ -6,6 +6,7 @@ import config from '../config/env.js';
 import SubscriptionPackage from '../models/SubscriptionPackage.js';
 import Subscription from '../models/Subscription.js';
 import User from '../models/User.js';
+import { getSetting } from '../models/SystemSettings.js';
 
 const router = Router();
 
@@ -23,6 +24,19 @@ function getRazorpay() {
     return razorpay;
 }
 
+// @desc    Get store visibility settings (which store sections are enabled)
+// @route   GET /api/payments/store-visibility
+// @access  Public (logged-in users)
+router.get('/store-visibility', protect, async (req, res) => {
+    try {
+        const showSubscriptionPlans = await getSetting('show_subscription_plans', true);
+        const showCreditPacks = await getSetting('show_credit_packs', true);
+        res.json({ success: true, showSubscriptionPlans, showCreditPacks });
+    } catch (error) {
+        res.json({ success: true, showSubscriptionPlans: true, showCreditPacks: true });
+    }
+});
+
 // @desc    Get Available Subscription Packages
 // @route   GET /api/payments/packages
 // @access  Public
@@ -35,6 +49,7 @@ router.get('/packages', async (req, res) => {
         res.status(500).json({ success: false, error: 'Failed to fetch packages' });
     }
 });
+
 
 // @desc    Create Razorpay Order
 // @route   POST /api/payments/create-order

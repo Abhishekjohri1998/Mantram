@@ -1865,6 +1865,25 @@ export default function SuperAdminDashboard() {
                                         <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-all ${systemSettings.maintenanceMode ? 'translate-x-6' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
+                                <div className="pt-2 border-t border-white/[0.06]">
+                                    <p className="text-xs text-slate-600 uppercase font-bold tracking-wider mb-3">Store Visibility</p>
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div><p className="text-base font-bold text-white">Show Subscription Plans</p><p className="text-sm text-slate-500">Users can see & purchase subscription packages</p></div>
+                                            <button onClick={() => handleToggleSetting('showSubscriptionPlans', !systemSettings.showSubscriptionPlans)}
+                                                className={`w-12 h-6 rounded-full transition-all cursor-pointer ${systemSettings.showSubscriptionPlans ? 'bg-emerald-500' : 'bg-slate-700'}`}>
+                                                <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-all ${systemSettings.showSubscriptionPlans ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                                            </button>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <div><p className="text-base font-bold text-white">Show Credit Packs (Top-up Store)</p><p className="text-sm text-slate-500">Users can buy additional credit packs</p></div>
+                                            <button onClick={() => handleToggleSetting('showCreditPacks', !systemSettings.showCreditPacks)}
+                                                className={`w-12 h-6 rounded-full transition-all cursor-pointer ${systemSettings.showCreditPacks !== false ? 'bg-emerald-500' : 'bg-slate-700'}`}>
+                                                <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-all ${systemSettings.showCreditPacks !== false ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                                 <div className="flex items-center justify-between">
                                     <div><p className="text-base font-bold text-white">Default AI Provider</p><p className="text-sm text-slate-500">Primary model for content generation</p></div>
                                     <select value={systemSettings.defaultProvider || 'gemini'} onChange={e => handleToggleSetting('defaultProvider', e.target.value)}

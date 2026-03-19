@@ -1020,7 +1020,9 @@ router.get('/system-settings', async (req, res) => {
         const watermarkPosition = await getSetting('watermark_position', 'bottom-right');
         const watermarkOpacity = await getSetting('watermark_opacity', 0.4);
         const watermarkOverrides = await getSetting('watermark_overrides', {});
-        res.json({ success: true, settings: { watermarkEnabled, defaultProvider, maintenanceMode, watermarkLogoUrl, watermarkPosition, watermarkOpacity, watermarkOverrides } });
+        const showSubscriptionPlans = await getSetting('show_subscription_plans', true);
+        const showCreditPacks = await getSetting('show_credit_packs', true);
+        res.json({ success: true, settings: { watermarkEnabled, defaultProvider, maintenanceMode, watermarkLogoUrl, watermarkPosition, watermarkOpacity, watermarkOverrides, showSubscriptionPlans, showCreditPacks } });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -1053,6 +1055,18 @@ router.put('/system-settings', async (req, res) => {
             before.maintenanceMode = await getSetting('maintenance_mode');
             await setSetting('maintenance_mode', !!maintenanceMode, req.user._id);
             after.maintenanceMode = !!maintenanceMode;
+        }
+
+        if (req.body.showSubscriptionPlans !== undefined) {
+            before.showSubscriptionPlans = await getSetting('show_subscription_plans');
+            await setSetting('show_subscription_plans', !!req.body.showSubscriptionPlans, req.user._id);
+            after.showSubscriptionPlans = !!req.body.showSubscriptionPlans;
+        }
+
+        if (req.body.showCreditPacks !== undefined) {
+            before.showCreditPacks = await getSetting('show_credit_packs');
+            await setSetting('show_credit_packs', !!req.body.showCreditPacks, req.user._id);
+            after.showCreditPacks = !!req.body.showCreditPacks;
         }
 
         await logAudit(req, {

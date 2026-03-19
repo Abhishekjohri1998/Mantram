@@ -55,7 +55,10 @@ export default function CreditsPage() {
     // Daily reward toast
     const [dailyToast, setDailyToast] = useState(null)
 
-    useEffect(() => { loadSummary(); loadUsage() }, [])
+    // Store visibility (controlled by SuperAdmin)
+    const [storeVisibility, setStoreVisibility] = useState({ showSubscriptionPlans: true, showCreditPacks: true })
+
+    useEffect(() => { loadSummary(); loadUsage(); loadStoreVisibility() }, [])
     useEffect(() => { loadUsage() }, [page])
 
     const loadSummary = async () => {
@@ -103,6 +106,13 @@ export default function CreditsPage() {
             const { packages: pkgs } = await paymentsAPI.getPackages()
             setPackages(pkgs)
         } catch (e) { console.error(e) } finally { setPackagesLoading(false) }
+    }
+
+    const loadStoreVisibility = async () => {
+        try {
+            const data = await paymentsAPI.getStoreVisibility()
+            setStoreVisibility({ showSubscriptionPlans: data.showSubscriptionPlans !== false, showCreditPacks: data.showCreditPacks !== false })
+        } catch { /* defaults to both visible */ }
     }
 
     const loadTopupPacks = async () => {
@@ -286,7 +296,11 @@ export default function CreditsPage() {
 
                     {/* Tabs */}
                     <div className="flex gap-2 flex-wrap">
-                        {['overview', 'plans', 'topup', 'rewards', 'history'].map(t => (
+                        {['overview',
+                          ...(storeVisibility.showSubscriptionPlans ? ['plans'] : []),
+                          ...(storeVisibility.showCreditPacks ? ['topup'] : []),
+                          'rewards', 'history'
+                        ].map(t => (
                             <button
                                 key={t}
                                 onClick={() => setTab(t)}
