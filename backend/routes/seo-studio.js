@@ -393,6 +393,15 @@ Average text-to-HTML ratio: ${siMetrics.avgTextToHtmlRatio || 0}%
 
 CRITICAL RULE: The "DETERMINISTIC CRAWL METRICS" section below contains EXACT counts from the real crawl. You MUST use these exact numbers in your issues. DO NOT make up your own H1, broken link, redirect, or other counts — use ONLY the numbers given. For example, if the data says "Missing H1 tags: N pages", you must report exactly N, not "homepage + 2 pages".
 
+IMPORTANT: Do NOT generate issues for ANY of these deterministic metrics — they are ALREADY displayed as separate checks in the report:
+- Missing H1 tags, multiple H1 tags
+- Missing alt text / images without alt
+- Broken internal or external links
+- Duplicate titles or meta descriptions
+- Thin pages, redirect chains, missing meta descriptions
+- Blocked resources, uncached resources
+Do NOT mention these in your summary, crawlSummary, or issues array. Focus ONLY on strategic insights, algorithm risks, content gaps, AI readiness, and opportunities that the deterministic checks do NOT cover.
+
 ${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
 
 ${siteData}
@@ -607,7 +616,7 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
     console.log(`🔍 DEBUG siteStats: missingH1=${st.missingH1Count}, multipleH1=${st.multipleH1Count}, brokenInt=${st.brokenInternalCount}, permRedirects=${st.permanentRedirectCount}, blockedRobots=${st.blockedByRobotsTxtCount}, blockedRes=${st.blockedResourceCount}, uncached=${st.uncachedResourceCount}, missingAlt=${st.missingAltCount}, totalPages=${st.pagesCrawled}`);
     const deterministicChecks = [];
 
-    if (st.missingH1Count > 0) deterministicChecks.push({
+    if (st.missingH1Count > 5) deterministicChecks.push({
       check: `${st.missingH1Count} pages without H1 tag`, value: st.missingH1Count, issueType: 'error',
       aboutThisIssue: 'The H1 tag is the most important heading on a page. It tells search engines what the page is about and is a critical on-page SEO signal. Pages without H1 tags are harder for Google to understand and rank.',
       howToFix: 'Add a unique, descriptive H1 tag to each page that includes the primary keyword. There should be exactly one H1 per page. Learn more: https://developers.google.com/search/docs/fundamentals/seo-starter-guide#use-heading-tags',
