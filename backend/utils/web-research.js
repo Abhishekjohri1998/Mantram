@@ -13,20 +13,36 @@ const FETCH_TIMEOUT = 12000; // 12s
 
 function isBotChallengePage(html) {
   if (!html || html.length < 100) return false;
-  // Cloudflare challenge indicators
-  const cfIndicators = [
-    'Verifying your connection',
-    'cf-browser-verification',
-    'cf_chl_opt',
-    'cf-challenge-running',
-    'Just a moment...',
-    'Checking if the site connection is secure',
-    'Enable JavaScript and cookies to continue',
-    'Attention Required! | Cloudflare',
-    'ray ID',
-  ];
   const lowerHtml = html.toLowerCase();
-  return cfIndicators.some(indicator => lowerHtml.includes(indicator.toLowerCase()));
+  
+  // Check the <title> — Cloudflare challenge pages have very specific titles
+  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const title = (titleMatch?.[1] || '').trim().toLowerCase();
+  
+  // HIGH-CONFIDENCE challenge titles — must also have CF markers in the body
+  // to avoid false positives on legitimate pages with similar titles
+  const cfChallengeTitles = [
+    'just a moment...',
+    'checking if the site connection is secure',
+  ];
+  
+  // Cloudflare-specific HTML markers (only present on actual challenge pages)
+  const hasCfMarkers = lowerHtml.includes('cf_chl_opt') ||
+                       lowerHtml.includes('cf-challenge-running') ||
+                       lowerHtml.includes('cf-browser-verification') ||
+                       lowerHtml.includes('cdn-cgi/challenge-platform');
+  
+  // Title match + CF markers = definitely a challenge page
+  if (cfChallengeTitles.some(ct => title.includes(ct)) && hasCfMarkers) return true;
+  
+  // CF markers alone (without title) = also a challenge page
+  if (lowerHtml.includes('cf-challenge-running') && lowerHtml.includes('cf_chl_opt')) return true;
+  if (lowerHtml.includes('cf-browser-verification') && lowerHtml.includes('cdn-cgi/challenge-platform')) return true;
+  
+  // Very short page with CF title = challenge (no real content)
+  if (cfChallengeTitles.some(ct => title.includes(ct)) && html.length < 20000) return true;
+  
+  return false;
 }
 
 // ============================================================================
@@ -175,13 +191,16 @@ async function safeFetchWithMeta(url, options = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
     const startTime = Date.now();
+    const effectiveUA = _cfSession?.solved ? _cfSession.userAgent : USER_AGENT;
+    const cfCookies = _cfSession?.solved ? _cfSession.cookies : '';
     try {
         const resp = await fetch(url, {
             ...options,
             signal: controller.signal,
             headers: {
-                'User-Agent': USER_AGENT,
+                'User-Agent': effectiveUA,
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                ...(cfCookies ? { 'Cookie': cfCookies } : {}),
                 ...options.headers,
             },
             redirect: 'follow',
@@ -673,11 +692,17 @@ async function safeFetchWithRedirects(url) {
     while (maxHops-- > 0) {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+        const effectiveUA = _cfSession?.solved ? _cfSession.userAgent : USER_AGENT;
+        const cfCookies = _cfSession?.solved ? _cfSession.cookies : '';
         try {
             const resp = await fetch(currentUrl, {
                 signal: controller.signal,
-                headers: { 'User-Agent': USER_AGENT, 'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8' },
-                redirect: 'manual', // Don't auto-follow — we want to track the chain
+                headers: {
+                    'User-Agent': effectiveUA,
+                    'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
+                    ...(cfCookies ? { 'Cookie': cfCookies } : {}),
+                },
+                redirect: 'manual',
             });
             clearTimeout(timer);
 
@@ -732,16 +757,16 @@ async function fetchSitemap(baseUrl) {
                 const locPattern = /<sitemap>\s*<loc>([^<]+)<\/loc>/gi;
                 let m;
                 const childSitemaps = [];
-                while ((m = locPattern.exec(xml)) !== null && childSitemaps.length < 10) {
+                while ((m = locPattern.exec(xml)) !== null && childSitemaps.length < 20) {
                     childSitemaps.push(m[1].trim());
                 }
-                // Fetch first 5 child sitemaps (was 2 — needed for Semrush-level sitemap coverage)
-                for (const childUrl of childSitemaps.slice(0, 5)) {
+                // Fetch first 10 child sitemaps for full coverage
+                for (const childUrl of childSitemaps.slice(0, 10)) {
                     try {
                         const childXml = await safeFetch(childUrl);
                         const childLocPattern = /<url>\s*<loc>([^<]+)<\/loc>/gi;
                         let cm;
-                        while ((cm = childLocPattern.exec(childXml)) !== null && urls.length < 500) {
+                        while ((cm = childLocPattern.exec(childXml)) !== null && urls.length < 2000) {
                             urls.push(cm[1].trim());
                         }
                     } catch { /* skip failed child sitemap */ }
@@ -750,7 +775,7 @@ async function fetchSitemap(baseUrl) {
                 // Standard sitemap — extract URLs
                 const locPattern = /<url>\s*<loc>([^<]+)<\/loc>/gi;
                 let m;
-                while ((m = locPattern.exec(xml)) !== null && urls.length < 500) {
+                while ((m = locPattern.exec(xml)) !== null && urls.length < 2000) {
                     urls.push(m[1].trim());
                 }
             }
@@ -956,10 +981,31 @@ export async function researchDomain(baseUrl) {
 
     console.log(`🕷️  Deep crawl starting: ${cleanBase}`);
 
-    // PHASE 0: Solve Cloudflare challenge (if present) — takes ~5-30s
-    // This extracts cookies that let all subsequent HTTP requests bypass the challenge
+    // PHASE 0: Conditional Cloudflare challenge detection
+    // Try a quick fetch first — only launch the expensive Playwright solver if CF is detected
     resetCfSession(); // Fresh session for each domain
-    await solveCloudflare(cleanBase);
+    let _cfNeeded = false;
+    try {
+        const probeCtrl = new AbortController();
+        const probeTimer = setTimeout(() => probeCtrl.abort(), 8000);
+        const probeResp = await fetch(cleanBase, {
+            signal: probeCtrl.signal,
+            headers: { 'User-Agent': USER_AGENT, 'Accept': 'text/html,*/*;q=0.8' },
+            redirect: 'follow',
+        });
+        clearTimeout(probeTimer);
+        const probeHtml = await probeResp.text();
+        _cfNeeded = isBotChallengePage(probeHtml);
+        if (_cfNeeded) {
+            console.log(`🛡️  Cloudflare challenge DETECTED — launching solver...`);
+            await solveCloudflare(cleanBase);
+        } else {
+            console.log(`🛡️  No Cloudflare challenge — skipping solver (saved 15-30s)`);
+        }
+    } catch (probeErr) {
+        console.log(`🛡️  Homepage probe failed (${probeErr.message}) — trying solver as fallback`);
+        await solveCloudflare(cleanBase);
+    }
 
     // PHASE 1: Fetch homepage + robots.txt + sitemap.xml in parallel
     const [homepageResult, robotsTxt, sitemap, llmsTxt] = await Promise.all([
@@ -1186,12 +1232,111 @@ export async function researchDomain(baseUrl) {
 
     const allPages = [homepage, ...allSubPages];
     const crawlElapsed = ((Date.now() - crawlStartTime) / 1000).toFixed(1);
-    console.log(`🕷️  Crawl complete: ${allPages.length} pages in ${crawlElapsed}s (queue had ${toCrawl.length} URLs)`);
 
-    // PHASE 3.5: Bot challenge detection summary
-    const botChallengePages = allPages.filter(p => p.isBotChallenge);
+    // CRAWL TELEMETRY — detailed breakdown for debugging
+    const failedPages = allSubPages.filter(p => !p.success);
+    const botChallengePages = failedPages.filter(p => p.isBotChallenge);
+    const timeoutPages = failedPages.filter(p => p.error?.includes('timeout') || p.error?.includes('abort'));
+    const httpErrorPages = failedPages.filter(p => p.statusCode >= 400);
+    console.log(`🕷️  Crawl complete: ${allPages.length} pages in ${crawlElapsed}s (queue had ${toCrawl.length} URLs)`);
+    console.log(`🕷️  Breakdown: ${allPages.filter(p => p.success).length} success, ${failedPages.length} failed (${botChallengePages.length} bot-challenge, ${timeoutPages.length} timeout, ${httpErrorPages.length} HTTP error)`);
     if (botChallengePages.length > 0) {
-      console.log(`🛡️  ${botChallengePages.length} pages returned bot challenge pages (Cloudflare) — excluded from H1/content analysis`);
+      console.log(`🛡️  ${botChallengePages.length} pages returned bot challenge pages — excluded from analysis`);
+    }
+
+    // PHASE 3.5: Playwright H1 re-scan for pages with missing H1
+    // Many SPA/JS-rendered pages show no H1 in raw HTML but have H1 in rendered DOM
+    const pagesWithMissingH1 = allPages.filter(p => p.success && (!p.h1 || p.h1.length === 0));
+    if (pagesWithMissingH1.length > 0) {
+        console.log(`🖥️  H1 re-scan: ${pagesWithMissingH1.length} pages missing H1 — launching Playwright batch scan...`);
+        let pw;
+        try {
+            pw = await import('playwright');
+            pw = pw.default || pw;
+        } catch { pw = null; }
+
+        if (pw) {
+            let h1Browser;
+            try {
+                h1Browser = await pw.chromium.launch({
+                    headless: true,
+                    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
+                });
+                const h1Context = await h1Browser.newContext({
+                    userAgent: _cfSession?.solved ? _cfSession.userAgent : 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                    viewport: { width: 1280, height: 800 },
+                    ignoreHTTPSErrors: true,
+                });
+                // Inject CF cookies if available
+                if (_cfSession?.solved && _cfSession.cookies) {
+                    try {
+                        const domain = new URL(cleanBase).hostname;
+                        const cookiePairs = _cfSession.cookies.split('; ').map(c => {
+                            const [name, ...rest] = c.split('=');
+                            return { name, value: rest.join('='), domain, path: '/' };
+                        });
+                        await h1Context.addCookies(cookiePairs);
+                    } catch { /* skip cookie injection */ }
+                }
+
+                const h1Page = await h1Context.newPage();
+                // Block heavy resources (images, fonts, CSS) to speed up
+                await h1Page.route('**/*', (route) => {
+                    const type = route.request().resourceType();
+                    if (['image', 'media', 'font', 'stylesheet'].includes(type)) {
+                        route.abort().catch(() => {});
+                    } else {
+                        route.continue().catch(() => {});
+                    }
+                });
+
+                const H1_BATCH_LIMIT = 50; // Max pages to re-scan
+                const H1_PAGE_TIMEOUT = 8000; // 8s per page
+                const H1_TOTAL_TIMEOUT = 60000; // 60s total
+                const h1ScanStart = Date.now();
+                let h1Found = 0;
+
+                for (const page of pagesWithMissingH1.slice(0, H1_BATCH_LIMIT)) {
+                    if (Date.now() - h1ScanStart > H1_TOTAL_TIMEOUT) {
+                        console.log(`🖥️  H1 re-scan timeout (60s) — scanned ${h1Found} of ${pagesWithMissingH1.length} pages`);
+                        break;
+                    }
+                    try {
+                        await h1Page.goto(page.url, { waitUntil: 'domcontentloaded', timeout: H1_PAGE_TIMEOUT });
+                        await h1Page.waitForTimeout(1500); // Let JS render
+
+                        const h1Data = await h1Page.evaluate(() => {
+                            const h1Elements = document.querySelectorAll('h1');
+                            return Array.from(h1Elements).map(h => h.textContent?.trim()).filter(t => t && t.length > 0);
+                        });
+
+                        if (h1Data.length > 0) {
+                            // Update the page data with JS-rendered H1
+                            page.h1 = h1Data;
+                            page.headings = [
+                                ...h1Data.map(text => ({ level: 1, text })),
+                                ...(page.headings || []).filter(h => h.level !== 1),
+                            ];
+                            page.jsRenderedH1 = true;
+                            h1Found++;
+                        }
+                    } catch {
+                        // Timeout or navigation error — skip page
+                    }
+                }
+
+                await h1Page.close().catch(() => {});
+                await h1Context.close().catch(() => {});
+                await h1Browser.close().catch(() => {});
+                const h1Elapsed = ((Date.now() - h1ScanStart) / 1000).toFixed(1);
+                console.log(`🖥️  H1 re-scan complete: ${h1Found} H1s found via JS rendering in ${h1Elapsed}s (of ${Math.min(pagesWithMissingH1.length, H1_BATCH_LIMIT)} pages scanned)`);
+            } catch (h1Err) {
+                console.warn(`🖥️  H1 re-scan error: ${h1Err.message}`);
+                if (h1Browser) await h1Browser.close().catch(() => {});
+            }
+        } else {
+            console.warn(`🖥️  H1 re-scan skipped — Playwright not available`);
+        }
     }
 
     // PHASE 4: Compute duplicate content
