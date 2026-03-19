@@ -152,11 +152,6 @@ export default function SuperAdminDashboard() {
         if (tab === 'waitlist') loadWaitlist()
         if (tab === 'coupons') loadCoupons()
         if (tab === 'content') { loadBrands(); loadContent() }
-        if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts(); loadApiKeys() }
-        if (tab === 'users' || tab === 'ai-credits') loadUsers()
-        if (tab === 'approvals') loadPendingUsers()
-        if (tab === 'coupons') loadCoupons()
-        if (tab === 'content') { loadBrands(); loadContent() }
         if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts(); loadApiKeys(); loadStudioVisibility() }
         if (tab === 'integrations') loadIntegrations()
         if (tab === 'packages') loadPackages()
