@@ -1,4 +1,4 @@
-import { useState, createContext, useContext } from 'react'
+import React, { useState, createContext, useContext } from 'react'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import { useAuth } from '../context/AuthContext'
