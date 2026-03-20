@@ -74,9 +74,9 @@ export default function Nexus() {
                     </div>
 
                     {/* Actions + Info Grid */}
-                    <div className="grid grid-cols-12 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                         {/* Create */}
-                        <div className="col-span-12 lg:col-span-8 grid grid-cols-2 gap-4">
+                        <div className="col-span-12 lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {[
                                 { icon: 'edit_note', label: 'Create Content', desc: 'Generate brand-aligned text', path: '/content-studio', color: 'from-primary/20 to-primary/5' },
                                 { icon: 'brush', label: 'Create Visual', desc: 'Generate brand visuals', path: '/creative-studio', color: 'from-purple-500/20 to-purple-500/5' },

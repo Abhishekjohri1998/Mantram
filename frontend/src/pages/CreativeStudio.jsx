@@ -2397,7 +2397,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
             {/* =================== AI PHOTOSHOOT MODE =================== */}
             {studioMode === 'photoshoot' && (
-                <div className="grid grid-cols-12 gap-6 fade-up">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 fade-up">
 
                     {/* Recent Photoshoots */}
                     {(() => {
@@ -3300,7 +3300,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-12 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                         <div className="col-span-12 lg:col-span-5 space-y-4">
                             {/* Text */}
                             <div className="studio-card p-5">
@@ -3466,7 +3466,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                     {/* ══ STEP 1: Intelligence Brief (merged Brief + Products) ══ */}
                     {campStep === 1 && (
-                        <div className="grid grid-cols-12 gap-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                             <div className="col-span-12 lg:col-span-7 space-y-4">
                                 {/* Campaign Name + Goal */}
                                 <div className="studio-card p-5">
@@ -3760,7 +3760,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                     {/* ══ STEP 2: Copy & Style ══ */}
                     {campStep === 2 && (
-                        <div className="grid grid-cols-12 gap-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                             <div className="col-span-12 lg:col-span-7 space-y-4">
                                 {/* AI Copy */}
                                 <div className="studio-card p-5">
@@ -4486,7 +4486,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                         )}
 
                                         {/* Template Name & Icon */}
-                                        <div className="grid grid-cols-12 gap-3 mb-4">
+                                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 mb-4">
                                             <div className="col-span-9">
                                                 <label className="text-[11px] font-bold text-slate-400 mb-1.5 block">Template Name *</label>
                                                 <input type="text" value={newTmpl.label}
@@ -4970,7 +4970,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
 
                     ) : (
                         /* ──────────── Active Template Detail Panel ──────────── */
-                        <div className="grid grid-cols-12 gap-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                             {/* Left — Form Fields */}
                             <div className="col-span-12 lg:col-span-5 space-y-4">
                                 {/* Template Header */}
@@ -6297,7 +6297,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-12 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                         {/* Left — Upload Zone */}
                         <div className="col-span-12 lg:col-span-5 space-y-4">
                             {/* Person Photo Upload */}
@@ -6573,7 +6573,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
 
                     {/* ── Product Lifestyle Sub-mode ── */}
                     {mockupSubMode === 'lifestyle' && (
-                    <div className="grid grid-cols-12 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                         {/* Left — Controls */}
                         <div className="col-span-12 lg:col-span-5 space-y-4">
                             {/* Product Upload */}
@@ -6950,7 +6950,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
 
                     {/* ── Logo / Brand Mockup Sub-mode ── */}
                     {mockupSubMode === 'logo' && (
-                    <div className="grid grid-cols-12 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                         {/* Left — Controls */}
                         <div className="col-span-12 lg:col-span-5 space-y-4">
                             {/* Logo Upload */}

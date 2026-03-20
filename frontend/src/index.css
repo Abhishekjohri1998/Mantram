@@ -305,6 +305,39 @@
     padding: 1.5rem;
     border-radius: 1rem;
   }
+
+  /* ── Mobile-First Grid Helpers ── */
+  .responsive-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  @media (min-width: 640px) { .responsive-grid { grid-template-columns: repeat(2, 1fr); gap: 1.25rem; } }
+  @media (min-width: 1024px) { .responsive-grid { grid-template-columns: repeat(3, 1fr); gap: 1.5rem; } }
+  @media (min-width: 1280px) { .responsive-grid { grid-template-columns: repeat(4, 1fr); } }
+
+  /* ── Interactive Touch Targets ── */
+  .touch-target {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── Hide/Show on breakpoints ── */
+  .hide-on-mobile { @apply hidden sm:block; }
+  .show-on-mobile { @apply block sm:hidden; }
+
+  /* ── Responsive Container ── */
+  .responsive-container {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  @media (min-width: 1024px) { .responsive-container { padding-left: 2rem; padding-right: 2rem; } }
 }
 
 @layer utilities {

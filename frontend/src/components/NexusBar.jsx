@@ -561,13 +561,13 @@ export default function NexusBar() {
                 {/* Chat Panel (opens upward from bubble) */}
                 {open && (
                     <div className={`absolute bottom-16 right-0 rounded-2xl overflow-hidden animate-fade-in
-                        ${expanded ? 'w-[520px]' : 'w-[380px]'}`}
+                        ${expanded ? 'w-[calc(100vw-48px)] sm:w-[450px] lg:w-[520px]' : 'w-[calc(100vw-48px)] sm:w-[380px]'}`}
                         style={{
                             background: 'linear-gradient(180deg, rgba(15,15,30,0.98), rgba(10,10,26,0.98))',
                             border: '1px solid rgba(139, 92, 246, 0.25)',
                             boxShadow: '0 -8px 60px rgba(0,0,0,0.6), 0 0 40px rgba(139, 92, 246, 0.1)',
                             backdropFilter: 'blur(24px)',
-                            maxHeight: expanded ? '75vh' : '500px',
+                            maxHeight: expanded ? '85vh' : 'min(500px, 70vh)',
                         }}>
 
                         {/* Panel Header */}

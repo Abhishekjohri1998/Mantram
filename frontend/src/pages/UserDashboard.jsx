@@ -374,11 +374,11 @@ export default function UserDashboard() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-12 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* ═══════════════════════════════════════════════════════════ */}
                 {/* MAIN COLUMN                                                 */}
                 {/* ═══════════════════════════════════════════════════════════ */}
-                <div className="col-span-12 lg:col-span-8 space-y-6">
+                <div className="col-span-1 lg:col-span-8 space-y-6">
 
                     {/* ── 4. BRAND HEALTH RINGS ── */}
                     <div className="glass-panel rounded-2xl p-5 lg:p-6 border border-white/[0.06] anim-slide-up" style={{ animationDelay: '250ms' }}>
@@ -388,8 +388,8 @@ export default function UserDashboard() {
                             <span className="text-2xl font-extrabold text-white ml-auto">{health.overallScore || 0}<span className="text-sm text-slate-500 font-medium">/100</span></span>
                         </div>
                         <div className="flex flex-col sm:flex-row items-center gap-6">
-                            <div className="shrink-0">
-                                <svg width="180" height="180" viewBox="0 0 180 180">
+                            <div className="shrink-0 w-full max-w-[180px] aspect-square mx-auto">
+                                <svg viewBox="0 0 180 180" className="w-full h-full">
                                     <HealthRing score={health.contentVelocity || 0} radius={78} strokeWidth={8} color="#8b5cf6" label="Content" delay={0} />
                                     <HealthRing score={health.creativeOutput || 0} radius={66} strokeWidth={8} color="#06b6d4" label="Creative" delay={100} />
                                     <HealthRing score={health.brandCompleteness || 0} radius={54} strokeWidth={8} color="#f59e0b" label="DNA" delay={200} />
@@ -1185,7 +1185,7 @@ export default function UserDashboard() {
                         </div>
                         {d2cSnapshot?.connected ? (
                             <>
-                                <div className="grid grid-cols-3 gap-2 mb-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
                                     {[
                                         { label: 'Revenue', value: `₹${(d2cSnapshot.weeklyRevenue || 0).toLocaleString()}`, icon: 'payments', color: '#34d399' },
                                         { label: 'Orders', value: d2cSnapshot.weeklyOrders || 0, icon: 'shopping_bag', color: '#8b5cf6' },
