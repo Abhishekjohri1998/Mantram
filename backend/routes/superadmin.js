@@ -443,7 +443,7 @@ router.post('/users/:id/impersonate', async (req, res) => {
             action: 'IMPERSONATE_USER',
             targetModel: 'User',
             targetId: user._id,
-            severity: 'medium',
+            severity: 'warning',
             metadata: { adminName: req.user.name, userName: user.name }
         });
 
@@ -1103,7 +1103,7 @@ router.post('/watermark/upload', async (req, res) => {
         const url = await uploadToS3(buffer, s3Key, mimeType);
 
         await setSetting('watermark_logo_url', url, req.user._id);
-        await logAudit(req, { action: 'UPDATE_WATERMARK_LOGO', targetModel: 'SystemSettings', targetId: 'watermark_logo', severity: 'medium', metadata: { url } });
+        await logAudit(req, { action: 'UPDATE_WATERMARK_LOGO', targetModel: 'SystemSettings', targetId: 'watermark_logo', severity: 'warning', metadata: { url } });
 
         res.json({ success: true, url, message: 'Watermark logo uploaded' });
     } catch (error) {
@@ -2611,7 +2611,7 @@ router.put('/users/:id/studio-access', async (req, res) => {
             action: 'UPDATE_USER_STUDIO_ACCESS',
             targetModel: 'User',
             targetId: user._id,
-            severity: 'medium',
+            severity: 'warning',
             metadata: { userName: user.name, userEmail: user.email },
             changes: { before, after: user.studioAccess },
         });

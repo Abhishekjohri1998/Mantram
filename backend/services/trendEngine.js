@@ -52,7 +52,7 @@ async function fetchGoogleTrendsDaily(geo = 'IN') {
     try {
         const result = await googleTrends.dailyTrends({ geo });
         if (result && result.trim().startsWith('<')) {
-            console.warn('⚠️ Google Daily Trends returned HTML (likely rate-limited).');
+            console.log('ℹ️ Google Daily Trends rate-limited, falling back to RSS/Grok.');
             return [];
         }
         const parsed = JSON.parse(result);
@@ -89,7 +89,7 @@ async function fetchGoogleTrendsRealtime(geo = 'IN') {
     try {
         const result = await googleTrends.realTimeTrends({ geo, category: 'all' });
         if (result && result.trim().startsWith('<')) {
-            console.warn('⚠️ Google Real-time Trends returned HTML (likely rate-limited).');
+            console.log('ℹ️ Google Real-time Trends rate-limited, falling back to RSS/Grok.');
             return [];
         }
         const parsed = JSON.parse(result);
@@ -243,14 +243,27 @@ RULES:
             options: {},
         });
 
-        const content = aiResult.content || '';
-        const jsonMatch = content.match(/\[[\s\S]*\]/);
-        if (!jsonMatch) {
-            console.warn('AI trend match: no JSON in response');
-            return [];
-        }
+        let content = aiResult.content || '';
+        content = content.replace(/```(?:json)?\s*/g, '').replace(/```/g, '').trim();
 
-        const matches = JSON.parse(jsonMatch[0]);
+        let matches = [];
+        try {
+            const parsed = JSON.parse(content);
+            matches = Array.isArray(parsed) ? parsed : (parsed.trends || []);
+            if (!Array.isArray(matches)) throw new Error('Parsed result is not an array');
+        } catch (parseErr) {
+            const jsonMatch = content.match(/\[[\s\S]*\]/);
+            if (!jsonMatch) {
+                console.warn('AI trend match: no JSON in response. Raw response:', content.substring(0, 100));
+                return [];
+            }
+            try {
+                matches = JSON.parse(jsonMatch[0]);
+            } catch (fallbackErr) {
+                console.warn('AI trend match: invalid JSON array');
+                return [];
+            }
+        }
         const result = matches
             .filter(m => typeof m.index === 'number' && m.index >= 0 && m.index < trends.length)
             .map(m => ({
