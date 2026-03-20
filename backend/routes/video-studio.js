@@ -949,8 +949,8 @@ router.post('/ugc/enhance-photo', protect, async (req, res) => {
             imgMime = imgResp.headers.get('content-type') || 'image/png';
         }
 
-        // Call Nanobanana 2 (Gemini 3.1 Flash Image Preview) with the image + edit prompt
-        const modelId = 'gemini-3.1-flash-image-preview';
+        // Call NanoBanana 2 (Gemini 3.1 Flash Image Preview) with the image + edit prompt
+        const modelId = 'gemini-3.1-flash-image-preview'; // NanoBanana 2
         const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${geminiKey}`;
 
         const geminiResp = await fetch(geminiUrl, {

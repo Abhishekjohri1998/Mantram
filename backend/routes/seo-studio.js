@@ -29,6 +29,7 @@ import { getMozDomainAuthority, getMozBatchDA, formatMozDataForPrompt, isMozConf
 import {
   getInstantSiteIntelligence, getDomainRankings, getCompetitiveOverlap,
   discoverSerpCompetitors, getBrandMentions,
+  submitSiteCrawl, getCrawlResults,
   formatRankedKeywordsForPrompt, formatInstantPageForPrompt,
   formatSerpCompetitorsForPrompt, formatDomainIntersectionForPrompt,
   isOnPageConfigured,
@@ -271,8 +272,18 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
     const dna = brandObj.dna || {};
     const country = dna.targetMarket || dna.country || 'India';
     
+    // Submit DataForSEO OnPage 500-page crawl FIRST (async, runs on their servers)
+    let dfsCrawlTaskId = null;
+    if (isOnPageConfigured()) {
+      try {
+        const crawlResult = await submitSiteCrawl(brandDomain, { maxPages: 500, enableJS: true, enableBrowserRendering: true });
+        dfsCrawlTaskId = crawlResult?.taskId || null;
+        if (dfsCrawlTaskId) console.log(`📋 DataForSEO OnPage crawl submitted: ${dfsCrawlTaskId} (500 pages)`);
+      } catch (e) { console.warn(`⚠️ DataForSEO crawl submit failed: ${e.message}`); }
+    }
+
     let [siteResearch, siteIntel, pageSpeedData, backlinkData, mozData] = await Promise.all([
-      researchDomain(website, { maxPages: 200, timeout: 60000 }).catch(e => {
+      researchDomain(website, { maxPages: 800, timeout: 300000 }).catch(e => {
         console.error(`❌ Crawl failed: ${e.message}`);
         return { url: website, pages: [], homepage: {}, siteIntelligence: { totalPages: 0 }, error: e.message };
       }),
@@ -284,6 +295,73 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
       isDataForSEOConfigured() ? getDomainBacklinks(brandDomain).catch(e => ({ available: false, error: e.message })) : Promise.resolve({ available: false }),
       isMozConfigured() ? getMozDomainAuthority(brandDomain).catch(e => ({ available: false, error: e.message })) : Promise.resolve({ available: false }),
     ]);
+
+    // ── DATAFORSEO ONPAGE CRAWL MERGE ──
+    // If local crawl got < 200 pages and DataForSEO crawl was submitted, poll for results
+    const localPageCount = siteResearch.pages?.length || 0;
+    if (dfsCrawlTaskId && localPageCount < 200) {
+      console.log(`📋 Local crawl got ${localPageCount} pages — polling DataForSEO OnPage crawl for more...`);
+      // Poll up to 90s (DataForSEO typically finishes in 30-60s)
+      let dfsPages = null;
+      for (let poll = 0; poll < 9; poll++) {
+        await new Promise(r => setTimeout(r, 10000)); // Wait 10s between polls
+        try {
+          const results = await getCrawlResults(dfsCrawlTaskId);
+          if (results?.available && results.summary?.crawl_progress === 'finished') {
+            dfsPages = results.pages || [];
+            console.log(`📋 DataForSEO OnPage crawl finished: ${dfsPages.length} pages (vs local ${localPageCount})`);
+            break;
+          } else {
+            const status = results?.summary?.crawl_status || {};
+            console.log(`📋 DataForSEO poll ${poll + 1}/9: ${status.pages_crawled || 0} pages crawled, status: ${results?.summary?.crawl_progress || 'unknown'}`);
+          }
+        } catch (e) { console.warn(`📋 DataForSEO poll error: ${e.message}`); }
+      }
+
+      // Merge: if DataForSEO got significantly more pages, use their data
+      if (dfsPages && dfsPages.length > localPageCount * 1.5) {
+        console.log(`📋 Using DataForSEO pages (${dfsPages.length}) over local (${localPageCount})`);
+        // Convert DataForSEO page format to our format
+        const convertedPages = dfsPages.map(p => ({
+          url: p.url || '',
+          success: true,
+          statusCode: p.status_code || 200,
+          title: p.meta?.title || '',
+          metaDescription: p.meta?.description || '',
+          h1: p.meta?.htags?.h1 || [],
+          h2: p.meta?.htags?.h2 || [],
+          h3: p.meta?.htags?.h3 || [],
+          wordCount: p.meta?.content?.plain_text_word_count || 0,
+          internalLinkCount: p.meta?.internal_links_count || 0,
+          externalLinkCount: p.meta?.external_links_count || 0,
+          images: { total: p.meta?.images_count || 0, withoutAlt: (p.meta?.images_count || 0) - (p.meta?.images_alt_count || 0) },
+          canonical: p.meta?.canonical || '',
+          headings: [
+            ...(p.meta?.htags?.h1 || []).map(t => ({ level: 1, text: t })),
+            ...(p.meta?.htags?.h2 || []).map(t => ({ level: 2, text: t })),
+            ...(p.meta?.htags?.h3 || []).map(t => ({ level: 3, text: t })),
+          ],
+          responseTimeMs: p.page_timing?.time_to_interactive || 0,
+          pageSizeBytes: p.size || 0,
+          pageSizeKB: Math.round((p.size || 0) / 1024),
+          dataSource: 'dataforseo-onpage',
+        })).filter(p => p.url && p.statusCode < 400);
+
+        if (convertedPages.length > localPageCount) {
+          // Merge: keep local homepage data, add DataForSEO pages for sub-pages
+          const localHomepage = siteResearch.pages?.[0] || siteResearch.homepage;
+          const localUrls = new Set((siteResearch.pages || []).map(p => p.url));
+          const newPages = convertedPages.filter(p => !localUrls.has(p.url));
+          siteResearch.pages = [localHomepage, ...(siteResearch.pages || []).slice(1), ...newPages];
+          siteResearch.dataForSEOPageCount = convertedPages.length;
+          // Update siteIntelligence totals
+          if (siteResearch.siteIntelligence) {
+            siteResearch.siteIntelligence.totalPages = siteResearch.pages.length;
+          }
+          console.log(`📋 Merged: ${siteResearch.pages.length} total pages (${localPageCount} local + ${newPages.length} DataForSEO)`);
+        }
+      }
+    }
 
     // ── 429 FALLBACK: If crawl failed, use previous successful audit data ──
     let crawlFailed = false;

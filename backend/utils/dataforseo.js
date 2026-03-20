@@ -218,7 +218,7 @@ async function fetchBacklinkSummary(domain) {
         const data = await response.json();
         if (data.status_code !== 20000) return { _error: data.status_message, _subscriptionNeeded: false };
 
-        // Check task-level error (e.g., subscription not activated)
+        // Check task-level error (e.g., subscription not activated or insufficient funds)
         const task = data.tasks?.[0];
         if (task?.status_code === 40204) {
             console.warn('⚠️ DataForSEO Backlinks API: Subscription NOT activated — activate at https://app.dataforseo.com/backlinks-subscription');
@@ -226,6 +226,14 @@ async function fetchBacklinkSummary(domain) {
                 _error: 'Backlinks API subscription not activated',
                 _subscriptionNeeded: true,
                 _activateUrl: 'https://app.dataforseo.com/backlinks-subscription',
+            };
+        }
+        if (task?.status_code === 40200) {
+            console.warn('⚠️ DataForSEO Backlinks API: Payment Required — insufficient balance. Top up at https://app.dataforseo.com/billing');
+            return {
+                _error: 'DataForSEO account balance insufficient — please top up your account',
+                _subscriptionNeeded: true,
+                _activateUrl: 'https://app.dataforseo.com/billing',
             };
         }
         if (task?.status_code !== 20000) {
