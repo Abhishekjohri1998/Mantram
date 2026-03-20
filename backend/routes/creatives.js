@@ -107,7 +107,8 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
     for (const ip of imageParts) {
         if (ip.inlineData) parts.push({ inlineData: ip.inlineData });
     }
-    parts.push({ text: promptText });
+    const finalPrompt = aspectRatio && aspectRatio !== '1:1' ? `${promptText}\n\n[ASPECT RATIO: ${aspectRatio}]` : promptText;
+    parts.push({ text: finalPrompt });
 
     let imageUrl = null;
     let textResponse = '';
@@ -131,7 +132,6 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
                     generationConfig: {
                         responseModalities: ['TEXT', 'IMAGE'],
                         temperature,
-                        imageGenerationConfig: { aspectRatio },
                     },
                 }),
             });
