@@ -398,7 +398,7 @@ export default function SuperAdminDashboard() {
     return (
         <DashboardLayout>
             <SEOHead title="Super Admin — Mantram AI" noIndex={true} />
-            <div className="flex min-h-screen">
+            <div>
                 {toast && <div className={`fixed top-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-bold shadow-xl ${toast.type === 'error' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}`}>{toast.msg}</div>}
 
                 {/* Per-User Studio Access Modal */}
@@ -457,76 +457,39 @@ export default function SuperAdminDashboard() {
                     </div>
                 )}
 
-                {/* ═══════ SIDEBAR NAVIGATION ═══════ */}
-                {/* Inner Sidebar - Hidden on mobile, sticky on desktop */}
-                <aside className={`hidden lg:flex ${sidebarCollapsed ? 'w-[60px]' : 'w-[240px]'} flex-shrink-0 bg-gradient-to-b from-white/[0.03] to-transparent border-r border-white/[0.06] transition-all duration-300 sticky top-0 self-start h-screen overflow-y-auto flex-col`} style={{ scrollbarWidth: 'none' }}>
-                    {/* Sidebar Header */}
-                    <div className="p-4 border-b border-white/[0.06]">
-                        <div className="flex items-center justify-between">
-                            {!sidebarCollapsed && (
-                                <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-amber-400 text-xl">shield_person</span>
-                                    <span className="text-sm font-black text-white uppercase tracking-wider">Admin</span>
-                                </div>
-                            )}
-                            <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-slate-500 hover:text-white transition-all cursor-pointer">
-                                <span className="material-symbols-outlined text-base">{sidebarCollapsed ? 'chevron_right' : 'chevron_left'}</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Nav Groups */}
-                    <nav className="p-2 space-y-1">
-                        {navGroups.map((group, gi) => (
-                            <div key={gi} className="mb-1">
-                                {!sidebarCollapsed && (
-                                    <p className="px-3 pt-4 pb-1 text-[9px] font-black text-slate-600 uppercase tracking-[0.15em]">{group.label}</p>
-                                )}
-                                {sidebarCollapsed && gi > 0 && <div className="border-t border-white/[0.04] mx-2 my-2" />}
-                                {group.items.map(item => (
-                                    <button key={item.id} onClick={() => setTab(item.id)}
-                                        title={sidebarCollapsed ? item.label : undefined}
-                                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer group relative
-                                            ${tab === item.id
-                                                ? 'bg-amber-500/15 text-amber-400 shadow-sm shadow-amber-500/10'
-                                                : 'text-slate-400 hover:bg-white/[0.04] hover:text-white'}`}>
-                                        <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
-                                        {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
-                                        {item.badge > 0 && (
-                                            <span className={`${sidebarCollapsed ? 'absolute -top-0.5 -right-0.5' : 'ml-auto'} min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-black px-1`}>
-                                                {item.badge > 99 ? '99+' : item.badge}
-                                            </span>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-                        ))}
-                    </nav>
-                </aside>
 
                 {/* ═══════ MAIN CONTENT ═══════ */}
                 {/* Main Content Area */}
                 <div className="flex-1 min-w-0">
-                    {/* Mobile Tab Navigation - Visible only on mobile */}
-                    <div className="lg:hidden flex items-center gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide no-scrollbar">
-                        {navGroups.map(group => (
-                            <React.Fragment key={group.label}>
-                                {group.items.map(item => (
-                                    <button
-                                        key={item.id}
-                                        onClick={() => setTab(item.id)}
-                                        className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-                                            tab === item.id 
-                                            ? 'bg-primary text-white shadow-lg shadow-primary/20' 
-                                            : 'bg-white/[0.04] text-slate-400 border border-white/[0.06]'
-                                        }`}
-                                    >
-                                        <span className="material-symbols-outlined text-sm">{item.icon}</span>
-                                        {item.label}
-                                    </button>
-                                ))}
-                            </React.Fragment>
-                        ))}
+                    {/* Top Tab Navigation - Always visible and scrollable */}
+                    <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide no-scrollbar border-b border-white/[0.05]">
+                        <div className="flex items-center gap-2 px-1">
+                            {navGroups.map(group => (
+                                <React.Fragment key={group.label}>
+                                    {/* Group Label (Optional, shown in sidebar style but for top nav we can omit or make subtle) */}
+                                    <div className="h-6 w-px bg-white/[0.08] mx-2 first:hidden" />
+                                    {group.items.map(item => (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => setTab(item.id)}
+                                            className={`whitespace-nowrap px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 h-10 ${
+                                                tab === item.id 
+                                                ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' 
+                                                : 'bg-white/[0.03] text-slate-400 border border-white/[0.06] hover:bg-white/[0.08] hover:text-white'
+                                            }`}
+                                        >
+                                            <span className="material-symbols-outlined text-sm">{item.icon}</span>
+                                            {item.label}
+                                            {item.badge > 0 && (
+                                                <span className="ml-1 min-w-[16px] h-[16px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-black px-1 shadow-sm">
+                                                    {item.badge > 99 ? '99+' : item.badge}
+                                                </span>
+                                            )}
+                                        </button>
+                                    ))}
+                                </React.Fragment>
+                            ))}
+                        </div>
                     </div>
 
                     {/* ─── TOP BAR: Header + View as User ─── */}
