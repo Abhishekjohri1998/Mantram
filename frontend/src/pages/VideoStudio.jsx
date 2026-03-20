@@ -480,9 +480,9 @@ export default function VideoStudio() {
                 </div>
 
                 {/* ── Mode Toggle ── */}
-                <div className="flex items-center gap-2 mb-8 p-1.5 rounded-2xl bg-white/[0.025] border border-white/[0.05] w-fit">
+                <div className="flex flex-wrap items-center gap-2 mb-8 p-1.5 rounded-2xl bg-white/[0.025] border border-white/[0.05] w-fit max-w-full">
                     <button onClick={() => setStudioMode('advanced')}
-                        className={`px-6 py-3 rounded-xl text-base font-semibold transition-all cursor-pointer flex items-center gap-2.5 ${studioMode === 'advanced'
+                        className={`flex-1 sm:flex-none px-6 py-3 rounded-xl text-base font-semibold transition-all cursor-pointer flex items-center justify-center gap-2.5 ${studioMode === 'advanced'
                             ? 'bg-gradient-to-r from-violet-600 to-cyan-600 text-white shadow-lg shadow-violet-500/20'
                             : 'text-slate-500 hover:text-white hover:bg-white/[0.03]'}`}>
                         <span className="material-symbols-outlined text-lg">terminal</span> Advanced
@@ -555,9 +555,9 @@ export default function VideoStudio() {
                                     const promptPreview = promptText ? (promptText.length > 80 ? promptText.slice(0, 80) + '…' : promptText) : '';
 
                                     return (
-                                        <div key={p._id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.12] transition-all group">
+                                        <div key={p._id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.12] transition-all group">
                                             {/* Thumbnail / Play area */}
-                                            <div className="relative w-28 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-black/40 cursor-pointer"
+                                            <div className="relative w-full sm:w-28 h-40 sm:h-16 flex-shrink-0 rounded-lg overflow-hidden bg-black/40 cursor-pointer"
                                                 onClick={() => { if (videoUrl) setPlayingVideo(videoUrl); else loadProject(p._id) }}>
                                                 {videoUrl ? (
                                                     <video src={`${videoUrl}#t=1`} className="w-full h-full object-cover" muted playsInline preload="auto"
@@ -1191,15 +1191,15 @@ export default function VideoStudio() {
                                     <span className="material-symbols-outlined text-cyan-400 text-base">mic</span>
                                     Select Voice
                                 </h3>
-                                <div className="flex gap-2 mb-4">
+                                <div className="flex flex-wrap gap-2 mb-4">
                                     <button onClick={() => setSelectedVoProvider('minimax')}
-                                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer ${selectedVoProvider === 'minimax'
+                                        className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer ${selectedVoProvider === 'minimax'
                                             ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
                                             : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'}`}>
                                         🌍 Global (Minimax)
                                     </button>
                                     <button onClick={() => setSelectedVoProvider('sarvam')}
-                                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer ${selectedVoProvider === 'sarvam'
+                                        className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer ${selectedVoProvider === 'sarvam'
                                             ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                                             : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'}`}>
                                         🇮🇳 Indian (Sarvam)
@@ -1399,39 +1399,45 @@ export default function VideoStudio() {
                                 </div>
 
                                 {/* Resolution Selector */}
-                                <div className="flex items-center gap-3 mb-3">
+                                <div className="flex items-center gap-3 mb-3 flex-wrap">
                                     <span className="text-sm text-slate-500">Resolution:</span>
-                                    {['720p', '1080p', '4k'].map(r => (
-                                        <button key={r} onClick={() => setRouting(prev => ({ ...prev, resolution: r }))}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${routing.resolution === r
-                                                ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
-                                                : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'
-                                                }`}>{r}</button>
-                                    ))}
+                                    <div className="flex flex-wrap gap-2">
+                                        {['720p', '1080p', '4k'].map(r => (
+                                            <button key={r} onClick={() => setRouting(prev => ({ ...prev, resolution: r }))}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${routing.resolution === r
+                                                    ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
+                                                    : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'
+                                                    }`}>{r}</button>
+                                        ))}
+                                    </div>
                                 </div>
 
                                 {/* Aspect Ratio Selector */}
-                                <div className="flex items-center gap-3 mb-3">
+                                <div className="flex items-center gap-3 mb-3 flex-wrap">
                                     <span className="text-sm text-slate-500">Ratio:</span>
-                                    {['16:9', '9:16', '1:1', '4:3', '3:4'].map(r => (
-                                        <button key={r} onClick={() => setRouting(prev => ({ ...prev, aspectRatio: r }))}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${(routing.aspectRatio || '16:9') === r
-                                                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                                                : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'
-                                                }`}>{r}</button>
-                                    ))}
+                                    <div className="flex flex-wrap gap-2">
+                                        {['16:9', '9:16', '1:1', '4:3', '3:4'].map(r => (
+                                            <button key={r} onClick={() => setRouting(prev => ({ ...prev, aspectRatio: r }))}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${(routing.aspectRatio || '16:9') === r
+                                                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                                                    : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'
+                                                    }`}>{r}</button>
+                                        ))}
+                                    </div>
                                 </div>
 
                                 {/* Mode Selector */}
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-3 flex-wrap">
                                     <span className="text-sm text-slate-500">Mode:</span>
-                                    {['fast', 'quality'].map(m => (
-                                        <button key={m} onClick={() => setRouting(prev => ({ ...prev, mode: m }))}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all capitalize ${routing.mode === m
-                                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                                                : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'
-                                                }`}>{m}</button>
-                                    ))}
+                                    <div className="flex flex-wrap gap-2">
+                                        {['fast', 'quality'].map(m => (
+                                            <button key={m} onClick={() => setRouting(prev => ({ ...prev, mode: m }))}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all capitalize ${routing.mode === m
+                                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                                    : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'
+                                                    }`}>{m}</button>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
 
