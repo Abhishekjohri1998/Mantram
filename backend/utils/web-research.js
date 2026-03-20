@@ -1387,13 +1387,15 @@ export async function researchDomain(baseUrl, options = {}) {
 
     console.log(`🕷️  Initial crawl queue: ${toCrawl.length} pages (sitemap: ${sitemap.found ? sitemap.count : 0}, robots: ${robotsTxt.found})`);
 
-    // PHASE 3: Crawl with recursive link discovery
+    // PHASE 3: Crawl with recursive link discovery — ADAPTIVE THROTTLING
     const allSubPages = [];
-    const BATCH_SIZE = _cfNeeded ? 4 : 20; // Lower concurrency for CF sites to avoid 429
-    const BATCH_DELAY = _cfNeeded ? 500 : 30; // Longer delay for CF-protected sites
+    let batchSize = _cfNeeded ? 4 : 10; // Start moderate, adapt based on success rate
+    let batchDelay = _cfNeeded ? 500 : 50;
     let queueIndex = 0;
     const allFailedUrls = [];
-    let consecutiveFailedBatches = 0; // Track consecutive all-fail batches for early bail
+    let consecutiveFailedBatches = 0;
+    let totalBatchesTried = 0;
+    let totalSuccesses = 0;
 
     while (queueIndex < toCrawl.length) {
         if (Date.now() - crawlStartTime > CRAWL_TIMEOUT_MS) {
@@ -1402,17 +1404,17 @@ export async function researchDomain(baseUrl, options = {}) {
         }
         if (allSubPages.length + 1 >= MAX_PAGES) break;
 
-        // EARLY BAIL: if 3 consecutive batches had 0 success, site is clearly rate-limiting — skip to Playwright
-        if (consecutiveFailedBatches >= 3 && allFailedUrls.length > 30) {
+        // EARLY BAIL: if 8 consecutive batches had 0 success after trying 80+ URLs
+        if (consecutiveFailedBatches >= 8 && allFailedUrls.length > 80) {
             const remaining = toCrawl.length - queueIndex;
             console.log(`🕷️  Early bail: ${consecutiveFailedBatches} consecutive failed batches — skipping ${remaining} remaining URLs (will use Playwright)`);
-            // Add ALL remaining URLs to failed list for Playwright re-crawl
             allFailedUrls.push(...toCrawl.slice(queueIndex));
             break;
         }
 
-        const batch = toCrawl.slice(queueIndex, queueIndex + BATCH_SIZE);
-        queueIndex += BATCH_SIZE;
+        const batch = toCrawl.slice(queueIndex, queueIndex + batchSize);
+        queueIndex += batchSize;
+        totalBatchesTried++;
 
         const batchResults = await Promise.all(
             batch.map(url => crawlPage(url).catch(e => ({ url, success: false, error: e.message })))
@@ -1422,12 +1424,32 @@ export async function researchDomain(baseUrl, options = {}) {
         const failedBatch = batchResults.filter(p => !p.success);
         allSubPages.push(...successPages);
         allFailedUrls.push(...failedBatch.map(p => p.url).filter(Boolean));
+        totalSuccesses += successPages.length;
 
-        // Track consecutive failures for early bail
-        if (successPages.length === 0) {
+        // ── ADAPTIVE THROTTLING ──
+        const batchSuccessRate = successPages.length / batch.length;
+        if (batchSuccessRate === 0) {
             consecutiveFailedBatches++;
+            // Aggressive throttle-down: reduce batch size, increase delay
+            if (batchSize > 3) {
+                batchSize = Math.max(3, Math.floor(batchSize * 0.5));
+                batchDelay = Math.min(3000, batchDelay * 2);
+                console.log(`🕷️  Throttle down: batch=${batchSize}, delay=${batchDelay}ms (${consecutiveFailedBatches} consecutive failures)`);
+            }
+        } else if (batchSuccessRate < 0.5) {
+            consecutiveFailedBatches = 0;
+            // Moderate throttle: reduce batch size slightly
+            if (batchSize > 5) {
+                batchSize = Math.max(5, batchSize - 2);
+                batchDelay = Math.min(2000, batchDelay + 100);
+            }
         } else {
             consecutiveFailedBatches = 0;
+            // Good success rate: cautiously increase speed
+            if (batchSize < 15 && batchSuccessRate > 0.8) {
+                batchSize = Math.min(15, batchSize + 1);
+                batchDelay = Math.max(30, batchDelay - 20);
+            }
         }
 
         // Recursive discovery
@@ -1440,7 +1462,7 @@ export async function researchDomain(baseUrl, options = {}) {
             }
         }
 
-        if (queueIndex < toCrawl.length) await new Promise(r => setTimeout(r, BATCH_DELAY));
+        if (queueIndex < toCrawl.length) await new Promise(r => setTimeout(r, batchDelay));
     }
 
     const allPages = [homepage, ...allSubPages];
@@ -2563,8 +2585,8 @@ export function formatSiteResearch(research) {
     text += `- Total word count: ${si.totalWordCount} (avg ${si.avgWordCount || 0} per page)\n`;
     text += `- Total images: ${si.totalImages} (${si.imagesWithoutAlt} missing alt text)\n`;
     text += `- Internal links: ${si.internalLinkCount}, External links: ${si.externalLinkCount}\n`;
-    text += `- Schema/JSON-LD: ${si.hasSchemaOrg ? `Yes (${si.schemaTypes.join(', ')})` : 'NONE FOUND'}\n`;
-    text += `- Tech Stack: ${si.techStack.join(', ') || 'Unknown'}\n`;
+    text += `- Schema/JSON-LD: ${si.hasSchemaOrg ? `Yes (${(si.schemaTypes || []).join(', ')})` : 'NONE FOUND'}\n`;
+    text += `- Tech Stack: ${(si.techStack || []).join(', ') || 'Unknown'}\n`;
     text += `- Canonical: ${si.hasCanonical ? 'Yes' : 'MISSING'}\n`;
     text += `- Mobile viewport: ${si.hasViewport ? 'Yes' : 'MISSING'}\n`;
     text += `- FAQ section: ${si.hasFAQ ? 'Yes' : 'Not found'}\n`;

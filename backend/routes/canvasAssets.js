@@ -203,19 +203,60 @@ Return ONLY valid JSON (no markdown, no backticks). Only include elements you ca
     }
 })
 
-// POST /api/canvas-assets/ai-generate — Generate image from text prompt
+// POST /api/canvas-assets/ai-generate — Generate image from text prompt (+ optional reference images)
 router.post('/ai-generate', protect, requireCredits('canvasGenerate'), async (req, res) => {
     try {
-        const { prompt, size = '1024x1024' } = req.body
+        const { prompt, size = '1024x1024', referenceImages = [] } = req.body
         if (!prompt) return res.status(400).json({ error: 'Prompt is required' })
 
         const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY
         if (!imageKey) return res.status(400).json({ error: 'GEMINI_API_KEY not configured' })
 
         const baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
-        // Nano Banana 2 (recommended for image gen/edit)
-        const models = ['gemini-2.5-flash-preview-image-generation']
+        const models = ['gemini-3.1-flash-image-preview']
         let imageUrl = null
+
+        // Build multimodal parts — reference images first, then text prompt
+        const parts = []
+        for (const refBase64 of referenceImages.slice(0, 4)) {
+            const base64Data = refBase64.includes('base64,') ? refBase64.split('base64,')[1] : refBase64
+            const mimeType = refBase64.startsWith('data:') ? refBase64.split(';')[0].split(':')[1] : 'image/png'
+            parts.push({ inlineData: { mimeType, data: base64Data } })
+        }
+        const refCount = parts.length
+        const textPrompt = refCount > 0
+            ? `You are an elite creative director and visual artist with 20+ years of experience at top agencies. You have extraordinary creative intelligence.
+
+CREATIVE ANALYSIS PROCESS:
+1. ANALYZE each reference image: Identify dominant colors, mood, composition style, lighting quality, texture patterns, typography styles, and visual weight distribution
+2. EXTRACT creative DNA: Pull the artistic essence — what makes each reference visually powerful
+3. SYNTHESIZE: Merge the best creative elements into a cohesive new vision
+
+I have provided ${refCount} reference image(s). Study them deeply. Now create a NEW masterpiece based on this instruction: ${prompt}
+
+CREATIVE PRINCIPLES TO APPLY:
+- Color Harmony: Use complementary/analogous color schemes from the references
+- Visual Hierarchy: Guide the eye through focal points, contrast, and spacing
+- Composition: Apply rule of thirds, golden ratio, or dynamic symmetry
+- Lighting: Professional lighting that creates depth and dimension  
+- Mood: Ensure emotional consistency throughout the image
+- Detail: Crisp, high-resolution output with rich textures
+
+The output must be a stunning, gallery-quality image that feels like it was crafted by a top creative agency.`
+            : `You are an elite creative director and visual artist. Generate a stunning, gallery-quality image with these principles:
+
+INSTRUCTION: ${prompt}
+
+CREATIVE PRINCIPLES:
+- Color Harmony: Use a sophisticated, harmonious color palette
+- Visual Hierarchy: Strong focal point with supporting elements
+- Composition: Professional layout using rule of thirds or golden ratio
+- Lighting: Cinematic, professional lighting with depth
+- Mood: Create an emotional resonance that captivates the viewer
+- Detail: Ultra-high quality, crisp details, rich textures
+
+Make it look like it was produced by a world-class creative studio.`
+        parts.push({ text: textPrompt })
 
         for (const modelId of models) {
             try {
@@ -224,14 +265,14 @@ router.post('/ai-generate', protect, requireCredits('canvasGenerate'), async (re
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{ role: 'user', parts: [{ text: `Generate a high-quality image: ${prompt}` }] }],
+                        contents: [{ role: 'user', parts }],
                         generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
                     }),
                 })
                 const data = await resp.json()
                 if (data.error) throw new Error(data.error.message)
-                const parts = data.candidates?.[0]?.content?.parts || []
-                for (const part of parts) {
+                const resParts = data.candidates?.[0]?.content?.parts || []
+                for (const part of resParts) {
                     if (part.inlineData?.mimeType?.startsWith('image/')) {
                         imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
                         break
@@ -247,30 +288,83 @@ router.post('/ai-generate', protect, requireCredits('canvasGenerate'), async (re
         
         // Upload Base64 result to S3
         const s3Key = `canvas/${req.user._id}/${Date.now()}.png`;
-        const s3Url = await uploadToS3(imageUrl, s3Key, 'image/png');
+        let s3Url = null; try { s3Url = await uploadToS3(imageUrl, s3Key, 'image/png'); } catch (e) { console.error('S3 Upload Error:', e.message); }
         
-        res.json({ imageUrl: s3Url || imageUrl, model: 'NanoBanana 2', source: s3Url ? 's3' : 'base64' })
+        res.json({ imageUrl: s3Url || imageUrl, model: 'NanoBanana 2', source: s3Url ? 's3' : 'base64', refsUsed: refCount })
     } catch (err) {
         console.error('AI generate error:', err.message)
         res.status(500).json({ error: safeErrorMessage(err) })
     }
 })
 
-// POST /api/canvas-assets/ai-edit — Edit image with prompt (inpaint/outpaint)
+// POST /api/canvas-assets/ai-edit — Edit image with prompt (+ optional additional images for merge/combine)
 router.post('/ai-edit', protect, requireCredits('canvasGenerate'), async (req, res) => {
     try {
-        const { prompt, imageBase64 } = req.body
+        const { prompt, imageBase64, additionalImages = [] } = req.body
         if (!prompt || !imageBase64) return res.status(400).json({ error: 'Prompt and imageBase64 required' })
 
         const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY
         if (!imageKey) return res.status(400).json({ error: 'GEMINI_API_KEY not configured' })
 
         const baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
-        // Extract base64 data from data URI if present
         const base64Data = imageBase64.includes('base64,') ? imageBase64.split('base64,')[1] : imageBase64
         const mimeType = imageBase64.startsWith('data:') ? imageBase64.split(';')[0].split(':')[1] : 'image/png'
 
-        const models = ['gemini-2.5-flash-preview-image-generation']
+        // Build multimodal parts: main image + additional images + text prompt
+        const parts = [{ inlineData: { mimeType, data: base64Data } }]
+
+        // Add individual images (from selected canvas objects)
+        for (const addImg of additionalImages.slice(0, 4)) {
+            const addData = addImg.includes('base64,') ? addImg.split('base64,')[1] : addImg
+            const addMime = addImg.startsWith('data:') ? addImg.split(';')[0].split(':')[1] : 'image/png'
+            parts.push({ inlineData: { mimeType: addMime, data: addData } })
+        }
+
+        const imgCount = parts.length
+        const editText = imgCount > 1
+            ? `You are Fidato, an elite AI creative director with extraordinary visual intelligence. You have deep expertise in image composition, color theory, and visual storytelling.
+
+CREATIVE ANALYSIS TASK:
+I have provided ${imgCount} images. The FIRST image is the full canvas context. The remaining ${imgCount - 1} image(s) are individual selected elements on the canvas.
+
+STEP 1 — DEEP IMAGE ANALYSIS (do this internally):
+For each image, analyze:
+• Dominant colors and color palette
+• Subject matter and visual elements
+• Mood, emotion, and visual weight
+• Lighting direction and quality
+• Texture patterns and visual styles
+• Negative space and composition
+
+STEP 2 — CREATIVE INTELLIGENCE:
+Based on the user's instruction: "${prompt}"
+• Identify HOW these images can work together harmoniously
+• Find visual connections — shared colors, complementary themes, consistent mood
+• Plan the optimal composition that balances all elements
+• Determine the best color grading that unifies everything
+
+STEP 3 — EXECUTION:
+• Create a single, cohesive masterpiece that intelligently blends elements from all provided images
+• Apply professional color harmony and seamless blending
+• Ensure lighting consistency across all merged elements
+• Use smooth transitions, matching shadows, and consistent perspective
+• The result should look like it was professionally composed — NOT like a collage
+
+CRITICAL: Think like a senior art director. The output must be a stunning, unified image — not a cut-and-paste job. Output the final image.`
+            : `You are Fidato, an elite AI creative director. Edit this image with creative intelligence.
+
+INSTRUCTION: ${prompt}
+
+CREATIVE RULES:
+• Keep the overall composition and unaffected areas identical
+• Apply changes with professional precision — matching lighting, shadows, and color temperature
+• Ensure the edit blends seamlessly with the existing image
+• The result should look like it was professionally retouched
+
+Output the modified image.`
+        parts.push({ text: editText })
+
+        const models = ['gemini-3.1-flash-image-preview']
         let imageUrl = null
 
         for (const modelId of models) {
@@ -280,20 +374,14 @@ router.post('/ai-edit', protect, requireCredits('canvasGenerate'), async (req, r
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{
-                            role: 'user',
-                            parts: [
-                                { inlineData: { mimeType, data: base64Data } },
-                                { text: `Edit this existing image according to these instructions: ${prompt}. Keep the overall composition, layout, and unaffected areas identical. Only make the specific requested changes. Output the modified image.` },
-                            ],
-                        }],
+                        contents: [{ role: 'user', parts }],
                         generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
                     }),
                 })
                 const data = await resp.json()
                 if (data.error) throw new Error(data.error.message)
-                const parts = data.candidates?.[0]?.content?.parts || []
-                for (const part of parts) {
+                const resParts = data.candidates?.[0]?.content?.parts || []
+                for (const part of resParts) {
                     if (part.inlineData?.mimeType?.startsWith('image/')) {
                         imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
                         break
@@ -309,9 +397,9 @@ router.post('/ai-edit', protect, requireCredits('canvasGenerate'), async (req, r
         
         // Upload Base64 result to S3
         const s3Key = `canvas/${req.user._id}/${Date.now()}_edit.png`;
-        const s3Url = await uploadToS3(imageUrl, s3Key, 'image/png');
+        let s3Url = null; try { s3Url = await uploadToS3(imageUrl, s3Key, 'image/png'); } catch (e) { console.error('S3 Upload Error:', e.message); }
         
-        res.json({ imageUrl: s3Url || imageUrl, model: 'NanoBanana 2', source: s3Url ? 's3' : 'base64' })
+        res.json({ imageUrl: s3Url || imageUrl, model: 'NanoBanana 2', source: s3Url ? 's3' : 'base64', imagesProcessed: imgCount })
     } catch (err) {
         console.error('AI edit error:', err.message)
         res.status(500).json({ error: safeErrorMessage(err) })
@@ -344,7 +432,7 @@ router.post('/ai-edit-visual', protect, requireCredits('canvasGenerate'), async 
             parts.push({ text: `Edit this image: ${prompt}. Keep all unaffected areas identical. Output the modified image.` })
         }
 
-        const modelId = 'gemini-2.5-flash-preview-image-generation'
+        const modelId = 'gemini-3.1-flash-image-preview'
         const url = `${baseUrl}/models/${modelId}:generateContent?key=${imageKey}`
         const resp = await fetch(url, {
             method: 'POST',
@@ -368,7 +456,7 @@ router.post('/ai-edit-visual', protect, requireCredits('canvasGenerate'), async 
         
         // Upload Base64 result to S3
         const s3Key = `canvas/${req.user._id}/${Date.now()}_visual.png`;
-        const s3Url = await uploadToS3(imageUrl, s3Key, 'image/png');
+        let s3Url = null; try { s3Url = await uploadToS3(imageUrl, s3Key, 'image/png'); } catch (e) { console.error('S3 Upload Error:', e.message); }
         
         res.json({ imageUrl: s3Url || imageUrl, model: 'Gemini Flash', source: s3Url ? 's3' : 'base64' })
     } catch (err) {
@@ -407,7 +495,7 @@ router.post('/ai-retouch', protect, requireCredits('canvasGenerate'), async (req
             parts.push({ text: `RETOUCH TASK: I have provided an image and a black-and-white mask. WHITE areas in the mask indicate the region to retouch. ${prompt || 'Clean up and retouch the masked area to look seamless and natural'}. CRITICAL: Keep all pixels outside the white mask EXACTLY the same. Output the complete modified image.` })
         }
 
-        const modelId = 'gemini-2.5-flash-preview-image-generation'
+        const modelId = 'gemini-3.1-flash-image-preview'
         const url = `${baseUrl}/models/${modelId}:generateContent?key=${imageKey}`
         const resp = await fetch(url, {
             method: 'POST',
@@ -431,7 +519,7 @@ router.post('/ai-retouch', protect, requireCredits('canvasGenerate'), async (req
         
         // Upload Base64 result to S3
         const s3Key = `canvas/${req.user._id}/${Date.now()}_retouch.png`;
-        const s3Url = await uploadToS3(imageUrl, s3Key, 'image/png');
+        let s3Url = null; try { s3Url = await uploadToS3(imageUrl, s3Key, 'image/png'); } catch (e) { console.error('S3 Upload Error:', e.message); }
         
         res.json({ imageUrl: s3Url || imageUrl, model: 'Gemini Flash', source: s3Url ? 's3' : 'base64' })
     } catch (err) {
@@ -460,7 +548,7 @@ router.post('/ai-background', protect, requireCredits('canvasBgRemove'), async (
             promptText = `Replace ONLY the background of this image with: ${bgPrompt || 'a clean, professional studio background'}. CRITICAL: Keep the foreground subject(s) completely identical — same pose, same colors, same details. Only change what is behind/around the subject. Blend the new background seamlessly. Output the full modified image.`
         }
 
-        const modelId = 'gemini-2.5-flash-preview-image-generation'
+        const modelId = 'gemini-3.1-flash-image-preview'
         const url = `${baseUrl}/models/${modelId}:generateContent?key=${imageKey}`
         const resp = await fetch(url, {
             method: 'POST',
@@ -490,7 +578,7 @@ router.post('/ai-background', protect, requireCredits('canvasBgRemove'), async (
         
         // Upload Base64 result to S3
         const s3Key = `canvas/${req.user._id}/${Date.now()}_background.png`;
-        const s3Url = await uploadToS3(imageUrl, s3Key, 'image/png');
+        let s3Url = null; try { s3Url = await uploadToS3(imageUrl, s3Key, 'image/png'); } catch (e) { console.error('S3 Upload Error:', e.message); }
         
         res.json({ imageUrl: s3Url || imageUrl, action, model: 'Gemini Flash', source: s3Url ? 's3' : 'base64' })
     } catch (err) {

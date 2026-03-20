@@ -614,13 +614,8 @@ Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhr
 
         console.log(`📸 AI Photo Studio: angle=${cameraAngle} lens=${lens} light=${lightingStyle}/${lightDirection} surface=${surface} model=${modelPresence} mood=${mood?.join(',')} fidelity=${fidelity} ratio=${aspectRatio}`);
 
-        // Models — Nano Banana 2 is the latest/best for image editing
-        const models = [
-            'gemini-3.1-flash-image-preview',    // Nano Banana 2 (best, latest)
-            'gemini-3-pro-image-preview',          // Nano Banana Pro
-            'gemini-2.5-flash-image',              // Nano Banana (stable)
-            'gemini-2.5-flash-preview-image-generation', // Fallback (newer)
-        ];
+        // NanoBanana 2 — direct, no fallback chain
+        const models = ['gemini-3.1-flash-image-preview'];
 
         let resultImage = null;
         let resultText = '';

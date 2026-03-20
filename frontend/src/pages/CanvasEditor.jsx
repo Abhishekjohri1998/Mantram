@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, Component } from 'reac
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useBrand } from '../context/BrandContext'
 import SEOHead from '../components/SEOHead'
+import FormattedText from '../components/FormattedText'
 import * as fabric from 'fabric'
 import { media as mediaAPI } from '../services/api'
 import { TEMPLATE_LIBRARY, TEMPLATE_CATEGORIES } from './canvasTemplates'
@@ -164,12 +165,76 @@ function CanvasEditorInner() {
     const [customH, setCustomH] = useState(1080)
     const [lockRatio, setLockRatio] = useState(true)
 
+    // ── Floating Toolbar State ──
+    const [floatTool, setFloatTool] = useState(null)
+    const [showGenPanel, setShowGenPanel] = useState(false)
+    const [genPrompt, setGenPrompt] = useState('')
+    const [genEnhance, setGenEnhance] = useState(true)
+    const [genRatio, setGenRatio] = useState('1:1')
+    const [genRefs, setGenRefs] = useState([])
+    const [genLoading, setGenLoading] = useState(false)
+
+    // ── Context Menu State ──
+    const [contextMenu, setContextMenu] = useState(null) // { x, y, target }
+    const clipboardRef = useRef(null) // stores cloned fabric objects for copy/paste
+
+    // ── Sidebar Collapse State ──
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+
+    // ── Canvas Theme (dark/light workspace background) ──
+    const [canvasTheme, setCanvasTheme] = useState('dark') // 'dark' or 'light'
+
+    // ── Fidato Canvas Chat State ──
+    const [fidatoOpen, setFidatoOpen] = useState(false)
+    const [fidatoMessages, setFidatoMessages] = useState([
+        { role: 'assistant', content: 'Hey! I\'m Fidato, your AI creative partner. \ud83c\udfa8\n\nI can help you generate images, create campaigns, merge images, extract color palettes, and more. What would you like to create?' }
+    ])
+    const [fidatoInput, setFidatoInput] = useState('')
+    const [fidatoLoading, setFidatoLoading] = useState(false)
+    const fidatoMsgEndRef = useRef(null)
+
+    // ── Fidato Voice Input State ──
+    const [fidatoRecording, setFidatoRecording] = useState(false)
+    const [fidatoTranscribing, setFidatoTranscribing] = useState(false)
+    const fidatoMediaRecorderRef = useRef(null)
+    const fidatoAudioChunksRef = useRef([])
+    const fidatoSilenceCheckRef = useRef(null)
+    const fidatoRecordingTimerRef = useRef(null)
+    const fidatoAnalyserRef = useRef(null)
+
     // ── Font Category State ──
     const [fontCategory, setFontCategory] = useState('all')
 
     // ── Image Source Tab (for Images sidebar) ──
     const [imageSourceTab, setImageSourceTab] = useState('upload')
     const [generatedImages, setGeneratedImages] = useState([])
+    const [loadingBankImages, setLoadingBankImages] = useState(false)
+
+    // ── Fetch generated images from backend image bank ──
+    useEffect(() => {
+        const fetchBankImages = async () => {
+            const token = localStorage.getItem('mantram_token')
+            const brandId = activeBrand?._id
+            if (!token || !brandId) return
+            setLoadingBankImages(true)
+            try {
+                const resp = await fetch(`/api/creatives/image-bank?category=generated&brandId=${brandId}&limit=40`, {
+                    headers: { 'Authorization': `Bearer ${token}` },
+                })
+                const data = await resp.json()
+                if (data.success && data.images) {
+                    setGeneratedImages(data.images.map(img => ({
+                        url: img.imageUrl || img.thumbnailUrl,
+                        label: img.title || img.type || 'Generated',
+                        timestamp: new Date(img.createdAt).getTime(),
+                        id: img._id,
+                    })).filter(img => img.url))
+                }
+            } catch (err) { console.warn('Failed to load image bank:', err) }
+            setLoadingBankImages(false)
+        }
+        fetchBankImages()
+    }, [activeBrand])
 
     // ── AI Creative Generator State ──
     const [aiCreativeKeywords, setAiCreativeKeywords] = useState('')
@@ -244,7 +309,7 @@ function CanvasEditorInner() {
     const updateLayers = useCallback(() => {
         const fc = fabricRef.current
         if (!fc) return
-        const objs = fc.getObjects()
+        const objs = fc.getObjects().filter(o => o.id !== 'artboard') // Exclude artboard from layers
         const layerList = objs.map((obj, i) => ({
             id: obj.id || `layer-${i}`,
             name: obj.customName || obj.type || `Layer ${i + 1}`,
@@ -302,43 +367,43 @@ function CanvasEditorInner() {
                     return
                 }
 
-                // Calculate display size to fit in viewport
-                const maxW = Math.max(container.clientWidth - 80, 200)
-                const maxH = Math.max(container.clientHeight - 80, 200)
-                console.log('Canvas init: container size', maxW, maxH, 'target canvas:', canvasWidth, canvasHeight)
+                // ── INFINITE CANVAS: Canvas fills entire container ──
+                const containerW = container.clientWidth
+                const containerH = container.clientHeight
+                console.log('Canvas init: container size', containerW, containerH, 'artboard:', canvasWidth, canvasHeight)
 
-                const scale = Math.min(maxW / canvasWidth, maxH / canvasHeight, 1)
-                const displayW = Math.round(canvasWidth * scale)
-                const displayH = Math.round(canvasHeight * scale)
-
-                console.log('Canvas init: creating Fabric.Canvas', displayW, 'x', displayH)
                 const fc = new fabric.Canvas(canvasEl, {
-                    width: displayW,
-                    height: displayH,
-                    backgroundColor: '#1a1a2e',
+                    width: containerW,
+                    height: containerH,
+                    backgroundColor: 'transparent', // Background handled by CSS dotted grid
                     preserveObjectStacking: true,
                     selection: true,
+                    fireRightClick: true,      // Enable right-click events in fabric
                 })
 
-                // Store the logical→display scale
+                // Store logical dimensions (no artboard auto-created — user adds via presets)
+                const scale = Math.min((containerW - 80) / canvasWidth, (containerH - 80) / canvasHeight, 1)
                 fc._logicalScale = scale
                 fc._logicalWidth = canvasWidth
                 fc._logicalHeight = canvasHeight
+                fc._artboardLeft = Math.round((containerW - Math.round(canvasWidth * scale)) / 2)
+                fc._artboardTop = Math.round((containerH - Math.round(canvasHeight * scale)) / 2)
 
                 fabricRef.current = fc
-                console.log('Canvas init: Fabric.Canvas created successfully')
+                console.log('Canvas init: Fabric.Canvas created (clean infinite canvas — no artboard)')
 
                 // Load the image
                 if (imageUrl) {
                     console.log('Canvas init: loading image...', imageUrl.substring(0, 80))
                     fabric.FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' }).then(img => {
-                        // Scale image to fill canvas
-                        const imgScale = Math.max(displayW / img.width, displayH / img.height)
+                        // Scale and center image in the canvas
+                        const maxDim = Math.min(containerW * 0.8, containerH * 0.8)
+                        const imgScale = Math.min(maxDim / img.width, maxDim / img.height, 1)
                         img.set({
                             scaleX: imgScale,
                             scaleY: imgScale,
-                            left: displayW / 2,
-                            top: displayH / 2,
+                            left: containerW / 2,
+                            top: containerH / 2,
                             originX: 'center',
                             originY: 'center',
                             selectable: true,
@@ -347,7 +412,8 @@ function CanvasEditorInner() {
                             id: 'bg-image',
                         })
                         fc.add(img)
-                        fc.sendObjectToBack(img)
+                        // Keep artboard at back, image on top of it
+                        fc.sendObjectToBack(artboard)
                         fc.renderAll()
                         updateLayers()
                         saveHistory()
@@ -355,7 +421,6 @@ function CanvasEditorInner() {
                     }).catch(err => {
                         console.error('Failed to load image:', err)
                         showToast('⚠️ Failed to load image — canvas is ready for new elements')
-                        // Still save initial history even without image
                         saveHistory()
                     })
                 } else {
@@ -370,6 +435,24 @@ function CanvasEditorInner() {
                 fc.on('object:modified', () => { updateSelectedProps(); saveHistory(); updateLayers() })
                 fc.on('object:added', () => { updateLayers() })
                 fc.on('object:removed', () => { updateLayers() })
+
+                // ── RIGHT-CLICK: Direct DOM listener on the upper canvas (bulletproof) ──
+                const showContextMenu = (e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    const active = fc.getActiveObject()
+                    setContextMenu({
+                        x: e.clientX,
+                        y: e.clientY,
+                        hasTarget: !!active,
+                        isGroup: active?.type === 'group',
+                        isMultiSelect: active?.type === 'activeselection',
+                        isLocked: active?.lockMovementX || false,
+                    })
+                }
+                // Attach to ALL canvas layers (upper canvas handles events, lower renders)
+                if (fc.upperCanvasEl) fc.upperCanvasEl.addEventListener('contextmenu', showContextMenu)
+                if (fc.wrapperEl) fc.wrapperEl.addEventListener('contextmenu', showContextMenu)
 
                 // Find initial preset
                 const preset = PRESETS.find(p => p.w === canvasWidth && p.h === canvasHeight)
@@ -394,33 +477,61 @@ function CanvasEditorInner() {
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
 
-    // ── Resize canvas to new preset ──
+    // ── Add/resize size guide (artboard) via preset ──
     const resizeToPreset = (preset) => {
         const fc = fabricRef.current
         if (!fc) return
 
         setActivePreset(preset.id)
-        const container = containerRef.current
-        const maxW = container.clientWidth - 80
-        const maxH = container.clientHeight - 80
+        const canvasW = fc.width
+        const canvasH = fc.height
+        const maxW = canvasW - 80
+        const maxH = canvasH - 80
         const scale = Math.min(maxW / preset.w, maxH / preset.h, 1)
         const displayW = Math.round(preset.w * scale)
         const displayH = Math.round(preset.h * scale)
+        const artboardLeft = Math.round((canvasW - displayW) / 2)
+        const artboardTop = Math.round((canvasH - displayH) / 2)
 
-        fc.setDimensions({ width: displayW, height: displayH })
+        // Create artboard if it doesn't exist, otherwise update it
+        let artboard = fc.getObjects().find(o => o.id === 'artboard')
+        if (!artboard) {
+            artboard = new fabric.Rect({
+                left: artboardLeft,
+                top: artboardTop,
+                width: displayW,
+                height: displayH,
+                fill: '#ffffff',
+                rx: 4,
+                ry: 4,
+                selectable: false,
+                evented: false,
+                hoverCursor: 'default',
+                id: 'artboard',
+                excludeFromExport: false,
+                shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.25)', blur: 30, offsetX: 0, offsetY: 4 }),
+            })
+            fc.add(artboard)
+            fc.sendObjectToBack(artboard)
+        } else {
+            artboard.set({ left: artboardLeft, top: artboardTop, width: displayW, height: displayH })
+        }
+
         fc._logicalScale = scale
         fc._logicalWidth = preset.w
         fc._logicalHeight = preset.h
+        fc._artboardLeft = artboardLeft
+        fc._artboardTop = artboardTop
 
-        // Resize background image to fill
+        // Resize background image to fill artboard
         const bgImg = fc.getObjects().find(o => o.id === 'bg-image')
         if (bgImg) {
             const imgScale = Math.max(displayW / bgImg.width, displayH / bgImg.height)
             bgImg.set({
                 scaleX: imgScale,
                 scaleY: imgScale,
-                left: displayW / 2,
-                top: displayH / 2,
+                left: artboardLeft + displayW / 2,
+                top: artboardTop + displayH / 2,
             })
         }
 
@@ -723,69 +834,288 @@ function CanvasEditorInner() {
         if (obj) { fc.sendObjectBackwards(obj); fc.renderAll(); updateLayers(); saveHistory() }
     }
 
+    // ── Copy selected object(s) ──
+    const copySelected = useCallback(() => {
+        const fc = fabricRef.current
+        const obj = fc?.getActiveObject()
+        if (!obj) return
+        obj.clone().then(cloned => {
+            clipboardRef.current = cloned
+            showToast('📋 Copied')
+        })
+    }, [showToast])
+
+    // ── Cut selected object(s) ──
+    const cutSelected = useCallback(() => {
+        const fc = fabricRef.current
+        const obj = fc?.getActiveObject()
+        if (!obj) return
+        obj.clone().then(cloned => {
+            clipboardRef.current = cloned
+            fc.remove(obj)
+            fc.renderAll()
+            saveHistory()
+            updateLayers()
+            showToast('✂️ Cut')
+        })
+    }, [saveHistory, updateLayers, showToast])
+
+    // ── Paste from clipboard ──
+    const pasteFromClipboard = useCallback(() => {
+        const fc = fabricRef.current
+        const clip = clipboardRef.current
+        if (!fc || !clip) return
+        clip.clone().then(cloned => {
+            cloned.set({
+                left: (cloned.left || 0) + 20,
+                top: (cloned.top || 0) + 20,
+                evented: true,
+            })
+            if (cloned.type === 'activeselection') {
+                cloned.canvas = fc
+                cloned.forEachObject(obj => fc.add(obj))
+                cloned.setCoords()
+            } else {
+                fc.add(cloned)
+            }
+            // Offset clipboard for next paste
+            clipboardRef.current = clip
+            clip.set({ left: (clip.left || 0) + 20, top: (clip.top || 0) + 20 })
+            fc.setActiveObject(cloned)
+            fc.renderAll()
+            saveHistory()
+            updateLayers()
+            showToast('📄 Pasted')
+        })
+    }, [saveHistory, updateLayers, showToast])
+
+    // ── Group selected objects ──
+    const groupSelected = useCallback(() => {
+        const fc = fabricRef.current
+        const active = fc?.getActiveObject()
+        if (!active || active.type !== 'activeselection') { showToast('⚠️ Select multiple objects to group'); return }
+        const group = active.toGroup()
+        group._customName = 'Group'
+        fc.renderAll()
+        saveHistory()
+        updateLayers()
+        showToast('📐 Grouped')
+    }, [saveHistory, updateLayers, showToast])
+
+    // ── Ungroup a group ──
+    const ungroupSelected = useCallback(() => {
+        const fc = fabricRef.current
+        const active = fc?.getActiveObject()
+        if (!active || active.type !== 'group') { showToast('⚠️ Select a group to ungroup'); return }
+        active.toActiveSelection()
+        fc.renderAll()
+        saveHistory()
+        updateLayers()
+        showToast('📐 Ungrouped')
+    }, [saveHistory, updateLayers, showToast])
+
+    // ── Merge/flatten selected objects into a single raster image ──
+    const mergeSelected = useCallback(() => {
+        const fc = fabricRef.current
+        const active = fc?.getActiveObject()
+        if (!active) return
+        const objects = active.type === 'activeselection' ? active.getObjects() : [active]
+        if (objects.length < 2) { showToast('⚠️ Select 2+ objects to merge'); return }
+
+        // Calculate bounding box of selection
+        const bounds = active.getBoundingRect()
+        const tmpCanvas = document.createElement('canvas')
+        tmpCanvas.width = bounds.width
+        tmpCanvas.height = bounds.height
+        const ctx = tmpCanvas.getContext('2d')
+
+        // Render selection to temporary canvas
+        fc.discardActiveObject()
+        const origVp = fc.viewportTransform.slice()
+        fc.viewportTransform = [1, 0, 0, 1, -bounds.left, -bounds.top]
+        fc.renderAll()
+        ctx.drawImage(fc.getElement(), 0, 0)
+        fc.viewportTransform = origVp
+        
+        const dataUrl = tmpCanvas.toDataURL('image/png')
+        
+        // Remove original objects
+        objects.forEach(o => fc.remove(o))
+        
+        // Add merged image
+        fabric.FabricImage.fromURL(dataUrl, { crossOrigin: 'anonymous' }).then(img => {
+            img.set({ left: bounds.left, top: bounds.top })
+            img._customName = 'Merged Layer'
+            fc.add(img)
+            fc.setActiveObject(img)
+            fc.renderAll()
+            saveHistory()
+            updateLayers()
+            showToast('🔀 Merged into single image')
+        })
+    }, [saveHistory, updateLayers, showToast])
+
+    // ── Export selected objects as PNG download ──
+    const exportSelected = useCallback(() => {
+        const fc = fabricRef.current
+        const active = fc?.getActiveObject()
+        if (!active) return
+
+        const bounds = active.getBoundingRect()
+        const tmpCanvas = document.createElement('canvas')
+        tmpCanvas.width = bounds.width
+        tmpCanvas.height = bounds.height
+        const ctx = tmpCanvas.getContext('2d')
+
+        const origVp = fc.viewportTransform.slice()
+        fc.viewportTransform = [1, 0, 0, 1, -bounds.left, -bounds.top]
+        // Temporarily hide non-selected objects
+        const allObjs = fc.getObjects()
+        const selectedObjs = active.type === 'activeselection' ? active.getObjects() : [active]
+        const hiddenObjs = allObjs.filter(o => !selectedObjs.includes(o))
+        hiddenObjs.forEach(o => { o._wasVisible = o.visible; o.visible = false })
+        const origBg = fc.backgroundColor
+        fc.backgroundColor = 'transparent'
+        fc.renderAll()
+        ctx.drawImage(fc.getElement(), 0, 0)
+        // Restore
+        hiddenObjs.forEach(o => { o.visible = o._wasVisible !== false })
+        fc.backgroundColor = origBg
+        fc.viewportTransform = origVp
+        fc.renderAll()
+
+        const link = document.createElement('a')
+        link.download = `canvas-selection-${Date.now()}.png`
+        link.href = tmpCanvas.toDataURL('image/png')
+        link.click()
+        showToast('💾 Selection exported!')
+    }, [showToast])
+
+    // ── Save individual object as image download ──
+    const saveObjectAsImage = useCallback(() => {
+        const fc = fabricRef.current
+        const obj = fc?.getActiveObject()
+        if (!obj) return
+        exportSelected() // Reuse export selected logic
+    }, [exportSelected])
+
+    // ── Lock/Unlock toggle ──
+    const toggleLock = useCallback(() => {
+        const fc = fabricRef.current
+        const obj = fc?.getActiveObject()
+        if (!obj) return
+        const isLocked = obj.lockMovementX
+        obj.set({
+            lockMovementX: !isLocked,
+            lockMovementY: !isLocked,
+            lockScalingX: !isLocked,
+            lockScalingY: !isLocked,
+            lockRotation: !isLocked,
+            hasControls: isLocked,
+            selectable: true,
+        })
+        fc.renderAll()
+        showToast(isLocked ? '🔓 Unlocked' : '🔒 Locked')
+    }, [showToast])
+
+    // ── Right-click handler ──
+    const handleCanvasContextMenu = useCallback((e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        const fc = fabricRef.current
+        if (!fc) return
+
+        // Fabric.js already selects the object on mousedown (which fires before contextmenu)
+        const active = fc.getActiveObject()
+
+        setContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            hasTarget: !!active,
+            isGroup: active?.type === 'group',
+            isMultiSelect: active?.type === 'activeselection',
+            isLocked: active?.lockMovementX || false,
+        })
+    }, [])
+
+    // ── Close context menu ──
+    const closeContextMenu = useCallback(() => setContextMenu(null), [])
+
+    // ── Toggle canvas dark/light theme ──
+    const toggleCanvasTheme = useCallback(() => {
+        setCanvasTheme(prev => prev === 'dark' ? 'light' : 'dark')
+    }, [])
+
     // ── Apply filter to background image ──
     const applyFilter = (filterId) => {
         const fc = fabricRef.current
         if (!fc) return
-        const bgImg = fc.getObjects().find(o => o.id === 'bg-image')
-        if (!bgImg || bgImg.type !== 'image') return
+        // Apply to selected object, or first image on canvas
+        let target = fc.getActiveObject()
+        if (!target || target.type !== 'image') {
+            target = fc.getObjects().find(o => o.type === 'image')
+        }
+        if (!target || target.type !== 'image') return
 
         setActiveFilter(filterId)
 
         // Clear existing filters
-        bgImg.filters = []
+        target.filters = []
 
         switch (filterId) {
             case 'grayscale':
-                bgImg.filters.push(new fabric.filters.Grayscale())
+                target.filters.push(new fabric.filters.Grayscale())
                 break
             case 'sepia':
-                bgImg.filters.push(new fabric.filters.Sepia())
+                target.filters.push(new fabric.filters.Sepia())
                 break
             case 'brightness':
-                bgImg.filters.push(new fabric.filters.Brightness({ brightness: 0.15 }))
+                target.filters.push(new fabric.filters.Brightness({ brightness: 0.15 }))
                 break
             case 'contrast':
-                bgImg.filters.push(new fabric.filters.Contrast({ contrast: 0.2 }))
+                target.filters.push(new fabric.filters.Contrast({ contrast: 0.2 }))
                 break
             case 'vintage':
-                bgImg.filters.push(new fabric.filters.Sepia())
-                bgImg.filters.push(new fabric.filters.Contrast({ contrast: 0.1 }))
-                bgImg.filters.push(new fabric.filters.Brightness({ brightness: -0.05 }))
+                target.filters.push(new fabric.filters.Sepia())
+                target.filters.push(new fabric.filters.Contrast({ contrast: 0.1 }))
+                target.filters.push(new fabric.filters.Brightness({ brightness: -0.05 }))
                 break
             case 'warm':
-                bgImg.filters.push(new fabric.filters.ColorMatrix({
+                target.filters.push(new fabric.filters.ColorMatrix({
                     matrix: [1.2, 0, 0, 0, 0, 0, 1.05, 0, 0, 0, 0, 0, 0.9, 0, 0, 0, 0, 0, 1, 0]
                 }))
                 break
             case 'cool':
-                bgImg.filters.push(new fabric.filters.ColorMatrix({
+                target.filters.push(new fabric.filters.ColorMatrix({
                     matrix: [0.9, 0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0, 0, 1.2, 0, 0, 0, 0, 0, 1, 0]
                 }))
                 break
             case 'blur':
-                bgImg.filters.push(new fabric.filters.Blur({ blur: 0.08 }))
+                target.filters.push(new fabric.filters.Blur({ blur: 0.08 }))
                 break
             default:
                 break
         }
 
-        bgImg.applyFilters()
+        target.applyFilters()
         fc.renderAll()
         saveHistory()
     }
 
-    // ── Apply brightness/contrast adjustments ──
+    // ── Apply brightness/contrast adjustments to selected image ──
     const applyAdjustments = useCallback(() => {
         const fc = fabricRef.current
         if (!fc) return
-        const bgImg = fc.getObjects().find(o => o.id === 'bg-image')
-        if (!bgImg || bgImg.type !== 'image') return
+        let target = fc.getActiveObject()
+        if (!target || target.type !== 'image') {
+            target = fc.getObjects().find(o => o.type === 'image')
+        }
+        if (!target || target.type !== 'image') return
 
-        bgImg.filters = []
-        if (brightness !== 0) bgImg.filters.push(new fabric.filters.Brightness({ brightness: brightness / 100 }))
-        if (contrast !== 0) bgImg.filters.push(new fabric.filters.Contrast({ contrast: contrast / 100 }))
-        bgImg.applyFilters()
+        target.filters = []
+        if (brightness !== 0) target.filters.push(new fabric.filters.Brightness({ brightness: brightness / 100 }))
+        if (contrast !== 0) target.filters.push(new fabric.filters.Contrast({ contrast: contrast / 100 }))
+        target.applyFilters()
         fc.renderAll()
     }, [brightness, contrast])
 
@@ -826,13 +1156,6 @@ function CanvasEditorInner() {
         const fc = fabricRef.current
         if (!fc) return
         const scaleFactor = newZoom / 100
-        const container = containerRef.current
-        const maxW = container.clientWidth - 80
-        const maxH = container.clientHeight - 80
-        const baseScale = Math.min(maxW / fc._logicalWidth, maxH / fc._logicalHeight, 1)
-        const displayW = Math.round(fc._logicalWidth * baseScale * (newZoom / (baseScale * 100)))
-        const displayH = Math.round(fc._logicalHeight * baseScale * (newZoom / (baseScale * 100)))
-        fc.setDimensions({ width: displayW, height: displayH })
         fc.setZoom(scaleFactor)
         fc.renderAll()
     }
@@ -846,28 +1169,35 @@ function CanvasEditorInner() {
         fc.discardActiveObject()
         fc.renderAll()
 
-        // Temporarily set zoom to 1 for full-res export
-        const currentZoom = fc.getZoom()
-        fc.setZoom(1)
-        fc.setDimensions({ width: fc._logicalWidth, height: fc._logicalHeight })
+        const artboard = fc.getObjects().find(o => o.id === 'artboard')
+        let dataUrl
 
-        const dataUrl = fc.toDataURL({
-            format,
-            quality: format === 'jpeg' ? 0.92 : 1,
-            multiplier: 1,
-        })
+        if (artboard) {
+            // Export only the artboard area
+            const currentZoom = fc.getZoom()
+            fc.setZoom(1)
+            artboard.visible = false
+            fc.renderAll()
 
-        // Restore zoom
-        fc.setZoom(currentZoom)
-        const container = containerRef.current
-        const maxW = container.clientWidth - 80
-        const maxH = container.clientHeight - 80
-        const scale = Math.min(maxW / fc._logicalWidth, maxH / fc._logicalHeight, 1)
-        fc.setDimensions({
-            width: Math.round(fc._logicalWidth * scale),
-            height: Math.round(fc._logicalHeight * scale),
-        })
-        fc.renderAll()
+            dataUrl = fc.toDataURL({
+                format,
+                quality: format === 'jpeg' ? 0.92 : 1,
+                left: artboard.left, top: artboard.top,
+                width: artboard.width, height: artboard.height,
+            })
+
+            artboard.visible = true
+            fc.setZoom(currentZoom)
+            fc.renderAll()
+        } else {
+            // No artboard — export full canvas
+            const currentZoom = fc.getZoom()
+            fc.setZoom(1)
+            fc.renderAll()
+            dataUrl = fc.toDataURL({ format, quality: format === 'jpeg' ? 0.92 : 1 })
+            fc.setZoom(currentZoom)
+            fc.renderAll()
+        }
 
         const a = document.createElement('a')
         a.href = dataUrl
@@ -1228,10 +1558,28 @@ function CanvasEditorInner() {
         if (dna.favicon) {
             assets.push({ type: 'image', name: 'Favicon', url: dna.favicon, icon: 'star' })
         }
-        // Scanned images from website
+        // Scanned images from website (dna.images)
         if (Array.isArray(dna.images)) {
-            dna.images.slice(0, 12).forEach((img, i) => {
-                assets.push({ type: 'image', name: `Web Image ${i + 1}`, url: typeof img === 'string' ? img : img.url, icon: 'image' })
+            dna.images.slice(0, 20).forEach((img, i) => {
+                const url = typeof img === 'string' ? img : img.url
+                if (url) assets.push({ type: 'image', name: `Web Image ${i + 1}`, url, icon: 'image' })
+            })
+        }
+        // Brand images downloaded during onboarding (activeBrand.brandImages)
+        if (Array.isArray(activeBrand?.brandImages)) {
+            activeBrand.brandImages.forEach((img, i) => {
+                const url = typeof img === 'string' ? img : img.url
+                if (url && !assets.some(a => a.url === url)) {
+                    assets.push({ type: 'image', name: img.name || `Brand Image ${i + 1}`, url, icon: 'image' })
+                }
+            })
+        }
+        // Product images from catalog
+        if (Array.isArray(activeBrand?.products)) {
+            activeBrand.products.slice(0, 10).forEach(p => {
+                if (p.imageUrl) {
+                    assets.push({ type: 'image', name: p.name || 'Product', url: p.imageUrl, icon: 'shopping_bag' })
+                }
             })
         }
         return assets
@@ -1502,9 +1850,10 @@ function CanvasEditorInner() {
             if (fc && fc.getObjects().length > 0) {
                 showToast('🎨 Editing image with AI...')
                 const canvasDataUrl = fc.toDataURL({ format: 'png', quality: 0.9 })
+                const token = localStorage.getItem('mantram_token')
                 const resp = await fetch('/api/canvas-assets/ai-edit', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify({ prompt: aiPrompt, imageBase64: canvasDataUrl }),
                 })
                 const data = await resp.json()
@@ -1513,9 +1862,10 @@ function CanvasEditorInner() {
             } else {
                 // Empty canvas → generate a new image
                 showToast('✨ Generating image with AI...')
+                const token2 = localStorage.getItem('mantram_token')
                 const resp = await fetch('/api/canvas-assets/ai-generate', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token2}` },
                     body: JSON.stringify({ prompt: aiPrompt, size: `${canvasWidth}x${canvasHeight}` }),
                 })
                 const data = await resp.json()
@@ -1524,7 +1874,7 @@ function CanvasEditorInner() {
             }
             // AUTO-APPLY: Add/replace directly on canvas
             const img = await fabric.FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' })
-            const allObjects = fc.getObjects().slice()
+            const allObjects = fc.getObjects().filter(o => o.id !== 'artboard').slice()
             allObjects.forEach(o => fc.remove(o))
             const scaleX = fc.width / img.width
             const scaleY = fc.height / img.height
@@ -1534,6 +1884,7 @@ function CanvasEditorInner() {
             fc.add(img)
             fc.renderAll()
             saveHistory()
+            setGeneratedImages(prev => [{ url: imageUrl, label: 'AI Edit', timestamp: Date.now() }, ...prev])
             showToast('✨ Canvas updated with AI result')
         } catch (err) { setAiError(err.message) }
         setAiLoading(false)
@@ -1559,9 +1910,10 @@ function CanvasEditorInner() {
             fc.renderAll()
 
             showToast('🎨 Inpainting selected area...')
+            const token = localStorage.getItem('mantram_token')
             const resp = await fetch('/api/canvas-assets/ai-edit-visual', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
                     prompt: aiPrompt,
                     imageBase64: canvasDataUrl,
@@ -1610,9 +1962,10 @@ function CanvasEditorInner() {
             fc.renderAll()
 
             showToast('🔧 Retouching selected area...')
+            const token = localStorage.getItem('mantram_token')
             const resp = await fetch('/api/canvas-assets/ai-retouch', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
                     prompt: aiPrompt || 'Retouch and clean up this area naturally',
                     imageBase64: canvasDataUrl,
@@ -1657,9 +2010,13 @@ function CanvasEditorInner() {
         try {
             const canvasDataUrl = fc.toDataURL({ format: 'png', quality: 0.9 })
             showToast(bgAction === 'remove' ? '🪄 Removing background...' : '🎨 Replacing background...')
+            const token = localStorage.getItem('mantram_token')
             const resp = await fetch('/api/canvas-assets/ai-background', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
                 body: JSON.stringify({
                     imageBase64: canvasDataUrl,
                     action: bgAction,
@@ -2559,9 +2916,10 @@ function CanvasEditorInner() {
         setAiError('')
         try {
             showToast('🎨 Generating editable design...')
+            const token = localStorage.getItem('mantram_token')
             const resp = await fetch('/api/canvas-assets/ai-creative-generate', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
                     keywords: aiCreativeKeywords,
                     style: aiCreativeStyle,
@@ -2680,33 +3038,702 @@ function CanvasEditorInner() {
     }, [aiCreativeKeywords, aiCreativeStyle, activeBrand, loadGoogleFont, saveHistory, showToast, updateLayers])
 
     // ── Sidebar Tab Config ──
+    // ── Generate Image Handler (NanoBanana 2) ──
+    const handleGenImage = useCallback(async () => {
+        if (!genPrompt.trim() || genLoading) return
+        setGenLoading(true)
+        try {
+            const [rw, rh] = genRatio.split(':').map(Number)
+            const w = 1024; const h = Math.round(1024 * (rh / rw))
+            const token = localStorage.getItem('mantram_token') || ''
+
+            // Collect reference images (uploaded refs + canvas snapshot if canvas has objects)
+            const referenceImages = genRefs.map(r => r.url)
+            const fc = fabricRef.current
+            if (fc && fc.getObjects().length > 0) {
+                // Also add canvas snapshot as a reference
+                referenceImages.push(fc.toDataURL({ format: 'png', quality: 0.8 }))
+            }
+
+            const resp = await fetch('/api/canvas-assets/ai-generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: JSON.stringify({
+                    prompt: genEnhance ? `Professional high-quality ${genPrompt}` : genPrompt,
+                    size: `${w}x${h}`,
+                    referenceImages,
+                }),
+            })
+            const data = await resp.json()
+            if (data.error) throw new Error(data.error)
+            // Add to canvas
+            if (!fc) return
+            const img = await fabric.FabricImage.fromURL(data.imageUrl, { crossOrigin: 'anonymous' })
+            const scale = Math.min(fc.width / img.width, fc.height / img.height) * 0.8
+            img.set({ left: (fc.width - img.width * scale) / 2, top: (fc.height - img.height * scale) / 2, scaleX: scale, scaleY: scale })
+            img._customName = 'AI Generated'
+            fc.add(img); fc.setActiveObject(img); fc.renderAll(); saveHistory()
+            setShowGenPanel(false); setGenPrompt(''); setGenRefs([])
+            showToast(`✨ Image generated${data.refsUsed ? ` (${data.refsUsed} refs used)` : ''} and added to canvas`)
+        } catch (err) { showToast('Error: ' + err.message) }
+        setGenLoading(false)
+    }, [genPrompt, genEnhance, genRatio, genLoading, genRefs])
+
+    // ── Add image URL to canvas helper ──
+    const addImageUrlToCanvas = useCallback(async (url, label) => {
+        try {
+            const fc = fabricRef.current; if (!fc) return
+            const img = await fabric.FabricImage.fromURL(url, { crossOrigin: 'anonymous' })
+            const scale = Math.min(fc.width / img.width, fc.height / img.height) * 0.6
+            img.set({ left: 100 + Math.random() * 100, top: 100 + Math.random() * 100, scaleX: scale, scaleY: scale })
+            img._customName = label || 'AI Image'
+            fc.add(img); fc.setActiveObject(img); fc.renderAll(); saveHistory()
+            // Track in generated images gallery
+            setGeneratedImages(prev => [{ url, label: label || `AI Image ${prev.length + 1}`, timestamp: Date.now() }, ...prev])
+            showToast('🎨 Image added to canvas')
+        } catch (err) { showToast('Failed to add image') }
+    }, [])
+
+    // ── Fidato Canvas Chat Handler ──
+    const handleFidatoSend = useCallback(async (voiceText) => {
+        const msg = (voiceText || fidatoInput).trim()
+        if (!msg || fidatoLoading) return
+        setFidatoMessages(prev => [...prev, { role: 'user', content: msg }])
+        setFidatoInput('')
+        setFidatoLoading(true)
+        setTimeout(() => fidatoMsgEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+
+        const token = localStorage.getItem('mantram_token') || ''
+        const authHeaders = { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+
+        // Helper: extract individual image data URLs from canvas objects
+        const extractObjectImages = (fc) => {
+            const imgs = []
+            const activeObj = fc.getActiveObject()
+            // If there's a multi-selection (ActiveSelection), extract each selected object
+            const selectedObjs = activeObj?.type === 'activeselection'
+                ? activeObj.getObjects()
+                : activeObj ? [activeObj] : []
+
+            // Use selected objects if any, otherwise all image objects on canvas (excluding artboard)
+            const targets = selectedObjs.length > 0 ? selectedObjs : fc.getObjects().filter(o => o.id !== 'artboard')
+
+            for (const obj of targets) {
+                if (obj.type === 'image' && obj.getSrc) {
+                    try {
+                        // Create a temp canvas to export just this object
+                        const tc = document.createElement('canvas')
+                        const w = obj.width * (obj.scaleX || 1)
+                        const h = obj.height * (obj.scaleY || 1)
+                        tc.width = Math.min(w, 1024); tc.height = Math.min(h, 1024)
+                        const ctx = tc.getContext('2d')
+                        const el = obj.getElement ? obj.getElement() : obj._element
+                        if (el) {
+                            ctx.drawImage(el, 0, 0, tc.width, tc.height)
+                            imgs.push(tc.toDataURL('image/png', 0.85))
+                        }
+                    } catch (e) { console.warn('Could not extract object image:', e) }
+                }
+            }
+            return imgs
+        }
+
+        try {
+            const fc = fabricRef.current
+            const hasObjects = fc && fc.getObjects().filter(o => o.id !== 'artboard').length > 0
+            const lowerMsg = msg.toLowerCase()
+
+            // ── Smart intent detection (creative intelligence) ──
+            // Build brand context for all prompts
+            const brandName = activeBrand?.name || 'Brand'
+            const brandDna = activeBrand?.dna || {}
+            const brandColors = [brandDna.colors?.primary, brandDna.colors?.secondary, brandDna.colors?.accent].filter(Boolean)
+            const brandFonts = [brandDna.typography?.heading, brandDna.typography?.body].filter(Boolean)
+            const brandTagline = brandDna.tagline || activeBrand?.tagline || ''
+            const brandIndustry = brandDna.industry || activeBrand?.industry || ''
+            const brandProducts = (activeBrand?.products || []).slice(0, 3).map(p => p.name).filter(Boolean)
+            const brandWebsite = activeBrand?.website || ''
+            const brandContext = [
+                `Brand: ${brandName}`,
+                brandTagline ? `Tagline: "${brandTagline}"` : '',
+                brandIndustry ? `Industry: ${brandIndustry}` : '',
+                brandColors.length ? `Brand Colors: ${brandColors.join(', ')}` : '',
+                brandFonts.length ? `Typography: ${brandFonts.join(', ')}` : '',
+                brandProducts.length ? `Products: ${brandProducts.join(', ')}` : '',
+                brandWebsite ? `Website: ${brandWebsite}` : '',
+            ].filter(Boolean).join('. ')
+
+            // Intent: Create/Generate new images (works regardless of canvas state)
+            const isGenerateOnly = /\b(generate|create|make|design|draw|produce|craft)\b/i.test(lowerMsg) && /\b(image|photo|visual|graphic|creative|poster|banner|ad|flyer|post|thumbnail|cover|artwork|illustration|picture)s?\b/i.test(lowerMsg)
+            // Intent: Merge/combine existing images
+            const isMerge = /\b(merge|combine|blend|mix|fuse|stitch|overlay|composite|mashup|put together|integrate|unify|make one image|create from these|join|collage|montage)\b/.test(lowerMsg)
+            // Intent: Extract colors  
+            const isPalette = lowerMsg.includes('palette') || lowerMsg.includes('extract color')
+
+            // ── Creative Director: Batch / Carousel generation ──
+            const batchMatch = lowerMsg.match(/(\d+)\s*(image|post|creative|slide|variation|design|visual|banner|card|frame)/i)
+            const isBatchGenerate = batchMatch || /\b(carousel|series|batch|set of|multiple|campaign set)\b/i.test(lowerMsg)
+            const batchCount = batchMatch ? Math.min(parseInt(batchMatch[1]), 8) : 4
+
+            // ── Creative Director: Size adaptation ──
+            const SIZE_PRESETS = {
+                'ig post': { w: 1080, h: 1080, label: 'IG Post', ratio: '1:1' },
+                'ig story': { w: 1080, h: 1920, label: 'IG Story', ratio: '9:16' },
+                'ig reel': { w: 1080, h: 1920, label: 'IG Reel', ratio: '9:16' },
+                'fb post': { w: 1200, h: 630, label: 'FB Post', ratio: '1.91:1' },
+                'linkedin': { w: 1200, h: 627, label: 'LinkedIn', ratio: '1.91:1' },
+                'yt thumb': { w: 1280, h: 720, label: 'YT Thumb', ratio: '16:9' },
+                'twitter': { w: 1600, h: 900, label: 'X / Twitter', ratio: '16:9' },
+                'x': { w: 1600, h: 900, label: 'X / Twitter', ratio: '16:9' },
+                'carousel': { w: 1080, h: 1350, label: 'Carousel', ratio: '4:5' },
+                'web banner': { w: 1920, h: 600, label: 'Web Banner', ratio: '3.2:1' },
+                'pinterest': { w: 1000, h: 1500, label: 'Pinterest', ratio: '2:3' },
+            }
+            const isAdapt = /\b(adapt|resize|convert|fit|scale|repurpose|reformat)\b/i.test(lowerMsg) && /\b(size|format|platform|dimension|social|media|story|reel|post|banner)\b/i.test(lowerMsg)
+
+            // ── Parse which sizes the user mentioned ──
+            const parseMentionedSizes = (msg) => {
+                const found = []
+                for (const [key, preset] of Object.entries(SIZE_PRESETS)) {
+                    if (msg.includes(key)) found.push(preset)
+                }
+                return found
+            }
+
+            if (isBatchGenerate && !isMerge && !isAdapt) {
+                // ═══ BATCH / CAROUSEL GENERATION ═══════════════════════════════════
+                const count = batchCount
+                const theme = msg.replace(/\d+\s*(image|post|creative|slide|variation|design|visual|banner|card|frame)s?/i, '').replace(/\b(carousel|series|batch|set of|multiple|campaign set|create|generate|make|for)\b/gi, '').trim() || 'brand campaign'
+
+                setFidatoMessages(prev => [...prev, {
+                    role: 'assistant',
+                    content: `🎬 **Creative Director Mode**\n\nGenerating **${count} unique creatives** for: *"${theme}"*\n\n⏳ This may take a minute...`,
+                }])
+
+                const slides = [
+                    { angle: 'Opening hook — bold, attention-grabbing visual that stops the scroll', label: 'Hook' },
+                    { angle: 'Core benefit — showcase the key value proposition with striking imagery', label: 'Benefit' },
+                    { angle: 'Feature highlight — detail-oriented creative showing specifics', label: 'Feature' },
+                    { angle: 'Social proof or lifestyle shot — show the product/brand in context', label: 'Lifestyle' },
+                    { angle: 'Behind the scenes or process — authentic, raw visual', label: 'BTS' },
+                    { angle: 'Testimonial or quote card — typographic design', label: 'Quote' },
+                    { angle: 'Urgency or offer — time-sensitive promo visual', label: 'Offer' },
+                    { angle: 'Final CTA — strong call to action with brand identity', label: 'CTA' },
+                ]
+
+                const results = []
+                for (let i = 0; i < count; i++) {
+                    const slide = slides[i % slides.length]
+                    const prompt = `You are Fidato, an elite Creative Director at a top-tier agency. Create slide ${i + 1} of ${count} for a "${theme}" campaign by ${brandName}.
+
+CREATIVE BRIEF:
+- ${brandColors.length ? `Brand palette: ${brandColors.join(', ')}. Weave these colors naturally into the design.` : 'Use a sophisticated, harmonious color palette.'}
+- This is the "${slide.label}" slide — creative angle: ${slide.angle}
+- The series must feel like a premium campaign — each slide unique but visually connected through color palette, typography style, and mood
+- Think editorial-grade visuals: strong focal points, intentional negative space, dynamic composition
+- Use cinematic lighting and rich textures
+- Make it scroll-stopping — this should feel like a campaign from Nike, Apple, or Glossier
+- Format: Square (1080×1080), optimized for social media carousel viewing
+
+Do NOT use generic stock photo aesthetics. Create something with real creative vision.`
+
+                    // Update progress
+                    setFidatoMessages(prev => {
+                        const updated = [...prev]
+                        updated[updated.length - 1] = {
+                            role: 'assistant',
+                            content: `🎬 **Creative Director Mode**\n\nGenerating **${count} unique creatives** for: *"${theme}"*\n\n${'✅ '.repeat(results.length)}${'⏳ '}Slide ${i + 1}/${count}: ${slide.label}...${'⬜ '.repeat(Math.max(0, count - i - 1))}`,
+                        }
+                        return updated
+                    })
+
+                    try {
+                        const resp = await fetch('/api/canvas-assets/ai-generate', {
+                            method: 'POST', headers: authHeaders,
+                            body: JSON.stringify({ prompt, size: '1024x1024' }),
+                        })
+                        const data = await resp.json()
+                        if (data.imageUrl) {
+                            results.push({ url: data.imageUrl, label: `${slide.label} (${i + 1}/${count})` })
+                            // Add to canvas in a grid
+                            const cols = Math.ceil(Math.sqrt(count))
+                            const gridX = (i % cols) * 280 + 50
+                            const gridY = Math.floor(i / cols) * 280 + 50
+                            const img = await fabric.FabricImage.fromURL(data.imageUrl, { crossOrigin: 'anonymous' })
+                            const scale = 250 / Math.max(img.width, img.height)
+                            img.set({ left: gridX, top: gridY, scaleX: scale, scaleY: scale })
+                            img._customName = `${slide.label} ${i + 1}`
+                            fc.add(img)
+                            fc.renderAll()
+                            // Track in gallery
+                            setGeneratedImages(prev => [{ url: data.imageUrl, label: `${theme} — ${slide.label}`, timestamp: Date.now() }, ...prev])
+                        }
+                    } catch (err) { console.warn(`Slide ${i + 1} failed:`, err.message) }
+                }
+
+                saveHistory()
+                setFidatoMessages(prev => {
+                    const updated = [...prev]
+                    updated[updated.length - 1] = {
+                        role: 'assistant',
+                        content: `✅ **Campaign Complete!** Generated **${results.length}/${count}** creatives for *"${theme}"*.\n\nAll images added to your canvas in a grid. Click any to select, edit, or export individually!`,
+                        images: results.map(r => ({ url: r.url, label: r.label })),
+                    }
+                    return updated
+                })
+
+            } else if (isAdapt && hasObjects) {
+                // ═══ SIZE ADAPTATION ═══════════════════════════════════════════════
+                let mentionedSizes = parseMentionedSizes(lowerMsg)
+
+                // If user says "all sizes" or "all social media" → auto-select all common sizes
+                const wantsAll = /\b(all\s*(size|format|platform|social|media)|every\s*(size|format)|all\s*of\s*them)\b/i.test(lowerMsg)
+                if (wantsAll || mentionedSizes.length === 0 && /\b(all)\b/i.test(lowerMsg)) {
+                    mentionedSizes = [
+                        SIZE_PRESETS['ig post'], SIZE_PRESETS['ig story'],
+                        SIZE_PRESETS['fb post'], SIZE_PRESETS['linkedin'],
+                        SIZE_PRESETS['yt thumb'], SIZE_PRESETS['twitter'],
+                        SIZE_PRESETS['carousel'], SIZE_PRESETS['web banner'],
+                        SIZE_PRESETS['pinterest'],
+                    ]
+                }
+
+                if (mentionedSizes.length === 0) {
+                    // No specific sizes mentioned — suggest options
+                    setFidatoMessages(prev => [...prev, {
+                        role: 'assistant',
+                        content: `📐 Size Adaptation — Which formats?\n\nJust tell me like:\n• "Adapt for IG Story and LinkedIn"\n• "Resize for FB Post, YT Thumb, Pinterest"\n• "Adapt to all sizes"\n\nAvailable:\n• IG Post — 1080×1080\n• IG Story / Reel — 1080×1920\n• FB Post — 1200×630\n• LinkedIn — 1200×627\n• YT Thumb — 1280×720\n• X / Twitter — 1600×900\n• Carousel — 1080×1350\n• Web Banner — 1920×600\n• Pinterest — 1000×1500`,
+                    }])
+                } else {
+                    // Specific sizes — go ahead and adapt
+                    const canvasDataUrl = fc.toDataURL({ format: 'png', quality: 0.92 })
+                    const sizeNames = mentionedSizes.map(s => s.label).join(', ')
+
+                    setFidatoMessages(prev => [...prev, {
+                        role: 'assistant',
+                        content: `📐 **Adapting creative for ${mentionedSizes.length} format${mentionedSizes.length > 1 ? 's' : ''}:** ${sizeNames}\n\n⏳ Intelligently recomposing for each aspect ratio...`,
+                    }])
+
+                    const adaptResults = []
+                    for (let i = 0; i < mentionedSizes.length; i++) {
+                        const size = mentionedSizes[i]
+
+                        // Update progress
+                        setFidatoMessages(prev => {
+                            const updated = [...prev]
+                            updated[updated.length - 1] = {
+                                role: 'assistant',
+                                content: `📐 **Adapting creative**\n\n${'✅ '.repeat(adaptResults.length)}⏳ ${size.label} (${size.w}×${size.h})...${'⬜ '.repeat(Math.max(0, mentionedSizes.length - i - 1))}`,
+                            }
+                            return updated
+                        })
+
+                        try {
+                            // ── PRE-COMPOSE: Create scaffold at target dimensions ──
+                            // This gives the AI a visual map: content centered + blurred bg hint
+                            const srcImg = new Image()
+                            srcImg.crossOrigin = 'anonymous'
+                            await new Promise((resolve, reject) => {
+                                srcImg.onload = resolve; srcImg.onerror = reject
+                                srcImg.src = canvasDataUrl
+                            })
+
+                            // Create target-size canvas
+                            const targetW = Math.min(size.w, 1536) // cap for API limits
+                            const targetH = Math.min(size.h, 1536)
+                            const preCanvas = document.createElement('canvas')
+                            preCanvas.width = targetW
+                            preCanvas.height = targetH
+                            const pCtx = preCanvas.getContext('2d')
+
+                            // Step 1: Draw heavily blurred, stretched version as background fill
+                            // This gives the AI color/texture hints for empty areas
+                            pCtx.save()
+                            pCtx.filter = 'blur(40px) saturate(1.2)'
+                            pCtx.drawImage(srcImg, -20, -20, targetW + 40, targetH + 40)
+                            pCtx.restore()
+
+                            // Step 2: Draw the original image centered and properly scaled
+                            const scaleToFit = Math.min(targetW / srcImg.width, targetH / srcImg.height) * 0.85
+                            const drawW = srcImg.width * scaleToFit
+                            const drawH = srcImg.height * scaleToFit
+                            const drawX = (targetW - drawW) / 2
+                            const drawY = (targetH - drawH) / 2
+                            pCtx.drawImage(srcImg, drawX, drawY, drawW, drawH)
+
+                            const preComposedDataUrl = preCanvas.toDataURL('image/png', 0.92)
+
+                            const adaptPrompt = `OUTPAINT / GENERATIVE FILL task for ${size.label} (${size.w}×${size.h}px).
+
+You are looking at a pre-composed image: the ORIGINAL content is centered, surrounded by a blurred hint of the background colors and textures.
+
+YOUR JOB:
+1. Keep the centered original content EXACTLY as-is — do not alter, crop, or move it
+2. SEAMLESSLY extend and refine the blurred background areas into natural, photorealistic continuations of the scene
+3. The final image should look like the original was always designed for ${size.label} format
+4. Match lighting, perspective, textures, and color grading perfectly
+5. NO solid colors, NO borders, NO letterboxing, NO padding — only natural scene extension
+6. The transition from original content to extended background must be INVISIBLE
+
+Output a single ${size.w}×${size.h} image.`
+
+                            const resp = await fetch('/api/canvas-assets/ai-edit', {
+                                method: 'POST', headers: authHeaders,
+                                body: JSON.stringify({ prompt: adaptPrompt, imageBase64: preComposedDataUrl }),
+                            })
+                            const data = await resp.json()
+                            if (data.imageUrl) {
+                                adaptResults.push({ url: data.imageUrl, label: size.label, size: `${size.w}×${size.h}` })
+                                // Add to canvas offset to the right
+                                const img = await fabric.FabricImage.fromURL(data.imageUrl, { crossOrigin: 'anonymous' })
+                                const maxDim = 300
+                                const scale = maxDim / Math.max(img.width, img.height)
+                                img.set({ left: (i + 1) * 320 + 50, top: 50, scaleX: scale, scaleY: scale })
+                                img._customName = `${size.label} Adapted`
+                                fc.add(img)
+                                fc.renderAll()
+                                setGeneratedImages(prev => [{ url: data.imageUrl, label: `${size.label} (${size.w}×${size.h})`, timestamp: Date.now() }, ...prev])
+                            }
+                        } catch (err) { console.warn(`Adapt ${size.label} failed:`, err.message) }
+                    }
+
+                    saveHistory()
+                    setFidatoMessages(prev => {
+                        const updated = [...prev]
+                        updated[updated.length - 1] = {
+                            role: 'assistant',
+                            content: `✅ **Adaptation Complete!** Created **${adaptResults.length} format${adaptResults.length > 1 ? 's' : ''}**:\n\n${adaptResults.map(r => `• **${r.label}** — ${r.size}`).join('\n')}\n\nAll versions added to canvas. Select any to edit, download, or publish!`,
+                            images: adaptResults.map(r => ({ url: r.url, label: r.label })),
+                        }
+                        return updated
+                    })
+                }
+
+            } else if (isMerge && hasObjects) {
+                // ── MERGE: Send each selected image individually (NOT a canvas screenshot) ──
+                const selectedImages = extractObjectImages(fc)
+                const objectCount = selectedImages.length
+
+                if (objectCount < 2) {
+                    setFidatoMessages(prev => [...prev, {
+                        role: 'assistant',
+                        content: `📸 I need at least 2 images to merge! Select multiple images on canvas (hold Shift and click), then ask me to merge them.`
+                    }])
+                } else {
+                    setFidatoMessages(prev => [...prev, {
+                        role: 'assistant', content: `🎨 **Creative Director Mode** — Analyzing ${objectCount} images individually...\n\n• Extracting each image cleanly (no overlaps)\n• Studying colors, subjects, mood of each\n• Finding visual connections\n• Planning the optimal creative blend\n\n⏳ Creating your masterpiece...`
+                    }])
+
+                    // Use ai-generate with referenceImages — NOT ai-edit with screenshot
+                    // This ensures each image is sent as a clean, individual input
+                    const mergePrompt = `${msg}.\n\n${brandContext ? `Brand Context: ${brandContext}.` : ''}\n\nI have provided ${objectCount} individual images. IMPORTANT: These are separate, clean images — NOT overlapping.\n\nCREATIVE MERGE INSTRUCTIONS:\n1. ANALYZE each image independently — study its subject, colors, mood, lighting, and composition\n2. FIND visual harmony — shared palettes, complementary themes, consistent emotional tone\n3. CREATE a single, stunning, unified artwork that seamlessly blends elements from ALL images\n4. Use professional techniques: seamless blending, matched lighting, consistent perspective, smooth color transitions\n5. The result must look PROFESSIONALLY COMPOSED — not like a cut-paste collage\n6. Maintain the best elements of each image while creating something cohesive and new\n\nOutput a single high-quality merged image.`
+
+                    const resp = await fetch('/api/canvas-assets/ai-generate', {
+                        method: 'POST', headers: authHeaders,
+                        body: JSON.stringify({
+                            prompt: mergePrompt,
+                            size: '1024x1024',
+                            referenceImages: selectedImages,
+                        }),
+                    })
+                    const data = await resp.json()
+                    if (data.error) throw new Error(data.error)
+                    // Auto-add to canvas
+                    addImageUrlToCanvas(data.imageUrl)
+                    setFidatoMessages(prev => {
+                        const updated = [...prev]
+                        updated[updated.length - 1] = {
+                            role: 'assistant',
+                            content: `✨ Done! Merged ${data.imagesProcessed || objectCount} images — added to canvas.`,
+                            images: [{ url: data.imageUrl }]
+                        }
+                        return updated
+                    })
+                }
+
+            } else if (isPalette && hasObjects) {
+                // ── PALETTE: Extract dominant colors from canvas ──
+                const canvasDataUrl = fc.toDataURL({ format: 'png', quality: 0.5 })
+                const tempImg = new Image()
+                tempImg.crossOrigin = 'anonymous'
+                await new Promise((resolve, reject) => {
+                    tempImg.onload = resolve; tempImg.onerror = reject
+                    tempImg.src = canvasDataUrl
+                })
+                const tc = document.createElement('canvas')
+                tc.width = 50; tc.height = 50
+                const ctx = tc.getContext('2d')
+                ctx.drawImage(tempImg, 0, 0, 50, 50)
+                const imgData = ctx.getImageData(0, 0, 50, 50).data
+                const colorMap = {}
+                for (let i = 0; i < imgData.length; i += 16) {
+                    const r = Math.round(imgData[i] / 32) * 32
+                    const g = Math.round(imgData[i + 1] / 32) * 32
+                    const b = Math.round(imgData[i + 2] / 32) * 32
+                    const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+                    colorMap[hex] = (colorMap[hex] || 0) + 1
+                }
+                const topColors = Object.entries(colorMap).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([hex]) => hex)
+                setFidatoMessages(prev => [...prev, {
+                    role: 'assistant',
+                    content: `🎨 **Extracted Color Palette:**\n\n${topColors.map(c => `● ${c}`).join('\n')}\n\nThese are the dominant colors from your canvas. You can use them for brand consistency across campaigns!`,
+                    palette: topColors
+                }])
+
+            } else if (isGenerateOnly) {
+                // ── GENERATE: Fresh image from scratch (with brand knowledge) ──
+                setFidatoMessages(prev => [...prev, {
+                    role: 'assistant', content: `🎨 Generating image for ${brandName}...`
+                }])
+                const enrichedPrompt = `${msg}\n\nBrand Context: ${brandContext}. Use the brand's visual identity — colors, style, and aesthetic that match the brand. Create a professional, campaign-ready image.`
+                const resp = await fetch('/api/canvas-assets/ai-generate', {
+                    method: 'POST', headers: authHeaders,
+                    body: JSON.stringify({ prompt: enrichedPrompt, size: '1024x1024' }),
+                })
+                const data = await resp.json()
+                if (data.error) throw new Error(data.error)
+                addImageUrlToCanvas(data.imageUrl)
+                setFidatoMessages(prev => {
+                    const updated = [...prev]
+                    updated[updated.length - 1] = {
+                        role: 'assistant',
+                        content: '✨ Image generated and added to canvas!',
+                        images: [{ url: data.imageUrl }]
+                    }
+                    return updated
+                })
+
+            } else if (hasObjects) {
+                // ── EDIT: Canvas has content → extract individual images + canvas for context ──
+                const selectedImages = extractObjectImages(fc)
+                const objectCount = selectedImages.length
+                setFidatoMessages(prev => [...prev, {
+                    role: 'assistant', content: `🎨 Analyzing ${objectCount} image${objectCount > 1 ? 's' : ''} on your canvas and applying changes...`
+                }])
+                const canvasDataUrl = fc.toDataURL({ format: 'png', quality: 0.92 })
+                const resp = await fetch('/api/canvas-assets/ai-edit', {
+                    method: 'POST', headers: authHeaders,
+                    body: JSON.stringify({
+                        prompt: msg,
+                        imageBase64: canvasDataUrl,
+                        additionalImages: selectedImages,
+                    }),
+                })
+                const data = await resp.json()
+                if (data.error) throw new Error(data.error)
+                // Auto-add to canvas
+                addImageUrlToCanvas(data.imageUrl)
+                setFidatoMessages(prev => {
+                    const updated = [...prev]
+                    updated[updated.length - 1] = {
+                        role: 'assistant',
+                        content: `✅ Done! Processed ${data.imagesProcessed || 1} image${(data.imagesProcessed || 1) > 1 ? 's' : ''} — result added to canvas. Tell me what else to adjust!`,
+                        images: [{ url: data.imageUrl }]
+                    }
+                    return updated
+                })
+
+            } else {
+                // ── SMART FALLBACK: If msg seems creative, generate. Otherwise chat. ──
+                const seemsCreative = /\b(image|photo|visual|graphic|creative|poster|banner|ad|flyer|post|thumbnail|social media|instagram|facebook|linkedin)\b/i.test(lowerMsg)
+
+                if (seemsCreative) {
+                    // User wants creative output — generate an image
+                    setFidatoMessages(prev => [...prev, {
+                        role: 'assistant', content: `🎨 I sense a creative request! Generating for ${brandName}...`
+                    }])
+                    const enrichedPrompt = `The user is a creative director working on ${brandName}. They need: "${msg}". ${brandContext}. Create a stunning, professional-grade visual that matches the brand identity. If they mention social media, create an optimized social media creative. Make it campaign-ready and visually striking.`
+                    try {
+                        const resp = await fetch('/api/canvas-assets/ai-generate', {
+                            method: 'POST', headers: authHeaders,
+                            body: JSON.stringify({ prompt: enrichedPrompt, size: '1024x1024' }),
+                        })
+                        const data = await resp.json()
+                        if (data.error) throw new Error(data.error)
+                        addImageUrlToCanvas(data.imageUrl)
+                        setFidatoMessages(prev => {
+                            const updated = [...prev]
+                            updated[updated.length - 1] = {
+                                role: 'assistant',
+                                content: '✨ Creative generated and added to canvas!',
+                                images: [{ url: data.imageUrl }]
+                            }
+                            return updated
+                        })
+                    } catch (genErr) {
+                        const resp = await fetch('/api/nexus/chat', {
+                            method: 'POST', headers: authHeaders,
+                            body: JSON.stringify({ message: `[Canvas Creative Director for ${brandName}] ${brandContext}. The user said: "${msg}". Help them creatively. Be concise and actionable.`, brandId: activeBrand?._id }),
+                        })
+                        const data = await resp.json()
+                        const reply = data.reply || data.message || 'Let me help! Describe the image you want and I\'ll generate it.'
+                        setFidatoMessages(prev => [...prev, { role: 'assistant', content: reply }])
+                    }
+                } else {
+                    // Pure chat — creative conversation with brand context
+                    try {
+                        const resp = await fetch('/api/nexus/chat', {
+                            method: 'POST', headers: authHeaders,
+                            body: JSON.stringify({ message: `[Canvas Creative Director for ${brandName}] ${brandContext}. The user is in the Creative Canvas editor. They said: "${msg}". Help them with their creative task. If they want images, tell them to describe what they want. Keep it concise.`, brandId: activeBrand?._id }),
+                        })
+                        const data = await resp.json()
+                        if (data.error) throw new Error(data.error)
+                        const reply = data.reply || data.message || data.response || 'Try describing an image you\'d like to create!'
+                        setFidatoMessages(prev => [...prev, { role: 'assistant', content: reply }])
+                    } catch {
+                        setFidatoMessages(prev => [...prev, {
+                            role: 'assistant',
+                            content: `Here's what I can do:\n\n• "Create a product photo on marble table" → Generates new image\n• "Change the background to sunset" → Edits canvas\n• "Merge these into a collage" → Combines images\n• "Adapt to all sizes" → Multi-platform resize\n• "Create 4 carousel images" → Campaign batch\n\nTry it! 🎯`
+                        }])
+                    }
+                }
+            }
+        } catch (err) {
+            setFidatoMessages(prev => [...prev, {
+                role: 'assistant', content: `❌ Sorry, I ran into an issue: ${err.message}. Please try again!`
+            }])
+        }
+        setFidatoLoading(false)
+        setTimeout(() => fidatoMsgEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 200)
+    }, [fidatoInput, fidatoLoading, activeBrand])
+
     const SIDEBAR_TABS = [
-        { id: 'ai', icon: 'auto_awesome', label: 'AI', isAi: true },
-        { id: 'elements', icon: 'dashboard_customize', label: 'Elements' },
-        { id: 'text-styles', icon: 'format_quote', label: 'Text' },
-        { id: 'apps', icon: 'apps', label: 'Apps' },
-        { id: 'templates', icon: 'view_quilt', label: 'Templates' },
-        { id: 'images', icon: 'photo_library', label: 'Images' },
-        { id: 'icons', icon: 'interests', label: 'Icons' },
-        { id: 'textures', icon: 'texture', label: 'Textures' },
-        { id: 'fonts', icon: 'font_download', label: 'Fonts' },
-        { id: 'stickers', icon: 'emoji_emotions', label: 'Stickers' },
-        { id: 'brand', icon: 'palette', label: 'Brand' },
-        { id: 'gradients', icon: 'gradient', label: 'Gradients' },
+        { id: 'ai', emoji: '✦', label: 'AI', isAi: true },
+        { id: 'elements', emoji: '◇', label: 'Elements' },
+        { id: 'text-styles', emoji: '𝐓', label: 'Text' },
+        { id: 'apps', emoji: '⊞', label: 'Apps' },
+        { id: 'templates', emoji: '▦', label: 'Templates' },
+        { id: 'images', emoji: '◐', label: 'Images' },
+        { id: 'icons', emoji: '☆', label: 'Icons' },
+        { id: 'textures', emoji: '∿', label: 'Textures' },
+        { id: 'fonts', emoji: '𝔸', label: 'Fonts' },
+        { id: 'stickers', emoji: '◉', label: 'Stickers' },
+        { id: 'brand', emoji: '◈', label: 'Brand' },
+        { id: 'gradients', emoji: '◑', label: 'Gradients' },
     ]
 
     // ── Keyboard shortcuts ──
     useEffect(() => {
         const handler = (e) => {
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return
             if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); handleUndo() }
             if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); handleRedo() }
-            if (e.key === 'Delete' || e.key === 'Backspace') { deleteSelected() }
+            if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelected() }
             if ((e.metaKey || e.ctrlKey) && e.key === 'd') { e.preventDefault(); duplicateSelected() }
+            if ((e.metaKey || e.ctrlKey) && e.key === 'c') { e.preventDefault(); copySelected() }
+            if ((e.metaKey || e.ctrlKey) && e.key === 'x') { e.preventDefault(); cutSelected() }
+            if ((e.metaKey || e.ctrlKey) && e.key === 'v') { e.preventDefault(); pasteFromClipboard() }
+            if ((e.metaKey || e.ctrlKey) && e.key === 'g' && !e.shiftKey) { e.preventDefault(); groupSelected() }
+            if ((e.metaKey || e.ctrlKey) && e.key === 'g' && e.shiftKey) { e.preventDefault(); ungroupSelected() }
+            if (e.key === 'Escape') { closeContextMenu() }
         }
         window.addEventListener('keydown', handler)
         return () => window.removeEventListener('keydown', handler)
-    }, [handleUndo, handleRedo]) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [handleUndo, handleRedo, copySelected, cutSelected, pasteFromClipboard, groupSelected, ungroupSelected, closeContextMenu]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // ── Infinite canvas: spacebar+drag pan, scroll-to-zoom ──
+    useEffect(() => {
+        const container = containerRef.current
+        const fc = fabricRef.current
+        if (!container || !fc) return
+
+        let isSpaceHeld = false
+        let isPanning = false
+        let lastPanX = 0
+        let lastPanY = 0
+
+        // ── Spacebar: enter/exit pan mode ──
+        const handleKeyDown = (e) => {
+            if (e.code === 'Space' && !e.repeat && !isSpaceHeld) {
+                // Don't hijack if user is typing in an input
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return
+                e.preventDefault()
+                isSpaceHeld = true
+                container.classList.add('panning')
+                if (fc) fc.selection = false // Disable selection while panning
+            }
+        }
+        const handleKeyUp = (e) => {
+            if (e.code === 'Space') {
+                isSpaceHeld = false
+                isPanning = false
+                container.classList.remove('panning')
+                if (fc) fc.selection = true
+            }
+        }
+
+        // ── Mouse drag while space held = pan ──
+        const handleMouseDown = (e) => {
+            if (isSpaceHeld) {
+                isPanning = true
+                lastPanX = e.clientX
+                lastPanY = e.clientY
+                e.preventDefault()
+            }
+        }
+        const handleMouseMove = (e) => {
+            if (isPanning && isSpaceHeld && fc) {
+                const dx = e.clientX - lastPanX
+                const dy = e.clientY - lastPanY
+                lastPanX = e.clientX
+                lastPanY = e.clientY
+
+                const vpt = fc.viewportTransform
+                vpt[4] += dx
+                vpt[5] += dy
+                fc.setViewportTransform(vpt)
+                fc.renderAll()
+            }
+        }
+        const handleMouseUp = () => {
+            isPanning = false
+        }
+
+        // ── Scroll: Ctrl/Cmd+scroll = zoom, plain scroll = pan ──
+        const handleWheel = (e) => {
+            e.preventDefault()
+            if (!fc) return
+
+            if (e.ctrlKey || e.metaKey) {
+                // Zoom
+                const delta = e.deltaY > 0 ? -5 : 5
+                const newZoom = Math.max(10, Math.min(400, zoom + delta))
+                setZoom(newZoom)
+                fc.setZoom(newZoom / 100)
+                fc.renderAll()
+            } else {
+                // Pan
+                const vpt = fc.viewportTransform
+                vpt[4] -= e.deltaX
+                vpt[5] -= e.deltaY
+                fc.setViewportTransform(vpt)
+                fc.renderAll()
+            }
+        }
+
+        // Attach events
+        document.addEventListener('keydown', handleKeyDown)
+        document.addEventListener('keyup', handleKeyUp)
+        container.addEventListener('mousedown', handleMouseDown)
+        document.addEventListener('mousemove', handleMouseMove)
+        document.addEventListener('mouseup', handleMouseUp)
+        container.addEventListener('wheel', handleWheel, { passive: false })
+
+        // Close context menu on click anywhere
+        const handleClick = () => closeContextMenu()
+        window.addEventListener('click', handleClick)
+
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown)
+            document.removeEventListener('keyup', handleKeyUp)
+            container.removeEventListener('mousedown', handleMouseDown)
+            document.removeEventListener('mousemove', handleMouseMove)
+            document.removeEventListener('mouseup', handleMouseUp)
+            container.removeEventListener('wheel', handleWheel)
+            window.removeEventListener('click', handleClick)
+            container.classList.remove('panning')
+        }
+    }, [zoom, closeContextMenu])
 
     // ── Determine current preset info ──
     const currentPreset = PRESETS.find(p => p.id === activePreset) || PRESETS[0]
@@ -2716,7 +3743,7 @@ function CanvasEditorInner() {
     // ══════════════════════════════════════════════════════════════════════
 
     return (
-        <div className="canvas-editor">
+        <div className={`canvas-editor ${canvasTheme === 'light' ? 'theme-light' : ''}`}>
             {/* ── TOP TOOLBAR ── */}
             <div className="ce-toolbar">
                 <div className="ce-toolbar-left">
@@ -2786,7 +3813,11 @@ function CanvasEditorInner() {
             {/* ── MAIN AREA ── */}
             <div className="ce-main">
 
-                <div className={`ce-sidebar-left`}>
+                <div className={`ce-sidebar-left ${sidebarCollapsed ? 'collapsed' : ''}`}>
+                    {/* Collapse toggle */}
+                    <button className="ce-sidebar-collapse-btn" onClick={() => setSidebarCollapsed(prev => !prev)} title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+                        <span className="material-symbols-outlined">{sidebarCollapsed ? 'chevron_right' : 'chevron_left'}</span>
+                    </button>
                     {/* ── Icon Rail ── */}
                     <div className="ce-icon-rail">
                         {SIDEBAR_TABS.map(tab => (
@@ -2794,7 +3825,7 @@ function CanvasEditorInner() {
                                 className={`ce-rail-btn ${sidebarTab === tab.id && panelOpen ? 'active' : ''} ${tab.isAi ? 'ai-tab' : ''}`}
                                 onClick={() => handleTabClick(tab.id)}
                                 title={tab.label}>
-                                <span className="material-symbols-outlined ce-rail-icon">{tab.icon}</span>
+                                <span className="ce-rail-icon">{tab.emoji}</span>
                                 <span className="ce-rail-label">{tab.label}</span>
                             </button>
                         ))}
@@ -3766,9 +4797,16 @@ function CanvasEditorInner() {
                                     </div>
                                     {/* Sub-tab pills */}
                                     <div className="ce-category-pills" style={{ paddingBottom: 8 }}>
-                                        {[{ id: 'upload', label: '📁 Upload' }, { id: 'brand', label: '🏢 Brand' }, { id: 'generated', label: '✨ Generated' }, { id: 'stock', label: '🖼 Stock' }].map(t => (
+                                        {[
+                                            { id: 'upload', label: 'Upload', color: '#818cf8' },
+                                            { id: 'brand', label: 'Brand', color: '#f472b6' },
+                                            { id: 'generated', label: 'Generated', color: '#34d399' },
+                                            { id: 'stock', label: 'Stock', color: '#fbbf24' },
+                                        ].map(t => (
                                             <button key={t.id} className={`ce-category-pill ${imageSourceTab === t.id ? 'active' : ''}`}
-                                                onClick={() => setImageSourceTab(t.id)}>
+                                                onClick={() => setImageSourceTab(t.id)}
+                                                style={imageSourceTab === t.id ? { borderColor: t.color, color: '#fff', background: `${t.color}22` } : {}}>
+                                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: t.color, display: 'inline-block', marginRight: 5, flexShrink: 0 }} />
                                                 {t.label}
                                             </button>
                                         ))}
@@ -3807,7 +4845,22 @@ function CanvasEditorInner() {
                                     {/* Generated sub-tab */}
                                     {imageSourceTab === 'generated' && (
                                         <div style={{ padding: '0 8px' }}>
-                                            <p className="ce-empty-state">Images generated via Creative Studio AI will appear here. Generate images from the AI Photoshoot or Template modes.</p>
+                                            {loadingBankImages ? (
+                                                <div className="ce-loading-spinner"><span className="material-symbols-outlined ce-spin">progress_activity</span> Loading images...</div>
+                                            ) : generatedImages.length > 0 ? (
+                                                <div className="ce-photo-grid">
+                                                    {generatedImages.map((img, i) => (
+                                                        <button key={img.id || i} className="ce-photo-thumb" onClick={() => addImageUrlToCanvas(img.url, img.label)} title={img.label || `Generated ${i + 1}`}>
+                                                            <img src={img.url} alt={img.label || `Generated ${i + 1}`} loading="lazy" />
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div style={{ textAlign: 'center', padding: '20px 10px' }}>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 40, color: '#6e6e73', opacity: 0.4, display: 'block', marginBottom: 8 }}>auto_awesome</span>
+                                                    <p className="ce-empty-state">No generated images yet.<br/>Use AI Editor or Fidato to create images.</p>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
@@ -3892,7 +4945,7 @@ function CanvasEditorInner() {
 
 
                 {/* ── CANVAS AREA ── */}
-                <div className="ce-canvas-area" ref={containerRef}>
+                <div className="ce-canvas-area" ref={containerRef} onContextMenu={handleCanvasContextMenu}>
                     <div className="ce-canvas-wrapper">
                         <canvas ref={canvasRef} />
                         <div className="ce-canvas-info">
@@ -3913,7 +4966,321 @@ function CanvasEditorInner() {
                             style={{ width: 28, height: 28 }} title="Reset zoom">
                             <span className="material-symbols-outlined" style={{ fontSize: 14 }}>fit_screen</span>
                         </button>
+                        <div style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.15)', margin: '0 4px' }} />
+                        <button className="ce-tool-btn" onClick={toggleCanvasTheme}
+                            style={{ width: 28, height: 28 }} title={`Switch to ${canvasTheme === 'dark' ? 'light' : 'dark'} background`}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>
+                                {canvasTheme === 'dark' ? 'light_mode' : 'dark_mode'}
+                            </span>
+                        </button>
                     </div>
+
+                    {/* \u2500\u2500 FLOATING BOTTOM TOOLBAR \u2500\u2500 */}
+                    <div className="ce-floating-toolbar">
+                        <button className={`ce-float-btn ${floatTool === 'select' ? 'active' : ''}`}
+                            onClick={() => { setFloatTool('select'); setShowGenPanel(false) }} title="Select">
+                            <span className="material-symbols-outlined">arrow_selector_tool</span>
+                        </button>
+                        <button className={`ce-float-btn ${showGenPanel ? 'active' : ''}`}
+                            onClick={() => { setFloatTool('image'); setShowGenPanel(!showGenPanel) }} title="Generate Image">
+                            <span className="material-symbols-outlined">image</span>
+                        </button>
+                        <button className={`ce-float-btn`} onClick={() => setShowTextModal(true)} title="Add Text">
+                            <span className="material-symbols-outlined">title</span>
+                        </button>
+                        <div className="ce-float-divider" />
+                        <button className={`ce-float-btn`} onClick={uploadImage} title="Upload Image">
+                            <span className="material-symbols-outlined">upload</span>
+                        </button>
+                        <button className={`ce-float-btn`} onClick={() => { setSidebarTab('elements'); setPanelOpen(true) }} title="Shapes">
+                            <span className="material-symbols-outlined">shapes</span>
+                        </button>
+                        <button className={`ce-float-btn`} onClick={() => { setSidebarTab('ai'); setPanelOpen(true); setAiTool('background') }} title="Background">
+                            <span className="material-symbols-outlined">wallpaper</span>
+                        </button>
+                        <div className="ce-float-divider" />
+                        <button className={`ce-float-btn`} onClick={() => { setSidebarTab('ai'); setPanelOpen(true); setAiTool('visual') }} title="AI Inpaint">
+                            <span className="material-symbols-outlined">gesture</span>
+                        </button>
+                        <button className={`ce-float-btn`} onClick={() => { setSidebarTab('ai'); setPanelOpen(true); setAiTool('retouch') }} title="AI Retouch">
+                            <span className="material-symbols-outlined">auto_fix</span>
+                        </button>
+                    </div>
+
+                    {/* \u2500\u2500 GENERATE IMAGE FLOATING PANEL \u2500\u2500 */}
+                    {showGenPanel && (
+                        <div className="ce-genimg-panel">
+                            <div className="ce-genimg-header">
+                                <div>
+                                    <div className="ce-genimg-title">
+                                        <span className="material-symbols-outlined">auto_awesome</span>
+                                        Create Image
+                                    </div>
+                                    <div className="ce-genimg-subtitle">NanoBanana 2</div>
+                                </div>
+                                <button className="ce-genimg-close" onClick={() => setShowGenPanel(false)}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+                                </button>
+                            </div>
+                            <div className="ce-genimg-section">
+                                <div className="ce-genimg-label">References</div>
+                                <div className="ce-genimg-refs">
+                                    <button className="ce-genimg-ref-add" onClick={() => {
+                                        const input = document.createElement('input')
+                                        input.type = 'file'; input.accept = 'image/*'
+                                        input.onchange = (e) => {
+                                            const file = e.target.files?.[0]
+                                            if (!file) return
+                                            const reader = new FileReader()
+                                            reader.onload = (ev) => setGenRefs(prev => [...prev, { url: ev.target.result, thumb: ev.target.result }])
+                                            reader.readAsDataURL(file)
+                                        }
+                                        input.click()
+                                    }}>
+                                        <span className="material-symbols-outlined">add</span>
+                                    </button>
+                                    {genRefs.map((ref, i) => (
+                                        <div key={i} className="ce-genimg-ref-thumb">
+                                            <img src={ref.thumb} alt={`Ref ${i + 1}`} />
+                                            <button className="ce-genimg-ref-remove" onClick={() => setGenRefs(prev => prev.filter((_, j) => j !== i))}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 12 }}>close</span>
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="ce-genimg-section">
+                                <div className="ce-genimg-label">
+                                    Instruction
+                                    <div className="ce-genimg-enhance-row">
+                                        <span style={{ fontSize: 11, color: '#64748b', marginRight: 6 }}>ENHANCE</span>
+                                        <button className={`ce-toggle ${genEnhance ? 'active' : ''}`} onClick={() => setGenEnhance(!genEnhance)} />
+                                    </div>
+                                </div>
+                                <textarea className="ce-genimg-textarea" placeholder="Describe the image you want to create..." value={genPrompt} onChange={e => setGenPrompt(e.target.value)} rows={3} />
+                            </div>
+                            <div className="ce-genimg-section">
+                                <div className="ce-genimg-label">Aspect Ratio</div>
+                                <div className="ce-genimg-ratios">
+                                    {[{ r: '1:1', icon: '\u2b1c' }, { r: '16:9', icon: '\ud83d\udda5\ufe0f' }, { r: '9:16', icon: '\ud83d\udcf1' }, { r: '4:5', icon: '\ud83d\udcf8' }, { r: '3:2', icon: '\ud83c\udf9e\ufe0f' }].map(opt => (
+                                        <button key={opt.r} className={`ce-genimg-ratio-btn ${genRatio === opt.r ? 'active' : ''}`} onClick={() => setGenRatio(opt.r)}>
+                                            <span style={{ fontSize: 12 }}>{opt.icon}</span> {opt.r}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <button className="ce-genimg-create-btn" onClick={handleGenImage} disabled={genLoading || !genPrompt.trim()}>
+                                {genLoading ? (<><span className="material-symbols-outlined ce-spin" style={{ fontSize: 18 }}>progress_activity</span> Generating...</>) : (<><span className="material-symbols-outlined" style={{ fontSize: 18 }}>auto_awesome</span> Create</>)}
+                            </button>
+                        </div>
+                    )}
+
+                    {/* \u2500\u2500 FIDATO CHAT TOGGLE \u2500\u2500 */}
+                    {!fidatoOpen && (
+                        <button className="ce-fidato-toggle" onClick={() => setFidatoOpen(true)} title="Fidato AI">
+                            <span className="material-symbols-outlined">smart_toy</span>
+                        </button>
+                    )}
+
+                    {/* \u2500\u2500 FIDATO CANVAS CHAT PANEL \u2500\u2500 */}
+                    {fidatoOpen && (
+                        <div className="ce-fidato-panel">
+                            <div className="ce-fidato-header">
+                                <div className="ce-fidato-header-left">
+                                    <div className="ce-fidato-avatar">F</div>
+                                    <div>
+                                        <div className="ce-fidato-name">Fidato</div>
+                                        <div className="ce-fidato-status">Creative Canvas</div>
+                                    </div>
+                                </div>
+                                <button className="ce-fidato-collapse" onClick={() => setFidatoOpen(false)}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+                                </button>
+                            </div>
+                            <div className="ce-fidato-messages">
+                                {fidatoMessages.map((msg, i) => (
+                                    <div key={i} className={`ce-fidato-msg ${msg.role}`}>
+                                        <div className="ce-fidato-msg-avatar">{msg.role === 'assistant' ? 'F' : '\u2726'}</div>
+                                        <div className="ce-fidato-msg-bubble">
+                                            <FormattedText text={msg.content || ''} />
+                                            {msg.images && msg.images.length > 0 && (
+                                                <div className="ce-fidato-images">
+                                                    {msg.images.map((img, j) => (
+                                                        <button key={j} className="ce-fidato-img-thumb" onClick={() => addImageUrlToCanvas(img.url)} title="Click to add to canvas">
+                                                            <img src={img.url} alt={`Generated ${j + 1}`} />
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {msg.plan && (
+                                                <div className="ce-fidato-plan">
+                                                    <div className="ce-fidato-plan-title">{msg.plan.title}</div>
+                                                    {msg.plan.items.map((item, k) => (
+                                                        <div key={k} className={`ce-fidato-plan-item ${item.status || ''}`}>
+                                                            <span className="material-symbols-outlined">{item.status === 'done' ? 'check_circle' : item.status === 'active' ? 'pending' : 'radio_button_unchecked'}</span>
+                                                            {item.text}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                                {fidatoLoading && (
+                                    <div className="ce-fidato-thinking">
+                                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span> Thinking
+                                        <div className="ce-fidato-thinking-dots"><span /><span /><span /></div>
+                                    </div>
+                                )}
+                                <div ref={fidatoMsgEndRef} />
+                            </div>
+                            <div className="ce-fidato-input-bar">
+                                {/* Voice recording indicator */}
+                                {(fidatoRecording || fidatoTranscribing) && (
+                                    <div style={{ padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: fidatoRecording ? '#f87171' : '#fbbf24', animation: 'pulse 1s infinite' }} />
+                                        <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>
+                                            {fidatoRecording ? '\ud83c\udf99\ufe0f Listening... speak your command' : '\ud83e\udde0 Transcribing...'}
+                                        </span>
+                                    </div>
+                                )}
+                                <div className="ce-fidato-input-row">
+                                    <textarea className="ce-fidato-input" placeholder="What do you want to do?" value={fidatoInput} onChange={e => setFidatoInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleFidatoSend() } }} rows={1} />
+                                    <button
+                                        className="ce-fidato-mic-btn"
+                                        onClick={() => {
+                                            if (fidatoRecording) {
+                                                // Stop recording
+                                                if (fidatoSilenceCheckRef.current) clearInterval(fidatoSilenceCheckRef.current)
+                                                if (fidatoRecordingTimerRef.current) clearTimeout(fidatoRecordingTimerRef.current)
+                                                if (fidatoMediaRecorderRef.current?.state === 'recording') {
+                                                    fidatoMediaRecorderRef.current.stop()
+                                                    setFidatoRecording(false)
+                                                }
+                                            } else if (!fidatoTranscribing && !fidatoLoading) {
+                                                // Start recording
+                                                (async () => {
+                                                    try {
+                                                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+                                                        const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+                                                        const mediaRecorder = new MediaRecorder(stream, { mimeType })
+                                                        fidatoMediaRecorderRef.current = mediaRecorder
+                                                        fidatoAudioChunksRef.current = []
+
+                                                        // Silence detection
+                                                        try {
+                                                            const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+                                                            const source = audioCtx.createMediaStreamSource(stream)
+                                                            const analyser = audioCtx.createAnalyser()
+                                                            analyser.fftSize = 512
+                                                            analyser.smoothingTimeConstant = 0.8
+                                                            source.connect(analyser)
+                                                            fidatoAnalyserRef.current = { analyser, audioCtx }
+
+                                                            let silentFrames = 0
+                                                            fidatoSilenceCheckRef.current = setInterval(() => {
+                                                                const dataArray = new Uint8Array(analyser.frequencyBinCount)
+                                                                analyser.getByteFrequencyData(dataArray)
+                                                                const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length
+                                                                if (avg < 15) {
+                                                                    silentFrames++
+                                                                    if (silentFrames >= 35 && fidatoAudioChunksRef.current.length > 0) {
+                                                                        if (fidatoMediaRecorderRef.current?.state === 'recording') {
+                                                                            fidatoMediaRecorderRef.current.stop()
+                                                                            setFidatoRecording(false)
+                                                                        }
+                                                                    }
+                                                                } else { silentFrames = 0 }
+                                                            }, 60)
+                                                        } catch (e) { console.warn('Silence detection unavailable:', e.message) }
+
+                                                        mediaRecorder.ondataavailable = (e) => {
+                                                            if (e.data.size > 0) fidatoAudioChunksRef.current.push(e.data)
+                                                        }
+
+                                                        mediaRecorder.onstop = async () => {
+                                                            if (fidatoSilenceCheckRef.current) clearInterval(fidatoSilenceCheckRef.current)
+                                                            if (fidatoAnalyserRef.current?.audioCtx) {
+                                                                fidatoAnalyserRef.current.audioCtx.close().catch(() => {})
+                                                                fidatoAnalyserRef.current = null
+                                                            }
+                                                            if (fidatoRecordingTimerRef.current) clearTimeout(fidatoRecordingTimerRef.current)
+                                                            stream.getTracks().forEach(t => t.stop())
+                                                            const audioBlob = new Blob(fidatoAudioChunksRef.current, { type: mimeType })
+
+                                                            if (audioBlob.size > 1000) {
+                                                                setFidatoTranscribing(true)
+                                                                try {
+                                                                    const formData = new FormData()
+                                                                    formData.append('audio', audioBlob, 'recording.webm')
+                                                                    formData.append('language', 'unknown')
+                                                                    const token = localStorage.getItem('mantram_token')
+                                                                    const resp = await fetch('/api/voice/transcribe', {
+                                                                        method: 'POST',
+                                                                        headers: token ? { Authorization: `Bearer ${token}` } : {},
+                                                                        body: formData,
+                                                                    })
+                                                                    const data = await resp.json()
+                                                                    if (data.success && data.text) {
+                                                                        setFidatoInput(data.text)
+                                                                        // Auto-send after a brief delay
+                                                                        setTimeout(() => {
+                                                                            setFidatoInput('')
+                                                                            handleFidatoSend(data.text)
+                                                                        }, 300)
+                                                                    }
+                                                                } catch (err) { console.error('Transcription failed:', err) }
+                                                                setFidatoTranscribing(false)
+                                                            }
+                                                        }
+
+                                                        mediaRecorder.start(250)
+                                                        setFidatoRecording(true)
+
+                                                        // Safety max 15s
+                                                        fidatoRecordingTimerRef.current = setTimeout(() => {
+                                                            if (fidatoMediaRecorderRef.current?.state === 'recording') {
+                                                                fidatoMediaRecorderRef.current.stop()
+                                                                setFidatoRecording(false)
+                                                            }
+                                                        }, 15000)
+                                                    } catch (err) { console.error('Mic access denied:', err) }
+                                                })()
+                                            }
+                                        }}
+                                        disabled={fidatoTranscribing}
+                                        style={{
+                                            background: fidatoRecording ? 'rgba(239,68,68,0.15)' : 'transparent',
+                                            color: fidatoRecording ? '#f87171' : fidatoTranscribing ? '#fbbf24' : '#64748b',
+                                            border: 'none', cursor: 'pointer', borderRadius: 8, padding: '6px',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            animation: fidatoRecording ? 'pulse 1.5s infinite' : 'none',
+                                            transition: 'all 0.2s',
+                                        }}
+                                        title={fidatoRecording ? 'Stop recording' : 'Speak to Fidato'}
+                                    >
+                                        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                                            {fidatoRecording ? 'stop_circle' : fidatoTranscribing ? 'hourglass_top' : 'mic'}
+                                        </span>
+                                    </button>
+                                    <button className="ce-fidato-send-btn" onClick={handleFidatoSend} disabled={fidatoLoading || !fidatoInput.trim()}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{fidatoLoading ? 'progress_activity' : 'arrow_upward'}</span>
+                                    </button>
+                                </div>
+                                <div className="ce-fidato-shortcuts">
+                                    <button className="ce-fidato-shortcut" onClick={() => setFidatoInput('Generate a campaign image for ')}>
+                                        <span className="material-symbols-outlined">auto_awesome</span> Create
+                                    </button>
+                                    <button className="ce-fidato-shortcut" onClick={() => setFidatoInput('Extract color palette from the image on canvas')}>
+                                        <span className="material-symbols-outlined">palette</span> Palette
+                                    </button>
+                                    <button className="ce-fidato-shortcut" onClick={() => setFidatoInput('Merge the selected images on canvas into ')}>
+                                        <span className="material-symbols-outlined">merge</span> Merge
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* ── RIGHT SIDEBAR (Advanced only) ── */}
@@ -4170,6 +5537,82 @@ function CanvasEditorInner() {
                     </div>
                 )
             }
+
+            {/* ── RIGHT-CLICK CONTEXT MENU ── */}
+            {contextMenu && (
+                <div className="ce-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }}
+                    onClick={e => e.stopPropagation()}>
+                    {contextMenu.hasTarget ? (
+                        <>
+                            <button className="ce-ctx-item" onClick={() => { copySelected(); closeContextMenu() }}>
+                                <span className="material-symbols-outlined">content_copy</span> Copy <kbd>⌘C</kbd>
+                            </button>
+                            <button className="ce-ctx-item" onClick={() => { cutSelected(); closeContextMenu() }}>
+                                <span className="material-symbols-outlined">content_cut</span> Cut <kbd>⌘X</kbd>
+                            </button>
+                            <button className="ce-ctx-item" onClick={() => { pasteFromClipboard(); closeContextMenu() }}>
+                                <span className="material-symbols-outlined">content_paste</span> Paste <kbd>⌘V</kbd>
+                            </button>
+                            <div className="ce-ctx-divider" />
+                            <button className="ce-ctx-item" onClick={() => { duplicateSelected(); closeContextMenu() }}>
+                                <span className="material-symbols-outlined">copy_all</span> Duplicate <kbd>⌘D</kbd>
+                            </button>
+                            <button className="ce-ctx-item ce-ctx-danger" onClick={() => { deleteSelected(); closeContextMenu() }}>
+                                <span className="material-symbols-outlined">delete</span> Delete <kbd>⌫</kbd>
+                            </button>
+                            <div className="ce-ctx-divider" />
+                            <button className="ce-ctx-item" onClick={() => { saveObjectAsImage(); closeContextMenu() }}>
+                                <span className="material-symbols-outlined">save_alt</span> Save as Image
+                            </button>
+                            <button className="ce-ctx-item" onClick={() => { exportSelected(); closeContextMenu() }}>
+                                <span className="material-symbols-outlined">download</span> Export Selected
+                            </button>
+                            <div className="ce-ctx-divider" />
+                            {contextMenu.isMultiSelect && (
+                                <button className="ce-ctx-item" onClick={() => { groupSelected(); closeContextMenu() }}>
+                                    <span className="material-symbols-outlined">group_work</span> Group <kbd>⌘G</kbd>
+                                </button>
+                            )}
+                            {contextMenu.isGroup && (
+                                <button className="ce-ctx-item" onClick={() => { ungroupSelected(); closeContextMenu() }}>
+                                    <span className="material-symbols-outlined">workspaces</span> Ungroup <kbd>⇧⌘G</kbd>
+                                </button>
+                            )}
+                            {(contextMenu.isMultiSelect || contextMenu.isGroup) && (
+                                <button className="ce-ctx-item" onClick={() => { mergeSelected(); closeContextMenu() }}>
+                                    <span className="material-symbols-outlined">merge</span> Merge (Flatten)
+                                </button>
+                            )}
+                            <div className="ce-ctx-divider" />
+                            <button className="ce-ctx-item" onClick={() => { bringForward(); closeContextMenu() }}>
+                                <span className="material-symbols-outlined">flip_to_front</span> Bring Forward
+                            </button>
+                            <button className="ce-ctx-item" onClick={() => { sendBackward(); closeContextMenu() }}>
+                                <span className="material-symbols-outlined">flip_to_back</span> Send Backward
+                            </button>
+                            <div className="ce-ctx-divider" />
+                            <button className="ce-ctx-item" onClick={() => { toggleLock(); closeContextMenu() }}>
+                                <span className="material-symbols-outlined">{contextMenu.isLocked ? 'lock_open' : 'lock'}</span>
+                                {contextMenu.isLocked ? 'Unlock' : 'Lock'}
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button className="ce-ctx-item" onClick={() => { pasteFromClipboard(); closeContextMenu() }}
+                                disabled={!clipboardRef.current}>
+                                <span className="material-symbols-outlined">content_paste</span> Paste <kbd>⌘V</kbd>
+                            </button>
+                            <div className="ce-ctx-divider" />
+                            <button className="ce-ctx-item" onClick={() => { uploadImage(); closeContextMenu() }}>
+                                <span className="material-symbols-outlined">upload</span> Upload Image
+                            </button>
+                            <button className="ce-ctx-item" onClick={() => { exportCanvas('png'); closeContextMenu() }}>
+                                <span className="material-symbols-outlined">download</span> Export Canvas
+                            </button>
+                        </>
+                    )}
+                </div>
+            )}
 
             {/* ── TOAST ── */}
             {toast && <div className="ce-toast">{toast}</div>}

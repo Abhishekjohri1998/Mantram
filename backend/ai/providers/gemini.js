@@ -69,113 +69,41 @@ export class GeminiProvider extends BaseProvider {
     }
 
     /**
-     * Generate image using Gemini's image generation capabilities.
+     * Generate image using NanoBanana 2 (gemini-3.1-flash-image-preview).
      * Uses the dedicated GEMINI_IMAGE_API_KEY (billed key) for image generation.
-     * Tries in order:
-     *   1. gemini-3.1-flash-image-preview (Nanobanana 2 — latest, Feb 2026)
-     *   2. gemini-2.0-flash-exp-image-generation (Gemini native image gen)
-     *   3. imagen-4.0-generate-001 (Imagen 4 via predict API)
+     * Direct call — no fallback chain for speed.
      */
     async generateImage({ prompt, size = '1024x1024', model }) {
         const startTime = Date.now();
         const [width, height] = size.split('x').map(Number);
         const aspectRatio = width === height ? '1:1' : width > height ? '16:9' : '9:16';
-        // Use dedicated image API key (billed)
         const imageKey = this.imageApiKey;
+        const modelId = 'gemini-3.1-flash-image-preview'; // NanoBanana 2
 
-        // Method 1: Gemini 3.1 Flash Image Preview (primary)
-        try {
-            const modelId = 'gemini-3.1-flash-image-preview';
-            const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ role: 'user', parts: [{ text: `Generate an image: ${prompt}` }] }],
-                    generationConfig: { responseModalities: ['IMAGE'] },
-                }),
-            });
+        const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: `Generate an image: ${prompt}` }] }],
+                generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+            }),
+        });
 
-            const data = await response.json();
-            if (data.error) throw new Error(data.error.message);
+        const data = await response.json();
+        if (data.error) throw new Error(`NanoBanana 2 error: ${data.error.message}`);
 
-            const parts = data.candidates?.[0]?.content?.parts || [];
-            for (const part of parts) {
-                if (part.inlineData?.mimeType?.startsWith('image/')) {
-                    return {
-                        imageUrl: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`,
-                        model: modelId,
-                        provider: 'gemini',
-                        generationTime: Date.now() - startTime,
-                    };
-                }
-            }
-            throw new Error('No image in response');
-        } catch (err) {
-            console.error('Gemini 3.1 Flash Image Preview failed:', err.message);
-        }
-
-        // Method 2: Gemini 2.0 Flash Image Generation (fallback)
-        try {
-            const modelId = 'gemini-2.0-flash-preview-image-generation';
-            const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ role: 'user', parts: [{ text: `Generate an image: ${prompt}` }] }],
-                    generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
-                }),
-            });
-
-            const data = await response.json();
-            if (data.error) throw new Error(data.error.message);
-
-            const parts = data.candidates?.[0]?.content?.parts || [];
-            for (const part of parts) {
-                if (part.inlineData?.mimeType?.startsWith('image/')) {
-                    return {
-                        imageUrl: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`,
-                        model: modelId,
-                        provider: 'gemini',
-                        generationTime: Date.now() - startTime,
-                    };
-                }
-            }
-            throw new Error('No image in response');
-        } catch (err) {
-            console.error('Gemini 2.0 Flash image gen failed:', err.message);
-        }
-
-        // Method 3: Imagen 3.0 (generateImages API fallback)
-        try {
-            const modelId = 'imagen-3.0-generate-002';
-            const url = `${this.baseUrl}/models/${modelId}:predict?key=${imageKey}`;
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    instances: [{ prompt }],
-                    parameters: { sampleCount: 1, aspectRatio },
-                }),
-            });
-
-            const data = await response.json();
-            if (data.error) throw new Error(data.error.message);
-
-            if (data.predictions?.[0]?.bytesBase64Encoded) {
+        const parts = data.candidates?.[0]?.content?.parts || [];
+        for (const part of parts) {
+            if (part.inlineData?.mimeType?.startsWith('image/')) {
                 return {
-                    imageUrl: `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`,
+                    imageUrl: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`,
                     model: modelId,
                     provider: 'gemini',
                     generationTime: Date.now() - startTime,
                 };
             }
-            throw new Error('No image in Imagen response');
-        } catch (err) {
-            console.error('Imagen 3.0 failed:', err.message);
         }
-
-        throw new Error('Gemini image generation requires a billed API key. Please enable billing at https://ai.google.dev/pricing or the system will use DALL-E as fallback.');
+        throw new Error('NanoBanana 2: no image in response');
     }
 }

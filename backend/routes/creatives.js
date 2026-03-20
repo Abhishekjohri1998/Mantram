@@ -93,67 +93,56 @@ function extractBase64(dataUri) {
     return { mimeType, data };
 }
 
-// ── Gemini image generation via @google/genai SDK ───────────────────────
+// ── Gemini image generation via REST API (NanoBanana 2) ─────────────────
 async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K') {
     const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
     if (!imageKey) throw new Error('Gemini API key not configured');
 
-    const ai = new GoogleGenAI({ apiKey: imageKey });
+    const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+    // NanoBanana 2 primary, gemini-2.5-flash-image as single fallback for 503/overload
+    const models = ['gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image'];
 
-    // Model fallback chain — gemini-3.1-flash-image-preview first
-    const models = [
-        'gemini-3.1-flash-image-preview',         // Gemini 3.1 Flash Image Preview (primary)
-        'gemini-2.0-flash-preview-image-generation', // Gemini 2.0 Flash image gen (fallback)
-        'imagen-3.0-generate-002',                // Imagen 3 fallback
-    ];
-
-    // Build content parts — OFFICIAL GEMINI FORMAT:
-    // Text prompt FIRST, then reference images as direct inlineData parts.
-    // Do NOT interleave text labels between images — that confuses the model.
-    // Ref: https://ai.google.dev/gemini-api/docs/image-generation#use-up-to-14-reference-images
-    const contents = [
-        { text: promptText },
-        ...imageParts.filter(p => p.inlineData),  // Only include actual image parts, strip text labels
-    ];
+    // Build content parts — images as inlineData, then text prompt last
+    const parts = [];
+    for (const ip of imageParts) {
+        if (ip.inlineData) parts.push({ inlineData: ip.inlineData });
+    }
+    parts.push({ text: promptText });
 
     let imageUrl = null;
-    let usedModel = '';
     let textResponse = '';
+    let usedModel = '';
 
-    const imageCount = contents.filter(p => p.inlineData).length;
-    console.log(`\n══════ CREATIVE STUDIO IMAGE GENERATION (SDK) ══════`);
-    console.log(`🎨 Models to try: ${models.length}`);
+    const imageCount = parts.filter(p => p.inlineData).length;
+    console.log(`\n══════ CREATIVE STUDIO IMAGE GENERATION (NanoBanana 2) ══════`);
     console.log(`🖼️  Reference images: ${imageCount}`);
-    // Diagnostic: log each content part's type and size
-    contents.forEach((part, i) => {
-        if (part.text) {
-            console.log(`  📄 Part ${i}: TEXT (${part.text.length} chars)`);
-        } else if (part.inlineData) {
-            const dataLen = part.inlineData.data?.length || 0;
-            console.log(`  🖼️  Part ${i}: IMAGE mime=${part.inlineData.mimeType}, base64Size=${Math.round(dataLen / 1024)}KB`);
-        }
-    });
     console.log(`📐 Aspect ratio: ${aspectRatio} | Resolution: ${imageSize}`);
     console.log(`📝 Prompt (first 200 chars): ${promptText.substring(0, 200)}...`);
 
     for (const modelId of models) {
         try {
-            console.log(`\n🔄 Trying model: ${modelId}...`);
-
-            const response = await ai.models.generateContent({
-                model: modelId,
-                contents,
-                config: {
-                    responseModalities: ['IMAGE'],
-                    temperature,
-                    imageConfig: {
-                        aspectRatio,
-                        ...(imageSize ? { imageSize } : {}),
+            console.log(`🎨 Trying: ${modelId}...`);
+            const url = `${baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ role: 'user', parts }],
+                    generationConfig: {
+                        responseModalities: ['TEXT', 'IMAGE'],
+                        temperature,
+                        imageGenerationConfig: { aspectRatio },
                     },
-                },
+                }),
             });
 
-            const resParts = response.candidates?.[0]?.content?.parts || [];
+            const data = await resp.json();
+            if (data.error) {
+                console.warn(`⚠️ ${modelId}: ${data.error.message || JSON.stringify(data.error)}`);
+                continue; // try fallback
+            }
+
+            const resParts = data.candidates?.[0]?.content?.parts || [];
             for (const part of resParts) {
                 if (part.inlineData?.mimeType?.startsWith('image/')) {
                     imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
@@ -163,52 +152,17 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
 
             if (imageUrl) {
                 usedModel = modelId;
-                console.log(`✅ Image generated successfully with model: ${modelId}`);
+                console.log(`✅ Image generated successfully with ${modelId}`);
                 break;
-            } else {
-                console.warn(`⚠️ Model ${modelId} responded but returned no image`);
             }
-        } catch (e) { console.error(`❌ Model ${modelId} exception:`, e.message); continue; }
-    }
-    if (!imageUrl) {
-        console.error('❌ All Gemini models failed — trying DALL-E 3 fallback...');
-        try {
-            const openaiKey = process.env.OPENAI_API_KEY;
-            if (!openaiKey) throw new Error('No OpenAI key configured');
-
-            // DALL-E 3 only supports: 1024x1024, 1792x1024, 1024x1792
-            const dalleSize = aspectRatio === '16:9' ? '1792x1024'
-                : aspectRatio === '9:16' ? '1024x1792'
-                : '1024x1024';
-
-            const dalleResp = await fetch('https://api.openai.com/v1/images/generations', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${openaiKey}`,
-                },
-                body: JSON.stringify({
-                    model: 'dall-e-3',
-                    prompt: promptText.substring(0, 4000), // DALL-E has 4000 char limit
-                    size: dalleSize,
-                    n: 1,
-                    quality: 'standard',
-                }),
-            });
-
-            const dalleData = await dalleResp.json();
-            if (dalleData.error) throw new Error(dalleData.error.message);
-
-            const dalleUrl = dalleData.data?.[0]?.url;
-            if (dalleUrl) {
-                imageUrl = dalleUrl;
-                usedModel = 'dall-e-3';
-                console.log(`✅ DALL-E 3 fallback succeeded: ${dalleUrl.substring(0, 80)}...`);
-            }
-        } catch (dalleErr) {
-            console.error('❌ DALL-E 3 fallback also failed:', dalleErr.message);
+            console.warn(`⚠️ ${modelId}: no image in response`);
+        } catch (e) {
+            console.error(`❌ ${modelId} error:`, e.message);
+            continue;
         }
     }
+
+    if (!imageUrl) throw new Error('Image generation failed — all models unavailable');
 
     console.log(`══════ END IMAGE GENERATION ══════\n`);
     return { imageUrl, model: usedModel, textResponse };
@@ -653,11 +607,17 @@ The output must fill the entire canvas edge-to-edge. No frames, borders, or mock
                             options.logoPosition || 'bottom-right',
                             options.logoSize || 'medium'
                         );
-                        // Re-upload composited image to S3
+                        // Try S3 re-upload, but keep base64 if it fails
                         const compositedBase64 = `data:image/png;base64,${compositedBuffer.toString('base64')}`;
-                        const compositedS3 = await uploadToS3(compositedBase64, `creatives/${brandId}/${Date.now()}-logo.png`);
-                        imageUrl = compositedS3;
-                        console.log(`✅ Logo composited & re-uploaded: ${imageUrl}`);
+                        try {
+                            const compositedS3 = await uploadToS3(compositedBase64, `creatives/${brandId}/${Date.now()}-logo.png`);
+                            imageUrl = compositedS3;
+                            console.log(`✅ Logo composited & re-uploaded: ${imageUrl}`);
+                        } catch (s3Err) {
+                            // S3 failed — keep the composited base64 image (logo is still applied)
+                            imageUrl = compositedBase64;
+                            console.warn(`⚠️ Logo composited but S3 re-upload failed, keeping base64:`, s3Err.message);
+                        }
                     } else {
                         console.warn('⚠️ Failed to fetch image or logo buffers for overlay');
                     }

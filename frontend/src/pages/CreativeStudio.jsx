@@ -346,6 +346,157 @@ export default function CreativeStudio() {
     const [fromContent, setFromContent] = useState(false)
     const [aspectRatio, setAspectRatio] = useState('1:1')
     const [publishData, setPublishData] = useState(null) // { image, text } or null
+
+    // ── Animate State ──
+    const [animateModalOpen, setAnimateModalOpen] = useState(false)
+    const [animatePrompt, setAnimatePrompt] = useState('')
+    const [animateModel, setAnimateModel] = useState('grok-imagine')
+    const [animateDuration, setAnimateDuration] = useState(5)
+    const [animateAspectRatio, setAnimateAspectRatio] = useState('1:1')
+    const [animateGenerating, setAnimateGenerating] = useState(false)
+    const [animateAnalyzing, setAnimateAnalyzing] = useState(false)
+    const [animateProjectId, setAnimateProjectId] = useState(null)
+    const [animateProgress, setAnimateProgress] = useState(0)
+    const [animateVideoUrl, setAnimateVideoUrl] = useState(null)
+    const [animateError, setAnimateError] = useState('')
+    const animatePollRef = useRef(null)
+
+    const ANIMATE_MODELS = {
+        'grok-imagine': { name: 'Grok Imagine', icon: '🤖', dur: [1, 15], ratios: ['16:9', '9:16', '1:1'] },
+        'seedance-2.0': { name: 'Seedance 2.0', icon: '🎞️', dur: [4, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'] },
+        'kling-3.0': { name: 'Kling 3.0', icon: '🎥', dur: [3, 15], ratios: ['16:9', '9:16', '1:1'] },
+        'veo-3.1': { name: 'Veo 3.1', icon: '🎬', dur: [4, 8], ratios: ['16:9', '9:16'] },
+        'seedance-1.0': { name: 'Seedance 1.0', icon: '🌱', dur: [5, 10], ratios: ['16:9', '9:16', '1:1', '4:3'] },
+    }
+
+    // ── Animate: AI Prompt Suggestion ──
+    const handleAnimateClick = async () => {
+        if (!result?.imageUrl) return
+        setAnimateModalOpen(true)
+        setAnimateError('')
+        setAnimateVideoUrl(null)
+        setAnimateGenerating(false)
+        setAnimateProjectId(null)
+        setAnimateProgress(0)
+        setAnimateAnalyzing(true)
+        try {
+            // Detect aspect ratio from image
+            const img = new Image()
+            img.crossOrigin = 'anonymous'
+            await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = result.imageUrl })
+            const w = img.naturalWidth, h = img.naturalHeight
+            const ratio = w / h
+            const detectedRatio = ratio > 1.6 ? '16:9' : ratio < 0.65 ? '9:16' : ratio > 1.2 ? '4:3' : ratio < 0.85 ? '3:4' : '1:1'
+            setAnimateAspectRatio(detectedRatio)
+
+            // Ask AI to describe optimal animation
+            const token = localStorage.getItem('mantram_token') || ''
+            const resp = await fetch('/api/nexus/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                    message: `You are an expert animation director. Analyze this image and write a concise animation prompt (2-3 sentences max) describing the ideal motion, camera movement, and mood to bring this still image to life as a short video. Focus on:
+- What should move (subject, background, particles)
+- Camera motion (pan, zoom, dolly, static)
+- Atmosphere (lighting shifts, particle effects)
+
+Be specific and cinematic. Do NOT describe the image — describe the MOTION only. Output ONLY the prompt, nothing else.`,
+                    images: [result.imageUrl],
+                    brandId: activeBrand?._id,
+                }),
+            })
+            const data = await resp.json()
+            const suggestedPrompt = (data.response || data.text || data.reply || '').replace(/^["']|["']$/g, '').trim()
+            if (suggestedPrompt) setAnimatePrompt(suggestedPrompt)
+            else setAnimatePrompt('Gentle cinematic motion with smooth camera movement, soft lighting shifts, and natural ambient animation.')
+        } catch (e) {
+            console.warn('Animate prompt suggestion failed:', e)
+            setAnimatePrompt('Gentle cinematic motion with smooth camera movement, soft lighting shifts, and natural ambient animation.')
+        }
+        setAnimateAnalyzing(false)
+    }
+
+    // ── Animate: Generate Video ──
+    const handleAnimateGenerate = async () => {
+        if (!result?.imageUrl || !animatePrompt.trim()) return
+        setAnimateGenerating(true)
+        setAnimateError('')
+        setAnimateVideoUrl(null)
+        setAnimateProgress(5)
+        try {
+            const token = localStorage.getItem('mantram_token') || ''
+            const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+            let projectId = null
+
+            if (animateModel === 'seedance-2.0') {
+                // Seedance uses dedicated I2V endpoint
+                const resp = await fetch('/api/video-studio/advanced/image-to-video', {
+                    method: 'POST', headers,
+                    body: JSON.stringify({
+                        imageUrl: result.imageUrl,
+                        prompt: animatePrompt.trim(),
+                        duration: animateDuration,
+                        aspectRatio: animateAspectRatio,
+                        qualityMode: 'fast',
+                        brandId: activeBrand?._id || null,
+                    }),
+                })
+                const data = await resp.json()
+                if (!data.success) throw new Error(data.error || 'Animation failed')
+                projectId = data.project._id
+            } else {
+                // All other models use advanced/generate with firstImageUrl
+                const resp = await fetch('/api/video-studio/advanced/generate', {
+                    method: 'POST', headers,
+                    body: JSON.stringify({
+                        prompt: animatePrompt.trim(),
+                        model: animateModel,
+                        duration: animateDuration,
+                        resolution: '1080p',
+                        aspectRatio: animateAspectRatio,
+                        firstImageUrl: result.imageUrl,
+                        generateAudio: true,
+                        qualityMode: 'fast',
+                        brandId: activeBrand?._id || null,
+                    }),
+                })
+                const data = await resp.json()
+                if (!data.success) throw new Error(data.error || 'Animation failed')
+                projectId = data.project._id
+            }
+
+            setAnimateProjectId(projectId)
+            // Start polling
+            if (animatePollRef.current) clearInterval(animatePollRef.current)
+            animatePollRef.current = setInterval(async () => {
+                try {
+                    const token2 = localStorage.getItem('mantram_token') || ''
+                    const sr = await fetch(`/api/video-studio/${projectId}/status`, {
+                        headers: { Authorization: `Bearer ${token2}` },
+                    })
+                    const sd = await sr.json()
+                    const gen = sd.project?.generation || {}
+                    setAnimateProgress(gen.progress || 30)
+                    if (gen.status === 'COMPLETED' || sd.project?.status === 'critique') {
+                        clearInterval(animatePollRef.current)
+                        setAnimateVideoUrl(gen.videoUrl || gen.s3VideoUrl || '')
+                        setAnimateGenerating(false)
+                        setAnimateProgress(100)
+                    } else if (gen.status === 'FAILED') {
+                        clearInterval(animatePollRef.current)
+                        setAnimateError(gen.error || 'Animation generation failed')
+                        setAnimateGenerating(false)
+                    }
+                } catch { /* continue polling */ }
+            }, 5000)
+        } catch (e) {
+            setAnimateError(e.message)
+            setAnimateGenerating(false)
+        }
+    }
+
+    // Cleanup animate polling on unmount
+    useEffect(() => () => { if (animatePollRef.current) clearInterval(animatePollRef.current) }, [])
     const [studioMode, setStudioMode] = useState('create')
 
     // ── Virtual Try-On State ──
@@ -2069,6 +2220,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     className="btn-glass py-2.5 px-6 rounded-xl text-sm font-bold bg-[#1877F2]/10 text-[#1877F2] hover:bg-[#1877F2]/20 border border-[#1877F2]/30 cursor-pointer transition-all">
                                     <span className="material-symbols-outlined text-sm">share</span> Publish
                                 </button>
+                                <button onClick={handleAnimateClick}
+                                    className="py-2.5 px-6 rounded-xl text-sm font-bold cursor-pointer transition-all duration-200 hover:scale-[1.03] flex items-center gap-1.5"
+                                    style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(236,72,153,0.15))', color: '#c084fc', border: '1px solid rgba(139,92,246,0.3)' }}>
+                                    <span className="material-symbols-outlined text-sm">animation</span> Animate
+                                </button>
                             </div>
 
                             {/* Open Canvas Editor */}
@@ -2084,6 +2240,159 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <span className="material-symbols-outlined">edit</span>
                                     Open Canvas Editor
                                 </button>
+                            )}
+
+                            {/* ═══ ANIMATE MODAL ═══ */}
+                            {animateModalOpen && (
+                                <div className="mt-4 studio-card p-6 fade-up border border-violet-500/20" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.03), rgba(236,72,153,0.03))' }}>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-violet-400">animation</span>
+                                            Animate Creative
+                                        </h4>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-slate-500 bg-white/[0.05] px-2 py-0.5 rounded-full">
+                                                {animateAspectRatio} • First Frame
+                                            </span>
+                                            <button onClick={() => { setAnimateModalOpen(false); if (animatePollRef.current) clearInterval(animatePollRef.current) }}
+                                                className="text-slate-500 hover:text-white cursor-pointer">
+                                                <span className="material-symbols-outlined text-sm">close</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* AI-suggested prompt */}
+                                    {animateAnalyzing ? (
+                                        <div className="flex items-center gap-3 py-6 justify-center">
+                                            <span className="material-symbols-outlined text-violet-400 animate-spin">progress_activity</span>
+                                            <span className="text-sm text-slate-400">AI is analyzing your image for the best animation...</span>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <textarea
+                                                value={animatePrompt}
+                                                onChange={e => setAnimatePrompt(e.target.value)}
+                                                placeholder="Describe the animation motion..."
+                                                className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 outline-none focus:border-violet-500/40 resize-none mb-3"
+                                                rows={3}
+                                                disabled={animateGenerating}
+                                            />
+
+                                            {/* Config Row */}
+                                            <div className="flex flex-wrap gap-3 mb-4">
+                                                {/* Model Selector */}
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Model</span>
+                                                    <select value={animateModel} onChange={e => {
+                                                        setAnimateModel(e.target.value)
+                                                        const m = ANIMATE_MODELS[e.target.value]
+                                                        if (m && animateDuration < m.dur[0]) setAnimateDuration(m.dur[0])
+                                                        if (m && animateDuration > m.dur[1]) setAnimateDuration(m.dur[1])
+                                                        if (m && !m.ratios.includes(animateAspectRatio)) setAnimateAspectRatio(m.ratios[0])
+                                                    }}
+                                                        className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white outline-none cursor-pointer"
+                                                        disabled={animateGenerating}>
+                                                        {Object.entries(ANIMATE_MODELS).map(([id, m]) => (
+                                                            <option key={id} value={id}>{m.icon} {m.name}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                {/* Duration */}
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Duration</span>
+                                                    <select value={animateDuration} onChange={e => setAnimateDuration(Number(e.target.value))}
+                                                        className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white outline-none cursor-pointer"
+                                                        disabled={animateGenerating}>
+                                                        {(() => {
+                                                            const m = ANIMATE_MODELS[animateModel]
+                                                            return Array.from({ length: (m?.dur[1] || 15) - (m?.dur[0] || 1) + 1 }, (_, i) => (m?.dur[0] || 1) + i)
+                                                                .map(d => <option key={d} value={d}>{d}s</option>)
+                                                        })()}
+                                                    </select>
+                                                </div>
+                                                {/* Aspect Ratio */}
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Ratio</span>
+                                                    <div className="flex gap-1">
+                                                        {(ANIMATE_MODELS[animateModel]?.ratios || ['1:1']).map(r => (
+                                                            <button key={r} onClick={() => setAnimateAspectRatio(r)}
+                                                                disabled={animateGenerating}
+                                                                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${animateAspectRatio === r
+                                                                    ? 'bg-violet-500/20 text-violet-300 border border-violet-500/40'
+                                                                    : 'bg-white/[0.03] text-slate-500 border border-transparent hover:text-white'}`}>
+                                                                {r}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Error */}
+                                            {animateError && (
+                                                <div className="mb-3 p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+                                                    <span className="material-symbols-outlined text-sm">error</span> {animateError}
+                                                </div>
+                                            )}
+
+                                            {/* Generating Progress */}
+                                            {animateGenerating && (
+                                                <div className="mb-3">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <span className="text-xs text-slate-400 flex items-center gap-2">
+                                                            <span className="material-symbols-outlined text-violet-400 animate-spin text-sm">progress_activity</span>
+                                                            Animating — usually 1-3 minutes...
+                                                        </span>
+                                                        <span className="text-xs text-violet-400 font-bold">{animateProgress}%</span>
+                                                    </div>
+                                                    <div className="w-full h-1.5 rounded-full bg-white/[0.05] overflow-hidden">
+                                                        <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${animateProgress}%`, background: 'linear-gradient(90deg, #7c3aed, #ec4899)' }} />
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Video Result */}
+                                            {animateVideoUrl && (
+                                                <div className="mb-3 rounded-xl overflow-hidden border border-violet-500/20">
+                                                    <video controls autoPlay className="w-full" style={{ maxHeight: '400px' }}
+                                                        src={animateProjectId ? `/api/video-studio/${animateProjectId}/video` : animateVideoUrl} />
+                                                    <div className="flex gap-2 p-3 bg-black/20">
+                                                        <button onClick={async () => {
+                                                            try {
+                                                                const src = animateProjectId ? `/api/video-studio/${animateProjectId}/video` : animateVideoUrl
+                                                                const resp = await fetch(src)
+                                                                const blob = await resp.blob()
+                                                                const url = URL.createObjectURL(blob)
+                                                                const a = document.createElement('a'); a.href = url; a.download = 'animation.mp4'; a.click()
+                                                                setTimeout(() => URL.revokeObjectURL(url), 100)
+                                                            } catch { window.open(animateVideoUrl, '_blank') }
+                                                        }}
+                                                            className="flex-1 py-2 rounded-lg text-xs font-bold text-white cursor-pointer flex items-center justify-center gap-1.5"
+                                                            style={{ background: 'linear-gradient(135deg, #7c3aed, #06b6d4)' }}>
+                                                            <span className="material-symbols-outlined text-sm">download</span> Download Video
+                                                        </button>
+                                                        <button onClick={() => { setAnimateVideoUrl(null); setAnimateProgress(0); setAnimateProjectId(null) }}
+                                                            className="py-2 px-4 rounded-lg text-xs font-bold bg-white/[0.06] text-slate-300 cursor-pointer hover:bg-white/[0.1] transition-all">
+                                                            <span className="material-symbols-outlined text-sm">refresh</span> Retry
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Generate Button */}
+                                            {!animateVideoUrl && (
+                                                <button onClick={handleAnimateGenerate} disabled={animateGenerating || !animatePrompt.trim()}
+                                                    className="w-full py-3 rounded-xl text-sm font-bold text-white cursor-pointer transition-all duration-200 disabled:opacity-30 flex items-center justify-center gap-2"
+                                                    style={{ background: animateGenerating ? 'rgba(139,92,246,0.15)' : 'linear-gradient(135deg, #7c3aed, #ec4899)', boxShadow: animateGenerating ? 'none' : '0 4px 20px rgba(139,92,246,0.3)' }}>
+                                                    {animateGenerating ? (
+                                                        <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Generating Animation...</>
+                                                    ) : (
+                                                        <><span className="material-symbols-outlined text-sm">play_arrow</span> Generate Animation</>
+                                                    )}
+                                                </button>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
                             )}
                         </div>
                     )}

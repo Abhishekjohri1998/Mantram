@@ -746,41 +746,32 @@ router.post('/generate-ad-image', protect, requireCredits('adCreative'), async (
         const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
         if (!imageKey) return res.status(400).json({ success: false, error: 'Gemini API key not configured' });
 
-        const models = [
-            'gemini-3.1-flash-image-preview',
-            'gemini-3-pro-image-preview',
-            'gemini-2.5-flash-image',
-            'gemini-2.5-flash-preview-image-generation',
-        ];
+        const modelId = 'gemini-3.1-flash-image-preview'; // NanoBanana 2 — direct, no fallback
 
         let imageUrl = null;
-        let usedModel = '';
-        for (const modelId of models) {
-            try {
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${imageKey}`;
-                const resp = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: fullPrompt }] }],
-                        generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.5 },
-                    }),
-                });
-                const data = await resp.json();
-                if (data.error) continue;
-                const resParts = data.candidates?.[0]?.content?.parts || [];
-                for (const part of resParts) {
-                    if (part.inlineData?.mimeType?.startsWith('image/')) {
-                        imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                    }
+        try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${imageKey}`;
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: fullPrompt }] }],
+                    generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.5 },
+                }),
+            });
+            const data = await resp.json();
+            if (data.error) throw new Error(data.error.message);
+            const resParts = data.candidates?.[0]?.content?.parts || [];
+            for (const part of resParts) {
+                if (part.inlineData?.mimeType?.startsWith('image/')) {
+                    imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
                 }
-                if (imageUrl) { usedModel = modelId; break; }
-            } catch (e) { continue; }
-        }
+            }
+        } catch (e) { console.error('NanoBanana 2 ad image error:', e.message); }
 
-        if (!imageUrl) return res.status(500).json({ success: false, error: 'Image generation failed across all models' });
+        if (!imageUrl) return res.status(500).json({ success: false, error: 'Image generation failed' });
 
-        res.json({ success: true, imageUrl, model: usedModel, platform: platform || 'meta-feed' });
+        res.json({ success: true, imageUrl, model: modelId, platform: platform || 'meta-feed' });
     } catch (error) {
         console.error('PM Ad image generation error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });

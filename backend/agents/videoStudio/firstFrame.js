@@ -6,7 +6,7 @@
  * get an HTTP URL that video generation APIs can use.
  */
 
-const GEMINI_MODELS = ['gemini-2.5-flash-preview-image-generation', 'imagen-3.0-generate-002'];
+const GEMINI_MODELS = ['gemini-3.1-flash-image-preview']; // NanoBanana 2
 
 /**
  * Generate an image using Gemini's native image generation
