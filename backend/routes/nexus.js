@@ -492,50 +492,68 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
             }
         }
 
-        // English / fallback → Grok (live knowledge)
+        // English / fallback → Grok (live knowledge) OR Gemini (vision)
         if (!rawReply) {
-            const grokKey = process.env.GROK_API_KEY;
-            if (grokKey) {
+            // IF images are present, bypass Grok and use Gemini strictly for Vision
+            if (images && images.length > 0) {
+                console.log(`🖼️ Nexus: Image detected, routing to Gemini Vision...`);
                 try {
-                    const grokMessages = [
-                        { role: 'system', content: systemPrompt },
-                        ...history.map((m, idx) => {
-                            const isLast = idx === history.length - 1;
-                            if (isLast && m.role === 'user' && images?.length) {
-                                const content = [{ type: 'text', text: m.content }];
-                                images.forEach(img => content.push({ type: 'image_url', image_url: { url: img } }));
-                                return { role: 'user', content };
-                            }
-                            return {
-                                role: m.role === 'user' ? 'user' : 'assistant',
-                                content: m.content,
-                            };
-                        }),
-                    ];
+                    const ai = getRouter();
+                    const userPrompt = history.map(m => `${m.role === 'user' ? 'User' : 'Fidato'}: ${m.content}`).join('\n') + '\n\nRespond as Fidato.';
+                    const result = await ai.generateText(
+                        { systemPrompt, userPrompt, images, maxTokens: 1200, temperature: 0.7 },
+                        { provider: 'gemini' } // Force Gemini for vision
+                    );
+                    rawReply = result.text || result.content || '';
+                } catch (visionErr) {
+                    console.error('Nexus: Gemini Vision failed:', visionErr.message);
+                }
+            } 
+            // OTHERWISE (no images), use Grok as usual
+            else {
+                const grokKey = process.env.GROK_API_KEY;
+                if (grokKey) {
+                    try {
+                        const grokMessages = [
+                            { role: 'system', content: systemPrompt },
+                            ...history.map((m, idx) => {
+                                const isLast = idx === history.length - 1;
+                                if (isLast && m.role === 'user' && images?.length) {
+                                    const content = [{ type: 'text', text: m.content }];
+                                    images.forEach(img => content.push({ type: 'image_url', image_url: { url: img } }));
+                                    return { role: 'user', content };
+                                }
+                                return {
+                                    role: m.role === 'user' ? 'user' : 'assistant',
+                                    content: m.content,
+                                };
+                            }),
+                        ];
 
-                    const grokResp = await fetch('https://api.x.ai/v1/chat/completions', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${grokKey}`,
-                        },
-                        body: JSON.stringify({
-                            model: images?.length ? 'grok-2-vision-1212' : 'grok-3-mini-fast',
-                            messages: grokMessages,
-                            max_tokens: 1200,
-                            temperature: 0.7,
-                            stream: false,
-                        }),
-                    });
+                        const grokResp = await fetch('https://api.x.ai/v1/chat/completions', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${grokKey}`,
+                            },
+                            body: JSON.stringify({
+                                model: 'grok-3-mini-fast',
+                                messages: grokMessages,
+                                max_tokens: 1200,
+                                temperature: 0.7,
+                                stream: false,
+                            }),
+                        });
 
-                    const grokData = await grokResp.json();
-                    if (!grokData.error) {
-                        rawReply = grokData.choices?.[0]?.message?.content || '';
-                    } else {
-                        throw new Error(grokData.error.message);
+                        const grokData = await grokResp.json();
+                        if (!grokData.error) {
+                            rawReply = grokData.choices?.[0]?.message?.content || '';
+                        } else {
+                            throw new Error(grokData.error.message);
+                        }
+                    } catch (grokErr) {
+                        console.warn('Nexus: Grok failed, using default:', grokErr.message);
                     }
-                } catch (grokErr) {
-                    console.warn('Nexus: Grok failed, using default:', grokErr.message);
                 }
             }
 
@@ -682,11 +700,28 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
 
         let fullReply = '';
 
-        // ── Try Grok streaming (English / fallback) ──
+        // ── Try Grok streaming (English / fallback) OR Gemini (vision) ──
         const grokKey = process.env.GROK_API_KEY;
         let streamed = false;
 
-        if (!isIndian && grokKey) {
+        // IF images are present, bypass Grok and use Gemini strictly for Vision
+        if (images && images.length > 0) {
+            console.log(`🖼️ Nexus Stream: Image detected, routing to Gemini Vision...`);
+            try {
+                const ai = getRouter();
+                const userPrompt = history.map(m => `${m.role === 'user' ? 'User' : 'Fidato'}: ${m.content}`).join('\n') + '\n\nRespond as Fidato.';
+                const result = await ai.generateText(
+                    { systemPrompt, userPrompt, images, maxTokens: 2000, temperature: 0.8 },
+                    { provider: 'gemini' } // Force Gemini for vision
+                );
+                fullReply = result.text || result.content || '';
+                // streamed is still false — the simulator below will stream it word-by-word
+            } catch (visionErr) {
+                console.error('Nexus stream: Gemini Vision failed:', visionErr.message);
+            }
+        }
+        // OTHERWISE, use Grok as usual
+        else if (!isIndian && grokKey) {
             try {
                 const grokMessages = [
                     { role: 'system', content: systemPrompt },

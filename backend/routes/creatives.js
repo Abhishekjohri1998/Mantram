@@ -589,7 +589,7 @@ The output must fill the entire canvas edge-to-edge. No frames, borders, or mock
         // Watermark disabled for creative output — clean designs only
         let imageUrl = result.imageUrl || '';
 
-        // NEW: Upload to S3 for public access (required by Meta/IG)
+        // Upload to S3 for public access
         if (imageUrl && imageUrl.startsWith('data:image/')) {
             try {
                 const s3Url = await uploadToS3(imageUrl, `creatives/${brandId}/${Date.now()}.png`);
@@ -597,6 +597,7 @@ The output must fill the entire canvas edge-to-edge. No frames, borders, or mock
                 console.log(`[S3] Creative uploaded to S3: ${imageUrl}`);
             } catch (s3Err) {
                 console.error('[S3] Failed to upload generated creative to S3:', s3Err.message);
+                throw new Error(`S3 Upload Failed. Strict S3-only policy requires valid AWS credentials. Error: ${s3Err.message}`);
             }
         }
 

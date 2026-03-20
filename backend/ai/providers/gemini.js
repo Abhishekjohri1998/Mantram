@@ -14,9 +14,39 @@ export class GeminiProvider extends BaseProvider {
         this.imageApiKey = config.imageApiKey || this.apiKey;
     }
 
-    async generateText({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 2048, model }) {
+    async generateText({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 2048, model, images = [] }) {
         const modelId = model || this.config.defaultModel || 'gemini-2.5-flash';
         const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${this.apiKey}`;
+        
+        const parts = [{ text: `${systemPrompt}\n\n${userPrompt}` }];
+
+        // Attach base64 or URL images to Gemini payload
+        if (images && images.length > 0) {
+            for (const img of images) {
+                let mimeType = 'image/jpeg';
+                let b64Data = '';
+                
+                if (img.startsWith('data:')) {
+                    const match = img.match(/^data:([\w/+]+);base64,(.+)$/);
+                    if (match) {
+                        mimeType = match[1];
+                        b64Data = match[2];
+                    }
+                } else if (img.startsWith('http')) {
+                    try {
+                        console.log(`📥 Fetching image URL for Gemini Vision: ${img.substring(0, 100)}...`);
+                        const r = await fetch(img);
+                        const arr = await r.arrayBuffer();
+                        b64Data = Buffer.from(arr).toString('base64');
+                        mimeType = r.headers.get('content-type') || 'image/jpeg';
+                    } catch(e) { console.warn('⚠️ Failed to fetch image URL for Gemini:', e.message); }
+                }
+                
+                if (b64Data) {
+                    parts.push({ inlineData: { mimeType, data: b64Data } });
+                }
+            }
+        }
 
         const startTime = Date.now();
         const response = await fetch(url, {
@@ -24,7 +54,7 @@ export class GeminiProvider extends BaseProvider {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [
-                    { role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] },
+                    { role: 'user', parts },
                 ],
                 generationConfig: {
                     temperature,

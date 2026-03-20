@@ -315,7 +315,10 @@ async function submitGrokVideoGeneration({ prompt, imageUrl, duration, resolutio
         payload.image_url = imageUrl;
     }
 
-    console.log(`🎬 Submitting to Grok Imagine: grok-imagine-video (${dur}s, ${res})`);
+    console.log(`🎬 Submitting to Grok Imagine: grok-imagine-video (${dur}s, ${res}, ratio: ${aspectRatio || '16:9'})`);
+    console.log(`   📸 image_url: ${payload.image_url ? payload.image_url.substring(0, 120) + '...' : 'NONE (text-to-video)'}`);
+    console.log(`   📝 prompt: ${prompt.substring(0, 120)}...`);
+    console.log(`   📦 Full payload:`, JSON.stringify(payload, null, 2).substring(0, 600));
 
     const response = await fetch(`${GROK_BASE_URL}/videos/generations`, {
         method: 'POST',
@@ -397,7 +400,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
 
     // ── Grok Imagine: use native xAI API instead of fal.ai ──
     if (model === 'grok-imagine') {
-        const result = await submitGrokVideoGeneration({ prompt, imageUrl, duration, resolution });
+        const result = await submitGrokVideoGeneration({ prompt, imageUrl, duration, resolution, aspectRatio });
         return {
             requestId: result.requestId,
             endpoint: 'grok-imagine-video',
@@ -409,7 +412,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
 
     // ── kie.ai models: Veo 3.1 Fast ──
     if (model === 'veo-3.1-fast') {
-        const result = await submitKieVideoGeneration({ model, prompt, imageUrl, duration, aspectRatio: '16:9' });
+        const result = await submitKieVideoGeneration({ model, prompt, imageUrl, duration, aspectRatio: aspectRatio || '16:9' });
         return {
             requestId: result.taskId,
             endpoint: `kie-${model}`,

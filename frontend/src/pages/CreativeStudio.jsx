@@ -373,14 +373,10 @@ export default function CreativeStudio() {
         setAnimateProgress(0)
         setAnimateAnalyzing(true)
         try {
-            // Detect aspect ratio from image
-            const img = new Image()
-            img.crossOrigin = 'anonymous'
-            await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = result.imageUrl })
-            const w = img.naturalWidth, h = img.naturalHeight
-            const ratio = w / h
-            const detectedRatio = ratio > 1.6 ? '16:9' : ratio < 0.65 ? '9:16' : ratio > 1.2 ? '4:3' : ratio < 0.85 ? '3:4' : '1:1'
-            setAnimateAspectRatio(detectedRatio)
+            // Preserve the user's explicitly chosen aspect ratio instead of 
+            // overriding it strictly based on the generated image bounds (since
+            // some image models like NanoBanana currently force 1:1).
+            setAnimateAspectRatio(aspectRatio || '1:1')
 
             // Ask AI to describe optimal animation
             const data = await nexusAPI.chat(

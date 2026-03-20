@@ -40,7 +40,7 @@ export const uploadToS3 = async (fileContent, fileName, mimeType = "image/png") 
                 Key: key,
                 Body: buffer,
                 ContentType: mimeType,
-                // ACL: "public-read", // Removed as bucket might have Object Ownership set to BucketOwnerEnforced
+                ACL: "public-read",
             },
         });
 
