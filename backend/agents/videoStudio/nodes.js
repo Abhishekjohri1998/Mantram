@@ -26,7 +26,7 @@ import {
 } from './prompts.js';
 import { estimateCost, submitVideoGeneration, getGenerationStatus, getGrokGenerationStatus, MODEL_CAPABILITIES } from './falClient.js';
 import { getKieGenerationStatus } from './kieClient.js';
-import { getPiApiGenerationStatus, resubmitPiApiTask } from './piApiClient.js';
+import { getPiApiGenerationStatus, resubmitPiApiTask, uploadImageToHostedUrl } from './piApiClient.js';
 import { getPastProjects } from './selfLearning.js';
 
 // ── Helper: Parse JSON from any AI response ──

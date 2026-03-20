@@ -406,7 +406,7 @@ async function generateTTS(text, language) {
 // ============================================================================
 router.post('/chat', protect, async (req, res) => {
     try {
-        const { message, brandId, voiceMode, detectedLanguage } = req.body;
+        const { message, brandId, voiceMode, detectedLanguage, images } = req.body;
         if (!message) return res.status(400).json({ error: 'Message is required' });
 
         const userId = String(req.user._id);
@@ -499,10 +499,18 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
                 try {
                     const grokMessages = [
                         { role: 'system', content: systemPrompt },
-                        ...history.map(m => ({
-                            role: m.role === 'user' ? 'user' : 'assistant',
-                            content: m.content,
-                        })),
+                        ...history.map((m, idx) => {
+                            const isLast = idx === history.length - 1;
+                            if (isLast && m.role === 'user' && images?.length) {
+                                const content = [{ type: 'text', text: m.content }];
+                                images.forEach(img => content.push({ type: 'image_url', image_url: { url: img } }));
+                                return { role: 'user', content };
+                            }
+                            return {
+                                role: m.role === 'user' ? 'user' : 'assistant',
+                                content: m.content,
+                            };
+                        }),
                     ];
 
                     const grokResp = await fetch('https://api.x.ai/v1/chat/completions', {
@@ -512,7 +520,7 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
                             'Authorization': `Bearer ${grokKey}`,
                         },
                         body: JSON.stringify({
-                            model: 'grok-3-mini-fast',
+                            model: images?.length ? 'grok-2-vision-1212' : 'grok-3-mini-fast',
                             messages: grokMessages,
                             max_tokens: 1200,
                             temperature: 0.7,
@@ -604,7 +612,7 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
 // POST /api/nexus/stream — Real-Time SSE Streaming Chat
 // ============================================================================
 router.post('/stream', protect, async (req, res) => {
-    const { message, brandId, voiceMode, language: clientLanguage, detectedLanguage } = req.body;
+    const { message, brandId, voiceMode, language: clientLanguage, detectedLanguage, images } = req.body;
     if (!message) return res.status(400).json({ error: 'Message is required' });
 
     const userId = String(req.user._id);
@@ -682,10 +690,18 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
             try {
                 const grokMessages = [
                     { role: 'system', content: systemPrompt },
-                    ...history.map(m => ({
-                        role: m.role === 'user' ? 'user' : 'assistant',
-                        content: m.content,
-                    })),
+                    ...history.map((m, idx) => {
+                        const isLast = idx === history.length - 1;
+                        if (isLast && m.role === 'user' && images?.length) {
+                            const content = [{ type: 'text', text: m.content }];
+                            images.forEach(img => content.push({ type: 'image_url', image_url: { url: img } }));
+                            return { role: 'user', content };
+                        }
+                        return {
+                            role: m.role === 'user' ? 'user' : 'assistant',
+                            content: m.content,
+                        };
+                    }),
                 ];
 
                 const grokResp = await fetch('https://api.x.ai/v1/chat/completions', {
@@ -695,7 +711,7 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
                         'Authorization': `Bearer ${grokKey}`,
                     },
                     body: JSON.stringify({
-                        model: 'grok-3-fast',
+                        model: images?.length ? 'grok-2-vision-1212' : 'grok-3-fast',
                         messages: grokMessages,
                         max_tokens: 2000,
                         temperature: 0.8,

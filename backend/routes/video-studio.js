@@ -2620,7 +2620,9 @@ export async function downloadAndUploadVideoToS3(projectId, videoUrl) {
         return s3Url;
     } catch (e) {
         console.warn(`⚠️ Video S3 upload error:`, e.message);
-        return null;
+        // S3 failed — keep the original provider video URL (xAI/PiAPI CDN)
+        console.log(`📎 Keeping original video URL: ${videoUrl.substring(0, 80)}...`);
+        return videoUrl;
     }
 }
 

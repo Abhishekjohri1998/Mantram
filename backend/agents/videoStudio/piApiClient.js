@@ -114,10 +114,10 @@ async function verifyHostedUrl(url) {
 /**
  * Upload a base64 image to a free file hosting service to get a public URL.
  * Uses catbox.moe (primary, proven reliable with PiAPI) and tmpfiles.org (fallback).
- * Includes retry logic and URL verification to ensure PiAPI can actually fetch the image.
+ * Includes retry logic and URL verification to ensure external APIs can actually fetch the image.
  * Returns hosted URL or null.
  */
-async function uploadImageToHostedUrl(base64DataUri) {
+export async function uploadImageToHostedUrl(base64DataUri) {
     // Extract base64 and mime type
     const match = base64DataUri.match(/^data:([\w/+]+);base64,(.+)$/);
     if (!match) {

@@ -120,6 +120,14 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
     console.log(`📐 Aspect ratio: ${aspectRatio} | Resolution: ${imageSize}`);
     console.log(`📝 Prompt (first 200 chars): ${promptText.substring(0, 200)}...`);
 
+    // Prepend aspect ratio instruction to prompt for correct dimensions
+    const arInstruction = aspectRatio !== '1:1' ? `Generate this image in ${aspectRatio} aspect ratio (${aspectRatio === '9:16' ? 'portrait/vertical' : aspectRatio === '16:9' ? 'landscape/horizontal' : aspectRatio}). ` : '';
+    // Update text prompt with aspect ratio
+    const lastPartIdx = parts.length - 1;
+    if (parts[lastPartIdx]?.text) {
+        parts[lastPartIdx].text = arInstruction + parts[lastPartIdx].text;
+    }
+
     for (const modelId of models) {
         try {
             console.log(`🎨 Trying: ${modelId}...`);
