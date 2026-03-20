@@ -203,7 +203,7 @@ export async function matchTrendsToBrand(trends, brand, orchestrator) {
         const aiResult = await orchestrator.generateContent({
             brand: { name: 'Marketing Trend Agent' },
             user: { _id: 'system' },
-            type: 'social',
+            type: 'trend_matching',
             prompt: `You are a MARKETING TREND HIJACK strategist. Your job is to identify trending topics that a brand can USE for marketing content.
 
 ${brandContext}
@@ -250,19 +250,22 @@ RULES:
         try {
             const parsed = JSON.parse(content);
             matches = Array.isArray(parsed) ? parsed : (parsed.trends || []);
-            if (!Array.isArray(matches)) throw new Error('Parsed result is not an array');
         } catch (parseErr) {
-            const jsonMatch = content.match(/\[[\s\S]*\]/);
-            if (!jsonMatch) {
-                console.warn('AI trend match: no JSON in response. Raw response:', content.substring(0, 100));
+            // Robust parsing for partial/truncated JSON: extract all complete { ... } objects
+            const objectRegex = /\{[\s\S]*?\}/g;
+            const foundObjects = content.match(objectRegex) || [];
+            for (const objStr of foundObjects) {
+                try {
+                    const obj = JSON.parse(objStr);
+                    if (obj && typeof obj.index === 'number') matches.push(obj);
+                } catch (e) { /* skip broken objects */ }
+            }
+
+            if (matches.length === 0) {
+                console.warn('AI trend match: no valid JSON objects found. Raw response length:', content.length);
                 return [];
             }
-            try {
-                matches = JSON.parse(jsonMatch[0]);
-            } catch (fallbackErr) {
-                console.warn('AI trend match: invalid JSON array');
-                return [];
-            }
+            console.log(`ℹ️ Salvaged ${matches.length} trend matches from truncated response.`);
         }
         const result = matches
             .filter(m => typeof m.index === 'number' && m.index >= 0 && m.index < trends.length)

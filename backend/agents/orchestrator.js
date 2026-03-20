@@ -274,7 +274,8 @@ class Orchestrator {
             educate: 4096, brand: 2048,
             // Legacy types
             blog: 4096, email: 1024, seo: 2048,
-            social: 512, ad: 256, caption: 256,
+            social: 1024, ad: 512, caption: 512,
+            trend_matching: 2048,
         }[type] || 1024;
     }
 
