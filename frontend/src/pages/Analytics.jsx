@@ -65,16 +65,11 @@ export default function Analytics() {
         if (!radar) return
         setStrategyLoading(true)
         try {
-            const resp = await fetch('/api/dashboard-summary/strategy', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-                body: JSON.stringify({
-                    brandId: activeBrand?._id,
-                    radarData: radar,
-                    contentStats: { totalContent, totalCreatives, published, drafts, avgScore, typeBreakdown },
-                }),
+            const data = await dashboardSummary.getStrategy({
+                brandId: activeBrand?._id,
+                radarData: radar,
+                contentStats: { totalContent, totalCreatives, published, drafts, avgScore, typeBreakdown },
             })
-            const data = await resp.json()
             setAiStrategy(data.strategy || data)
         } catch (e) {
             setAiStrategy({

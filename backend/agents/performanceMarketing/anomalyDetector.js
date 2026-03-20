@@ -19,8 +19,8 @@ import { getRouter } from '../../ai/router.js';
 // ── Anomaly thresholds ──
 const THRESHOLDS = {
     'roas-drop': { field: 'roas', direction: 'below', pctDelta: 20, severity: 'high' },
-    'cpc-spike': { field: 'cpc', direction: 'above', pctDelta: 30, severity: 'medium' },
-    'ctr-drop': { field: 'ctr', direction: 'below', pctDelta: 25, severity: 'medium' },
+    'cpc-spike': { field: 'cpc', direction: 'above', pctDelta: 30, severity: 'warning' },
+    'ctr-drop': { field: 'ctr', direction: 'below', pctDelta: 25, severity: 'warning' },
     'budget-exceeded': { field: 'spend', direction: 'above', pctDelta: 15, severity: 'high' },
     'conversion-drop': { field: 'conversions', direction: 'below', pctDelta: 40, severity: 'critical' },
 };
@@ -110,7 +110,7 @@ export async function detectAnomalies(userId, brandId) {
     }
 
     // Sort by severity: critical > high > medium > low
-    const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+    const severityOrder = { critical: 0, high: 1, warning: 2, low: 3 };
     allAnomalies.sort((a, b) => (severityOrder[a.severity] || 3) - (severityOrder[b.severity] || 3));
 
     return { anomalies: allAnomalies, total: allAnomalies.length, checkedCampaigns: campaigns.length };
@@ -228,7 +228,7 @@ export async function autoRespond(actions, userId) {
                     campaign.anomalies = campaign.anomalies || [];
                     campaign.anomalies.push({
                         type: 'budget-shift-recommended',
-                        severity: 'medium',
+                        severity: 'warning',
                         detected: new Date(),
                         action: action.reason,
                         resolved: false,

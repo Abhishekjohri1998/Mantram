@@ -237,6 +237,7 @@ export const trends = {
 // ============ Dashboard Summary API ============
 export const dashboardSummary = {
     get: (brandId) => apiFetch(`/dashboard-summary${brandId ? `?brandId=${brandId}` : ''}`),
+    getStrategy: (data) => apiFetch('/dashboard-summary/strategy', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ============ D2C Shopify Analytics API ============
@@ -872,6 +873,33 @@ export const socialMediaStudio = {
     list: (params = {}) => apiFetch(`/social-media-studio/strategies?${new URLSearchParams(params)}`),
     get: (id) => apiFetch(`/social-media-studio/strategies/${id}`),
     delete: (id) => apiFetch(`/social-media-studio/strategies/${id}`, { method: 'DELETE' }),
+};
+
+// ============ Canvas Assets API ============
+export const canvasAssets = {
+    aiEdit: (data) => apiFetch('/canvas-assets/ai-edit', { method: 'POST', body: JSON.stringify(data) }),
+    aiEditVisual: (data) => apiFetch('/canvas-assets/ai-edit-visual', { method: 'POST', body: JSON.stringify(data) }),
+    aiRetouch: (data) => apiFetch('/canvas-assets/ai-retouch', { method: 'POST', body: JSON.stringify(data) }),
+    aiBackground: (data) => apiFetch('/canvas-assets/ai-background', { method: 'POST', body: JSON.stringify(data) }),
+    aiAnalyze: (data) => apiFetch('/canvas-assets/ai-analyze', { method: 'POST', body: JSON.stringify(data) }),
+    aiAnalyzeTemplate: (data) => apiFetch('/canvas-assets/ai-analyze-template', { method: 'POST', body: JSON.stringify(data) }),
+    aiGenerate: (data) => apiFetch('/canvas-assets/ai-generate', { method: 'POST', body: JSON.stringify(data) }),
+    aiCreativeGenerate: (data) => apiFetch('/canvas-assets/ai-creative-generate', { method: 'POST', body: JSON.stringify(data) }),
+    getPhotos: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/canvas-assets/photos?${query}`);
+    },
+    getTextures: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/canvas-assets/textures?${query}`);
+    },
+};
+
+// ============ Video Studio API ============
+export const videoStudio = {
+    advancedGenerate: (data) => apiFetch('/video-studio/advanced/generate', { method: 'POST', body: JSON.stringify(data) }),
+    advancedI2V: (data) => apiFetch('/video-studio/advanced/image-to-video', { method: 'POST', body: JSON.stringify(data) }),
+    getStatus: (id) => apiFetch(`/video-studio/${id}/status`),
 };
 
 // ============ Voice API ============

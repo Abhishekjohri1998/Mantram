@@ -263,7 +263,7 @@ function computeRedFlags(orderAnalytics, products, customerAnalytics) {
     if (customerAnalytics.repeatRate < 15 && customerAnalytics.totalCustomers > 20) {
         flags.push({
             type: 'low_repeat',
-            severity: 'medium',
+            severity: 'warning',
             title: `Only ${customerAnalytics.repeatRate}% Repeat Customers`,
             desc: `Most customers aren't coming back. Build loyalty with post-purchase email sequences, personalized recommendations, and subscription offers.`,
             icon: 'person_off',
@@ -276,7 +276,7 @@ function computeRedFlags(orderAnalytics, products, customerAnalytics) {
     if (unfulfillRate > 30 && orderAnalytics.unfulfilled > 5) {
         flags.push({
             type: 'unfulfilled_orders',
-            severity: 'medium',
+            severity: 'warning',
             title: `${orderAnalytics.unfulfilled} Unfulfilled Orders (${unfulfillRate}%)`,
             desc: `A large portion of orders remain unfulfilled. Slow fulfillment leads to cancellations and poor reviews.`,
             icon: 'local_shipping',

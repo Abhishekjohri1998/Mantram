@@ -1213,7 +1213,7 @@ const DEMO_CAMPAIGNS = [
             placements: ['youtube', 'display'],
         },
         performance: { impressions: 2130000, reach: 980000, clicks: 42600, ctr: 2.0, cpc: 1.89, cpm: 37.6, conversions: 640, conversionRate: 1.5, roas: 2.1, spend: 80100, leads: 0, revenue: 168210, blendedRoas: 2.1, lastSyncAt: new Date() },
-        anomalies: [{ type: 'ctr-drop', severity: 'medium', detected: new Date(Date.now() - 2 * 86400000), metric: 'ctr', expected: 2.5, actual: 2.0, action: 'alert-sent', resolved: false }],
+        anomalies: [{ type: 'ctr-drop', severity: 'warning', detected: new Date(Date.now() - 2 * 86400000), metric: 'ctr', expected: 2.5, actual: 2.0, action: 'alert-sent', resolved: false }],
         aiInsights: { summary: 'CTR dropped 20% after week 2. Display placements underperforming YouTube. Consider pausing display and reallocating to YouTube shorts.', recommendations: ['Pause Display placements', 'Test YouTube Shorts format', 'Add frequency capping'], riskLevel: 'medium', predictedRoas: 2.4, optimizationScore: 62 },
         creatives: [
             { name: 'YouTube Pre-roll — 15s', format: 'video', headline: 'ACwO — Sound Redefined', primaryText: 'India\'s fastest-growing audio brand. Premium sound, accessible prices.', cta: 'Learn More', aiGenerated: true },

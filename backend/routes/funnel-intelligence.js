@@ -153,7 +153,7 @@ router.get('/:funnelId/health', protect, async (req, res) => {
             }
             if (isStagnant) {
                 overallScore -= 10;
-                issues.push({ type: 'stagnant', stage: stage.name, message: `${activeEntries} leads stuck in "${stage.name}" for 7+ days average`, severity: 'medium' });
+                issues.push({ type: 'stagnant', stage: stage.name, message: `${activeEntries} leads stuck in "${stage.name}" for 7+ days average`, severity: 'warning' });
                 recommendations.push({ stage: stage.name, action: 'Review stage criteria', description: `Consider splitting "${stage.name}" or adding intermediate touchpoints`, kpi: `Avg time in "${stage.name}"`, baseline: `${avgTimeHrs} hours (${Math.round(avgTimeHrs / 24)} days)`, target: `Below 72 hours (3 days) avg dwell time`, proofMethod: `Re-check health monitor — avg time should decrease by 50%+ after adding touchpoints` });
             }
             if (hasLostLeads) {

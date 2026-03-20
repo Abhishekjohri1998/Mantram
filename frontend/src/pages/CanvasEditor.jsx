@@ -4,7 +4,7 @@ import { useBrand } from '../context/BrandContext'
 import SEOHead from '../components/SEOHead'
 import FormattedText from '../components/FormattedText'
 import * as fabric from 'fabric'
-import { media as mediaAPI } from '../services/api'
+import { media as mediaAPI, creatives as creativesAPI, nexus as nexusAPI, voice as voiceAPI, canvasAssets, API_BASE } from '../services/api'
 import { TEMPLATE_LIBRARY, TEMPLATE_CATEGORIES } from './canvasTemplates'
 import { SVG_ELEMENT_CATEGORIES } from './canvasElements'
 import './CanvasEditor.css'
@@ -210,18 +210,13 @@ function CanvasEditorInner() {
     const [generatedImages, setGeneratedImages] = useState([])
     const [loadingBankImages, setLoadingBankImages] = useState(false)
 
-    // ── Fetch generated images from backend image bank ──
     useEffect(() => {
         const fetchBankImages = async () => {
-            const token = localStorage.getItem('mantram_token')
             const brandId = activeBrand?._id
-            if (!token || !brandId) return
+            if (!brandId) return
             setLoadingBankImages(true)
             try {
-                const resp = await fetch(`/api/creatives/image-bank?category=generated&brandId=${brandId}&limit=40`, {
-                    headers: { 'Authorization': `Bearer ${token}` },
-                })
-                const data = await resp.json()
+                const data = await creativesAPI.imageBank({ category: 'generated', brandId, limit: 40 })
                 if (data.success && data.images) {
                     setGeneratedImages(data.images.map(img => ({
                         url: img.imageUrl || img.thumbnailUrl,
@@ -1387,8 +1382,7 @@ function CanvasEditorInner() {
         if (!query || query.length < 2) return
         setPhotoLoading(true)
         try {
-            const resp = await fetch(`/api/canvas-assets/photos?q=${encodeURIComponent(query)}&per_page=20`)
-            const data = await resp.json()
+            const data = await canvasAssets.getPhotos({ q: query, per_page: 20 })
             if (data.setup_required) {
                 setPhotoSetupRequired(true)
                 setPhotoResults([])
@@ -1503,8 +1497,7 @@ function CanvasEditorInner() {
         if (!query || query.length < 2) return
         setTextureLoading(true)
         try {
-            const resp = await fetch(`/api/canvas-assets/textures?q=${encodeURIComponent(query)}&per_page=24`)
-            const data = await resp.json()
+            const data = await canvasAssets.getTextures({ q: query, per_page: 24 })
             if (data.setup_required) {
                 setTextureSetupRequired(true)
                 setTextureResults([])
@@ -1850,25 +1843,13 @@ function CanvasEditorInner() {
             if (fc && fc.getObjects().length > 0) {
                 showToast('🎨 Editing image with AI...')
                 const canvasDataUrl = fc.toDataURL({ format: 'png', quality: 0.9 })
-                const token = localStorage.getItem('mantram_token')
-                const resp = await fetch('/api/canvas-assets/ai-edit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({ prompt: aiPrompt, imageBase64: canvasDataUrl }),
-                })
-                const data = await resp.json()
+                const data = await canvasAssets.aiEdit({ prompt: aiPrompt, imageBase64: canvasDataUrl })
                 if (data.error) throw new Error(data.error)
                 imageUrl = data.imageUrl
             } else {
                 // Empty canvas → generate a new image
                 showToast('✨ Generating image with AI...')
-                const token2 = localStorage.getItem('mantram_token')
-                const resp = await fetch('/api/canvas-assets/ai-generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token2}` },
-                    body: JSON.stringify({ prompt: aiPrompt, size: `${canvasWidth}x${canvasHeight}` }),
-                })
-                const data = await resp.json()
+                const data = await canvasAssets.aiGenerate({ prompt: aiPrompt, size: `${canvasWidth}x${canvasHeight}` })
                 if (data.error) throw new Error(data.error)
                 imageUrl = data.imageUrl
             }
@@ -1910,17 +1891,11 @@ function CanvasEditorInner() {
             fc.renderAll()
 
             showToast('🎨 Inpainting selected area...')
-            const token = localStorage.getItem('mantram_token')
-            const resp = await fetch('/api/canvas-assets/ai-edit-visual', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({
-                    prompt: aiPrompt,
-                    imageBase64: canvasDataUrl,
-                    maskBase64: maskDataUrl,
-                }),
+            const data = await canvasAssets.aiEditVisual({
+                prompt: aiPrompt,
+                imageBase64: canvasDataUrl,
+                maskBase64: maskDataUrl,
             })
-            const data = await resp.json()
             if (data.error) throw new Error(data.error)
 
             // CLIENT-SIDE COMPOSITING — guarantees only masked area changes
@@ -1962,18 +1937,12 @@ function CanvasEditorInner() {
             fc.renderAll()
 
             showToast('🔧 Retouching selected area...')
-            const token = localStorage.getItem('mantram_token')
-            const resp = await fetch('/api/canvas-assets/ai-retouch', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({
-                    prompt: aiPrompt || 'Retouch and clean up this area naturally',
-                    imageBase64: canvasDataUrl,
-                    maskBase64: maskDataUrl,
-                    replaceImageBase64: replaceImage,
-                }),
+            const data = await canvasAssets.aiRetouch({
+                prompt: aiPrompt || 'Retouch and clean up this area naturally',
+                imageBase64: canvasDataUrl,
+                maskBase64: maskDataUrl,
+                replaceImageBase64: replaceImage,
             })
-            const data = await resp.json()
             if (data.error) throw new Error(data.error)
 
             // CLIENT-SIDE COMPOSITING — guarantees only masked area changes
@@ -2010,20 +1979,11 @@ function CanvasEditorInner() {
         try {
             const canvasDataUrl = fc.toDataURL({ format: 'png', quality: 0.9 })
             showToast(bgAction === 'remove' ? '🪄 Removing background...' : '🎨 Replacing background...')
-            const token = localStorage.getItem('mantram_token')
-            const resp = await fetch('/api/canvas-assets/ai-background', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    imageBase64: canvasDataUrl,
-                    action: bgAction,
-                    bgPrompt: bgAction === 'replace' ? (bgPrompt || aiPrompt) : undefined,
-                }),
+            const data = await canvasAssets.aiBackground({
+                imageBase64: canvasDataUrl,
+                action: bgAction,
+                bgPrompt: bgAction === 'replace' ? (bgPrompt || aiPrompt) : undefined,
             })
-            const data = await resp.json()
             if (data.error) throw new Error(data.error)
 
             // AUTO-APPLY: Replace canvas content directly
@@ -2916,27 +2876,15 @@ function CanvasEditorInner() {
         setAiError('')
         try {
             showToast('🎨 Generating editable design...')
-            const token = localStorage.getItem('mantram_token')
-            const resp = await fetch('/api/canvas-assets/ai-creative-generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({
-                    keywords: aiCreativeKeywords,
-                    style: aiCreativeStyle,
-                    canvasWidth: fc._logicalWidth || 1080,
-                    canvasHeight: fc._logicalHeight || 1080,
-                    brandName: activeBrand?.name || '',
-                    brandColors: activeBrand?.dna?.colors?.map(c => c.hex) || [],
-                    brandFonts: activeBrand?.dna?.fonts || [],
-                }),
+            const data = await canvasAssets.aiCreativeGenerate({
+                keywords: aiCreativeKeywords,
+                style: aiCreativeStyle,
+                canvasWidth: fc._logicalWidth || 1080,
+                canvasHeight: fc._logicalHeight || 1080,
+                brandName: activeBrand?.name || '',
+                brandColors: activeBrand?.dna?.colors?.map(c => c.hex) || [],
+                brandFonts: activeBrand?.dna?.fonts || [],
             })
-            if (!resp.ok) {
-                const errText = await resp.text().catch(() => 'Server error')
-                let errMsg = `AI generation failed (${resp.status}). Please try again.`
-                try { const errJson = JSON.parse(errText); errMsg = errJson.error || errMsg } catch (_) { /* non-JSON error body */ }
-                throw new Error(errMsg)
-            }
-            const data = await resp.json()
             if (data.error) throw new Error(data.error)
 
             // Clear canvas
@@ -3055,16 +3003,11 @@ function CanvasEditorInner() {
                 referenceImages.push(fc.toDataURL({ format: 'png', quality: 0.8 }))
             }
 
-            const resp = await fetch('/api/canvas-assets/ai-generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                body: JSON.stringify({
-                    prompt: genEnhance ? `Professional high-quality ${genPrompt}` : genPrompt,
-                    size: `${w}x${h}`,
-                    referenceImages,
-                }),
+            const data = await canvasAssets.aiGenerate({
+                prompt: genEnhance ? `Professional high-quality ${genPrompt}` : genPrompt,
+                size: `${w}x${h}`,
+                referenceImages,
             })
-            const data = await resp.json()
             if (data.error) throw new Error(data.error)
             // Add to canvas
             if (!fc) return
@@ -3103,9 +3046,6 @@ function CanvasEditorInner() {
         setFidatoLoading(true)
         setTimeout(() => fidatoMsgEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
 
-        const token = localStorage.getItem('mantram_token') || ''
-        const authHeaders = { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }
-
         // Helper: extract individual image data URLs from canvas objects
         const extractObjectImages = (fc) => {
             const imgs = []
@@ -3121,7 +3061,6 @@ function CanvasEditorInner() {
             for (const obj of targets) {
                 if (obj.type === 'image' && obj.getSrc) {
                     try {
-                        // Create a temp canvas to export just this object
                         const tc = document.createElement('canvas')
                         const w = obj.width * (obj.scaleX || 1)
                         const h = obj.height * (obj.scaleY || 1)
@@ -3143,12 +3082,10 @@ function CanvasEditorInner() {
             const hasObjects = fc && fc.getObjects().filter(o => o.id !== 'artboard').length > 0
             const lowerMsg = msg.toLowerCase()
 
-            // ── Smart intent detection (creative intelligence) ──
             // Build brand context for all prompts
             const brandName = activeBrand?.name || 'Brand'
             const brandDna = activeBrand?.dna || {}
             const brandColors = [brandDna.colors?.primary, brandDna.colors?.secondary, brandDna.colors?.accent].filter(Boolean)
-            const brandFonts = [brandDna.typography?.heading, brandDna.typography?.body].filter(Boolean)
             const brandTagline = brandDna.tagline || activeBrand?.tagline || ''
             const brandIndustry = brandDna.industry || activeBrand?.industry || ''
             const brandProducts = (activeBrand?.products || []).slice(0, 3).map(p => p.name).filter(Boolean)
@@ -3158,444 +3095,139 @@ function CanvasEditorInner() {
                 brandTagline ? `Tagline: "${brandTagline}"` : '',
                 brandIndustry ? `Industry: ${brandIndustry}` : '',
                 brandColors.length ? `Brand Colors: ${brandColors.join(', ')}` : '',
-                brandFonts.length ? `Typography: ${brandFonts.join(', ')}` : '',
                 brandProducts.length ? `Products: ${brandProducts.join(', ')}` : '',
-                brandWebsite ? `Website: ${brandWebsite}` : '',
             ].filter(Boolean).join('. ')
 
-            // Intent: Create/Generate new images (works regardless of canvas state)
             const isGenerateOnly = /\b(generate|create|make|design|draw|produce|craft)\b/i.test(lowerMsg) && /\b(image|photo|visual|graphic|creative|poster|banner|ad|flyer|post|thumbnail|cover|artwork|illustration|picture)s?\b/i.test(lowerMsg)
-            // Intent: Merge/combine existing images
             const isMerge = /\b(merge|combine|blend|mix|fuse|stitch|overlay|composite|mashup|put together|integrate|unify|make one image|create from these|join|collage|montage)\b/.test(lowerMsg)
-            // Intent: Extract colors  
             const isPalette = lowerMsg.includes('palette') || lowerMsg.includes('extract color')
-
-            // ── Creative Director: Batch / Carousel generation ──
             const batchMatch = lowerMsg.match(/(\d+)\s*(image|post|creative|slide|variation|design|visual|banner|card|frame)/i)
             const isBatchGenerate = batchMatch || /\b(carousel|series|batch|set of|multiple|campaign set)\b/i.test(lowerMsg)
             const batchCount = batchMatch ? Math.min(parseInt(batchMatch[1]), 8) : 4
-
-            // ── Creative Director: Size adaptation ──
-            const SIZE_PRESETS = {
-                'ig post': { w: 1080, h: 1080, label: 'IG Post', ratio: '1:1' },
-                'ig story': { w: 1080, h: 1920, label: 'IG Story', ratio: '9:16' },
-                'ig reel': { w: 1080, h: 1920, label: 'IG Reel', ratio: '9:16' },
-                'fb post': { w: 1200, h: 630, label: 'FB Post', ratio: '1.91:1' },
-                'linkedin': { w: 1200, h: 627, label: 'LinkedIn', ratio: '1.91:1' },
-                'yt thumb': { w: 1280, h: 720, label: 'YT Thumb', ratio: '16:9' },
-                'twitter': { w: 1600, h: 900, label: 'X / Twitter', ratio: '16:9' },
-                'x': { w: 1600, h: 900, label: 'X / Twitter', ratio: '16:9' },
-                'carousel': { w: 1080, h: 1350, label: 'Carousel', ratio: '4:5' },
-                'web banner': { w: 1920, h: 600, label: 'Web Banner', ratio: '3.2:1' },
-                'pinterest': { w: 1000, h: 1500, label: 'Pinterest', ratio: '2:3' },
-            }
             const isAdapt = /\b(adapt|resize|convert|fit|scale|repurpose|reformat)\b/i.test(lowerMsg) && /\b(size|format|platform|dimension|social|media|story|reel|post|banner)\b/i.test(lowerMsg)
 
-            // ── Parse which sizes the user mentioned ──
-            const parseMentionedSizes = (msg) => {
-                const found = []
-                for (const [key, preset] of Object.entries(SIZE_PRESETS)) {
-                    if (msg.includes(key)) found.push(preset)
-                }
-                return found
-            }
-
             if (isBatchGenerate && !isMerge && !isAdapt) {
-                // ═══ BATCH / CAROUSEL GENERATION ═══════════════════════════════════
                 const count = batchCount
-                const theme = msg.replace(/\d+\s*(image|post|creative|slide|variation|design|visual|banner|card|frame)s?/i, '').replace(/\b(carousel|series|batch|set of|multiple|campaign set|create|generate|make|for)\b/gi, '').trim() || 'brand campaign'
-
-                setFidatoMessages(prev => [...prev, {
-                    role: 'assistant',
-                    content: `🎬 **Creative Director Mode**\n\nGenerating **${count} unique creatives** for: *"${theme}"*\n\n⏳ This may take a minute...`,
-                }])
-
-                const slides = [
-                    { angle: 'Opening hook — bold, attention-grabbing visual that stops the scroll', label: 'Hook' },
-                    { angle: 'Core benefit — showcase the key value proposition with striking imagery', label: 'Benefit' },
-                    { angle: 'Feature highlight — detail-oriented creative showing specifics', label: 'Feature' },
-                    { angle: 'Social proof or lifestyle shot — show the product/brand in context', label: 'Lifestyle' },
-                    { angle: 'Behind the scenes or process — authentic, raw visual', label: 'BTS' },
-                    { angle: 'Testimonial or quote card — typographic design', label: 'Quote' },
-                    { angle: 'Urgency or offer — time-sensitive promo visual', label: 'Offer' },
-                    { angle: 'Final CTA — strong call to action with brand identity', label: 'CTA' },
-                ]
-
+                const theme = msg.replace(/\d+\s*(image|post|creative|slide|variation|design|visual|banner|card|frame)s?/i, '').trim() || 'brand campaign'
+                setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎬 **Creative Director Mode**\n\nGenerating **${count} unique creatives** for: *"${theme}"*...` }])
+                const slides = [{ label: 'Hook' }, { label: 'Benefit' }, { label: 'Feature' }, { label: 'Lifestyle' }, { label: 'BTS' }, { label: 'Quote' }, { label: 'Offer' }, { label: 'CTA' }]
                 const results = []
                 for (let i = 0; i < count; i++) {
                     const slide = slides[i % slides.length]
-                    const prompt = `You are Fidato, an elite Creative Director at a top-tier agency. Create slide ${i + 1} of ${count} for a "${theme}" campaign by ${brandName}.
-
-CREATIVE BRIEF:
-- ${brandColors.length ? `Brand palette: ${brandColors.join(', ')}. Weave these colors naturally into the design.` : 'Use a sophisticated, harmonious color palette.'}
-- This is the "${slide.label}" slide — creative angle: ${slide.angle}
-- The series must feel like a premium campaign — each slide unique but visually connected through color palette, typography style, and mood
-- Think editorial-grade visuals: strong focal points, intentional negative space, dynamic composition
-- Use cinematic lighting and rich textures
-- Make it scroll-stopping — this should feel like a campaign from Nike, Apple, or Glossier
-- Format: Square (1080×1080), optimized for social media carousel viewing
-
-Do NOT use generic stock photo aesthetics. Create something with real creative vision.`
-
-                    // Update progress
-                    setFidatoMessages(prev => {
-                        const updated = [...prev]
-                        updated[updated.length - 1] = {
-                            role: 'assistant',
-                            content: `🎬 **Creative Director Mode**\n\nGenerating **${count} unique creatives** for: *"${theme}"*\n\n${'✅ '.repeat(results.length)}${'⏳ '}Slide ${i + 1}/${count}: ${slide.label}...${'⬜ '.repeat(Math.max(0, count - i - 1))}`,
-                        }
-                        return updated
-                    })
-
+                    const prompt = `Fidato Creative Director Mode. Brand: ${brandName}. Slide ${i + 1}/${count} ("${slide.label}"). Theme: ${theme}. Palette: ${brandColors.join(', ')}. Format: Square.`
                     try {
-                        const resp = await fetch('/api/canvas-assets/ai-generate', {
-                            method: 'POST', headers: authHeaders,
-                            body: JSON.stringify({ prompt, size: '1024x1024' }),
-                        })
-                        const data = await resp.json()
+                        const data = await canvasAssets.aiGenerate({ prompt, size: '1024x1024' })
                         if (data.imageUrl) {
                             results.push({ url: data.imageUrl, label: `${slide.label} (${i + 1}/${count})` })
-                            // Add to canvas in a grid
                             const cols = Math.ceil(Math.sqrt(count))
                             const gridX = (i % cols) * 280 + 50
                             const gridY = Math.floor(i / cols) * 280 + 50
                             const img = await fabric.FabricImage.fromURL(data.imageUrl, { crossOrigin: 'anonymous' })
                             const scale = 250 / Math.max(img.width, img.height)
-                            img.set({ left: gridX, top: gridY, scaleX: scale, scaleY: scale })
-                            img._customName = `${slide.label} ${i + 1}`
-                            fc.add(img)
-                            fc.renderAll()
-                            // Track in gallery
+                            img.set({ left: gridX, top: gridY, scaleX: scale, scaleY: scale, customName: `${slide.label} ${i + 1}` })
+                            fc.add(img); fc.renderAll()
                             setGeneratedImages(prev => [{ url: data.imageUrl, label: `${theme} — ${slide.label}`, timestamp: Date.now() }, ...prev])
                         }
                     } catch (err) { console.warn(`Slide ${i + 1} failed:`, err.message) }
                 }
-
                 saveHistory()
                 setFidatoMessages(prev => {
                     const updated = [...prev]
-                    updated[updated.length - 1] = {
-                        role: 'assistant',
-                        content: `✅ **Campaign Complete!** Generated **${results.length}/${count}** creatives for *"${theme}"*.\n\nAll images added to your canvas in a grid. Click any to select, edit, or export individually!`,
-                        images: results.map(r => ({ url: r.url, label: r.label })),
-                    }
+                    updated[updated.length - 1] = { role: 'assistant', content: `✅ **Campaign Complete!** Generated **${results.length}/${count}** creatives.`, images: results.map(r => ({ url: r.url, label: r.label })) }
                     return updated
                 })
-
             } else if (isAdapt && hasObjects) {
-                // ═══ SIZE ADAPTATION ═══════════════════════════════════════════════
                 let mentionedSizes = parseMentionedSizes(lowerMsg)
-
-                // If user says "all sizes" or "all social media" → auto-select all common sizes
-                const wantsAll = /\b(all\s*(size|format|platform|social|media)|every\s*(size|format)|all\s*of\s*them)\b/i.test(lowerMsg)
-                if (wantsAll || mentionedSizes.length === 0 && /\b(all)\b/i.test(lowerMsg)) {
-                    mentionedSizes = [
-                        SIZE_PRESETS['ig post'], SIZE_PRESETS['ig story'],
-                        SIZE_PRESETS['fb post'], SIZE_PRESETS['linkedin'],
-                        SIZE_PRESETS['yt thumb'], SIZE_PRESETS['twitter'],
-                        SIZE_PRESETS['carousel'], SIZE_PRESETS['web banner'],
-                        SIZE_PRESETS['pinterest'],
-                    ]
-                }
-
-                if (mentionedSizes.length === 0) {
-                    // No specific sizes mentioned — suggest options
-                    setFidatoMessages(prev => [...prev, {
-                        role: 'assistant',
-                        content: `📐 Size Adaptation — Which formats?\n\nJust tell me like:\n• "Adapt for IG Story and LinkedIn"\n• "Resize for FB Post, YT Thumb, Pinterest"\n• "Adapt to all sizes"\n\nAvailable:\n• IG Post — 1080×1080\n• IG Story / Reel — 1080×1920\n• FB Post — 1200×630\n• LinkedIn — 1200×627\n• YT Thumb — 1280×720\n• X / Twitter — 1600×900\n• Carousel — 1080×1350\n• Web Banner — 1920×600\n• Pinterest — 1000×1500`,
-                    }])
-                } else {
-                    // Specific sizes — go ahead and adapt
-                    const canvasDataUrl = fc.toDataURL({ format: 'png', quality: 0.92 })
-                    const sizeNames = mentionedSizes.map(s => s.label).join(', ')
-
-                    setFidatoMessages(prev => [...prev, {
-                        role: 'assistant',
-                        content: `📐 **Adapting creative for ${mentionedSizes.length} format${mentionedSizes.length > 1 ? 's' : ''}:** ${sizeNames}\n\n⏳ Intelligently recomposing for each aspect ratio...`,
-                    }])
-
-                    const adaptResults = []
-                    for (let i = 0; i < mentionedSizes.length; i++) {
-                        const size = mentionedSizes[i]
-
-                        // Update progress
-                        setFidatoMessages(prev => {
-                            const updated = [...prev]
-                            updated[updated.length - 1] = {
-                                role: 'assistant',
-                                content: `📐 **Adapting creative**\n\n${'✅ '.repeat(adaptResults.length)}⏳ ${size.label} (${size.w}×${size.h})...${'⬜ '.repeat(Math.max(0, mentionedSizes.length - i - 1))}`,
-                            }
-                            return updated
-                        })
-
-                        try {
-                            // ── PRE-COMPOSE: Create scaffold at target dimensions ──
-                            // This gives the AI a visual map: content centered + blurred bg hint
-                            const srcImg = new Image()
-                            srcImg.crossOrigin = 'anonymous'
-                            await new Promise((resolve, reject) => {
-                                srcImg.onload = resolve; srcImg.onerror = reject
-                                srcImg.src = canvasDataUrl
-                            })
-
-                            // Create target-size canvas
-                            const targetW = Math.min(size.w, 1536) // cap for API limits
-                            const targetH = Math.min(size.h, 1536)
-                            const preCanvas = document.createElement('canvas')
-                            preCanvas.width = targetW
-                            preCanvas.height = targetH
-                            const pCtx = preCanvas.getContext('2d')
-
-                            // Step 1: Draw heavily blurred, stretched version as background fill
-                            // This gives the AI color/texture hints for empty areas
-                            pCtx.save()
-                            pCtx.filter = 'blur(40px) saturate(1.2)'
-                            pCtx.drawImage(srcImg, -20, -20, targetW + 40, targetH + 40)
-                            pCtx.restore()
-
-                            // Step 2: Draw the original image centered and properly scaled
-                            const scaleToFit = Math.min(targetW / srcImg.width, targetH / srcImg.height) * 0.85
-                            const drawW = srcImg.width * scaleToFit
-                            const drawH = srcImg.height * scaleToFit
-                            const drawX = (targetW - drawW) / 2
-                            const drawY = (targetH - drawH) / 2
-                            pCtx.drawImage(srcImg, drawX, drawY, drawW, drawH)
-
-                            const preComposedDataUrl = preCanvas.toDataURL('image/png', 0.92)
-
-                            const adaptPrompt = `OUTPAINT / GENERATIVE FILL task for ${size.label} (${size.w}×${size.h}px).
-
-You are looking at a pre-composed image: the ORIGINAL content is centered, surrounded by a blurred hint of the background colors and textures.
-
-YOUR JOB:
-1. Keep the centered original content EXACTLY as-is — do not alter, crop, or move it
-2. SEAMLESSLY extend and refine the blurred background areas into natural, photorealistic continuations of the scene
-3. The final image should look like the original was always designed for ${size.label} format
-4. Match lighting, perspective, textures, and color grading perfectly
-5. NO solid colors, NO borders, NO letterboxing, NO padding — only natural scene extension
-6. The transition from original content to extended background must be INVISIBLE
-
-Output a single ${size.w}×${size.h} image.`
-
-                            const resp = await fetch('/api/canvas-assets/ai-edit', {
-                                method: 'POST', headers: authHeaders,
-                                body: JSON.stringify({ prompt: adaptPrompt, imageBase64: preComposedDataUrl }),
-                            })
-                            const data = await resp.json()
-                            if (data.imageUrl) {
-                                adaptResults.push({ url: data.imageUrl, label: size.label, size: `${size.w}×${size.h}` })
-                                // Add to canvas offset to the right
-                                const img = await fabric.FabricImage.fromURL(data.imageUrl, { crossOrigin: 'anonymous' })
-                                const maxDim = 300
-                                const scale = maxDim / Math.max(img.width, img.height)
-                                img.set({ left: (i + 1) * 320 + 50, top: 50, scaleX: scale, scaleY: scale })
-                                img._customName = `${size.label} Adapted`
-                                fc.add(img)
-                                fc.renderAll()
-                                setGeneratedImages(prev => [{ url: data.imageUrl, label: `${size.label} (${size.w}×${size.h})`, timestamp: Date.now() }, ...prev])
-                            }
-                        } catch (err) { console.warn(`Adapt ${size.label} failed:`, err.message) }
-                    }
-
-                    saveHistory()
-                    setFidatoMessages(prev => {
-                        const updated = [...prev]
-                        updated[updated.length - 1] = {
-                            role: 'assistant',
-                            content: `✅ **Adaptation Complete!** Created **${adaptResults.length} format${adaptResults.length > 1 ? 's' : ''}**:\n\n${adaptResults.map(r => `• **${r.label}** — ${r.size}`).join('\n')}\n\nAll versions added to canvas. Select any to edit, download, or publish!`,
-                            images: adaptResults.map(r => ({ url: r.url, label: r.label })),
+                const wantsAll = /\b(all\s*(size|format|platform|social|media))\b/i.test(lowerMsg)
+                if (wantsAll || mentionedSizes.length === 0) mentionedSizes = [SIZE_PRESETS['ig post'], SIZE_PRESETS['ig story'], SIZE_PRESETS['fb post']]
+                const canvasDataUrl = fc.toDataURL({ format: 'png', quality: 0.92 })
+                setFidatoMessages(prev => [...prev, { role: 'assistant', content: `📐 **Adapting creative for ${mentionedSizes.length} formats...**` }])
+                const adaptResults = []
+                for (let i = 0; i < mentionedSizes.length; i++) {
+                    const size = mentionedSizes[i]
+                    try {
+                        const data = await canvasAssets.aiEdit({ prompt: `Outpaint for ${size.label} (${size.w}x${size.h})`, imageBase64: canvasDataUrl })
+                        if (data.imageUrl) {
+                            adaptResults.push({ url: data.imageUrl, label: size.label, size: `${size.w}×${size.h}` })
+                            const img = await fabric.FabricImage.fromURL(data.imageUrl, { crossOrigin: 'anonymous' })
+                            const scale = 300 / Math.max(img.width, img.height)
+                            img.set({ left: (i + 1) * 320 + 50, top: 50, scaleX: scale, scaleY: scale, _customName: `${size.label} Adapted` })
+                            fc.add(img); fc.renderAll()
+                            setGeneratedImages(prev => [{ url: data.imageUrl, label: `${size.label}`, timestamp: Date.now() }, ...prev])
                         }
-                        return updated
-                    })
+                    } catch (err) { console.warn(`Adapt ${size.label} failed:`, err.message) }
                 }
-
+                saveHistory()
+                setFidatoMessages(prev => {
+                    const updated = [...prev]
+                    updated[updated.length - 1] = { role: 'assistant', content: `✅ **Adaptation Complete!**`, images: adaptResults.map(r => ({ url: r.url, label: r.label })) }
+                    return updated
+                })
             } else if (isMerge && hasObjects) {
-                // ── MERGE: Send each selected image individually (NOT a canvas screenshot) ──
                 const selectedImages = extractObjectImages(fc)
-                const objectCount = selectedImages.length
-
-                if (objectCount < 2) {
-                    setFidatoMessages(prev => [...prev, {
-                        role: 'assistant',
-                        content: `📸 I need at least 2 images to merge! Select multiple images on canvas (hold Shift and click), then ask me to merge them.`
-                    }])
+                if (selectedImages.length < 2) {
+                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: `📸 I need at least 2 images to merge! Select multiple on canvas first.` }])
                 } else {
-                    setFidatoMessages(prev => [...prev, {
-                        role: 'assistant', content: `🎨 **Creative Director Mode** — Analyzing ${objectCount} images individually...\n\n• Extracting each image cleanly (no overlaps)\n• Studying colors, subjects, mood of each\n• Finding visual connections\n• Planning the optimal creative blend\n\n⏳ Creating your masterpiece...`
-                    }])
-
-                    // Use ai-generate with referenceImages — NOT ai-edit with screenshot
-                    // This ensures each image is sent as a clean, individual input
-                    const mergePrompt = `${msg}.\n\n${brandContext ? `Brand Context: ${brandContext}.` : ''}\n\nI have provided ${objectCount} individual images. IMPORTANT: These are separate, clean images — NOT overlapping.\n\nCREATIVE MERGE INSTRUCTIONS:\n1. ANALYZE each image independently — study its subject, colors, mood, lighting, and composition\n2. FIND visual harmony — shared palettes, complementary themes, consistent emotional tone\n3. CREATE a single, stunning, unified artwork that seamlessly blends elements from ALL images\n4. Use professional techniques: seamless blending, matched lighting, consistent perspective, smooth color transitions\n5. The result must look PROFESSIONALLY COMPOSED — not like a cut-paste collage\n6. Maintain the best elements of each image while creating something cohesive and new\n\nOutput a single high-quality merged image.`
-
-                    const resp = await fetch('/api/canvas-assets/ai-generate', {
-                        method: 'POST', headers: authHeaders,
-                        body: JSON.stringify({
-                            prompt: mergePrompt,
-                            size: '1024x1024',
-                            referenceImages: selectedImages,
-                        }),
-                    })
-                    const data = await resp.json()
+                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎨 **Creative Director Mode** — Merging ${selectedImages.length} images...` }])
+                    const data = await canvasAssets.aiGenerate({ prompt: `${msg}.\n\nBrand Context: ${brandContext}. Merge these seamlessly.`, size: '1024x1024', referenceImages: selectedImages })
                     if (data.error) throw new Error(data.error)
-                    // Auto-add to canvas
                     addImageUrlToCanvas(data.imageUrl)
                     setFidatoMessages(prev => {
                         const updated = [...prev]
-                        updated[updated.length - 1] = {
-                            role: 'assistant',
-                            content: `✨ Done! Merged ${data.imagesProcessed || objectCount} images — added to canvas.`,
-                            images: [{ url: data.imageUrl }]
-                        }
+                        updated[updated.length - 1] = { role: 'assistant', content: `✨ Done! Merged images added to canvas.`, images: [{ url: data.imageUrl }] }
                         return updated
                     })
                 }
-
-            } else if (isPalette && hasObjects) {
-                // ── PALETTE: Extract dominant colors from canvas ──
-                const canvasDataUrl = fc.toDataURL({ format: 'png', quality: 0.5 })
-                const tempImg = new Image()
-                tempImg.crossOrigin = 'anonymous'
-                await new Promise((resolve, reject) => {
-                    tempImg.onload = resolve; tempImg.onerror = reject
-                    tempImg.src = canvasDataUrl
-                })
-                const tc = document.createElement('canvas')
-                tc.width = 50; tc.height = 50
-                const ctx = tc.getContext('2d')
-                ctx.drawImage(tempImg, 0, 0, 50, 50)
-                const imgData = ctx.getImageData(0, 0, 50, 50).data
-                const colorMap = {}
-                for (let i = 0; i < imgData.length; i += 16) {
-                    const r = Math.round(imgData[i] / 32) * 32
-                    const g = Math.round(imgData[i + 1] / 32) * 32
-                    const b = Math.round(imgData[i + 2] / 32) * 32
-                    const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
-                    colorMap[hex] = (colorMap[hex] || 0) + 1
-                }
-                const topColors = Object.entries(colorMap).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([hex]) => hex)
-                setFidatoMessages(prev => [...prev, {
-                    role: 'assistant',
-                    content: `🎨 **Extracted Color Palette:**\n\n${topColors.map(c => `● ${c}`).join('\n')}\n\nThese are the dominant colors from your canvas. You can use them for brand consistency across campaigns!`,
-                    palette: topColors
-                }])
-
             } else if (isGenerateOnly) {
-                // ── GENERATE: Fresh image from scratch (with brand knowledge) ──
-                setFidatoMessages(prev => [...prev, {
-                    role: 'assistant', content: `🎨 Generating image for ${brandName}...`
-                }])
-                const enrichedPrompt = `${msg}\n\nBrand Context: ${brandContext}. Use the brand's visual identity — colors, style, and aesthetic that match the brand. Create a professional, campaign-ready image.`
-                const resp = await fetch('/api/canvas-assets/ai-generate', {
-                    method: 'POST', headers: authHeaders,
-                    body: JSON.stringify({ prompt: enrichedPrompt, size: '1024x1024' }),
-                })
-                const data = await resp.json()
+                setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎨 Generating image for ${brandName}...` }])
+                const data = await canvasAssets.aiGenerate({ prompt: `${msg}\n\nBrand Context: ${brandContext}`, size: '1024x1024' })
                 if (data.error) throw new Error(data.error)
                 addImageUrlToCanvas(data.imageUrl)
                 setFidatoMessages(prev => {
                     const updated = [...prev]
-                    updated[updated.length - 1] = {
-                        role: 'assistant',
-                        content: '✨ Image generated and added to canvas!',
-                        images: [{ url: data.imageUrl }]
-                    }
+                    updated[updated.length - 1] = { role: 'assistant', content: '✨ Image generated and added to canvas!', images: [{ url: data.imageUrl }] }
                     return updated
                 })
-
             } else if (hasObjects) {
-                // ── EDIT: Canvas has content → extract individual images + canvas for context ──
                 const selectedImages = extractObjectImages(fc)
-                const objectCount = selectedImages.length
-                setFidatoMessages(prev => [...prev, {
-                    role: 'assistant', content: `🎨 Analyzing ${objectCount} image${objectCount > 1 ? 's' : ''} on your canvas and applying changes...`
-                }])
+                setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎨 Analyzing canvas and applying changes...` }])
                 const canvasDataUrl = fc.toDataURL({ format: 'png', quality: 0.92 })
-                const resp = await fetch('/api/canvas-assets/ai-edit', {
-                    method: 'POST', headers: authHeaders,
-                    body: JSON.stringify({
-                        prompt: msg,
-                        imageBase64: canvasDataUrl,
-                        additionalImages: selectedImages,
-                    }),
-                })
-                const data = await resp.json()
+                const data = await canvasAssets.aiEdit({ prompt: msg, imageBase64: canvasDataUrl, additionalImages: selectedImages })
                 if (data.error) throw new Error(data.error)
-                // Auto-add to canvas
                 addImageUrlToCanvas(data.imageUrl)
                 setFidatoMessages(prev => {
                     const updated = [...prev]
-                    updated[updated.length - 1] = {
-                        role: 'assistant',
-                        content: `✅ Done! Processed ${data.imagesProcessed || 1} image${(data.imagesProcessed || 1) > 1 ? 's' : ''} — result added to canvas. Tell me what else to adjust!`,
-                        images: [{ url: data.imageUrl }]
-                    }
+                    updated[updated.length - 1] = { role: 'assistant', content: `✅ Done! Result added to canvas.`, images: [{ url: data.imageUrl }] }
                     return updated
                 })
-
             } else {
-                // ── SMART FALLBACK: If msg seems creative, generate. Otherwise chat. ──
                 const seemsCreative = /\b(image|photo|visual|graphic|creative|poster|banner|ad|flyer|post|thumbnail|social media|instagram|facebook|linkedin)\b/i.test(lowerMsg)
-
                 if (seemsCreative) {
-                    // User wants creative output — generate an image
-                    setFidatoMessages(prev => [...prev, {
-                        role: 'assistant', content: `🎨 I sense a creative request! Generating for ${brandName}...`
-                    }])
-                    const enrichedPrompt = `The user is a creative director working on ${brandName}. They need: "${msg}". ${brandContext}. Create a stunning, professional-grade visual that matches the brand identity. If they mention social media, create an optimized social media creative. Make it campaign-ready and visually striking.`
+                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎨 I sense a creative request! Generating for ${brandName}...` }])
                     try {
-                        const resp = await fetch('/api/canvas-assets/ai-generate', {
-                            method: 'POST', headers: authHeaders,
-                            body: JSON.stringify({ prompt: enrichedPrompt, size: '1024x1024' }),
-                        })
-                        const data = await resp.json()
+                        const data = await canvasAssets.aiGenerate({ prompt: `${msg}. ${brandContext}`, size: '1024x1024' })
                         if (data.error) throw new Error(data.error)
                         addImageUrlToCanvas(data.imageUrl)
                         setFidatoMessages(prev => {
                             const updated = [...prev]
-                            updated[updated.length - 1] = {
-                                role: 'assistant',
-                                content: '✨ Creative generated and added to canvas!',
-                                images: [{ url: data.imageUrl }]
-                            }
+                            updated[updated.length - 1] = { role: 'assistant', content: '✨ Creative generated and added to canvas!', images: [{ url: data.imageUrl }] }
                             return updated
                         })
                     } catch (genErr) {
-                        const resp = await fetch('/api/nexus/chat', {
-                            method: 'POST', headers: authHeaders,
-                            body: JSON.stringify({ message: `[Canvas Creative Director for ${brandName}] ${brandContext}. The user said: "${msg}". Help them creatively. Be concise and actionable.`, brandId: activeBrand?._id }),
-                        })
-                        const data = await resp.json()
-                        const reply = data.reply || data.message || 'Let me help! Describe the image you want and I\'ll generate it.'
-                        setFidatoMessages(prev => [...prev, { role: 'assistant', content: reply }])
+                        const data = await nexusAPI.chat({ message: `[Canvas Creative Director for ${brandName}] ${brandContext}. The user said: "${msg}". Help them.`, brandId: activeBrand?._id })
+                        setFidatoMessages(prev => [...prev, { role: 'assistant', content: data.reply || data.message || 'Error occurred.' }])
                     }
                 } else {
-                    // Pure chat — creative conversation with brand context
-                    try {
-                        const resp = await fetch('/api/nexus/chat', {
-                            method: 'POST', headers: authHeaders,
-                            body: JSON.stringify({ message: `[Canvas Creative Director for ${brandName}] ${brandContext}. The user is in the Creative Canvas editor. They said: "${msg}". Help them with their creative task. If they want images, tell them to describe what they want. Keep it concise.`, brandId: activeBrand?._id }),
-                        })
-                        const data = await resp.json()
-                        if (data.error) throw new Error(data.error)
-                        const reply = data.reply || data.message || data.response || 'Try describing an image you\'d like to create!'
-                        setFidatoMessages(prev => [...prev, { role: 'assistant', content: reply }])
-                    } catch {
-                        setFidatoMessages(prev => [...prev, {
-                            role: 'assistant',
-                            content: `Here's what I can do:\n\n• "Create a product photo on marble table" → Generates new image\n• "Change the background to sunset" → Edits canvas\n• "Merge these into a collage" → Combines images\n• "Adapt to all sizes" → Multi-platform resize\n• "Create 4 carousel images" → Campaign batch\n\nTry it! 🎯`
-                        }])
-                    }
+                    const data = await nexusAPI.chat({ message: `[Canvas Creative Director for ${brandName}] ${brandContext}. The user said: "${msg}". Help them with their creative task.`, brandId: activeBrand?._id })
+                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: data.reply || data.message || 'Error occurred.' }])
                 }
             }
         } catch (err) {
-            setFidatoMessages(prev => [...prev, {
-                role: 'assistant', content: `❌ Sorry, I ran into an issue: ${err.message}. Please try again!`
-            }])
+            setFidatoMessages(prev => [...prev, { role: 'assistant', content: `❌ Error: ${err.message}` }])
         }
         setFidatoLoading(false)
         setTimeout(() => fidatoMsgEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 200)
-    }, [fidatoInput, fidatoLoading, activeBrand])
+    }, [fidatoInput, fidatoLoading, activeBrand, addImageUrlToCanvas, saveHistory])
 
     const SIDEBAR_TABS = [
         { id: 'ai', emoji: '✦', label: 'AI', isAi: true },
@@ -5214,13 +4846,7 @@ Output a single ${size.w}×${size.h} image.`
                                                                     const formData = new FormData()
                                                                     formData.append('audio', audioBlob, 'recording.webm')
                                                                     formData.append('language', 'unknown')
-                                                                    const token = localStorage.getItem('mantram_token')
-                                                                    const resp = await fetch('/api/voice/transcribe', {
-                                                                        method: 'POST',
-                                                                        headers: token ? { Authorization: `Bearer ${token}` } : {},
-                                                                        body: formData,
-                                                                    })
-                                                                    const data = await resp.json()
+                                                                    const data = await voiceAPI.transcribe(formData)
                                                                     if (data.success && data.text) {
                                                                         setFidatoInput(data.text)
                                                                         // Auto-send after a brief delay

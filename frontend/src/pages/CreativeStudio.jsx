@@ -3,7 +3,7 @@ import SEOHead from '../components/SEOHead'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
-import { creatives as creativesAPI, agents as agentsAPI, products as productsAPI, brands as brandsAPI, media as mediaAPI, trends as trendsAPI } from '../services/api'
+import { creatives as creativesAPI, agents as agentsAPI, products as productsAPI, brands as brandsAPI, media as mediaAPI, trends as trendsAPI, nexus as nexusAPI, videoStudio as videoStudioAPI, canvasAssets, API_BASE } from '../services/api'
 import { useBrand } from '../context/BrandContext'
 import VoiceInput from '../components/VoiceInput'
 import PublishModal from '../components/PublishModal'
@@ -22,17 +22,10 @@ function getTimeAgo(dateStr) {
     return new Date(dateStr).toLocaleDateString();
 }
  
-// ── Helper: Upload base64 image to S3 via backend ──
 async function uploadToS3(base64Data, folder = 'uploads') {
     try {
         if (base64Data.startsWith('http')) return base64Data;
-        const token = localStorage.getItem('token');
-        const res = await fetch('/api/media/upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ imageData: base64Data, folder }),
-        });
-        const data = await res.json();
+        const data = await mediaAPI.upload({ imageData: base64Data, folder });
         if (data.success && data.url) return data.url;
         console.warn('[uploadToS3] S3 upload failed, using base64 fallback:', data.error);
         return base64Data;
@@ -390,22 +383,16 @@ export default function CreativeStudio() {
             setAnimateAspectRatio(detectedRatio)
 
             // Ask AI to describe optimal animation
-            const token = localStorage.getItem('mantram_token') || ''
-            const resp = await fetch('/api/nexus/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({
-                    message: `You are an expert animation director. Analyze this image and write a concise animation prompt (2-3 sentences max) describing the ideal motion, camera movement, and mood to bring this still image to life as a short video. Focus on:
+            const data = await nexusAPI.chat(
+                `You are an expert animation director. Analyze this image and write a concise animation prompt (2-3 sentences max) describing the ideal motion, camera movement, and mood to bring this still image to life as a short video. Focus on:
 - What should move (subject, background, particles)
 - Camera motion (pan, zoom, dolly, static)
 - Atmosphere (lighting shifts, particle effects)
 
 Be specific and cinematic. Do NOT describe the image — describe the MOTION only. Output ONLY the prompt, nothing else.`,
-                    images: [result.imageUrl],
-                    brandId: activeBrand?._id,
-                }),
-            })
-            const data = await resp.json()
+                activeBrand?._id,
+                { images: [result.imageUrl] }
+            )
             const suggestedPrompt = (data.response || data.text || data.reply || '').replace(/^["']|["']$/g, '').trim()
             if (suggestedPrompt) setAnimatePrompt(suggestedPrompt)
             else setAnimatePrompt('Gentle cinematic motion with smooth camera movement, soft lighting shifts, and natural ambient animation.')
@@ -424,43 +411,33 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         setAnimateVideoUrl(null)
         setAnimateProgress(5)
         try {
-            const token = localStorage.getItem('mantram_token') || ''
-            const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
             let projectId = null
 
             if (animateModel === 'seedance-2.0') {
                 // Seedance uses dedicated I2V endpoint
-                const resp = await fetch('/api/video-studio/advanced/image-to-video', {
-                    method: 'POST', headers,
-                    body: JSON.stringify({
-                        imageUrl: result.imageUrl,
-                        prompt: animatePrompt.trim(),
-                        duration: animateDuration,
-                        aspectRatio: animateAspectRatio,
-                        qualityMode: 'fast',
-                        brandId: activeBrand?._id || null,
-                    }),
+                const data = await videoStudioAPI.advancedI2V({
+                    imageUrl: result.imageUrl,
+                    prompt: animatePrompt.trim(),
+                    duration: animateDuration,
+                    aspectRatio: animateAspectRatio,
+                    qualityMode: 'fast',
+                    brandId: activeBrand?._id || null,
                 })
-                const data = await resp.json()
                 if (!data.success) throw new Error(data.error || 'Animation failed')
                 projectId = data.project._id
             } else {
                 // All other models use advanced/generate with firstImageUrl
-                const resp = await fetch('/api/video-studio/advanced/generate', {
-                    method: 'POST', headers,
-                    body: JSON.stringify({
-                        prompt: animatePrompt.trim(),
-                        model: animateModel,
-                        duration: animateDuration,
-                        resolution: '1080p',
-                        aspectRatio: animateAspectRatio,
-                        firstImageUrl: result.imageUrl,
-                        generateAudio: true,
-                        qualityMode: 'fast',
-                        brandId: activeBrand?._id || null,
-                    }),
+                const data = await videoStudioAPI.advancedGenerate({
+                    prompt: animatePrompt.trim(),
+                    model: animateModel,
+                    duration: animateDuration,
+                    resolution: '1080p',
+                    aspectRatio: animateAspectRatio,
+                    firstImageUrl: result.imageUrl,
+                    generateAudio: true,
+                    qualityMode: 'fast',
+                    brandId: activeBrand?._id || null,
                 })
-                const data = await resp.json()
                 if (!data.success) throw new Error(data.error || 'Animation failed')
                 projectId = data.project._id
             }
@@ -470,11 +447,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             if (animatePollRef.current) clearInterval(animatePollRef.current)
             animatePollRef.current = setInterval(async () => {
                 try {
-                    const token2 = localStorage.getItem('mantram_token') || ''
-                    const sr = await fetch(`/api/video-studio/${projectId}/status`, {
-                        headers: { Authorization: `Bearer ${token2}` },
-                    })
-                    const sd = await sr.json()
+                    const sd = await videoStudioAPI.getStatus(projectId)
                     const gen = sd.project?.generation || {}
                     setAnimateProgress(gen.progress || 30)
                     if (gen.status === 'COMPLETED' || sd.project?.status === 'critique') {
@@ -1118,44 +1091,24 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             const imageBase64 = photoshootResult.imageUrl
             let resultUrl = null
 
+            let data;
             if (psEditTool === 'prompt') {
                 if (!psEditPrompt.trim()) throw new Error('Enter a prompt')
-                const resp = await fetch('/api/canvas-assets/ai-edit', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: psEditPrompt, imageBase64 }),
-                })
-                const data = await resp.json()
-                if (data.error) throw new Error(data.error)
-                resultUrl = data.imageUrl
+                data = await canvasAssets.aiEdit({ prompt: psEditPrompt, imageBase64 })
             } else if (psEditTool === 'visual') {
                 if (!psEditPrompt.trim()) throw new Error('Enter a prompt')
                 const maskDataUrl = getPsMaskDataUrl()
                 if (!maskDataUrl) throw new Error('Paint a mask on the image first')
-                const resp = await fetch('/api/canvas-assets/ai-edit-visual', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: psEditPrompt, imageBase64, maskBase64: maskDataUrl }),
-                })
-                const data = await resp.json()
-                if (data.error) throw new Error(data.error)
-                resultUrl = data.imageUrl
+                data = await canvasAssets.aiEditVisual({ prompt: psEditPrompt, imageBase64, maskBase64: maskDataUrl })
             } else if (psEditTool === 'retouch') {
                 const maskDataUrl = getPsMaskDataUrl()
-                const resp = await fetch('/api/canvas-assets/ai-retouch', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: psEditPrompt || 'Retouch naturally', imageBase64, maskBase64: maskDataUrl }),
-                })
-                const data = await resp.json()
-                if (data.error) throw new Error(data.error)
-                resultUrl = data.imageUrl
+                data = await canvasAssets.aiRetouch({ prompt: psEditPrompt || 'Retouch naturally', imageBase64, maskBase64: maskDataUrl })
             } else if (psEditTool === 'background') {
-                const resp = await fetch('/api/canvas-assets/ai-background', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ imageBase64, action: psBgAction, bgPrompt: psBgAction === 'replace' ? (psBgPrompt || psEditPrompt) : undefined }),
-                })
-                const data = await resp.json()
-                if (data.error) throw new Error(data.error)
-                resultUrl = data.imageUrl
+                data = await canvasAssets.aiBackground({ imageBase64, action: psBgAction, bgPrompt: psBgAction === 'replace' ? (psBgPrompt || psEditPrompt) : undefined })
             }
+
+            if (data?.error) throw new Error(data.error)
+            resultUrl = data?.imageUrl
 
             if (resultUrl) {
                 // Auto-apply: replace the photoshoot result image
@@ -1320,15 +1273,10 @@ Brand Colors: ${brandColors}
 
 Return ONLY the prompt formula text, no explanation. Start directly with "Create a..." or "Design a..."`
 
-            const resp = await fetch('/api/canvas-assets/ai-analyze', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    prompt: analysisPrompt,
-                    ...(isBase64 ? { imageBase64: imageSource } : { imageUrl: imageSource }),
-                }),
+            const data = await canvasAssets.aiAnalyze({
+                prompt: analysisPrompt,
+                ...(isBase64 ? { imageBase64: imageSource } : { imageUrl: imageSource }),
             })
-            const data = await resp.json()
 
             if (data.description) {
                 // Successfully got a prompt formula — set it as the template prompt
@@ -1397,20 +1345,11 @@ Return ONLY the prompt formula text, no explanation. Start directly with "Create
         const brandColors = activeBrand.dna?.colors?.map(c => c.hex).join(', ') || 'not specified'
 
         try {
-            const token = localStorage.getItem('mantram_token') || ''
-            const resp = await fetch('/api/canvas-assets/ai-analyze-template', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-                body: JSON.stringify({
-                    ...(isBase64 ? { imageBase64: imageSource } : { imageUrl: imageSource }),
-                    brandName: activeBrand.name,
-                    brandColors,
-                }),
+            const data = await canvasAssets.aiAnalyzeTemplate({
+                ...(isBase64 ? { imageBase64: imageSource } : { imageUrl: imageSource }),
+                brandName: activeBrand.name,
+                brandColors,
             })
-            const data = await resp.json()
 
             if (data.promptFormula) {
                 // Auto-generate fields from detected elements
@@ -1518,11 +1457,8 @@ Return ONLY the prompt formula text, no explanation. Start directly with "Create
         const brandColors = activeBrand.dna?.colors?.map(c => c.hex).join(', ') || 'not specified'
 
         try {
-            const resp = await fetch('/api/canvas-assets/ai-analyze', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    prompt: `You are an expert design analyst. Analyze this design image and create a REUSABLE BASE PROMPT FORMULA for this template category.
+            const data = await canvasAssets.aiAnalyze({
+                prompt: `You are an expert design analyst. Analyze this design image and create a REUSABLE BASE PROMPT FORMULA for this template category.
 
 Extract the visual DNA:
 1. Background style (color, gradient, texture, pattern)
@@ -1546,10 +1482,8 @@ Brand: ${activeBrand.name}
 Brand colors: ${brandColors}
 
 Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
-                    ...(isBase64 ? { imageBase64: imageSource } : { imageUrl: imageSource }),
-                }),
+                ...(isBase64 ? { imageBase64: imageSource } : { imageUrl: imageSource }),
             })
-            const data = await resp.json()
             if (data.description) {
                 setNewCat(prev => ({ ...prev, basePromptFormula: data.description }))
             } else {
@@ -2354,11 +2288,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             {animateVideoUrl && (
                                                 <div className="mb-3 rounded-xl overflow-hidden border border-violet-500/20">
                                                     <video controls autoPlay className="w-full" style={{ maxHeight: '400px' }}
-                                                        src={animateProjectId ? `/api/video-studio/${animateProjectId}/video` : animateVideoUrl} />
+                                                    src={animateProjectId ? `${API_BASE}/video-studio/${animateProjectId}/video` : animateVideoUrl} />
                                                     <div className="flex gap-2 p-3 bg-black/20">
                                                         <button onClick={async () => {
                                                             try {
-                                                                const src = animateProjectId ? `/api/video-studio/${animateProjectId}/video` : animateVideoUrl
+                                                                const src = animateProjectId ? `${API_BASE}/video-studio/${animateProjectId}/video` : animateVideoUrl
                                                                 const resp = await fetch(src)
                                                                 const blob = await resp.blob()
                                                                 const url = URL.createObjectURL(blob)
