@@ -46,11 +46,11 @@ function ScoreBar({ score, color, label, icon }) {
     return (
         <div className="flex items-center gap-2">
             <span className="text-xs w-4">{icon}</span>
-            <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+            <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden min-w-[60px]">
                 <div className={`h-full rounded-full ${color} transition-all duration-700`}
                     style={{ width: `${score * 10}%` }} />
             </div>
-            <span className="text-sm text-slate-400 w-4 text-right">{score}</span>
+            <span className="text-[11px] text-slate-400 w-4 text-right font-mono">{score}</span>
         </div>
     )
 }
@@ -125,27 +125,31 @@ function IdeaCard({ idea, index, onExpand, onAction, isFilm, onFeedback, feedbac
             )}
 
             {/* Actions */}
-            <div className="flex gap-2 pt-3 border-t border-white/5">
+            <div className="flex flex-wrap gap-2 pt-3 border-t border-white/5">
                 <button onClick={() => onExpand(idea)}
-                    className="flex-1 py-2 rounded-xl bg-primary/10 text-primary text-[11px] font-bold hover:bg-primary/20 cursor-pointer transition-all flex items-center justify-center gap-1">
+                    className="flex-1 min-w-[100px] py-2 rounded-xl bg-primary/10 text-primary text-[11px] font-bold hover:bg-primary/20 cursor-pointer transition-all flex items-center justify-center gap-1">
                     <span className="material-symbols-outlined text-sm">unfold_more</span> Deep Dive
                 </button>
                 {isFilm && (
                     <button onClick={() => onScreenplay(idea)}
-                        className="flex-1 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-[11px] font-bold hover:bg-emerald-500/20 cursor-pointer transition-all flex items-center justify-center gap-1">
+                        className="flex-1 min-w-[100px] py-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-[11px] font-bold hover:bg-emerald-500/20 cursor-pointer transition-all flex items-center justify-center gap-1">
                         <span className="material-symbols-outlined text-sm">description</span> Screenplay
                     </button>
                 )}
-                <button onClick={() => onAction('content', idea)}
-                    className="py-2 px-3 rounded-xl bg-white/5 text-slate-300 text-[11px] font-bold hover:bg-white/10 cursor-pointer transition-all"
-                    title="Generate Content">
-                    <span className="material-symbols-outlined text-sm">edit_note</span>
-                </button>
-                <button onClick={() => isFilm ? handleIdeaAction('creative', idea) : onAction('creative', idea)}
-                    className="py-2 px-3 rounded-xl bg-white/5 text-slate-300 text-[11px] font-bold hover:bg-white/10 cursor-pointer transition-all"
-                    title={isFilm ? "Generate Film" : "Generate Visual"}>
-                    <span className="material-symbols-outlined text-sm">{isFilm ? "movie" : "palette"}</span>
-                </button>
+                <div className="flex gap-2 w-full sm:w-auto">
+                    <button onClick={() => onAction('content', idea)}
+                        className="flex-1 sm:flex-none py-2 px-3 rounded-xl bg-white/5 text-slate-300 text-[11px] font-bold hover:bg-white/10 cursor-pointer transition-all flex items-center justify-center"
+                        title="Generate Content">
+                        <span className="material-symbols-outlined text-sm">edit_note</span>
+                        <span className="sm:hidden ml-1">Content</span>
+                    </button>
+                    <button onClick={() => isFilm ? handleIdeaAction('creative', idea) : onAction('creative', idea)}
+                        className="flex-1 sm:flex-none py-2 px-3 rounded-xl bg-white/5 text-slate-300 text-[11px] font-bold hover:bg-white/10 cursor-pointer transition-all flex items-center justify-center"
+                        title={isFilm ? "Generate Film" : "Generate Visual"}>
+                        <span className="material-symbols-outlined text-sm">{isFilm ? "movie" : "palette"}</span>
+                        <span className="sm:hidden ml-1">{isFilm ? "Film" : "Visual"}</span>
+                    </button>
+                </div>
             </div>
         </div>
     )
@@ -652,7 +656,7 @@ export default function BrainstormStudio() {
                         <div className="flex-1 h-px bg-white/[0.06]" />
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
+                    <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
                         {INTENTS.map((item, i) => {
                             const isSelected = intent === item.id && loading;
                             const isDimmed = loading && intent !== item.id;
@@ -914,7 +918,7 @@ export default function BrainstormStudio() {
                                     <h3 className="text-lg font-bold text-white">{intent === 'ad-film' ? 'Film Concepts' : 'Campaign Concepts'}</h3>
                                     <span className="text-sm text-slate-500 ml-1">{intent === 'ad-film' ? '👍 Approve a film to generate screenplay' : 'Layer 1 — Big Ideas'}</span>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {(ideas.filmConcepts || ideas.campaignConcepts)?.map((idea, i) => (
                                         <IdeaCard key={i} idea={idea} index={i}
                                             isFilm={intent === 'ad-film'}
@@ -934,7 +938,7 @@ export default function BrainstormStudio() {
                                         <span className="material-symbols-outlined text-amber-400">videocam</span>
                                         <h3 className="text-lg font-bold text-white">Production Approaches</h3>
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                         {ideas.productionApproaches.map((p, i) => (
                                             <div key={i} className="glass-panel rounded-2xl p-5 animate-fade-in">
                                                 <p className="text-sm text-primary font-bold mb-3 uppercase">{p.filmRef}</p>
@@ -965,7 +969,7 @@ export default function BrainstormStudio() {
                                         <h3 className="text-lg font-bold text-white">Tactical Ideas</h3>
                                         <span className="text-sm text-slate-500 ml-1">Layer 2 — Execution Angles</span>
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                         {ideas.tacticalIdeas.map((t, i) => (
                                             <div key={i} className="glass-panel rounded-2xl p-5 animate-fade-in" style={{ animationDelay: `${i * 100}ms` }}>
                                                 <p className="text-sm text-primary font-bold mb-3 uppercase">{t.campaignRef}</p>
@@ -1016,7 +1020,7 @@ export default function BrainstormStudio() {
                                         <span className="text-sm text-slate-500 ml-1">Layer 3 — Names & Taglines</span>
                                     </div>
                                     <div className="glass-panel rounded-2xl p-5">
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                             {/* Product naming categories */}
                                             {Object.entries(ideas.namingIdeas).filter(([k]) => k !== 'taglines' && k !== 'hashtags').map(([cat, items]) => (
                                                 <div key={cat}>
@@ -1073,7 +1077,7 @@ export default function BrainstormStudio() {
                                     </div>
                                     <div className="glass-panel rounded-2xl p-5">
                                         {/* Phases */}
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
                                             {ideas.executionPlan.phases?.map((phase, i) => (
                                                 <div key={i} className="p-4 rounded-xl bg-white/3 border border-white/5">
                                                     <div className="flex items-center gap-2 mb-2">
@@ -1200,7 +1204,7 @@ export default function BrainstormStudio() {
                             </div>
 
                             {/* Success Probability + Competitive Landscape */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
                                 {strategyData.success_probability && (
                                     <div className="glass-panel rounded-2xl p-5">
                                         <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
@@ -1471,15 +1475,17 @@ export default function BrainstormStudio() {
                                     <div className="space-y-2">
                                         {strategyData.budget_breakdown.map((b, i) => (
                                             <div key={i}>
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-xs text-slate-300 w-32 truncate">{b.channel}</span>
+                                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                                                    <span className="text-xs text-slate-300 w-full sm:w-32 truncate">{b.channel}</span>
                                                     <div className="flex-1 h-3 bg-white/5 rounded-full overflow-hidden">
                                                         <div className="h-full bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full transition-all" style={{ width: `${b.percentage}%` }} />
                                                     </div>
-                                                    <span className="text-xs text-slate-400 w-16 text-right">{b.amount}</span>
-                                                    <span className="text-xs text-amber-400 w-10 text-right font-bold">{b.percentage}%</span>
+                                                    <div className="flex items-center gap-2 min-w-[80px] justify-end">
+                                                        <span className="text-xs text-slate-400 text-right">{b.amount}</span>
+                                                        <span className="text-xs text-amber-400 text-right font-bold">{b.percentage}%</span>
+                                                    </div>
                                                 </div>
-                                                {b.rationale && <p className="text-[10px] text-slate-500 ml-32 pl-3 mt-0.5">↳ {b.rationale}</p>}
+                                                {b.rationale && <p className="text-[10px] text-slate-500 sm:ml-32 sm:pl-3 mt-1">↳ {b.rationale}</p>}
                                             </div>
                                         ))}
                                     </div>
@@ -1526,13 +1532,13 @@ export default function BrainstormStudio() {
                     </div>
 
                     {/* Slide */}
-                    <div className="flex-1 flex items-center justify-center p-8 relative">
+                    <div className="flex-1 flex items-center justify-center p-4 sm:p-8 relative overflow-y-auto">
                         {(() => {
                             const slide = slides[slideIndex]
                             if (!slide) return null
                             const accent = slide.accent_color || '#6366f1'
                             return (
-                                <div className="w-full max-w-4xl aspect-[16/9] rounded-3xl p-10 flex flex-col justify-center relative overflow-hidden animate-fade-in"
+                                <div className="w-full max-w-4xl min-h-[60vh] sm:aspect-[16/9] rounded-2xl sm:rounded-3xl p-6 sm:p-10 flex flex-col justify-center relative overflow-hidden animate-fade-in"
                                     style={{ background: `linear-gradient(135deg, ${accent}15, ${accent}05, #0f0f1a)`, border: `1px solid ${accent}25` }}>
                                     {slide.layout === 'hero' && (
                                         <div className="text-center">
@@ -1557,7 +1563,7 @@ export default function BrainstormStudio() {
                                         <div>
                                             <h2 className="text-2xl font-black text-white mb-2">{slide.title}</h2>
                                             {slide.subtitle && <p className="text-sm text-slate-400 mb-6">{slide.subtitle}</p>}
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                            <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                                                 {slide.content?.stats?.map((s, i) => (
                                                     <div key={i} className="text-center p-4 rounded-xl" style={{ background: `${accent}10`, border: `1px solid ${accent}20` }}>
                                                         <p className="text-2xl font-black text-white">{s.value}</p>
@@ -1571,7 +1577,7 @@ export default function BrainstormStudio() {
                                     {slide.layout === 'grid' && (
                                         <div>
                                             <h2 className="text-2xl font-black text-white mb-6">{slide.title}</h2>
-                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                                                 {slide.content?.cards?.map((card, i) => (
                                                     <div key={i} className="p-4 rounded-xl bg-white/5 border border-white/5">
                                                         <span className="text-xl mb-2 block">{card.icon}</span>
@@ -1585,7 +1591,7 @@ export default function BrainstormStudio() {
                                     {slide.layout === 'timeline' && (
                                         <div>
                                             <h2 className="text-2xl font-black text-white mb-6">{slide.title}</h2>
-                                            <div className="flex gap-4">
+                                            <div className="flex flex-col md:flex-row gap-3 sm:gap-4">
                                                 {slide.content?.phases?.map((phase, i) => (
                                                     <div key={i} className="flex-1 p-4 rounded-xl border border-white/5" style={{ background: `${accent}08` }}>
                                                         <p className="text-sm font-bold text-white mb-1">{phase.name}</p>

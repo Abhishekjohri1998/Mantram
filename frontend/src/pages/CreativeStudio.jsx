@@ -1522,7 +1522,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
         <DashboardLayout title="Creative Studio" subtitle="AI-powered image generation & design">
             <SEOHead title="Creative Studio — Mantram AI" noIndex={true} />
             {/* ══ Unified Studio Navigation ══ */}
-            <div className="flex items-center gap-1.5 p-1 rounded-2xl glass-panel mb-6 fade-up">
+            <div className="flex items-center gap-1.5 p-1 rounded-2xl glass-panel mb-6 fade-up overflow-x-auto scrollbar-hide whitespace-nowrap">
                 {[
                     { id: 'create', icon: 'auto_awesome', label: 'AI Create' },
                     { id: 'photoshoot', icon: 'photo_camera', label: 'Photoshoot' },
@@ -1540,7 +1540,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             setStudioMode(tab.id)
                             if (tab.id === 'imagebank') loadImageBank()
                         }}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+                        className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
                             studioMode === tab.id
                                 ? 'studio-nav-pill text-white'
                                 : 'text-slate-500 hover:text-slate-200 hover:bg-white/[0.04]'
@@ -2560,7 +2560,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 }
                                             })
                                             return allBrandPhotos.length > 0 ? (
-                                                <div className="grid grid-cols-4 gap-3">
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                                     {allBrandPhotos.map((img, i) => (
                                                         <button key={`bpm-${i}`}
                                                             onClick={() => {
@@ -3315,7 +3315,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
                                     <span className="material-symbols-outlined text-violet-400 text-lg">palette</span>Style
                                 </h3>
-                                <div className="grid grid-cols-4 gap-2">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                                     {[{id:'2d-flat',l:'2D Flat'},{id:'3d-render',l:'3D Rendered'},{id:'isometric',l:'Isometric'},{id:'hand-drawn',l:'Hand-drawn'},{id:'neon',l:'Neon Glow'},{id:'metallic',l:'Metallic'},{id:'gradient',l:'Gradient'},{id:'pixel',l:'Pixel Art'}].map(s=>(
                                         <button key={s.id} onClick={()=>setClgStyle(s.id)} className={`px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${clgStyle===s.id?'border-violet-400/40 bg-violet-500/10 text-white':'border-white/[0.06] bg-white/[0.02] text-slate-400 hover:text-slate-200'}`}>{s.l}</button>
                                     ))}
@@ -3453,13 +3453,13 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     </div>
 
                     {/* Step Indicator — 3-step flow */}
-                    <div className="flex items-center gap-2 mb-6">
+                    <div className="flex items-center gap-2 mb-6 overflow-x-auto scrollbar-hide pb-2">
                         {[{n:1,l:'Intelligence Brief',icon:'psychology'},{n:2,l:'Copy & Style',icon:'palette'},{n:3,l:'Generate',icon:'auto_awesome'}].map((s,i)=>(
                             <Fragment key={s.n}>
-                                <button onClick={()=>s.n<campStep&&setCampStep(s.n)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${campStep===s.n?'bg-blue-500/20 text-blue-300 border border-blue-400/30':campStep>s.n?'bg-emerald-500/10 text-emerald-300 border border-emerald-400/20 cursor-pointer':'bg-white/[0.03] text-slate-600 border border-white/[0.05]'}`}>
+                                <button onClick={()=>s.n<campStep&&setCampStep(s.n)} className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${campStep===s.n?'bg-blue-500/20 text-blue-300 border border-blue-400/30':campStep>s.n?'bg-emerald-500/10 text-emerald-300 border border-emerald-400/20 cursor-pointer':'bg-white/[0.03] text-slate-600 border border-white/[0.05]'}`}>
                                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${campStep===s.n?'bg-blue-500 text-white':campStep>s.n?'bg-emerald-500 text-white':'bg-white/10 text-slate-600'}`}>{campStep>s.n?'✓':s.n}</span>{s.l}
                                 </button>
-                                {i<2&&<div className={`flex-1 h-px ${campStep>s.n?'bg-emerald-500/30':'bg-white/[0.06]'}`}/>}
+                                {i<2&&<div className={`flex-1 min-w-[20px] h-px ${campStep>s.n?'bg-emerald-500/30':'bg-white/[0.06]'}`}/>}
                             </Fragment>
                         ))}
                     </div>
@@ -3470,7 +3470,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <div className="col-span-12 lg:col-span-7 space-y-4">
                                 {/* Campaign Name + Goal */}
                                 <div className="studio-card p-5">
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-blue-400 text-lg">badge</span>Campaign Name</h3>
                                             <input type="text" value={campName} onChange={e=>setCampName(e.target.value)} placeholder="Auto-generated from keyword..." className="w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-blue-400/30" />
@@ -3938,7 +3938,7 @@ setCampCopies(errCopies);}
                                 {/* Logo Placement */}
                                 <div className="studio-card p-5">
                                     <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-amber-400 text-lg">crop_free</span>Logo Placement</h3>
-                                    <div className="grid grid-cols-3 gap-1.5">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
                                         {[{id:'top-left',l:'↖ TL'},{id:'top-center',l:'↑ TC'},{id:'top-right',l:'↗ TR'},{id:'bottom-left',l:'↙ BL'},{id:'bottom-center',l:'↓ BC'},{id:'bottom-right',l:'↘ BR'},{id:'none',l:'None'}].map(p=>(
                                             <button key={p.id} onClick={()=>setCampLogoPlacement(p.id)} className={`px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${campLogoPlacement===p.id?'border-amber-400/40 bg-amber-500/10 text-white':'border-white/[0.06] text-slate-400'}`}>{p.l}</button>
                                         ))}
@@ -3947,7 +3947,7 @@ setCampCopies(errCopies);}
                                 {/* Creative Scene / Setting */}
                                 <div className="studio-card p-5">
                                     <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-teal-400 text-lg">photo_camera</span>Creative Scene</h3>
-                                    <div className="grid grid-cols-3 gap-1.5">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
                                         {[
                                             {id:'auto',l:'🎲 Auto',d:'AI picks best scene'},
                                             {id:'studio',l:'📸 Studio',d:'Clean studio backdrop'},
@@ -4023,7 +4023,7 @@ setCampCopies(errCopies);}
                                     )}
                                 </div>
                                 {/* Nav */}
-                                <div className="flex gap-3">
+                                <div className="flex flex-col sm:flex-row gap-3">
                                     <button onClick={()=>setCampStep(1)} className="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer"><span className="material-symbols-outlined text-lg">arrow_back</span>Back</button>
                                     <button onClick={()=>setCampStep(3)} className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 text-white text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer">Next: Generate<span className="material-symbols-outlined text-lg">arrow_forward</span></button>
                                 </div>
@@ -4656,7 +4656,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                                                 </button>
                                                             </div>
                                                         ) : (
-                                                            <div className="grid grid-cols-3 gap-2">
+                                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                                                 {/* Upload from system */}
                                                                 <label className="flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 border-dashed border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] hover:border-primary/30 cursor-pointer transition-all text-center">
                                                                     <span className="material-symbols-outlined text-lg text-slate-500">upload_file</span>
@@ -4702,7 +4702,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                                                     <button onClick={() => setNewTmpl(p => ({ ...p, _showBrandImages: false }))}
                                                                         className="text-xs text-slate-500 hover:text-white cursor-pointer">✕</button>
                                                                 </div>
-                                                                <div className="grid grid-cols-4 gap-1.5 max-h-32 overflow-y-auto">
+                                                                <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-32 overflow-y-auto">
                                                                     {newTmpl._brandImageList.map((img, i) => (
                                                                         <img key={i} src={img.url} alt=""
                                                                             className="w-full h-16 object-cover rounded-lg cursor-pointer border-2 border-transparent hover:border-primary transition-all"
@@ -5921,8 +5921,8 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                         className="max-w-full max-h-[65vh] object-contain rounded-2xl shadow-2xl" />
 
                                     {/* Info bar */}
-                                    <div className="mt-4 w-full max-w-2xl">
-                                        <div className="flex items-center justify-between mb-3">
+                                    <div className="mt-4 w-full max-w-2xl px-4">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                                             <div>
                                                 <p className="text-white font-bold text-sm">{img.title || 'AI Generated Image'}</p>
                                                 <p className="text-slate-400 text-[11px]">
@@ -5931,7 +5931,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                                 </p>
                                             </div>
                                             {img.prompt && (
-                                                <p className="text-slate-500 text-xs max-w-xs text-right italic truncate">"{img.prompt}"</p>
+                                                <p className="text-slate-500 text-xs sm:max-w-xs sm:text-right italic line-clamp-2" title={img.prompt}>"{img.prompt}"</p>
                                             )}
                                         </div>
 
@@ -5992,46 +5992,46 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
             {refPickerSlot && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in"
                     onClick={() => setRefPickerSlot(null)}>
-                    <div className="bg-[#1a1a2e] rounded-2xl shadow-2xl overflow-hidden animate-scale-in flex"
+                    <div className="bg-[#1a1a2e] rounded-2xl shadow-2xl overflow-hidden animate-scale-in flex flex-col md:flex-row"
                         style={{ width: '720px', maxWidth: '92vw', height: '520px', maxHeight: '85vh' }}
                         onClick={e => e.stopPropagation()}>
 
                         {/* ── Left Sidebar ── */}
-                        <div className="w-[200px] flex-shrink-0 bg-[#12121f] border-r border-white/[0.06] flex flex-col">
+                        <div className="w-full md:w-[200px] flex-shrink-0 bg-[#12121f] border-b md:border-b-0 md:border-r border-white/[0.06] flex flex-col">
                             {/* Header */}
                             <div className="p-4 pb-3">
                                 <h3 className="text-sm font-extrabold text-white capitalize flex items-center gap-2">
                                     <span className="material-symbols-outlined text-primary text-lg">image_search</span>
                                     {refPickerSlot?.startsWith('character-') ? 'Add Character' : refPickerSlot === 'style' ? 'Style Reference' : 'Reference Image'}
                                 </h3>
-                                <p className="text-[10px] text-slate-500 mt-1">
+                                <p className="text-[10px] text-slate-500 mt-1 hidden md:block">
                                     {refPickerSlot?.startsWith('character-') ? 'Pick a person, mascot, or character to include in your design' : refPickerSlot === 'style' ? 'Pick an image to match its visual style' : 'Pick an image for context'}
                                 </p>
                             </div>
 
-                            {/* Source tabs — vertical */}
-                            <div className="flex flex-col gap-1 px-3">
+                            {/* Source tabs — vertical on md+, horizontal on mobile */}
+                            <div className="flex flex-row md:flex-col gap-1 px-3 pb-2 md:pb-0 overflow-x-auto md:overflow-x-visible scrollbar-hide">
                                 {[
                                     { id: 'upload', icon: 'cloud_upload', label: 'Upload', subtitle: 'From device' },
                                     { id: 'bank', icon: 'photo_library', label: 'Library', subtitle: `${bankImages.length} images` },
                                     { id: 'brand', icon: 'domain', label: 'Brand Assets', subtitle: `${brandImages.length} images` },
                                 ].map(t => (
                                     <button key={t.id} onClick={() => setRefPickerTab(t.id)}
-                                        className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer
+                                        className={`flex-shrink-0 flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer
                                             ${refPickerTab === t.id
                                                 ? 'bg-primary/15 text-white border border-primary/30'
                                                 : 'text-slate-400 hover:text-white hover:bg-white/[0.04] border border-transparent'}`}>
                                         <span className={`material-symbols-outlined text-base ${refPickerTab === t.id ? 'text-primary' : ''}`}>{t.icon}</span>
                                         <div>
                                             <p className="text-xs font-bold">{t.label}</p>
-                                            <p className="text-[9px] text-slate-500">{t.subtitle}</p>
+                                            <p className="text-[9px] text-slate-500 hidden md:block">{t.subtitle}</p>
                                         </div>
                                     </button>
                                 ))}
                             </div>
 
-                            {/* Upload panel always visible at bottom */}
-                            <div className="mt-auto p-3">
+                            {/* Upload panel always visible at bottom on desktop */}
+                            <div className="mt-auto p-3 hidden md:block">
                                 <label className="flex flex-col items-center justify-center p-4 rounded-xl border-2 border-dashed border-white/[0.08] hover:border-primary/40 cursor-pointer bg-white/[0.02] transition-all hover:bg-white/[0.04] group">
                                     <span className="material-symbols-outlined text-2xl text-slate-500 group-hover:text-primary mb-1">add_photo_alternate</span>
                                     <span className="text-[10px] text-slate-400 group-hover:text-white font-medium">Upload image</span>

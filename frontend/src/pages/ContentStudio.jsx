@@ -230,7 +230,7 @@ function SmartInput({ onParse, onSkip }) {
 
 function StepGoal({ onSelect }) {
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 max-w-4xl mx-auto">
             {GOALS.map((g, i) => (
                 <button key={g.id} onClick={() => onSelect(g.id)}
                     className="glass-panel rounded-2xl p-5 text-left hover:border-primary/30 hover:scale-[1.02] transition-all cursor-pointer group animate-fade-in"
@@ -260,7 +260,7 @@ function StepSubType({ goal, onSelect, onBack }) {
                     <p className="text-sm text-slate-400">What specifically?</p>
                 </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {goalData?.subTypes.map((st, i) => (
                     <button key={st.id} onClick={() => onSelect(st.id)}
                         className="glass-panel rounded-xl p-4 text-left hover:bg-white/[0.06] hover:border-primary/30 transition-all cursor-pointer animate-fade-in group"
@@ -297,7 +297,7 @@ function StepChannel({ onSelect, onBack, goal }) {
             </button>
             <h3 className="text-xl font-extrabold text-white mb-2">Where will this be <span className="text-primary">published?</span></h3>
             <p className="text-sm text-slate-400 mb-6">Content will be auto-optimized for the selected platform{selected.length > 1 ? 's' : ''}.</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {CHANNELS.map((ch, i) => (
                     <button key={ch.id} onClick={() => handleToggle(ch.id)}
                         className={`glass-panel rounded-xl p-4 text-center transition-all cursor-pointer animate-fade-in ${selected.includes(ch.id) || (ch.id === 'multi' && selected.length > 2)
@@ -512,7 +512,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                                 reader.readAsDataURL(file)
                             }
                         }} onDragOver={e => e.preventDefault()}
-                            className="border-2 border-dashed border-white/[0.1] rounded-2xl p-10 text-center hover:border-primary/40 transition-colors">
+                            className="border-2 border-dashed border-white/[0.1] rounded-2xl p-6 sm:p-10 text-center hover:border-primary/40 transition-colors">
                             <span className="material-symbols-outlined text-4xl text-slate-600 mb-3 block">add_photo_alternate</span>
                             <p className="text-slate-400 mb-2 text-sm">Drag & drop a product image or creative</p>
                             <p className="text-xs text-slate-600 mb-3">AI will analyze the image and create a content brief</p>
@@ -664,7 +664,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
 
                     {/* Image grid */}
                     {!libraryLoading && libraryImages.length > 0 && (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto pr-1">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[400px] overflow-y-auto pr-1">
                             {libraryImages.map(img => (
                                 <button key={img._id} onClick={() => {
                                     setImagePreview(img.imageUrl)
@@ -1168,7 +1168,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                                     </button>
                                 )}
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <input value={q.name} onChange={e => updateQuote(idx, 'name', e.target.value)}
                                     placeholder="Full Name" className="input-glass py-2 px-3 rounded-lg text-xs" />
                                 <input value={q.title} onChange={e => updateQuote(idx, 'title', e.target.value)}
@@ -1233,7 +1233,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                     {/* Media Contact */}
                     <div>
                         <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">Media Contact</p>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <input value={contactName} onChange={e => setContactName(e.target.value)}
                                 placeholder="Contact Name" className="input-glass py-2 px-3 rounded-lg text-xs" />
                             <input value={contactEmail} onChange={e => setContactEmail(e.target.value)}
@@ -2254,7 +2254,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     <p className="text-sm text-slate-300 leading-relaxed line-clamp-3">{result.content}</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                     <button onClick={onCreateVisual}
                         className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-primary/30 transition-all cursor-pointer text-left group border border-white/[0.06]">
                         <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-3 group-hover:scale-110 transition-transform">
@@ -2576,7 +2576,7 @@ function StepProductPicker({ brandId, selectedProduct, onSelect, onBack }) {
                 </div>
             ) : (
                 <>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                         {filtered.map(p => {
                             const isSelected = selectedProduct?._id === p._id
                             return (
@@ -3118,8 +3118,8 @@ SPOKESPERSON QUOTES:`
                                 ${step > i ? 'bg-primary text-white' : step === i ? 'bg-primary/20 text-primary border border-primary/40' : 'bg-white/5 text-slate-600'}`}>
                                 {step > i ? '✓' : i + 1}
                             </div>
-                            <span className={`text-xs font-bold ${step >= i ? 'text-slate-300' : 'text-slate-600'}`}>{lbl}</span>
-                            {i < 4 && <div className={`w-8 h-px ${step > i ? 'bg-primary/40' : 'bg-white/5'}`} />}
+                            <span className={`text-xs font-bold hidden sm:inline ${step >= i ? 'text-slate-300' : 'text-slate-600'}`}>{lbl}</span>
+                            {i < 4 && <div className={`w-4 sm:w-8 h-px ${step > i ? 'bg-primary/40' : 'bg-white/5'}`} />}
                         </div>
                     ))}
                     <div className="ml-auto">
@@ -3369,3 +3369,4 @@ SPOKESPERSON QUOTES:`
         </DashboardLayout>
     )
 }
+
