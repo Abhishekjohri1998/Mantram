@@ -458,7 +458,8 @@ export default function SuperAdminDashboard() {
                 )}
 
                 {/* ═══════ SIDEBAR NAVIGATION ═══════ */}
-                <aside className={`${sidebarCollapsed ? 'w-[60px]' : 'w-[240px]'} flex-shrink-0 bg-gradient-to-b from-white/[0.03] to-transparent border-r border-white/[0.06] transition-all duration-300 sticky top-0 self-start h-screen overflow-y-auto`} style={{ scrollbarWidth: 'none' }}>
+                {/* Inner Sidebar - Hidden on mobile, sticky on desktop */}
+                <aside className={`hidden lg:flex ${sidebarCollapsed ? 'w-[60px]' : 'w-[240px]'} flex-shrink-0 bg-gradient-to-b from-white/[0.03] to-transparent border-r border-white/[0.06] transition-all duration-300 sticky top-0 self-start h-screen overflow-y-auto flex-col`} style={{ scrollbarWidth: 'none' }}>
                     {/* Sidebar Header */}
                     <div className="p-4 border-b border-white/[0.06]">
                         <div className="flex items-center justify-between">
@@ -504,7 +505,30 @@ export default function SuperAdminDashboard() {
                 </aside>
 
                 {/* ═══════ MAIN CONTENT ═══════ */}
-                <div className="flex-1 min-w-0 p-6 lg:p-8">
+                {/* Main Content Area */}
+                <div className="flex-1 min-w-0">
+                    {/* Mobile Tab Navigation - Visible only on mobile */}
+                    <div className="lg:hidden flex items-center gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide no-scrollbar">
+                        {menuGroups.map(group => (
+                            <React.Fragment key={group.title}>
+                                {group.items.map(item => (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => setTab(item.id)}
+                                        className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                                            tab === item.id 
+                                            ? 'bg-primary text-white shadow-lg shadow-primary/20' 
+                                            : 'bg-white/[0.04] text-slate-400 border border-white/[0.06]'
+                                        }`}
+                                    >
+                                        <span className="material-symbols-outlined text-sm">{item.icon}</span>
+                                        {item.label}
+                                    </button>
+                                ))}
+                            </React.Fragment>
+                        ))}
+                    </div>
+
                     {/* ─── TOP BAR: Header + View as User ─── */}
                     <div className="mb-6">
                         <div className="flex items-center justify-between mb-4">
@@ -580,7 +604,7 @@ export default function SuperAdminDashboard() {
                     <div>
                         {loading ? <div className="flex items-center justify-center py-20 text-slate-500"><span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>Loading...</div> : stats && (
                             <>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
+                                <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
                                     <Card icon="group" color="text-blue-400" value={stats.totalUsers} label="Users" />
                                     <Card icon="branding_watermark" color="text-purple-400" value={stats.totalBrands} label="Brands" />
                                     <Card icon="article" color="text-emerald-400" value={stats.totalContent} label="Content" />
@@ -600,7 +624,7 @@ export default function SuperAdminDashboard() {
                                                 Full Analytics <span className="material-symbols-outlined text-sm">arrow_forward</span>
                                             </button>
                                         </div>
-                                        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+                                        <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
                                             {tokenData.providerWallets.map(w => {
                                                 if (w.budget === 0 && w.consumed === 0) return null;
                                                 const remaining = Math.max(0, w.budget - w.consumed);
@@ -624,7 +648,7 @@ export default function SuperAdminDashboard() {
                                         </div>
                                     </div>
                                 )}
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                                <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
                                     <div className="glass-panel rounded-2xl p-5">
                                         <div className="flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-amber-400">payments</span><span className="text-sm font-bold text-white">Revenue</span></div>
                                         <p className="text-2xl font-extrabold text-amber-400">₹{(stats.totalRevenue || 0).toLocaleString()}</p>
@@ -648,7 +672,7 @@ export default function SuperAdminDashboard() {
                                         <p className="text-xs text-slate-600 mt-1">{stats.usageAnalytics?.churnedUsersCount || 0} churned (20d+)</p>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4 mb-5">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
                                     <div className="glass-panel rounded-2xl p-5">
                                         <h3 className="font-bold text-white text-sm mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-primary text-lg">pie_chart</span>Plan Distribution</h3>
                                         <div className="flex gap-3">{(stats.planDistribution || []).map(p => (
@@ -740,7 +764,7 @@ export default function SuperAdminDashboard() {
                                                 Top AI Consumers (Leaderboard)
                                             </h3>
                                             <div className="overflow-x-auto">
-                                                <table className="w-full text-left">
+                                                <table className="w-full text-left min-w-[500px]">
                                                     <thead>
                                                         <tr className="text-[10px] text-slate-500 font-bold uppercase tracking-wider border-b border-white/[0.04]">
                                                             <th className="pb-2">User</th>
@@ -853,7 +877,7 @@ export default function SuperAdminDashboard() {
                         {waitlist.length > 0 ? (
                             <div className="glass-panel rounded-2xl overflow-hidden border border-white/[0.06] shadow-2xl">
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-left">
+                                    <table className="w-full text-left min-w-[800px]">
                                         <thead>
                                             <tr className="text-[10px] text-slate-500 font-black uppercase tracking-[0.1em] border-b border-white/[0.06] bg-white/[0.02]">
                                                 <th className="px-6 py-4">Name & Email</th>
@@ -1142,7 +1166,7 @@ export default function SuperAdminDashboard() {
                         {/* Detailed Usage Table */}
                         <div className="glass-panel rounded-2xl overflow-hidden border border-white/[0.06] shadow-2xl">
                             <div className="overflow-x-auto">
-                                <table className="w-full text-left">
+                                <table className="w-full text-left min-w-[900px]">
                                     <thead>
                                         <tr className="text-[10px] text-slate-500 font-black uppercase tracking-[0.1em] border-b border-white/[0.06] bg-white/[0.02]">
                                             <th className="px-6 py-4">User Identity</th>
@@ -1490,7 +1514,7 @@ export default function SuperAdminDashboard() {
                                     </h4>
                                     {(tokenData.topUsers || []).length > 0 ? (
                                         <div className="overflow-x-auto">
-                                            <table className="w-full text-left">
+                                            <table className="w-full text-left min-w-[700px]">
                                                 <thead>
                                                     <tr className="text-[10px] text-slate-500 font-bold uppercase tracking-wider border-b border-white/[0.04]">
                                                         <th className="pb-2">User</th>
@@ -1580,7 +1604,7 @@ export default function SuperAdminDashboard() {
                                         </div>
                                     )}
                                     {/* Suggestion cards */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 gap-3">
                                         {aiSuggestions.map((s, i) => (
                                             <div key={i} className="relative rounded-xl border border-white/[0.08] p-4 hover:border-purple-500/30 transition-all" style={{ background: `linear-gradient(135deg, ${s.color}08, transparent)` }}>
                                                 {s.badge && <span className="absolute -top-2 right-3 text-[8px] px-2 py-0.5 rounded-full font-bold text-white" style={{ background: s.color }}>{s.badge}</span>}
@@ -2158,7 +2182,7 @@ export default function SuperAdminDashboard() {
                                     {/* Per-Action Table */}
                                     <div className="glass-panel rounded-2xl overflow-hidden border border-white/[0.06]">
                                         <div className="overflow-x-auto">
-                                            <table className="w-full text-left">
+                                            <table className="w-full text-left min-w-[900px]">
                                                 <thead>
                                                     <tr className="text-[10px] text-slate-500 font-bold uppercase tracking-wider border-b border-white/[0.06] bg-white/[0.02]">
                                                         <th className="px-4 py-3">Action</th>
@@ -2473,46 +2497,50 @@ export default function SuperAdminDashboard() {
                                 </div>
 
                                 {/* Table Header */}
-                                <div className="grid grid-cols-[2fr_1.5fr_1fr_0.8fr_1.5fr_1fr] gap-3 px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-white/[0.06] mb-2">
-                                    <span>User</span><span>Brand</span><span>Platform</span><span>Status</span><span>Account</span><span>Last Synced</span>
-                                </div>
-
-                                {/* Table Rows */}
-                                <div className="space-y-1.5">
-                                    {(integrations.integrations || []).map(i => (
-                                        <div
-                                            key={i._id}
-                                            data-integration-row={`${i.user?.name || ''} ${i.user?.email || ''} ${i.brand?.name || ''} ${i.platform || ''}`.toLowerCase()}
-                                            data-platform={i.platform}
-                                            className="grid grid-cols-[2fr_1.5fr_1fr_0.8fr_1.5fr_1fr] gap-3 items-center glass-panel rounded-xl px-4 py-3 hover:bg-white/[0.03] transition-all"
-                                        >
-                                            {/* User */}
-                                            <div className="flex items-center gap-2 min-w-0">
-                                                <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center text-primary text-xs font-bold flex-shrink-0">
-                                                    {i.user?.name?.[0]?.toUpperCase() || '?'}
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <p className="text-sm font-medium text-white truncate">{i.user?.name || 'Unknown'}</p>
-                                                    <p className="text-[10px] text-slate-600 truncate">{i.user?.email}</p>
-                                                </div>
-                                            </div>
-                                            {/* Brand */}
-                                            <div className="min-w-0">
-                                                <p className="text-sm text-slate-300 truncate">{i.brand?.name || '—'}</p>
-                                            </div>
-                                            {/* Platform */}
-                                            <div className="flex items-center gap-1.5">
-                                                <span className="text-lg">{platformIcons[i.platform] || '🔌'}</span>
-                                                <span className="text-xs text-slate-400 capitalize">{(i.platform || '').replace('-', ' ')}</span>
-                                            </div>
-                                            {/* Status */}
-                                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold w-fit ${i.status === 'connected' ? 'bg-emerald-500/15 text-emerald-400' : i.status === 'expired' ? 'bg-amber-500/15 text-amber-400' : 'bg-slate-500/15 text-slate-400'}`}>{i.status}</span>
-                                            {/* Account */}
-                                            <p className="text-xs text-slate-400 truncate">{i.displayName || i.email || '—'}</p>
-                                            {/* Last Synced */}
-                                            <span className="text-xs text-slate-600">{i.lastSyncAt ? new Date(i.lastSyncAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Never'}</span>
+                                <div className="overflow-x-auto pb-2">
+                                    <div className="min-w-[800px]">
+                                        <div className="grid grid-cols-[2fr_1.5fr_1fr_0.8fr_1.5fr_1fr] gap-3 px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-white/[0.06] mb-2">
+                                            <span>User</span><span>Brand</span><span>Platform</span><span>Status</span><span>Account</span><span>Last Synced</span>
                                         </div>
-                                    ))}
+
+                                        {/* Table Rows */}
+                                        <div className="space-y-1.5">
+                                            {(integrations.integrations || []).map(i => (
+                                                <div
+                                                    key={i._id}
+                                                    data-integration-row={`${i.user?.name || ''} ${i.user?.email || ''} ${i.brand?.name || ''} ${i.platform || ''}`.toLowerCase()}
+                                                    data-platform={i.platform}
+                                                    className="grid grid-cols-[2fr_1.5fr_1fr_0.8fr_1.5fr_1fr] gap-3 items-center glass-panel rounded-xl px-4 py-3 hover:bg-white/[0.03] transition-all"
+                                                >
+                                                    {/* User */}
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center text-primary text-xs font-bold flex-shrink-0">
+                                                            {i.user?.name?.[0]?.toUpperCase() || '?'}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm font-medium text-white truncate">{i.user?.name || 'Unknown'}</p>
+                                                            <p className="text-[10px] text-slate-600 truncate">{i.user?.email}</p>
+                                                        </div>
+                                                    </div>
+                                                    {/* Brand */}
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm text-slate-300 truncate">{i.brand?.name || '—'}</p>
+                                                    </div>
+                                                    {/* Platform */}
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-lg">{platformIcons[i.platform] || '🔌'}</span>
+                                                        <span className="text-xs text-slate-400 capitalize">{(i.platform || '').replace('-', ' ')}</span>
+                                                    </div>
+                                                    {/* Status */}
+                                                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold w-fit ${i.status === 'connected' ? 'bg-emerald-500/15 text-emerald-400' : i.status === 'expired' ? 'bg-amber-500/15 text-amber-400' : 'bg-slate-500/15 text-slate-400'}`}>{i.status}</span>
+                                                    {/* Account */}
+                                                    <p className="text-xs text-slate-400 truncate">{i.displayName || i.email || '—'}</p>
+                                                    {/* Last Synced */}
+                                                    <span className="text-xs text-slate-600">{i.lastSyncAt ? new Date(i.lastSyncAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Never'}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {(integrations.integrations || []).length === 0 && (
@@ -2543,7 +2571,7 @@ export default function SuperAdminDashboard() {
 
                         <div className="glass-panel rounded-2xl overflow-hidden border border-white/[0.06]">
                             <div className="overflow-x-auto">
-                                <table className="w-full text-left">
+                                <table className="w-full text-left min-w-[800px]">
                                     <thead>
                                         <tr className="text-xs text-slate-500 font-bold uppercase tracking-wider border-b border-white/[0.06] bg-white/[0.02]">
                                             <th className="px-5 py-4">Action & Target</th>
@@ -2611,7 +2639,7 @@ export default function SuperAdminDashboard() {
                 {/* ════════════ MODALS ════════════ */}
                 {creditModal && (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setCreditModal(null)}>
-                        <div className="glass-panel rounded-2xl p-6 w-[400px] border border-primary/20" onClick={e => e.stopPropagation()}>
+                        <div className="glass-panel rounded-2xl p-6 w-[90%] max-w-sm border border-primary/20" onClick={e => e.stopPropagation()}>
                             <h3 className="font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-emerald-400">add_circle</span>Add Credits — {creditModal.name}</h3>
                             <p className="text-sm text-slate-500 mb-4">Current: {creditModal.creditBalance?.remaining || 0} credits</p>
                             <input type="number" value={creditAmount} onChange={e => setCreditAmount(e.target.value)} placeholder="Credits to add" className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none mb-4" />
@@ -2627,7 +2655,7 @@ export default function SuperAdminDashboard() {
                 )}
                 {planModal && (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setPlanModal(null)}>
-                        <div className="glass-panel rounded-2xl p-6 w-[420px] border border-primary/20" onClick={e => e.stopPropagation()}>
+                        <div className="glass-panel rounded-2xl p-6 w-[95%] max-w-md border border-primary/20" onClick={e => e.stopPropagation()}>
                             <h3 className="font-bold text-white mb-4 flex items-center gap-2"><span className="material-symbols-outlined text-blue-400">upgrade</span>Change Plan — {planModal.name}</h3>
                             <p className="text-sm text-slate-500 mb-4">Current: <strong className="text-white capitalize">{planModal.plan}</strong></p>
                             <div className="space-y-2">
@@ -2820,7 +2848,7 @@ export default function SuperAdminDashboard() {
                                             </select>
                                         </div>
                                         <div className="overflow-x-auto">
-                                            <table className="w-full text-left">
+                                            <table className="w-full text-left min-w-[900px]">
                                                 <thead>
                                                     <tr className="text-[10px] text-slate-500 font-black uppercase tracking-wider border-b border-white/[0.04] bg-white/[0.02]">
                                                         <th className="px-4 py-3">Action</th>
@@ -2945,7 +2973,7 @@ export default function SuperAdminDashboard() {
                                             </h4>
                                         </div>
                                         <div className="overflow-x-auto">
-                                            <table className="w-full text-left">
+                                            <table className="w-full text-left min-w-[800px]">
                                                 <thead>
                                                     <tr className="text-[10px] text-slate-500 font-black uppercase tracking-wider border-b border-white/[0.04] bg-white/[0.02]">
                                                         <th className="px-4 py-3">Model</th>
@@ -2986,7 +3014,7 @@ export default function SuperAdminDashboard() {
                                             </h4>
                                         </div>
                                         <div className="overflow-x-auto">
-                                            <table className="w-full text-left">
+                                            <table className="w-full text-left min-w-[600px]">
                                                 <thead>
                                                     <tr className="text-[10px] text-slate-500 font-black uppercase tracking-wider border-b border-white/[0.04] bg-white/[0.02]">
                                                         <th className="px-4 py-3">Pack</th>
