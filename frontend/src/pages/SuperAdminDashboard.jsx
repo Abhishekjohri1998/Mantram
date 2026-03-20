@@ -509,8 +509,8 @@ export default function SuperAdminDashboard() {
                 <div className="flex-1 min-w-0">
                     {/* Mobile Tab Navigation - Visible only on mobile */}
                     <div className="lg:hidden flex items-center gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide no-scrollbar">
-                        {menuGroups.map(group => (
-                            <React.Fragment key={group.title}>
+                        {navGroups.map(group => (
+                            <React.Fragment key={group.label}>
                                 {group.items.map(item => (
                                     <button
                                         key={item.id}
