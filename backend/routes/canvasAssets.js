@@ -213,7 +213,7 @@ router.post('/ai-generate', protect, requireCredits('canvasGenerate'), async (re
         if (!imageKey) return res.status(400).json({ error: 'GEMINI_API_KEY not configured' })
 
         const baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
-        const models = ['gemini-3.1-flash-image-preview']
+        const models = ['gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image']
         let imageUrl = null
 
         // Build multimodal parts — reference images first, then text prompt
@@ -364,7 +364,7 @@ CREATIVE RULES:
 Output the modified image.`
         parts.push({ text: editText })
 
-        const models = ['gemini-3.1-flash-image-preview']
+        const models = ['gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image']
         let imageUrl = null
 
         for (const modelId of models) {

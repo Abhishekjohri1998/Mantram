@@ -614,8 +614,8 @@ Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhr
 
         console.log(`📸 AI Photo Studio: angle=${cameraAngle} lens=${lens} light=${lightingStyle}/${lightDirection} surface=${surface} model=${modelPresence} mood=${mood?.join(',')} fidelity=${fidelity} ratio=${aspectRatio}`);
 
-        // NanoBanana 2 — direct, no fallback chain
-        const models = ['gemini-3.1-flash-image-preview'];
+        // NanoBanana 2 — direct, with fallbacks for experimental flakiness
+        const models = ['gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image', 'gemini-2.0-flash-exp-image-generation'];
 
         let resultImage = null;
         let resultText = '';

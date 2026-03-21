@@ -108,32 +108,43 @@ export class GeminiProvider extends BaseProvider {
         const [width, height] = size.split('x').map(Number);
         const aspectRatio = width === height ? '1:1' : width > height ? '16:9' : '9:16';
         const imageKey = this.imageApiKey;
-        const modelId = 'gemini-3.1-flash-image-preview'; // NanoBanana 2
+        const models = ['gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image', 'gemini-2.0-flash-exp-image-generation'];
+        let lastError = null;
 
-        const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ role: 'user', parts: [{ text: `Generate an image: ${prompt}` }] }],
-                generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
-            }),
-        });
+        for (const modelId of models) {
+            try {
+                const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ role: 'user', parts: [{ text: `Generate an image: ${prompt}` }] }],
+                        generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+                    }),
+                });
 
-        const data = await response.json();
-        if (data.error) throw new Error(`NanoBanana 2 error: ${data.error.message}`);
+                const data = await response.json();
+                if (data.error) {
+                    lastError = data.error.message;
+                    continue; // try next model
+                }
 
-        const parts = data.candidates?.[0]?.content?.parts || [];
-        for (const part of parts) {
-            if (part.inlineData?.mimeType?.startsWith('image/')) {
-                return {
-                    imageUrl: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`,
-                    model: modelId,
-                    provider: 'gemini',
-                    generationTime: Date.now() - startTime,
-                };
+                const parts = data.candidates?.[0]?.content?.parts || [];
+                for (const part of parts) {
+                    if (part.inlineData?.mimeType?.startsWith('image/')) {
+                        return {
+                            imageUrl: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`,
+                            model: modelId,
+                            provider: 'gemini',
+                            generationTime: Date.now() - startTime,
+                        };
+                    }
+                }
+            } catch (err) {
+                lastError = err.message;
+                continue;
             }
         }
-        throw new Error('NanoBanana 2: no image in response');
+        throw new Error(`NanoBanana/Gemini Image models failed. Last error: ${lastError}`);
     }
 }
