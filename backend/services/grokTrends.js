@@ -58,7 +58,12 @@ async function grokCall(systemPrompt, userPrompt, options = {}) {
 
         const data = await resp.json();
         if (data.error) {
-            console.warn('Grok API error:', data.error.message || data.error);
+            const msg = data.error.message || data.error;
+            if (typeof msg === 'string' && (msg.includes('credits') || msg.includes('spending limit'))) {
+                // Silently return null for billing errors to avoid log spam, fallbacks handle it
+                return null;
+            }
+            console.warn('Grok API error:', msg);
             return null;
         }
 

@@ -56,8 +56,8 @@ import funnelAgenticRoutes from './routes/funnel-agentic.js';
 
 const app = express();
 
-// Required for express-rate-limit when behind a proxy (CloudFront/ALB)
-app.set('trust proxy', 1);
+// Required for express-rate-limit when behind multiple proxies (CloudFront -> ALB -> Nginx)
+app.set('trust proxy', true);
 
 // Connect Database
 connectDB();
