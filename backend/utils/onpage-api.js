@@ -50,7 +50,12 @@ async function fetchInstantPage(url) {
             }]),
             signal: AbortSignal.timeout(30000),
         });
-        if (!resp.ok) { console.warn(`On-Page Instant error: ${resp.status}`); return null; }
+        if (!resp.ok) { 
+            if (resp.status === 402) console.warn('❌ DataForSEO Error: Payment Required (402). Check account balance.');
+            else if (resp.status === 429) console.warn('⚠️ DataForSEO Warning: Rate Limit Exceeded (429).');
+            else console.warn(`On-Page Instant error: ${resp.status}`); 
+            return null; 
+        }
         const data = await resp.json();
         if (data.status_code !== 20000) return null;
         
@@ -92,7 +97,12 @@ async function submitOnPageCrawl(domain, options = {}) {
             }]),
             signal: AbortSignal.timeout(15000),
         });
-        if (!resp.ok) { console.warn(`On-Page Task POST error: ${resp.status}`); return null; }
+        if (!resp.ok) { 
+            if (resp.status === 402) console.warn('❌ DataForSEO Error: Payment Required (402). Check account balance.');
+            else if (resp.status === 429) console.warn('⚠️ DataForSEO Warning: Rate Limit Exceeded (429).');
+            else console.warn(`On-Page Task POST error: ${resp.status}`); 
+            return null; 
+        }
         const data = await resp.json();
         if (data.status_code !== 20000) return null;
         const taskId = data.tasks?.[0]?.id;
@@ -208,7 +218,12 @@ async function fetchRankedKeywords(domain, options = {}) {
             }]),
             signal: AbortSignal.timeout(20000),
         });
-        if (!resp.ok) { console.warn(`Ranked Keywords error: ${resp.status}`); return null; }
+        if (!resp.ok) { 
+            if (resp.status === 402) console.warn('❌ DataForSEO Error: Payment Required (402). Check account balance.');
+            else if (resp.status === 429) console.warn('⚠️ DataForSEO Warning: Rate Limit Exceeded (429).');
+            else console.warn(`Ranked Keywords error: ${resp.status}`); 
+            return null; 
+        }
         const data = await resp.json();
         if (data.status_code !== 20000) return null;
         

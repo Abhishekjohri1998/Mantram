@@ -14,7 +14,8 @@ let razorpay;
 function getRazorpay() {
     if (!razorpay) {
         if (!config.razorpay?.keyId || !config.razorpay?.keySecret) {
-            throw new Error('Razorpay keys not configured — set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in .env');
+            console.error('❌ RAZORPAY CONFIG ERROR: Missing KEY_ID or KEY_SECRET in .env');
+            throw new Error('Razorpay keys not configured — set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in .env (and restart server)');
         }
         razorpay = new Razorpay({
             key_id: config.razorpay.keyId,
