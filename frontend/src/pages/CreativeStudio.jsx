@@ -657,6 +657,25 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const activeBrandIdRef = useRef(activeBrand?._id)
 
     // ── Helper Functions ──
+    async function handleDownloadImage(url, filename) {
+        if (!url) return
+        try {
+            const res = await fetch(url)
+            const blob = await res.blob()
+            const blobUrl = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = blobUrl
+            a.download = filename || 'mantram-creative.png'
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            window.URL.revokeObjectURL(blobUrl)
+        } catch (err) {
+            console.error('Download failed, falling back to new tab:', err)
+            window.open(url, '_blank')
+        }
+    }
+
     function getSignal() {
         if (abortControllerRef.current) abortControllerRef.current.abort()
         abortControllerRef.current = new AbortController()
@@ -2143,14 +2162,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <span className="material-symbols-outlined text-sm">{feedbackState === 'accepted' ? 'check_circle' : 'check'}</span>
                                     {feedbackState === 'accepted' ? ' Accepted ✓' : ' Accept'}
                                 </button>
-                                <button onClick={() => {
-                                    if (result?.imageUrl) {
-                                        const a = document.createElement('a')
-                                        a.href = result.imageUrl
-                                        a.download = `${result.title || 'creative'}.png`
-                                        a.click()
-                                    }
-                                }}
+                                <button onClick={() => handleDownloadImage(result?.imageUrl, `${result?.title || 'creative'}.png`)}
                                     className="btn-glass py-2.5 px-6 rounded-xl text-sm border border-white/[0.1] text-white cursor-pointer hover:bg-white/[0.06]">
                                     <span className="material-symbols-outlined text-sm">download</span> Export
                                 </button>
@@ -6534,10 +6546,10 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                             <img src={vtoHdResult || vtoPreviewResult} alt="Virtual Try-On Result" className="w-full h-full object-contain max-h-[500px]" />
                                         </div>
                                         <div className="flex gap-2">
-                                            <a href={vtoHdResult || vtoPreviewResult} download="try-on-result.png" target="_blank" rel="noreferrer"
+                                            <button onClick={() => handleDownloadImage(vtoHdResult || vtoPreviewResult, "try-on-result.png")}
                                                 className="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer">
                                                 <span className="material-symbols-outlined text-lg">download</span>Download
-                                            </a>
+                                            </button>
                                             <button onClick={() => { setVtoPersonImage(null); setVtoGarmentImage(null); setVtoPreviewResult(null); setVtoHdResult(null); setVtoError('') }}
                                                 className="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer">
                                                 <span className="material-symbols-outlined text-lg">restart_alt</span>Start Over
@@ -6949,10 +6961,10 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                             <img src={mockupResult} alt="Lifestyle Mockup" className="w-full h-full object-contain max-h-[500px]" />
                                         </div>
                                         <div className="flex gap-2">
-                                            <a href={mockupResult} download="lifestyle-mockup.png" target="_blank" rel="noreferrer"
+                                            <button onClick={() => handleDownloadImage(mockupResult, "lifestyle-mockup.png")}
                                                 className="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer">
                                                 <span className="material-symbols-outlined text-lg">download</span>Download
-                                            </a>
+                                            </button>
                                             <button onClick={() => { setMockupResult(null); setMockupScenePrompt('') }}
                                                 className="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer">
                                                 <span className="material-symbols-outlined text-lg">restart_alt</span>Try Another Scene
@@ -7259,10 +7271,10 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                             <img src={logoResult} alt="Logo Mockup" className="w-full h-full object-contain max-h-[500px]" />
                                         </div>
                                         <div className="flex gap-2">
-                                            <a href={logoResult} download="logo-mockup.png" target="_blank" rel="noreferrer"
+                                            <button onClick={() => handleDownloadImage(logoResult, "logo-mockup.png")}
                                                 className="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer">
                                                 <span className="material-symbols-outlined text-lg">download</span>Download
-                                            </a>
+                                            </button>
                                             <button onClick={() => { setLogoResult(null); setLogoSurface('') }}
                                                 className="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-white text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer">
                                                 <span className="material-symbols-outlined text-lg">restart_alt</span>Try Another Surface
