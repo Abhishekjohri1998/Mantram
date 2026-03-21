@@ -173,14 +173,14 @@ export const MODEL_CAPABILITIES = {
     },
     'grok-imagine': {
         id: 'grok-imagine', name: 'Grok Imagine', icon: '🤖', provider: 'grok',
-        description: 'xAI native video — fast, affordable, 1-15s',
+        description: 'xAI native video — fast, affordable, 1-15s, image-to-video',
         bestFor: 'Social reels, creative experiments, quick turnaround',
         duration: { min: 1, max: 15, native: 15, step: 1 },
         resolutions: ['480p', '720p'],
-        aspectRatios: ['16:9', '9:16', '1:1'],
+        aspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'],
         features: {
             firstFrame: true, lastFrame: false, referenceImages: false,
-            extendVideo: false, multiShot: false, nativeAudio: false,
+            extendVideo: false, multiShot: false, nativeAudio: true,
             voiceIds: false, cameraControl: false,
         },
         maxReferenceImages: 0,
@@ -310,13 +310,14 @@ async function submitGrokVideoGeneration({ prompt, imageUrl, duration, resolutio
         resolution: res,
     };
 
-    // Image-to-video
+    // Image-to-video: xAI API requires nested { image: { url: "..." } } format
+    // Reference: https://docs.x.ai/docs/guides/video-generation#generate-videos-from-images
     if (imageUrl) {
-        payload.image_url = imageUrl;
+        payload.image = { url: imageUrl };
     }
 
     console.log(`🎬 Submitting to Grok Imagine: grok-imagine-video (${dur}s, ${res}, ratio: ${aspectRatio || '16:9'})`);
-    console.log(`   📸 image_url: ${payload.image_url ? payload.image_url.substring(0, 120) + '...' : 'NONE (text-to-video)'}`);
+    console.log(`   📸 image: ${payload.image?.url ? payload.image.url.substring(0, 120) + '...' : 'NONE (text-to-video)'}`);
     console.log(`   📝 prompt: ${prompt.substring(0, 120)}...`);
     console.log(`   📦 Full payload:`, JSON.stringify(payload, null, 2).substring(0, 600));
 

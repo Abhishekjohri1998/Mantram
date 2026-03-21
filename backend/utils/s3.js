@@ -40,7 +40,8 @@ export const uploadToS3 = async (fileContent, fileName, mimeType = "image/png") 
                 Key: key,
                 Body: buffer,
                 ContentType: mimeType,
-                ACL: "public-read",
+                // Note: ACL removed — bucket uses "Bucket owner enforced" (ACLs disabled).
+                // Public access is controlled via bucket policy or CloudFront.
             },
         });
 

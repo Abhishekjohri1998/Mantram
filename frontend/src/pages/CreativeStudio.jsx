@@ -354,12 +354,13 @@ export default function CreativeStudio() {
     const [animateError, setAnimateError] = useState('')
     const animatePollRef = useRef(null)
 
+    // Synced with backend MODEL_CAPABILITIES (falClient.js) + xAI/fal.ai/PiAPI API docs
     const ANIMATE_MODELS = {
-        'grok-imagine': { name: 'Grok Imagine', icon: '🤖', dur: [1, 15], ratios: ['16:9', '9:16', '1:1'] },
-        'seedance-2.0': { name: 'Seedance 2.0', icon: '🎞️', dur: [4, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'] },
-        'kling-3.0': { name: 'Kling 3.0', icon: '🎥', dur: [3, 15], ratios: ['16:9', '9:16', '1:1'] },
-        'veo-3.1': { name: 'Veo 3.1', icon: '🎬', dur: [4, 8], ratios: ['16:9', '9:16'] },
-        'seedance-1.0': { name: 'Seedance 1.0', icon: '🌱', dur: [5, 10], ratios: ['16:9', '9:16', '1:1', '4:3'] },
+        'grok-imagine': { name: 'Grok Imagine', icon: '🤖', dur: [1, 15], ratios: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'], firstFrame: true, refImages: false, nativeAudio: true, desc: 'Fast, affordable, image-to-video' },
+        'seedance-2.0': { name: 'Seedance 2.0', icon: '🎞️', dur: [4, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'], firstFrame: true, refImages: true, nativeAudio: true, desc: 'Cinematic, camera control' },
+        'kling-3.0': { name: 'Kling 3.0', icon: '🎥', dur: [3, 15], ratios: ['16:9', '9:16', '1:1'], firstFrame: true, refImages: false, nativeAudio: true, desc: 'Best motion & physics' },
+        'veo-3.1': { name: 'Veo 3.1', icon: '🎬', dur: [4, 8], ratios: ['16:9', '9:16'], firstFrame: true, refImages: true, nativeAudio: true, desc: 'Premium cinematic quality' },
+        'seedance-1.0': { name: 'Seedance 1.0', icon: '🌱', dur: [5, 10], ratios: ['16:9', '9:16', '1:1', '4:3', '3:4'], firstFrame: true, refImages: false, nativeAudio: false, desc: 'Fast & affordable' },
     }
 
     // ── Animate: AI Prompt Suggestion ──
@@ -378,12 +379,19 @@ export default function CreativeStudio() {
             // some image models like NanoBanana currently force 1:1).
             setAnimateAspectRatio(aspectRatio || '1:1')
 
+            // Include the original image prompt context so AI can create a
+            // contextually relevant animation prompt (not just visual analysis)
+            const originalContext = prompt?.trim()
+                ? `\n\nORIGINAL IMAGE PROMPT (use this for context about what was intended): "${prompt.trim()}"`
+                : ''
+
             // Ask AI to describe optimal animation
             const data = await nexusAPI.chat(
                 `You are an expert animation director. Analyze this image and write a concise animation prompt (2-3 sentences max) describing the ideal motion, camera movement, and mood to bring this still image to life as a short video. Focus on:
 - What should move (subject, background, particles)
 - Camera motion (pan, zoom, dolly, static)
 - Atmosphere (lighting shifts, particle effects)
+${originalContext}
 
 Be specific and cinematic. Do NOT describe the image — describe the MOTION only. Output ONLY the prompt, nothing else.`,
                 activeBrand?._id,
@@ -2176,13 +2184,34 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             {animateModalOpen && (
                                 <div className="mt-4 studio-card p-6 fade-up border border-violet-500/20" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.03), rgba(236,72,153,0.03))' }}>
                                     <div className="flex items-center justify-between mb-4">
-                                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-violet-400">animation</span>
-                                            Animate Creative
-                                        </h4>
+                                        <div className="flex items-center gap-3">
+                                            {/* Image thumbnail preview */}
+                                            {result?.imageUrl && (
+                                                <img src={result.imageUrl} alt="Source" className="w-10 h-10 rounded-lg object-cover border border-violet-500/30" />
+                                            )}
+                                            <div>
+                                                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                                                    <span className="material-symbols-outlined text-violet-400">animation</span>
+                                                    Animate Creative
+                                                </h4>
+                                                <p className="text-[10px] text-slate-500 mt-0.5">{ANIMATE_MODELS[animateModel]?.desc || ''}</p>
+                                            </div>
+                                        </div>
                                         <div className="flex items-center gap-2">
+                                            {/* Dynamic capability badges based on selected model */}
+                                            <div className="flex gap-1">
+                                                {ANIMATE_MODELS[animateModel]?.firstFrame && (
+                                                    <span className="text-[9px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full border border-emerald-500/20">🖼️ First Frame</span>
+                                                )}
+                                                {ANIMATE_MODELS[animateModel]?.nativeAudio && (
+                                                    <span className="text-[9px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded-full border border-cyan-500/20">🔊 Audio</span>
+                                                )}
+                                                {ANIMATE_MODELS[animateModel]?.refImages && (
+                                                    <span className="text-[9px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-full border border-amber-500/20">📎 Ref Images</span>
+                                                )}
+                                            </div>
                                             <span className="text-xs text-slate-500 bg-white/[0.05] px-2 py-0.5 rounded-full">
-                                                {animateAspectRatio} • First Frame
+                                                {animateAspectRatio}
                                             </span>
                                             <button onClick={() => { setAnimateModalOpen(false); if (animatePollRef.current) clearInterval(animatePollRef.current) }}
                                                 className="text-slate-500 hover:text-white cursor-pointer">
@@ -2243,7 +2272,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 {/* Aspect Ratio */}
                                                 <div className="flex flex-col gap-1">
                                                     <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Ratio</span>
-                                                    <div className="flex gap-1">
+                                                    <div className="flex gap-1 flex-wrap">
                                                         {(ANIMATE_MODELS[animateModel]?.ratios || ['1:1']).map(r => (
                                                             <button key={r} onClick={() => setAnimateAspectRatio(r)}
                                                                 disabled={animateGenerating}
