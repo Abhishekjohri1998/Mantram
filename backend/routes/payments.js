@@ -360,7 +360,7 @@ router.post('/verify-topup', protect, async (req, res) => {
                 $inc: { 'credits.topUp': credits },
                 $set: { 'credits.topUpExpiry': expiry },
             },
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         // Update pack purchase stats

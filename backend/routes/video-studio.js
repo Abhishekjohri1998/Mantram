@@ -1569,7 +1569,7 @@ router.get('/ugc/:videoId/status', protect, async (req, res) => {
                     'generation.completedAt': new Date(),
                     finalVideoUrl: statusData.videoUrl,
                 },
-                { new: true }
+                { returnDocument: 'after' }
             );
 
             if (statusData.videoUrl && project) {

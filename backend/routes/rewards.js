@@ -109,7 +109,7 @@ router.post('/claim-milestone', protect, async (req, res) => {
                 $set: { [`milestones.${milestoneId}`]: true },
                 $inc: { 'credits.bonus': reward.credits },
             },
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         console.log(`🎯 Milestone claimed: ${user.email} → ${milestoneId} (+${reward.credits} credits)`);
