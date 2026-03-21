@@ -37,6 +37,43 @@ const FILTERS = [
     { id: 'blur', label: 'Blur' },
 ]
 
+// ── Expanded Color Palette ──
+const COLOR_PALETTE = [
+    // Row 1 – Reds
+    '#ef4444','#dc2626','#b91c1c','#991b1b',
+    // Row 2 – Oranges
+    '#f97316','#ea580c','#c2410c','#9a3412',
+    // Row 3 – Yellows / Amber
+    '#f59e0b','#d97706','#b45309','#fbbf24',
+    // Row 4 – Greens
+    '#22c55e','#16a34a','#15803d','#166534',
+    // Row 5 – Teals
+    '#14b8a6','#0d9488','#0f766e','#115e59',
+    // Row 6 – Blues
+    '#3b82f6','#2563eb','#1d4ed8','#1e40af',
+    // Row 7 – Indigos
+    '#6366f1','#4f46e5','#4338ca','#3730a3',
+    // Row 8 – Purples
+    '#a855f7','#9333ea','#7c3aed','#6d28d9',
+    // Row 9 – Pinks
+    '#ec4899','#db2777','#be185d','#9d174d',
+    // Row 10 – Neutrals
+    '#ffffff','#f1f5f9','#94a3b8','#475569',
+    '#1e293b','#0f172a','#000000','transparent',
+]
+
+// ── Shadow Presets ──
+const SHADOW_PRESETS = [
+    { label: 'None', color: 'rgba(0,0,0,0)', blur: 0, offsetX: 0, offsetY: 0 },
+    { label: 'Subtle', color: 'rgba(0,0,0,0.15)', blur: 8, offsetX: 0, offsetY: 2 },
+    { label: 'Medium', color: 'rgba(0,0,0,0.25)', blur: 16, offsetX: 0, offsetY: 4 },
+    { label: 'Dramatic', color: 'rgba(0,0,0,0.4)', blur: 32, offsetX: 0, offsetY: 8 },
+    { label: 'Glow', color: 'rgba(99,102,241,0.5)', blur: 24, offsetX: 0, offsetY: 0 },
+    { label: 'Neon', color: 'rgba(236,72,153,0.6)', blur: 20, offsetX: 0, offsetY: 0 },
+    { label: 'Hard', color: 'rgba(0,0,0,0.5)', blur: 0, offsetX: 4, offsetY: 4 },
+    { label: 'Float', color: 'rgba(0,0,0,0.2)', blur: 40, offsetX: 0, offsetY: 16 },
+]
+
 // ── Element Categories (Canva-style) ──
 const ELEMENT_CATEGORIES = {
     text: { label: 'Text', icon: 'text_fields', items: [
@@ -4889,7 +4926,7 @@ function CanvasEditorInner() {
                                             {fidatoRecording ? 'stop_circle' : fidatoTranscribing ? 'hourglass_top' : 'mic'}
                                         </span>
                                     </button>
-                                    <button className="ce-fidato-send-btn" onClick={handleFidatoSend} disabled={fidatoLoading || !fidatoInput.trim()}>
+                                    <button className="ce-fidato-send-btn" onClick={() => handleFidatoSend()} disabled={fidatoLoading || !fidatoInput.trim()}>
                                         <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{fidatoLoading ? 'progress_activity' : 'arrow_upward'}</span>
                                     </button>
                                 </div>
@@ -4970,20 +5007,26 @@ function CanvasEditorInner() {
                             {/* Color */}
                             <div style={{ marginBottom: 8 }}>
                                 <p style={{ fontSize: 10, color: '#475569', marginBottom: 4, fontWeight: 600 }}>COLOR</p>
-                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                                    {(activeBrand?.dna?.colors || []).map((c, i) => (
-                                        <div key={i} className="ce-color-swatch" style={{ background: c.hex }}
-                                            onClick={() => setTextColor(c.hex)} title={c.hex} />
+                                {/* Brand colors */}
+                                {(activeBrand?.dna?.colors || []).length > 0 && (
+                                    <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
+                                        {(activeBrand?.dna?.colors || []).map((c, i) => (
+                                            <div key={`brand-${i}`} className="ce-color-swatch" style={{ background: c.hex, boxShadow: '0 0 0 1.5px rgba(255,255,255,0.15)' }}
+                                                onClick={() => setTextColor(c.hex)} title={`Brand: ${c.hex}`} />
+                                        ))}
+                                    </div>
+                                )}
+                                {/* Full palette */}
+                                <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                                    {COLOR_PALETTE.map(c => (
+                                        <div key={c} className="ce-color-swatch" style={{ background: c === 'transparent' ? 'repeating-conic-gradient(#ccc 0% 25%, transparent 0% 50%) 50% / 10px 10px' : c, border: (c === '#000000' || c === 'transparent' || c === '#0f172a' || c === '#1e293b') ? '1px solid rgba(255,255,255,0.2)' : 'none' }}
+                                            onClick={() => setTextColor(c)} title={c} />
                                     ))}
-                                    <div className="ce-color-swatch" style={{ background: '#ffffff' }}
-                                        onClick={() => setTextColor('#ffffff')} title="White" />
-                                    <div className="ce-color-swatch" style={{ background: '#000000', border: '1px solid rgba(255,255,255,0.2)' }}
-                                        onClick={() => setTextColor('#000000')} title="Black" />
-                                    <div className="ce-color-swatch" style={{ background: '#f87171' }} onClick={() => setTextColor('#f87171')} title="Red" />
-                                    <div className="ce-color-swatch" style={{ background: '#fbbf24' }} onClick={() => setTextColor('#fbbf24')} title="Yellow" />
-                                    <div className="ce-color-swatch" style={{ background: '#34d399' }} onClick={() => setTextColor('#34d399')} title="Green" />
-                                    <div className="ce-color-swatch" style={{ background: '#60a5fa' }} onClick={() => setTextColor('#60a5fa')} title="Blue" />
-                                    <div className="ce-color-swatch" style={{ background: '#a78bfa' }} onClick={() => setTextColor('#a78bfa')} title="Purple" />
+                                </div>
+                                {/* Native picker */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                                    <input type="color" value={(() => { const fc = fabricRef.current; return fc?.getActiveObject()?.fill || '#ffffff' })()} onChange={e => setTextColor(e.target.value)} style={{ width: 24, height: 24, border: 'none', padding: 0, background: 'transparent', cursor: 'pointer' }} />
+                                    <span style={{ fontSize: 10, color: '#64748b' }}>Custom color</span>
                                 </div>
                             </div>
                             {/* Alignment */}
@@ -5029,15 +5072,190 @@ function CanvasEditorInner() {
                             </div>
                             <div style={{ marginBottom: 8 }}>
                                 <p style={{ fontSize: 10, color: '#475569', marginBottom: 4, fontWeight: 600 }}>FILL COLOR</p>
-                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                                    {['#6366f1', '#f87171', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa', '#f472b6', '#ffffff', '#000000', 'transparent'].map(c => (
-                                        <div key={c} className="ce-color-swatch" style={{ background: c === 'transparent' ? 'repeating-conic-gradient(#ccc 0% 25%, transparent 0% 50%) 50% / 12px 12px' : c, border: c === '#000000' || c === 'transparent' ? '1px solid rgba(255,255,255,0.2)' : 'none' }}
+                                <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                                    {COLOR_PALETTE.map(c => (
+                                        <div key={c} className="ce-color-swatch" style={{ background: c === 'transparent' ? 'repeating-conic-gradient(#ccc 0% 25%, transparent 0% 50%) 50% / 10px 10px' : c, border: (c === '#000000' || c === 'transparent' || c === '#0f172a' || c === '#1e293b') ? '1px solid rgba(255,255,255,0.2)' : 'none' }}
                                             onClick={() => {
                                                 const fc = fabricRef.current; const obj = fc?.getActiveObject()
                                                 if (obj) { obj.set('fill', c); fc.renderAll(); saveHistory() }
                                             }} title={c} />
                                     ))}
                                 </div>
+                                {/* Native picker */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                                    <input type="color" value={(() => { const fc = fabricRef.current; const o = fc?.getActiveObject(); return (o?.fill && typeof o.fill === 'string' && o.fill !== 'transparent') ? o.fill : '#6366f1' })()} onChange={e => {
+                                        const fc = fabricRef.current; const obj = fc?.getActiveObject()
+                                        if (obj) { obj.set('fill', e.target.value); fc.renderAll(); saveHistory() }
+                                    }} style={{ width: 24, height: 24, border: 'none', padding: 0, background: 'transparent', cursor: 'pointer' }} />
+                                    <span style={{ fontSize: 10, color: '#64748b' }}>Custom fill</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── BORDER & STROKE PANEL — any selected object ── */}
+                    {selectedLayer && (
+                        <div className="ce-panel">
+                            <div className="ce-panel-title">
+                                <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#818cf8' }}>border_style</span>
+                                Border & Stroke
+                            </div>
+                            {/* Border width */}
+                            <div style={{ marginBottom: 8 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#64748b', marginBottom: 4 }}>
+                                    <span>Width</span>
+                                    <span>{(() => { const fc = fabricRef.current; return fc?.getActiveObject()?.strokeWidth || 0 })()}px</span>
+                                </div>
+                                <input type="range" className="ce-slider" min={0} max={20} value={(() => { const fc = fabricRef.current; return fc?.getActiveObject()?.strokeWidth || 0 })()} onChange={e => {
+                                    const fc = fabricRef.current; const obj = fc?.getActiveObject()
+                                    if (obj) { obj.set('strokeWidth', parseInt(e.target.value)); if (!obj.stroke && parseInt(e.target.value) > 0) obj.set('stroke', '#ffffff'); fc.renderAll(); saveHistory() }
+                                }} />
+                            </div>
+                            {/* Border color */}
+                            <div style={{ marginBottom: 8 }}>
+                                <p style={{ fontSize: 10, color: '#475569', marginBottom: 4, fontWeight: 600 }}>STROKE COLOR</p>
+                                <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                                    {['#ffffff','#000000','#ef4444','#f97316','#f59e0b','#22c55e','#3b82f6','#6366f1','#a855f7','#ec4899','transparent'].map(c => (
+                                        <div key={`stroke-${c}`} className="ce-color-swatch" style={{ background: c === 'transparent' ? 'repeating-conic-gradient(#ccc 0% 25%, transparent 0% 50%) 50% / 10px 10px' : c, border: (c === '#000000' || c === 'transparent') ? '1px solid rgba(255,255,255,0.2)' : 'none' }}
+                                            onClick={() => {
+                                                const fc = fabricRef.current; const obj = fc?.getActiveObject()
+                                                if (obj) { obj.set('stroke', c === 'transparent' ? null : c); if (!obj.strokeWidth) obj.set('strokeWidth', 2); fc.renderAll(); saveHistory() }
+                                            }} title={c} />
+                                    ))}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                                    <input type="color" value={(() => { const fc = fabricRef.current; const o = fc?.getActiveObject(); return o?.stroke || '#ffffff' })()} onChange={e => {
+                                        const fc = fabricRef.current; const obj = fc?.getActiveObject()
+                                        if (obj) { obj.set('stroke', e.target.value); if (!obj.strokeWidth) obj.set('strokeWidth', 2); fc.renderAll(); saveHistory() }
+                                    }} style={{ width: 24, height: 24, border: 'none', padding: 0, background: 'transparent', cursor: 'pointer' }} />
+                                    <span style={{ fontSize: 10, color: '#64748b' }}>Custom stroke</span>
+                                </div>
+                            </div>
+                            {/* Border style */}
+                            <div style={{ marginBottom: 8 }}>
+                                <p style={{ fontSize: 10, color: '#475569', marginBottom: 4, fontWeight: 600 }}>STYLE</p>
+                                <div style={{ display: 'flex', gap: 4 }}>
+                                    {[
+                                        { label: 'Solid', dash: null },
+                                        { label: 'Dash', dash: [12, 6] },
+                                        { label: 'Dot', dash: [3, 6] },
+                                    ].map(s => (
+                                        <button key={s.label} className="ce-tool-btn" onClick={() => {
+                                            const fc = fabricRef.current; const obj = fc?.getActiveObject()
+                                            if (obj) { obj.set('strokeDashArray', s.dash); fc.renderAll(); saveHistory() }
+                                        }} style={{ flex: 1, fontSize: 10, fontWeight: 600 }} title={s.label}>
+                                            {s.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            {/* Border radius (for rect/rounded shapes) */}
+                            {(() => { const fc = fabricRef.current; const obj = fc?.getActiveObject(); return obj && (obj.type === 'rect' || obj.rx !== undefined) })() && (
+                                <div style={{ marginBottom: 4 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#64748b', marginBottom: 4 }}>
+                                        <span>Radius</span>
+                                        <span>{(() => { const fc = fabricRef.current; return fc?.getActiveObject()?.rx || 0 })()}px</span>
+                                    </div>
+                                    <input type="range" className="ce-slider" min={0} max={100} value={(() => { const fc = fabricRef.current; return fc?.getActiveObject()?.rx || 0 })()} onChange={e => {
+                                        const fc = fabricRef.current; const obj = fc?.getActiveObject()
+                                        if (obj) { const v = parseInt(e.target.value); obj.set('rx', v); obj.set('ry', v); fc.renderAll(); saveHistory() }
+                                    }} />
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ── OPACITY PANEL — any selected object ── */}
+                    {selectedLayer && (
+                        <div className="ce-panel">
+                            <div className="ce-panel-title">
+                                <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#818cf8' }}>opacity</span>
+                                Opacity
+                            </div>
+                            <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#64748b', marginBottom: 4 }}>
+                                    <span>Transparency</span>
+                                    <span>{objProps.opacity}%</span>
+                                </div>
+                                <input type="range" className="ce-slider" min={0} max={100} value={objProps.opacity}
+                                    onChange={e => updateProp('opacity', e.target.value)} />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── SHADOW PANEL — any selected object ── */}
+                    {selectedLayer && (
+                        <div className="ce-panel">
+                            <div className="ce-panel-title">
+                                <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#818cf8' }}>flare</span>
+                                Shadow
+                            </div>
+                            {/* Presets */}
+                            <div style={{ marginBottom: 8 }}>
+                                <p style={{ fontSize: 10, color: '#475569', marginBottom: 4, fontWeight: 600 }}>PRESETS</p>
+                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                    {SHADOW_PRESETS.map(sp => (
+                                        <button key={sp.label} className="ce-tool-btn" onClick={() => {
+                                            const fc = fabricRef.current; const obj = fc?.getActiveObject()
+                                            if (obj) {
+                                                if (sp.blur === 0 && sp.offsetX === 0 && sp.offsetY === 0) {
+                                                    obj.set('shadow', null)
+                                                } else {
+                                                    obj.set('shadow', new fabric.Shadow({ color: sp.color, blur: sp.blur, offsetX: sp.offsetX, offsetY: sp.offsetY }))
+                                                }
+                                                fc.renderAll(); saveHistory()
+                                            }
+                                        }} style={{ padding: '4px 8px', fontSize: 9, fontWeight: 600 }}>{sp.label}</button>
+                                    ))}
+                                </div>
+                            </div>
+                            {/* Custom shadow controls */}
+                            <div style={{ marginBottom: 6 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#64748b', marginBottom: 4 }}>
+                                    <span>Blur</span>
+                                    <span>{(() => { const fc = fabricRef.current; return fc?.getActiveObject()?.shadow?.blur || 0 })()}</span>
+                                </div>
+                                <input type="range" className="ce-slider" min={0} max={100} value={(() => { const fc = fabricRef.current; return fc?.getActiveObject()?.shadow?.blur || 0 })()} onChange={e => {
+                                    const fc = fabricRef.current; const obj = fc?.getActiveObject()
+                                    if (obj) {
+                                        const s = obj.shadow || new fabric.Shadow({ color: 'rgba(0,0,0,0.3)', blur: 0, offsetX: 0, offsetY: 0 })
+                                        s.blur = parseInt(e.target.value)
+                                        obj.set('shadow', s); fc.renderAll(); saveHistory()
+                                    }
+                                }} />
+                            </div>
+                            <div className="ce-prop-row">
+                                <span className="ce-prop-label" style={{ fontSize: 9 }}>X</span>
+                                <input className="ce-prop-input" type="number" min={-50} max={50} value={(() => { const fc = fabricRef.current; return fc?.getActiveObject()?.shadow?.offsetX || 0 })()} onChange={e => {
+                                    const fc = fabricRef.current; const obj = fc?.getActiveObject()
+                                    if (obj) {
+                                        const s = obj.shadow || new fabric.Shadow({ color: 'rgba(0,0,0,0.3)', blur: 10, offsetX: 0, offsetY: 0 })
+                                        s.offsetX = parseInt(e.target.value)
+                                        obj.set('shadow', s); fc.renderAll(); saveHistory()
+                                    }
+                                }} />
+                                <span className="ce-prop-label" style={{ fontSize: 9 }}>Y</span>
+                                <input className="ce-prop-input" type="number" min={-50} max={50} value={(() => { const fc = fabricRef.current; return fc?.getActiveObject()?.shadow?.offsetY || 0 })()} onChange={e => {
+                                    const fc = fabricRef.current; const obj = fc?.getActiveObject()
+                                    if (obj) {
+                                        const s = obj.shadow || new fabric.Shadow({ color: 'rgba(0,0,0,0.3)', blur: 10, offsetX: 0, offsetY: 0 })
+                                        s.offsetY = parseInt(e.target.value)
+                                        obj.set('shadow', s); fc.renderAll(); saveHistory()
+                                    }
+                                }} />
+                            </div>
+                            {/* Shadow color */}
+                            <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <input type="color" value={(() => { const fc = fabricRef.current; const s = fc?.getActiveObject()?.shadow; if (!s || !s.color) return '#000000'; const m = s.color.match?.(/\d+/g); return m ? `#${parseInt(m[0]).toString(16).padStart(2,'0')}${parseInt(m[1]).toString(16).padStart(2,'0')}${parseInt(m[2]).toString(16).padStart(2,'0')}` : '#000000' })()} onChange={e => {
+                                    const fc = fabricRef.current; const obj = fc?.getActiveObject()
+                                    if (obj) {
+                                        const hex = e.target.value; const r = parseInt(hex.slice(1,3),16); const g = parseInt(hex.slice(3,5),16); const b = parseInt(hex.slice(5,7),16)
+                                        const s = obj.shadow || new fabric.Shadow({ color: 'rgba(0,0,0,0.3)', blur: 10, offsetX: 0, offsetY: 0 })
+                                        s.color = `rgba(${r},${g},${b},0.4)`
+                                        obj.set('shadow', s); fc.renderAll(); saveHistory()
+                                    }
+                                }} style={{ width: 24, height: 24, border: 'none', padding: 0, background: 'transparent', cursor: 'pointer' }} />
+                                <span style={{ fontSize: 10, color: '#64748b' }}>Shadow color</span>
                             </div>
                         </div>
                     )}

@@ -3288,4 +3288,84 @@ Respond in JSON:
   }
 });
 
+
+// ============================================================================
+// CONTENT FIX — Generate brand-aligned content to fix SEO issues (one-click)
+// ============================================================================
+
+router.post('/content-fix', protect, requireCredits('contentRefine'), async (req, res, next) => {
+  try {
+    const { brandId, issueTitle, issueDescription, pageUrl, fixType, currentContent, targetKeyword } = req.body;
+    if (!issueTitle) return res.status(400).json({ success: false, error: 'issueTitle is required' });
+
+    const brand = await loadBrand(brandId, req.user?._id);
+    const brandContext = buildBrandContext(brand);
+
+    // Build a focused prompt based on fixType
+    const fixTypePrompts = {
+      'meta-title': `Write an SEO-optimized page title (under 60 characters) for this page.`,
+      'meta-description': `Write a compelling meta description (under 155 characters) for this page.`,
+      'h1': `Write a clear, keyword-rich H1 heading for this page.`,
+      'content-rewrite': `Rewrite/improve the page content to fix the SEO issue described. Make it comprehensive, valuable, and well-structured with proper headings.`,
+      'content-expand': `Expand this thin content into a comprehensive, valuable piece. Add depth, examples, and structure with proper subheadings.`,
+      'new-content': `Create comprehensive, high-quality content for this topic. Include a compelling H1, structured sections with H2/H3, and actionable insights.`,
+      'faq': `Generate a FAQ section with 5-8 question-answer pairs relevant to this page topic. Format as plain text with "Q:" and "A:" prefixes.`,
+      'alt-text': `Generate descriptive, keyword-rich alt text for images on this page.`,
+    };
+
+    const fixPrompt = fixTypePrompts[fixType] || 'Generate improved content that addresses this SEO issue.';
+
+    const systemPrompt = `You are a senior content strategist who writes content that ranks on Google AND converts visitors. You write in the brand's authentic voice — never generic marketing speak.
+
+${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
+
+CRITICAL FORMATTING RULES:
+- Output ONLY the final content. No explanations, no meta-commentary.
+- Do NOT use ** (bold markdown), ## (heading markdown), or any markdown formatting.
+- Do NOT wrap output in quotes or code blocks.
+- Write clean, natural text. Use line breaks for paragraphs.
+- For headings in content, just use the text on its own line (no # or **).
+- Content must sound human, conversational, and authoritative.
+- Match the brand's tone and vocabulary exactly.`;
+
+    const userPrompt = `SEO ISSUE: ${issueTitle}
+${issueDescription ? `DETAILS: ${issueDescription}` : ''}
+${pageUrl ? `PAGE: ${pageUrl}` : ''}
+${targetKeyword ? `TARGET KEYWORD: ${targetKeyword}` : ''}
+${currentContent ? `CURRENT CONTENT TO IMPROVE:\n${currentContent}` : ''}
+
+TASK: ${fixPrompt}
+
+Generate the content now.`;
+
+    const result = await aiCall(systemPrompt, userPrompt, {
+      temperature: 0.6,
+      maxTokens: 4096,
+      timeout: 60000,
+    });
+
+    // Strip any residual markdown formatting
+    let cleanContent = result
+      .replace(/\*\*/g, '')           // Remove bold
+      .replace(/^#{1,6}\s+/gm, '')    // Remove heading markers
+      .replace(/```[\s\S]*?```/g, '') // Remove code blocks
+      .replace(/^>\s+/gm, '')        // Remove blockquotes
+      .trim();
+
+    if (req.user && lastTokenUsage) {
+      logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoContentFix', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+    }
+
+    res.json({
+      success: true,
+      content: cleanContent,
+      fixType: fixType || 'general',
+      aiMeta: lastTokenUsage || {},
+    });
+  } catch (error) {
+    console.error('SEO content-fix error:', error);
+    next(error);
+  }
+});
+
 export default router;

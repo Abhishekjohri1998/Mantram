@@ -43,7 +43,7 @@ const TAB_TO_AUDIT_TYPE = {
     'backlinks': 'backlinks',
 };
 
-export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, website, competitors, brandPayload, gaConnected, gaReport, gscReport, hideNav }) {
+export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, website, competitors, brandPayload, gaConnected, gaReport, gscReport, gaLoading, hideNav }) {
     // Per-tab data cache
     const [tabData, setTabData] = useState({});
     const [loadingAction, setLoadingAction] = useState('');
@@ -51,6 +51,10 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
     const [pageUrl, setPageUrl] = useState('');
     const [issueFilter, setIssueFilter] = useState('all');
     const [reportTimestamps, setReportTimestamps] = useState({});
+
+    // Content fix state (per-item AI generated content)
+    const [contentFixes, setContentFixes] = useState({});
+    const [fixLoading, setFixLoading] = useState({});
 
     const brandId = brand?._id;
 
@@ -87,6 +91,73 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
     const buildPayload = (extra = {}) => ({
         url: website, brand: brandPayload, brandId, country: brand?.dna?.country || 'India', industry: brand?.dna?.industry, ...extra,
     });
+
+    // ── Content Fix: one-click AI content generation from SEO suggestions ──
+    const generateContentFix = useCallback(async (fixKey, { issueTitle, issueDescription, pageUrl: pUrl, fixType, currentContent, targetKeyword }) => {
+        setFixLoading(prev => ({ ...prev, [fixKey]: true }));
+        try {
+            const res = await seoAPI.contentFix({ brandId, issueTitle, issueDescription, pageUrl: pUrl || website, fixType, currentContent, targetKeyword });
+            if (res.success && res.content) {
+                setContentFixes(prev => ({ ...prev, [fixKey]: res.content }));
+            }
+        } catch (err) {
+            setContentFixes(prev => ({ ...prev, [fixKey]: `Error: ${err.message}` }));
+        } finally {
+            setFixLoading(prev => ({ ...prev, [fixKey]: false }));
+        }
+    }, [brandId, website]);
+
+    // Reusable inline Fix-with-AI button + result display
+    const FixWithAI = ({ fixKey, issueTitle, issueDescription, pageUrl: pUrl, fixType, currentContent, targetKeyword, label }) => {
+        const isLoading = fixLoading[fixKey];
+        const result = contentFixes[fixKey];
+        return (
+            <div className="mt-2">
+                {!result && (
+                    <button
+                        onClick={() => generateContentFix(fixKey, { issueTitle, issueDescription, pageUrl: pUrl, fixType, currentContent, targetKeyword })}
+                        disabled={isLoading}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all border"
+                        style={{
+                            background: isLoading ? 'rgba(99,102,241,0.1)' : 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.1))',
+                            borderColor: 'rgba(99,102,241,0.3)',
+                            color: '#a5b4fc',
+                        }}
+                    >
+                        {isLoading ? (
+                            <><span className="material-symbols-outlined text-xs animate-spin">sync</span> Generating...</>
+                        ) : (
+                            <><span className="material-symbols-outlined text-xs">auto_fix_high</span> {label || 'Fix with AI'}</>
+                        )}
+                    </button>
+                )}
+                {result && (
+                    <div className="mt-2 rounded-xl p-4 border" style={{ background: 'rgba(99,102,241,0.04)', borderColor: 'rgba(99,102,241,0.15)' }}>
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-bold text-primary flex items-center gap-1">
+                                <span className="material-symbols-outlined text-xs">auto_fix_high</span> AI Generated Content
+                            </span>
+                            <div className="flex gap-2">
+                                <button onClick={() => navigator.clipboard.writeText(result)}
+                                    className="text-[10px] px-2 py-1 rounded-md bg-white/[0.05] text-slate-300 font-bold cursor-pointer hover:bg-white/[0.1] flex items-center gap-1 border border-white/[0.08]">
+                                    <span className="material-symbols-outlined text-[10px]">content_copy</span> Copy
+                                </button>
+                                <button onClick={() => { setContentFixes(prev => { const n = { ...prev }; delete n[fixKey]; return n; }); generateContentFix(fixKey, { issueTitle, issueDescription, pageUrl: pUrl, fixType, currentContent, targetKeyword }); }}
+                                    className="text-[10px] px-2 py-1 rounded-md bg-white/[0.05] text-slate-300 font-bold cursor-pointer hover:bg-white/[0.1] flex items-center gap-1 border border-white/[0.08]">
+                                    <span className="material-symbols-outlined text-[10px]">refresh</span> Regenerate
+                                </button>
+                                <button onClick={() => setContentFixes(prev => { const n = { ...prev }; delete n[fixKey]; return n; })}
+                                    className="text-[10px] px-2 py-1 rounded-md bg-white/[0.05] text-slate-400 font-bold cursor-pointer hover:bg-white/[0.1] border border-white/[0.08]">
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+                        <div className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">{result}</div>
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     const data = tabData[advPage];
     const cachedAt = reportTimestamps[advPage];
@@ -178,59 +249,285 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
         switch (advPage) {
             // ── OVERVIEW DASHBOARD ──
             case 'overview': {
-                if (!hasData && !gaReport) return (
-                    <EmptyState icon="space_dashboard" title="Overview Dashboard" desc="Run a Health Check to see your SEO scores and top opportunities, or connect Google Analytics for traffic data.">
+                const hasAnalytics = gaReport || gscReport;
+                const isLoading = gaLoading && !hasAnalytics;
+
+                // Only show empty state if nothing at all — no analytics, no health check
+                if (!hasData && !hasAnalytics && !isLoading && !gaConnected) return (
+                    <EmptyState icon="space_dashboard" title="Overview Dashboard" desc="Connect Google Analytics & Search Console to see live traffic data, or run a Health Check to analyze your SEO.">
                         <RunButton onClick={() => runAnalysis('overview', seoAPI.healthCheck, buildPayload(), 'Running health check...')} label="Run Health Check" icon="health_and_safety" />
                     </EmptyState>
                 );
+
                 const d = data || {};
                 return (
                     <div className="space-y-6 animate-fade-in">
-                        {/* Score rings */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-                            {[{ s: d.seoHealthScore, l: 'SEO Health', c: '#34d399' }, { s: d.aiVisibilityScore, l: 'AI Visibility', c: '#a78bfa' },
-                            { s: d.technicalScore, l: 'Technical', c: '#60a5fa' }, { s: d.contentScore, l: 'Content', c: '#fbbf24' },
-                            { s: d.authorityScore, l: 'Authority', c: '#fb7185' }].map(x => (
-                                <SectionCard key={x.l}><ScoreRing score={x.s} label={x.l} color={x.c} /></SectionCard>
-                            ))}
-                        </div>
 
-                        {/* Summary */}
-                        {d.summary && <SectionCard title="Summary" icon="description"><FormattedText text={d.summary} /></SectionCard>}
-
-                        {/* Top Opportunity */}
-                        {d.topOpportunity && (
-                            <div className="rounded-xl p-4 border border-emerald-500/20 bg-emerald-500/5">
-                                <span className="text-xs font-bold text-emerald-400 uppercase">Top Opportunity</span>
-                                <p className="text-sm text-white mt-1">{d.topOpportunity}</p>
+                        {/* ═══ LIVE ANALYTICS DASHBOARD (Primary Content) ═══ */}
+                        {isLoading && (
+                            <div className="rounded-2xl p-6 text-center" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.04))', border: '1px solid rgba(99,102,241,0.15)' }}>
+                                <span className="material-symbols-outlined text-3xl text-primary animate-spin block mb-3">sync</span>
+                                <p className="text-sm text-white font-bold">Loading your analytics dashboard...</p>
+                                <p className="text-xs text-slate-400 mt-1">Fetching data from Google Analytics & Search Console</p>
                             </div>
                         )}
 
-                        {/* Quick wins */}
-                        {d.fixNow?.length > 0 && (
-                            <SectionCard title="Fix Now" icon="build">
-                                <div className="space-y-2">{d.fixNow.slice(0, 5).map((f, i) => (
-                                    <div key={i} className="flex items-start gap-2 text-sm"><span className="text-rose-400 mt-0.5">●</span><span className="text-slate-300">{typeof f === 'string' ? f : f.title || f.issue}</span></div>
-                                ))}</div>
-                            </SectionCard>
+                        {gaConnected && !hasAnalytics && !isLoading && (
+                            <div className="rounded-2xl p-6 text-center" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)' }}>
+                                <span className="material-symbols-outlined text-3xl text-amber-400 block mb-3">warning</span>
+                                <p className="text-sm text-white font-bold">Google Analytics Connected — No Data Yet</p>
+                                <p className="text-xs text-slate-400 mt-1">Make sure a GA4 property and Search Console site are linked to your Google account. The data will load automatically.</p>
+                            </div>
                         )}
 
-                        {/* GA Summary */}
+                        {/* ─── GA4 Section ─── */}
                         {gaReport && (
-                            <SectionCard title="Google Analytics (Last 30 days)" icon="monitoring">
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                    {[{ l: 'Users', v: gaReport.summary?.totalUsers?.toLocaleString() }, { l: 'Sessions', v: gaReport.summary?.totalSessions?.toLocaleString() },
-                                    { l: 'Page Views', v: gaReport.summary?.totalPageViews?.toLocaleString() }, { l: 'Bounce Rate', v: `${((gaReport.summary?.avgBounceRate || 0) * 100).toFixed(1)}%` }].map(s => (
-                                        <div key={s.l} className="p-3 rounded-lg bg-white/[0.03]">
-                                            <p className="text-xs text-slate-500 font-bold">{s.l}</p>
-                                            <p className="text-lg font-black text-white">{s.v || '—'}</p>
+                            <>
+                                {/* GA4 KPI Summary */}
+                                <SectionCard title="Google Analytics — Last 30 Days" icon="monitoring">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                                        {[
+                                            { l: 'Users', v: gaReport.summary?.totalUsers?.toLocaleString(), icon: 'person', color: '#60a5fa' },
+                                            { l: 'New Users', v: (gaReport.traffic?.reduce((s, t) => s + (t.newUsers || 0), 0) || 0).toLocaleString(), icon: 'person_add', color: '#34d399' },
+                                            { l: 'Sessions', v: gaReport.summary?.totalSessions?.toLocaleString(), icon: 'ads_click', color: '#a78bfa' },
+                                            { l: 'Page Views', v: gaReport.summary?.totalPageViews?.toLocaleString(), icon: 'visibility', color: '#fbbf24' },
+                                            { l: 'Bounce Rate', v: `${((gaReport.summary?.avgBounceRate || 0) * 100).toFixed(1)}%`, icon: 'exit_to_app', color: '#fb7185' },
+                                            { l: 'Avg Duration', v: (() => { const avg = gaReport.traffic?.length ? gaReport.traffic.reduce((s, t) => s + (t.avgDuration || 0), 0) / gaReport.traffic.length : 0; return avg >= 60 ? `${Math.floor(avg / 60)}m ${Math.round(avg % 60)}s` : `${Math.round(avg)}s`; })(), icon: 'timer', color: '#f97316' },
+                                        ].map(s => (
+                                            <div key={s.l} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.05] text-center">
+                                                <span className="material-symbols-outlined text-sm mb-1 block" style={{ color: s.color }}>{s.icon}</span>
+                                                <p className="text-lg font-black text-white">{s.v || '—'}</p>
+                                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{s.l}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </SectionCard>
+
+                                {/* Traffic Trend Sparkline */}
+                                {gaReport.traffic?.length > 1 && (
+                                    <SectionCard title="Daily Users — 30-Day Trend" icon="show_chart">
+                                        <div className="h-32 w-full">
+                                            {(() => {
+                                                const tData = gaReport.traffic;
+                                                const maxV = Math.max(...tData.map(t => t.users), 1);
+                                                const minV = Math.min(...tData.map(t => t.users));
+                                                const w = 100, h = 100;
+                                                const points = tData.map((t, i) => {
+                                                    const x = (i / (tData.length - 1)) * w;
+                                                    const y = h - ((t.users - minV) / (maxV - minV || 1)) * (h - 10) - 5;
+                                                    return `${x},${y}`;
+                                                }).join(' ');
+                                                const areaPath = `M 0,${h} L ${tData.map((t, i) => { const x = (i / (tData.length - 1)) * w; const y = h - ((t.users - minV) / (maxV - minV || 1)) * (h - 10) - 5; return `${x},${y}`; }).join(' L ')} L ${w},${h} Z`;
+                                                return (
+                                                    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-full" preserveAspectRatio="none">
+                                                        <defs>
+                                                            <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="0%" stopColor="#6366f1" stopOpacity="0.3" />
+                                                                <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <path d={areaPath} fill="url(#sparkGrad)" />
+                                                        <polyline points={points} fill="none" stroke="#818cf8" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+                                                    </svg>
+                                                );
+                                            })()}
                                         </div>
+                                        <div className="flex justify-between text-[10px] text-slate-600 mt-1 px-1">
+                                            <span>{gaReport.traffic[0]?.date?.replace(/(\d{4})(\d{2})(\d{2})/, '$2/$3')}</span>
+                                            <span className="text-slate-400 font-bold">{Math.max(...gaReport.traffic.map(t => t.users)).toLocaleString()} peak</span>
+                                            <span>{gaReport.traffic[gaReport.traffic.length - 1]?.date?.replace(/(\d{4})(\d{2})(\d{2})/, '$2/$3')}</span>
+                                        </div>
+                                    </SectionCard>
+                                )}
+
+                                {/* Channel Breakdown */}
+                                {gaReport.channels?.length > 0 && (
+                                    <SectionCard title="Traffic Channels" icon="pie_chart">
+                                        <div className="space-y-2">
+                                            {(() => {
+                                                const totalSessions = gaReport.channels.reduce((s, c) => s + c.sessions, 0) || 1;
+                                                const channelColors = {
+                                                    'Organic Search': '#34d399', 'Direct': '#60a5fa', 'Social': '#f472b6',
+                                                    'Referral': '#a78bfa', 'Paid Search': '#fbbf24', 'Email': '#fb923c',
+                                                    'Display': '#2dd4bf', 'Organic Social': '#f472b6',
+                                                };
+                                                return gaReport.channels.map((ch, i) => {
+                                                    const pct = ((ch.sessions / totalSessions) * 100).toFixed(1);
+                                                    const color = channelColors[ch.channel] || '#94a3b8';
+                                                    return (
+                                                        <div key={i} className="flex items-center gap-3">
+                                                            <span className="text-xs text-slate-300 font-medium w-28 truncate">{ch.channel}</span>
+                                                            <div className="flex-1 h-5 rounded-full bg-white/[0.04] overflow-hidden relative">
+                                                                <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: color, minWidth: '4px' }} />
+                                                            </div>
+                                                            <span className="text-xs text-slate-400 font-bold w-12 text-right">{pct}%</span>
+                                                            <span className="text-[10px] text-slate-500 w-16 text-right">{ch.sessions.toLocaleString()}</span>
+                                                        </div>
+                                                    );
+                                                });
+                                            })()}
+                                        </div>
+                                    </SectionCard>
+                                )}
+
+                                {/* Top Pages */}
+                                {gaReport.topPages?.length > 0 && (
+                                    <SectionCard title={`Top Pages (${gaReport.topPages.length})`} icon="description">
+                                        <DataTable columns={[
+                                            { key: 'path', label: 'Page' },
+                                            { key: 'views', label: 'Views' },
+                                            { key: 'users', label: 'Users' },
+                                            { key: 'bounce', label: 'Bounce' },
+                                            { key: 'duration', label: 'Avg Time' },
+                                        ]} rows={gaReport.topPages.slice(0, 15).map(p => ({
+                                            path: <span className="text-xs truncate max-w-[250px] block" title={p.path}>{p.title || p.path}</span>,
+                                            views: p.views?.toLocaleString(),
+                                            users: p.users?.toLocaleString(),
+                                            bounce: `${((p.bounceRate || 0) * 100).toFixed(0)}%`,
+                                            duration: (() => { const dur = p.avgDuration || 0; return dur >= 60 ? `${Math.floor(dur / 60)}m ${Math.round(dur % 60)}s` : `${Math.round(dur)}s`; })(),
+                                        }))} />
+                                    </SectionCard>
+                                )}
+                            </>
+                        )}
+
+                        {/* ─── GSC Section ─── */}
+                        {gscReport && (
+                            <>
+                                {/* GSC KPI Summary */}
+                                <SectionCard title="Search Console — Last 28 Days" icon="travel_explore">
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                        {[
+                                            { l: 'Total Clicks', v: gscReport.summary?.totalClicks?.toLocaleString(), icon: 'ads_click', color: '#34d399' },
+                                            { l: 'Impressions', v: gscReport.summary?.totalImpressions?.toLocaleString(), icon: 'visibility', color: '#60a5fa' },
+                                            { l: 'Avg CTR', v: `${((gscReport.summary?.avgCtr || 0) * 100).toFixed(2)}%`, icon: 'percent', color: '#fbbf24' },
+                                            { l: 'Avg Position', v: (gscReport.summary?.avgPosition || 0).toFixed(1), icon: 'format_list_numbered', color: '#a78bfa' },
+                                        ].map(s => (
+                                            <div key={s.l} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.05] text-center">
+                                                <span className="material-symbols-outlined text-sm mb-1 block" style={{ color: s.color }}>{s.icon}</span>
+                                                <p className="text-lg font-black text-white">{s.v || '—'}</p>
+                                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{s.l}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </SectionCard>
+
+                                {/* GSC Top Keywords */}
+                                {gscReport.keywords?.length > 0 && (
+                                    <SectionCard title={`Top Search Keywords (${gscReport.keywords.length})`} icon="key">
+                                        <DataTable columns={[
+                                            { key: 'keyword', label: 'Keyword' },
+                                            { key: 'clicks', label: 'Clicks' },
+                                            { key: 'impressions', label: 'Impressions' },
+                                            { key: 'ctr', label: 'CTR' },
+                                            { key: 'position', label: 'Position' },
+                                        ]} rows={gscReport.keywords.slice(0, 20).map(k => ({
+                                            keyword: <span className="text-xs font-medium">{k.keyword}</span>,
+                                            clicks: k.clicks?.toLocaleString(),
+                                            impressions: k.impressions?.toLocaleString(),
+                                            ctr: `${((k.ctr || 0) * 100).toFixed(1)}%`,
+                                            position: <span className={`font-bold ${k.position <= 3 ? 'text-emerald-400' : k.position <= 10 ? 'text-blue-400' : k.position <= 20 ? 'text-amber-400' : 'text-slate-400'}`}>{k.position?.toFixed(1)}</span>,
+                                        }))} />
+                                        {/* Striking distance */}
+                                        {(() => {
+                                            const striking = gscReport.keywords.filter(k => k.position >= 4 && k.position <= 20 && k.impressions > 50);
+                                            if (striking.length === 0) return null;
+                                            return (
+                                                <div className="mt-4 p-3 rounded-xl bg-amber-500/5 border border-amber-500/10">
+                                                    <p className="text-xs font-bold text-amber-400 mb-2 flex items-center gap-1.5">
+                                                        <span className="material-symbols-outlined text-sm">trending_up</span>
+                                                        Striking Distance ({striking.length} keywords near page 1)
+                                                    </p>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {striking.slice(0, 10).map((k, i) => (
+                                                            <span key={i} className="text-[11px] px-2 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/15">
+                                                                {k.keyword} <span className="text-amber-500">#{k.position?.toFixed(0)}</span>
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+                                    </SectionCard>
+                                )}
+
+                                {/* GSC Top Pages */}
+                                {gscReport.pages?.length > 0 && (
+                                    <SectionCard title={`Top Pages in Search (${gscReport.pages.length})`} icon="web">
+                                        <DataTable columns={[
+                                            { key: 'page', label: 'Page URL' },
+                                            { key: 'clicks', label: 'Clicks' },
+                                            { key: 'impressions', label: 'Impressions' },
+                                            { key: 'ctr', label: 'CTR' },
+                                            { key: 'position', label: 'Avg Pos' },
+                                        ]} rows={gscReport.pages.slice(0, 15).map(p => ({
+                                            page: <span className="text-xs truncate max-w-[300px] block text-blue-400" title={p.page}>{p.page?.replace(/https?:\/\/[^/]+/, '') || p.page}</span>,
+                                            clicks: p.clicks?.toLocaleString(),
+                                            impressions: p.impressions?.toLocaleString(),
+                                            ctr: `${((p.ctr || 0) * 100).toFixed(1)}%`,
+                                            position: p.position?.toFixed(1),
+                                        }))} />
+                                    </SectionCard>
+                                )}
+                            </>
+                        )}
+
+                        {/* ═══ CONNECT ANALYTICS CTA (when not connected) ═══ */}
+                        {!gaConnected && (
+                            <div className="rounded-2xl p-6 text-center" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.06), rgba(139,92,246,0.03))', border: '1px dashed rgba(99,102,241,0.25)' }}>
+                                <span className="material-symbols-outlined text-4xl mb-3 block" style={{ color: '#818cf8' }}>link</span>
+                                <h3 className="text-base font-bold text-white mb-1">Connect Google Analytics & Search Console</h3>
+                                <p className="text-xs text-slate-400 max-w-md mx-auto mb-4">See live traffic, top pages, search keywords, and performance data. Just like your Google dashboard — right here in SEO Studio.</p>
+                                <button onClick={() => window.location.href = '/integrations'}
+                                    className="px-6 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer transition-all hover:shadow-lg flex items-center gap-2 mx-auto"
+                                    style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 20px rgba(99,102,241,0.35)' }}>
+                                    <span className="material-symbols-outlined text-sm">link</span> Go to Integrations
+                                </button>
+                            </div>
+                        )}
+
+                        {/* ═══ SEO HEALTH CHECK (Secondary — collapsible) ═══ */}
+                        {hasData && (
+                            <>
+                                <div className="flex items-center gap-2 mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                                    <span className="material-symbols-outlined text-sm text-primary">health_and_safety</span>
+                                    <h3 className="text-sm font-bold text-white">SEO Health Check</h3>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                                    {[{ s: d.seoHealthScore, l: 'SEO Health', c: '#34d399' }, { s: d.aiVisibilityScore, l: 'AI Visibility', c: '#a78bfa' },
+                                    { s: d.technicalScore, l: 'Technical', c: '#60a5fa' }, { s: d.contentScore, l: 'Content', c: '#fbbf24' },
+                                    { s: d.authorityScore, l: 'Authority', c: '#fb7185' }].map(x => (
+                                        <SectionCard key={x.l}><ScoreRing score={x.s} label={x.l} color={x.c} /></SectionCard>
                                     ))}
                                 </div>
-                            </SectionCard>
+                                {d.summary && <SectionCard title="Summary" icon="description"><FormattedText text={d.summary} /></SectionCard>}
+                                {d.topOpportunity && (
+                                    <div className="rounded-xl p-4 border border-emerald-500/20 bg-emerald-500/5">
+                                        <span className="text-xs font-bold text-emerald-400 uppercase">Top Opportunity</span>
+                                        <p className="text-sm text-white mt-1">{d.topOpportunity}</p>
+                                    </div>
+                                )}
+                                {d.fixNow?.length > 0 && (
+                                    <SectionCard title="Fix Now" icon="build">
+                                        <div className="space-y-3">{d.fixNow.slice(0, 5).map((f, i) => {
+                                            const title = typeof f === 'string' ? f : f.title || f.issue;
+                                            const desc = typeof f === 'object' ? (f.description || f.whyFirst || '') : '';
+                                            return (
+                                                <div key={i}>
+                                                    <div className="flex items-start gap-2 text-sm"><span className="text-rose-400 mt-0.5">●</span><span className="text-slate-300">{title}</span></div>
+                                                    <FixWithAI fixKey={`fixnow-${i}`} issueTitle={title} issueDescription={desc} fixType="content-rewrite" label="Fix with AI" />
+                                                </div>
+                                            );
+                                        })}</div>
+                                    </SectionCard>
+                                )}
+                            </>
                         )}
 
-                        <RunButton onClick={() => runAnalysis('overview', seoAPI.healthCheck, buildPayload(), 'Refreshing...')} label="Refresh Overview" icon="refresh" />
+                        {/* Action buttons */}
+                        <div className="flex gap-3 flex-wrap">
+                            <RunButton onClick={() => runAnalysis('overview', seoAPI.healthCheck, buildPayload(), 'Running health check...')} label={hasData ? 'Refresh Health Check' : 'Run SEO Health Check'} icon="health_and_safety" />
+                        </div>
                     </div>
                 );
             }
@@ -269,19 +566,27 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         </div>
 
                         {/* Issues list */}
-                        <div className="space-y-2">{filtered.map((issue, i) => (
-                            <div key={i} className="glass-panel rounded-xl p-4 flex items-start gap-3">
-                                <span className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: SEVERITY_COLORS[issue.severity] || '#94a3b8' }} />
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-sm font-bold text-white">{issue.title || issue.issue}</span>
-                                        <span className="text-xs px-1.5 py-0.5 rounded-full font-bold uppercase" style={{ background: `${SEVERITY_COLORS[issue.severity]}15`, color: SEVERITY_COLORS[issue.severity] }}>{issue.severity}</span>
+                        <div className="space-y-2">{filtered.map((issue, i) => {
+                            const isContentIssue = /content|title|meta|heading|h1|thin|description|alt|text/i.test(issue.title || issue.issue || issue.category || '');
+                            return (
+                                <div key={i} className="glass-panel rounded-xl p-4 flex items-start gap-3">
+                                    <span className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: SEVERITY_COLORS[issue.severity] || '#94a3b8' }} />
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-sm font-bold text-white">{issue.title || issue.issue}</span>
+                                            <span className="text-xs px-1.5 py-0.5 rounded-full font-bold uppercase" style={{ background: `${SEVERITY_COLORS[issue.severity]}15`, color: SEVERITY_COLORS[issue.severity] }}>{issue.severity}</span>
+                                        </div>
+                                        <p className="text-xs text-slate-400">{issue.description || issue.fix}</p>
+                                        {issue.affectedPages && <p className="text-xs text-slate-600 mt-1">Affected: {issue.affectedPages}</p>}
+                                        {isContentIssue && (
+                                            <FixWithAI fixKey={`audit-${i}`} issueTitle={issue.title || issue.issue} issueDescription={issue.description || issue.fix}
+                                                fixType={/title/i.test(issue.title || '') ? 'meta-title' : /meta.*desc/i.test(issue.title || '') ? 'meta-description' : /h1/i.test(issue.title || '') ? 'h1' : /thin/i.test(issue.title || '') ? 'content-expand' : 'content-rewrite'}
+                                                label="Generate Fix" />
+                                        )}
                                     </div>
-                                    <p className="text-xs text-slate-400">{issue.description || issue.fix}</p>
-                                    {issue.affectedPages && <p className="text-xs text-slate-600 mt-1">Affected: {issue.affectedPages}</p>}
                                 </div>
-                            </div>
-                        ))}</div>
+                            );
+                        })}</div>
 
                         <RunButton onClick={() => runAnalysis('site-audit', seoAPI.healthCheck, buildPayload(), 'Re-scanning...')} label="Re-run Audit" icon="refresh" />
                     </div>
@@ -329,15 +634,42 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         {/* Content gaps */}
                         {data.contentGaps?.length > 0 && (
                             <SectionCard title="Content Gaps" icon="lightbulb">
-                                <div className="space-y-2">{data.contentGaps.map((gap, i) => (
-                                    <div key={i} className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
-                                        <span className="text-amber-400 text-sm">💡</span>
-                                        <div>
-                                            <p className="text-sm font-bold text-white">{gap.topic || gap.title || gap}</p>
-                                            {gap.reason && <p className="text-xs text-slate-400 mt-0.5">{gap.reason}</p>}
+                                <div className="space-y-3">{data.contentGaps.map((gap, i) => {
+                                    const gapTitle = gap.topic || gap.title || (typeof gap === 'string' ? gap : '');
+                                    return (
+                                        <div key={i} className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-amber-400 text-sm">💡</span>
+                                                <div className="flex-1">
+                                                    <p className="text-sm font-bold text-white">{gapTitle}</p>
+                                                    {gap.reason && <p className="text-xs text-slate-400 mt-0.5">{gap.reason}</p>}
+                                                    <FixWithAI fixKey={`kw-gap-${i}`} issueTitle={gapTitle} issueDescription={gap.reason || ''}
+                                                        fixType="new-content" targetKeyword={gap.keyword || gapTitle} label="Generate Content" />
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}</div>
+                                    );
+                                })}</div>
+                            </SectionCard>
+                        )}
+
+                        {/* Real GSC Ranking Keywords */}
+                        {gscReport?.keywords?.length > 0 && (
+                            <SectionCard title={`Your Ranking Keywords — Search Console (${gscReport.keywords.length})`} icon="travel_explore">
+                                <p className="text-xs text-slate-400 mb-3">Real keyword performance data from Google Search Console. Keywords in <span className="text-amber-400 font-bold">amber</span> are in "striking distance" (positions 4-20) — focus content efforts here for quick wins.</p>
+                                <DataTable columns={[
+                                    { key: 'keyword', label: 'Keyword' },
+                                    { key: 'clicks', label: 'Clicks' },
+                                    { key: 'impressions', label: 'Impressions' },
+                                    { key: 'ctr', label: 'CTR' },
+                                    { key: 'position', label: 'Position' },
+                                ]} rows={gscReport.keywords.slice(0, 30).map(k => ({
+                                    keyword: <span className={`text-xs font-medium ${k.position >= 4 && k.position <= 20 ? 'text-amber-300' : ''}`}>{k.keyword}</span>,
+                                    clicks: k.clicks?.toLocaleString(),
+                                    impressions: k.impressions?.toLocaleString(),
+                                    ctr: `${((k.ctr || 0) * 100).toFixed(1)}%`,
+                                    position: <span className={`font-bold ${k.position <= 3 ? 'text-emerald-400' : k.position <= 10 ? 'text-blue-400' : k.position <= 20 ? 'text-amber-400' : 'text-slate-400'}`}>{k.position?.toFixed(1)}</span>,
+                                }))} />
                             </SectionCard>
                         )}
 
@@ -360,28 +692,41 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         {/* Topic suggestions */}
                         {data.topicSuggestions?.length > 0 && (
                             <SectionCard title="Topic Suggestions" icon="auto_awesome">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{data.topicSuggestions.map((t, i) => (
-                                    <div key={i} className="rounded-xl p-4 bg-white/[0.02] border border-white/[0.04]">
-                                        <h4 className="text-sm font-bold text-white mb-1">{t.title || t.topic || t}</h4>
-                                        {t.reason && <p className="text-xs text-slate-400">{t.reason}</p>}
-                                        {t.estimatedTraffic && <span className="text-xs text-emerald-400 font-bold mt-1 inline-block">~{t.estimatedTraffic} monthly visits</span>}
-                                    </div>
-                                ))}</div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{data.topicSuggestions.map((t, i) => {
+                                    const topic = t.title || t.topic || (typeof t === 'string' ? t : '');
+                                    return (
+                                        <div key={i} className="rounded-xl p-4 bg-white/[0.02] border border-white/[0.04]">
+                                            <h4 className="text-sm font-bold text-white mb-1">{topic}</h4>
+                                            {t.reason && <p className="text-xs text-slate-400">{t.reason}</p>}
+                                            {t.estimatedTraffic && <span className="text-xs text-emerald-400 font-bold mt-1 inline-block">~{t.estimatedTraffic} monthly visits</span>}
+                                            <FixWithAI fixKey={`topic-${i}`} issueTitle={topic} issueDescription={t.reason || ''}
+                                                fixType="new-content" targetKeyword={t.keyword || topic} label="Generate Content" />
+                                        </div>
+                                    );
+                                })}</div>
                             </SectionCard>
                         )}
 
                         {/* Content gaps */}
                         {data.contentGaps?.length > 0 && (
                             <SectionCard title="Content Gaps vs Competitors" icon="compare_arrows">
-                                <div className="space-y-2">{data.contentGaps.map((gap, i) => (
-                                    <div key={i} className="flex items-start gap-2 p-3 rounded-lg bg-violet-500/5 border border-violet-500/10">
-                                        <span className="text-violet-400 mt-0.5">◆</span>
-                                        <div>
-                                            <p className="text-sm font-bold text-white">{gap.topic || gap.title || gap}</p>
-                                            {gap.competitorUrl && <p className="text-xs text-slate-500 mt-0.5">Competitor: {gap.competitorUrl}</p>}
+                                <div className="space-y-3">{data.contentGaps.map((gap, i) => {
+                                    const gapTitle = gap.topic || gap.title || (typeof gap === 'string' ? gap : '');
+                                    return (
+                                        <div key={i} className="p-3 rounded-lg bg-violet-500/5 border border-violet-500/10">
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-violet-400 mt-0.5">◆</span>
+                                                <div className="flex-1">
+                                                    <p className="text-sm font-bold text-white">{gapTitle}</p>
+                                                    {gap.competitorUrl && <p className="text-xs text-slate-500 mt-0.5">Competitor: {gap.competitorUrl}</p>}
+                                                    {gap.reason && <p className="text-xs text-slate-400 mt-0.5">{gap.reason}</p>}
+                                                    <FixWithAI fixKey={`content-gap-${i}`} issueTitle={gapTitle} issueDescription={gap.reason || ''}
+                                                        fixType="new-content" targetKeyword={gap.keyword || gapTitle} label="Generate Content" />
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}</div>
+                                    );
+                                })}</div>
                             </SectionCard>
                         )}
 
@@ -553,12 +898,16 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
 
                                 {data.issues?.length > 0 && (
                                     <SectionCard title="Issues Found" icon="warning">
-                                        <div className="space-y-2">{data.issues.map((issue, i) => (
-                                            <div key={i} className="flex items-start gap-2 p-3 rounded-lg bg-white/[0.02]">
-                                                <span className="w-2 h-2 rounded-full mt-1.5" style={{ background: SEVERITY_COLORS[issue.severity] || '#94a3b8' }} />
-                                                <div>
-                                                    <p className="text-sm font-bold text-white">{issue.title || issue.issue}</p>
-                                                    <p className="text-xs text-slate-400">{issue.fix || issue.description}</p>
+                                        <div className="space-y-3">{data.issues.map((issue, i) => (
+                                            <div key={i} className="p-3 rounded-lg bg-white/[0.02]">
+                                                <div className="flex items-start gap-2">
+                                                    <span className="w-2 h-2 rounded-full mt-1.5" style={{ background: SEVERITY_COLORS[issue.severity] || '#94a3b8' }} />
+                                                    <div className="flex-1">
+                                                        <p className="text-sm font-bold text-white">{issue.title || issue.issue}</p>
+                                                        <p className="text-xs text-slate-400">{issue.fix || issue.description}</p>
+                                                        <FixWithAI fixKey={`onpage-issue-${i}`} issueTitle={issue.title || issue.issue} issueDescription={issue.fix || issue.description}
+                                                            pageUrl={pageUrl} fixType="content-rewrite" label="Rewrite with AI" />
+                                                    </div>
                                                 </div>
                                             </div>
                                         ))}</div>

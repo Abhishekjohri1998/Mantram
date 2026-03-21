@@ -155,6 +155,7 @@ export const content = {
     refineText: (data) => apiFetch('/content/refine-text', { method: 'POST', body: JSON.stringify(data) }),
     youtube: (data) => apiFetch('/content/agentic/youtube', { method: 'POST', body: JSON.stringify(data) }),
     youtubeSeo: (data) => apiFetch('/content/agentic/youtube-seo', { method: 'POST', body: JSON.stringify(data) }),
+    trending: (data) => apiFetch('/content/trending', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ============ Creatives API ============
@@ -589,6 +590,7 @@ export const seoStudio = {
     // Phase 3: Advanced
     jsCrawl: (data) => apiFetch('/seo-studio/js-crawl', { method: 'POST', body: JSON.stringify(data), timeout: 240000 }),
     contentScore: (data) => apiFetch('/seo-studio/content-score', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
+    contentFix: (data) => apiFetch('/seo-studio/content-fix', { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
     competitorMonitor: (data) => apiFetch('/seo-studio/competitor-monitor', { method: 'POST', body: JSON.stringify(data), timeout: 300000 }),
     geoHistory: (params = {}) => {
         const query = new URLSearchParams(params).toString();

@@ -128,10 +128,30 @@ export default function SeoStudio() {
     }, [activeBrand])
 
     const loadGAProperties = async () => {
-        try { const d = await gaAPI.properties(activeBrand?._id); setGaProperties(d.properties || []) } catch { }
+        try {
+            const d = await gaAPI.properties(activeBrand?._id)
+            const props = d.properties || []
+            setGaProperties(props)
+            // Auto-select first property and load its report
+            if (props.length > 0 && !gaSelectedProp) {
+                const firstProp = props[0].propertyId
+                setGaSelectedProp(firstProp)
+                loadGAReport(firstProp)
+            }
+        } catch { }
     }
     const loadGSCSites = async () => {
-        try { const d = await gaAPI.searchConsoleSites(activeBrand?._id); setGaSites(d.sites || []) } catch { }
+        try {
+            const d = await gaAPI.searchConsoleSites(activeBrand?._id)
+            const sites = d.sites || []
+            setGaSites(sites)
+            // Auto-select first site and load its report
+            if (sites.length > 0 && !gaSelectedSite) {
+                const firstSite = sites[0].siteUrl
+                setGaSelectedSite(firstSite)
+                loadGSCReport(firstSite)
+            }
+        } catch { }
     }
     const loadGAReport = async (propId) => {
         if (!propId) return; setGaLoading(true)
@@ -1201,6 +1221,7 @@ small{color:#94a3b8;font-size:10px}
                                 gaConnected={gaConnected}
                                 gaReport={gaReport}
                                 gscReport={gscReport}
+                                gaLoading={gaLoading}
                                 hideNav
                             />
                         )}
