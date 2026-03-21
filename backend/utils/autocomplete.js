@@ -27,11 +27,21 @@ export async function getAutocompleteSuggestions(query, country = '', lang = 'en
       headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
       signal: AbortSignal.timeout(SUGGEST_TIMEOUT),
     });
-    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(`Google API rate limit or bad request (${resp.status})`);
+    }
+    const text = await resp.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error('Google returned non-JSON response');
+    }
     // Response format: [query, [suggestions...]]
     return (data[1] || []).filter(s => typeof s === 'string');
   } catch (e) {
-    console.warn(`Autocomplete failed for "${query}":`, e.message);
+    // Only log if it's not an HTML parsing error, these are normally just rate limits or bad queries
+    console.warn(`Autocomplete fail for "${query.substring(0, 30)}...":`, e.message);
     return [];
   }
 }
@@ -95,7 +105,7 @@ export function generateSeedQueries(brandName, industry, targetAudience, country
   }
 
   // Audience-specific
-  if (targetAudience && industry) {
+  if (targetAudience && industry && targetAudience.length < 50) {
     seeds.push(`${industry} for ${targetAudience}`);
   }
 
@@ -104,7 +114,11 @@ export function generateSeedQueries(brandName, industry, targetAudience, country
     seeds.push(`best ${industry} in ${country}`);
   }
 
-  return seeds.filter(Boolean).slice(0, 20); // Cap at 20 seeds
+  // Sanitize and filter
+  return seeds
+    .filter(Boolean)
+    .map(s => s.trim().substring(0, 80)) // Max 80 chars per seed query
+    .slice(0, 20); // Cap at 20 seeds
 }
 
 
