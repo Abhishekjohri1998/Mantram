@@ -53,6 +53,7 @@ import funnelWebhookRoutes from './routes/funnel-webhooks.js';
 import mediaUploadRoutes from './routes/mediaUpload.js';
 import studioReportRoutes from './routes/studio-reports.js';
 import funnelAgenticRoutes from './routes/funnel-agentic.js';
+import retentionStudioRoutes from './routes/retention-studio.js';
 
 const app = express();
 
@@ -246,6 +247,9 @@ app.use('/api/funnel-agentic', funnelAgenticRoutes);
 app.use('/api/media', mediaUploadRoutes);
 app.use('/api/studio-reports', studioReportRoutes);
 app.use('/api/intel', intelMissionRoutes);
+
+// Retention Studio (Amazon → D2C Re-engagement)
+app.use('/api/retention-studio', retentionStudioRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

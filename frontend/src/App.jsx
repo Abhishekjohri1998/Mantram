@@ -43,6 +43,7 @@ const BrandManagement = lazy(() => import('./pages/BrandManagement'))
 const SkillsHub = lazy(() => import('./pages/SkillsHub'))
 const StudioPreview = lazy(() => import('./pages/StudioPreview'))
 const JoinTeam = lazy(() => import('./pages/JoinTeam'))
+const RetentionStudio = lazy(() => import('./pages/RetentionStudio'))
 
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
 const TermsOfService = lazy(() => import('./pages/TermsOfService'))
@@ -116,6 +117,7 @@ function App() {
                   <Route path="/credits" element={<ProtectedRoute><CreditsPage /></ProtectedRoute>} />
                   <Route path="/skills" element={<ProtectedRoute><SkillsHub /></ProtectedRoute>} />
                   <Route path="/superadmin" element={<ProtectedRoute allowedRoles={['superadmin']}><SuperAdminDashboard /></ProtectedRoute>} />
+                  <Route path="/retention-studio" element={<ProtectedRoute><RetentionStudio /></ProtectedRoute>} />
                 </Routes>
               </Suspense>
 

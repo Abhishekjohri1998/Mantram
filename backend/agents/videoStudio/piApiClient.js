@@ -31,6 +31,25 @@ import config from '../../config/env.js';
 import sharp from 'sharp';
 
 const PIAPI_BASE_URL = 'https://api.piapi.ai';
+const PIAPI_MAX_PROMPT_LENGTH = 1950; // PiAPI enforces 2000 char limit; leave buffer
+
+/**
+ * Truncate a prompt to fit PiAPI's character limit.
+ * Tries to break at sentence boundaries for cleaner output.
+ */
+function truncatePrompt(prompt, maxLen = PIAPI_MAX_PROMPT_LENGTH) {
+    if (!prompt || prompt.length <= maxLen) return prompt;
+    console.warn(`⚠️ Prompt too long (${prompt.length} chars), truncating to ${maxLen}`);
+    const truncated = prompt.substring(0, maxLen);
+    // Try to break at last sentence boundary
+    const lastPeriod = truncated.lastIndexOf('.');
+    const lastNewline = truncated.lastIndexOf('\n');
+    const breakPoint = Math.max(lastPeriod, lastNewline);
+    if (breakPoint > maxLen * 0.7) {
+        return truncated.substring(0, breakPoint + 1).trim();
+    }
+    return truncated.trim();
+}
 
 /**
  * Get the PiAPI API key
@@ -355,6 +374,9 @@ export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, a
     // Clean any remaining <img> tags from prompt (legacy)
     finalPrompt = finalPrompt.replace(/<img>[^<]*<\/img>/g, '').trim();
 
+    // Truncate to PiAPI's max prompt length (2000 chars)
+    finalPrompt = truncatePrompt(finalPrompt);
+
     // Build task input
     const taskInput = {
         prompt: finalPrompt,
@@ -432,6 +454,9 @@ export async function submitPiApiImageToVideo({ imageUrl, prompt, duration, aspe
 
     // Clean residual HTML tags
     finalPrompt = finalPrompt.replace(/<img>[^<]*<\/img>/g, '').trim();
+
+    // Truncate to PiAPI's max prompt length (2000 chars)
+    finalPrompt = truncatePrompt(finalPrompt);
 
     const taskType = qualityMode === 'quality' ? 'seedance-2-preview' : 'seedance-2-fast-preview';
     console.log(`🎯 PiAPI I2V task_type: ${taskType}`);

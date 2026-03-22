@@ -922,3 +922,92 @@ export const voice = {
     },
 };
 
+// ============ Retention Studio API ============
+export const retentionStudio = {
+    // Campaign CRUD
+    list: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/retention-studio/campaigns?${query}`);
+    },
+    get: (id) => apiFetch(`/retention-studio/campaigns/${id}`),
+    create: (data) => apiFetch('/retention-studio/campaigns', { method: 'POST', body: JSON.stringify(data) }),
+    delete: (id) => apiFetch(`/retention-studio/campaigns/${id}`, { method: 'DELETE' }),
+
+    // Pipeline nodes
+    ingest: (id, data) => apiFetch(`/retention-studio/campaigns/${id}/ingest`, { method: 'POST', body: JSON.stringify(data) }),
+    match: (id) => apiFetch(`/retention-studio/campaigns/${id}/match`, { method: 'POST' }),
+    creative: (id, data) => apiFetch(`/retention-studio/campaigns/${id}/creative`, { method: 'POST', body: JSON.stringify(data) }),
+    compose: (id, data) => apiFetch(`/retention-studio/campaigns/${id}/compose`, { method: 'POST', body: JSON.stringify(data) }),
+    approve: (id, data) => apiFetch(`/retention-studio/campaigns/${id}/approve`, { method: 'POST', body: JSON.stringify(data) }),
+    send: (id) => apiFetch(`/retention-studio/campaigns/${id}/send`, { method: 'POST' }),
+    preview: (id) => apiFetch(`/retention-studio/campaigns/${id}/preview`),
+    testEmail: (id, testEmail) => apiFetch(`/retention-studio/campaigns/${id}/test-email`, { method: 'POST', body: JSON.stringify({ testEmail }) }),
+    generateImage: (id) => apiFetch(`/retention-studio/campaigns/${id}/generate-image`, { method: 'POST' }),
+    emailStatus: () => apiFetch('/retention-studio/email-status'),
+
+    // Analytics & Pipeline
+    analytics: (id) => apiFetch(`/retention-studio/campaigns/${id}/analytics`),
+    pipeline: () => apiFetch('/retention-studio/pipeline'),
+
+    // ── Phase 1: RFM Segmentation ──
+    rfmAnalysis: (brandId) => apiFetch(`/retention-studio/rfm?brandId=${brandId}`),
+    rfmSegment: (segment, brandId, params = {}) => {
+        const query = new URLSearchParams({ brandId, ...params }).toString();
+        return apiFetch(`/retention-studio/rfm/${segment}?${query}`);
+    },
+
+    // ── Phase 1: Win-Back ──
+    winbackCandidates: (brandId, inactiveDays = 60) =>
+        apiFetch(`/retention-studio/winback?brandId=${brandId}&inactiveDays=${inactiveDays}`),
+
+    // ── Phase 1: Price Drops ──
+    priceDrops: (brandId) => apiFetch(`/retention-studio/price-drops?brandId=${brandId}`),
+
+    // ── Phase 1: Post-Purchase ──
+    recentBuyers: (brandId, daysBack = 7) =>
+        apiFetch(`/retention-studio/recent-buyers?brandId=${brandId}&daysBack=${daysBack}`),
+
+    // ── Phase 1: A/B Testing ──
+    createABTest: (id, variants) =>
+        apiFetch(`/retention-studio/campaigns/${id}/ab-test`, { method: 'POST', body: JSON.stringify({ variants }) }),
+    abResults: (id) => apiFetch(`/retention-studio/campaigns/${id}/ab-results`),
+
+    // ── Phase 1: UTM ──
+    utm: (id) => apiFetch(`/retention-studio/campaigns/${id}/utm`),
+
+    // ── Phase 1: Flow Templates ──
+    templates: () => apiFetch('/retention-studio/templates'),
+    templateCategories: () => apiFetch('/retention-studio/templates/categories'),
+    template: (id) => apiFetch(`/retention-studio/templates/${id}`),
+
+    // ── Phase 2: Unified Contacts ──
+    unifiedContacts: (brandId, params = {}) => {
+        const query = new URLSearchParams({ brandId, ...params }).toString();
+        return apiFetch(`/retention-studio/contacts/unified?${query}`);
+    },
+    duplicateContacts: (brandId) => apiFetch(`/retention-studio/contacts/duplicates?brandId=${brandId}`),
+    marketableContacts: (brandId) => apiFetch(`/retention-studio/contacts/marketable?brandId=${brandId}`),
+
+    // ── Phase 2: SMS ──
+    smsStatus: () => apiFetch('/retention-studio/sms/status'),
+    sendSMS: (to, message) => apiFetch('/retention-studio/sms/send', { method: 'POST', body: JSON.stringify({ to, message }) }),
+    sendBulkSMS: (recipients, message) => apiFetch('/retention-studio/sms/bulk', { method: 'POST', body: JSON.stringify({ recipients, message }) }),
+
+    // ── Phase 3: Push Notifications ──
+    pushStatus: () => apiFetch('/retention-studio/push/status'),
+    sendPush: (token, notification) => apiFetch('/retention-studio/push/send', { method: 'POST', body: JSON.stringify({ token, ...notification }) }),
+    sendBulkPush: (tokens, notification) => apiFetch('/retention-studio/push/bulk', { method: 'POST', body: JSON.stringify({ tokens, ...notification }) }),
+    sendTopicPush: (topic, notification) => apiFetch('/retention-studio/push/topic', { method: 'POST', body: JSON.stringify({ topic, ...notification }) }),
+    subscribeToPush: (tokens, topic) => apiFetch('/retention-studio/push/subscribe', { method: 'POST', body: JSON.stringify({ tokens, topic }) }),
+
+    // ── Phase 3: Lead Form Widget ──
+    widgetConfig: () => apiFetch('/retention-studio/widget/config'),
+    widgetEmbed: (brandId) => apiFetch(`/retention-studio/widget/embed?brandId=${brandId}`),
+
+    // ── Phase 3: Browse Abandonment ──
+    browseAbandonCandidates: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/retention-studio/track/candidates?${query}`);
+    },
+    browseTrackerStats: () => apiFetch('/retention-studio/track/stats'),
+};
