@@ -100,6 +100,10 @@ export const auth = {
     google: () => apiFetch('/auth/google'),
     verifyEmail: (token) => apiFetch(`/auth/verify-email?token=${token}`),
     resendVerification: (email) => apiFetch('/auth/resend-verification', { method: 'POST', body: JSON.stringify({ email }) }),
+    forgotPassword: (email) => apiFetch('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+    resetPassword: (token, password) => apiFetch('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) }),
+    changePassword: (currentPassword, newPassword) => apiFetch('/auth/change-password', { method: 'PUT', body: JSON.stringify({ currentPassword, newPassword }) }),
+    claimUserId: (userId) => apiFetch('/auth/claim-userid', { method: 'PUT', body: JSON.stringify({ userId }) }),
     getStudioAccess: () => apiFetch('/auth/studio-access'),
 };
 
@@ -377,6 +381,12 @@ export const superadmin = {
     createCoupon: (data) => apiFetch('/superadmin/coupons', { method: 'POST', body: JSON.stringify(data) }),
     updateCoupon: (id, data) => apiFetch(`/superadmin/coupons/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     deleteCoupon: (id) => apiFetch(`/superadmin/coupons/${id}`, { method: 'DELETE' }),
+
+    // Retention Offers
+    getRetentionOffers: () => apiFetch('/superadmin/retention-offers'),
+    createRetentionOffer: (data) => apiFetch('/superadmin/retention-offers', { method: 'POST', body: JSON.stringify(data) }),
+    updateRetentionOffer: (id, data) => apiFetch(`/superadmin/retention-offers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteRetentionOffer: (id) => apiFetch(`/superadmin/retention-offers/${id}`, { method: 'DELETE' }),
     // Brands
     getBrands: (params = {}) => {
         const query = new URLSearchParams(params).toString();
@@ -713,6 +723,19 @@ export const payments = {
         apiFetch('/payments/verify-topup', {
             method: 'POST',
             body: JSON.stringify(paymentData)
+        }),
+    subscriptionStatus: () => apiFetch('/payments/subscription-status'),
+    upgradePreview: (packageId, billingCycle = 'monthly') =>
+        apiFetch(`/payments/upgrade-preview?packageId=${packageId}&billingCycle=${billingCycle}`),
+    cancelSubscription: (reason = '') =>
+        apiFetch('/payments/cancel-subscription', {
+            method: 'POST',
+            body: JSON.stringify({ reason })
+        }),
+    acceptRetentionOffer: (offerId) =>
+        apiFetch('/payments/accept-retention-offer', {
+            method: 'POST',
+            body: JSON.stringify({ offerId })
         }),
 };
 

@@ -11,6 +11,7 @@ import PlanGatedRoute from './components/PlanGatedRoute'
 import Auth from './pages/Auth'
 import Landing from './pages/Landing'
 import VerifyEmail from './pages/VerifyEmail'
+import ResetPassword from './pages/ResetPassword'
 
 // ── Lazy Imports (Heavy/Studio Pages) ──
 const BrandOnboarding = lazy(() => import('./pages/BrandOnboarding'))
@@ -44,6 +45,7 @@ const SkillsHub = lazy(() => import('./pages/SkillsHub'))
 const StudioPreview = lazy(() => import('./pages/StudioPreview'))
 const JoinTeam = lazy(() => import('./pages/JoinTeam'))
 const RetentionStudio = lazy(() => import('./pages/RetentionStudio'))
+const UserSettings = lazy(() => import('./pages/UserSettings'))
 
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
 const TermsOfService = lazy(() => import('./pages/TermsOfService'))
@@ -81,6 +83,7 @@ function App() {
                   <Route path="/login" element={<Auth />} />
                   <Route path="/signup" element={<Auth />} />
                   <Route path="/verify-email" element={<VerifyEmail />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/onboarding" element={<BrandOnboarding />} />
                   <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                   <Route path="/terms" element={<TermsOfService />} />
@@ -115,6 +118,7 @@ function App() {
                   <Route path="/conversations/ai-settings" element={<ProtectedRoute><AISettings /></ProtectedRoute>} />
                   <Route path="/conversations/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
                   <Route path="/credits" element={<ProtectedRoute><CreditsPage /></ProtectedRoute>} />
+                  <Route path="/settings" element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
                   <Route path="/skills" element={<ProtectedRoute><SkillsHub /></ProtectedRoute>} />
                   <Route path="/superadmin" element={<ProtectedRoute allowedRoles={['superadmin']}><SuperAdminDashboard /></ProtectedRoute>} />
                   <Route path="/retention-studio" element={<ProtectedRoute><RetentionStudio /></ProtectedRoute>} />

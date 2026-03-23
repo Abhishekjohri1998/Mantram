@@ -18,6 +18,7 @@ import Waitlist from '../models/Waitlist.js';
 import SubscriptionPackage from '../models/SubscriptionPackage.js';
 import SystemSettings, { getSetting, setSetting } from '../models/SystemSettings.js';
 import AuditLog from '../models/AuditLog.js';
+import RetentionOffer from '../models/RetentionOffer.js';
 import { CREDIT_COSTS, getCreditCosts, getCreditBalance, invalidateCreditCostCache, MODEL_COSTS } from '../middleware/credits.js';
 import { protect, authorize, generateToken } from '../middleware/auth.js';
 import { safeErrorMessage } from '../utils/safeError.js';
@@ -654,6 +655,53 @@ router.post('/subscriptions', async (req, res) => {
             'credits.total': credits || planCredits[plan] || 50, 'credits.used': 0,
         });
         res.json({ success: true, subscription });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════
+// 3b. RETENTION OFFER MANAGEMENT
+// ══════════════════════════════════════════════════════════════
+
+router.get('/retention-offers', async (req, res) => {
+    try {
+        const offers = await RetentionOffer.find()
+            .populate('createdBy', 'name email')
+            .sort('-priority');
+        res.json({ success: true, offers });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+router.post('/retention-offers', async (req, res) => {
+    try {
+        const offer = await RetentionOffer.create({
+            ...req.body,
+            createdBy: req.user._id,
+        });
+        await logAudit(req, { action: 'CREATE_RETENTION_OFFER', targetModel: 'RetentionOffer', targetId: offer._id });
+        res.status(201).json({ success: true, offer });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+router.put('/retention-offers/:id', async (req, res) => {
+    try {
+        const offer = await RetentionOffer.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
+        if (!offer) return res.status(404).json({ success: false, error: 'Offer not found' });
+        res.json({ success: true, offer });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+router.delete('/retention-offers/:id', async (req, res) => {
+    try {
+        await RetentionOffer.findByIdAndDelete(req.params.id);
+        res.json({ success: true, message: 'Retention offer deleted' });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }

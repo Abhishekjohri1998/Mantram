@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const subscriptionSchema = new mongoose.Schema({
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     plan: { type: String, required: true },
-    billingCycle: { type: String, enum: ['monthly', 'yearly', 'lifetime'], default: 'monthly' },
+    billingCycle: { type: String, enum: ['monthly', 'quarterly', 'yearly', 'lifetime'], default: 'monthly' },
 
     // Credits
     credits: {
@@ -23,6 +23,19 @@ const subscriptionSchema = new mongoose.Schema({
     // Status
     status: { type: String, enum: ['active', 'expired', 'cancelled', 'trial'], default: 'active' },
 
+    // ── Cancellation ──
+    cancelledAt: { type: Date },
+    cancelReason: { type: String, default: '' },
+    gracePeriodEnd: { type: Date },            // access continues until this date after cancel
+
+    // ── Retention Offer ──
+    retentionOfferApplied: { type: Boolean, default: false },
+    retentionOfferId: { type: mongoose.Schema.Types.ObjectId, ref: 'RetentionOffer' },
+
+    // ── Auto-Renewal / Mandate ──
+    autoRenew: { type: Boolean, default: false },
+    razorpaySubscriptionId: { type: String, default: '' }, // for future mandate support
+
     // Coupon
     couponApplied: { type: mongoose.Schema.Types.ObjectId, ref: 'Coupon' },
     couponCode: { type: String, default: '' },
@@ -31,6 +44,10 @@ const subscriptionSchema = new mongoose.Schema({
     // Payment
     paymentMethod: { type: String, default: '' },
     transactionId: { type: String, default: '' },
+
+    // Pro-rata tracking
+    proRataCredit: { type: Number, default: 0 },   // credit from previous plan
+    proRataCharged: { type: Number, default: 0 },   // actual amount charged after pro-rata
 
     // Metadata
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // admin who assigned

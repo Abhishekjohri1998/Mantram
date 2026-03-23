@@ -19,6 +19,11 @@ export default function Auth() {
     const [isSocialLoading, setIsSocialLoading] = useState(false)
     const [error, setError] = useState('')
     const [form, setForm] = useState({ name: '', email: '', password: '', company: '' })
+    const [showPassword, setShowPassword] = useState(false)
+    const [showForgot, setShowForgot] = useState(false)
+    const [forgotEmail, setForgotEmail] = useState('')
+    const [forgotMessage, setForgotMessage] = useState('')
+    const [forgotLoading, setForgotLoading] = useState(false)
     const pollingRef = useRef(null)
 
     const redirect = searchParams.get('redirect') || '/dashboard'
@@ -96,6 +101,22 @@ export default function Auth() {
     }
 
     const update = (field, value) => setForm(prev => ({ ...prev, [field]: value }))
+
+    const handleForgotPassword = async (e) => {
+        e.preventDefault()
+        if (!forgotEmail.trim()) return setError('Enter your email address')
+        setForgotLoading(true)
+        setError('')
+        setForgotMessage('')
+        try {
+            const res = await authAPI.forgotPassword(forgotEmail.trim())
+            setForgotMessage(res.message || 'If an account exists, a reset link has been sent.')
+        } catch (err) {
+            setError(err.message || 'Failed to send reset email')
+        } finally {
+            setForgotLoading(false)
+        }
+    }
 
     const handleGoogleLogin = async () => {
         try {
@@ -216,7 +237,7 @@ export default function Auth() {
                 </div>
 
                 {/* Auth Card */}
-                <div className="glass-panel rounded-2xl p-8">
+                <div className="glass-panel rounded-2xl p-8 relative overflow-hidden">
                     {/* Tabs */}
                     <div className="flex rounded-xl bg-white/[0.04] p-1 mb-6">
                         <button onClick={() => { setIsLogin(true); setError('') }}
@@ -291,7 +312,7 @@ export default function Auth() {
                             <div className="relative">
                                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-lg">lock</span>
                                 <input
-                                    type="password" 
+                                    type={showPassword ? 'text' : 'password'} 
                                     name="password"
                                     id="auth-password"
                                     value={form.password} 
@@ -299,9 +320,20 @@ export default function Auth() {
                                     placeholder="••••••••" 
                                     required 
                                     minLength={6}
-                                    className="input-glass w-full pl-10 py-3"
+                                    className="input-glass w-full pl-10 pr-10 py-3"
                                 />
+                                <button type="button" onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+                                    tabIndex={-1}>
+                                    <span className="material-symbols-outlined text-lg">{showPassword ? 'visibility_off' : 'visibility'}</span>
+                                </button>
                             </div>
+                            {isLogin && (
+                                <button type="button" onClick={() => { setShowForgot(true); setForgotEmail(form.email); setError(''); setForgotMessage('') }}
+                                    className="text-xs text-primary/70 hover:text-primary mt-2 cursor-pointer transition-colors">
+                                    Forgot Password?
+                                </button>
+                            )}
                         </div>
 
                         {error && (
@@ -344,6 +376,56 @@ export default function Auth() {
                         )}
                         Continue with Google
                     </button>
+
+                    {/* Forgot Password Overlay */}
+                    {showForgot && (
+                        <div className="absolute inset-0 bg-[#0a0c16]/95 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center p-8 z-20">
+                            <span className="material-symbols-outlined text-4xl text-primary mb-4">lock_reset</span>
+                            <h3 className="text-white text-lg font-bold mb-2">Reset Password</h3>
+                            <p className="text-slate-400 text-xs text-center mb-6">Enter your email and we'll send a link to reset your password.</p>
+                            
+                            {forgotMessage && (
+                                <div className="w-full p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm mb-4 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-lg">check_circle</span> {forgotMessage}
+                                </div>
+                            )}
+                            {error && (
+                                <div className="w-full p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm mb-4 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-lg">error</span> {error}
+                                </div>
+                            )}
+
+                            <form onSubmit={handleForgotPassword} className="w-full space-y-4">
+                                <div className="relative">
+                                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-lg">mail</span>
+                                    <input
+                                        type="email"
+                                        id="forgot-email"
+                                        value={forgotEmail}
+                                        onChange={e => setForgotEmail(e.target.value)}
+                                        placeholder="you@company.com"
+                                        required
+                                        autoFocus
+                                        className="input-glass w-full pl-10 py-3"
+                                    />
+                                </div>
+                                <button type="submit" disabled={forgotLoading}
+                                    className="btn-primary w-full py-3 rounded-xl text-sm font-bold disabled:opacity-50">
+                                    {forgotLoading ? (
+                                        <span className="flex items-center justify-center gap-2">
+                                            <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>
+                                            Sending...
+                                        </span>
+                                    ) : 'Send Reset Link'}
+                                </button>
+                            </form>
+
+                            <button onClick={() => { setShowForgot(false); setError(''); setForgotMessage('') }}
+                                className="mt-4 text-xs text-slate-500 hover:text-slate-300 transition-colors cursor-pointer">
+                                ← Back to Sign In
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Back to home */}

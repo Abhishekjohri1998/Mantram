@@ -349,7 +349,7 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                                         className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-white/[0.06] hover:text-white transition-all cursor-pointer text-left">
                                         <span className="material-symbols-outlined text-lg">toll</span> Credit Usage
                                     </button>
-                                    <button onClick={() => { navigate('/team'); setShowMenu(false) }}
+                                    <button onClick={() => { navigate('/settings'); setShowMenu(false) }}
                                         className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-white/[0.06] hover:text-white transition-all cursor-pointer text-left">
                                         <span className="material-symbols-outlined text-lg">settings</span> Settings
                                     </button>
