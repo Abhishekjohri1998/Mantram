@@ -50,11 +50,21 @@ let lastTokenUsage = null;
 export function getLastTokenUsage() { return lastTokenUsage; }
 
 async function aiCall(systemPrompt, userPrompt, options = {}) {
-  const { temperature = 0.7, maxTokens = 8192, json = false, timeout = 60000 } = options;
+  const { temperature = 0.7, maxTokens = 8192, json = false, timeout = 60000, signal = null } = options;
   lastTokenUsage = null;
 
   const overallController = new AbortController();
   const overallTimer = setTimeout(() => overallController.abort(), timeout);
+
+  // If an external signal is provided, listen for its abort too
+  if (signal) {
+    if (signal.aborted) {
+      clearTimeout(overallTimer);
+      overallController.abort();
+    } else {
+      signal.addEventListener('abort', () => overallController.abort());
+    }
+  }
 
   const defaultProvider = process.env.DEFAULT_TEXT_PROVIDER || 'anthropic';
   const defaultModel = process.env.DEFAULT_TEXT_MODEL;
@@ -1784,7 +1794,11 @@ STRATEGIC RULES (MANDATORY):
     const location = brand?.location || brandPayload?.location || '';
     const competitors = brand?.competitors?.map(c => c.name || c) || [];
 
-    console.log(`🔮 Starting parallel: AI analysis + GEO probe v3 for "${brandName}" in "${industry}"`);
+    // Unified controller for this request's AI budget
+    const overallController = new AbortController();
+    const overallTimer = setTimeout(() => overallController.abort(), remainingBudget);
+
+    console.log(`🔮 Starting parallel: AI analysis + GEO probe v3 for "${brandName}" in "${industry}" (Budget: ${remainingBudget}ms)`);
 
     // Fetch previous probe for citation drift detection
     let previousProbe = null;
@@ -1796,15 +1810,46 @@ STRATEGIC RULES (MANDATORY):
       } catch (_) { /* ignore */ }
     }
 
-    const [result, geoProbeResult] = await Promise.all([
-      aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget }),
-      probeAIVisibility(brandName, industry, location, website, competitors, customPrompts || [], previousProbe).catch(err => {
-        console.warn('GEO Probe failed (non-blocking):', err.message);
-        return null;
-      }),
-    ]);
+    let result = null;
+    let geoProbeResult = null;
 
-    const parsed = parseJSON(result);
+    try {
+      const [_result, _geoProbeResult] = await Promise.all([
+        aiCall(systemPrompt, userPrompt, { 
+          json: true, temperature: 0.5, maxTokens: 8192, 
+          timeout: remainingBudget, 
+          signal: overallController.signal 
+        }).catch(err => {
+          if (err.name === 'AbortError') console.warn('AI Visibility analysis timed out (budget reached)');
+          else console.warn('AI Visibility analysis failed:', err.message);
+          return null;
+        }),
+        probeAIVisibility(brandName, industry, location, website, competitors, customPrompts || [], previousProbe, overallController.signal).catch(err => {
+          if (err.name === 'AbortError') console.warn('GEO Probe timed out (budget reached)');
+          else console.warn('GEO Probe failed (non-blocking):', err.message);
+          return null;
+        }),
+      ]);
+      result = _result;
+      geoProbeResult = _geoProbeResult;
+    } catch (err) {
+      if (err.name === 'AbortError') console.warn('Parallel AI Visibility tasks timed out');
+      else console.error('Fatal error in parallel AI Visibility tasks:', err.message);
+    } finally {
+      clearTimeout(overallTimer);
+    }
+
+    let parsed;
+    if (result) {
+      try {
+        parsed = parseJSON(result);
+      } catch (e) {
+        console.warn('Failed to parse AI Visibility JSON, using fallback data.');
+        parsed = { aiVisibilityScore: 50 };
+      }
+    } else {
+      parsed = { aiVisibilityScore: 50, _timedOut: true };
+    }
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
 
     // Merge real GEO probe data into response

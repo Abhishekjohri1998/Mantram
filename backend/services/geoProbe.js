@@ -15,7 +15,7 @@
 
 const PROBE_TIMEOUT = 15000;
 const TOTAL_SUPPORTED_MODELS = 5;
-const SAMPLES_PER_PROMPT = 3; // Run each prompt 3x per model for statistical confidence
+const SAMPLES_PER_PROMPT = 2; // Reduced from 3 to ensure we stay within the 180s total budget
 
 // ============================================================================
 // PROMPT GENERATION (with intent tagging)
@@ -79,11 +79,18 @@ function extractCitations(text) {
 // LLM PROBING FUNCTIONS
 // ============================================================================
 
-async function probeGemini(prompt) {
+async function probeGemini(prompt, signal = null) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return null;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT);
+    
+    // Listen for parent abort
+    if (signal) {
+        if (signal.aborted) { clearTimeout(timer); controller.abort(); }
+        else signal.addEventListener('abort', () => { clearTimeout(timer); controller.abort(); });
+    }
+
     try {
         const resp = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
@@ -104,11 +111,17 @@ async function probeGemini(prompt) {
     } catch (e) { clearTimeout(timer); return null; }
 }
 
-async function probeOpenAI(prompt) {
+async function probeOpenAI(prompt, signal = null) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return null;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT);
+
+    if (signal) {
+        if (signal.aborted) { clearTimeout(timer); controller.abort(); }
+        else signal.addEventListener('abort', () => { clearTimeout(timer); controller.abort(); });
+    }
+
     try {
         const resp = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -130,11 +143,17 @@ async function probeOpenAI(prompt) {
     } catch (e) { clearTimeout(timer); return null; }
 }
 
-async function probeClaude(prompt) {
+async function probeClaude(prompt, signal = null) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return null;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT);
+
+    if (signal) {
+        if (signal.aborted) { clearTimeout(timer); controller.abort(); }
+        else signal.addEventListener('abort', () => { clearTimeout(timer); controller.abort(); });
+    }
+
     try {
         const resp = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
@@ -152,11 +171,17 @@ async function probeClaude(prompt) {
     } catch (e) { clearTimeout(timer); return null; }
 }
 
-async function probeGrok(prompt) {
+async function probeGrok(prompt, signal = null) {
     const apiKey = process.env.GROK_API_KEY;
     if (!apiKey) return null;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT);
+
+    if (signal) {
+        if (signal.aborted) { clearTimeout(timer); controller.abort(); }
+        else signal.addEventListener('abort', () => { clearTimeout(timer); controller.abort(); });
+    }
+
     try {
         const resp = await fetch('https://api.x.ai/v1/chat/completions', {
             method: 'POST',
@@ -178,11 +203,17 @@ async function probeGrok(prompt) {
     } catch (e) { clearTimeout(timer); return null; }
 }
 
-async function probePerplexity(prompt) {
+async function probePerplexity(prompt, signal = null) {
     const apiKey = process.env.PERPLEXITY_API_KEY;
     if (!apiKey) return null;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT);
+
+    if (signal) {
+        if (signal.aborted) { clearTimeout(timer); controller.abort(); }
+        else signal.addEventListener('abort', () => { clearTimeout(timer); controller.abort(); });
+    }
+
     try {
         const resp = await fetch('https://api.perplexity.ai/chat/completions', {
             method: 'POST',
@@ -403,7 +434,7 @@ function computeConfidence(samples) {
 // MAIN PROBE FUNCTION
 // ============================================================================
 
-async function probeAIVisibility(brandName, industry, location, website, competitors = [], customPrompts = [], previousProbe = null) {
+async function probeAIVisibility(brandName, industry, location, website, competitors = [], customPrompts = [], previousProbe = null, signal = null) {
     console.log(`🔮 GEO Probe v3: Starting multi-sample probing for "${brandName}" (${SAMPLES_PER_PROMPT}x per prompt)...`);
 
     const prompts = generateIndustryPrompts(brandName, industry, location, website, customPrompts);
@@ -435,7 +466,14 @@ async function probeAIVisibility(brandName, industry, location, website, competi
         const sampleResults = [];
 
         for (const promptObj of prompts) {
-            const probePromises = availableModels.map(m => m.fn(promptObj.text));
+            if (signal && signal.aborted) break;
+
+            // CONCURRENT probing across models for THIS prompt
+            const probePromises = availableModels.map(m => m.fn(promptObj.text, signal).catch(err => {
+                console.warn(`🔮 GEO Probe: ${m.name} failed for prompt:`, err.message);
+                return null;
+            }));
+            
             const results = await Promise.all(probePromises);
 
             for (const result of results) {
@@ -447,8 +485,8 @@ async function probeAIVisibility(brandName, industry, location, website, competi
                 }
             }
 
-            // Rate limit between prompts
-            await new Promise(r => setTimeout(r, 200));
+            // Small jitter delay between prompt batches instead of large static wait
+            if (!signal?.aborted) await new Promise(r => setTimeout(r, Math.random() * 200 + 100));
         }
 
         // Compute per-sample mention rate for CI
