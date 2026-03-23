@@ -28,6 +28,9 @@ import { uploadToS3 } from '../utils/s3.js';
 import rateLimit from 'express-rate-limit';
 import nodemailer from 'nodemailer';
 import env from '../config/env.js';
+import { getOnPageProviderStatus } from '../utils/onpage-api.js';
+import { getDataForSEOProviderStatus } from '../utils/dataforseo.js';
+import { getRedisStatus } from '../utils/cache.js';
 
 const router = Router();
 
@@ -42,6 +45,35 @@ const adminLimiter = rateLimit({
 
 // All routes require superadmin
 router.use(protect, authorize('superadmin'), adminLimiter);
+
+/**
+ * Platform Provider Status — Live health check of all external APIs/DBs
+ */
+router.get('/provider-status', async (req, res) => {
+    try {
+        const mongoStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+        const redisStatus = getRedisStatus();
+        const onPageStatus = getOnPageProviderStatus();
+        const labsStatus = getDataForSEOProviderStatus();
+
+        res.json({
+            success: true,
+            providers: {
+                mongodb: { status: mongoStatus, dbName: mongoose.connection.name },
+                redis: redisStatus,
+                dataforseo: {
+                    onPage: onPageStatus,
+                    labs: labsStatus,
+                    overallStatus: (onPageStatus.suspended || labsStatus.suspended) ? 'degraded' : 'healthy',
+                    message: (onPageStatus.suspended || labsStatus.suspended) ? 'Account balance exhausted. API suspended for 1 hour.' : 'Fully operational'
+                },
+                env: process.env.NODE_ENV || 'development'
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
 
 // ══════════════════════════════════════════════════════════════
 // 1. PLATFORM OVERVIEW

@@ -13,8 +13,47 @@ const DATAFORSEO_LOGIN = process.env.DATAFORSEO_LOGIN || '';
 const DATAFORSEO_PASSWORD = process.env.DATAFORSEO_PASSWORD || '';
 const DATAFORSEO_BASE = 'https://api.dataforseo.com/v3';
 
+// ─── RESILIENCE: Global Suspension State ───────────────────────────────
+let isSuspended = false;
+let suspensionTime = null;
+const SUSPENSION_DURATION = 60 * 60 * 1000; // 1 hour
+
+/**
+ * Handle 402 errors globally to stop spamming the API when balance is empty
+ */
+function handlePaymentError() {
+    if (!isSuspended) {
+        isSuspended = true;
+        suspensionTime = Date.now();
+        console.warn(`🛑 DataForSEO: 402 Payment Required detected. Suspending API for 1 hour.`);
+    }
+}
+
 function hasDataForSEO() {
-    return !!(DATAFORSEO_LOGIN && DATAFORSEO_PASSWORD);
+    // Check if configured
+    if (!DATAFORSEO_LOGIN || !DATAFORSEO_PASSWORD) return false;
+    
+    // Check if suspended
+    if (isSuspended) {
+        if (Date.now() - suspensionTime > SUSPENSION_DURATION) {
+            isSuspended = false;
+            suspensionTime = null;
+            return true;
+        }
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Export current status for the Admin Dashboard
+ */
+export function getDataForSEOProviderStatus() {
+    return {
+        configured: !!(DATAFORSEO_LOGIN && DATAFORSEO_PASSWORD),
+        suspended: isSuspended,
+        suspensionRemaining: isSuspended ? Math.max(0, SUSPENSION_DURATION - (Date.now() - suspensionTime)) : 0
+    };
 }
 
 function getAuthHeader() {
@@ -51,6 +90,7 @@ async function fetchKeywordData(keywords, locationCode = '2356', languageCode = 
         });
 
         if (!response.ok) {
+            if (response.status === 402) handlePaymentError();
             console.warn(`DataForSEO API error: ${response.status}`);
             return null;
         }
@@ -97,7 +137,10 @@ async function fetchKeywordDifficulty(keywords, locationCode = '2356', languageC
             }]),
         });
 
-        if (!response.ok) return null;
+        if (!response.ok) {
+            if (response.status === 402) handlePaymentError();
+            return null;
+        }
         const data = await response.json();
         if (data.status_code !== 20000) return null;
 
@@ -136,7 +179,10 @@ async function fetchSerpFeatures(keywords, locationCode = '2356', languageCode =
             body: JSON.stringify(tasks),
         });
 
-        if (!response.ok) return null;
+        if (!response.ok) {
+            if (response.status === 402) handlePaymentError();
+            return null;
+        }
         const data = await response.json();
         if (data.status_code !== 20000) return null;
 
@@ -179,7 +225,10 @@ async function fetchKeywordSuggestions(seedKeyword, locationCode = '2356', langu
             }]),
         });
 
-        if (!response.ok) return null;
+        if (!response.ok) {
+            if (response.status === 402) handlePaymentError();
+            return null;
+        }
         const data = await response.json();
         if (data.status_code !== 20000) return null;
 
@@ -214,7 +263,10 @@ async function fetchBacklinkSummary(domain) {
             signal: AbortSignal.timeout(15000),
         });
 
-        if (!response.ok) return { _error: `HTTP ${response.status}`, _subscriptionNeeded: false };
+        if (!response.ok) {
+            if (response.status === 402) handlePaymentError();
+            return { _error: `HTTP ${response.status}`, _subscriptionNeeded: false };
+        }
         const data = await response.json();
         if (data.status_code !== 20000) return { _error: data.status_message, _subscriptionNeeded: false };
 
@@ -281,7 +333,10 @@ async function fetchTopReferringDomains(domain, limit = 20) {
             }]),
         });
 
-        if (!response.ok) return null;
+        if (!response.ok) {
+            if (response.status === 402) handlePaymentError();
+            return null;
+        }
         const data = await response.json();
         if (data.status_code !== 20000) return null;
 

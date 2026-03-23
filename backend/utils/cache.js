@@ -50,4 +50,16 @@ export async function getCachedOrFetch(key, fetchFn, ttl = CACHE_TTL) {
   }
 }
 
+/**
+ * Get current Redis connection status
+ */
+export function getRedisStatus() {
+  return {
+    configured: !!process.env.REDIS_HOST,
+    connected: redisClient ? redisClient.status === 'ready' : false,
+    mode: process.env.REDIS_TLS === 'true' ? 'TLS/SSL' : 'standard',
+    host: process.env.REDIS_HOST || 'none'
+  };
+}
+
 export default redisClient;

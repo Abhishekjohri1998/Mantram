@@ -274,25 +274,31 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
     
     // Submit DataForSEO OnPage 500-page crawl FIRST (async, runs on their servers)
     let dfsCrawlTaskId = null;
-    if (isOnPageConfigured()) {
+    const dfsOnPageStatus = getOnPageProviderStatus();
+    
+    if (dfsOnPageStatus.configured && !dfsOnPageStatus.suspended) {
       try {
         const crawlResult = await submitSiteCrawl(brandDomain, { maxPages: 500, enableJS: true, enableBrowserRendering: true });
         dfsCrawlTaskId = crawlResult?.taskId || null;
         if (dfsCrawlTaskId) console.log(`📋 DataForSEO OnPage crawl submitted: ${dfsCrawlTaskId} (500 pages)`);
       } catch (e) { console.warn(`⚠️ DataForSEO crawl submit failed: ${e.message}`); }
+    } else if (dfsOnPageStatus.suspended) {
+      console.warn(`⚠️ DataForSEO OnPage is currently suspended due to payment error. Skipping crawl.`);
     }
 
+    const dfsLabsStatus = getDataForSEOProviderStatus();
+    
     let [siteResearch, siteIntel, pageSpeedData, backlinkData, mozData] = await Promise.all([
       researchDomain(website, { maxPages: 800, timeout: 300000 }).catch(e => {
         console.error(`❌ Crawl failed: ${e.message}`);
         return { url: website, pages: [], homepage: {}, siteIntelligence: { totalPages: 0 }, error: e.message };
       }),
-      isOnPageConfigured() ? getInstantSiteIntelligence(brandDomain, { country }).catch(e => {
+      (dfsOnPageStatus.configured && !dfsOnPageStatus.suspended) ? getInstantSiteIntelligence(brandDomain, { country }).catch(e => {
         console.warn(`⚠️ Instant intelligence failed: ${e.message}`);
         return { available: false };
-      }) : Promise.resolve({ available: false }),
+      }) : Promise.resolve({ available: false, _suspended: dfsOnPageStatus.suspended }),
       getPageSpeed(website, 'mobile').catch(e => ({ success: false, error: e.message })),
-      isDataForSEOConfigured() ? getDomainBacklinks(brandDomain).catch(e => ({ available: false, error: e.message })) : Promise.resolve({ available: false }),
+      (dfsLabsStatus.configured && !dfsLabsStatus.suspended) ? getDomainBacklinks(brandDomain).catch(e => ({ available: false, error: e.message })) : Promise.resolve({ available: false, _suspended: dfsLabsStatus.suspended }),
       isMozConfigured() ? getMozDomainAuthority(brandDomain).catch(e => ({ available: false, error: e.message })) : Promise.resolve({ available: false }),
     ]);
 

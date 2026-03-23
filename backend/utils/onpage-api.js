@@ -13,8 +13,47 @@ const DATAFORSEO_LOGIN = process.env.DATAFORSEO_LOGIN || '';
 const DATAFORSEO_PASSWORD = process.env.DATAFORSEO_PASSWORD || '';
 const DATAFORSEO_BASE = 'https://api.dataforseo.com/v3';
 
+// ─── RESILIENCE: Global Suspension State ───────────────────────────────
+let isSuspended = false;
+let suspensionTime = null;
+const SUSPENSION_DURATION = 60 * 60 * 1000; // 1 hour
+
+/**
+ * Handle 402 errors globally to stop spamming the API when balance is empty
+ */
+function handlePaymentError() {
+    if (!isSuspended) {
+        isSuspended = true;
+        suspensionTime = Date.now();
+        console.warn(`🛑 DataForSEO: 402 Payment Required detected. Suspending API for 1 hour.`);
+    }
+}
+
 function hasDataForSEO() {
-    return !!(DATAFORSEO_LOGIN && DATAFORSEO_PASSWORD);
+    // Check if configured
+    if (!DATAFORSEO_LOGIN || !DATAFORSEO_PASSWORD) return false;
+    
+    // Check if suspended
+    if (isSuspended) {
+        if (Date.now() - suspensionTime > SUSPENSION_DURATION) {
+            isSuspended = false;
+            suspensionTime = null;
+            return true;
+        }
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Export current status for the Admin Dashboard
+ */
+export function getOnPageProviderStatus() {
+    return {
+        configured: !!(DATAFORSEO_LOGIN && DATAFORSEO_PASSWORD),
+        suspended: isSuspended,
+        suspensionRemaining: isSuspended ? Math.max(0, SUSPENSION_DURATION - (Date.now() - suspensionTime)) : 0
+    };
 }
 
 function getAuthHeader() {
@@ -51,7 +90,7 @@ async function fetchInstantPage(url) {
             signal: AbortSignal.timeout(30000),
         });
         if (!resp.ok) { 
-            if (resp.status === 402) console.warn('❌ DataForSEO Error: Payment Required (402). Check account balance.');
+            if (resp.status === 402) handlePaymentError();
             else if (resp.status === 429) console.warn('⚠️ DataForSEO Warning: Rate Limit Exceeded (429).');
             else console.warn(`On-Page Instant error: ${resp.status}`); 
             return null; 
@@ -98,7 +137,7 @@ async function submitOnPageCrawl(domain, options = {}) {
             signal: AbortSignal.timeout(15000),
         });
         if (!resp.ok) { 
-            if (resp.status === 402) console.warn('❌ DataForSEO Error: Payment Required (402). Check account balance.');
+            if (resp.status === 402) handlePaymentError();
             else if (resp.status === 429) console.warn('⚠️ DataForSEO Warning: Rate Limit Exceeded (429).');
             else console.warn(`On-Page Task POST error: ${resp.status}`); 
             return null; 
@@ -219,7 +258,7 @@ async function fetchRankedKeywords(domain, options = {}) {
             signal: AbortSignal.timeout(20000),
         });
         if (!resp.ok) { 
-            if (resp.status === 402) console.warn('❌ DataForSEO Error: Payment Required (402). Check account balance.');
+            if (resp.status === 402) handlePaymentError();
             else if (resp.status === 429) console.warn('⚠️ DataForSEO Warning: Rate Limit Exceeded (429).');
             else console.warn(`Ranked Keywords error: ${resp.status}`); 
             return null; 
