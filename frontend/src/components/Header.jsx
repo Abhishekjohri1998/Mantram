@@ -15,6 +15,7 @@ export default function Header({ title, subtitle, onMenuToggle }) {
     const [showBrandMenu, setShowBrandMenu] = useState(false)
     const [showIntelPanel, setShowIntelPanel] = useState(false)
     const [intelMissionCount, setIntelMissionCount] = useState(0)
+    const [platformBudgets, setPlatformBudgets] = useState(null)
     const menuRef = useRef(null)
     const brandMenuRef = useRef(null)
 
@@ -60,13 +61,64 @@ export default function Header({ title, subtitle, onMenuToggle }) {
     const creditColor = creditPercent > 50 ? 'emerald' : creditPercent > 20 ? 'amber' : 'rose'
 
     // Credit Notifications
+    // Fetch platform budgets only for superadmins
+    useEffect(() => {
+        if (user?.role === 'superadmin') {
+            const fetchBudgets = async () => {
+                try {
+                    const resp = await fetch('/api/superadmin/provider-budgets', {
+                        headers: { 'Authorization': `Bearer ${localStorage.getItem('mantram_token')}` }
+                    })
+                    const data = await resp.json()
+                    if (data.success) setPlatformBudgets(data.budgets)
+                } catch (err) {
+                    console.error('Failed to fetch platform budgets:', err)
+                }
+            }
+            fetchBudgets()
+            // Refresh every 30 mins
+            const timer = setInterval(fetchBudgets, 30 * 60 * 1000)
+            return () => clearInterval(timer)
+        }
+    }, [user])
+
     const showWarning = creditBalance && !creditBalance.unlimited && creditBalance.remaining <= 15 && creditBalance.remaining > 0
     const showConsumed = creditBalance && !creditBalance.unlimited && creditBalance.remaining === 0
+
+    // Platform budget alerts (for admin)
+    const getPlatformAlerts = () => {
+        if (!platformBudgets) return []
+        return Object.entries(platformBudgets).map(([id, p]) => {
+            const percentUsed = (p.consumed / p.budget) * 100
+            if (percentUsed >= 100) return { id, level: 'critical', provider: id, percentUsed: Math.round(percentUsed) }
+            if (percentUsed >= 80) return { id, level: 'warning', provider: id, percentUsed: Math.round(percentUsed) }
+            return null
+        }).filter(Boolean)
+    }
+    const platformAlerts = getPlatformAlerts()
 
     return (
         <>
             <div className="sticky top-0 z-50">
-            {/* Credit Warning Banners */}
+            {/* Admin Platform Alerts */}
+            {platformAlerts.map(alert => (
+                <div key={`admin-alert-${alert.id}`} className={`${alert.level === 'critical' ? 'bg-rose-500/10 border-rose-500/20' : 'bg-amber-500/10 border-amber-500/20'} border-b py-2 px-4 animate-fade-in flex items-center justify-center gap-3 backdrop-blur-md`}>
+                    <span className={`material-symbols-outlined text-sm ${alert.level === 'critical' ? 'text-rose-500' : 'text-amber-500'}`}>
+                        {alert.level === 'critical' ? 'dangerous' : 'warning'}
+                    </span>
+                    <p className={`text-xs font-medium ${alert.level === 'critical' ? 'text-rose-200' : 'text-amber-200'}`}>
+                        <span className="uppercase font-bold">{alert.provider}</span> Platform {alert.level === 'critical' ? 'EXHAUSTED' : 'Credits Low'} ({alert.percentUsed}% consumed). Please recharge the API account.
+                    </p>
+                    <button 
+                        onClick={() => navigate('/superadmin')}
+                        className={`text-[10px] px-2 py-0.5 rounded-full border transition-all ${alert.level === 'critical' ? 'bg-rose-500 text-white border-rose-400 hover:bg-rose-600' : 'bg-amber-500 text-black border-amber-400 hover:bg-amber-600'}`}
+                    >
+                        Manage
+                    </button>
+                </div>
+            ))}
+
+            {/* Credit Warning Banners (User-specific) */}
             {showWarning && (
                 <div className="bg-amber-500/10 border-b border-amber-500/20 py-2 px-4 animate-fade-in flex items-center justify-center gap-3 backdrop-blur-md">
                     <span className="material-symbols-outlined text-amber-500 text-lg">warning</span>

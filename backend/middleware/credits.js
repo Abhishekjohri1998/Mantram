@@ -13,7 +13,7 @@
 
 import mongoose from 'mongoose';
 import User from '../models/User.js';
-import SystemSettings from '../models/SystemSettings.js';
+import SystemSettings, { getSetting, setSetting } from '../models/SystemSettings.js';
 import CreditUsage from '../models/CreditUsage.js';
 import { estimateCost } from '../agents/videoStudio/falClient.js';
 
@@ -317,24 +317,42 @@ export const logTokenUsage = async (userId, tokenData, meta = {}) => {
     const estimatedCost = Math.round(((inputTokens / 1000) * modelCost.input + (outputTokens / 1000) * modelCost.output) * 100) / 100;
 
     try {
-        // Update the most recent CreditUsage record if it exists
+        // 1. Update the most recent CreditUsage record if it exists
         const updated = await CreditUsage.findOneAndUpdate(
             { user: userId, action: meta.action || 'unknown', 'tokenUsage.inputTokens': 0 },
             { $set: { 'tokenUsage.inputTokens': inputTokens, 'tokenUsage.outputTokens': outputTokens, 'tokenUsage.totalTokens': totalTokens, 'tokenUsage.model': model, 'tokenUsage.provider': provider, 'tokenUsage.estimatedCost': estimatedCost } },
             { sort: { createdAt: -1 } }
         );
 
-        // If no matching unfilled record, create a new token-only log
+        // 2. If no matching unfilled record, create a new token-only log
         if (!updated) {
             await CreditUsage.create({
                 user: userId,
                 action: meta.action || 'ai_call',
-                cost: 0, // no credit deduction, just token tracking
+                cost: 0, 
                 description: `Token usage: ${model}`,
                 studio: meta.studio || 'unknown',
                 metadata: { route: meta.route || '', brandId: meta.brandId },
                 tokenUsage: { inputTokens, outputTokens, totalTokens, model, provider, estimatedCost },
             });
+        }
+
+        // 3. Increment Platform Provider Budget (Admin Monitoring)
+        if (estimatedCost > 0) {
+            const budgets = await getSetting('provider_budgets', {});
+            const p = (provider || '').toLowerCase();
+            if (p && budgets[p]) {
+                budgets[p].consumed = (budgets[p].consumed || 0) + estimatedCost;
+                budgets[p].lastUpdate = new Date();
+                await setSetting('provider_budgets', budgets);
+            } else if (p) {
+                // Initialize if missing but provider is known
+                const knownProviders = ['gemini', 'openai', 'anthropic', 'grok', 'piapi', 'fal', 'heygen', 'sarvam'];
+                if (knownProviders.includes(p)) {
+                    budgets[p] = { budget: 1000, consumed: estimatedCost, lastUpdate: new Date() }; // Default $10 budget
+                    await setSetting('provider_budgets', budgets);
+                }
+            }
         }
     } catch (err) {
         console.warn('Token usage log failed:', err.message);

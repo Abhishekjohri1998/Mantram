@@ -1407,6 +1407,57 @@ router.delete('/packages/:id', async (req, res) => {
     }
 });
 
+// ══════════════════════════════════════════════════════════════
+// 9. PLATFORM PROVIDER BUDGETS
+// ══════════════════════════════════════════════════════════════
+
+// GET /superadmin/provider-budgets — current consumption vs limits
+router.get('/provider-budgets', async (req, res) => {
+    try {
+        const budgets = await getSetting('provider_budgets', {});
+        res.json({ success: true, budgets });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// PUT /superadmin/provider-budgets — update limit or reset consumption
+router.put('/provider-budgets', async (req, res) => {
+    try {
+        const { provider, budget, consumed, reset } = req.body;
+        if (!provider) return res.status(400).json({ success: false, error: 'Provider name required' });
+        
+        const budgets = await getSetting('provider_budgets', {});
+        const p = provider.toLowerCase();
+        
+        if (!budgets[p]) {
+            budgets[p] = { budget: 1000, consumed: 0, lastUpdate: new Date() };
+        }
+
+        if (budget !== undefined) budgets[p].budget = budget;
+        if (consumed !== undefined) budgets[p].consumed = consumed;
+        if (reset) {
+            budgets[p].consumed = 0;
+            budgets[p].lastReset = new Date();
+        }
+        
+        budgets[p].lastUpdate = new Date();
+        await setSetting('provider_budgets', budgets, req.user._id);
+
+        await logAudit(req, {
+            action: 'UPDATE_PROVIDER_BUDGET',
+            targetModel: 'SystemSettings',
+            targetId: p,
+            severity: 'warning',
+            metadata: { provider: p, budget, reset }
+        });
+
+        res.json({ success: true, message: `Budget for ${provider} updated`, budgets });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 // AI-Powered Package Suggestion Engine
 router.post('/packages/ai-suggest', async (req, res) => {
     try {
