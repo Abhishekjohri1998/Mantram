@@ -523,8 +523,13 @@ router.get('/google/callback', async (req, res) => {
         const tokenData = await tokenResp.json();
 
         if (tokenData.error) {
-            console.error('Google Auth token exchange failed:', tokenData.error);
-            return res.send(closeAuthPopupScript(`Auth failed: ${tokenData.error_description || tokenData.error}`));
+            console.error('❌ Google Auth token exchange failed:', {
+                error: tokenData.error,
+                description: tokenData.error_description,
+                sentClientId: clientId ? `${clientId.substring(0, 10)}...` : 'MISSING',
+                sentRedirectUri: redirectUri
+            });
+            return res.send(closeAuthPopupScript(`Auth failed: ${tokenData.error_description || tokenData.error} (Check server logs for details)`));
         }
 
         const { access_token } = tokenData;
