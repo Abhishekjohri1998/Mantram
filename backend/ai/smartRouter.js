@@ -11,6 +11,7 @@
  */
 
 import { getRouter } from './router.js';
+import { AIProviderBusyError, AIProviderQuotaError } from './errors.js';
 
 // ============================================================================
 // ROUTING TABLE — the single source of truth for model selection
@@ -154,6 +155,19 @@ class SmartLanguageRouter {
             }
             // Sarvam failed → fall through to ModelRouter fallback
             console.warn('⚠️ Sarvam unavailable, falling back to default provider');
+            try {
+                result = await this._callSarvam(systemPrompt, userPrompt, { temperature, maxTokens });
+                if (result) {
+                    return { ...result, _routeInfo: route };
+                }
+            } catch (error) {
+                // Re-throw specific AI errors
+                if (error instanceof AIProviderBusyError || error instanceof AIProviderQuotaError) {
+                    throw error;
+                }
+                console.warn('⚠️ Sarvam unavailable or failed, falling back to default provider:', error.message);
+            }
+            // Sarvam failed or unavailable → fall through to ModelRouter fallback
             route.reason += ' (Sarvam fallback)';
         }
 
@@ -192,13 +206,23 @@ class SmartLanguageRouter {
                 }),
             });
 
+            const data = await response.json();
+
             if (!response.ok) {
-                const err = await response.json().catch(() => ({}));
-                console.error('Sarvam LLM error:', err);
+                const msg = data.error?.message || data.error || response.statusText;
+                const lowerMsg = String(msg).toLowerCase();
+
+                if (response.status === 429 || lowerMsg.includes('rate limit')) {
+                    throw new AIProviderBusyError('sarvam', msg);
+                }
+                if (lowerMsg.includes('credits') || lowerMsg.includes('quota')) {
+                    throw new AIProviderQuotaError('sarvam', msg);
+                }
+
+                console.error('Sarvam LLM error:', data.error);
                 return null;
             }
 
-            const data = await response.json();
             const text = data.choices?.[0]?.message?.content || '';
             return {
                 text,

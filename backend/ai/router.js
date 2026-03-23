@@ -2,16 +2,11 @@ import config from '../config/env.js';
 import { GeminiProvider } from './providers/gemini.js';
 import { OpenAIProvider } from './providers/openai.js';
 import { AnthropicProvider } from './providers/anthropic.js';
+import { AIProviderBusyError, AIProviderQuotaError } from './errors.js';
 
 /**
  * Model Router — Routes AI requests to the configured provider.
  * Handles provider selection, fallback, and usage tracking.
- * 
- * To add a new provider:
- *   1. Create server/ai/providers/myProvider.js extending BaseProvider
- *   2. Add it to the providers map below
- *   3. Set DEFAULT_TEXT_PROVIDER=myProvider in .env
- *   Done. No other code changes.
  */
 class ModelRouter {
     constructor() {
@@ -26,7 +21,7 @@ class ModelRouter {
         // Register all providers — they self-check if API key exists
         this.providers.gemini = new GeminiProvider({
             apiKey: providerConfigs.gemini?.apiKey,
-            defaultModel: 'gemini-2.5-flash',
+            defaultModel: 'gemini-2.0-flash', // Updated to latest stable
         });
         this.providers.openai = new OpenAIProvider({
             apiKey: providerConfigs.openai?.apiKey,
@@ -77,14 +72,14 @@ class ModelRouter {
 
     /**
      * Get the best available image provider
-     * Priority: Gemini (Imagen 3 / nanobanana pro) > OpenAI (DALL-E)
+     * Priority: Gemini (Imagen 3) > OpenAI (DALL-E)
      */
     getImageProvider(preferences = {}) {
         const priority = [
             preferences.provider,
             config.ai.defaultImageProvider,
-            'gemini',  // Gemini 3.1 Flash Image Preview (nanobanana pro)
-            'openai',  // DALL-E fallback
+            'gemini',
+            'openai',
         ].filter(Boolean);
 
         for (const name of priority) {
@@ -111,21 +106,19 @@ class ModelRouter {
         }
 
         const triedProviders = new Set([provider.name]);
+        let lastError = null;
 
         try {
             const result = await provider.generateText(params);
             this._logUsage('text', provider.name, result.tokensUsed);
             return result;
         } catch (error) {
-            const isQuotaError = error.message?.toLowerCase().includes('quota') ||
-                error.message?.toLowerCase().includes('rate limit') ||
-                error.message?.toLowerCase().includes('429') ||
-                error.message?.toLowerCase().includes('credit') ||
-                error.message?.toLowerCase().includes('balance');
+            lastError = error;
+            const isQuotaError = this._testQuotaError(error);
 
             if (isQuotaError) {
-                provider.cooldownUntil = Date.now() + (5 * 60 * 1000);
-                console.warn(`⏳ Provider ${provider.name} hit quota/credit limits. Cooling down for 5 mins.`);
+                provider.cooldownUntil = Date.now() + (5 * 60 * 1000); // 5 min cooldown
+                console.warn(`⏳ Provider ${provider.name} hit quota/credit limits. Cooling down.`);
             }
 
             console.error(`Provider ${provider.name} failed, searching for fallback:`, error.message);
@@ -143,17 +136,55 @@ class ModelRouter {
                     this._logUsage('text', fallback.name, result.tokensUsed);
                     return result;
                 } catch (fallbackError) {
+                    lastError = fallbackError;
                     console.error(`Fallback ${fallback.name} also failed:`, fallbackError.message);
                 }
             }
             
-            throw error;
+            // If we reached here, ALL available providers failed.
+            // Throw a categorized error for the client.
+            throw this._categorizeError(lastError, 'text');
         }
     }
 
     async analyzeText(params, preferences = {}) {
         const provider = this.getTextProvider(preferences);
-        return provider.analyzeText(params);
+        try {
+            return await provider.analyzeText(params);
+        } catch (error) {
+            throw this._categorizeError(error, 'text', provider.name);
+        }
+    }
+
+    _testQuotaError(error) {
+        const msg = error.message?.toLowerCase() || '';
+        return msg.includes('quota') || 
+               msg.includes('rate limit') || 
+               msg.includes('429') || 
+               msg.includes('credit') || 
+               msg.includes('balance') ||
+               msg.includes('billing');
+    }
+
+    _categorizeError(error, type, providerName = 'multi') {
+        const msg = error.message?.toLowerCase() || '';
+        const isBusy = msg.includes('rate limit') || 
+                       msg.includes('429') || 
+                       msg.includes('busy') || 
+                       msg.includes('overloaded') ||
+                       msg.includes('503') ||
+                       msg.includes('capacity');
+        
+        const isQuota = msg.includes('quota') || 
+                        msg.includes('credit') || 
+                        msg.includes('balance') ||
+                        msg.includes('billing');
+
+        if (isBusy) return new AIProviderBusyError(providerName, error.message);
+        if (isQuota) return new AIProviderQuotaError(providerName, error.message);
+
+        // Fallback to generic AI error if not specifically recognized as busy/quota
+        return error;
     }
 
     /**
@@ -161,34 +192,42 @@ class ModelRouter {
      */
     async generateImage(params, preferences = {}) {
         const provider = this.getImageProvider(preferences);
+        let lastError = null;
 
         if (provider.cooldownUntil && Date.now() < provider.cooldownUntil) {
             const fallback = this._getFallback(provider.name, 'image');
-            if (fallback) return await fallback.generateImage(params);
+            if (fallback) {
+                try { 
+                    return await fallback.generateImage(params); 
+                } catch (e) {
+                    lastError = e;
+                }
+            }
         }
 
         try {
             return await provider.generateImage(params);
         } catch (error) {
-            const isQuotaError = error.message?.toLowerCase().includes('quota') ||
-                error.message?.toLowerCase().includes('rate limit') ||
-                error.message?.toLowerCase().includes('credit') ||
-                error.message?.toLowerCase().includes('balance') ||
-                error.message?.toLowerCase().includes('429');
+            lastError = error;
+            const isQuotaError = this._testQuotaError(error);
 
             if (isQuotaError) {
                 provider.cooldownUntil = Date.now() + (5 * 60 * 1000);
-                console.warn(`⏳ Image provider ${provider.name} hit quota limits. Cooling down for 5 mins.`);
+                console.warn(`⏳ Image provider ${provider.name} hit quota limits. Cooling down.`);
             }
 
             console.error(`Image provider ${provider.name} failed:`, error.message);
             // Try fallback provider
             const fallback = this._getFallback(provider.name, 'image');
             if (fallback) {
-                console.log(`Trying fallback image provider: ${fallback.name}`);
-                return await fallback.generateImage(params);
+                try {
+                    console.log(`Trying fallback image provider: ${fallback.name}`);
+                    return await fallback.generateImage(params);
+                } catch (fallbackError) {
+                    lastError = fallbackError;
+                }
             }
-            throw error;
+            throw this._categorizeError(lastError, 'image', provider.name);
         }
     }
 

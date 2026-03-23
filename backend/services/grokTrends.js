@@ -1,3 +1,5 @@
+import { AIProviderBusyError, AIProviderQuotaError } from '../ai/errors.js';
+
 /**
  * Grok Trends Service — Real-time Trending Intelligence via xAI Grok
  * 
@@ -57,14 +59,23 @@ async function grokCall(systemPrompt, userPrompt, options = {}) {
         });
 
         const data = await resp.json();
-        if (data.error) {
-            const msg = data.error.message || data.error;
-            if (typeof msg === 'string' && (msg.includes('credits') || msg.includes('spending limit'))) {
-                // Silently return null for billing errors to avoid log spam, fallbacks handle it
-                return null;
+        
+        if (!resp.ok) {
+            const msg = data.error?.message || data.error || resp.statusText;
+            const lowerMsg = String(msg).toLowerCase();
+            
+            // Check for busy/rate limit (429)
+            if (resp.status === 429 || lowerMsg.includes('rate limit') || lowerMsg.includes('too many requests')) {
+                throw new AIProviderBusyError('grok', msg);
             }
+            
+            // Check for quota/credits
+            if (lowerMsg.includes('credits') || lowerMsg.includes('spending limit') || lowerMsg.includes('balance') || lowerMsg.includes('quota')) {
+                throw new AIProviderQuotaError('grok', msg);
+            }
+
             console.warn('Grok API error:', msg);
-            return null;
+            return null; // Fallback for other errors
         }
 
         const text = data.choices?.[0]?.message?.content || '';

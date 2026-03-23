@@ -32,8 +32,12 @@ export class OpenAIProvider extends BaseProvider {
             }),
         });
 
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(`OpenAI Error [${response.status}]: ${data.error?.message || response.statusText}`);
+        }
+
         const data = await response.json();
-        if (data.error) throw new Error(`OpenAI Error: ${data.error.message}`);
 
         return {
             text: data.choices?.[0]?.message?.content || '',

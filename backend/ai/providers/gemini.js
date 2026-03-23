@@ -62,6 +62,10 @@ export class GeminiProvider extends BaseProvider {
                 },
             }),
         });
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(`Gemini API Error [${response.status}]: ${data.error?.message || response.statusText}`);
+        }
 
         const data = await response.json();
 

@@ -103,7 +103,18 @@ Do NOT make things up. Only report real findings from your search.`,
         });
 
         if (!resp.ok) {
-            console.error(`🕵️ Insight failed for "${mission.title}":`, resp.status);
+            const data = await resp.json().catch(() => ({}));
+            const msg = data.error?.message || data.error || resp.statusText;
+            const lowerMsg = String(msg).toLowerCase();
+
+            if (resp.status === 429 || lowerMsg.includes('rate limit')) {
+                throw new AIProviderBusyError('grok', msg);
+            }
+            if (lowerMsg.includes('credits') || lowerMsg.includes('spending limit') || lowerMsg.includes('quota')) {
+                throw new AIProviderQuotaError('grok', msg);
+            }
+
+            console.error(`🕵️ Insight failed for "${mission.title}":`, resp.status, msg);
             return null;
         }
 
@@ -173,7 +184,16 @@ If the new report is essentially the same info as before, output: VERDICT: NO_CH
             }),
         });
 
-        if (!resp.ok) return { isNew: true, summary: newReport, severity: 'info' };
+        if (!resp.ok) {
+            const data = await resp.json().catch(() => ({}));
+            const msg = data.error?.message || data.error || resp.statusText;
+            const lowerMsg = String(msg).toLowerCase();
+
+            if (resp.status === 429 || lowerMsg.includes('rate limit')) throw new AIProviderBusyError('grok', msg);
+            if (lowerMsg.includes('credits') || lowerMsg.includes('spending limit')) throw new AIProviderQuotaError('grok', msg);
+
+            return { isNew: true, summary: newReport, severity: 'info' };
+        }
 
         const data = await resp.json();
         const analysis = data.choices?.[0]?.message?.content || '';

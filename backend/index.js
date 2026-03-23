@@ -293,8 +293,17 @@ app.use((err, req, res, next) => {
         }
     }
 
-    const statusCode = err.statusCode || 500;
-    res.status(statusCode).json({
+    // AI Provider Errors (Busy/Quota) receive special status codes and friendly messages
+    if (err.name === 'AIProviderBusyError' || err.name === 'AIProviderQuotaError' || err.statusCode === 429 || err.statusCode === 503) {
+        return res.status(err.statusCode || 503).json({
+            success: false,
+            message: err.message,
+            provider: err.provider,
+            isAIError: true
+        });
+    }
+
+    res.status(err.statusCode || 500).json({
         success: false,
         error: config.nodeEnv === 'development' ? err.message : 'Server Error',
         message: err.message || 'Internal Server Error',

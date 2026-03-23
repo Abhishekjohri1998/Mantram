@@ -30,6 +30,10 @@ export class AnthropicProvider extends BaseProvider {
                 temperature,
             }),
         });
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(`Claude Error [${response.status}]: ${data.error?.message || response.statusText}`);
+        }
 
         const data = await response.json();
         if (data.error) throw new Error(`Claude Error: ${data.error.message}`);
