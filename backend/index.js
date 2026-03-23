@@ -68,10 +68,31 @@ app.set('trust proxy', 3);
 // Connect Database
 connectDB();
 
-// BUG-17 FIX: Security headers
+// BUG-17 FIX: Security headers (Enforced for SEO & PCI compliance)
 app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
-    contentSecurityPolicy: false, // Disabled for API server — frontend handles CSP
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://*.google.com", "https://*.googleapis.com"],
+            connectSrc: ["'self'", "https://*.google.com", "https://*.googleapis.com", "https://*.anthropic.com", "https://*.openai.com"],
+            imgSrc: ["'self'", "data:", "https://*.googleusercontent.com", "https://*.shopify.com", "https://*.aws.amazon.com"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            objectSrc: ["'none'"],
+            upgradeInsecureRequests: [],
+        },
+    },
+    hsts: {
+        maxAge: 63072000, // 2 years in seconds
+        includeSubDomains: true,
+        preload: true
+    },
+    frameguard: { action: 'deny' },
+    xContentTypeOptions: true,
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    xssFilter: true,
+    dnsPrefetchControl: { allow: false }
 }));
 
 // Set Permissions Policy to allow Razorpay sensors/payment features

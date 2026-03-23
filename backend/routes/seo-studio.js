@@ -588,35 +588,74 @@ Respond in STRICT JSON:
 Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must have a 'whyItMatters' that connects to business outcomes. Think like a consultant, not a checklist tool.`;
 
     const userPrompt = `Analyze site: ${website}`;
-    let parsed;
+    // Unified controller for this request's AI budget
+    const overallController = new AbortController();
+    const overallTimer = setTimeout(() => overallController.abort(), remainingBudget);
+
+    let result = null;
     try {
-        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget });
-        // Log token usage from this AI call
-        if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: req.creditAction || 'seoHealthCheck', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+      result = await aiCall(systemPrompt, userPrompt, { 
+        json: true, temperature: 0.5, maxTokens: 8192, 
+        timeout: remainingBudget,
+        signal: overallController.signal
+      });
+    } catch (err) {
+      if (err.name === 'AbortError') console.warn(`🤖 SEO Check timed out for ${website}`);
+      else console.error(`❌ SEO Check error for ${website}:`, err.message);
+    } finally {
+      clearTimeout(overallTimer);
+    }
+
+    let parsed;
+    if (result) {
+      try {
         parsed = parseJSON(result);
-    } catch (aiErr) {
-        console.warn(`⚠️ AI analysis failed (${aiErr.message}) — returning deterministic data only`);
-        // Return a minimal AI result so the deterministic crawl data is still available
+        // Log token usage on success
+        if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: req.creditAction || 'seoHealthCheck', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+      } catch (e) {
+        console.warn('Failed to parse SEO Check JSON, using fallback.');
         parsed = {
             seoHealthScore: 50,
             aiVisibilityScore: 50,
             technicalScore: 50,
             contentScore: 50,
             authorityScore: 50,
-            summary: `SEO audit crawled ${siMetrics.totalPages || 0} pages. AI analysis timed out — the deterministic issue checks below are from real crawl data.`,
-            strategicBrief: 'AI analysis was unable to complete within the timeout window. All issue checks shown are based on real crawl data and are accurate.',
+            summary: `SEO audit crawled ${siMetrics.totalPages || 0} pages. AI analysis parsing failed — the deterministic issue checks below are from real crawl data.`,
+            strategicBrief: 'AI analysis result was malformed. All issue checks shown are based on real crawl data and are accurate.',
             algorithmRisks: [],
             issues: [],
             fixNow: [],
             createNext: [],
             monitor: [],
             aiSeoInsights: { schemaReadiness: { score: 0, issues: [], recommendations: [] }, qnaPresence: { score: 0, suggestions: [] }, entityCoverage: { score: 0, missingEntities: [], recommendations: [] }, snippetStructure: { score: 0, recommendations: [] }, trustSignals: { score: 0, recommendations: [] } },
-            topOpportunity: 'AI analysis timed out — review the deterministic checks for issue details.',
+            topOpportunity: 'AI analysis failed — review the deterministic checks for issue details.',
             competitorHints: [],
             industryBenchmark: '',
-            crawlSummary: `Crawled ${siMetrics.totalPages || 0} pages. AI could not complete analysis.`,
-            _aiTimedOut: true,
+            crawlSummary: `Crawled ${siMetrics.totalPages || 0} pages. AI parsing error.`,
+            _aiParseError: true,
         };
+      }
+    } else {
+      parsed = {
+          seoHealthScore: 50,
+          aiVisibilityScore: 50,
+          technicalScore: 50,
+          contentScore: 50,
+          authorityScore: 50,
+          summary: `SEO audit crawled ${siMetrics.totalPages || 0} pages. AI analysis timed out — the deterministic issue checks below are from real crawl data.`,
+          strategicBrief: 'AI analysis was unable to complete within the timeout window. All issue checks shown are based on real crawl data and are accurate.',
+          algorithmRisks: [],
+          issues: [],
+          fixNow: [],
+          createNext: [],
+          monitor: [],
+          aiSeoInsights: { schemaReadiness: { score: 0, issues: [], recommendations: [] }, qnaPresence: { score: 0, suggestions: [] }, entityCoverage: { score: 0, missingEntities: [], recommendations: [] }, snippetStructure: { score: 0, recommendations: [] }, trustSignals: { score: 0, recommendations: [] } },
+          topOpportunity: 'AI analysis timed out — review the deterministic checks for issue details.',
+          competitorHints: [],
+          industryBenchmark: '',
+          crawlSummary: `Crawled ${siMetrics.totalPages || 0} pages. AI could not complete analysis.`,
+          _aiTimedOut: true,
+      };
     }
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
 
@@ -1352,9 +1391,38 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
       + 'Generate 5-8 keyword clusters. Use VERIFIED volumes where available. Add confidenceStars (1-5) based on how many data layers support each cluster.';
 
     const userPrompt = 'Find traffic opportunities for: ' + website;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget });
-    if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoTraffic', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
-    const parsed = parseJSON(result);
+    
+    // Unified controller for this request's AI budget
+    const overallController = new AbortController();
+    const overallTimer = setTimeout(() => overallController.abort(), remainingBudget);
+
+    let result = null;
+    try {
+      result = await aiCall(systemPrompt, userPrompt, { 
+        json: true, temperature: 0.5, maxTokens: 8192, 
+        timeout: remainingBudget,
+        signal: overallController.signal
+      });
+      if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoTraffic', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+    } catch (err) {
+      if (err.name === 'AbortError') console.warn(`🤖 AI Traffic Analysis timed out for ${website} (budget reached)`);
+      else console.error(`❌ AI Traffic Analysis error for ${website}:`, err.message);
+    } finally {
+      clearTimeout(overallTimer);
+    }
+
+    let parsed;
+    if (result) {
+      try {
+        parsed = parseJSON(result);
+      } catch (e) {
+        console.warn('Failed to parse SEO Traffic JSON, using fallback data.');
+        parsed = { summary: 'Strategic analysis unavailable due to processing error.', keywordClusters: [] };
+      }
+    } else {
+      parsed = { summary: 'Analysis timed out. Please try again or check individual signals.', keywordClusters: [], _timedOut: true };
+    }
+    
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
 
     // Attach real intelligence metadata
@@ -1588,8 +1656,35 @@ Respond in JSON:
 Be STRATEGIC and SPECIFIC. Every insight must have a WHY and an actionable HOW. Think like a competitive intelligence firm, not a scraping tool.`;
 
     const userPrompt = `Competitive analysis for: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192, timeout: remainingBudget });
-    const parsed = parseJSON(result);
+    // Unified controller for this request's AI budget
+    const overallController = new AbortController();
+    const overallTimer = setTimeout(() => overallController.abort(), remainingBudget);
+
+    let result = null;
+    try {
+      result = await aiCall(systemPrompt, userPrompt, { 
+        json: true, temperature: 0.6, maxTokens: 8192, 
+        timeout: remainingBudget,
+        signal: overallController.signal
+      });
+    } catch (err) {
+      if (err.name === 'AbortError') console.warn(`🤖 Trending Keywords timed out for ${website}`);
+      else console.error(`❌ Trending Keywords error:`, err.message);
+    } finally {
+      clearTimeout(overallTimer);
+    }
+
+    let parsed;
+    if (result) {
+      try {
+        parsed = parseJSON(result);
+      } catch (e) {
+        console.warn('Failed to parse Trending Keywords JSON.');
+        parsed = { clusters: [] };
+      }
+    } else {
+      parsed = { clusters: [], _timedOut: true };
+    }
     parsed.researchSources = [
       ...(siteResearch.pages?.map(p => p.url) || [website]),
       ...allCompetitorUrls,
@@ -2097,8 +2192,14 @@ Respond in JSON:
 
 CRITICAL: Only include REAL existing companies. Do not make up fictional companies or URLs.`;
 
-    const result = await aiCall(systemPrompt, `Find competitors for: ${brand.name} (${brand.website || brand.dna?.industry || 'general'})`, { json: true, temperature: 0.5 });
-    const parsed = parseJSON(result);
+    let result = null;
+    try {
+      result = await aiCall(systemPrompt, `Find competitors for: ${brand.name} (${brand.website || brand.dna?.industry || 'general'})`, { json: true, temperature: 0.5 });
+    } catch (err) {
+      console.warn('AI competitor search failed:', err.message);
+    }
+
+    const parsed = result ? parseJSON(result) : { competitors: [] };
 
     // Save to brand
     if (parsed.competitors?.length) {
@@ -2271,14 +2372,36 @@ Respond in STRICT JSON:
 Generate 5-10 discovered backlinks (from real DataForSEO data), 5-8 link gap items, 8-12 link opportunities, and 2-3 outreach templates. Be SPECIFIC and cite real data.`;
 
     const userPrompt = `Complete backlink intelligence analysis for: ${brandDomain} (${normalizedUrl})`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6144, timeout: aiBudget });
-    if (!result) throw new Error('AI analysis returned empty result');
-    let parsed;
+    
+    // Unified controller for this request's AI budget
+    const overallController = new AbortController();
+    const overallTimer = setTimeout(() => overallController.abort(), aiBudget);
+
+    let result = null;
     try {
-      parsed = parseJSON(result);
-    } catch (e) {
-      console.error('Failed to parse AI response for backlinks:', e.message, result.substring(0, 200));
-      throw new Error('AI analysis returned invalid data format');
+      result = await aiCall(systemPrompt, userPrompt, { 
+        json: true, temperature: 0.5, maxTokens: 6144, 
+        timeout: aiBudget,
+        signal: overallController.signal
+      });
+      if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoBacklinks', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+    } catch (err) {
+      if (err.name === 'AbortError') console.warn(`🤖 Backlink Intelligence timed out for ${brandDomain}`);
+      else console.error(`❌ Backlink Intelligence error:`, err.message);
+    } finally {
+      clearTimeout(overallTimer);
+    }
+
+    let parsed;
+    if (result) {
+      try {
+        parsed = parseJSON(result);
+      } catch (e) {
+        console.warn('Failed to parse Backlink Intelligence JSON, using fallback data.');
+        parsed = { summary: 'Backlink analysis unavailable due to processing error.', discoveredBacklinks: [] };
+      }
+    } else {
+      parsed = { summary: 'Analysis timed out. Please try again later.', discoveredBacklinks: [], _timedOut: true };
     }
     
     if (!parsed || typeof parsed !== 'object') {
@@ -2467,9 +2590,36 @@ Respond in STRICT JSON:
 }`;
 
     const userPrompt = `Build 90-day war room plan for: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192, timeout: remainingBudget });
-    if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoWarRoom', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
-    const parsed = parseJSON(result);
+    // Unified controller for this request's AI budget
+    const overallController = new AbortController();
+    const overallTimer = setTimeout(() => overallController.abort(), remainingBudget);
+
+    let result = null;
+    try {
+      result = await aiCall(systemPrompt, userPrompt, { 
+        json: true, temperature: 0.6, maxTokens: 8192, 
+        timeout: remainingBudget,
+        signal: overallController.signal
+      });
+      if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoWarRoom', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+    } catch (err) {
+      if (err.name === 'AbortError') console.warn(`🤖 SEO War Room timed out for ${website}`);
+      else console.error(`❌ SEO War Room error:`, err.message);
+    } finally {
+      clearTimeout(overallTimer);
+    }
+
+    let parsed;
+    if (result) {
+      try {
+        parsed = parseJSON(result);
+      } catch (e) {
+        console.warn('Failed to parse SEO War Room JSON.');
+        parsed = { summary: 'War Room analysis unavailable.' };
+      }
+    } else {
+      parsed = { summary: 'Analysis timed out. Please try again later.', _timedOut: true };
+    }
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
 
     if (req.user && brand?._id) {
@@ -2590,9 +2740,36 @@ Respond in STRICT JSON:
 CRITICAL: Use the REAL mention rate (${probeData.aggregate.mentionRate}%) as the overall visibility score. Reference ACTUAL probe results. Every recommendation must tie back to specific prompts where the brand was NOT mentioned.`;
 
     const userPrompt = `Analyze real LLM probe results for: ${brandName} (${website})`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6144, timeout: remainingBudget });
-    if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoLlmProbe', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
-    const parsed = parseJSON(result);
+    // Unified controller for this request's AI budget
+    const overallController = new AbortController();
+    const overallTimer = setTimeout(() => overallController.abort(), remainingBudget);
+
+    let result = null;
+    try {
+      result = await aiCall(systemPrompt, userPrompt, { 
+        json: true, temperature: 0.5, maxTokens: 6144, 
+        timeout: remainingBudget,
+        signal: overallController.signal
+      });
+      if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoLlmProbe', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+    } catch (err) {
+      if (err.name === 'AbortError') console.warn(`🤖 LLM Probe analysis timed out for ${website}`);
+      else console.error(`❌ LLM Probe analysis error:`, err.message);
+    } finally {
+      clearTimeout(overallTimer);
+    }
+
+    let parsed;
+    if (result) {
+      try {
+        parsed = parseJSON(result);
+      } catch (e) {
+        console.warn('Failed to parse LLM Probe JSON.');
+        parsed = { summary: 'LLM Probe analysis unavailable.' };
+      }
+    } else {
+      parsed = { summary: 'Analysis timed out. Please try again later.', _timedOut: true };
+    }
 
     // Merge real probe data into response
     parsed.realProbeData = {
@@ -2697,9 +2874,37 @@ Generate production-ready code. Every fix must be copy-paste ready. Use the bran
     const userPrompt = `Generate auto-fix code for: ${website}`;
     const elapsed = Date.now() - (req.startTime || Date.now());
     const remainingBudget = Math.max(5000, 28000 - elapsed);
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.4, maxTokens: 8192, timeout: remainingBudget });
-    if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoAutoFix', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
-    const parsed = parseJSON(result);
+    
+    // Unified controller for this request's AI budget
+    const overallController = new AbortController();
+    const overallTimer = setTimeout(() => overallController.abort(), remainingBudget);
+
+    let result = null;
+    try {
+      result = await aiCall(systemPrompt, userPrompt, { 
+        json: true, temperature: 0.4, maxTokens: 8192, 
+        timeout: remainingBudget,
+        signal: overallController.signal
+      });
+      if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoAutoFix', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+    } catch (err) {
+      if (err.name === 'AbortError') console.warn(`🤖 Auto-Fix timed out for ${website}`);
+      else console.error(`❌ Auto-Fix error:`, err.message);
+    } finally {
+      clearTimeout(overallTimer);
+    }
+
+    let parsed;
+    if (result) {
+      try {
+        parsed = parseJSON(result);
+      } catch (e) {
+        console.warn('Failed to parse Auto-Fix JSON.');
+        parsed = { summary: 'Auto-Fix analysis unavailable.' };
+      }
+    } else {
+      parsed = { summary: 'Auto-Fix analysis timed out.', _timedOut: true };
+    }
 
     if (req.user && brand?._id) {
       try {
@@ -2830,9 +3035,37 @@ Generate 15-20 mined prompts. Be specific to this brand's industry. Think about 
     // STEP 3: AI call enriched with real autocomplete data
     const elapsed = Date.now() - (req.startTime || Date.now());
     const remainingBudget = Math.max(5000, 28000 - elapsed);
-    const aiResult = await aiCall(systemPrompt, userPrompt + autocompleteContext, { json: true, temperature: 0.6, maxTokens: 8192, timeout: remainingBudget });
-    if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoPromptMining', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
-    const parsed = parseJSON(aiResult);
+    
+    // Unified controller for this request's AI budget
+    const overallController = new AbortController();
+    const overallTimer = setTimeout(() => overallController.abort(), remainingBudget);
+
+    let aiResult = null;
+    try {
+      aiResult = await aiCall(systemPrompt, userPrompt + autocompleteContext, { 
+        json: true, temperature: 0.6, maxTokens: 8192, 
+        timeout: remainingBudget,
+        signal: overallController.signal
+      });
+      if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoPromptMining', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+    } catch (err) {
+      if (err.name === 'AbortError') console.warn(`🤖 Prompt Mining timed out for ${website}`);
+      else console.error(`❌ Prompt Mining error:`, err.message);
+    } finally {
+      clearTimeout(overallTimer);
+    }
+
+    let parsed;
+    if (aiResult) {
+      try {
+        parsed = parseJSON(aiResult);
+      } catch (e) {
+        console.warn('Failed to parse Prompt Mining JSON.');
+        parsed = { summary: 'Prompt Mining analysis unavailable.' };
+      }
+    } else {
+      parsed = { summary: 'Prompt Mining analysis timed out.', _timedOut: true };
+    }
     parsed.researchSources = [website];
 
     // Attach real autocomplete data to response
@@ -3330,8 +3563,23 @@ Respond in JSON:
   "followUpQuestions": ["Follow-up 1", "Follow-up 2", "Follow-up 3"]
 }`;
 
-    const result = await aiCall(systemPrompt, question, { json: true, temperature: 0.7, maxTokens: 4096, timeout: 15000 });
-    const parsed = parseJSON(result);
+    const overallController = new AbortController();
+    const overallTimer = setTimeout(() => overallController.abort(), 15000);
+
+    let result = null;
+    try {
+      result = await aiCall(systemPrompt, question, { 
+        json: true, temperature: 0.7, maxTokens: 4096, 
+        timeout: 15000,
+        signal: overallController.signal
+      });
+    } catch (err) {
+      console.error('🤖 AI Ask error:', err.message);
+    } finally {
+      clearTimeout(overallTimer);
+    }
+
+    const parsed = result ? parseJSON(result) : { answer: 'I apologize, but I am unable to answer that right now due to a processing timeout. Please try rephrasing your question.' };
 
     res.json({ success: true, ...parsed });
   } catch (error) {
@@ -3389,11 +3637,25 @@ TASK: ${fixPrompt}
 
 Generate the content now.`;
 
-    const result = await aiCall(systemPrompt, userPrompt, {
-      temperature: 0.6,
-      maxTokens: 4096,
-      timeout: 60000,
-    });
+    const overallController = new AbortController();
+    const overallTimer = setTimeout(() => overallController.abort(), 60000);
+
+    let result = null;
+    try {
+      result = await aiCall(systemPrompt, userPrompt, {
+        temperature: 0.6,
+        maxTokens: 4096,
+        timeout: 60000,
+        signal: overallController.signal
+      });
+    } catch (err) {
+      if (err.name === 'AbortError') console.warn(`🤖 Content Fix timed out for ${pageUrl}`);
+      else console.error(`❌ Content Fix error:`, err.message);
+    } finally {
+      clearTimeout(overallTimer);
+    }
+
+    if (!result) return res.status(504).json({ success: false, error: 'AI content generation timed out. Please try again with a specific keyword.' });
 
     // Strip any residual markdown formatting
     let cleanContent = result
