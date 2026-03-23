@@ -7,6 +7,7 @@ import mongoose from 'mongoose';
 import config from './config/env.js';
 import session from 'express-session';
 import RedisStore from 'connect-redis';
+import MongoStore from 'connect-mongo';
 import redisClient from './utils/cache.js';
 
 // Route imports
@@ -192,13 +193,17 @@ app.use((req, res, next) => {
 });
 
 // Scaling Phase 4: Redis Session Management
-// FALLBACK: Use MemoryStore if Redis is not configured to prevent crashes
+// FALLBACK: Use MongoStore if Redis is not configured (MemoryStore is NOT production-ready)
 const sessionStore = process.env.REDIS_HOST 
     ? new RedisStore({ client: redisClient, prefix: 'sess:' })
-    : undefined; // Defaults to MemoryStore
+    : MongoStore.create({ 
+        mongoUrl: config.mongoUri, 
+        collectionName: 'sessions',
+        ttl: 24 * 60 * 60 // 1 day
+    });
 
 if (!process.env.REDIS_HOST) {
-    console.warn('⚠️  REDIS_HOST not found. Falling back to MemoryStore for sessions. (Scaling/Clustering disabled)');
+    console.log('📦 Using MongoStore for sessions (MemoryStore replaced for production stability).');
 }
 
 app.use(session({
