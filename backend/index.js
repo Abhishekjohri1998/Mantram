@@ -152,18 +152,20 @@ app.use((req, res, next) => {
 });
 
 // Regular body parsers - Skip for webhooks to avoid interference
+// HARDENING: Reducing global limit to 1MB to prevent memory exhaustion attacks. 
+// Specific routes (media/studio) will have higher limits applied directly.
 app.use((req, res, next) => {
     if (req.originalUrl && (req.originalUrl.includes('/api/shopify/webhooks') || req.originalUrl.includes('/api/funnel-webhooks') || req.originalUrl.includes('/api/webhooks'))) {
         return next();
     }
-    express.json({ limit: '50mb' })(req, res, next);
+    express.json({ limit: '1mb' })(req, res, next);
 });
 
 app.use((req, res, next) => {
     if (req.originalUrl && (req.originalUrl.includes('/api/shopify/webhooks') || req.originalUrl.includes('/api/funnel-webhooks') || req.originalUrl.includes('/api/webhooks'))) {
         return next();
     }
-    express.urlencoded({ extended: true, limit: '50mb' })(req, res, next);
+    express.urlencoded({ extended: true, limit: '1mb' })(req, res, next);
 });
 
 // Request logging in dev
@@ -189,6 +191,17 @@ const apiLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
 });
+
+// Global limit to prevent massive brute force across all endpoints
+const globalLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 500, // max 500 requests per minute per IP
+    message: { success: false, error: 'Maximum platform capacity reached for your IP. Please wait a minute.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+app.use('/api/', globalLimiter);
 app.use('/api/', apiLimiter);
 
 // Specific limiters for auth
@@ -376,5 +389,35 @@ server.headersTimeout = 66000;
 // AI image generation (Gemini) + S3 upload + DB save can take 2-4 minutes
 // Default Node.js HTTP timeout is 2 minutes — extend to 5 minutes for heavy operations
 server.timeout = 300000;
+
+// ══════════════════════════════════════════════════════════════
+// SCALING: GRACEFUL SHUTDOWN
+// ══════════════════════════════════════════════════════════════
+const gracefulShutdown = (signal) => {
+    console.log(`\n🛑 ${signal} received. Starting graceful shutdown...`);
+    
+    // Stop accepting new connections
+    server.close(async () => {
+        console.log('HTTP server closed.');
+        
+        try {
+            await mongoose.connection.close();
+            console.log('MongoDB connection closed.');
+            process.exit(0);
+        } catch (err) {
+            console.error('Error during shutdown:', err);
+            process.exit(1);
+        }
+    });
+
+    // Force exit after 30s if cleanup hangs
+    setTimeout(() => {
+        console.error('Could not close connections in time, forcefully shutting down');
+        process.exit(1);
+    }, 30000);
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 export default app;

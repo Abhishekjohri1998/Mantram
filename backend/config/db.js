@@ -8,12 +8,12 @@ const connectDB = async (attempt = 1) => {
     try {
         const conn = await mongoose.connect(config.mongoUri, {
             serverSelectionTimeoutMS: 30000,   // 30s to pick a server
-            socketTimeoutMS: 120000,           // 2min socket timeout (pipeline ops are heavy)
+            socketTimeoutMS: 45000,            // 45s socket timeout (fail faster under load)
             connectTimeoutMS: 30000,           // 30s initial connect
             heartbeatFrequencyMS: 10000,       // heartbeat every 10s to keep alive
-            maxPoolSize: 20,                   // larger pool for concurrent pipeline reads/writes
-            minPoolSize: 5,                    // keep 5 connections warm
-            maxIdleTimeMS: 60000,              // close idle connections after 60s
+            maxPoolSize: 100,                  // significantly larger pool for 100M-scale concurrency
+            minPoolSize: 10,                   // keep more connections warm
+            maxIdleTimeMS: 30000,              // close idle connections faster (30s)
             family: 4, // Force IPv4 to avoid DNS issues
         });
         console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
