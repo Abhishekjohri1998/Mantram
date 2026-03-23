@@ -1076,9 +1076,7 @@ router.post('/api-keys/:provider/test', async (req, res) => {
         }
 
         const controller = new AbortController();
-        if (typeof controller.signal.setMaxListeners === 'function') {
-            controller.signal.setMaxListeners(30);
-        }
+        try { setMaxListeners(30, controller.signal); } catch (e) {}
         const timer = setTimeout(() => controller.abort(), 15000);
         const resp = await fetch(url, { method: 'GET', headers, signal: controller.signal });
         clearTimeout(timer);
@@ -2652,6 +2650,7 @@ router.get('/system-logs', async (req, res) => {
 // STUDIO ACCESS CONTROL (Portal Visibility + Per-User Overrides)
 // ══════════════════════════════════════════════════════════════
 import { STUDIO_KEYS, STUDIO_LABELS, getPortalVisibility, resolveStudioAccess } from '../middleware/studioAccess.js';
+import { setMaxListeners } from 'events';
 
 /**
  * GET /api/superadmin/studio-visibility

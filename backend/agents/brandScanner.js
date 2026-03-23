@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { setMaxListeners } from 'events';
 
 /**
  * Scan a website and extract comprehensive brand DNA using AI Vision + Social Intelligence
@@ -807,9 +808,7 @@ async function analyzeSocialMedia(socialLinks, aiRouter) {
     for (const { platform, url } of platformsToAnalyze.slice(0, 3)) {
         try {
             const controller = new AbortController();
-            if (typeof controller.signal.setMaxListeners === 'function') {
-                controller.signal.setMaxListeners(30);
-            }
+            try { setMaxListeners(30, controller.signal); } catch (e) {}
             const timeout = setTimeout(() => controller.abort(), 10000);
             const resp = await fetch(url, {
                 headers: {
@@ -999,9 +998,7 @@ async function crawlSubPages($, baseUrl, isSPA = false, sharedBrowser = null) {
             // Fallback to fetch for non-SPA or if Puppeteer failed
             if (!pageHtml) {
                 const controller = new AbortController();
-                if (typeof controller.signal.setMaxListeners === 'function') {
-                    controller.signal.setMaxListeners(30);
-                }
+                try { setMaxListeners(30, controller.signal); } catch (e) {}
                 const timeout = setTimeout(() => controller.abort(), 15000);
                 const resp = await fetch(pageUrl, {
                     headers: {
@@ -1081,9 +1078,7 @@ async function fetchPage(url) {
         if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
 
         const controller = new AbortController();
-        if (typeof controller.signal.setMaxListeners === 'function') {
-            controller.signal.setMaxListeners(30);
-        }
+        try { setMaxListeners(30, controller.signal); } catch (e) {}
         const timeout = setTimeout(() => controller.abort(), 15000);
 
         const response = await fetch(url, {
@@ -1135,9 +1130,7 @@ async function fetchExternalCSS($, baseUrl) {
                 if (cssUrl.includes('fonts.googleapis.com')) return '';
 
                 const controller = new AbortController();
-                if (typeof controller.signal.setMaxListeners === 'function') {
-                    controller.signal.setMaxListeners(30);
-                }
+                try { setMaxListeners(30, controller.signal); } catch (e) {}
                 const timeout = setTimeout(() => controller.abort(), 5000);
                 const res = await fetch(cssUrl, {
                     headers: { 'User-Agent': 'Mozilla/5.0' },

@@ -1,3 +1,4 @@
+import { setMaxListeners } from 'events';
 /**
  * Mantram AI — People Also Ask (PAA) Scraper
  * 
@@ -24,9 +25,7 @@ async function fetchPAAForQuery(query, gl = 'in', hl = 'en') {
 
     try {
         const controller = new AbortController();
-        if (typeof controller.signal.setMaxListeners === 'function') {
-            controller.signal.setMaxListeners(30);
-        }
+        try { setMaxListeners(30, controller.signal); } catch (e) {}
         const timer = setTimeout(() => controller.abort(), 10000);
         
         const resp = await fetch(url, {

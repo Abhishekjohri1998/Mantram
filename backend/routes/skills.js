@@ -6,6 +6,7 @@ import Brand from '../models/Brand.js';
 import { seedDefaultSkills } from '../seeds/defaultSkills.js';
 import { resolveTargetMarkets, getMarketContext, getRelevantFestivals } from '../utils/globalCalendar.js';
 import { safeErrorMessage } from '../utils/safeError.js';
+import { setMaxListeners } from 'events';
 
 const router = Router();
 
@@ -18,9 +19,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
     const { temperature = 0.7, maxTokens = 4096, json = false, timeoutMs = 120000 } = options;
 
     const controller = new AbortController();
-    if (typeof controller.signal.setMaxListeners === 'function') {
-        controller.signal.setMaxListeners(30);
-    }
+    try { setMaxListeners(30, controller.signal); } catch (e) {}
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {

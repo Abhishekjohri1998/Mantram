@@ -38,6 +38,7 @@ import { jsRenderCrawl, formatJSCrawlForPrompt } from '../utils/js-crawler.js';
 import { scoreSiteContent, formatContentScoresForPrompt } from '../utils/content-scorer.js';
 import { crawlCompetitor, compareSnapshots, analyzeKeywordOverlap, formatCompetitorMonitorForPrompt } from '../utils/competitor-monitor.js';
 import CompetitorSnapshot from '../models/CompetitorSnapshot.js';
+import { setMaxListeners } from 'events';
 
 const router = Router();
 
@@ -54,9 +55,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
   lastTokenUsage = null;
 
   const overallController = new AbortController();
-  if (typeof overallController.signal.setMaxListeners === 'function') {
-    overallController.signal.setMaxListeners(30);
-  }
+  try { setMaxListeners(30, overallController.signal); } catch (e) {}
   const overallTimer = setTimeout(() => overallController.abort(), timeout);
 
   // If an external signal is provided, listen for its abort too
@@ -593,9 +592,7 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
     const userPrompt = `Analyze site: ${website}`;
     // Unified controller for this request's AI budget
     const overallController = new AbortController();
-    if (typeof overallController.signal.setMaxListeners === 'function') {
-      overallController.signal.setMaxListeners(30);
-    }
+    try { setMaxListeners(30, overallController.signal); } catch (e) {}
     const overallTimer = setTimeout(() => overallController.abort(), remainingBudget);
 
     let result = null;
@@ -1400,9 +1397,7 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
     
     // Unified controller for this request's AI budget
     const overallController = new AbortController();
-    if (typeof overallController.signal.setMaxListeners === 'function') {
-      overallController.signal.setMaxListeners(30);
-    }
+    try { setMaxListeners(30, overallController.signal); } catch (e) {}
     const overallTimer = setTimeout(() => overallController.abort(), remainingBudget);
 
     let result = null;
@@ -1667,9 +1662,7 @@ Be STRATEGIC and SPECIFIC. Every insight must have a WHY and an actionable HOW. 
     const userPrompt = `Competitive analysis for: ${website}`;
     // Unified controller for this request's AI budget
     const overallController = new AbortController();
-    if (typeof overallController.signal.setMaxListeners === 'function') {
-      overallController.signal.setMaxListeners(30);
-    }
+    try { setMaxListeners(30, overallController.signal); } catch (e) {}
     const overallTimer = setTimeout(() => overallController.abort(), remainingBudget);
 
     let result = null;
@@ -1903,9 +1896,7 @@ STRATEGIC RULES (MANDATORY):
 
     // Unified controller for this request's AI budget
     const overallController = new AbortController();
-    if (typeof overallController.signal.setMaxListeners === 'function') {
-      overallController.signal.setMaxListeners(30);
-    }
+    try { setMaxListeners(30, overallController.signal); } catch (e) {}
     const overallTimer = setTimeout(() => overallController.abort(), remainingBudget);
 
     console.log(`🔮 Starting parallel: AI analysis + GEO probe v3 for "${brandName}" in "${industry}" (Budget: ${remainingBudget}ms)`);
@@ -2390,9 +2381,7 @@ Generate 5-10 discovered backlinks (from real DataForSEO data), 5-8 link gap ite
     
     // Unified controller for this request's AI budget
     const overallController = new AbortController();
-    if (typeof overallController.signal.setMaxListeners === 'function') {
-      overallController.signal.setMaxListeners(30);
-    }
+    try { setMaxListeners(30, overallController.signal); } catch (e) {}
     const overallTimer = setTimeout(() => overallController.abort(), aiBudget);
 
     let result = null;
@@ -2610,9 +2599,7 @@ Respond in STRICT JSON:
     const userPrompt = `Build 90-day war room plan for: ${website}`;
     // Unified controller for this request's AI budget
     const overallController = new AbortController();
-    if (typeof overallController.signal.setMaxListeners === 'function') {
-      overallController.signal.setMaxListeners(30);
-    }
+    try { setMaxListeners(30, overallController.signal); } catch (e) {}
     const overallTimer = setTimeout(() => overallController.abort(), remainingBudget);
 
     let result = null;
@@ -2763,9 +2750,7 @@ CRITICAL: Use the REAL mention rate (${probeData.aggregate.mentionRate}%) as the
     const userPrompt = `Analyze real LLM probe results for: ${brandName} (${website})`;
     // Unified controller for this request's AI budget
     const overallController = new AbortController();
-    if (typeof overallController.signal.setMaxListeners === 'function') {
-      overallController.signal.setMaxListeners(30);
-    }
+    try { setMaxListeners(30, overallController.signal); } catch (e) {}
     const overallTimer = setTimeout(() => overallController.abort(), remainingBudget);
 
     let result = null;
@@ -2901,9 +2886,7 @@ Generate production-ready code. Every fix must be copy-paste ready. Use the bran
     
     // Unified controller for this request's AI budget
     const overallController = new AbortController();
-    if (typeof overallController.signal.setMaxListeners === 'function') {
-      overallController.signal.setMaxListeners(30);
-    }
+    try { setMaxListeners(30, overallController.signal); } catch (e) {}
     const overallTimer = setTimeout(() => overallController.abort(), remainingBudget);
 
     let result = null;
@@ -3065,9 +3048,7 @@ Generate 15-20 mined prompts. Be specific to this brand's industry. Think about 
     
     // Unified controller for this request's AI budget
     const overallController = new AbortController();
-    if (typeof overallController.signal.setMaxListeners === 'function') {
-      overallController.signal.setMaxListeners(30);
-    }
+    try { setMaxListeners(30, overallController.signal); } catch (e) {}
     const overallTimer = setTimeout(() => overallController.abort(), remainingBudget);
 
     let aiResult = null;
@@ -3594,9 +3575,7 @@ Respond in JSON:
 }`;
 
     const overallController = new AbortController();
-    if (typeof overallController.signal.setMaxListeners === 'function') {
-      overallController.signal.setMaxListeners(30);
-    }
+    try { setMaxListeners(30, overallController.signal); } catch (e) {}
     const overallTimer = setTimeout(() => overallController.abort(), 15000);
 
     let result = null;
@@ -3671,9 +3650,7 @@ TASK: ${fixPrompt}
 Generate the content now.`;
 
     const overallController = new AbortController();
-    if (typeof overallController.signal.setMaxListeners === 'function') {
-      overallController.signal.setMaxListeners(30);
-    }
+    try { setMaxListeners(30, overallController.signal); } catch (e) {}
     const overallTimer = setTimeout(() => overallController.abort(), 60000);
 
     let result = null;
