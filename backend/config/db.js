@@ -14,7 +14,9 @@ const connectDB = async (attempt = 1) => {
             maxPoolSize: 100,                  // significantly larger pool for 100M-scale concurrency
             minPoolSize: 10,                   // keep more connections warm
             maxIdleTimeMS: 30000,              // close idle connections faster (30s)
-            family: 4, // Force IPv4 to avoid DNS issues
+            family: 4,                         // Force IPv4 to avoid DNS issues
+            readPreference: 'secondaryPreferred', // Phase 5: Offload reads to replicas
+            w: 'majority',                      // Phase 5: Ensure data consistency across replicas
         });
         console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
 

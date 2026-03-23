@@ -4,6 +4,9 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import connectDB from './config/db.js';
 import config from './config/env.js';
+import session from 'express-session';
+import RedisStore from 'connect-redis';
+import redisClient from './utils/cache.js';
 
 // Route imports
 import authRoutes from './routes/auth.js';
@@ -168,6 +171,20 @@ app.use((req, res, next) => {
     express.urlencoded({ extended: true, limit: '1mb' })(req, res, next);
 });
 
+// Scaling Phase 4: Redis Session Management
+app.use(session({
+    store: new RedisStore({ client: redisClient, prefix: 'sess:' }),
+    secret: config.sessionSecret || 'mantram_secret_123_scale', 
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: config.nodeEnv === 'production',
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000, // 1 day
+        sameSite: 'lax'
+    }
+}));
+
 // Request logging in dev
 if (config.nodeEnv === 'development') {
     app.use((req, res, next) => {
@@ -263,6 +280,15 @@ app.use('/api/intel', intelMissionRoutes);
 
 // Retention Studio (Amazon → D2C Re-engagement)
 app.use('/api/retention-studio', retentionStudioRoutes);
+
+// Phase 1: Health check for ALB
+app.get('/health', (req, res) => {
+    res.status(200).json({ 
+        status: 'ok', 
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
+});
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -419,5 +445,19 @@ const gracefulShutdown = (signal) => {
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// ══════════════════════════════════════════════════════════════
+// SCALING: ERROR GUARDS
+// ══════════════════════════════════════════════════════════════
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('🚨 Unhandled Rejection at:', promise, 'reason:', reason);
+    // In production, we log but don't crash unless it's a critical boot error
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('🚨 Uncaught Exception:', err);
+    // Optional: Graceful shutdown if exception is too severe
+    // gracefulShutdown('UncaughtException');
+});
 
 export default app;
