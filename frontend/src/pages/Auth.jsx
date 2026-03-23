@@ -13,7 +13,7 @@ const PLAN_LABELS = {
 export default function Auth() {
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
-    const { login, register, isAuthenticated, loading: authLoading, loginWithToken } = useAuth()
+    const { login, register, isAuthenticated, loading: authLoading, loginWithToken, user } = useAuth()
     const [isLogin, setIsLogin] = useState(true)
     const [loading, setLoading] = useState(false)
     const [isSocialLoading, setIsSocialLoading] = useState(false)
