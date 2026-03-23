@@ -1024,8 +1024,9 @@ router.post('/compile', protect, async (req, res) => {
 
             try {
                 const { execSync } = await import('child_process');
-                // Check if ffmpeg is available
-                execSync('ffmpeg -version', { stdio: 'pipe' });
+                // Get ffmpeg path from npm package
+                const ffmpegPath = (await import('@ffmpeg-installer/ffmpeg')).default?.path || (await import('@ffmpeg-installer/ffmpeg')).path;
+                execSync(`"${ffmpegPath}" -version`, { stdio: 'pipe' });
 
                 // Write concat file
                 const concatFile = path.join(tmpDir, 'concat.txt');
@@ -1033,7 +1034,7 @@ router.post('/compile', protect, async (req, res) => {
                 fs.writeFileSync(concatFile, concatContent);
 
                 // Build ffmpeg command
-                let ffmpegCmd = `ffmpeg -y -f concat -safe 0 -i "${concatFile}"`;
+                let ffmpegCmd = `"${ffmpegPath}" -y -f concat -safe 0 -i "${concatFile}"`;
 
                 // Add voiceover as audio overlay
                 if (voiceoverPath && fs.existsSync(voiceoverPath)) {
