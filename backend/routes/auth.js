@@ -380,8 +380,16 @@ router.put('/change-password', protect, async (req, res) => {
 
 // GET /api/auth/me
 router.get('/me', protect, async (req, res) => {
-    const user = await User.findById(req.user._id).lean();
+    let user = await User.findById(req.user._id).lean();
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+    // Auto-generate userId for existing users who don't have one
+    if (!user.userId) {
+        const generatedId = await User.generateUserId();
+        await User.findByIdAndUpdate(req.user._id, { userId: generatedId });
+        user.userId = generatedId;
+    }
+
     const planDetails = await SubscriptionPackage.findOne({ slug: user.plan || 'starter' }).lean();
     const brandCount = await Brand.countDocuments({ user: user._id });
     res.json({ success: true, user: { ...user, planDetails, brandCount } });
@@ -397,6 +405,52 @@ router.put('/profile', protect, async (req, res) => {
         { returnDocument: 'after', runValidators: true }
     );
     res.json({ success: true, user });
+});
+
+// PUT /api/auth/claim-userid — One-time custom User ID claim
+router.put('/claim-userid', protect, async (req, res) => {
+    try {
+        const { userId } = req.body;
+        if (!userId) return res.status(400).json({ success: false, error: 'User ID is required' });
+
+        // Validate format: 3-30 chars, lowercase alphanumeric + hyphens, no start/end hyphen
+        const cleaned = userId.trim().toLowerCase();
+        if (cleaned.length < 3 || cleaned.length > 30) {
+            return res.status(400).json({ success: false, error: 'User ID must be 3-30 characters' });
+        }
+        if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(cleaned) && cleaned.length > 2) {
+            return res.status(400).json({ success: false, error: 'Only lowercase letters, numbers, and hyphens. Cannot start/end with hyphen.' });
+        }
+        if (/--/.test(cleaned)) {
+            return res.status(400).json({ success: false, error: 'Cannot have consecutive hyphens' });
+        }
+
+        // Check if user already claimed
+        const currentUser = await User.findById(req.user._id);
+        if (!currentUser) return res.status(404).json({ success: false, error: 'User not found' });
+        if (currentUser.userIdClaimed) {
+            return res.status(403).json({ success: false, error: 'You have already claimed your User ID. This is a one-time action.' });
+        }
+
+        // Check availability
+        const existing = await User.findOne({ userId: cleaned, _id: { $ne: req.user._id } });
+        if (existing) {
+            return res.status(409).json({ success: false, error: 'This User ID is already taken. Try another one.' });
+        }
+
+        // Claim it
+        currentUser.userId = cleaned;
+        currentUser.userIdClaimed = true;
+        await currentUser.save();
+
+        res.json({ success: true, userId: cleaned, message: 'User ID claimed successfully! This is permanent.' });
+    } catch (error) {
+        console.error('Claim userId error:', error);
+        if (error.code === 11000) {
+            return res.status(409).json({ success: false, error: 'This User ID is already taken.' });
+        }
+        res.status(500).json({ success: false, error: 'Failed to claim User ID' });
+    }
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

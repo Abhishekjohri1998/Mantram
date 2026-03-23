@@ -26,6 +26,7 @@ const userSchema = new mongoose.Schema({
 
     // Creative User ID (e.g., "cosmic-ninja-42")
     userId: { type: String, unique: true, sparse: true, trim: true, lowercase: true },
+    userIdClaimed: { type: Boolean, default: false }, // true = user chose their ID, no more changes
 
     // Team / Organization
     organization: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

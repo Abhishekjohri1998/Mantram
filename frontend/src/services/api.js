@@ -103,6 +103,7 @@ export const auth = {
     forgotPassword: (email) => apiFetch('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
     resetPassword: (token, password) => apiFetch('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) }),
     changePassword: (currentPassword, newPassword) => apiFetch('/auth/change-password', { method: 'PUT', body: JSON.stringify({ currentPassword, newPassword }) }),
+    claimUserId: (userId) => apiFetch('/auth/claim-userid', { method: 'PUT', body: JSON.stringify({ userId }) }),
     getStudioAccess: () => apiFetch('/auth/studio-access'),
 };
 
