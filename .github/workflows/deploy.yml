@@ -12,8 +12,10 @@ jobs:
   deploy-frontend:
     name: 🎨 Frontend (S3 + CloudFront)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -61,7 +63,7 @@ jobs:
     needs: deploy-frontend
     steps:
       - name: 🚀 Deploy via SSH
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@v1.2.5
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.MEDIA_AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.MEDIA_AWS_SECRET_ACCESS_KEY }}
