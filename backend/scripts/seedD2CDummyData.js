@@ -122,7 +122,7 @@ async function seed() {
             displayName: 'ACwO Official Store',
             metadata: { _seedTag: SEED_TAG },
         },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
     );
     console.log('  ✅ Integration created');
 
@@ -149,7 +149,7 @@ async function seed() {
                 tags: ['acwo', 'electronics', 'audio'],
                 metadata: { _seedTag: SEED_TAG },
             },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
     }
     console.log(`  ✅ ${ACWO_PRODUCTS.length} products created`);
@@ -192,7 +192,7 @@ async function seed() {
                 shopifyUpdatedAt: randomDate(30),
                 syncedAt: new Date(),
             },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
         customerIds.push(custId);
     }

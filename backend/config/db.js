@@ -7,7 +7,7 @@ const RETRY_DELAY = 3000; // 3 seconds
 const connectDB = async (attempt = 1) => {
     try {
         const conn = await mongoose.connect(config.mongoUri, {
-            serverSelectionTimeoutMS: 30000,   // 30s to pick a server
+            serverSelectionTimeoutMS: 5000,            // 5s to pick a server
             socketTimeoutMS: 45000,            // 45s socket timeout (fail faster under load)
             connectTimeoutMS: 30000,           // 30s initial connect
             heartbeatFrequencyMS: 10000,       // heartbeat every 10s to keep alive

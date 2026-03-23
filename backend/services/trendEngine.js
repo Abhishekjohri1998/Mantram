@@ -271,24 +271,31 @@ RULES:
 
         let matches = [];
         try {
-            const parsed = JSON.parse(content);
+            // Remove markdown code fences if present
+            const cleanContent = content.replace(/```(?:json)?\s*/g, '').replace(/```/g, '').trim();
+            const parsed = JSON.parse(cleanContent);
             matches = Array.isArray(parsed) ? parsed : (parsed.trends || []);
         } catch (parseErr) {
+            console.warn('⚠️ AI trend match: JSON parse failed, attempting regex fallback. Raw length:', content.length);
             // Robust parsing for partial/truncated JSON: extract all complete { ... } objects
             const objectRegex = /\{[\s\S]*?\}/g;
             const foundObjects = content.match(objectRegex) || [];
             for (const objStr of foundObjects) {
                 try {
-                    const obj = JSON.parse(objStr);
-                    if (obj && typeof obj.index === 'number') matches.push(obj);
+                    // Try to fix common trailing comma or truncation issues in small chunks
+                    const fixedObjStr = objStr.trim().replace(/,\s*\}$/, '}');
+                    const obj = JSON.parse(fixedObjStr);
+                    if (obj && typeof obj.index === 'number') {
+                        matches.push(obj);
+                    }
                 } catch (e) { /* skip broken objects */ }
             }
 
             if (matches.length === 0) {
-                console.warn('AI trend match: no valid JSON objects found. Raw response length:', content.length);
+                console.error('❌ AI trend match: No valid JSON objects found in response.');
                 return [];
             }
-            console.log(`ℹ️ Salvaged ${matches.length} trend matches from truncated response.`);
+            console.log(`ℹ️ Salvaged ${matches.length} trend matches from problematic AI response.`);
         }
         const result = matches
             .filter(m => typeof m.index === 'number' && m.index >= 0 && m.index < trends.length)

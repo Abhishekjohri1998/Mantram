@@ -134,7 +134,7 @@ async function main() {
               accessToken: `demo_token_${plat}`,
               platformData: { accountId: plat === 'meta-ads' ? 'act_123456789' : '987-654-3210', accountName: plat === 'meta-ads' ? 'ACwO Meta Business' : 'ACwO Google Ads Account' },
               lastSyncAt: new Date(), metadata: { _seedTag: PM_SEED_TAG } },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
     }
     console.log('🔗 Meta Ads + Google Ads integrations connected');
