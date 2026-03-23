@@ -1,6 +1,20 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
+// ── Creative User ID Generator ──
+const USER_ID_ADJECTIVES = [
+    'cosmic', 'turbo', 'neon', 'cyber', 'ultra', 'pixel', 'atomic', 'hyper',
+    'stellar', 'blaze', 'storm', 'shadow', 'royal', 'epic', 'quantum', 'mighty',
+    'velvet', 'golden', 'mystic', 'prism', 'lunar', 'solar', 'rapid', 'noble',
+    'thunder', 'crystal', 'phantom', 'titan', 'frost', 'crimson', 'azure', 'viper',
+];
+const USER_ID_NOUNS = [
+    'ninja', 'sultan', 'maverick', 'falcon', 'phoenix', 'rambo', 'wizard', 'spartan',
+    'ranger', 'voyager', 'crusader', 'legend', 'knight', 'ace', 'captain', 'hunter',
+    'pilot', 'chief', 'pioneer', 'rebel', 'warrior', 'gladiator', 'dreamer', 'creator',
+    'hustler', 'genius', 'guru', 'monk', 'oracle', 'sage', 'wolf', 'hawk',
+];
+
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
@@ -9,6 +23,9 @@ const userSchema = new mongoose.Schema({
     plan: { type: String, default: 'starter' },
     avatar: { type: String, default: '' },
     company: { type: String, default: '' },
+
+    // Creative User ID (e.g., "cosmic-ninja-42")
+    userId: { type: String, unique: true, sparse: true, trim: true, lowercase: true },
 
     // Team / Organization
     organization: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -90,6 +107,10 @@ const userSchema = new mongoose.Schema({
     verificationToken: { type: String, select: false },
     verificationExpires: { type: Date, select: false },
 
+    // Password Reset
+    resetPasswordToken: { type: String, select: false },
+    resetPasswordExpires: { type: Date, select: false },
+
     // Registration Queue & Approval
     approvalStatus: { 
         type: String, 
@@ -119,6 +140,20 @@ userSchema.pre('save', async function () {
 userSchema.methods.matchPassword = async function (entered) {
     if (!this.password) return false;
     return await bcrypt.compare(entered, this.password);
+};
+
+// Static: generate a unique creative user ID
+userSchema.statics.generateUserId = async function () {
+    for (let i = 0; i < 10; i++) {
+        const adj = USER_ID_ADJECTIVES[Math.floor(Math.random() * USER_ID_ADJECTIVES.length)];
+        const noun = USER_ID_NOUNS[Math.floor(Math.random() * USER_ID_NOUNS.length)];
+        const num = Math.floor(Math.random() * 99) + 1;
+        const id = `${adj}-${noun}-${num}`;
+        const exists = await this.findOne({ userId: id });
+        if (!exists) return id;
+    }
+    // Fallback: use timestamp
+    return `user-${Date.now().toString(36)}`;
 };
 
 export default mongoose.model('User', userSchema);

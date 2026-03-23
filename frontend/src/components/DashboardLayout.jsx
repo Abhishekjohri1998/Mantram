@@ -1,7 +1,9 @@
-import React, { useState, createContext, useContext } from 'react'
+import React, { useState, useEffect, createContext, useContext } from 'react'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import { useAuth } from '../context/AuthContext'
+import { payments as paymentsAPI } from '../services/api'
+import { Link } from 'react-router-dom'
 
 // Context to share sidebar toggle across components
 const SidebarContext = createContext()
@@ -10,6 +12,19 @@ export const useSidebar = () => useContext(SidebarContext)
 export default function DashboardLayout({ children, title, subtitle }) {
     const [mobileOpen, setMobileOpen] = useState(false)
     const { user } = useAuth()
+    const [subWarning, setSubWarning] = useState(null)
+
+    // Check subscription status globally
+    useEffect(() => {
+        if (!user || user.role === 'superadmin') return
+        paymentsAPI.subscriptionStatus()
+            .then(data => {
+                if (data?.isCancelled && data?.isInGracePeriod) {
+                    setSubWarning({ plan: data.plan, daysRemaining: data.daysRemaining, gracePeriodEnd: data.gracePeriodEnd })
+                }
+            })
+            .catch(() => {})
+    }, [user])
 
     // Detect impersonation: superadmin token is saved in sessionStorage
     const isImpersonating = !!sessionStorage.getItem('mantram_superadmin_token')
@@ -56,6 +71,22 @@ export default function DashboardLayout({ children, title, subtitle }) {
                                 <span className="material-symbols-outlined text-xs">arrow_back</span>
                                 Back to SuperAdmin
                             </button>
+                        </div>
+                    )}
+
+                    {/* Global Cancelled Subscription Banner */}
+                    {subWarning && (
+                        <div className="sticky top-0 z-40 px-4 py-2 bg-gradient-to-r from-amber-500/90 to-orange-500/90 shadow-lg shadow-amber-500/10 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className="material-symbols-outlined text-white text-base">warning</span>
+                                <p className="text-white text-xs font-bold">
+                                    Subscription cancelled — <strong>{subWarning.daysRemaining} days</strong> of <strong>{subWarning.plan}</strong> access remaining
+                                </p>
+                            </div>
+                            <Link to="/credits" className="px-3 py-1 bg-white text-amber-700 rounded-lg text-[10px] font-black uppercase hover:bg-slate-100 transition-all flex items-center gap-1">
+                                <span className="material-symbols-outlined text-xs">autorenew</span>
+                                Resubscribe
+                            </Link>
                         </div>
                     )}
 

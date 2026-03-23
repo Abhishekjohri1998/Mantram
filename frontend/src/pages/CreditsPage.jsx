@@ -33,6 +33,15 @@ const ACTION_COLORS = {
     socialMediaAudit: 'sky', socialMediaCompetitor: 'sky', socialMediaScore: 'sky',
 }
 
+const CANCEL_REASONS = [
+    'Too expensive for my needs',
+    'Not using it enough',
+    'Switching to a competitor',
+    'Missing features I need',
+    'Temporary pause — will come back',
+    'Other',
+]
+
 export default function CreditsPage() {
     const [summary, setSummary] = useState(null)
     const [usage, setUsage] = useState([])
@@ -58,7 +67,17 @@ export default function CreditsPage() {
     // Store visibility (controlled by SuperAdmin)
     const [storeVisibility, setStoreVisibility] = useState({ showSubscriptionPlans: true, showCreditPacks: true })
 
-    useEffect(() => { loadSummary(); loadUsage(); loadStoreVisibility() }, [])
+    // Billing cycle toggle
+    const [billingCycle, setBillingCycle] = useState('monthly')
+
+    // Subscription status + cancel flow
+    const [subStatus, setSubStatus] = useState(null)
+    const [cancelModal, setCancelModal] = useState(null) // null | { step: 'reason' | 'offer' | 'confirm' | 'done', ... }
+    const [cancelReason, setCancelReason] = useState('')
+    const [cancelLoading, setCancelLoading] = useState(false)
+
+
+    useEffect(() => { loadSummary(); loadUsage(); loadStoreVisibility(); loadSubStatus() }, [])
     useEffect(() => { loadUsage() }, [page])
 
     const loadSummary = async () => {
@@ -115,6 +134,13 @@ export default function CreditsPage() {
         } catch { /* defaults to both visible */ }
     }
 
+    const loadSubStatus = async () => {
+        try {
+            const data = await paymentsAPI.subscriptionStatus()
+            setSubStatus(data)
+        } catch { /* ignore */ }
+    }
+
     const loadTopupPacks = async () => {
         try {
             const data = await paymentsAPI.getTopupPacks()
@@ -133,17 +159,19 @@ export default function CreditsPage() {
 
     const handleUpgrade = async (pkg) => {
         try {
-            const { orderId, amount, currency } = await paymentsAPI.createOrder(pkg._id)
+            const { orderId, amount, currency, proRata } = await paymentsAPI.createOrder(pkg._id, billingCycle)
             const options = {
                 key: import.meta.env.VITE_RAZORPAY_KEY_ID,
                 amount,
                 currency,
                 name: 'Mantram AI',
-                description: `Upgrade to ${pkg.name} Plan`,
+                description: proRata?.unusedCredit > 0
+                    ? `Upgrade to ${pkg.name} (₹${proRata.unusedCredit} credit applied)`
+                    : `Upgrade to ${pkg.name} Plan`,
                 order_id: orderId,
                 handler: async (response) => {
                     try {
-                        await paymentsAPI.verify({ ...response, packageId: pkg._id, billingCycle: 'monthly' })
+                        await paymentsAPI.verify({ ...response })
                         alert(`Successfully upgraded to ${pkg.name}!`)
                         window.location.reload()
                     } catch (e) { alert('Payment verification failed: ' + e.message) }
@@ -154,6 +182,38 @@ export default function CreditsPage() {
             const rzp = new window.Razorpay(options)
             rzp.open()
         } catch (e) { alert('Failed to initialize payment: ' + e.message) }
+    }
+
+    const handleCancelSubscription = async () => {
+        setCancelLoading(true)
+        try {
+            const data = await paymentsAPI.cancelSubscription(cancelReason)
+            setCancelModal({
+                step: data.retentionOffer ? 'offer' : 'done',
+                ...data,
+            })
+            loadSubStatus()
+        } catch (e) {
+            alert('Cancellation failed: ' + e.message)
+            setCancelModal(null)
+        } finally {
+            setCancelLoading(false)
+        }
+    }
+
+    const handleAcceptRetention = async (offerId) => {
+        setCancelLoading(true)
+        try {
+            const data = await paymentsAPI.acceptRetentionOffer(offerId)
+            alert(data.message)
+            setCancelModal(null)
+            loadSubStatus()
+            loadSummary()
+        } catch (e) {
+            alert('Failed: ' + e.message)
+        } finally {
+            setCancelLoading(false)
+        }
     }
 
     const handleTopup = async (pack) => {
@@ -217,6 +277,7 @@ export default function CreditsPage() {
     }
 
     return (
+    <>
         <DashboardLayout title="Credit Usage" subtitle="Track your AI generation credits">
             <SEOHead title="Credit Usage — Mantram AI" noIndex={true} />
 
@@ -648,6 +709,42 @@ export default function CreditsPage() {
 
                     ) : tab === 'plans' ? (
                         <div className="space-y-6">
+                            {/* ── Cancelled Subscription Banner ── */}
+                            {subStatus?.isCancelled && subStatus?.isInGracePeriod && (
+                                <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/5 border border-amber-500/30 p-5 rounded-2xl flex items-center gap-4">
+                                    <span className="material-symbols-outlined text-3xl text-amber-400">warning</span>
+                                    <div className="flex-1">
+                                        <h3 className="text-base font-bold text-amber-400">Subscription Cancelled</h3>
+                                        <p className="text-sm text-slate-400">
+                                            You have access to <span className="font-bold text-white">{subStatus.plan}</span> features until{' '}
+                                            <span className="font-bold text-white">
+                                                {new Date(subStatus.gracePeriodEnd).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                            </span>
+                                            {' '}— <span className="font-bold text-amber-400">{subStatus.daysRemaining} days remaining</span>
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ── Billing Cycle Toggle ── */}
+                            <div className="flex items-center justify-center gap-1 bg-white/[0.04] rounded-xl p-1 w-fit mx-auto">
+                                {[{k: 'monthly', l: 'Monthly'}, {k: 'quarterly', l: 'Quarterly', save: '10%'}, {k: 'yearly', l: 'Annual', save: '20%'}].map(c => (
+                                    <button
+                                        key={c.k}
+                                        onClick={() => setBillingCycle(c.k)}
+                                        className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all relative ${billingCycle === c.k
+                                            ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                                            : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'
+                                        }`}
+                                    >
+                                        {c.l}
+                                        {c.save && billingCycle === c.k && (
+                                            <span className="absolute -top-2 -right-2 px-1.5 py-0.5 rounded-full bg-emerald-500 text-[9px] font-black text-white">Save {c.save}</span>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+
                             {packagesLoading ? (
                                 <div className="flex items-center justify-center h-64">
                                     <div className="size-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -658,6 +755,10 @@ export default function CreditsPage() {
                                         const isCurrent = pkg.slug === balance?.plan;
                                         const currentTier = packages.find(p => p.slug === balance?.plan)?.tier || 0;
                                         const isUpgrade = pkg.tier > currentTier;
+                                        const price = pkg.pricing?.[billingCycle] || pkg.pricing?.monthly || 0;
+                                        const monthlyEquiv = billingCycle === 'yearly' ? Math.round(price / 12) : billingCycle === 'quarterly' ? Math.round(price / 3) : price;
+                                        const monthlyPrice = pkg.pricing?.monthly || 0;
+                                        const savings = billingCycle !== 'monthly' && monthlyPrice > 0 && price > 0 ? Math.round((1 - monthlyEquiv / monthlyPrice) * 100) : 0;
 
                                         return (
                                             <div key={pkg._id} className={`glass-panel p-6 rounded-2xl border transition-all hover:scale-[1.02] flex flex-col ${isCurrent ? 'border-primary ring-1 ring-primary/20 bg-primary/5' : 'border-white/[0.08]'}`}>
@@ -668,8 +769,16 @@ export default function CreditsPage() {
                                                     </div>
                                                     <p className="text-sm text-slate-500 mb-6">{pkg.description}</p>
                                                     <div className="mb-6">
-                                                        <span className="text-3xl font-black text-white">{pkg.pricing.currency === 'INR' ? '₹' : '$'}{pkg.pricing.monthly?.toLocaleString()}</span>
-                                                        <span className="text-slate-500 text-sm">/mo</span>
+                                                        <span className="text-3xl font-black text-white">{pkg.pricing.currency === 'INR' ? '₹' : '$'}{price?.toLocaleString()}</span>
+                                                        <span className="text-slate-500 text-sm">/{billingCycle === 'yearly' ? 'yr' : billingCycle === 'quarterly' ? 'qtr' : 'mo'}</span>
+                                                        {savings > 0 && (
+                                                            <span className="ml-2 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold">
+                                                                Save {savings}%
+                                                            </span>
+                                                        )}
+                                                        {billingCycle !== 'monthly' && monthlyEquiv > 0 && (
+                                                            <p className="text-xs text-slate-600 mt-1">≈ ₹{monthlyEquiv?.toLocaleString()}/mo</p>
+                                                        )}
                                                     </div>
                                                     <ul className="space-y-3 mb-8">
                                                         <li className="flex items-center gap-2 text-sm text-slate-300">
@@ -692,10 +801,19 @@ export default function CreditsPage() {
                                                         : isUpgrade
                                                             ? 'bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary-light'
                                                             : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'
-                                                        }`}
+                                                    }`}
                                                 >
                                                     {isCurrent ? 'Current Plan' : isUpgrade ? `Upgrade to ${pkg.name}` : `Switch to ${pkg.name}`}
                                                 </button>
+                                                {/* Cancel button for current plan */}
+                                                {isCurrent && subStatus?.hasSubscription && subStatus?.status === 'active' && (
+                                                    <button
+                                                        onClick={() => setCancelModal({ step: 'reason' })}
+                                                        className="mt-3 w-full py-2 text-xs text-slate-500 hover:text-rose-400 transition-all"
+                                                    >
+                                                        Cancel Subscription
+                                                    </button>
+                                                )}
                                             </div>
                                         )
                                     })}
@@ -777,5 +895,121 @@ export default function CreditsPage() {
                 </div>
             )}
         </DashboardLayout>
+
+        {/* ═══ Cancel Subscription Modal ═══ */}
+        {cancelModal && (
+            <div className="fixed inset-0 z-[999] bg-black/60 flex items-center justify-center p-4" onClick={() => !cancelLoading && setCancelModal(null)}>
+                <div className="bg-[#0e1117] border border-white/[0.1] rounded-3xl max-w-md w-full p-8 shadow-2xl" onClick={e => e.stopPropagation()}>
+
+                    {/* Step 1: Reason */}
+                    {cancelModal.step === 'reason' && (
+                        <>
+                            <div className="text-center mb-6">
+                                <span className="material-symbols-outlined text-4xl text-rose-400 mb-3 block">sentiment_dissatisfied</span>
+                                <h2 className="text-xl font-bold text-white">Cancel Subscription?</h2>
+                                <p className="text-sm text-slate-400 mt-2">We're sorry to see you go. Please tell us why:</p>
+                            </div>
+                            <div className="space-y-2 mb-6">
+                                {CANCEL_REASONS.map(r => (
+                                    <button
+                                        key={r}
+                                        onClick={() => setCancelReason(r)}
+                                        className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all border ${cancelReason === r
+                                            ? 'border-rose-500/40 bg-rose-500/10 text-white'
+                                            : 'border-white/[0.06] bg-white/[0.02] text-slate-400 hover:bg-white/[0.05]'
+                                        }`}
+                                    >
+                                        {r}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setCancelModal(null)}
+                                    className="flex-1 py-3 rounded-xl text-sm font-bold text-slate-400 bg-white/[0.04] hover:bg-white/[0.08] transition-all"
+                                >
+                                    Keep Subscription
+                                </button>
+                                <button
+                                    onClick={handleCancelSubscription}
+                                    disabled={!cancelReason || cancelLoading}
+                                    className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-40 transition-all"
+                                >
+                                    {cancelLoading ? 'Processing...' : 'Continue'}
+                                </button>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Step 2: Retention Offer */}
+                    {cancelModal.step === 'offer' && cancelModal.retentionOffer && (
+                        <>
+                            <div className="text-center mb-6">
+                                <span className="material-symbols-outlined text-4xl text-amber-400 mb-3 block">{cancelModal.retentionOffer.icon || 'local_offer'}</span>
+                                <h2 className="text-xl font-bold text-white">{cancelModal.retentionOffer.headline || 'Wait! We have a special offer'}</h2>
+                                <p className="text-sm text-slate-400 mt-2">{cancelModal.retentionOffer.description}</p>
+                            </div>
+                            <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/5 border border-amber-500/30 rounded-2xl p-6 mb-6 text-center">
+                                <p className="text-2xl font-black text-white mb-1">
+                                    {cancelModal.retentionOffer.offerType === 'discount' && `${cancelModal.retentionOffer.value}% OFF`}
+                                    {cancelModal.retentionOffer.offerType === 'bonus_credits' && `+${cancelModal.retentionOffer.value} Credits`}
+                                    {cancelModal.retentionOffer.offerType === 'free_month' && `${cancelModal.retentionOffer.value} Free Month(s)`}
+                                    {cancelModal.retentionOffer.offerType === 'downgrade' && `Switch to ${cancelModal.retentionOffer.value}`}
+                                </p>
+                                <p className="text-xs text-amber-400/80">{cancelModal.retentionOffer.name}</p>
+                            </div>
+                            <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 mb-6">
+                                <p className="text-sm text-slate-400">
+                                    <span className="material-symbols-outlined text-sm text-amber-400 align-middle mr-1">schedule</span>
+                                    Your <span className="text-white font-bold">{cancelModal.plan}</span> access continues until end of billing period
+                                    {cancelModal.daysRemaining > 0 && <> — <span className="text-amber-400 font-bold">{cancelModal.daysRemaining} days remaining</span></>}
+                                </p>
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setCancelModal({ ...cancelModal, step: 'done' })}
+                                    className="flex-1 py-3 rounded-xl text-sm font-bold text-slate-400 bg-white/[0.04] hover:bg-white/[0.08] transition-all"
+                                >
+                                    No thanks, cancel
+                                </button>
+                                <button
+                                    onClick={() => handleAcceptRetention(cancelModal.retentionOffer.id)}
+                                    disabled={cancelLoading}
+                                    className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 transition-all"
+                                >
+                                    {cancelLoading ? 'Applying...' : 'Accept Offer!'}
+                                </button>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Step 3: Done */}
+                    {cancelModal.step === 'done' && (
+                        <>
+                            <div className="text-center mb-6">
+                                <span className="material-symbols-outlined text-4xl text-slate-400 mb-3 block">check_circle</span>
+                                <h2 className="text-xl font-bold text-white">Subscription Cancelled</h2>
+                                <p className="text-sm text-slate-400 mt-2">
+                                    {cancelModal.message || `Your subscription has been cancelled. You'll continue to have access until the end of your billing period.`}
+                                </p>
+                            </div>
+                            {cancelModal.daysRemaining > 0 && (
+                                <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 mb-6 text-center">
+                                    <p className="text-3xl font-black text-amber-400">{cancelModal.daysRemaining}</p>
+                                    <p className="text-xs text-slate-500 uppercase tracking-wider font-bold mt-1">Days Remaining</p>
+                                </div>
+                            )}
+                            <button
+                                onClick={() => { setCancelModal(null); loadSubStatus() }}
+                                className="w-full py-3 rounded-xl text-sm font-bold text-white bg-primary hover:bg-primary-light transition-all"
+                            >
+                                Got it
+                            </button>
+                        </>
+                    )}
+                </div>
+            </div>
+        )}
+    </>
     )
 }

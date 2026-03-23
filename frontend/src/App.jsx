@@ -11,6 +11,7 @@ import PlanGatedRoute from './components/PlanGatedRoute'
 import Auth from './pages/Auth'
 import Landing from './pages/Landing'
 import VerifyEmail from './pages/VerifyEmail'
+import ResetPassword from './pages/ResetPassword'
 
 // ── Lazy Imports (Heavy/Studio Pages) ──
 const BrandOnboarding = lazy(() => import('./pages/BrandOnboarding'))
@@ -81,6 +82,7 @@ function App() {
                   <Route path="/login" element={<Auth />} />
                   <Route path="/signup" element={<Auth />} />
                   <Route path="/verify-email" element={<VerifyEmail />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/onboarding" element={<BrandOnboarding />} />
                   <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                   <Route path="/terms" element={<TermsOfService />} />

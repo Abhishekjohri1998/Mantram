@@ -70,11 +70,15 @@ router.post('/register', async (req, res) => {
         const waitlistEntry = await Waitlist.findOne({ email: email.toLowerCase() });
         const autoApprove = waitlistEntry?.status === 'invited';
 
+        // Generate creative user ID
+        const userId = await User.generateUserId();
+
         const user = await User.create({
             name,
             email,
             password,
             company,
+            userId,
             verificationToken,
             verificationExpires,
             isVerified: false,
@@ -237,6 +241,143 @@ router.post('/resend-verification', async (req, res) => {
     }
 });
 
+// ══════════════════════════════════════════════════════════════
+// PASSWORD MANAGEMENT
+// ══════════════════════════════════════════════════════════════
+
+// POST /api/auth/forgot-password — Send password reset email
+router.post('/forgot-password', async (req, res) => {
+    if (!requireDB(req, res)) return;
+    try {
+        const { email } = req.body;
+        if (!email) return res.status(400).json({ success: false, error: 'Email is required' });
+
+        // Always return success to prevent account enumeration
+        const successMsg = 'If an account with that email exists, a password reset link has been sent.';
+
+        const user = await User.findOne({ email: email.toLowerCase() });
+        if (!user) {
+            return res.json({ success: true, message: successMsg });
+        }
+
+        // Generate reset token
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        user.resetPasswordToken = resetToken;
+        user.resetPasswordExpires = Date.now() + 60 * 60 * 1000; // 1 hour
+        await user.save();
+
+        // Build reset URL
+        const frontendUrl = Array.isArray(config.frontendUrl) ? config.frontendUrl[0] : config.frontendUrl;
+        const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
+
+        // Send password reset email
+        try {
+            const { sendEmail } = await import('../utils/email.js');
+            await sendEmail({
+                to: user.email,
+                subject: '🔐 Reset Your Mantram AI Password',
+                html: `
+                    <div style="font-family:system-ui,-apple-system,sans-serif;max-width:500px;margin:0 auto;padding:40px 20px;">
+                        <div style="text-align:center;margin-bottom:32px;">
+                            <h1 style="color:#fff;font-size:24px;font-weight:800;margin:0;">Mantram AI</h1>
+                            <p style="color:#94a3b8;font-size:14px;margin:8px 0 0;">Password Reset Request</p>
+                        </div>
+                        <div style="background:#1e1b4b;border-radius:16px;padding:32px;border:1px solid rgba(99,102,241,0.2);">
+                            <p style="color:#e2e8f0;font-size:15px;line-height:1.6;margin:0 0 20px;">Hi <strong>${user.name}</strong>,</p>
+                            <p style="color:#94a3b8;font-size:14px;line-height:1.6;margin:0 0 24px;">
+                                We received a request to reset your password. Click the button below to set a new password. 
+                                This link expires in <strong>1 hour</strong>.
+                            </p>
+                            <div style="text-align:center;margin:24px 0;">
+                                <a href="${resetUrl}" 
+                                   style="display:inline-block;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;text-decoration:none;padding:14px 36px;border-radius:12px;font-weight:700;font-size:14px;">
+                                    Reset Password
+                                </a>
+                            </div>
+                            <p style="color:#64748b;font-size:12px;line-height:1.6;margin:20px 0 0;">
+                                If you didn't request this, you can safely ignore this email. Your password will remain unchanged.
+                            </p>
+                        </div>
+                        <p style="color:#475569;font-size:11px;text-align:center;margin:24px 0 0;">
+                            © ${new Date().getFullYear()} Mantram AI • AI-Powered Marketing OS
+                        </p>
+                    </div>
+                `,
+            });
+        } catch (emailErr) {
+            console.error('⚠️ Password reset email failed:', emailErr.message);
+        }
+
+        res.json({ success: true, message: successMsg });
+    } catch (error) {
+        console.error('Forgot password error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// POST /api/auth/reset-password — Reset password with token
+router.post('/reset-password', async (req, res) => {
+    if (!requireDB(req, res)) return;
+    try {
+        const { token, password } = req.body;
+        if (!token || !password) {
+            return res.status(400).json({ success: false, error: 'Token and new password are required' });
+        }
+        if (password.length < 6) {
+            return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
+        }
+
+        const user = await User.findOne({
+            resetPasswordToken: token,
+            resetPasswordExpires: { $gt: Date.now() },
+        }).select('+resetPasswordToken +resetPasswordExpires');
+
+        if (!user) {
+            return res.status(400).json({ success: false, error: 'Invalid or expired reset token. Please request a new password reset.' });
+        }
+
+        user.password = password; // Will be hashed by pre-save hook
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpires = undefined;
+        await user.save();
+
+        res.json({ success: true, message: 'Password has been reset successfully. You can now sign in with your new password.' });
+    } catch (error) {
+        console.error('Reset password error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// PUT /api/auth/change-password — Change password (authenticated)
+router.put('/change-password', protect, async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ success: false, error: 'Current password and new password are required' });
+        }
+        if (newPassword.length < 6) {
+            return res.status(400).json({ success: false, error: 'New password must be at least 6 characters' });
+        }
+
+        const user = await User.findById(req.user._id).select('+password');
+        if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+        // Verify current password
+        const isMatch = await user.matchPassword(currentPassword);
+        if (!isMatch) {
+            return res.status(401).json({ success: false, error: 'Current password is incorrect' });
+        }
+
+        user.password = newPassword; // Will be hashed by pre-save hook
+        await user.save();
+
+        res.json({ success: true, message: 'Password changed successfully.' });
+    } catch (error) {
+        console.error('Change password error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 // GET /api/auth/me
 router.get('/me', protect, async (req, res) => {
     const user = await User.findById(req.user._id).lean();
@@ -353,10 +494,12 @@ router.get('/google/callback', async (req, res) => {
             const waitlistEntry = await Waitlist.findOne({ email: profileData.email.toLowerCase() });
             const autoApprove = waitlistEntry?.status === 'invited';
 
+            const userId = await User.generateUserId();
             user = await User.create({
                 name: profileData.name || 'Google User',
                 email: profileData.email,
                 avatar: profileData.picture,
+                userId,
                 isGoogleUser: true,
                 isVerified: true, // Google users are pre-verified
                 password: Math.random().toString(36).slice(-12),

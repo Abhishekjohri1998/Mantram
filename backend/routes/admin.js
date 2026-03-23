@@ -207,6 +207,39 @@ router.post('/users/:id/reset-credits', async (req, res) => {
     }
 });
 
+// POST /api/admin/users/:id/reset-password — Admin force-reset user password
+router.post('/users/:id/reset-password', async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id).select('+password');
+        if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+        if (user.role === 'superadmin') return res.status(403).json({ success: false, error: 'Cannot reset superadmin password' });
+
+        const { newPassword } = req.body;
+        // If admin provides a password, use it; otherwise generate a temporary one
+        const tempPassword = newPassword || Math.random().toString(36).slice(-10) + 'A1!';
+
+        user.password = tempPassword; // Will be hashed by pre-save hook
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpires = undefined;
+        await user.save();
+
+        await logAudit(req, {
+            action: 'RESET_USER_PASSWORD',
+            targetModel: 'User',
+            targetId: user._id,
+            changes: { note: 'Password was reset by admin' }
+        });
+
+        res.json({ 
+            success: true, 
+            message: `Password reset for ${user.email}`,
+            tempPassword: newPassword ? undefined : tempPassword, // Only return temp password if auto-generated
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 // DELETE /api/admin/users/:id
 router.delete('/users/:id', async (req, res) => {
     try {

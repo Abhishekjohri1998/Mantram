@@ -7,6 +7,7 @@ import SubscriptionPackage from '../models/SubscriptionPackage.js';
 import Subscription from '../models/Subscription.js';
 import User from '../models/User.js';
 import { getSetting } from '../models/SystemSettings.js';
+import RetentionOffer from '../models/RetentionOffer.js';
 
 const router = Router();
 
@@ -52,7 +53,29 @@ router.get('/packages', async (req, res) => {
 });
 
 
-// @desc    Create Razorpay Order
+// ═══════════════════════════════════════════════════
+// Pro-rata helper
+// ═══════════════════════════════════════════════════
+function calcProRata(activeSub, newPlanPrice) {
+    if (!activeSub || !activeSub.endDate || !activeSub.startDate) {
+        return { unusedCredit: 0, proRataAmount: newPlanPrice, daysRemaining: 0, totalDays: 0 };
+    }
+    const now = new Date();
+    const end = new Date(activeSub.endDate);
+    const start = new Date(activeSub.startDate);
+    if (end <= now) {
+        return { unusedCredit: 0, proRataAmount: newPlanPrice, daysRemaining: 0, totalDays: 0 };
+    }
+    const msPerDay = 86400000;
+    const totalDays = Math.max(1, Math.ceil((end - start) / msPerDay));
+    const daysRemaining = Math.max(0, Math.ceil((end - now) / msPerDay));
+    const dailyRate = (activeSub.price || 0) / totalDays;
+    const unusedCredit = Math.round(dailyRate * daysRemaining * 100) / 100;
+    const proRataAmount = Math.max(0, Math.round((newPlanPrice - unusedCredit) * 100) / 100);
+    return { unusedCredit, proRataAmount, daysRemaining, totalDays, dailyRate: Math.round(dailyRate * 100) / 100 };
+}
+
+// @desc    Create Razorpay Order (with pro-rata for upgrades)
 // @route   POST /api/payments/create-order
 // @access  Private
 router.post('/create-order', protect, async (req, res) => {
@@ -64,19 +87,32 @@ router.post('/create-order', protect, async (req, res) => {
             return res.status(404).json({ success: false, error: 'Package not found' });
         }
 
-        const amount = pkg.pricing[billingCycle] || pkg.pricing.monthly;
-        if (!amount || amount <= 0) {
+        const fullPrice = pkg.pricing[billingCycle] || pkg.pricing.monthly;
+        if (!fullPrice || fullPrice <= 0) {
             return res.status(400).json({ success: false, error: 'Invalid plan price' });
         }
 
+        // Pro-rata: check if user has an active subscription
+        let proRata = { unusedCredit: 0, proRataAmount: fullPrice, daysRemaining: 0, totalDays: 0 };
+        const activeSub = await Subscription.findOne({ user: req.user._id, status: 'active' });
+        if (activeSub && activeSub.endDate && new Date(activeSub.endDate) > new Date()) {
+            proRata = calcProRata(activeSub, fullPrice);
+        }
+
+        // Minimum Razorpay order is ₹1 (100 paise)
+        const chargeAmount = Math.max(1, Math.round(proRata.proRataAmount));
+
         const options = {
-            amount: amount * 100, // Amount in paise
+            amount: chargeAmount * 100, // Amount in paise
             currency: pkg.pricing.currency || 'INR',
             receipt: `receipt_${Date.now()}`,
             notes: {
                 userId: req.user._id.toString(),
                 packageId: pkg._id.toString(),
                 billingCycle,
+                proRataCredit: proRata.unusedCredit.toString(),
+                fullPrice: fullPrice.toString(),
+                isProRata: (proRata.unusedCredit > 0).toString(),
             },
         };
 
@@ -87,6 +123,12 @@ router.post('/create-order', protect, async (req, res) => {
             orderId: order.id,
             amount: order.amount,
             currency: order.currency,
+            proRata: {
+                fullPrice,
+                unusedCredit: proRata.unusedCredit,
+                chargeAmount,
+                daysRemaining: proRata.daysRemaining,
+            },
         });
     } catch (error) {
         console.error('❌ Razorpay Order Error:', error);
@@ -146,13 +188,23 @@ router.post('/verify', protect, async (req, res) => {
         else if (billingCycle === 'quarterly') endDate.setMonth(endDate.getMonth() + 3);
         else endDate.setMonth(endDate.getMonth() + 1);
 
+        // Deactivate any existing active subscriptions before creating new one
+        await Subscription.updateMany(
+            { user: req.user._id, status: 'active' },
+            { $set: { status: 'expired' } }
+        );
+
+        // Read pro-rata data from order notes
+        const proRataCredit = parseFloat(order.notes?.proRataCredit) || 0;
+        const isProRata = order.notes?.isProRata === 'true';
+
         // Create subscription entry
         const subscription = await Subscription.create({
             user: req.user._id,
             plan: pkg.slug,
             billingCycle,
             credits: {
-                total: pkg.credits.monthly + pkg.credits.bonusOnSignup,
+                total: (pkg.credits.monthly || 0) + (pkg.credits.bonusOnSignup || 0),
                 used: 0,
             },
             price: (pkg.pricing[billingCycle] || pkg.pricing.monthly),
@@ -162,13 +214,15 @@ router.post('/verify', protect, async (req, res) => {
             status: 'active',
             paymentMethod: 'razorpay',
             transactionId: razorpay_payment_id,
+            proRataCredit: isProRata ? proRataCredit : 0,
+            proRataCharged: isProRata ? (order.amount / 100) : 0,
         });
 
         // Update user
         await User.findByIdAndUpdate(req.user._id, {
             plan: pkg.slug,
             activeSubscription: subscription._id,
-            'credits.total': pkg.credits.monthly + pkg.credits.bonusOnSignup,
+            'credits.total': (pkg.credits.monthly || 0) + (pkg.credits.bonusOnSignup || 0),
             'credits.used': 0,
         });
 
@@ -382,6 +436,268 @@ router.post('/verify-topup', protect, async (req, res) => {
     } catch (error) {
         console.error('❌ Topup Verification Error:', error);
         res.status(500).json({ success: false, error: 'Top-up verification failed' });
+    }
+});
+
+// ═══════════════════════════════════════════════════
+//  SUBSCRIPTION STATUS, CANCEL, RETENTION, PREVIEW
+// ═══════════════════════════════════════════════════
+
+/**
+ * @desc    Get current subscription status + remaining days
+ * @route   GET /api/payments/subscription-status
+ * @access  Private
+ */
+router.get('/subscription-status', protect, async (req, res) => {
+    try {
+        const sub = await Subscription.findOne({ user: req.user._id })
+            .sort('-createdAt')
+            .lean();
+        if (!sub) {
+            return res.json({
+                success: true,
+                hasSubscription: false,
+                plan: req.user.plan || 'starter',
+                status: 'none',
+            });
+        }
+
+        const now = new Date();
+        const end = sub.gracePeriodEnd || sub.endDate;
+        const msPerDay = 86400000;
+        const daysRemaining = end ? Math.max(0, Math.ceil((new Date(end) - now) / msPerDay)) : 0;
+        const isCancelled = sub.status === 'cancelled';
+        const isInGracePeriod = isCancelled && end && new Date(end) > now;
+
+        res.json({
+            success: true,
+            hasSubscription: true,
+            subscriptionId: sub._id,
+            plan: sub.plan,
+            billingCycle: sub.billingCycle,
+            status: sub.status,
+            price: sub.price,
+            currency: sub.currency,
+            startDate: sub.startDate,
+            endDate: sub.endDate,
+            daysRemaining,
+            isCancelled,
+            isInGracePeriod,
+            gracePeriodEnd: sub.gracePeriodEnd,
+            cancelledAt: sub.cancelledAt,
+            cancelReason: sub.cancelReason,
+            autoRenew: sub.autoRenew,
+            retentionOfferApplied: sub.retentionOfferApplied,
+        });
+    } catch (error) {
+        console.error('❌ Subscription Status Error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch status' });
+    }
+});
+
+/**
+ * @desc    Preview upgrade cost (pro-rata calculation)
+ * @route   GET /api/payments/upgrade-preview?packageId=xxx&billingCycle=monthly
+ * @access  Private
+ */
+router.get('/upgrade-preview', protect, async (req, res) => {
+    try {
+        const { packageId, billingCycle = 'monthly' } = req.query;
+        if (!packageId) {
+            return res.status(400).json({ success: false, error: 'packageId required' });
+        }
+
+        const pkg = await SubscriptionPackage.findById(packageId);
+        if (!pkg) {
+            return res.status(404).json({ success: false, error: 'Package not found' });
+        }
+
+        const newPrice = pkg.pricing[billingCycle] || pkg.pricing.monthly;
+        const activeSub = await Subscription.findOne({ user: req.user._id, status: 'active' });
+
+        let proRata = { unusedCredit: 0, proRataAmount: newPrice, daysRemaining: 0, totalDays: 0 };
+        if (activeSub && activeSub.endDate && new Date(activeSub.endDate) > new Date()) {
+            proRata = calcProRata(activeSub, newPrice);
+        }
+
+        res.json({
+            success: true,
+            currentPlan: activeSub?.plan || req.user.plan,
+            newPlan: pkg.name,
+            newPlanSlug: pkg.slug,
+            billingCycle,
+            fullPrice: newPrice,
+            unusedCredit: proRata.unusedCredit,
+            chargeAmount: Math.max(1, Math.round(proRata.proRataAmount)),
+            daysRemainingOnCurrent: proRata.daysRemaining,
+            totalDaysInCycle: proRata.totalDays,
+            currency: pkg.pricing.currency || 'INR',
+        });
+    } catch (error) {
+        console.error('❌ Upgrade Preview Error:', error);
+        res.status(500).json({ success: false, error: 'Failed to calculate upgrade' });
+    }
+});
+
+/**
+ * @desc    Cancel subscription (keeps access until billing period end)
+ * @route   POST /api/payments/cancel-subscription
+ * @access  Private
+ */
+router.post('/cancel-subscription', protect, async (req, res) => {
+    try {
+        const { reason } = req.body;
+
+        const sub = await Subscription.findOne({
+            user: req.user._id,
+            status: 'active',
+        });
+        if (!sub) {
+            return res.status(404).json({ success: false, error: 'No active subscription to cancel' });
+        }
+
+        // Set grace period = remaining billing period
+        const gracePeriodEnd = sub.endDate || new Date();
+        const now = new Date();
+        const msPerDay = 86400000;
+        const daysRemaining = Math.max(0, Math.ceil((new Date(gracePeriodEnd) - now) / msPerDay));
+
+        sub.status = 'cancelled';
+        sub.cancelledAt = now;
+        sub.cancelReason = reason || '';
+        sub.gracePeriodEnd = gracePeriodEnd;
+        sub.autoRenew = false;
+        await sub.save();
+
+        // Fetch best matching retention offer to show user
+        const retentionOffer = await RetentionOffer.findOne({
+            isActive: true,
+            $and: [
+                { $or: [{ targetPlans: { $size: 0 } }, { targetPlans: sub.plan }] },
+                { $or: [{ maxClaims: 0 }, { $expr: { $lt: ['$claimCount', '$maxClaims'] } }] },
+            ],
+        }).sort('-priority').lean();
+
+        console.log(`🚫 Subscription cancelled for ${req.user.email} — ${daysRemaining} days remaining`);
+
+        res.json({
+            success: true,
+            message: `Subscription cancelled. You have access to ${sub.plan} features until ${new Date(gracePeriodEnd).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}.`,
+            daysRemaining,
+            gracePeriodEnd,
+            plan: sub.plan,
+            retentionOffer: retentionOffer ? {
+                id: retentionOffer._id,
+                name: retentionOffer.name,
+                headline: retentionOffer.headline,
+                description: retentionOffer.description,
+                offerType: retentionOffer.offerType,
+                value: retentionOffer.value,
+                duration: retentionOffer.duration,
+                icon: retentionOffer.icon,
+                color: retentionOffer.color,
+            } : null,
+        });
+    } catch (error) {
+        console.error('❌ Cancel Subscription Error:', error);
+        res.status(500).json({ success: false, error: 'Cancellation failed' });
+    }
+});
+
+/**
+ * @desc    Accept retention offer (reverts cancellation, applies benefit)
+ * @route   POST /api/payments/accept-retention-offer
+ * @access  Private
+ */
+router.post('/accept-retention-offer', protect, async (req, res) => {
+    try {
+        const { offerId } = req.body;
+        if (!offerId) {
+            return res.status(400).json({ success: false, error: 'offerId required' });
+        }
+
+        const offer = await RetentionOffer.findById(offerId);
+        if (!offer || !offer.isActive) {
+            return res.status(404).json({ success: false, error: 'Offer not found or expired' });
+        }
+
+        // Check claims limit
+        if (offer.maxClaims > 0 && offer.claimCount >= offer.maxClaims) {
+            return res.status(400).json({ success: false, error: 'Offer is fully claimed' });
+        }
+
+        const sub = await Subscription.findOne({
+            user: req.user._id,
+            status: 'cancelled',
+        }).sort('-cancelledAt');
+
+        if (!sub) {
+            return res.status(404).json({ success: false, error: 'No cancelled subscription found' });
+        }
+
+        // Revert cancellation
+        sub.status = 'active';
+        sub.cancelledAt = undefined;
+        sub.cancelReason = '';
+        sub.gracePeriodEnd = undefined;  // Clear grace period to hide cancelled banner
+        sub.retentionOfferApplied = true;
+        sub.retentionOfferId = offer._id;
+
+        // Apply benefit based on type
+        let benefit = '';
+        switch (offer.offerType) {
+            case 'discount': {
+                const discountPct = offer.value;
+                benefit = `${discountPct}% discount on your next ${offer.duration} renewal(s)`;
+                sub.notes = `Retention: ${discountPct}% off for ${offer.duration} cycle(s)`;
+                break;
+            }
+            case 'bonus_credits': {
+                const bonusCredits = parseInt(offer.value);
+                await User.findByIdAndUpdate(req.user._id, {
+                    $inc: { 'credits.bonus': bonusCredits },
+                });
+                benefit = `${bonusCredits} bonus credits added to your account`;
+                break;
+            }
+            case 'free_month': {
+                const freeMonths = parseInt(offer.value) || 1;
+                const newEnd = new Date(sub.endDate);
+                newEnd.setMonth(newEnd.getMonth() + freeMonths);
+                sub.endDate = newEnd;
+                sub.gracePeriodEnd = newEnd;
+                benefit = `${freeMonths} free month(s) added — new end date: ${newEnd.toLocaleDateString('en-IN')}`;
+                break;
+            }
+            case 'downgrade': {
+                const targetPlan = offer.value;
+                const pkg = await SubscriptionPackage.findOne({ slug: targetPlan });
+                if (pkg) {
+                    sub.plan = targetPlan;
+                    sub.price = pkg.pricing.monthly;
+                    await User.findByIdAndUpdate(req.user._id, { plan: targetPlan });
+                    benefit = `Downgraded to ${pkg.name} at ₹${pkg.pricing.monthly}/mo`;
+                }
+                break;
+            }
+        }
+
+        await sub.save();
+
+        // Increment claim count
+        await RetentionOffer.findByIdAndUpdate(offerId, { $inc: { claimCount: 1 } });
+
+        console.log(`✅ Retention offer accepted by ${req.user.email}: ${offer.name} — ${benefit}`);
+
+        res.json({
+            success: true,
+            message: `Welcome back! ${benefit}`,
+            plan: sub.plan,
+            endDate: sub.endDate,
+        });
+    } catch (error) {
+        console.error('❌ Accept Retention Offer Error:', error);
+        res.status(500).json({ success: false, error: 'Failed to apply offer' });
     }
 });
 
