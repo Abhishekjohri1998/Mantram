@@ -746,7 +746,7 @@ router.post('/generate-ad-image', protect, requireCredits('adCreative'), async (
         const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
         if (!imageKey) return res.status(400).json({ success: false, error: 'Gemini API key not configured' });
 
-        const models = ['gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image', 'gemini-2.0-flash-exp-image-generation'];
+        const models = ['gemini-1.5-flash-latest', 'gemini-1.5-pro-latest'];
 
         let imageUrl = null;
         let usedModel = null;

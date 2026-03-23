@@ -2120,11 +2120,11 @@ router.get('/pricing-calculator', async (req, res) => {
         // Image actions: flat per-image cost
         // Video actions: flat per-generation cost
         const ACTION_API_COSTS = {
-            content: 0.15,           // ~3K tokens on gemini-2.5-flash
+            content: 0.15,           // ~3K tokens on gemini-1.5-flash-latest
             contentRefine: 0.10,     // ~2K tokens
             creative: 4.0,           // Gemini image gen (~$0.04/image)
             photoshoot: 4.5,         // Gemini image gen + ref images
-            seoHealthCheck: 0.20,    // ~4K tokens on gemini-2.5-flash
+            seoHealthCheck: 0.20,    // ~4K tokens on gemini-1.5-flash-latest
             seoTraffic: 0.20,
             seoCompetitors: 0.25,
             seoAiVisibility: 0.25,

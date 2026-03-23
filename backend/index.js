@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import connectDB from './config/db.js';
+import mongoose from 'mongoose';
 import config from './config/env.js';
 import session from 'express-session';
 import RedisStore from 'connect-redis';
