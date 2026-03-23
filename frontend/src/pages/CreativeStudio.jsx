@@ -730,13 +730,15 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
 
     useEffect(() => {
         if (studioMode === 'templates' && activeBrand?._id) loadCustomTemplates()
-    }, [studioMode, activeBrand, loadCustomTemplates])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [studioMode, activeBrand?._id])
 
     useEffect(() => {
         if (studioMode === 'templates' && activeBrand?._id) {
             loadCustomCategories()
         }
-    }, [studioMode, activeBrand, loadCustomCategories])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [studioMode, activeBrand?._id])
 
     useEffect(() => {
         if (prompt.trim()) {
