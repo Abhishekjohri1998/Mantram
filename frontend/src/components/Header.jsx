@@ -2,17 +2,17 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
-import { credits as creditsAPI } from '../services/api'
+import { useCredits } from '../context/CreditContext'
 import NexusBar from './NexusBar'
 import AgentFidatoPanel from './AgentFidatoPanel'
 
 export default function Header({ title, subtitle, onMenuToggle }) {
     const { user, logout } = useAuth()
     const { brands, activeBrand, selectBrand } = useBrand()
+    const { balance: creditBalance } = useCredits()
     const navigate = useNavigate()
     const [showMenu, setShowMenu] = useState(false)
     const [showBrandMenu, setShowBrandMenu] = useState(false)
-    const [creditBalance, setCreditBalance] = useState(null)
     const [showIntelPanel, setShowIntelPanel] = useState(false)
     const [intelMissionCount, setIntelMissionCount] = useState(0)
     const menuRef = useRef(null)
@@ -28,18 +28,6 @@ export default function Header({ title, subtitle, onMenuToggle }) {
         return () => document.removeEventListener('mousedown', handleClick)
     }, [])
 
-    // Fetch credit balance
-    useEffect(() => {
-        async function fetchCredits() {
-            try {
-                const data = await creditsAPI.balance()
-                setCreditBalance(data)
-            } catch { /* ignore */ }
-        }
-        if (user) fetchCredits()
-        const interval = setInterval(fetchCredits, 60 * 1000)
-        return () => clearInterval(interval)
-    }, [user])
 
     // Fetch active mission count for INTEL badge
     const fetchIntelCount = useCallback(async () => {
@@ -71,9 +59,37 @@ export default function Header({ title, subtitle, onMenuToggle }) {
         : 100
     const creditColor = creditPercent > 50 ? 'emerald' : creditPercent > 20 ? 'amber' : 'rose'
 
+    // Credit Notifications
+    const showWarning = creditBalance && !creditBalance.unlimited && creditBalance.remaining <= 15 && creditBalance.remaining > 0
+    const showConsumed = creditBalance && !creditBalance.unlimited && creditBalance.remaining === 0
+
     return (
         <>
-            <header className="sticky top-0 z-10 glass-panel border-b border-white/[0.06] px-3 sm:px-5 lg:px-8 py-3 lg:py-4 flex items-center justify-between gap-2">
+            <div className="sticky top-0 z-50">
+            {/* Credit Warning Banners */}
+            {showWarning && (
+                <div className="bg-amber-500/10 border-b border-amber-500/20 py-2 px-4 animate-fade-in flex items-center justify-center gap-3 backdrop-blur-md">
+                    <span className="material-symbols-outlined text-amber-500 text-lg">warning</span>
+                    <p className="text-amber-200 text-xs sm:text-sm font-medium">
+                        Your credits are going to expire soon (only <span className="font-bold">{creditBalance.remaining}</span> left). Please buy more to keep using the agentic studios.
+                    </p>
+                    <button onClick={() => navigate('/credits')} className="px-3 py-1 bg-amber-500 text-black text-[10px] font-black uppercase rounded-lg hover:bg-amber-400 transition-all cursor-pointer">
+                        Buy More
+                    </button>
+                </div>
+            )}
+            {showConsumed && (
+                <div className="bg-rose-500/10 border-b border-rose-500/20 py-2 px-4 animate-fade-in flex items-center justify-center gap-3 backdrop-blur-md">
+                    <span className="material-symbols-outlined text-rose-500 text-lg">error</span>
+                    <p className="text-rose-200 text-xs sm:text-sm font-medium">
+                        All credits consumed! You cannot perform any more AI operations until you top up.
+                    </p>
+                    <button onClick={() => navigate('/credits')} className="px-3 py-1 bg-rose-500 text-white text-[10px] font-black uppercase rounded-lg hover:bg-rose-600 transition-all cursor-pointer shadow-lg shadow-rose-500/20">
+                        Top Up Now
+                    </button>
+                </div>
+            )}
+            <header className="glass-panel border-b border-white/[0.06] px-3 sm:px-5 lg:px-8 py-3 lg:py-4 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 sm:gap-4 min-w-0">
                     {/* Hamburger — visible on mobile/tablet */}
                     <button
@@ -299,16 +315,18 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                     </div>
                 </div>
             </header>
-            <NexusBar />
+        </div>
 
-            {/* Agent Fidato INTEL — Global Side Panel */}
-            {showIntelPanel && (
-                <AgentFidatoPanel
-                    studio="global"
-                    panelOnly
-                    onClose={() => { setShowIntelPanel(false); fetchIntelCount() }}
-                />
-            )}
-        </>
-    )
+        <NexusBar />
+
+        {/* Agent Fidato INTEL — Global Side Panel */}
+        {showIntelPanel && (
+            <AgentFidatoPanel
+                studio="global"
+                panelOnly
+                onClose={() => { setShowIntelPanel(false); fetchIntelCount() }}
+            />
+        )}
+    </>
+)
 }
