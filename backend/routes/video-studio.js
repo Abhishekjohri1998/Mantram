@@ -515,10 +515,44 @@ router.post('/agent/create', protect, requireCredits('videoGenerate'), async (re
             }
         }
 
-        // ── Step 4: AI Storyboard — break the brief into scenes + VO script + text overlays ──
+        // ── Step 4: AI Storyboard — use Claude for intelligent film direction ──
+        // Force Anthropic/Claude for storyboard — it's the best at narrative structure,
+        // audio-visual mapping, and maintaining character consistency in structured output.
         const ai = getAIRouter();
-        const storyboardPrompt = `You are a professional video production AI director. Given a creative brief and brand context, break it down into a shot-by-shot video storyboard.
+        let storyboardProvider;
+        try {
+            storyboardProvider = ai.getProvider('anthropic');
+            console.log('   📡 Using Anthropic/Claude for storyboard generation');
+        } catch {
+            storyboardProvider = null;
+            console.log('   📡 Anthropic not available, falling back to default provider');
+        }
 
+        // ── Estimate audio duration from transcript for timing ──
+        const estimatedAudioDuration = audioTranscript
+            ? Math.ceil((audioTranscript.split(/\s+/).length / 150) * 60) // ~150 words/min
+            : 0;
+
+        const systemPrompt = `You are a world-class film director and cinematographer with expertise in:
+- Visual storytelling and narrative structure
+- Audio-visual synchronization (matching visuals to spoken word)
+- Character consistency across multiple shots
+- Cinematic camera work, lighting, and color grading
+- Scene transitions and visual flow
+
+Your job: Given a creative brief (and optionally an audio transcript), produce a professional shot-by-shot storyboard as JSON.
+
+CRITICAL RULES FOR VISUAL CONSISTENCY:
+1. Define "CHARACTER ANCHORS" — a precise physical description for each character that MUST appear VERBATIM in every scene's visualPrompt where that character appears
+2. Define a "VISUAL STYLE" — a consistent art direction string (e.g., "cinematic warm tones, shallow depth of field, golden hour lighting") that MUST appear in every scene's visualPrompt
+3. Each visualPrompt must be a self-contained, richly detailed prompt (as if it's the ONLY instruction a video generation AI will see)
+4. Include camera angle, lighting, color palette, and character positions in every visualPrompt
+5. Scenes must flow narratively — each should feel like the next shot in a continuous film
+
+Output ONLY valid JSON. No markdown, no explanation, no commentary.`;
+
+        const storyboardPrompt = `
+BRAND CONTEXT:
 ${brandContext}
 ${productContext}
 
@@ -526,53 +560,102 @@ AVAILABLE IMAGES: ${allImages.length} reference images available for use as firs
 
 USER'S CREATIVE BRIEF: "${prompt}"
 
-CHARACTER REFERENCE: ${characterRefUrl ? 'A character reference sheet is available. Include this person in all scenes featuring people, maintaining their exact appearance.' : 'No character reference provided.'}
-${characterDescriptions ? `\nCHARACTER DESCRIPTIONS (user-defined):\n${characterDescriptions}\n\nIMPORTANT: Design and maintain these characters consistently across ALL scenes. Each scene should clearly describe the character appearances.` : ''}
-${audioFileUrl ? `\nAUDIO-DRIVEN MODE: The user has uploaded their own audio track. This video MUST be synced to the audio.${audioTranscript ? `\n\nTRANSCRIPT OF UPLOADED AUDIO (this is the EXACT text from the user's audio — use this as the voiceover script):\n"${audioTranscript}"\n\nCRITICAL RULES FOR AUDIO-DRIVEN MODE:\n- The voiceoverScript MUST be the exact transcript above — do NOT write your own script\n- Each scene's voiceoverText should be a segment of this transcript\n- Design visuals that illustrate what is being said in each segment\n- Total video duration should match the natural length of this audio\n- Scene transitions should align with natural breaks in the speech` : `\n- Split the audio timeline into scene segments\n- Each scene visual should match the mood/content of that audio segment\n- The total video duration must match the audio duration`}\n- Do NOT generate separate voiceover — the user's audio IS the soundtrack` : ''}
+CHARACTER REFERENCE: ${characterRefUrl ? 'A character reference sheet photo is available. Include this exact person in all relevant scenes. Describe their physical appearance consistently.' : 'No reference photo provided.'}
+${characterDescriptions ? `
+CHARACTER DESCRIPTIONS (user-defined):
+${characterDescriptions}
+
+You MUST create a "characterAnchors" array with these characters. Each anchor is an exact physical description string. Then COPY-PASTE that exact anchor string into every scene's visualPrompt where the character appears. This ensures the video generation AI renders the same person.` : ''}
+${audioFileUrl ? `
+═══ AUDIO-DRIVEN MODE ═══
+The user uploaded their own audio. This video MUST precisely illustrate the audio content.
+${audioTranscript ? `
+FULL AUDIO TRANSCRIPT:
+"${audioTranscript}"
+
+ESTIMATED AUDIO DURATION: ~${estimatedAudioDuration} seconds
+
+CRITICAL AUDIO-VISUAL SYNC RULES:
+1. Split the transcript into SEMANTIC segments — break at natural sentence/paragraph boundaries, NOT arbitrary time cuts
+2. Each segment becomes one scene. The scene's voiceoverText = that exact segment of transcript (verbatim, no rewording)
+3. The voiceoverScript = the full transcript exactly as provided
+4. Each scene's visualPrompt must DIRECTLY ILLUSTRATE what is being said in that segment
+   - If audio says "a horse galloped across the plains" → visual shows a horse galloping across plains
+   - If audio says "she smiled warmly" → visual shows the character smiling
+   - Do NOT create generic/abstract visuals — they must match the SPECIFIC words
+5. Scene duration = proportional to the segment's word count (total video ≈ ${estimatedAudioDuration}s)
+6. Scene transitions should align with natural narrative beats
+7. Maintain visual continuity — same setting should look the same across consecutive scenes` : `
+- Split the audio timeline into scene segments matching the mood/content
+- Total video duration must match the audio`}
+- Do NOT generate separate voiceover — the user's audio IS the soundtrack
+- voiceoverScript should contain the transcript (or empty if no transcript)` : ''}
+
 TEXT OVERLAY LANGUAGE: ${textOverlays?.language || voiceover?.langCode || brand?.dna?.defaultLanguage || 'english'}
 BRAND NAME FOR OVERLAYS: ${textOverlays?.brandName || brand?.name || ''}
 CTA TEXT: ${textOverlays?.ctaText || ''}
 
-RULES:
-- Each scene should be 5-10 seconds (video models max at 15s)
-- For a 1-minute story: create 6-12 scenes
-- For a short ad: 2-4 scenes
-- Write a voiceover script that flows naturally across all scenes
-- Each scene visual prompt should be detailed and cinematic
-- If a product is featured, show it prominently in key scenes
-- Match the brand visual identity (colors, style, mood)
-- For EACH scene, suggest a text overlay (brand name, CTA, price, subtitle)
-- If text overlay language is NOT english, write overlays in that language script
+SCENE DESIGN RULES:
+- Each scene: 3-10 seconds (video models max at 15s)
+- For a 1-minute story: 6-12 scenes
+- For a 15-30s ad: 3-6 scenes
+- Each visualPrompt must be a COMPLETE, self-contained description (100+ words) including:
+  → Subject (who/what is in the scene, with exact character anchor if applicable)
+  → Action (what is happening)
+  → Setting (where, with specific environmental details)
+  → Camera (angle, movement — e.g., "slow dolly in", "wide establishing shot", "close-up")
+  → Lighting (e.g., "warm golden hour backlighting", "dramatic side lighting")
+  → Color palette (e.g., "teal and orange color grade", "desaturated cool tones")
+  → Mood/atmosphere (e.g., "intimate and tender", "epic and triumphant")
+- If a product is featured, show it prominently
+- Match the brand's visual identity
 
-Output ONLY valid JSON:
+Output ONLY this JSON structure:
 {
     "title": "Video title",
-    "totalDuration": number (total seconds),
+    "totalDuration": number,
+    "visualStyle": "A consistent art direction string used across ALL scenes (e.g., 'Cinematic 35mm film look, warm amber tones, shallow depth of field, natural lighting')",
+    "colorPalette": "Primary color scheme (e.g., 'warm ambers and deep browns with golden highlights')",
+    "characterAnchors": [
+        "Exact physical description of Character 1 — copy this verbatim into every scene featuring them",
+        "Exact physical description of Character 2 — if applicable"
+    ],
     "scenes": [
         {
             "sceneNumber": 1,
             "duration": 5,
-            "visualPrompt": "Detailed cinematic prompt for this scene",
-            "voiceoverText": "What the narrator says during this scene",
-            "useProductImage": boolean,
-            "useCharacterRef": boolean,
-            "mood": "energetic/calm/dramatic/warm/etc",
+            "visualPrompt": "COMPLETE cinematic prompt (100+ words). MUST include the character anchor text verbatim if character is in scene. MUST include visualStyle. MUST include camera angle, lighting, action, setting.",
+            "voiceoverText": "Exact segment of transcript for this scene (verbatim from audio, or written VO)",
+            "cameraAngle": "wide/medium/close-up/extreme-close-up/aerial/tracking/dolly",
+            "lighting": "Description of lighting setup",
+            "transitionFrom": "How this scene connects from the previous (e.g., 'cut from close-up of hands to wide landscape')",
+            "useProductImage": false,
+            "useCharacterRef": false,
+            "mood": "specific mood for this scene",
             "textOverlay": { "text": "Brand Name or CTA", "position": "bottom-center", "style": "bold" }
         }
     ],
-    "voiceoverScript": "Full combined voiceover script",
+    "voiceoverScript": "Full combined voiceover script (or full transcript if audio-driven)",
     "suggestedModel": "kling-3.0 or seedance-2.0 or veo-3.1 or hunyuan",
     "suggestedAspectRatio": "16:9 or 9:16 or 1:1",
     "suggestedMusicMood": "upbeat/epic/calm/emotional/corporate",
-    "reasoning": "Why these choices"
+    "reasoning": "Why these creative choices — explain the visual narrative strategy"
 }`;
 
-        const storyboardResult = await ai.generateText({
-            systemPrompt: 'You are a JSON generator. Output ONLY valid JSON, no markdown, no explanation.',
-            userPrompt: storyboardPrompt,
-            maxTokens: 4096,
-            temperature: 0.7,
-        });
+        // Use Claude specifically for storyboard, or fall back to default router
+        const storyboardResult = storyboardProvider
+            ? await storyboardProvider.generateText({
+                systemPrompt,
+                userPrompt: storyboardPrompt,
+                maxTokens: 8192,
+                temperature: 0.6,
+            })
+            : await ai.generateText({
+                systemPrompt,
+                userPrompt: storyboardPrompt,
+                maxTokens: 8192,
+                temperature: 0.6,
+            });
 
         const raw = (storyboardResult.text || storyboardResult.content || '{}')
             .replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
