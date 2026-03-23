@@ -540,6 +540,9 @@ RULES:
 async function fetchPageHTML(url) {
     if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
     const controller = new AbortController();
+    if (typeof controller.signal.setMaxListeners === 'function') {
+        controller.signal.setMaxListeners(30);
+    }
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
         const response = await fetch(url, {
@@ -565,6 +568,9 @@ async function fetchPageHTML(url) {
 async function fetchJSON(url) {
     if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
     const controller = new AbortController();
+    if (typeof controller.signal.setMaxListeners === 'function') {
+        controller.signal.setMaxListeners(30);
+    }
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
         const response = await fetch(url, {

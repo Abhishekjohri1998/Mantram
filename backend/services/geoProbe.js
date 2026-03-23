@@ -83,6 +83,9 @@ async function probeGemini(prompt, signal = null) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return null;
     const controller = new AbortController();
+    if (typeof controller.signal.setMaxListeners === 'function') {
+        controller.signal.setMaxListeners(30);
+    }
     const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT);
     
     // Listen for parent abort
@@ -115,6 +118,9 @@ async function probeOpenAI(prompt, signal = null) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return null;
     const controller = new AbortController();
+    if (typeof controller.signal.setMaxListeners === 'function') {
+        controller.signal.setMaxListeners(30);
+    }
     const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT);
 
     if (signal) {
@@ -147,6 +153,9 @@ async function probeClaude(prompt, signal = null) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return null;
     const controller = new AbortController();
+    if (typeof controller.signal.setMaxListeners === 'function') {
+        controller.signal.setMaxListeners(30);
+    }
     const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT);
 
     if (signal) {
@@ -175,6 +184,9 @@ async function probeGrok(prompt, signal = null) {
     const apiKey = process.env.GROK_API_KEY;
     if (!apiKey) return null;
     const controller = new AbortController();
+    if (typeof controller.signal.setMaxListeners === 'function') {
+        controller.signal.setMaxListeners(30);
+    }
     const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT);
 
     if (signal) {
@@ -207,6 +219,9 @@ async function probePerplexity(prompt, signal = null) {
     const apiKey = process.env.PERPLEXITY_API_KEY;
     if (!apiKey) return null;
     const controller = new AbortController();
+    if (typeof controller.signal.setMaxListeners === 'function') {
+        controller.signal.setMaxListeners(30);
+    }
     const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT);
 
     if (signal) {
@@ -438,6 +453,11 @@ async function probeAIVisibility(brandName, industry, location, website, competi
     console.log(`🔮 GEO Probe v3: Starting multi-sample probing for "${brandName}" (${SAMPLES_PER_PROMPT}x per prompt)...`);
 
     const prompts = generateIndustryPrompts(brandName, industry, location, website, customPrompts);
+    
+    // Increase listener limit for the shared signal to avoid MaxListenersExceededWarning
+    if (signal && typeof signal.setMaxListeners === 'function') {
+        signal.setMaxListeners(25);
+    }
     console.log(`🔮 GEO Probe: ${prompts.length} prompts × ${SAMPLES_PER_PROMPT} samples × N models`);
 
     const MODEL_MAP = {

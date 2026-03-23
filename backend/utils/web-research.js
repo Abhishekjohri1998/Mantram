@@ -156,6 +156,9 @@ async function safeFetch(url, options = {}) {
     const cfCookies = _cfSession?.solved ? _cfSession.cookies : '';
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         const controller = new AbortController();
+        if (typeof controller.signal.setMaxListeners === 'function') {
+            controller.signal.setMaxListeners(30);
+        }
         const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
         try {
             const resp = await fetch(url, {
@@ -199,6 +202,9 @@ async function safeFetch(url, options = {}) {
  */
 async function safeFetchWithMeta(url, options = {}) {
     const controller = new AbortController();
+    if (typeof controller.signal.setMaxListeners === 'function') {
+        controller.signal.setMaxListeners(30);
+    }
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
     const startTime = Date.now();
     const effectiveUA = _cfSession?.solved ? _cfSession.userAgent : USER_AGENT;
@@ -716,6 +722,9 @@ async function safeFetchWithRedirects(url) {
 
     while (maxHops-- > 0) {
         const controller = new AbortController();
+        if (typeof controller.signal.setMaxListeners === 'function') {
+            controller.signal.setMaxListeners(30);
+        }
         const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
         const effectiveUA = _cfSession?.solved ? _cfSession.userAgent : USER_AGENT;
         const cfCookies = _cfSession?.solved ? _cfSession.cookies : '';
@@ -1161,6 +1170,9 @@ export async function researchDomain(baseUrl, options = {}) {
     if (!skipCfSolve) {
       try {
         const probeCtrl = new AbortController();
+        if (typeof probeCtrl.signal.setMaxListeners === 'function') {
+            probeCtrl.signal.setMaxListeners(30);
+        }
         const probeTimer = setTimeout(() => probeCtrl.abort(), 8000);
         const probeResp = await fetch(cleanBase, {
             signal: probeCtrl.signal,
@@ -1780,6 +1792,9 @@ export async function researchDomain(baseUrl, options = {}) {
         const probeResults = await Promise.all(
             externalToProbe.map(async ({ url, from }) => {
                 const ctrl = new AbortController();
+                if (typeof ctrl.signal.setMaxListeners === 'function') {
+                    ctrl.signal.setMaxListeners(30);
+                }
                 const t = setTimeout(() => ctrl.abort(), 2000);
                 try {
                     const r = await fetch(url, { method: 'HEAD', signal: ctrl.signal, headers: { 'User-Agent': USER_AGENT }, redirect: 'follow' });
@@ -1825,6 +1840,9 @@ export async function researchDomain(baseUrl, options = {}) {
         const internalProbeResults = await Promise.all(
             uncrawledInternal.map(async ([url, sources]) => {
                 const ctrl = new AbortController();
+                if (typeof ctrl.signal.setMaxListeners === 'function') {
+                    ctrl.signal.setMaxListeners(30);
+                }
                 const t = setTimeout(() => ctrl.abort(), 2000);
                 try {
                     const r = await fetch(url, { method: 'HEAD', signal: ctrl.signal, headers: { 'User-Agent': USER_AGENT }, redirect: 'follow' });
@@ -1862,6 +1880,9 @@ export async function researchDomain(baseUrl, options = {}) {
         const resourceProbes = await Promise.all(
             resourcesToProbe.map(async ([url, info]) => {
                 const ctrl = new AbortController();
+                if (typeof ctrl.signal.setMaxListeners === 'function') {
+                    ctrl.signal.setMaxListeners(30);
+                }
                 const t = setTimeout(() => ctrl.abort(), 2000);
                 try {
                     const r = await fetch(url, { method: 'HEAD', signal: ctrl.signal, headers: { 'User-Agent': USER_AGENT }, redirect: 'follow' });

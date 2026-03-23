@@ -24,6 +24,9 @@ async function fetchPAAForQuery(query, gl = 'in', hl = 'en') {
 
     try {
         const controller = new AbortController();
+        if (typeof controller.signal.setMaxListeners === 'function') {
+            controller.signal.setMaxListeners(30);
+        }
         const timer = setTimeout(() => controller.abort(), 10000);
         
         const resp = await fetch(url, {

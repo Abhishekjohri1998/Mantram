@@ -18,6 +18,9 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
     const { temperature = 0.7, maxTokens = 4096, json = false, timeoutMs = 120000 } = options;
 
     const controller = new AbortController();
+    if (typeof controller.signal.setMaxListeners === 'function') {
+        controller.signal.setMaxListeners(30);
+    }
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {

@@ -1076,9 +1076,12 @@ router.post('/api-keys/:provider/test', async (req, res) => {
         }
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000);
+        if (typeof controller.signal.setMaxListeners === 'function') {
+            controller.signal.setMaxListeners(30);
+        }
+        const timer = setTimeout(() => controller.abort(), 15000);
         const resp = await fetch(url, { method: 'GET', headers, signal: controller.signal });
-        clearTimeout(timeout);
+        clearTimeout(timer);
 
         if (resp.ok || resp.status === 405 || resp.status === 200) {
             res.json({ success: true, status: 'connected', message: `${pConfig.label} API is reachable`, httpStatus: resp.status });
