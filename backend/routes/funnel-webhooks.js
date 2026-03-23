@@ -78,7 +78,7 @@ router.post('/:webhookToken/ingest', async (req, res) => {
                     },
                     $addToSet: { funnelIds: funnel._id, ...(tags?.length ? { tags: { $each: tags } } : {}) },
                 },
-                { upsert: true, new: true }
+                { upsert: true, returnDocument: 'after' }
             );
         }
 

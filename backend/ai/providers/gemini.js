@@ -15,7 +15,7 @@ export class GeminiProvider extends BaseProvider {
     }
 
     async generateText({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 2048, model, images = [] }) {
-        const modelId = model || this.config.defaultModel || 'gemini-2.5-flash';
+        const modelId = model || this.config.defaultModel || 'gemini-1.5-flash-latest';
         const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${this.apiKey}`;
         
         const parts = [{ text: `${systemPrompt}\n\n${userPrompt}` }];
@@ -112,7 +112,7 @@ export class GeminiProvider extends BaseProvider {
         const [width, height] = size.split('x').map(Number);
         const aspectRatio = width === height ? '1:1' : width > height ? '16:9' : '9:16';
         const imageKey = this.imageApiKey;
-        const models = ['gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image', 'gemini-2.0-flash-exp-image-generation'];
+        const models = ['gemini-3.1-flash-image-preview', 'gemini-1.5-flash-latest', 'gemini-1.5-pro-latest'];
         let lastError = null;
 
         for (const modelId of models) {

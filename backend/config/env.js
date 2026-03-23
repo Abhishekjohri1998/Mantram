@@ -137,5 +137,12 @@ export default {
     // Google PageSpeed Insights
     pagespeed: {
         apiKey: process.env.PAGESPEED_API_KEY,
+    },
+    
+    // Redis
+    redis: {
+        host: process.env.REDIS_HOST,
+        port: parseInt(process.env.REDIS_PORT) || 6379,
+        tls: process.env.REDIS_TLS === 'true',
     }
 };

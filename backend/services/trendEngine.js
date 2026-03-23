@@ -49,13 +49,25 @@ async function fetchGoogleTrendsRSS(geo = 'IN') {
 
 // ── Google Trends Daily ─────────────────────────────────────────────────
 async function fetchGoogleTrendsDaily(geo = 'IN') {
-    try {
-        const result = await googleTrends.dailyTrends({ geo });
-        if (result && result.trim().startsWith('<')) {
-            console.log('ℹ️ Google Daily Trends rate-limited, falling back to RSS/Grok.');
-            return [];
+    const retryFetch = async (retries = 2) => {
+        try {
+            // Add jitter to avoid synchronized bursts
+            await new Promise(r => setTimeout(r, Math.random() * 2000));
+            const result = await googleTrends.dailyTrends({ geo });
+            if (result && result.trim().startsWith('<')) {
+                if (retries > 0) return retryFetch(retries - 1);
+                console.log('ℹ️ Google Daily Trends rate-limited, falling back to RSS/Grok.');
+                return [];
+            }
+            return JSON.parse(result);
+        } catch (err) {
+            if (retries > 0) return retryFetch(retries - 1);
+            throw err;
         }
-        const parsed = JSON.parse(result);
+    };
+
+    try {
+        const parsed = await retryFetch();
         const days = parsed.default?.trendingSearchesDays || [];
         const searches = [];
 
@@ -86,13 +98,24 @@ async function fetchGoogleTrendsDaily(geo = 'IN') {
 
 // ── Google Trends Real-time ─────────────────────────────────────────────
 async function fetchGoogleTrendsRealtime(geo = 'IN') {
-    try {
-        const result = await googleTrends.realTimeTrends({ geo, category: 'all' });
-        if (result && result.trim().startsWith('<')) {
-            console.log('ℹ️ Google Real-time Trends rate-limited, falling back to RSS/Grok.');
-            return [];
+    const retryFetch = async (retries = 2) => {
+        try {
+            await new Promise(r => setTimeout(r, Math.random() * 2000));
+            const result = await googleTrends.realTimeTrends({ geo, category: 'all' });
+            if (result && result.trim().startsWith('<')) {
+                if (retries > 0) return retryFetch(retries - 1);
+                console.log('ℹ️ Google Real-time Trends rate-limited, falling back to RSS/Grok.');
+                return [];
+            }
+            return JSON.parse(result);
+        } catch (err) {
+            if (retries > 0) return retryFetch(retries - 1);
+            throw err;
         }
-        const parsed = JSON.parse(result);
+    };
+
+    try {
+        const parsed = await retryFetch();
         const stories = parsed.storySummaries?.trendingStories || [];
 
         return stories.slice(0, 15).map(story => ({

@@ -50,7 +50,7 @@ let lastTokenUsage = null;
 export function getLastTokenUsage() { return lastTokenUsage; }
 
 async function aiCall(systemPrompt, userPrompt, options = {}) {
-  const { temperature = 0.7, maxTokens = 8192, json = false, timeout = 35000 } = options;
+  const { temperature = 0.7, maxTokens = 8192, json = false, timeout = 60000 } = options;
   lastTokenUsage = null;
 
   const overallController = new AbortController();

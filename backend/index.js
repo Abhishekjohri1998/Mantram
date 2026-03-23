@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import connectDB from './config/db.js';
+import mongoose from 'mongoose';
 import config from './config/env.js';
 import session from 'express-session';
 import RedisStore from 'connect-redis';
@@ -155,20 +156,18 @@ app.use((req, res, next) => {
 });
 
 // Regular body parsers - Skip for webhooks to avoid interference
-// HARDENING: Reducing global limit to 1MB to prevent memory exhaustion attacks. 
-// Specific routes (media/studio) will have higher limits applied directly.
 app.use((req, res, next) => {
     if (req.originalUrl && (req.originalUrl.includes('/api/shopify/webhooks') || req.originalUrl.includes('/api/funnel-webhooks') || req.originalUrl.includes('/api/webhooks'))) {
         return next();
     }
-    express.json({ limit: '1mb' })(req, res, next);
+    express.json({ limit: '20mb' })(req, res, next);
 });
 
 app.use((req, res, next) => {
     if (req.originalUrl && (req.originalUrl.includes('/api/shopify/webhooks') || req.originalUrl.includes('/api/funnel-webhooks') || req.originalUrl.includes('/api/webhooks'))) {
         return next();
     }
-    express.urlencoded({ extended: true, limit: '1mb' })(req, res, next);
+    express.urlencoded({ extended: true, limit: '20mb' })(req, res, next);
 });
 
 // Scaling Phase 4: Redis Session Management
@@ -436,6 +435,10 @@ const gracefulShutdown = (signal) => {
         console.log('HTTP server closed.');
         
         try {
+            // Signal to db.js to not attempt reconnect
+            if (mongoose.connection) {
+                mongoose.connection.isShuttingDown = true;
+            }
             await mongoose.connection.close();
             console.log('MongoDB connection closed.');
             process.exit(0);
