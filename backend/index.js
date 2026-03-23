@@ -172,8 +172,17 @@ app.use((req, res, next) => {
 });
 
 // Scaling Phase 4: Redis Session Management
+// FALLBACK: Use MemoryStore if Redis is not configured to prevent crashes
+const sessionStore = process.env.REDIS_HOST 
+    ? new RedisStore({ client: redisClient, prefix: 'sess:' })
+    : undefined; // Defaults to MemoryStore
+
+if (!process.env.REDIS_HOST) {
+    console.warn('⚠️  REDIS_HOST not found. Falling back to MemoryStore for sessions. (Scaling/Clustering disabled)');
+}
+
 app.use(session({
-    store: new RedisStore({ client: redisClient, prefix: 'sess:' }),
+    store: sessionStore,
     secret: config.sessionSecret || 'mantram_secret_123_scale', 
     resave: false,
     saveUninitialized: false,

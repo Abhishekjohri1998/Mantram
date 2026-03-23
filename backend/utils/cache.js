@@ -1,16 +1,24 @@
 import Redis from 'ioredis';
 
-const redisClient = new Redis({
-  host: process.env.REDIS_HOST || 'localhost',
+const redisClient = process.env.REDIS_HOST ? new Redis({
+  host: process.env.REDIS_HOST,
   port: parseInt(process.env.REDIS_PORT) || 6379,
   // ElastiCache with encryption requires TLS
   tls: process.env.REDIS_TLS === 'true' ? {} : undefined,
   retryStrategy: (times) => Math.min(times * 200, 3000),
-  maxRetriesPerRequest: 3,
-});
+  maxRetriesPerRequest: 1, // Fail fast if it's down
+}) : null;
 
-redisClient.on('error', (err) => console.error('Redis Client Error:', err));
-redisClient.on('connect', () => console.log('✅ Redis Connected'));
+if (redisClient) {
+  redisClient.on('error', (err) => {
+    if (err.code === 'ECONNREFUSED') {
+       console.warn('⚠️  Redis connection refused. Check your REDIS_HOST or start redis-server.');
+    } else {
+       console.error('Redis Client Error:', err);
+    }
+  });
+  redisClient.on('connect', () => console.log('✅ Redis Connected'));
+}
 
 const CACHE_TTL = 300; // 5 minutes default
 
@@ -22,6 +30,8 @@ const CACHE_TTL = 300; // 5 minutes default
  */
 export async function getCachedOrFetch(key, fetchFn, ttl = CACHE_TTL) {
   try {
+    if (!redisClient) return fetchFn();
+
     const cached = await redisClient.get(key);
     if (cached) {
       return JSON.parse(cached);
@@ -33,7 +43,9 @@ export async function getCachedOrFetch(key, fetchFn, ttl = CACHE_TTL) {
     }
     return data;
   } catch (err) {
-    console.warn(`Cache error for key ${key}:`, err.message);
+    if (err.code !== 'ECONNREFUSED') {
+      console.warn(`Cache error for key ${key}:`, err.message);
+    }
     return fetchFn(); // Fallback to DB on cache error
   }
 }
