@@ -1,8 +1,4 @@
-/**
- * Mantram AI — Google PageSpeed Insights
- * Fetches real Core Web Vitals and performance metrics.
- * API is FREE — no key required.
- */
+import config from '../config/env.js';
 
 const PSI_API = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed';
 const PSI_TIMEOUT = 30000; // 30s — PageSpeed can be slow
@@ -17,7 +13,12 @@ export async function getPageSpeed(url, strategy = 'mobile') {
   let normalizedUrl = url.trim();
   if (!/^https?:\/\//i.test(normalizedUrl)) normalizedUrl = `https://${normalizedUrl}`;
 
-  const apiUrl = `${PSI_API}?url=${encodeURIComponent(normalizedUrl)}&strategy=${strategy}&category=performance&category=seo&category=accessibility&category=best-practices`;
+  let apiUrl = `${PSI_API}?url=${encodeURIComponent(normalizedUrl)}&strategy=${strategy}&category=performance&category=seo&category=accessibility&category=best-practices`;
+  
+  // Use API key if configured to increase daily quota
+  if (config.pagespeed?.apiKey) {
+    apiUrl += `&key=${config.pagespeed.apiKey}`;
+  }
 
   try {
     console.log(`⚡ PageSpeed: testing ${normalizedUrl} (${strategy})...`);

@@ -132,5 +132,10 @@ export default {
         clientId: process.env.LINKEDIN_CLIENT_ID,
         clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
         callbackUrl: process.env.LINKEDIN_CALLBACK_URL || `${process.env.BACKEND_URL || 'https://api.mantram.ai'}/api/social/auth/linkedin/callback`,
+    },
+    
+    // Google PageSpeed Insights
+    pagespeed: {
+        apiKey: process.env.PAGESPEED_API_KEY,
     }
 };
