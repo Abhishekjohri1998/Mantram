@@ -20,8 +20,9 @@ const connectDB = async (attempt = 1) => {
         });
         console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
 
-        // Auto-reconnect on disconnect
+        // Auto-reconnect on disconnect (unless shutting down)
         mongoose.connection.on('disconnected', () => {
+            if (mongoose.connection.isShuttingDown) return;
             console.warn('⚠️  MongoDB disconnected. Attempting reconnect...');
             setTimeout(() => connectDB(), RETRY_DELAY);
         });

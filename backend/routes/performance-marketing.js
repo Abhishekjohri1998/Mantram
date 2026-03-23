@@ -1398,7 +1398,7 @@ router.post('/seed-demo', protect, async (req, res) => {
                     lastSyncAt: new Date(),
                     metadata: { _seedTag: PM_SEED_TAG },
                 },
-                { upsert: true, new: true }
+                { upsert: true, returnDocument: 'after' }
             );
         }
 

@@ -1246,7 +1246,7 @@ router.post('/seed-demo', protect, async (req, res) => {
         await Integration.findOneAndUpdate(
             { user: userId, brand: brandId, platform: 'shopify' },
             { user: userId, brand: brandId, platform: 'shopify', status: 'connected', accessToken: 'shpat_demo_token', platformData: { shopDomain: 'acwo-official.myshopify.com', shopName: 'ACwO Official Store' }, lastSyncAt: new Date(), syncCount: 1, displayName: 'ACwO Official Store', metadata: { _seedTag: SEED_TAG } },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
 
         // 2. Products
@@ -1255,7 +1255,7 @@ router.post('/seed-demo', protect, async (req, res) => {
             await Product.findOneAndUpdate(
                 { brand: brandId, shopifyId: p.id },
                 { user: userId, brand: brandId, source: 'shopify', shopifyId: p.id, title: p.title, description: `Premium ${p.title} by ACwO.`, price: { amount: p.price, currency: 'INR' }, images: [], variants: [{ title: v, price: p.price, inventoryQuantity: p.inventory, sku: p.id }, { title: 'Default Title', price: p.price, inventoryQuantity: Math.floor(p.inventory/3), sku: p.id+'-DEF' }], status: 'active', tags: ['acwo','electronics'], metadata: { _seedTag: SEED_TAG } },
-                { upsert: true, new: true }
+                { upsert: true, returnDocument: 'after' }
             );
         }
 
@@ -1269,7 +1269,7 @@ router.post('/seed-demo', protect, async (req, res) => {
             await ShopifyCustomer.findOneAndUpdate(
                 { brand: brandId, shopifyCustomerId: cid },
                 { user: userId, brand: brandId, shopifyCustomerId: cid, email: `${fn.toLowerCase()}.${ln.toLowerCase()}${i}@gmail.com`, firstName: fn, lastName: ln, phone: `+91${_rBetween(7e9,1e10-1)}`, ordersCount: oc, totalSpent: oc * _rBetween(800,3000), currency: 'INR', defaultAddress: { city: ct.city, province: ct.province, country: ct.country, zip: ct.zip }, acceptsMarketing: Math.random()>0.35, state: 'enabled', tags: ['demo'], shopifyCreatedAt: _rDate(120), shopifyUpdatedAt: _rDate(30), syncedAt: new Date() },
-                { upsert: true, new: true }
+                { upsert: true, returnDocument: 'after' }
             );
             custIds.push(cid);
         }

@@ -435,6 +435,10 @@ const gracefulShutdown = (signal) => {
         console.log('HTTP server closed.');
         
         try {
+            // Signal to db.js to not attempt reconnect
+            if (mongoose.connection) {
+                mongoose.connection.isShuttingDown = true;
+            }
             await mongoose.connection.close();
             console.log('MongoDB connection closed.');
             process.exit(0);
