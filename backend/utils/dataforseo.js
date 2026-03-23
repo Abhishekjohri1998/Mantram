@@ -25,7 +25,17 @@ function handlePaymentError() {
     if (!isSuspended) {
         isSuspended = true;
         suspensionTime = Date.now();
-        console.warn(`🛑 DataForSEO: 402 Payment Required detected. Suspending API for 1 hour.`);
+        console.error(`
+================================================================================
+🛑 DATAFORSEO: 402 PAYMENT REQUIRED (Balance depleted)
+================================================================================
+The DataForSEO account balance is zero. Real keyword and backlink data is now
+temporarily disabled. The platform will fall back to AI-only estimations.
+
+ACTION REQUIRED: Please top up your account at:
+https://app.dataforseo.com/billing
+================================================================================
+`);
     }
 }
 

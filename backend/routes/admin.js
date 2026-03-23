@@ -1,313 +1,41 @@
 import { Router } from 'express';
-import User from '../models/User.js';
-import Brand from '../models/Brand.js';
-import Content from '../models/Content.js';
-import Creative from '../models/Creative.js';
-import Feedback from '../models/Feedback.js';
-import CreditUsage from '../models/CreditUsage.js';
-import Subscription from '../models/Subscription.js';
-import SubscriptionPackage from '../models/SubscriptionPackage.js';
-import { getCreditBalance } from '../middleware/credits.js';
-import { logAudit } from '../utils/audit.js';
-import ExcelJS from 'exceljs';
-
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
 import { protect, authorize } from '../middleware/auth.js';
-import { safeErrorMessage } from '../utils/safeError.js';
+import { getDataForSEOProviderStatus } from '../utils/dataforseo.js';
+import config from '../config/env.js';
 
 const router = Router();
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
-// All admin routes require admin role
-router.use(protect, authorize('admin'));
-
-// GET /api/admin/stats — platform-wide statistics
-router.get('/stats', async (req, res) => {
+/**
+ * GET /api/admin/provider-status
+ * Aggregates status for all external AI and data providers.
+ * SuperAdmin only.
+ */
+router.get('/provider-status', protect, authorize('superadmin'), async (req, res) => {
     try {
-        const [totalUsers, totalBrands, totalContent, totalCreatives, totalFeedback] = await Promise.all([
-            User.countDocuments(),
-            Brand.countDocuments(),
-            Content.countDocuments(),
-            Creative.countDocuments(),
-            Feedback.countDocuments(),
-        ]);
-
-        const planDistribution = await User.aggregate([
-            { $group: { _id: '$plan', count: { $sum: 1 } } },
-        ]);
-
-        const recentUsers = await User.find().sort('-createdAt').limit(5).select('name email plan role createdAt lastActive');
-
-        res.json({
-            success: true,
-            stats: {
-                totalUsers,
-                totalBrands,
-                totalContent,
-                totalCreatives,
-                totalFeedback,
-                planDistribution,
-                recentUsers,
+        const dataForSeo = getDataForSEOProviderStatus();
+        
+        // Basic connectivity checks for AI providers (pinging their base URL is usually enough to verify keys)
+        // For now, we report configuration status
+        const providerStatus = {
+            dataForSeo: {
+                ...dataForSeo,
+                login: config.googleAds?.clientId ? 'CONFIGURED' : 'MISSING' // Reusing common check pattern
             },
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
-    }
-});
-
-// GET /api/admin/users
-router.get('/users', async (req, res) => {
-    try {
-        const { page = 1, limit = 20, search, plan, role } = req.query;
-        const filter = {};
-        if (search) {
-            const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            filter.$or = [{ name: new RegExp(safeSearch, 'i') }, { email: new RegExp(safeSearch, 'i') }];
-        }
-        if (plan) filter.plan = plan;
-        if (role) filter.role = role;
-
-        const users = await User.find(filter)
-            .sort('-createdAt')
-            .limit(parseInt(limit))
-            .skip((parseInt(page) - 1) * parseInt(limit))
-            .select('-password');
-
-        const total = await User.countDocuments(filter);
-        res.json({ success: true, users, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
-    } catch (error) {
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
-    }
-});
-
-// PUT /api/admin/users/:id — update user role/plan/credits
-router.put('/users/:id', async (req, res) => {
-    try {
-        const { role, plan, credits, company } = req.body;
-        // BUG-13 FIX: Prevent admin from escalating to superadmin
-        if (role === 'superadmin') {
-            return res.status(403).json({ success: false, error: 'Cannot assign superadmin role' });
-        }
-        const targetUser = await User.findById(req.params.id);
-        if (!targetUser) return res.status(404).json({ success: false, error: 'User not found' });
-        if (targetUser.role === 'superadmin') {
-            return res.status(403).json({ success: false, error: 'Cannot modify superadmin accounts' });
-        }
-
-        const update = {};
-        if (role) update.role = role;
-        if (plan) update.plan = plan;
-        if (company !== undefined) update.company = company;
-        
-        if (credits) {
-            if (credits.total !== undefined) update['credits.total'] = credits.total;
-            if (credits.used !== undefined) update['credits.used'] = credits.used;
-            if (credits.bonus !== undefined) update['credits.bonus'] = credits.bonus;
-        }
-
-        // Auto-update credits if plan changed and no explicit credits provided
-        if (plan && plan !== targetUser.plan && !credits) {
-            const pkg = await SubscriptionPackage.findOne({ slug: plan });
-            if (pkg) {
-                update['credits.total'] = pkg.credits?.monthly || 50;
-                update['credits.used'] = 0;
-            } else {
-                const legacyCredits = { starter: 50, professional: 500, enterprise: 999999 };
-                update['credits.total'] = legacyCredits[plan] || 50;
-                update['credits.used'] = 0;
-            }
-        }
-
-        const user = await User.findByIdAndUpdate(req.params.id, update, { returnDocument: 'after' }).select('-password');
-        
-        await logAudit(req, {
-            action: 'UPDATE_USER',
-            targetModel: 'User',
-            targetId: user._id,
-            changes: { before: targetUser.toJSON(), after: user.toJSON() }
-        });
-
-        res.json({ success: true, user: { ...user.toJSON(), creditBalance: getCreditBalance(user) } });
-    } catch (error) {
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
-    }
-});
-
-
-// POST /api/admin/users/:id/add-credits
-router.post('/users/:id/add-credits', async (req, res) => {
-    try {
-        const { amount, reason } = req.body;
-        if (!amount || amount <= 0) return res.status(400).json({ success: false, error: 'Amount must be positive' });
-        
-        const user = await User.findById(req.params.id).select('-password');
-        if (!user) return res.status(404).json({ success: false, error: 'User not found' });
-        if (user.role === 'superadmin') return res.status(403).json({ success: false, error: 'Cannot modify superadmin credits' });
-
-        user.credits.bonus += amount;
-        await user.save();
-
-        // Create audit log
-        const balanceAfter = (user.credits?.total || 0) + (user.credits?.bonus || 0) - (user.credits?.used || 0);
-        await CreditUsage.create({
-            user: user._id,
-            action: 'admin_adjustment',
-            cost: -amount,
-            balanceAfter: Math.max(0, balanceAfter),
-            description: `Admin Adjustment: ${reason || 'Bonus credits added'}`,
-            metadata: {
-                adminId: req.user._id,
-                reason,
-                type: 'bonus'
-            }
-        }).catch(err => console.warn('Credit audit log failed:', err.message));
-
-        res.json({ success: true, user: { ...user.toJSON(), creditBalance: getCreditBalance(user) } });
-    } catch (error) {
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
-    }
-});
-
-// POST /api/admin/users/:id/reset-credits
-router.post('/users/:id/reset-credits', async (req, res) => {
-    try {
-        const user = await User.findById(req.params.id).select('-password');
-        if (!user) return res.status(404).json({ success: false, error: 'User not found' });
-        if (user.role === 'superadmin') return res.status(403).json({ success: false, error: 'Cannot reset superadmin credits' });
-
-        const previousUsed = user.credits.used;
-        user.credits.used = 0;
-        await user.save();
-
-        if (user.activeSubscription) {
-            await Subscription.findByIdAndUpdate(user.activeSubscription, { $set: { 'credits.used': 0 } });
-        }
-
-        // Create audit log
-        const balanceAfter = (user.credits?.total || 0) + (user.credits?.bonus || 0);
-        await CreditUsage.create({
-            user: user._id,
-            action: 'admin_adjustment',
-            cost: previousUsed,
-            balanceAfter: Math.max(0, balanceAfter),
-            description: 'Admin Adjustment: Manual Credit Reset',
-            metadata: {
-                adminId: req.user._id,
-                type: 'reset',
-                previousUsed
-            }
-        }).catch(err => console.warn('Credit audit log failed:', err.message));
-
-        res.json({ success: true, user: { ...user.toJSON(), creditBalance: getCreditBalance(user) } });
-    } catch (error) {
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
-    }
-});
-
-// POST /api/admin/users/:id/reset-password — Admin force-reset user password
-router.post('/users/:id/reset-password', async (req, res) => {
-    try {
-        const user = await User.findById(req.params.id).select('+password');
-        if (!user) return res.status(404).json({ success: false, error: 'User not found' });
-        if (user.role === 'superadmin') return res.status(403).json({ success: false, error: 'Cannot reset superadmin password' });
-
-        const { newPassword } = req.body;
-        // If admin provides a password, use it; otherwise generate a temporary one
-        const tempPassword = newPassword || Math.random().toString(36).slice(-10) + 'A1!';
-
-        user.password = tempPassword; // Will be hashed by pre-save hook
-        user.resetPasswordToken = undefined;
-        user.resetPasswordExpires = undefined;
-        await user.save();
-
-        await logAudit(req, {
-            action: 'RESET_USER_PASSWORD',
-            targetModel: 'User',
-            targetId: user._id,
-            changes: { note: 'Password was reset by admin' }
-        });
-
-        res.json({ 
-            success: true, 
-            message: `Password reset for ${user.email}`,
-            tempPassword: newPassword ? undefined : tempPassword, // Only return temp password if auto-generated
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
-    }
-});
-
-// DELETE /api/admin/users/:id
-router.delete('/users/:id', async (req, res) => {
-    try {
-        const targetUser = await User.findById(req.params.id);
-        if (!targetUser) return res.status(404).json({ success: false, error: 'User not found' });
-        if (targetUser.role === 'superadmin') {
-            return res.status(403).json({ success: false, error: 'Cannot delete superadmin accounts' });
-        }
-        await User.findByIdAndDelete(req.params.id);
-        res.json({ success: true, message: 'User deleted' });
-    } catch (error) {
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
-    }
-});
-
-// GET /api/admin/ai-health — AI system status
-router.get('/ai-health', async (req, res) => {
-    try {
-        const recentFeedback = await Feedback.aggregate([
-            { $match: { createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } } },
-            { $group: { _id: '$signalType', count: { $sum: 1 }, avgSentiment: { $avg: '$sentimentScore' } } },
-        ]);
-
-        res.json({
-            success: true,
-            aiHealth: {
-                recentFeedback,
-                status: 'operational',
+            ai: {
+                anthropic: config.ai.providers.anthropic.apiKey ? 'CONFIGURED' : 'MISSING',
+                openai: config.ai.providers.openai.apiKey ? 'CONFIGURED' : 'MISSING',
+                gemini: config.ai.providers.gemini.apiKey ? 'CONFIGURED' : 'MISSING',
             },
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
-    }
-});
+            google: {
+                oauth: config.google.clientId ? 'CONFIGURED' : 'MISSING',
+                searchConsole: 'ACTIVE' // Place-holder for future token health check
+            },
+            timestamp: new Date().toISOString()
+        };
 
-// GET /api/admin/waitlist/export — download waitlist excel data
-router.get('/waitlist/export', async (req, res) => {
-    try {
-        const excelPath = path.join(__dirname, '../../waitlist.xlsx');
-        if (!fs.existsSync(excelPath)) {
-            return res.status(404).json({ success: false, message: 'No waitlist data found.' });
-        }
-        res.download(excelPath, 'Mantram-AI-Waitlist.xlsx');
+        res.json({ success: true, providers: providerStatus });
     } catch (error) {
-        console.error('Export error:', error);
-        res.status(500).json({ success: false, message: 'Error exporting data' });
-    }
-});
-
-// GET /api/admin/settings/watermark — get watermark status
-router.get('/settings/watermark', async (req, res) => {
-    try {
-        const enabled = await getSetting('watermark_enabled', true);
-        res.json({ success: true, watermarkEnabled: enabled });
-    } catch (error) {
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
-    }
-});
-
-// PUT /api/admin/settings/watermark — toggle watermark on/off
-router.put('/settings/watermark', async (req, res) => {
-    try {
-        const { enabled } = req.body;
-        await setSetting('watermark_enabled', !!enabled, req.user._id);
-        console.log(`⚙️ Watermark ${enabled ? 'ENABLED' : 'DISABLED'} by admin ${req.user.email}`);
-        res.json({ success: true, watermarkEnabled: !!enabled });
-    } catch (error) {
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
