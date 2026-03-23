@@ -433,7 +433,8 @@ export const superadmin = {
     updateCreditCosts: (costs) => apiFetch('/superadmin/credit-costs', { method: 'PUT', body: JSON.stringify({ costs }) }),
     resetCreditCosts: () => apiFetch('/superadmin/credit-costs/reset', { method: 'POST' }),
     getPricingCalculator: (params = {}) => { const q = new URLSearchParams(params).toString(); return apiFetch(`/superadmin/pricing-calculator?${q}`); },
-    updateProviderBudgets: (budgets) => apiFetch('/superadmin/settings/provider-budgets', { method: 'PUT', body: JSON.stringify({ budgets }) }),
+    updateProviderBudgets: (data) => apiFetch('/superadmin/provider-budgets', { method: 'PUT', body: JSON.stringify(data) }),
+    getProviderBudgets: () => apiFetch('/superadmin/provider-budgets'),
     // API Key Management
     getApiKeys: () => apiFetch('/superadmin/api-keys'),
     updateApiKeys: (provider, keys) => apiFetch('/superadmin/api-keys', { method: 'PUT', body: JSON.stringify({ provider, keys }) }),

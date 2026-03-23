@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import { useCredits } from '../context/CreditContext'
+import { superadmin } from '../services/api'
 import NexusBar from './NexusBar'
 import AgentFidatoPanel from './AgentFidatoPanel'
 
@@ -66,10 +67,7 @@ export default function Header({ title, subtitle, onMenuToggle }) {
         if (user?.role === 'superadmin') {
             const fetchBudgets = async () => {
                 try {
-                    const resp = await fetch('/api/superadmin/provider-budgets', {
-                        headers: { 'Authorization': `Bearer ${localStorage.getItem('mantram_token')}` }
-                    })
-                    const data = await resp.json()
+                    const data = await superadmin.getProviderBudgets()
                     if (data.success) setPlatformBudgets(data.budgets)
                 } catch (err) {
                     console.error('Failed to fetch platform budgets:', err)
