@@ -156,9 +156,19 @@ app.use((req, res, next) => {
 });
 
 // Regular body parsers - Skip for webhooks to avoid interference
+app.use((req, res, next) => {
+    if (req.originalUrl && (req.originalUrl.includes('/api/shopify/webhooks') || req.originalUrl.includes('/api/funnel-webhooks') || req.originalUrl.includes('/api/webhooks'))) {
+        return next();
+    }
     express.json({ limit: '20mb' })(req, res, next);
+});
 
+app.use((req, res, next) => {
+    if (req.originalUrl && (req.originalUrl.includes('/api/shopify/webhooks') || req.originalUrl.includes('/api/funnel-webhooks') || req.originalUrl.includes('/api/webhooks'))) {
+        return next();
+    }
     express.urlencoded({ extended: true, limit: '20mb' })(req, res, next);
+});
 
 // Scaling Phase 4: Redis Session Management
 // FALLBACK: Use MemoryStore if Redis is not configured to prevent crashes
