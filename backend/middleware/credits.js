@@ -285,6 +285,7 @@ const MODEL_COSTS = {
     'claude-sonnet-4-20250514': { input: 0.3, output: 1.5 },
     'sarvam-m': { input: 0.02, output: 0.08 },
     // ── Image models (flat cost per image in USD cents) ──
+    'gemini-3.1-flash-image-preview': { flatCost: 4.0, type: 'image' },
     'gemini-1.5-flash-latest': { flatCost: 4.0, type: 'image' },
     'imagen-3.0-generate-001': { flatCost: 4.0, type: 'image' },
     // ── Video models (flat cost per generation in USD cents) ──
