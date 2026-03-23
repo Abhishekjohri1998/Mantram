@@ -30,7 +30,7 @@ export default {
         defaultTextProvider: process.env.DEFAULT_TEXT_PROVIDER || 'anthropic',
         defaultImageProvider: process.env.DEFAULT_IMAGE_PROVIDER || 'gemini',
         defaultTextModel: process.env.DEFAULT_TEXT_MODEL || 'claude-sonnet-4-20250514',
-        defaultImageModel: process.env.DEFAULT_IMAGE_MODEL || 'gemini-1.5-flash-latest',
+        defaultImageModel: process.env.DEFAULT_IMAGE_MODEL || 'gemini-3.1-flash-image-preview',
         providers: {
             gemini: {
                 apiKey: process.env.GEMINI_API_KEY,
