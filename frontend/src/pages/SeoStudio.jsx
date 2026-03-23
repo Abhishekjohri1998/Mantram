@@ -116,7 +116,7 @@ export default function SeoStudio() {
     // Check GA connection on mount AND on brand change
     useEffect(() => {
         // Reset GA state on brand switch
-        setGaConnected(false); setGaEmail(''); setGaProperties([]); setGaSelectedProp(''); setGaReport(null); setGaSites([]); setGaSelectedSite(''); setGscReport(null); setGaAuthError('');
+        setGaConnected(false); setGaEmail(''); setGaProperties([]); setGaSelectedProp(''); setGaReport(null); setGaSites([]); setGaSelectedSite(''); setGscReport(null);
         const brandId = activeBrand?._id;
         gaAPI.status(brandId).then(d => {
             setGaConnected(d.connected); setGaEmail(d.email || '')
@@ -127,69 +127,22 @@ export default function SeoStudio() {
         return () => window.removeEventListener('message', handler)
     }, [activeBrand])
 
-    const [gaAuthError, setGaAuthError] = useState('');
-
     const loadGAProperties = async () => {
-        try {
-            const d = await gaAPI.properties(activeBrand?._id)
-            const props = d.properties || []
-            setGaProperties(props)
-            // Auto-select first property and load its report
-            if (props.length > 0 && !gaSelectedProp) {
-                const firstProp = props[0].propertyId
-                setGaSelectedProp(firstProp)
-                loadGAReport(firstProp)
-            }
-        } catch (e) {
-            if (e.message.includes('Not connected') || e.message.includes('invalid') || e.message.includes('expired')) {
-                setGaAuthError('Your Google connection has expired. Please reconnect.');
-            }
-        }
+        try { const d = await gaAPI.properties(activeBrand?._id); setGaProperties(d.properties || []) } catch { }
     }
     const loadGSCSites = async () => {
-        try {
-            const d = await gaAPI.searchConsoleSites(activeBrand?._id)
-            const sites = d.sites || []
-            setGaSites(sites)
-            // Auto-select first site and load its report
-            if (sites.length > 0 && !gaSelectedSite) {
-                const firstSite = sites[0].siteUrl
-                setGaSelectedSite(firstSite)
-                loadGSCReport(firstSite)
-            }
-        } catch (e) {
-            if (e.message.includes('Not connected') || e.message.includes('invalid') || e.message.includes('expired')) {
-                setGaAuthError('Your Google connection has expired. Please reconnect.');
-            }
-        }
+        try { const d = await gaAPI.searchConsoleSites(activeBrand?._id); setGaSites(d.sites || []) } catch { }
     }
     const loadGAReport = async (propId) => {
         if (!propId) return; setGaLoading(true)
-        try { const d = await gaAPI.report({ propertyId: propId, brandId: activeBrand?._id }); if (d.success) setGaReport(d) } catch (e) {
-            if (e.message.includes('Not connected') || e.message.includes('invalid') || e.message.includes('expired')) setGaAuthError('Your Google connection has expired. Please reconnect.');
-        } finally { setGaLoading(false) }
+        try { const d = await gaAPI.report({ propertyId: propId, brandId: activeBrand?._id }); if (d.success) setGaReport(d) } catch { }
+        finally { setGaLoading(false) }
     }
     const loadGSCReport = async (siteUrl) => {
         if (!siteUrl) return; setGaLoading(true)
-        try { const d = await gaAPI.searchConsoleReport({ siteUrl, brandId: activeBrand?._id }); if (d.success) setGscReport(d) } catch (e) {
-            if (e.message.includes('Not connected') || e.message.includes('invalid') || e.message.includes('expired')) setGaAuthError('Your Google connection has expired. Please reconnect.');
-        } finally { setGaLoading(false) }
+        try { const d = await gaAPI.searchConsoleReport({ siteUrl, brandId: activeBrand?._id }); if (d.success) setGscReport(d) } catch { }
+        finally { setGaLoading(false) }
     }
-
-    const reconnectGA = async () => {
-        setGaAuthError('');
-        try {
-            const { url } = await gaAPI.connect(activeBrand?._id);
-            if (url) {
-                const width = 600, height = 700;
-                const left = window.screenX + (window.outerWidth - width) / 2;
-                const top = window.screenY + (window.outerHeight - height) / 2;
-                window.open(url, 'ConnectGoogle', `width=${width},height=${height},left=${left},top=${top},sandbox=allow-scripts allow-same-origin allow-popups`);
-            }
-        } catch (e) {
-            console.error('GA Reconnect Error:', e.message);
-        }
-    };
     // Connect/disconnect now happens in the Integrations hub — SEO Studio only reads status
 
     const brandPayload = activeBrand ? { name: activeBrand.name, website: activeBrand.website, _id: activeBrand._id, dna: activeBrand.dna } : null
@@ -223,7 +176,7 @@ export default function SeoStudio() {
 
     // ── Workflow runners ──────────────────────────────────────────────────
     const STAGE_MESSAGES = {
-        'health-check': ['Crawling your website (800+ pages)...', 'Discovering pages from sitemap...', 'Deep-crawling subpages (batch 1/70)...', 'Analyzing page structure & meta tags...', 'Probing internal links for broken URLs...', 'Detecting duplicate content & headings...', 'Checking schema & structured data...', 'Running AI SEO analysis...', 'Building action plan & trend deltas...'],
+        'health-check': ['Crawling your website...', 'Analyzing page structure & meta tags...', 'Checking schema & structured data...', 'Running AI SEO analysis...', 'Building action plan...'],
         'traffic': ['Crawling your website content...', 'Analyzing existing topics & gaps...', 'Researching keyword opportunities...', 'Building traffic strategy...'],
         'competitors': ['Crawling your website...', 'Researching competitor sites...', 'Comparing content & structure...', 'Building outrank plan...'],
         'ai-visibility': ['Crawling your website...', 'Checking schema & JSON-LD...', 'Analyzing heading structure & FAQs...', 'Evaluating AI discoverability...', 'Generating optimization templates...'],
@@ -275,7 +228,7 @@ export default function SeoStudio() {
         const stages = STAGE_MESSAGES[workflowId] || ['Processing...']
         let stageIdx = 0
         setLoadingStage(stages[0])
-        const stageInterval = setInterval(() => { stageIdx = Math.min(stageIdx + 1, stages.length - 1); setLoadingStage(stages[stageIdx]) }, 8000)
+        const stageInterval = setInterval(() => { stageIdx = Math.min(stageIdx + 1, stages.length - 1); setLoadingStage(stages[stageIdx]) }, 5000)
         elapsedTimerRef.current = setInterval(() => setLoadingElapsed(prev => prev + 1), 1000)
 
         try {
@@ -337,570 +290,100 @@ export default function SeoStudio() {
         const title = { 'health-check': 'SEO Health Check', 'traffic': 'Traffic Strategy', 'competitors': 'Competitor Analysis', 'ai-visibility': 'AI Visibility Audit', 'competitor-warroom': 'Competitor War Room', 'llm-probe': 'LLM Brand Probe', 'auto-fix': 'Auto-Fix Report', 'prompt-mining': 'Prompt Mining' }[type] || 'SEO Report'
         const date = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
         const brandName = brand?.name || 'Brand'
-        const brandLogo = brand?.dna?.logo?.url || ''
-        const brandWebsite = brand?.website || ''
-        const appOrigin = window.location.origin
-        const mantramLogo = `${appOrigin}/mantram-logo.png`
 
-        // Score color grading
-        const scoreColor = (s) => s >= 80 ? '#16a34a' : s >= 60 ? '#f59e0b' : s >= 40 ? '#f97316' : '#e11d48'
-        const scoreGrade = (s) => s >= 80 ? 'A' : s >= 60 ? 'B' : s >= 40 ? 'C' : 'D'
-
-        // ── Build Cover Page — Dedicated First Page with Dual Branding ──
-        let body = `
-        <div class="cover-page">
-            <div class="cover-gradient">
-                <div class="cover-logos">
-                    <div class="cover-mantram">
-                        <img src="${mantramLogo}" class="cover-mantram-logo" alt="Mantram AI" onerror="this.style.display='none'" />
-                        <span class="cover-mantram-label">Mantram AI</span>
-                    </div>
-                    <span class="cover-x">×</span>
-                    <div class="cover-brand">
-                        ${brandLogo ? `<img src="${brandLogo}" class="cover-brand-logo" alt="${brandName}" onerror="this.style.display='none'" />` : `<div class="cover-brand-initial">${brandName.charAt(0)}</div>`}
-                        <span class="cover-brand-name">${brandName}</span>
-                    </div>
-                </div>
-                <div class="cover-title-block">
-                    <h1 class="cover-title">${title}</h1>
-                    <p class="cover-subtitle">${brandWebsite}</p>
-                </div>
-                <div class="cover-meta">
-                    <span class="cover-date">${date}</span>
-                    <span class="cover-confidential">Confidential</span>
-                </div>
-                <div class="cover-powered">Powered by Mantram AI — SEO Studio</div>
-            </div>
-        </div>
-        <div class="section-break"></div>
-
-        <div class="report-masthead">
-            <div class="masthead-bar">
-                <div class="masthead-left">
-                    <img src="${mantramLogo}" class="mantram-header-logo" alt="Mantram AI" onerror="this.style.display='none'" />
-                    <span class="masthead-divider">|</span>
-                    <span class="masthead-studio">SEO Studio</span>
-                </div>
-                <div class="masthead-right">
-                    ${brandLogo ? `<img src="${brandLogo}" class="masthead-brand-logo" alt="${brandName}" onerror="this.style.display='none'" />` : ''}
-                    <span class="masthead-brand-name">${brandName}</span>
-                    <span class="masthead-date">${date}</span>
-                </div>
-            </div>
-        </div>
-        <div class="report-header">
-            <div class="header-left">
-                ${brandLogo ? `<img src="${brandLogo}" class="brand-logo" alt="${brandName}" />` : `<div class="brand-initial">${brandName.charAt(0)}</div>`}
-                <div>
-                    <h1 class="brand-name">${brandName}</h1>
-                    <p class="brand-url">${brandWebsite}</p>
-                </div>
-            </div>
-            <div class="header-right">
-                <div class="report-badge">${title}</div>
-                <p class="report-date">Report generated ${date}</p>
-            </div>
-        </div>
-        <div class="divider"></div>`
-
-        // ── Executive Summary ──
-        body += `<div class="exec-summary">
-            <div class="exec-label">EXECUTIVE SUMMARY</div>
-            <p class="exec-text">${data.summary || ''}</p>
-        </div>`
+        let body = `<h1>${title}</h1><p class="meta">${brandName} • ${date} • ${brand?.website || ''}</p>`
+        body += `<div class="summary">${data.summary || ''}</div>`
 
         // Scores for health-check
         if (type === 'health-check') {
             body += `<div class="scores">`
-            const td = data.trendDelta || {}
-            ;[['SEO Health', data.seoHealthScore, '🏥', td.scoreChange], ['AI Visibility', data.aiVisibilityScore, '🤖', null], ['Technical', data.technicalScore, '⚙️', td.technicalChange], ['Content', data.contentScore, '📝', td.contentChange], ['Authority', data.authorityScore, '🏛️', td.authorityChange]].forEach(([l, s, icon, delta]) => {
-                if (s !== undefined) {
-                    const c = scoreColor(s)
-                    const trendArrow = delta ? (delta > 0 ? `<span class="trend-up">▲${Math.abs(delta)}</span>` : delta < 0 ? `<span class="trend-down">▼${Math.abs(delta)}</span>` : '') : ''
-                    body += `<div class="score-card">
-                        <div class="score-ring" style="--score:${s};--color:${c}">
-                            <span class="score-num">${s}</span>
-                        </div>
-                        <div class="score-label">${l}</div>
-                        <div class="score-grade" style="color:${c}">${scoreGrade(s)} ${trendArrow}</div>
-                    </div>`
-                }
+            ;[['SEO Health', data.seoHealthScore], ['AI Visibility', data.aiVisibilityScore], ['Technical', data.technicalScore], ['Content', data.contentScore], ['Authority', data.authorityScore]].forEach(([l, s]) => {
+                if (s) body += `<div class="score-card"><div class="score-value">${s}</div><div class="score-label">${l}</div></div>`
             })
             body += `</div>`
-
-            // Strategic Brief
-            if (data.strategicBrief) {
-                body += `<div class="strategic-brief">
-                    <div class="brief-header"><span class="brief-icon">📊</span> Strategic Brief</div>
-                    <p>${data.strategicBrief}</p>
-                </div>`
-            }
-
-            // Crawl Intelligence
-            const stats = data.siteStats || {}
-            if (stats.pagesCrawled) {
-                body += `<div class="section-break"></div><h2><span class="h2-icon">🕷️</span> Crawl Intelligence</h2><div class="stats-grid">`
-                ;[
-                    ['Pages Crawled', stats.pagesCrawled, '📄'],
-                    ['Avg Response', `${stats.responseTimeAvg || 0}ms`, '⏱️'],
-                    ['Avg Page Size', `${stats.pageSizeAvg || 0}KB`, '📦'],
-                    ['Thin Pages', stats.thinPageCount || 0, '📃'],
-                    ['Orphan Pages', stats.orphanPageCount || 0, '🔗'],
-                    ['Security', stats.securityHeaderScore || '0/7', '🔒'],
-                    ['Avg Words', stats.avgWordCount || 0, '📝'],
-                    ['Mixed Content', stats.mixedContentCount || 0, '⚠️'],
-                    ['Redirect Chains', stats.redirectChainCount || 0, '🔀'],
-                    ['Duplicates', stats.duplicateContentCount || 0, '📋'],
-                    ['Noindex', stats.noindexPageCount || 0, '🚫'],
-                    ['Long URLs', stats.urlTooLongCount || 0, '🔗'],
-                    ['Broken External', stats.brokenExternalCount || 0, '💔'],
-                    ['Empty Anchors', stats.emptyAnchorCount || 0, '⚓'],
-                    ['Nofollow Internal', stats.nofollowInternalCount || 0, '🔇'],
-                    ['Canon. Conflicts', stats.conflictingCanonicalCount || 0, '⚡'],
-                    ['Browser Cache', stats.cacheControlPresent ? '✅ Yes' : '❌ No', '💾'],
-                    ['llms.txt', stats.llmsTxtFound ? '✅ Found' : '❌ Missing', '🤖'],
-                    // Moz Domain Authority
-                    ...(stats.mozAvailable ? [
-                        ['Domain Auth.', stats.domainAuthority || 0, '🏛️'],
-                        ['Page Auth.', stats.pageAuthority || 0, '📄'],
-                        ['Spam Score', `${stats.spamScore || 0}%`, '🛡️'],
-                    ] : []),
-                    // DataForSEO Backlinks
-                    ...(stats.backlinkDataAvailable ? [
-                        ['Total Backlinks', (stats.totalBacklinks || 0).toLocaleString(), '🔗'],
-                        ['Referring Domains', (stats.referringDomains || 0).toLocaleString(), '🌐'],
-                    ] : []),
-                ].forEach(([l, v, icon]) => {
-                    const isAlert = (typeof v === 'number' && v > 0 && ['Thin Pages', 'Orphan Pages', 'Mixed Content', 'Duplicates', 'Broken External', 'Empty Anchors', 'Long URLs', 'Canon. Conflicts', 'Nofollow Internal'].includes(l))
-                    body += `<div class="stat-card ${isAlert ? 'stat-alert' : ''}">
-                        <div class="stat-icon">${icon}</div>
-                        <div class="stat-value">${v}</div>
-                        <div class="stat-label">${l}</div>
-                    </div>`
-                })
-                body += `</div>`
-
-                // Resource Scanning
-                if (stats.blockedResourceCount || stats.uncachedResourceCount || stats.unminifiedResourceCount) {
-                    body += `<div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-top:8px">`
-                    ;[['Blocked Resources', stats.blockedResourceCount || 0, '🚫'], ['Uncached JS/CSS', stats.uncachedResourceCount || 0, '💾'], ['Unminified JS/CSS', stats.unminifiedResourceCount || 0, '📦']].forEach(([l, v, icon]) => {
-                        body += `<div class="stat-card ${v > 0 ? 'stat-alert' : ''}"><div class="stat-icon">${icon}</div><div class="stat-value">${v}</div><div class="stat-label">${l}</div></div>`
-                    })
-                    body += `</div>`
-                }
-
-                // Page Status Distribution
-                const psd = stats.pageStatusDistribution || {}
-                if (psd.status200 || psd.status301 || psd.status404 || psd.status5xx) {
-                    body += `<div class="status-bar">`
-                    if (psd.status200) body += `<span class="status-pill status-2xx">${psd.status200} × 2xx</span>`
-                    if (psd.status301) body += `<span class="status-pill status-3xx">${psd.status301} × 3xx</span>`
-                    if (psd.status404) body += `<span class="status-pill status-4xx">${psd.status404} × 404</span>`
-                    if (psd.status5xx) body += `<span class="status-pill status-5xx">${psd.status5xx} × 5xx</span>`
-                    body += `</div>`
-                }
-            }
-
-            // Security Headers
-            if (stats.securityHeaders?.length) {
-                body += `<h2><span class="h2-icon">🔒</span> Security Headers</h2><div class="stats-grid">`
-                stats.securityHeaders.forEach(h => {
-                    body += `<div class="stat-card" style="background:${h.present ? '#f0fdf4' : '#fef2f2'}"><div class="stat-value" style="font-size:20px">${h.present ? '✅' : '❌'}</div><div class="stat-label">${h.name}</div></div>`
-                })
-                body += `</div>`
-            }
-
-            // Action Buckets
-            const hasActions = data.fixNow?.length || data.createNext?.length || data.monitor?.length
-            if (hasActions) {
-                body += `<div class="section-break"></div><h2><span class="h2-icon">🎯</span> Action Plan</h2><div class="action-grid">`
-                if (data.fixNow?.length) {
-                    body += `<div class="action-card action-fix"><div class="action-header"><span>🔧</span> Fix Now</div><ul>`
-                    data.fixNow.forEach(f => { body += `<li><strong>${typeof f === 'string' ? f : f.title}</strong>${f.description ? `<br><small>${f.description}</small>` : ''}</li>` })
-                    body += `</ul></div>`
-                }
-                if (data.createNext?.length) {
-                    body += `<div class="action-card action-create"><div class="action-header"><span>✏️</span> Create Next</div><ul>`
-                    data.createNext.forEach(c => { body += `<li><strong>${typeof c === 'string' ? c : c.title}</strong>${c.reason ? `<br><small>${c.reason}</small>` : ''}</li>` })
-                    body += `</ul></div>`
-                }
-                if (data.monitor?.length) {
-                    body += `<div class="action-card action-monitor"><div class="action-header"><span>👁️</span> Monitor</div><ul>`
-                    data.monitor.forEach(m => { body += `<li><strong>${typeof m === 'string' ? m : m.title}</strong>${m.metric ? `<br><small>${m.metric}</small>` : ''}</li>` })
-                    body += `</ul></div>`
-                }
-                body += `</div>`
-            }
-
-            // Per-Page Report Cards
-            const pr = data.pageReports || []
-            if (pr.length) {
-                body += `<div class="section-break"></div><h2><span class="h2-icon">📄</span> Per-Page Analysis <span class="count-badge">${pr.length} pages</span></h2>
-                <table><thead><tr><th style="width:40%">Page</th><th>Response</th><th>Size</th><th>Words</th><th>Issues</th></tr></thead><tbody>`
-                pr.forEach((p, i) => {
-                    const issues = []
-                    if (!p.hasH1) issues.push('No H1')
-                    if (p.h1Count > 1) issues.push(`${p.h1Count} H1s`)
-                    if (!p.headingHierarchyValid) issues.push('Heading Skip')
-                    if (p.titleLength === 0) issues.push('No Title')
-                    if (p.titleLength > 60) issues.push('Title Long')
-                    if (p.metaDescLength === 0) issues.push('No Meta')
-                    if (p.wordCount < 300 && p.wordCount > 0) issues.push('Thin')
-                    if (p.responseTimeMs > 3000) issues.push('Slow')
-                    body += `<tr class="${i % 2 ? 'alt-row' : ''}"><td><strong>${(p.title || 'Untitled').substring(0, 45)}</strong><br><small>${(p.url || '').substring(0, 65)}</small></td><td>${p.responseTimeMs}ms</td><td>${p.pageSizeKB}KB</td><td>${p.wordCount}</td><td>${issues.length ? `<span class="issue-pill">${issues.join(', ')}</span>` : '<span class="ok-pill">✅ OK</span>'}</td></tr>`
-                })
-                body += `</tbody></table>`
-            }
-
-            // Algorithm Risks
-            if (data.algorithmRisks?.length) {
-                body += `<div class="section-break"></div><h2><span class="h2-icon">⚠️</span> Algorithm Risk Assessment</h2>
-                <table><thead><tr><th>Algorithm</th><th>Risk</th><th>Why</th><th>Action</th></tr></thead><tbody>`
-                data.algorithmRisks.forEach((r, i) => {
-                    body += `<tr class="${i % 2 ? 'alt-row' : ''}"><td><strong>${r.algorithm}</strong></td><td><span class="risk-${r.riskLevel}">${r.riskLevel}</span></td><td>${r.why || ''}</td><td>${r.action || ''}</td></tr>`
-                })
-                body += `</tbody></table>`
-            }
-
-            // ── Grouped Issues (Errors / Warnings / Notices — Semrush parity) ──
-            const gi = data.groupedIssues || {}
-            const hasGrouped = (gi.errorCount || 0) + (gi.warningCount || 0) + (gi.noticeCount || 0) > 0
-            if (hasGrouped) {
-                body += `<div class="section-break"></div><h2><span class="h2-icon">🔍</span> Site Audit Issues</h2>`
-                body += `<div class="issue-summary-bar">
-                    <div class="issue-summary-pill iss-error">🔴 ${gi.errorCount || 0} Errors</div>
-                    <div class="issue-summary-pill iss-warning">🟡 ${gi.warningCount || 0} Warnings</div>
-                    <div class="issue-summary-pill iss-notice">🔵 ${gi.noticeCount || 0} Notices</div>
-                </div>`
-                // Errors
-                if (gi.errors?.length) {
-                    body += `<div class="issue-group issue-group-error"><div class="issue-group-header">🔴 Errors (${gi.errors.length})</div>`
-                    gi.errors.forEach(e => {
-                        body += `<div class="issue-item">
-                            <div class="issue-title">${e.check}</div>
-                            <div class="issue-about"><strong>About this issue:</strong> ${e.aboutThisIssue || ''}</div>
-                            <div class="issue-fix"><strong>How to fix:</strong> ${e.howToFix || ''}</div>
-                        </div>`
-                    })
-                    body += `</div>`
-                }
-                // Warnings
-                if (gi.warnings?.length) {
-                    body += `<div class="issue-group issue-group-warning"><div class="issue-group-header">🟡 Warnings (${gi.warnings.length})</div>`
-                    gi.warnings.forEach(w => {
-                        body += `<div class="issue-item">
-                            <div class="issue-title">${w.check}</div>
-                            <div class="issue-about"><strong>About this issue:</strong> ${w.aboutThisIssue || ''}</div>
-                            <div class="issue-fix"><strong>How to fix:</strong> ${w.howToFix || ''}</div>
-                        </div>`
-                    })
-                    body += `</div>`
-                }
-                // Notices
-                if (gi.notices?.length) {
-                    body += `<div class="issue-group issue-group-notice"><div class="issue-group-header">🔵 Notices (${gi.notices.length})</div>`
-                    gi.notices.forEach(n => {
-                        body += `<div class="issue-item">
-                            <div class="issue-title">${n.check}</div>
-                            <div class="issue-about"><strong>About this issue:</strong> ${n.aboutThisIssue || ''}</div>
-                            <div class="issue-fix"><strong>How to fix:</strong> ${n.howToFix || ''}</div>
-                        </div>`
-                    })
-                    body += `</div>`
-                }
-            } else if (data.issues?.length) {
-                // Fallback to old flat issues if groupedIssues not present
-                body += `<div class="section-break"></div><h2><span class="h2-icon">🐛</span> Issues <span class="count-badge">${data.issues.length}</span></h2>
-                <table><thead><tr><th style="width:10%">Severity</th><th style="width:45%">Issue</th><th style="width:45%">Fix</th></tr></thead><tbody>`
-                data.issues.forEach((i, idx) => {
-                    body += `<tr class="${idx % 2 ? 'alt-row' : ''}"><td><span class="sev-pill sev-${i.severity}">${i.severity}</span></td><td><strong>${i.title}</strong><br><small>${i.description || ''}</small>${i.aboutThisIssue ? `<br><em class="about-issue">${i.aboutThisIssue}</em>` : ''}</td><td>${i.fix || i.howToFix || ''}</td></tr>`
-                })
-                body += `</tbody></table>`
-            }
-
-            // AI Insights
-            const ai = data.aiInsights
-            if (ai && (ai.trendSummary || ai.fixPriorities?.length || ai.duplicateValidation)) {
-                body += `<div class="section-break"></div><h2><span class="h2-icon">🤖</span> AI Insights <span class="ai-badge">Mantram AI Exclusive</span></h2>`
-                if (ai.trendSummary) body += `<div class="ai-card"><div class="ai-card-label">Trend Analysis</div><p>${ai.trendSummary}</p></div>`
-                if (ai.fixPriorities?.length) {
-                    body += `<div class="ai-card"><div class="ai-card-label">Top Fixes by Traffic Impact</div><ol>`
-                    ai.fixPriorities.forEach(p => { body += `<li><strong>${p.title}</strong> — ${p.reason} <span class="badge">+${p.estimatedScoreGain}pts</span></li>` })
-                    body += `</ol></div>`
-                }
-                if (ai.duplicateValidation) {
-                    body += `<div class="ai-card"><div class="ai-card-label">Duplicate Validation</div><p>${ai.duplicateValidation.summary}</p></div>`
-                }
+            if (data.issues?.length) {
+                body += `<h2>Issues (${data.issues.length})</h2><table><tr><th>Severity</th><th>Title</th><th>Fix</th></tr>`
+                data.issues.forEach(i => { body += `<tr><td class="sev-${i.severity}">${i.severity}</td><td>${i.title}<br><small>${i.description || ''}</small></td><td>${i.fix || ''}</td></tr>` })
+                body += `</table>`
             }
         }
 
         // Keywords for traffic
         if (type === 'traffic') {
             if (data.quickWins?.length) {
-                body += `<div class="section-break"></div><h2><span class="h2-icon">⚡</span> Quick Wins</h2>
-                <table><thead><tr><th>Action</th><th>Keyword</th><th>Impact</th></tr></thead><tbody>`
-                data.quickWins.forEach((w, i) => { body += `<tr class="${i % 2 ? 'alt-row' : ''}"><td>${w.action}</td><td><strong>${w.keyword || ''}</strong></td><td>${w.expectedImpact}</td></tr>` })
-                body += `</tbody></table>`
+                body += `<h2>Quick Wins</h2><table><tr><th>Action</th><th>Keyword</th><th>Impact</th></tr>`
+                data.quickWins.forEach(w => { body += `<tr><td>${w.action}</td><td>${w.keyword || ''}</td><td>${w.expectedImpact}</td></tr>` })
+                body += `</table>`
             }
             if (data.keywordClusters?.length) {
-                body += `<div class="section-break"></div><h2><span class="h2-icon">🎯</span> Keyword Clusters</h2>`
+                body += `<h2>Keyword Clusters</h2>`
                 data.keywordClusters.forEach(c => {
-                    body += `<div class="cluster-card"><div class="cluster-header"><strong>${c.clusterName}</strong> <span class="badge">${c.difficulty}</span> <span class="badge">${c.intent}</span> <span class="badge">${c.estimatedMonthlySearches || '?'}/mo</span></div>`
-                    body += `<p class="cluster-kws">${(c.keywords || []).map(k => typeof k === 'string' ? k : k.keyword).join(' • ')}</p>`
-                    if (c.suggestedTitle) body += `<p class="cluster-suggest">📝 ${c.suggestedTitle} <small>(${c.recommendedPageType})</small></p>`
+                    body += `<div class="cluster"><h3>${c.clusterName} <span class="badge">${c.difficulty}</span> <span class="badge">${c.intent}</span></h3>`
+                    body += `<p>Keywords: ${(c.keywords || []).map(k => typeof k === 'string' ? k : k.keyword).join(', ')}</p>`
+                    if (c.suggestedTitle) body += `<p>📝 ${c.suggestedTitle} (${c.recommendedPageType})</p>`
                     body += `</div>`
                 })
             }
             if (data.peopleAlsoAsk?.length) {
-                body += `<div class="section-break"></div><h2><span class="h2-icon">❓</span> People Also Ask</h2><div class="paa-grid">`
-                data.peopleAlsoAsk.forEach(q => { body += `<div class="paa-card">${q}</div>` })
-                body += `</div>`
+                body += `<h2>People Also Ask</h2><ul>`
+                data.peopleAlsoAsk.forEach(q => { body += `<li>${q}</li>` })
+                body += `</ul>`
             }
         }
 
         // Competitors
         if (type === 'competitors' || type === 'competitor-warroom') {
             if (data.competitors?.length) {
-                body += `<div class="section-break"></div><h2><span class="h2-icon">⚔️</span> Competitor Analysis</h2>`
+                body += `<h2>Competitors</h2>`
                 data.competitors.forEach(c => {
-                    body += `<div class="comp-card"><div class="comp-header"><strong>${c.name}</strong><small>${c.url}</small><span class="threat-${c.threatLevel || 'medium'}">${c.threatLevel || 'medium'} threat</span></div>
-                    <p><strong>Strengths:</strong> ${(c.strengths || []).join(', ')}</p>
-                    <p><strong>Weaknesses:</strong> ${(c.weaknesses || []).join(', ')}</p>
-                    ${c.howToBeat ? `<p class="beat-tip"><strong>How to beat:</strong> ${c.howToBeat}</p>` : ''}</div>`
+                    body += `<div class="comp"><h3>${c.name} — ${c.url}</h3>`
+                    body += `<p><strong>Strengths:</strong> ${(c.strengths || []).join(', ')}</p>`
+                    body += `<p><strong>Weaknesses:</strong> ${(c.weaknesses || []).join(', ')}</p></div>`
                 })
             }
             if (data.outrankPlan?.length) {
-                body += `<div class="section-break"></div><h2><span class="h2-icon">🏆</span> Outrank Plan</h2><ol class="outrank-list">`
-                data.outrankPlan.forEach(p => { body += `<li><strong>${p.action}</strong> — ${p.timeline} <span class="badge">${p.effort}</span><br><small>${p.expectedOutcome || ''}</small></li>` })
+                body += `<h2>Outrank Plan</h2><ol>`
+                data.outrankPlan.forEach(p => { body += `<li><strong>${p.action}</strong> — ${p.timeline} (${p.effort})</li>` })
                 body += `</ol>`
             }
         }
 
         // AI Visibility
         if (type === 'ai-visibility') {
-            body += `<div class="scores"><div class="score-card"><div class="score-ring" style="--score:${data.aiVisibilityScore || 0};--color:${scoreColor(data.aiVisibilityScore || 0)}"><span class="score-num">${data.aiVisibilityScore || 0}</span></div><div class="score-label">AI Visibility</div></div></div>`
+            body += `<div class="scores"><div class="score-card"><div class="score-value">${data.aiVisibilityScore || 0}</div><div class="score-label">AI Visibility Score</div></div></div>`
             const bd = data.breakdown || {}
             ;['schemaReadiness', 'qnaPresence', 'entityCoverage', 'snippetStructure', 'trustSignals'].forEach(k => {
-                if (bd[k]) body += `<div class="ai-breakdown"><h3>${k.replace(/([A-Z])/g, ' $1').trim()} — ${bd[k].score}/100</h3><p>${bd[k].currentState || ''}</p></div>`
+                if (bd[k]) body += `<div class="section"><h3>${k} — ${bd[k].score}/100</h3><p>${bd[k].currentState || ''}</p></div>`
             })
         }
 
         // 30-day plan
         if (data.thirtyDayPlan?.length) {
-            body += `<div class="section-break"></div><h2><span class="h2-icon">📅</span> 30-Day Plan</h2><div class="week-grid">`
+            body += `<h2>30-Day Plan</h2>`
             data.thirtyDayPlan.forEach(w => {
-                body += `<div class="week-card"><div class="week-badge">Week ${w.week}</div><div class="week-theme">${w.theme || ''}</div><ul>${(w.actions || []).map(a => `<li>${a}</li>`).join('')}</ul>${w.expectedOutcome ? `<p class="week-outcome">Expected: ${w.expectedOutcome}</p>` : ''}</div>`
+                body += `<div class="week"><h3>Week ${w.week}</h3><ul>${(w.actions || []).map(a => `<li>${a}</li>`).join('')}</ul></div>`
             })
-            body += `</div>`
         }
 
-        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title} — ${brandName}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Inter',system-ui,sans-serif;color:#1e293b;padding:0;font-size:12px;line-height:1.65;background:#fff}
-.page{max-width:850px;margin:0 auto;padding:40px 48px}
-
-/* ── Header ── */
-.report-header{display:flex;justify-content:space-between;align-items:center;padding-bottom:20px}
-.header-left{display:flex;align-items:center;gap:14px}
-.brand-logo{width:52px;height:52px;object-fit:contain;border-radius:10px;border:1px solid #e2e8f0}
-.brand-initial{width:52px;height:52px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900}
-.brand-name{font-size:22px;font-weight:800;color:#0f172a;letter-spacing:-0.5px}
-.brand-url{font-size:11px;color:#64748b;margin-top:2px}
-.header-right{text-align:right}
-.report-badge{display:inline-block;padding:6px 16px;border-radius:20px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px}
-.report-date{font-size:10px;color:#94a3b8;margin-top:6px}
-.divider{height:2px;background:linear-gradient(90deg,#6366f1 0%,#8b5cf6 50%,#e2e8f0 100%);margin-bottom:24px;border-radius:2px}
-
-/* ── Executive Summary ── */
-.exec-summary{background:linear-gradient(135deg,#f8fafc,#f1f5f9);border-left:4px solid #6366f1;padding:16px 20px;border-radius:0 12px 12px 0;margin-bottom:28px}
-.exec-label{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#6366f1;margin-bottom:6px}
-.exec-text{font-size:13px;color:#334155;line-height:1.7}
-
-/* ── Scores ── */
-.scores{display:flex;gap:16px;justify-content:center;margin:24px 0;flex-wrap:wrap}
-.score-card{text-align:center;padding:16px 20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;min-width:110px}
-.score-ring{position:relative;width:72px;height:72px;margin:0 auto 8px;border-radius:50%;background:conic-gradient(var(--color) calc(var(--score) * 3.6deg), #e2e8f0 0);display:flex;align-items:center;justify-content:center}
-.score-ring::before{content:'';position:absolute;width:56px;height:56px;border-radius:50%;background:#fff}
-.score-num{position:relative;z-index:1;font-size:22px;font-weight:900;color:#1e293b}
-.score-label{font-size:10px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:0.5px}
-.score-grade{font-size:11px;font-weight:800;margin-top:2px}
-
-/* ── Strategic Brief ── */
-.strategic-brief{background:#faf5ff;border:1px solid #e9d5ff;border-radius:12px;padding:16px 20px;margin:16px 0}
-.brief-header{font-size:13px;font-weight:700;color:#7c3aed;margin-bottom:8px;display:flex;align-items:center;gap:6px}
-.brief-icon{font-size:16px}
-.strategic-brief p{font-size:12px;color:#4c1d95;line-height:1.7}
-
-/* ── Sections ── */
-h2{font-size:15px;font-weight:800;color:#0f172a;margin:28px 0 14px;padding-bottom:8px;border-bottom:2px solid #e2e8f0;display:flex;align-items:center;gap:8px}
-.h2-icon{font-size:16px}
-.section-break{height:1px;background:linear-gradient(90deg,transparent,#cbd5e1,transparent);margin:32px 0}
-.count-badge{font-size:10px;font-weight:600;background:#e0e7ff;color:#4338ca;padding:2px 10px;border-radius:12px;margin-left:auto}
-
-/* ── Stats Grid ── */
-.stats-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:12px 0}
-.stat-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 8px;text-align:center;transition:all 0.2s}
-.stat-alert{background:#fef2f2;border-color:#fecaca}
-.stat-icon{font-size:14px;margin-bottom:2px}
-.stat-value{font-size:16px;font-weight:900;color:#1e293b}
-.stat-label{font-size:8px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;margin-top:2px}
-
-/* ── Status Bar ── */
-.status-bar{display:flex;gap:8px;margin:12px 0;align-items:center}
-.status-pill{padding:3px 10px;border-radius:8px;font-size:10px;font-weight:700}
-.status-2xx{background:#d1fae5;color:#059669}.status-3xx{background:#fef3c7;color:#d97706}.status-4xx{background:#fee2e2;color:#dc2626}.status-5xx{background:#fee2e2;color:#dc2626}
-
-/* ── Tables ── */
-table{width:100%;border-collapse:separate;border-spacing:0;margin:12px 0;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0}
-thead{background:linear-gradient(135deg,#f1f5f9,#e2e8f0)}
-th{padding:10px 14px;text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.8px;color:#475569}
-td{padding:10px 14px;border-top:1px solid #f1f5f9;font-size:11px;vertical-align:top}
-.alt-row{background:#fafbfc}
-small{color:#94a3b8;font-size:10px}
-
-/* ── Severity / Risk Pills ── */
-.sev-pill{display:inline-block;padding:2px 10px;border-radius:8px;font-size:9px;font-weight:800;text-transform:uppercase}
-.sev-critical{background:#fce7f3;color:#be185d}.sev-high{background:#ffedd5;color:#c2410c}.sev-medium{background:#fef3c7;color:#b45309}.sev-low{background:#f0fdf4;color:#16a34a}
-.issue-pill{display:inline-block;padding:2px 8px;border-radius:6px;font-size:9px;font-weight:700;background:#fef2f2;color:#dc2626}
-.ok-pill{font-size:10px;color:#16a34a;font-weight:700}
-.risk-high{color:#dc2626;font-weight:800}.risk-medium{color:#f59e0b;font-weight:700}.risk-low{color:#16a34a;font-weight:600}
-.about-issue{font-size:10px;color:#6366f1;font-style:italic}
-.badge{display:inline-block;padding:2px 8px;border-radius:8px;font-size:9px;font-weight:700;background:#e0e7ff;color:#4338ca;margin-left:4px}
-
-/* ── Action Cards ── */
-.action-grid{display:flex;gap:12px;flex-wrap:wrap}
-.action-card{flex:1;min-width:220px;border-radius:12px;padding:14px 16px;border:1px solid #e2e8f0}
-.action-header{font-size:12px;font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:6px}
-.action-fix{border-left:4px solid #ef4444;background:#fef2f2}.action-fix .action-header{color:#dc2626}
-.action-create{border-left:4px solid #22c55e;background:#f0fdf4}.action-create .action-header{color:#16a34a}
-.action-monitor{border-left:4px solid #3b82f6;background:#eff6ff}.action-monitor .action-header{color:#2563eb}
-.action-card ul{padding-left:16px;font-size:11px;color:#334155}
-.action-card li{margin:4px 0}
-
-/* ── AI Insights ── */
-.ai-badge{font-size:9px;background:linear-gradient(135deg,#7c3aed,#6366f1);color:#fff;padding:3px 10px;border-radius:10px;font-weight:700;margin-left:auto}
-.ai-card{background:#faf5ff;border:1px solid #e9d5ff;border-radius:12px;padding:14px 18px;margin:10px 0}
-.ai-card-label{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#7c3aed;margin-bottom:6px}
-.ai-card p,.ai-card li{font-size:11px;color:#4c1d95}
-
-/* ── Competitor / Cluster / Week Cards ── */
-.comp-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px 18px;margin:10px 0}
-.comp-header{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
-.comp-header strong{font-size:14px}.comp-header small{color:#64748b}
-.threat-high{color:#dc2626;font-weight:800;font-size:10px;padding:2px 8px;background:#fef2f2;border-radius:8px}
-.threat-medium{color:#f59e0b;font-weight:700;font-size:10px;padding:2px 8px;background:#fffbeb;border-radius:8px}
-.threat-low{color:#16a34a;font-weight:600;font-size:10px;padding:2px 8px;background:#f0fdf4;border-radius:8px}
-.beat-tip{background:#e0f2fe;border-radius:8px;padding:8px 12px;font-size:11px;color:#0c4a6e;margin-top:8px}
-.cluster-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px 18px;margin:8px 0}
-.cluster-header{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
-.cluster-kws{font-size:11px;color:#475569;margin:4px 0}.cluster-suggest{font-size:11px;color:#6366f1;margin-top:4px}
-.paa-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.paa-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;font-size:11px}
-.week-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.week-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;text-align:center}
-.week-badge{display:inline-block;padding:3px 12px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:10px;font-weight:800;margin-bottom:6px}
-.week-theme{font-size:12px;font-weight:700;color:#334155;margin-bottom:6px}
-.week-card ul{text-align:left;padding-left:16px;font-size:10px}.week-outcome{font-size:9px;color:#6366f1;margin-top:6px;font-style:italic}
-.outrank-list li{margin:10px 0;font-size:12px;line-height:1.6}
-.ai-breakdown{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px 18px;margin:8px 0}
-.ai-breakdown h3{font-size:12px;font-weight:700;color:#334155;text-transform:capitalize}
-
-/* ── Cover Page ── */
-.cover-page{page-break-after:always;margin:-24px -32px 0 -32px;padding:0}
-.cover-gradient{min-height:92vh;background:linear-gradient(160deg,#0f0a2e 0%,#1e1b4b 30%,#312e81 60%,#4338ca 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:60px 40px;border-radius:0}
-.cover-logos{display:flex;align-items:center;gap:28px;margin-bottom:48px}
-.cover-mantram,.cover-brand{display:flex;flex-direction:column;align-items:center;gap:10px}
-.cover-mantram-logo{height:48px;filter:brightness(10)}
-.cover-mantram-text{font-size:28px;font-weight:900;color:#fff;letter-spacing:1px}
-.cover-mantram-label{font-size:14px;font-weight:700;color:rgba(255,255,255,0.8);letter-spacing:1px;text-transform:uppercase}
-.cover-brand-logo{height:48px;max-width:140px;object-fit:contain;border-radius:8px}
-.cover-brand-initial{width:56px;height:56px;border-radius:14px;background:rgba(255,255,255,0.15);color:#fff;font-size:28px;font-weight:900;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(10px)}
-.cover-brand-name{font-size:14px;font-weight:700;color:rgba(255,255,255,0.8);letter-spacing:0.5px}
-.cover-x{font-size:24px;color:rgba(255,255,255,0.25);font-weight:300;margin:0 8px}
-.cover-title-block{margin-bottom:40px}
-.cover-title{font-size:34px;font-weight:900;color:#fff;letter-spacing:-0.5px;margin:0 0 8px 0;text-shadow:0 2px 4px rgba(0,0,0,0.2)}
-.cover-subtitle{font-size:14px;color:rgba(255,255,255,0.5);margin:0;letter-spacing:0.5px}
-.cover-meta{display:flex;gap:20px;margin-bottom:48px}
-.cover-date,.cover-confidential{font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.5px;font-weight:600}
-.cover-powered{font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:1.5px;text-transform:uppercase}
-
-/* ── Mantram Masthead ── */
-.report-masthead{margin:-32px -40px 20px -40px;padding:0}
-.masthead-bar{display:flex;justify-content:space-between;align-items:center;padding:10px 40px;background:linear-gradient(135deg,#1e1b4b,#312e81);border-radius:12px 12px 0 0}
-.masthead-left{display:flex;align-items:center;gap:10px}
-.mantram-header-logo{height:22px;filter:brightness(10)}
-.mantram-text-logo{font-size:14px;font-weight:900;color:#fff;letter-spacing:0.5px}
-.masthead-divider{color:rgba(255,255,255,0.3);font-size:16px}
-.masthead-studio{font-size:11px;font-weight:700;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:1px}
-.masthead-brand-logo{height:18px;max-width:80px;object-fit:contain;border-radius:4px;margin-right:6px}
-.masthead-brand-name{font-size:11px;font-weight:700;color:rgba(255,255,255,0.7);margin-right:10px}
-.masthead-date{font-size:10px;color:rgba(255,255,255,0.5)}
-.masthead-right{display:flex;align-items:center;text-align:right}
-
-/* ── Trend Arrows ── */
-.trend-up{color:#16a34a;font-size:10px;font-weight:800;margin-left:4px}
-.trend-down{color:#dc2626;font-size:10px;font-weight:800;margin-left:4px}
-
-/* ── Issue Groups (Errors/Warnings/Notices) ── */
-.issue-summary-bar{display:flex;gap:12px;margin:12px 0 16px 0}
-.issue-summary-pill{padding:8px 16px;border-radius:10px;font-size:12px;font-weight:800;text-align:center;flex:1}
-.iss-error{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
-.iss-warning{background:#fffbeb;color:#d97706;border:1px solid #fde68a}
-.iss-notice{background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe}
-.issue-group{border-radius:12px;padding:16px 20px;margin:12px 0}
-.issue-group-error{background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #dc2626}
-.issue-group-warning{background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #f59e0b}
-.issue-group-notice{background:#eff6ff;border:1px solid #bfdbfe;border-left:4px solid #3b82f6}
-.issue-group-header{font-size:13px;font-weight:800;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(0,0,0,0.06)}
-.issue-group-error .issue-group-header{color:#dc2626}
-.issue-group-warning .issue-group-header{color:#d97706}
-.issue-group-notice .issue-group-header{color:#2563eb}
-.issue-item{padding:10px 0;border-bottom:1px solid rgba(0,0,0,0.04)}
-.issue-item:last-child{border-bottom:none;padding-bottom:0}
-.issue-title{font-size:12px;font-weight:700;color:#1e293b;margin-bottom:4px}
-.issue-about{font-size:10px;color:#475569;margin:4px 0;line-height:1.5}
-.issue-fix{font-size:10px;color:#059669;margin:4px 0;line-height:1.5}
-.issue-about strong,.issue-fix strong{font-size:9px;text-transform:uppercase;letter-spacing:0.5px}
-
-/* ── Footer ── */
-.report-footer{margin-top:48px;padding-top:16px;border-top:2px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center}
-.footer-brand{display:flex;align-items:center;gap:8px}
-.footer-logo{height:18px;opacity:0.6}
-.footer-text{font-size:9px;color:#94a3b8}
-.footer-right{font-size:9px;color:#cbd5e1;text-align:right}
-
-/* ── Print ── */
-@media print{
-    body{padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    .page{padding:24px 32px}
-    .cover-page{page-break-after:always;margin:0;padding:0}
-    .cover-gradient{min-height:100vh;border-radius:0}
-    .section-break{page-break-before:auto}
-    table{page-break-inside:auto}
-    tr{page-break-inside:avoid}
-    .scores{page-break-inside:avoid}
-    .action-grid{page-break-inside:avoid}
-}
-@page{margin:16mm 12mm;size:A4}
-</style></head><body><div class="page">${body}
-<div class="report-footer">
-    <div class="footer-brand">
-        <img src="${mantramLogo}" class="footer-logo" alt="Mantram AI" onerror="this.style.display='none'" />
-        <span class="footer-text">Generated by <strong>Mantram AI</strong> SEO Studio</span>
-    </div>
-    <div class="footer-right">
-        <span>${title} • ${brandName}</span><br>
-        <span>${date} • Confidential</span>
-    </div>
-</div>
-</div></body></html>`
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title} — ${brandName}</title><style>
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter','Segoe UI',sans-serif;color:#1e293b;padding:40px;max-width:900px;margin:0 auto;font-size:13px;line-height:1.6}
+h1{font-size:24px;margin-bottom:4px;color:#0f172a}h2{font-size:16px;margin:24px 0 12px;color:#1e293b;border-bottom:2px solid #e2e8f0;padding-bottom:6px}h3{font-size:14px;margin:8px 0;color:#334155}
+.meta{color:#64748b;margin-bottom:16px;font-size:12px}.summary{background:#f8fafc;border-left:4px solid #6366f1;padding:12px 16px;margin-bottom:24px;border-radius:0 8px 8px 0}
+.scores{display:flex;gap:16px;margin:16px 0;flex-wrap:wrap}.score-card{background:#f1f5f9;border-radius:12px;padding:16px 24px;text-align:center;min-width:100px}
+.score-value{font-size:32px;font-weight:900;color:#6366f1}.score-label{font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase}
+table{width:100%;border-collapse:collapse;margin:12px 0}th{background:#f1f5f9;padding:8px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#475569}
+td{padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:12px}small{color:#94a3b8}
+.sev-critical{color:#e11d48;font-weight:700}.sev-high{color:#f97316;font-weight:700}.sev-medium{color:#f59e0b}.sev-low{color:#64748b}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#f1f5f9;color:#475569;margin-left:6px}
+.cluster,.comp,.section,.week{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin:8px 0}
+ul,ol{padding-left:20px}li{margin:4px 0}
+@media print{body{padding:20px}h1{font-size:20px}}
+</style></head><body>${body}<div style="margin-top:40px;padding-top:16px;border-top:2px solid #e2e8f0;text-align:center"><p style="color:#94a3b8;font-size:10px">Generated by Mantram AI SEO Studio • ${date}</p></div></body></html>`
 
         const w = window.open('', '_blank')
         w.document.write(html)
         w.document.close()
-        setTimeout(() => { w.print() }, 800)
+        setTimeout(() => { w.print() }, 500)
     }
 
     // ── RENDER ────────────────────────────────────────────────────────────
@@ -1089,7 +572,7 @@ small{color:#94a3b8;font-size:10px}
                                 ))}</div>
                                 <p className="text-[10px] text-slate-600 mt-4">
                                     {loadingElapsed > 0 && `${Math.floor(loadingElapsed / 60)}:${String(loadingElapsed % 60).padStart(2, '0')} elapsed`}
-                                    {loadingElapsed > 15 && ' — full-site crawl (800+ pages) takes 3-5 minutes'}
+                                    {loadingElapsed > 15 && ' — AI analysis can take up to 3 minutes for complex sites'}
                                 </p>
                                 <button onClick={cancelWorkflow}
                                     className="mt-4 px-4 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-white bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] cursor-pointer transition-all flex items-center gap-1.5">
@@ -1098,26 +581,8 @@ small{color:#94a3b8;font-size:10px}
                             </div>
                         )}
 
-                        {/* ─── Baseline data indicator ─── */}
-                        {isWorkflow && !loading && results && results._isBaseline && (
-                            <div className="flex items-center justify-between p-3 rounded-xl mb-4 animate-fade-in" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}>
-                                <div className="flex items-center gap-2 text-xs text-emerald-400">
-                                    <span className="material-symbols-outlined text-sm">auto_awesome</span>
-                                    <span>Auto-generated during brand onboarding • <strong className="text-white">Deterministic scoring — no AI hallucination</strong></span>
-                                </div>
-                                <CreditTooltipWrapper action={currentItem?.creditAction}>
-                                    <button onClick={() => runWorkflow(activeSection)} disabled={loading}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white cursor-pointer hover:brightness-110 transition-all"
-                                        style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
-                                        <span className="material-symbols-outlined text-xs">play_arrow</span> Run Full Health Check
-                                        <CreditBadge action={currentItem?.creditAction} />
-                                    </button>
-                                </CreditTooltipWrapper>
-                            </div>
-                        )}
-
                         {/* ─── Saved-data indicator ─── */}
-                        {isWorkflow && !loading && results && savedAt && !results._isBaseline && (
+                        {isWorkflow && !loading && results && savedAt && (
                             <div className="flex items-center justify-between p-3 rounded-xl mb-4 animate-fade-in" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.12)' }}>
                                 <div className="flex items-center gap-2 text-xs text-slate-400">
                                     <span className="material-symbols-outlined text-primary text-sm">history</span>
@@ -1248,9 +713,6 @@ small{color:#94a3b8;font-size:10px}
                                 gaConnected={gaConnected}
                                 gaReport={gaReport}
                                 gscReport={gscReport}
-                                gaLoading={gaLoading}
-                                gaAuthError={gaAuthError}
-                                reconnectGA={reconnectGA}
                                 hideNav
                             />
                         )}
@@ -1269,290 +731,26 @@ small{color:#94a3b8;font-size:10px}
 
 function HealthCheckResults({ results }) {
     const [issueFilter, setIssueFilter] = useState('all')
-    const [showPageCards, setShowPageCards] = useState(false)
-    const [showAiInsights, setShowAiInsights] = useState(true)
     const issues = results.issues || []
     const filtered = issueFilter === 'all' ? issues : issues.filter(i => i.severity === issueFilter)
-    const stats = results.siteStats || {}
-    const pageReports = results.pageReports || []
-
-    // ── Bridge backend data names to existing UI (Semrush parity) ──
-    // Use local variables instead of mutating React state
-    const groupedIssues = results.groupedIssues || results.categorizedIssues || null
-    const trends = results.trends || null
-    const trendDelta = results.trendDelta || (trends ? {
-        previousDate: trends.previousAuditDate,
-        scoreChange: trends.scores?.seoHealth?.delta || 0,
-        technicalChange: trends.scores?.technicalScore?.delta || 0,
-        newIssueCount: trends.issues?.total?.delta > 0 ? trends.issues.total.delta : 0,
-        resolvedIssueCount: trends.issues?.total?.delta < 0 ? Math.abs(trends.issues.total.delta) : 0,
-        pagesCrawledChange: trends.metrics?.pagesCrawled?.delta || 0,
-        brokenInternalChange: trends.metrics?.brokenInternalCount?.delta || 0,
-        thinPageChange: trends.metrics?.thinPageCount?.delta || 0,
-        duplicateTitleChange: trends.metrics?.duplicateContentCount?.delta || 0,
-    } : null)
 
     return (<>
         {/* Summary */}
         <div className="glass-panel rounded-2xl p-6 mb-6">
             <p className="text-sm text-slate-300 leading-relaxed">{results.summary}</p>
-            {results.topOpportunity && <p className="text-sm text-primary font-bold mt-2">{results.topOpportunity}</p>}
-            {results.strategicBrief && <p className="text-xs text-slate-400 mt-3 leading-relaxed">{results.strategicBrief}</p>}
+            <p className="text-sm text-primary font-bold mt-2">{results.topOpportunity}</p>
         </div>
 
-        {/* Score Cards — with trend arrows ↑/↓ when available */}
+        {/* Score Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-            {[{ s: results.seoHealthScore, l: 'SEO Health', c: 'emerald', tk: 'seoHealth' },
-              { s: results.aiVisibilityScore, l: 'AI Visibility', c: 'violet', tk: null },
-              { s: results.technicalScore, l: 'Technical', c: 'blue', tk: 'technicalScore' },
-              { s: results.contentScore, l: 'Content', c: 'amber', tk: 'contentScore' },
-              { s: results.authorityScore, l: 'Authority', c: 'rose', tk: 'authorityScore' }].map(x => {
-                const trendData = x.tk && trends?.scores?.[x.tk]
-                return (
-                    <div key={x.l} className="glass-panel rounded-2xl p-4 flex flex-col items-center relative">
-                        <ScoreRing score={x.s || 0} size={80} label={x.l} color={x.c} />
-                        {trendData && trendData.delta !== 0 && (
-                            <span className={`absolute top-2 right-2 text-[10px] font-black px-1.5 py-0.5 rounded-full ${
-                                trendData.improved ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'
-                            }`}>{trendData.label}</span>
-                        )}
-                    </div>
-                )
-            })}
+            {[{ s: results.seoHealthScore, l: 'SEO Health', c: 'emerald' }, { s: results.aiVisibilityScore, l: 'AI Visibility', c: 'violet' },
+            { s: results.technicalScore, l: 'Technical', c: 'blue' }, { s: results.contentScore, l: 'Content', c: 'amber' },
+            { s: results.authorityScore, l: 'Authority', c: 'rose' }].map(x => (
+                <div key={x.l} className="glass-panel rounded-2xl p-4 flex flex-col items-center">
+                    <ScoreRing score={x.s || 0} size={80} label={x.l} color={x.c} />
+                </div>
+            ))}
         </div>
-
-        {/* ── Trend Delta (since last audit) ── */}
-        {trendDelta && (
-            <div className="glass-panel rounded-2xl p-5 mb-6 border border-primary/10">
-                <h4 className="text-xs font-bold text-primary uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm">trending_up</span> Changes Since Last Audit
-                    <span className="ml-auto text-[9px] text-slate-500 font-normal normal-case">{new Date(trendDelta.previousDate).toLocaleDateString()}</span>
-                </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {[
-                        { label: 'Score', value: trendDelta.scoreChange, suffix: '' },
-                        { label: 'Technical', value: trendDelta.technicalChange, suffix: '' },
-                        { label: 'New Issues', value: trendDelta.newIssueCount, suffix: '', isCount: true },
-                        { label: 'Resolved', value: trendDelta.resolvedIssueCount, suffix: '', isCount: true, isPositive: true },
-                        { label: 'Pages Crawled', value: trendDelta.pagesCrawledChange, suffix: '' },
-                        { label: 'Broken Internal', value: trendDelta.brokenInternalChange, suffix: '', isNegative: true },
-                        { label: 'Thin Pages', value: trendDelta.thinPageChange, suffix: '', isNegative: true },
-                        { label: 'Dup. Titles', value: trendDelta.duplicateTitleChange, suffix: '', isNegative: true },
-                    ].map(d => (
-                        <div key={d.label} className="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                            <span className={`text-base font-black ${d.isCount ? (d.isPositive ? 'text-emerald-400' : (d.value > 0 ? 'text-red-400' : 'text-slate-400')) : (d.isNegative ? (d.value > 0 ? 'text-red-400' : d.value < 0 ? 'text-emerald-400' : 'text-slate-400') : (d.value > 0 ? 'text-emerald-400' : d.value < 0 ? 'text-red-400' : 'text-slate-400'))}`}>
-                                {d.isCount ? d.value : (d.value > 0 ? '+' : '')}{d.value}{d.suffix}
-                            </span>
-                            <span className="text-[9px] text-slate-500 font-bold uppercase">{d.label}</span>
-                        </div>
-                    ))}
-                </div>
-                {/* Per-issue deltas */}
-                {trendDelta.issueDeltas?.length > 0 && (
-                    <div className="mt-4 border-t border-white/[0.06] pt-3">
-                        <p className="text-[9px] font-bold text-slate-500 uppercase mb-2">Issue-Level Changes</p>
-                        <div className="space-y-1.5">
-                            {trendDelta.issueDeltas.slice(0, 12).map((d, idx) => (
-                                <div key={idx} className="flex items-center gap-2 text-[10px]">
-                                    {d.status === 'new' && <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 font-black">NEW</span>}
-                                    {d.status === 'resolved' && <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-black">✓ RESOLVED</span>}
-                                    {d.status === 'changed' && <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 font-black">CHANGED</span>}
-                                    <span className="text-slate-300 truncate flex-1">{d.check}</span>
-                                    {d.status === 'changed' && <span className="text-slate-500 text-[9px]">{d.previousValue} → {d.currentValue}</span>}
-                                    {d.status === 'new' && <span className="text-slate-500 text-[9px]">{d.currentValue}</span>}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </div>
-        )}
-
-        {/* ── Crawl Intelligence Dashboard ── */}
-        <div className="glass-panel rounded-2xl p-5 mb-6">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-sm text-primary">monitoring</span> Crawl Intelligence
-            </h4>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-                {[
-                    { label: 'Pages Crawled', value: stats.pagesCrawled || 0, icon: 'description', color: '#6366f1' },
-                    { label: 'Avg Response', value: `${stats.responseTimeAvg || 0}ms`, icon: 'speed', color: (stats.responseTimeAvg || 0) > 2000 ? '#f43f5e' : '#10b981' },
-                    { label: 'Avg Page Size', value: `${stats.pageSizeAvg || 0}KB`, icon: 'data_usage', color: (stats.pageSizeAvg || 0) > 2000 ? '#f59e0b' : '#10b981' },
-                    { label: 'Thin Pages', value: stats.thinPageCount || 0, icon: 'short_text', color: (stats.thinPageCount || 0) > 0 ? '#f59e0b' : '#10b981' },
-                    { label: 'Orphan Pages', value: stats.orphanPageCount || 0, icon: 'link_off', color: (stats.orphanPageCount || 0) > 0 ? '#f43f5e' : '#10b981' },
-                    { label: 'Security', value: stats.securityHeaderScore || '0/7', icon: 'shield', color: '#6366f1' },
-                    { label: 'Broken External', value: stats.brokenExternalCount || 0, icon: 'broken_image', color: (stats.brokenExternalCount || 0) > 0 ? '#f43f5e' : '#10b981' },
-                    { label: 'Broken Internal', value: stats.brokenInternalCount || 0, icon: 'link_off', color: (stats.brokenInternalCount || 0) > 0 ? '#f43f5e' : '#10b981' },
-                    { label: 'Empty Anchors', value: stats.emptyAnchorCount || 0, icon: 'text_fields', color: (stats.emptyAnchorCount || 0) > 0 ? '#f59e0b' : '#10b981' },
-                    { label: 'Nofollow Internal', value: stats.nofollowInternalCount || 0, icon: 'block', color: (stats.nofollowInternalCount || 0) > 0 ? '#f59e0b' : '#10b981' },
-                    { label: 'Canon. Conflicts', value: stats.conflictingCanonicalCount || 0, icon: 'content_copy', color: (stats.conflictingCanonicalCount || 0) > 0 ? '#f43f5e' : '#10b981' },
-                    { label: 'Browser Cache', value: stats.cacheControlPresent ? 'Yes' : 'No', icon: 'cached', color: stats.cacheControlPresent ? '#10b981' : '#f59e0b' },
-                    { label: 'AI Crawl (llms.txt)', value: stats.llmsTxtFound ? 'Found' : 'Missing', icon: 'smart_toy', color: stats.llmsTxtFound ? '#10b981' : '#f59e0b' },
-                    // ── Semrush parity: Missing metrics ──
-                    { label: 'Missing H1', value: stats.missingH1Count || 0, icon: 'title', color: (stats.missingH1Count || 0) > 0 ? '#f43f5e' : '#10b981' },
-                    { label: 'Multiple H1', value: stats.multipleH1Count || 0, icon: 'format_h1', color: (stats.multipleH1Count || 0) > 0 ? '#f59e0b' : '#10b981' },
-                    { label: 'Perm. Redirects', value: stats.permanentRedirectCount || 0, icon: 'alt_route', color: (stats.permanentRedirectCount || 0) > 0 ? '#f59e0b' : '#10b981' },
-                    { label: 'Blocked (robots)', value: stats.blockedByRobotsTxtCount || 0, icon: 'gpp_bad', color: (stats.blockedByRobotsTxtCount || 0) > 0 ? '#f59e0b' : '#10b981' },
-                    { label: 'Missing Alt Text', value: stats.missingAltCount || 0, icon: 'image_not_supported', color: (stats.missingAltCount || 0) > 0 ? '#f59e0b' : '#10b981' },
-                    { label: 'Dup. Titles', value: stats.titleDuplicateCount || 0, icon: 'file_copy', color: (stats.titleDuplicateCount || 0) > 0 ? '#f59e0b' : '#10b981' },
-                    { label: 'Redirect Chains', value: stats.redirectChainCount || 0, icon: 'link', color: (stats.redirectChainCount || 0) > 0 ? '#f59e0b' : '#10b981' },
-                    { label: 'Missing Meta Desc', value: stats.missingMetaDescCount || 0, icon: 'description', color: (stats.missingMetaDescCount || 0) > 0 ? '#f59e0b' : '#10b981' },
-                    { label: 'Schema Types', value: (stats.schemaTypes || []).length > 0 ? (stats.schemaTypes || []).length : '✗', icon: 'data_object', color: (stats.schemaTypes || []).length > 0 ? '#10b981' : '#f43f5e' },
-                    { label: 'Slow Pages (>3s)', value: stats.slowPageCount || 0, icon: 'hourglass_top', color: (stats.slowPageCount || 0) > 0 ? '#f43f5e' : '#10b981' },
-                    { label: 'Noindex Pages', value: stats.noindexPageCount || 0, icon: 'visibility_off', color: (stats.noindexPageCount || 0) > 0 ? '#f59e0b' : '#10b981' },
-                    // ── Backlink Intelligence (DataForSEO) ──
-                    ...(stats.backlinkDataAvailable ? [
-                      { label: 'Referring Domains', value: (stats.referringDomains || 0).toLocaleString(), icon: 'hub', color: '#8b5cf6' },
-                      { label: 'Domain Rank', value: stats.domainRank || 0, icon: 'military_tech', color: '#8b5cf6' },
-                    ] : []),
-                    // ── Moz Domain Authority ──
-                    ...(stats.mozAvailable ? [
-                      { label: 'Domain Auth. (DA)', value: stats.domainAuthority || 0, icon: 'verified', color: '#f59e0b' },
-                      { label: 'Page Auth. (PA)', value: stats.pageAuthority || 0, icon: 'description', color: '#f59e0b' },
-                      { label: 'Spam Score', value: `${stats.spamScore || 0}%`, icon: 'shield', color: (stats.spamScore || 0) > 30 ? '#f43f5e' : '#10b981' },
-                    ] : []),
-                    // ── Resource Scanning (Semrush parity) ──
-                    { label: 'Blocked Resources', value: stats.blockedResourceCount || 0, icon: 'block', color: (stats.blockedResourceCount || 0) > 0 ? '#f43f5e' : '#10b981' },
-                    { label: 'Uncached JS/CSS', value: stats.uncachedResourceCount || 0, icon: 'cloud_off', color: (stats.uncachedResourceCount || 0) > 0 ? '#f59e0b' : '#10b981' },
-                    { label: 'Unminified JS/CSS', value: stats.unminifiedResourceCount || 0, icon: 'compress', color: (stats.unminifiedResourceCount || 0) > 0 ? '#f59e0b' : '#10b981' },
-                ].map(s => (
-                    <div key={s.label} className="flex items-center gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                        <span className="material-symbols-outlined text-lg" style={{ color: s.color }}>{s.icon}</span>
-                        <div>
-                            <p className="text-base font-black text-white leading-tight">{s.value}</p>
-                            <p className="text-[9px] text-slate-500 font-bold uppercase">{s.label}</p>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {/* Page Status Distribution */}
-            {stats.pageStatusDistribution && (
-                <div className="flex items-center gap-2 mt-4 flex-wrap">
-                    <span className="text-[9px] text-slate-600 font-bold uppercase">Status:</span>
-                    {[
-                        { label: '2xx', count: stats.pageStatusDistribution.status200, color: '#10b981' },
-                        { label: '3xx', count: stats.pageStatusDistribution.status301, color: '#f59e0b' },
-                        { label: '404', count: stats.pageStatusDistribution.status404, color: '#f43f5e' },
-                        { label: '5xx', count: stats.pageStatusDistribution.status5xx, color: '#dc2626' },
-                    ].filter(s => s.count > 0).map(s => (
-                        <span key={s.label} className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${s.color}15`, color: s.color }}>
-                            {s.label}: {s.count}
-                        </span>
-                    ))}
-                    {(stats.mixedContentCount || 0) > 0 && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400">⚠️ {stats.mixedContentCount} mixed content</span>
-                    )}
-                    {(stats.noindexPageCount || 0) > 0 && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400">🚫 {stats.noindexPageCount} noindex</span>
-                    )}
-                </div>
-            )}
-        </div>
-
-        {/* ── Security Headers (NEW — unique feature) ── */}
-        {stats.securityHeaders?.length > 0 && (
-            <div className="glass-panel rounded-2xl p-5 mb-6">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm text-violet-400">shield</span> Security Headers
-                    <span className="text-[9px] text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded-full ml-auto">★ Unique to Mantram AI</span>
-                </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                    {stats.securityHeaders.map((h, i) => (
-                        <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${h.present ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-rose-500/5 border-rose-500/10'}`}>
-                            <span className={`material-symbols-outlined text-sm ${h.present ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                {h.present ? 'check_circle' : 'cancel'}
-                            </span>
-                            <div>
-                                <p className={`text-[10px] font-bold ${h.present ? 'text-emerald-400' : 'text-rose-400'}`}>{h.name}</p>
-                                <p className="text-[8px] text-slate-600 uppercase">{h.importance}</p>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        )}
-
-        {/* ── AI Insights Panel (Competitive Moat — only Mantram has this) ── */}
-        {results.aiInsights && results.aiInsights.poweredBy?.length > 0 && (
-            <div className="glass-panel rounded-2xl p-5 mb-6 border border-violet-500/15">
-                <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider flex items-center gap-2">
-                        <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Insights
-                        <span className="text-[8px] text-violet-400/60 bg-violet-500/10 px-1.5 py-0.5 rounded-full ml-1">★ Mantram AI Exclusive</span>
-                    </h4>
-                    <button onClick={() => setShowAiInsights(!showAiInsights)}
-                        className="text-[10px] font-bold text-violet-400 px-2 py-1 rounded-lg bg-violet-500/10 hover:bg-violet-500/15 cursor-pointer transition-all flex items-center gap-1">
-                        <span className="material-symbols-outlined text-xs">{showAiInsights ? 'expand_less' : 'expand_more'}</span>
-                        {showAiInsights ? 'Hide' : 'Show'}
-                    </button>
-                </div>
-                {showAiInsights && (
-                    <div className="space-y-4 animate-fade-in">
-                        {/* AI Trend Summary */}
-                        {results.aiInsights.trendSummary && (
-                            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
-                                    <span className="material-symbols-outlined text-xs text-amber-400">trending_up</span> AI Trend Analysis
-                                </p>
-                                <p className="text-xs text-slate-300 leading-relaxed">{results.aiInsights.trendSummary}</p>
-                            </div>
-                        )}
-
-                        {/* AI Fix Priorities */}
-                        {results.aiInsights.fixPriorities?.length > 0 && (
-                            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-2 flex items-center gap-1">
-                                    <span className="material-symbols-outlined text-xs text-emerald-400">priority_high</span> Top Fixes by Traffic Impact
-                                </p>
-                                <div className="space-y-2">
-                                    {results.aiInsights.fixPriorities.map((fix, i) => (
-                                        <div key={i} className="flex items-start gap-2.5 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] transition-all">
-                                            <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${
-                                                fix.impact === 'high' ? 'bg-rose-500/20 text-rose-400' : fix.impact === 'medium' ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-500/20 text-slate-400'
-                                            }`}>#{fix.rank}</span>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-[11px] font-bold text-white">{fix.title}</p>
-                                                <p className="text-[10px] text-slate-400 mt-0.5">{fix.reason}</p>
-                                            </div>
-                                            {fix.estimatedScoreGain > 0 && (
-                                                <span className="flex-shrink-0 text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">+{fix.estimatedScoreGain} pts</span>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* AI Duplicate Validation */}
-                        {results.aiInsights.duplicateValidation && (
-                            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
-                                    <span className="material-symbols-outlined text-xs text-blue-400">content_copy</span> AI Duplicate Validation
-                                </p>
-                                <p className="text-xs text-slate-300 mb-2">{results.aiInsights.duplicateValidation.summary}</p>
-                                <div className="flex gap-3">
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400">
-                                        {results.aiInsights.duplicateValidation.trueDuplicateCount} True Duplicates
-                                    </span>
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">
-                                        {results.aiInsights.duplicateValidation.falsePositiveCount} False Positives
-                                    </span>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Powered By */}
-                        <div className="flex items-center gap-2 pt-2 border-t border-white/[0.04]">
-                            <span className="text-[8px] text-slate-600 uppercase font-bold">Powered by</span>
-                            {results.aiInsights.poweredBy.map((model, i) => (
-                                <span key={i} className="text-[8px] text-violet-400/60 bg-violet-500/8 px-1.5 py-0.5 rounded-full">{model}</span>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </div>
-        )}
 
         {/* Action Board */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -1561,132 +759,10 @@ function HealthCheckResults({ results }) {
             <ActionBucket title="👁️ Monitor" items={results.monitor} color="blue" />
         </div>
 
-        {/* ── Per-Page Report Cards (NEW — like Semrush) ── */}
-        {pageReports.length > 0 && (
-            <div className="glass-panel rounded-2xl p-5 mb-6">
-                <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                        <span className="material-symbols-outlined text-sm text-blue-400">analytics</span> Per-Page Report ({pageReports.length} pages)
-                    </h4>
-                    <button onClick={() => setShowPageCards(!showPageCards)}
-                        className="text-[10px] font-bold text-primary px-2 py-1 rounded-lg bg-primary/10 hover:bg-primary/15 cursor-pointer transition-all flex items-center gap-1">
-                        <span className="material-symbols-outlined text-xs">{showPageCards ? 'expand_less' : 'expand_more'}</span>
-                        {showPageCards ? 'Collapse' : 'Expand'}
-                    </button>
-                </div>
-                {showPageCards && (
-                    <div className="space-y-2 animate-fade-in">
-                        {pageReports.map((page, i) => {
-                            const pageIssueTags = []
-                            if (!page.hasH1) pageIssueTags.push('No H1')
-                            if (page.h1Count > 1) pageIssueTags.push(`${page.h1Count} H1s`)
-                            if (!page.headingHierarchyValid) pageIssueTags.push('Heading Skip')
-                            if (page.titleLength === 0) pageIssueTags.push('No Title')
-                            if (page.titleLength > 60) pageIssueTags.push('Title Too Long')
-                            if (page.metaDescLength === 0) pageIssueTags.push('No Meta Desc')
-                            if (page.imagesWithoutAlt > 0) pageIssueTags.push(`${page.imagesWithoutAlt} No-Alt Imgs`)
-                            if (page.urlTooLong) pageIssueTags.push('URL >75 chars')
-                            if (page.metaRobots?.noindex) pageIssueTags.push('noindex')
-                            if (page.wordCount < 300 && page.wordCount > 0) pageIssueTags.push('Thin')
-                            if (page.responseTimeMs > 3000) pageIssueTags.push('Slow')
-
-                            return (
-                                <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] transition-all">
-                                    {/* Status dot */}
-                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${pageIssueTags.length === 0 ? 'bg-emerald-400' : pageIssueTags.length <= 2 ? 'bg-amber-400' : 'bg-rose-400'}`} />
-                                    {/* URL + title */}
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-[11px] font-bold text-white truncate">{page.title || page.url}</p>
-                                        <p className="text-[9px] text-slate-600 truncate">{page.url}</p>
-                                    </div>
-                                    {/* Stats */}
-                                    <div className="flex items-center gap-3 flex-shrink-0">
-                                        <span className="text-[9px] text-slate-500">{page.responseTimeMs}ms</span>
-                                        <span className="text-[9px] text-slate-500">{page.pageSizeKB}KB</span>
-                                        <span className="text-[9px] text-slate-500">{page.wordCount}w</span>
-                                    </div>
-                                    {/* Issue tags */}
-                                    {pageIssueTags.length > 0 && (
-                                        <div className="flex gap-1 flex-shrink-0">
-                                            {pageIssueTags.slice(0, 3).map((tag, ti) => (
-                                                <span key={ti} className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500/10 text-rose-400">{tag}</span>
-                                            ))}
-                                            {pageIssueTags.length > 3 && <span className="text-[8px] text-slate-600">+{pageIssueTags.length - 3}</span>}
-                                        </div>
-                                    )}
-                                </div>
-                            )
-                        })}
-                    </div>
-                )}
-            </div>
-        )}
-
-        {/* ── ERRORS / WARNINGS / NOTICES (Semrush-style) ── */}
-        {groupedIssues && (groupedIssues.errorCount > 0 || groupedIssues.warningCount > 0 || groupedIssues.noticeCount > 0) && (
-            <div className="space-y-4 mb-6">
-                {[
-                    { key: 'errors', label: 'Errors', items: groupedIssues?.errors || [], color: '#f43f5e', bg: 'bg-rose-500', icon: 'error' },
-                    { key: 'warnings', label: 'Warnings', items: groupedIssues?.warnings || [], color: '#f59e0b', bg: 'bg-amber-500', icon: 'warning' },
-                    { key: 'notices', label: 'Notices', items: groupedIssues?.notices || [], color: '#3b82f6', bg: 'bg-blue-500', icon: 'info' },
-                ].filter(g => g.items.length > 0).map(group => (
-                    <details key={group.key} open={group.key === 'errors'} className="glass-panel rounded-2xl overflow-hidden">
-                        <summary className="cursor-pointer p-4 flex items-center gap-3 hover:bg-white/[0.02] transition-all">
-                            <span className="material-symbols-outlined text-lg" style={{ color: group.color }}>{group.icon}</span>
-                            <span className="text-sm font-bold text-white">{group.label}</span>
-                            <span className={`text-xs px-2.5 py-0.5 rounded-full font-black text-white ${group.bg}/20`} style={{ background: `${group.color}20`, color: group.color }}>
-                                {group.items.length}
-                            </span>
-                            <span className="material-symbols-outlined text-sm text-slate-600 ml-auto">expand_more</span>
-                        </summary>
-                        <div className="px-4 pb-4 space-y-2">
-                            {group.items.map((issue, idx) => (
-                                <details key={idx} className="rounded-xl bg-white/[0.02] border border-white/[0.06] overflow-hidden">
-                                    <summary className="cursor-pointer p-3 flex items-center gap-3 hover:bg-white/[0.02] transition-all">
-                                        <span className="w-1 h-6 rounded-full shrink-0" style={{ background: group.color }} />
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-xs font-bold text-white truncate">{issue.check}</p>
-                                            <p className="text-[10px] text-slate-500">{issue.value}</p>
-                                        </div>
-                                        <span className="material-symbols-outlined text-sm text-slate-600">chevron_right</span>
-                                    </summary>
-                                    <div className="px-4 pb-3 border-t border-white/[0.04] mt-1 pt-3 space-y-2">
-                                        {issue.aboutThisIssue && (
-                                            <div>
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">About this issue</p>
-                                                <p className="text-xs text-slate-300 leading-relaxed">{issue.aboutThisIssue}</p>
-                                            </div>
-                                        )}
-                                        {issue.howToFix && (
-                                            <div>
-                                                <p className="text-[10px] font-bold text-emerald-400 uppercase mb-1">How to fix</p>
-                                                <p className="text-xs text-slate-300 leading-relaxed">{issue.howToFix}</p>
-                                            </div>
-                                        )}
-                                        {issue.affectedUrls?.length > 0 && (
-                                            <div>
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Affected Pages ({issue.affectedUrls.length})</p>
-                                                <div className="space-y-1">
-                                                    {issue.affectedUrls.slice(0, 10).map((url, j) => (
-                                                        <a key={j} href={url} target="_blank" rel="noopener noreferrer"
-                                                            className="block text-[10px] text-primary/60 hover:text-primary truncate transition-colors">{url}</a>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </details>
-                            ))}
-                        </div>
-                    </details>
-                ))}
-            </div>
-        )}
-
-        {/* AI-Generated Issues List */}
+        {/* Issues List */}
         <div className="glass-panel rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-bold text-white">{issues.length} AI-Identified Issues</h3>
+                <h3 className="text-base font-bold text-white">{issues.length} Issues Found</h3>
                 <div className="flex gap-1">
                     {['all', ...SEVERITY_ORDER].map(s => (
                         <button key={s} onClick={() => setIssueFilter(s)}
@@ -1860,195 +936,12 @@ function AIVisibilityResults({ results }) {
     return (<>
         <div className="glass-panel rounded-2xl p-6 mb-6">
             <div className="flex items-center gap-6">
-            <ScoreRing score={results.aiVisibilityScore || 0} size={100} label="AI Visibility" color="violet" />
-                <div className="flex-1">
-                    <p className="text-sm text-slate-300 leading-relaxed">{results.summary}</p>
-                    {results.scoreBreakdown && <p className="text-[10px] text-slate-600 mt-2">Score: {results.scoreBreakdown.formula} — On-page: {results.scoreBreakdown.onPageAnalysis}, Probe: {results.scoreBreakdown.realProbeScore}{results.scoreBreakdown.margin > 0 ? ` ±${results.scoreBreakdown.margin}` : ''} <span className={`ml-2 px-1.5 py-0.5 rounded-full ${results.scoreBreakdown.confidence === 'high' ? 'bg-emerald-500/15 text-emerald-400' : results.scoreBreakdown.confidence === 'medium' ? 'bg-amber-500/15 text-amber-400' : 'bg-red-500/15 text-red-400'}`}>{results.scoreBreakdown.confidence || 'unknown'} confidence</span></p>}
-                </div>
+                <ScoreRing score={results.aiVisibilityScore || 0} size={100} label="AI Visibility" color="violet" />
+                <p className="text-sm text-slate-300 leading-relaxed flex-1">{results.summary}</p>
             </div>
         </div>
 
-        {/* ═══ Live AI Probe Results (Real LLM Data) ═══ */}
-        {results.geoProbe && (
-            <div className="glass-panel rounded-2xl p-5 mb-6 border border-violet-500/10">
-                <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm">smart_toy</span> Live AI Probe — Real LLM Responses
-                    {results.geoProbe.samplesPerPrompt > 1 && <span className="ml-auto text-[9px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300 font-medium">{results.geoProbe.samplesPerPrompt}x Multi-Sample</span>}
-                    {results.geoProbe.sentimentMethod === 'llm' && <span className="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 font-medium">LLM Sentiment</span>}
-                </h4>
-
-                {/* Probe Stats */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                    {[
-                        { label: 'Mention Rate', value: `${results.geoProbe.mentionRate}%`, icon: 'trending_up', color: results.geoProbe.mentionRate > 50 ? '#10b981' : results.geoProbe.mentionRate > 20 ? '#f59e0b' : '#f43f5e' },
-                        { label: 'Weighted Rate', value: `${results.geoProbe.weightedMentionRate || results.geoProbe.mentionRate}%`, icon: 'balance', color: '#a78bfa' },
-                        { label: 'Total Probes', value: results.geoProbe.totalProbes, icon: 'query_stats', color: '#8b5cf6' },
-                        { label: 'Score', value: results.geoProbe.scoreCI ? `${results.geoProbe.realScore}±${results.geoProbe.scoreCI.margin}` : results.geoProbe.realScore, icon: 'verified', color: results.geoProbe.realScore > 50 ? '#10b981' : '#f59e0b' },
-                    ].map(s => (
-                        <div key={s.label} className="flex items-center gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                            <span className="material-symbols-outlined text-lg" style={{ color: s.color }}>{s.icon}</span>
-                            <div>
-                                <p className="text-base font-black text-white leading-tight">{s.value}</p>
-                                <p className="text-[9px] text-slate-500 font-bold uppercase">{s.label}</p>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Per-Model Breakdown */}
-                {results.geoProbe.modelBreakdown && (
-                    <div className="flex gap-3 mb-4 flex-wrap">
-                        {Object.entries(results.geoProbe.modelBreakdown).map(([model, data]) => (
-                            <div key={model} className="flex-1 min-w-[140px] p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                                <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">{model}</p>
-                                <p className="text-lg font-black text-white">{data.mentionRate}%</p>
-                                <p className="text-[9px] text-slate-600">{data.mentioned}/{data.probed} probes mentioned brand</p>
-                                <div className="flex gap-1 mt-1">
-                                    {data.sentiment.positive > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">{data.sentiment.positive} positive</span>}
-                                    {data.sentiment.neutral > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-500/10 text-slate-400">{data.sentiment.neutral} neutral</span>}
-                                    {data.sentiment.negative > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400">{data.sentiment.negative} negative</span>}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {/* Sentiment Distribution */}
-                {results.geoProbe.sentimentDistribution && (
-                    <div className="mb-4">
-                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">Sentiment Distribution</p>
-                        <div className="h-3 rounded-full overflow-hidden flex bg-slate-800">
-                            {(() => { const sd = results.geoProbe.sentimentDistribution; const total = Math.max(1, (sd.positive || 0) + (sd.neutral || 0) + (sd.negative || 0)); return (<>
-                                {sd.positive > 0 && <div className="bg-emerald-500 transition-all" style={{ width: `${(sd.positive / total) * 100}%` }} />}
-                                {sd.neutral > 0 && <div className="bg-slate-500 transition-all" style={{ width: `${(sd.neutral / total) * 100}%` }} />}
-                                {sd.negative > 0 && <div className="bg-red-500 transition-all" style={{ width: `${(sd.negative / total) * 100}%` }} />}
-                            </>); })()}
-                        </div>
-                        <div className="flex gap-4 mt-1">
-                            <span className="text-[9px] text-emerald-400">● Positive: {results.geoProbe.sentimentDistribution.positive}</span>
-                            <span className="text-[9px] text-slate-400">● Neutral: {results.geoProbe.sentimentDistribution.neutral}</span>
-                            <span className="text-[9px] text-red-400">● Negative: {results.geoProbe.sentimentDistribution.negative}</span>
-                        </div>
-                    </div>
-                )}
-
-                {/* Share of Voice */}
-                {results.geoProbe.shareOfVoice && Object.keys(results.geoProbe.shareOfVoice).length > 0 && (
-                    <div className="mb-4">
-                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">Share of Voice (across AI models)</p>
-                        <div className="space-y-1.5">
-                            {Object.entries(results.geoProbe.shareOfVoice).sort((a, b) => b[1] - a[1]).map(([name, pct]) => (
-                                <div key={name} className="flex items-center gap-2">
-                                    <span className="text-[10px] text-slate-400 w-24 truncate">{name}</span>
-                                    <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
-                                        <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${pct}%` }} />
-                                    </div>
-                                    <span className="text-[10px] text-white font-bold w-8 text-right">{pct}%</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-                {/* Citation Drift (vs previous probe) */}
-                {results.geoProbe.citationDrift && (
-                    <div className="mb-4">
-                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">Citation Drift (vs Previous Probe)</p>
-                        <div className="flex gap-3 mb-2">
-                            <span className="text-[9px] px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-400">{results.geoProbe.citationDrift.newCitations?.length || 0} new</span>
-                            <span className="text-[9px] px-2 py-1 rounded-lg bg-red-500/10 text-red-400">{results.geoProbe.citationDrift.lostCitations?.length || 0} lost</span>
-                            <span className="text-[9px] px-2 py-1 rounded-lg bg-slate-500/10 text-slate-400">{results.geoProbe.citationDrift.retained || 0} retained</span>
-                            <span className={`text-[9px] px-2 py-1 rounded-lg ${results.geoProbe.citationDrift.driftRate > 50 ? 'bg-red-500/10 text-red-400' : results.geoProbe.citationDrift.driftRate > 20 ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}`}>{results.geoProbe.citationDrift.driftRate}% drift rate</span>
-                        </div>
-                        {results.geoProbe.citationDrift.newCitations?.length > 0 && (
-                            <div className="text-[9px] text-slate-500 mb-1">
-                                <strong className="text-emerald-400">New citations:</strong> {results.geoProbe.citationDrift.newCitations.slice(0, 5).join(', ')}
-                            </div>
-                        )}
-                        {results.geoProbe.citationDrift.lostCitations?.length > 0 && (
-                            <div className="text-[9px] text-slate-500">
-                                <strong className="text-red-400">Lost citations:</strong> {results.geoProbe.citationDrift.lostCitations.slice(0, 5).join(', ')}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Real AI Snippets */}
-                {results.geoProbe.topSnippets?.length > 0 && (
-                    <div>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">What AI Models Say About Your Brand</p>
-                        <div className="space-y-2">
-                            {results.geoProbe.topSnippets.map((s, i) => (
-                                <div key={i} className="p-3 rounded-lg bg-violet-500/5 border border-violet-500/10">
-                                    <p className="text-[9px] text-violet-400 font-bold mb-1">{s.model} — "{s.prompt}"</p>
-                                    <p className="text-[11px] text-slate-300 italic leading-relaxed">"{s.snippet}"</p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </div>
-        )}
-
-        {/* ═══ Competitive Position + Entity Confidence + Citations ═══ */}
-        {results.geoProbe && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-                {/* Competitive Position */}
-                <div className="glass-panel rounded-2xl p-4 text-center">
-                    <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">AI Market Position</p>
-                    <span className={`text-lg font-black px-4 py-1.5 rounded-full ${
-                        results.geoProbe.competitivePosition === 'Leader' ? 'bg-emerald-500/15 text-emerald-400' :
-                        results.geoProbe.competitivePosition === 'Challenger' ? 'bg-amber-500/15 text-amber-400' :
-                        'bg-slate-500/15 text-slate-400'
-                    }`}>{results.geoProbe.competitivePosition || 'Niche'}</span>
-                    <p className="text-[9px] text-slate-600 mt-2">{
-                        results.geoProbe.competitivePosition === 'Leader' ? 'Dominant AI visibility (40%+ SoV)' :
-                        results.geoProbe.competitivePosition === 'Challenger' ? 'Growing AI presence (20-40% SoV)' :
-                        'Low AI visibility (<20% SoV) — needs optimization'
-                    }</p>
-                </div>
-
-                {/* Entity Confidence */}
-                {results.geoProbe.entityConfidence && (
-                    <div className="glass-panel rounded-2xl p-4 text-center">
-                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">Entity Recognition</p>
-                        <p className="text-2xl font-black text-white">{results.geoProbe.entityConfidence.recognitionRate}%</p>
-                        <p className="text-[9px] text-slate-600">AI recognizes your brand in {results.geoProbe.entityConfidence.recognized}/{results.geoProbe.entityConfidence.probed} brand-specific probes</p>
-                    </div>
-                )}
-
-                {/* Citations Found */}
-                {results.geoProbe.citations?.length > 0 && (
-                    <div className="glass-panel rounded-2xl p-4">
-                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-2">Citation Sources ({results.geoProbe.citations.length})</p>
-                        <div className="space-y-1 max-h-24 overflow-y-auto">
-                            {results.geoProbe.citations.map((url, i) => (
-                                <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="block text-[10px] text-violet-400 hover:text-violet-300 truncate">{url.replace(/^https?:\/\//, '')}</a>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </div>
-        )}
-
-        {/* ═══ Content Gaps — prompts where competitors appear but brand doesn't ═══ */}
-        {results.geoProbe?.contentGaps?.length > 0 && (
-            <div className="glass-panel rounded-2xl p-5 mb-6 border border-amber-500/10">
-                <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm">warning</span> Content Gaps — Your Competitors Appear, You Don't
-                </h4>
-                <div className="space-y-2">
-                    {results.geoProbe.contentGaps.map((gap, i) => (
-                        <div key={i} className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
-                            <p className="text-[11px] text-white font-bold">"{gap.prompt}"</p>
-                            <p className="text-[9px] text-slate-500 mt-1">
-                                <span className="text-amber-400">{(gap.models || [gap.model]).join(', ')}</span> — Competitors found: <span className="text-red-400">{gap.competitorsFound.join(', ')}</span>
-                            </p>
-                            <p className="text-[9px] text-emerald-400 mt-0.5">{gap.opportunity}</p>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        )}
+        {/* Breakdown */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
             {sections.map(s => bd[s.key] && (
                 <div key={s.key} className="glass-panel rounded-2xl p-4 text-center">
@@ -2139,31 +1032,6 @@ function IssueCard({ issue }) {
                     {issue.impact && <p className="text-[11px] text-amber-400">⚡ Impact: {issue.impact}</p>}
                     {issue.fix && <p className="text-[11px] text-emerald-400">✓ Fix: {issue.fix}</p>}
                     {issue.effort && <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${issue.effort === 'quick-fix' ? 'bg-emerald-500/10 text-emerald-400' : issue.effort === 'moderate' ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-400'}`}>{issue.effort}</span>}
-                    {/* ── Semrush parity: About this issue + How to fix ── */}
-                    {issue.aboutThisIssue && (
-                        <div className="mt-2 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-                            <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">About this issue</p>
-                            <p className="text-[11px] text-slate-300 leading-relaxed">{issue.aboutThisIssue}</p>
-                        </div>
-                    )}
-                    {issue.howToFix && (
-                        <div className="p-2.5 rounded-lg bg-emerald-500/[0.03] border border-emerald-500/[0.08]">
-                            <p className="text-[9px] font-bold text-emerald-400 uppercase mb-1">How to fix</p>
-                            <p className="text-[11px] text-slate-300 leading-relaxed">{issue.howToFix}</p>
-                        </div>
-                    )}
-                    {issue.affectedUrls?.length > 0 && (
-                        <div>
-                            <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Affected Pages ({issue.affectedUrls.length})</p>
-                            <div className="space-y-0.5">
-                                {issue.affectedUrls.slice(0, 5).map((url, j) => (
-                                    <a key={j} href={url} target="_blank" rel="noopener noreferrer"
-                                        className="block text-[10px] text-primary/60 hover:text-primary truncate transition-colors">{url}</a>
-                                ))}
-                                {issue.affectedUrls.length > 5 && <p className="text-[9px] text-slate-600">+{issue.affectedUrls.length - 5} more</p>}
-                            </div>
-                        </div>
-                    )}
                 </div>
             )}
         </div>

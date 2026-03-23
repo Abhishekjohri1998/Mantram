@@ -8,41 +8,35 @@ const router = Router();
 // AI HELPER (same pattern as brainstorm-studio)
 // ============================================================================
 async function aiCall(systemPrompt, userPrompt, options = {}) {
-    // Dynamic maxTokens based on input length — short queries don't need 4096
-    const inputLen = (systemPrompt + userPrompt).length;
-    const defaultMaxTokens = inputLen < 500 ? 1024 : inputLen < 2000 ? 2048 : 4096;
-    const { temperature = 0.7, maxTokens = defaultMaxTokens, json = false } = options;
+    const { temperature = 0.7, maxTokens = 4096, json = false } = options;
 
-    // Try Gemini FIRST (fastest — 0.5-1s TTFT vs Claude's 3-5s)
-    const geminiKey = process.env.GEMINI_API_KEY;
-    if (geminiKey) {
+    // Try Claude first (best at intent classification & reasoning)
+    if (process.env.ANTHROPIC_API_KEY) {
         try {
-            const resp = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        systemInstruction: { parts: [{ text: systemPrompt }] },
-                        contents: [{ parts: [{ text: userPrompt }] }],
-                        generationConfig: {
-                            temperature,
-                            maxOutputTokens: maxTokens,
-                            ...(json ? { responseMimeType: 'application/json' } : {}),
-                        },
-                    }),
-                }
-            );
+            const resp = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': process.env.ANTHROPIC_API_KEY,
+                    'anthropic-version': '2023-06-01',
+                },
+                body: JSON.stringify({
+                    model: process.env.DEFAULT_TEXT_MODEL || 'claude-sonnet-4-20250514',
+                    max_tokens: maxTokens,
+                    system: systemPrompt,
+                    messages: [{ role: 'user', content: userPrompt }],
+                    ...(json ? {} : {}),
+                }),
+            });
             const data = await resp.json();
-            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (text) return text;
-            if (data.error) console.warn('Gemini failed:', data.error.message);
+            if (data.content?.[0]?.text) return data.content[0].text;
+            if (data.error) console.warn('Claude failed:', data.error.message);
         } catch (e) {
-            console.warn('Gemini error:', e.message);
+            console.warn('Claude error:', e.message);
         }
     }
 
-    // Fallback to GPT-4o-mini (fast, good quality)
+    // Fallback to GPT-4o-mini
     if (process.env.OPENAI_API_KEY) {
         try {
             const resp = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -69,28 +63,31 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
         }
     }
 
-    // Fallback to Claude (slowest but best reasoning)
-    if (process.env.ANTHROPIC_API_KEY) {
+    // Fallback to Gemini
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (geminiKey) {
         try {
-            const resp = await fetch('https://api.anthropic.com/v1/messages', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-api-key': process.env.ANTHROPIC_API_KEY,
-                    'anthropic-version': '2023-06-01',
-                },
-                body: JSON.stringify({
-                    model: process.env.DEFAULT_TEXT_MODEL || 'claude-sonnet-4-20250514',
-                    max_tokens: maxTokens,
-                    system: systemPrompt,
-                    messages: [{ role: 'user', content: userPrompt }],
-                }),
-            });
+            const resp = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        systemInstruction: { parts: [{ text: systemPrompt }] },
+                        contents: [{ parts: [{ text: userPrompt }] }],
+                        generationConfig: {
+                            temperature,
+                            maxOutputTokens: maxTokens,
+                            ...(json ? { responseMimeType: 'application/json' } : {}),
+                        },
+                    }),
+                }
+            );
             const data = await resp.json();
-            if (data.content?.[0]?.text) return data.content[0].text;
-            if (data.error) console.warn('Claude failed:', data.error.message);
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) return text;
         } catch (e) {
-            console.warn('Claude error:', e.message);
+            console.warn('Gemini fallback error:', e.message);
         }
     }
 
@@ -276,7 +273,7 @@ data: {
   "tagline": "Brand tagline if relevant (from DNA)",
   "productMention": "The SPECIFIC product/service name from the knowledge bank that fits this occasion. If no exact product fits, mention the brand's core offering.",
   "style": "Brief visual style description",
-  "aspectRatio": "1:1 | 16:9 | 9:16"
+  "aspectRatio": "1:1"
 }
 
 CRITICAL IMAGE PROMPT RULES:
@@ -368,15 +365,23 @@ RESPONSE FORMAT — respond in STRICT JSON:
             // Append strict anti-render suffix
             cleanPrompt += '\n\nThe output must be ONLY the design itself, edge-to-edge, filling the entire canvas. Do NOT add color swatches, color circles, color labels, palette panels, title cards, dimension text, mockup frames, or any elements outside the design.';
 
-            // ===== IMAGE SIZE MAPPING =====
-            // Map request ratios to standard dimensions
+            // ===== SOCIAL MEDIA SIZE MAPPING =====
+            // DALL-E 3 only supports: 1024x1024 (1:1), 1024x1792 (9:16), 1792x1024 (16:9)
+            // Map all social media ratios to these three
             const ratio = (parsed.data.aspectRatio || '1:1').toLowerCase().replace(/\s+/g, '');
             let imageSize;
             switch (ratio) {
-                case '9:16':  imageSize = '1024x1792'; break;
-                case '16:9':  imageSize = '1792x1024'; break;
-                case '1:1':   
-                default:      imageSize = '1024x1024'; break;
+                case '9:16':  // Instagram/Facebook Story, Reels, TikTok
+                case '4:5':   // Instagram post (portrait) — closest DALL-E match
+                    imageSize = '1024x1792';
+                    break;
+                case '16:9':  // YouTube thumbnail, LinkedIn cover, Twitter/X header
+                    imageSize = '1792x1024';
+                    break;
+                case '1:1':   // Instagram post (square), Facebook post
+                default:
+                    imageSize = '1024x1024';
+                    break;
             }
 
             console.log(`🎨 Agent: Generating image (ratio: ${ratio} → ${imageSize}, brand: ${brand?.name || 'none'}, brandImages: ${brandImgs.length})`);

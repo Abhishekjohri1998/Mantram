@@ -4,7 +4,7 @@
  * Handles auth tokens, error handling, and response parsing.
  */
 
-export const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`;
+const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`;
 
 // Token management
 let authToken = localStorage.getItem('mantram_token') || '';
@@ -44,29 +44,19 @@ export async function apiFetch(endpoint, options = {}) {
 
     // Configurable timeout — default 90s, heavy operations can pass longer
     const { timeout: timeoutMs = 90000, ...fetchOptions } = options;
-    const internalController = new AbortController();
-    const timer = setTimeout(() => internalController.abort(), timeoutMs);
-
-    // If an external signal is provided, link it to our internal controller
-    if (options.signal) {
-        if (options.signal.aborted) internalController.abort();
-        options.signal.addEventListener('abort', () => internalController.abort());
-    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     let response;
     try {
         response = await fetch(`${API_BASE}${endpoint}`, {
             ...fetchOptions,
             headers,
-            signal: internalController.signal,
+            signal: controller.signal,
         });
     } catch (e) {
         clearTimeout(timer);
-        if (e.name === 'AbortError') {
-            // If it was aborted externally, we might not want to throw the "timeout" message
-            if (options.signal?.aborted) throw e; 
-            throw new Error('Request timed out — the server is still processing. Please try again.');
-        }
+        if (e.name === 'AbortError') throw new Error('Request timed out — the server is still processing. Please try again.');
         throw new Error(e.message === 'Load failed' ? 'Network error — check your connection and ensure the backend is running.' : e.message);
     }
     clearTimeout(timer);
@@ -98,13 +88,6 @@ export const auth = {
     getProfile: () => apiFetch('/auth/me'),
     updateProfile: (data) => apiFetch('/auth/profile', { method: 'PUT', body: JSON.stringify(data) }),
     google: () => apiFetch('/auth/google'),
-    verifyEmail: (token) => apiFetch(`/auth/verify-email?token=${token}`),
-    resendVerification: (email) => apiFetch('/auth/resend-verification', { method: 'POST', body: JSON.stringify({ email }) }),
-    forgotPassword: (email) => apiFetch('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
-    resetPassword: (token, password) => apiFetch('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) }),
-    changePassword: (currentPassword, newPassword) => apiFetch('/auth/change-password', { method: 'PUT', body: JSON.stringify({ currentPassword, newPassword }) }),
-    claimUserId: (userId) => apiFetch('/auth/claim-userid', { method: 'PUT', body: JSON.stringify({ userId }) }),
-    getStudioAccess: () => apiFetch('/auth/studio-access'),
 };
 
 // ============ Brands API ============
@@ -119,7 +102,6 @@ export const brands = {
     updateAutonomy: (id, settings) => apiFetch(`/brands/${id}/autonomy`, { method: 'PUT', body: JSON.stringify(settings) }),
     getAuditLog: (id, page = 1) => apiFetch(`/brands/${id}/audit-log?page=${page}`),
     delete: (id) => apiFetch(`/brands/${id}`, { method: 'DELETE' }),
-    analyzeVisualDNA: (id) => apiFetch(`/brands/${id}/analyze-visual-dna`, { method: 'POST' }),
     // Custom Templates
     getTemplates: (id) => apiFetch(`/brands/${id}/templates`),
     saveTemplate: (id, data) => apiFetch(`/brands/${id}/templates`, { method: 'POST', body: JSON.stringify(data) }),
@@ -145,7 +127,7 @@ export const brands = {
 // ============ Content API ============
 export const content = {
     providers: () => apiFetch('/content/providers'),
-    generate: (data, options = {}) => apiFetch('/content/generate', { method: 'POST', body: JSON.stringify(data), ...options }),
+    generate: (data) => apiFetch('/content/generate', { method: 'POST', body: JSON.stringify(data) }),
     list: (params = {}) => {
         const query = new URLSearchParams(params).toString();
         return apiFetch(`/content?${query}`);
@@ -153,19 +135,18 @@ export const content = {
     get: (id) => apiFetch(`/content/${id}`),
     update: (id, data) => apiFetch(`/content/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     feedback: (id, data) => apiFetch(`/content/${id}/feedback`, { method: 'POST', body: JSON.stringify(data) }),
-    regenerate: (id, data, options = {}) => apiFetch(`/content/${id}/regenerate`, { method: 'POST', body: JSON.stringify(data), ...options }),
+    regenerate: (id, data) => apiFetch(`/content/${id}/regenerate`, { method: 'POST', body: JSON.stringify(data) }),
     delete: (id) => apiFetch(`/content/${id}`, { method: 'DELETE' }),
-    refine: (id, data, options = {}) => apiFetch(`/content/${id}/refine`, { method: 'POST', body: JSON.stringify(data), ...options }),
+    refine: (id, data) => apiFetch(`/content/${id}/refine`, { method: 'POST', body: JSON.stringify(data) }),
     refineText: (data) => apiFetch('/content/refine-text', { method: 'POST', body: JSON.stringify(data) }),
     youtube: (data) => apiFetch('/content/agentic/youtube', { method: 'POST', body: JSON.stringify(data) }),
     youtubeSeo: (data) => apiFetch('/content/agentic/youtube-seo', { method: 'POST', body: JSON.stringify(data) }),
-    trending: (data) => apiFetch('/content/trending', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ============ Creatives API ============
 export const creatives = {
-    generate: (data, options = {}) => apiFetch('/creatives/generate', { method: 'POST', body: JSON.stringify(data), timeout: 300000, ...options }),
-    enhancePrompt: (data, options = {}) => apiFetch('/creatives/enhance-prompt', { method: 'POST', body: JSON.stringify(data), ...options }),
+    generate: (data) => apiFetch('/creatives/generate', { method: 'POST', body: JSON.stringify(data) }),
+    enhancePrompt: (data) => apiFetch('/creatives/enhance-prompt', { method: 'POST', body: JSON.stringify(data) }),
     list: (params = {}) => {
         const query = new URLSearchParams(params).toString();
         return apiFetch(`/creatives?${query}`);
@@ -178,14 +159,11 @@ export const creatives = {
         return apiFetch(`/creatives/image-bank?${query}`);
     },
     uploadToBank: (data) => apiFetch('/creatives/upload-to-bank', { method: 'POST', body: JSON.stringify(data) }),
-    virtualTryon: (data) => apiFetch('/creatives/virtual-tryon', { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
-    lifestyleMockup: (data) => apiFetch('/creatives/lifestyle-mockup', { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
-    vtoStatus: (requestId, brandId) => apiFetch(`/creatives/vto-status/${requestId}${brandId ? `?brandId=${brandId}` : ''}`),
 };
 
 // ============ Agent API ============
 export const agents = {
-    scanWebsite: (url) => apiFetch('/agents/scan-website', { method: 'POST', body: JSON.stringify({ url }), timeout: 180000 }),
+    scanWebsite: (url) => apiFetch('/agents/scan-website', { method: 'POST', body: JSON.stringify({ url }) }),
     brainstorm: (data) => apiFetch('/agents/brainstorm', { method: 'POST', body: JSON.stringify(data) }),
     saveBrainstorm: (brandData) => apiFetch('/agents/brainstorm/save', { method: 'POST', body: JSON.stringify({ brandData }) }),
     generateLogo: (data) => apiFetch('/agents/generate-logo', { method: 'POST', body: JSON.stringify(data) }),
@@ -234,7 +212,6 @@ export const trends = {
     refresh: (geo = 'IN') => apiFetch(`/trends/refresh?geo=${geo}`, { method: 'POST' }),
     grokTopics: (params = {}) => { const q = new URLSearchParams(params).toString(); return apiFetch(`/trends/grok-topics?${q}`); },
     grokSeo: (params = {}) => { const q = new URLSearchParams(params).toString(); return apiFetch(`/trends/grok-seo?${q}`); },
-    productIntelligence: (data) => apiFetch('/trends/product-intelligence', { method: 'POST', body: JSON.stringify(data) }),
     grokContent: (params = {}) => { const q = new URLSearchParams(params).toString(); return apiFetch(`/trends/grok-content?${q}`); },
     grokCompetitors: (params = {}) => { const q = new URLSearchParams(params).toString(); return apiFetch(`/trends/grok-competitors?${q}`); },
 };
@@ -242,7 +219,6 @@ export const trends = {
 // ============ Dashboard Summary API ============
 export const dashboardSummary = {
     get: (brandId) => apiFetch(`/dashboard-summary${brandId ? `?brandId=${brandId}` : ''}`),
-    getStrategy: (data) => apiFetch('/dashboard-summary/strategy', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ============ D2C Shopify Analytics API ============
@@ -381,12 +357,6 @@ export const superadmin = {
     createCoupon: (data) => apiFetch('/superadmin/coupons', { method: 'POST', body: JSON.stringify(data) }),
     updateCoupon: (id, data) => apiFetch(`/superadmin/coupons/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     deleteCoupon: (id) => apiFetch(`/superadmin/coupons/${id}`, { method: 'DELETE' }),
-
-    // Retention Offers
-    getRetentionOffers: () => apiFetch('/superadmin/retention-offers'),
-    createRetentionOffer: (data) => apiFetch('/superadmin/retention-offers', { method: 'POST', body: JSON.stringify(data) }),
-    updateRetentionOffer: (id, data) => apiFetch(`/superadmin/retention-offers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    deleteRetentionOffer: (id) => apiFetch(`/superadmin/retention-offers/${id}`, { method: 'DELETE' }),
     // Brands
     getBrands: (params = {}) => {
         const query = new URLSearchParams(params).toString();
@@ -421,42 +391,10 @@ export const superadmin = {
     deletePackage: (id) => apiFetch(`/superadmin/packages/${id}`, { method: 'DELETE' }),
     aiSuggestPackages: () => apiFetch('/superadmin/packages/ai-suggest', { method: 'POST' }),
     seedDefaultPackages: (force) => apiFetch('/superadmin/packages/seed-defaults', { method: 'POST', body: JSON.stringify({ force }) }),
-    // Credit Packs (Top-Up Store Management)
-    getCreditPacks: () => apiFetch('/superadmin/credit-packs'),
-    createCreditPack: (data) => apiFetch('/superadmin/credit-packs', { method: 'POST', body: JSON.stringify(data) }),
-    updateCreditPack: (id, data) => apiFetch(`/superadmin/credit-packs/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    deleteCreditPack: (id) => apiFetch(`/superadmin/credit-packs/${id}`, { method: 'DELETE' }),
-    toggleCreditPack: (id) => apiFetch(`/superadmin/credit-packs/${id}/toggle`, { method: 'POST' }),
-    seedCreditPacks: (force) => apiFetch('/superadmin/credit-packs/seed-defaults', { method: 'POST', body: JSON.stringify({ force }) }),
-    // Studio Access Control
-    getStudioVisibility: () => apiFetch('/superadmin/studio-visibility'),
-    updateStudioVisibility: (visibility) => apiFetch('/superadmin/studio-visibility', { method: 'PUT', body: JSON.stringify({ visibility }) }),
-    getUserStudioAccess: (userId) => apiFetch(`/superadmin/users/${userId}/studio-access`),
-    updateUserStudioAccess: (userId, overrides) => apiFetch(`/superadmin/users/${userId}/studio-access`, { method: 'PUT', body: JSON.stringify({ overrides }) }),
     // Credit Costs
     getCreditCosts: () => apiFetch('/superadmin/credit-costs'),
-    // Pricing Strategy Command Center
-    getPricingPolicy: () => apiFetch('/superadmin/pricing-policy'),
-    getPricingMonitor: () => apiFetch('/superadmin/pricing-monitor'),
-    triggerPricingCheck: () => apiFetch('/superadmin/pricing-monitor/check', { method: 'POST' }),
-    dismissPricingAlerts: () => apiFetch('/superadmin/pricing-monitor/dismiss', { method: 'POST' }),
     updateCreditCosts: (costs) => apiFetch('/superadmin/credit-costs', { method: 'PUT', body: JSON.stringify({ costs }) }),
     resetCreditCosts: () => apiFetch('/superadmin/credit-costs/reset', { method: 'POST' }),
-    getPricingCalculator: (params = {}) => { const q = new URLSearchParams(params).toString(); return apiFetch(`/superadmin/pricing-calculator?${q}`); },
-    updateProviderBudgets: (data) => apiFetch('/superadmin/provider-budgets', { method: 'PUT', body: JSON.stringify(data) }),
-    getProviderBudgets: () => apiFetch('/superadmin/provider-budgets'),
-    // API Key Management
-    getApiKeys: () => apiFetch('/superadmin/api-keys'),
-    updateApiKeys: (provider, keys) => apiFetch('/superadmin/api-keys', { method: 'PUT', body: JSON.stringify({ provider, keys }) }),
-    deleteApiKeys: (provider) => apiFetch(`/superadmin/api-keys/${provider}`, { method: 'DELETE' }),
-    testApiKey: (provider) => apiFetch(`/superadmin/api-keys/${provider}/test`, { method: 'POST' }),
-    // Watermark Management
-    uploadWatermarkLogo: (image) => apiFetch('/superadmin/watermark/upload', { method: 'POST', body: JSON.stringify({ image }) }),
-    updateWatermarkSettings: (data) => apiFetch('/superadmin/watermark/settings', { method: 'PUT', body: JSON.stringify(data) }),
-    setWatermarkOverride: (data) => apiFetch('/superadmin/watermark/override', { method: 'PUT', body: JSON.stringify(data) }),
-    getWatermarkOverrides: () => apiFetch('/superadmin/watermark/overrides'),
-    // Provider Usage Intelligence
-    getProviderUsage: (days = 30) => apiFetch(`/superadmin/provider-usage?days=${days}`),
     // Token Usage Analytics
     getTokenUsage: (days = 30) => apiFetch(`/superadmin/stats/token-usage?days=${days}`),
     syncCredits: () => apiFetch('/superadmin/system/sync-all-credits', { method: 'POST' }),
@@ -465,13 +403,6 @@ export const superadmin = {
         return apiFetch(`/superadmin/system-logs?${query}`);
     },
     impersonateUser: (id) => apiFetch(`/superadmin/users/${id}/impersonate`, { method: 'POST' }),
-    // Waitlist
-    getWaitlist: (params = {}) => {
-        const query = new URLSearchParams(params).toString();
-        return apiFetch(`/superadmin/waitlist?${query}`);
-    },
-    deleteWaitlist: (id) => apiFetch(`/superadmin/waitlist/${id}`, { method: 'DELETE' }),
-    approveWaitlist: (id) => apiFetch(`/superadmin/waitlist/${id}/approve`, { method: 'POST' }),
 };
 
 // ============ Credits API ============
@@ -486,13 +417,13 @@ export const credits = {
 
 // ============ Brainstorm Studio API ============
 export const brainstormStudio = {
-    start: (data, options = {}) => apiFetch('/brainstorm-studio/start', { method: 'POST', body: JSON.stringify(data), ...options }),
-    confirm: (data, options = {}) => apiFetch('/brainstorm-studio/confirm', { method: 'POST', body: JSON.stringify(data), ...options }),
-    generate: (data, options = {}) => apiFetch('/brainstorm-studio/generate', { method: 'POST', body: JSON.stringify(data), ...options }),
-    refine: (data, options = {}) => apiFetch('/brainstorm-studio/refine', { method: 'POST', body: JSON.stringify(data), ...options }),
-    feedback: (data, options = {}) => apiFetch('/brainstorm-studio/feedback', { method: 'POST', body: JSON.stringify(data), ...options }),
-    screenplay: (data, options = {}) => apiFetch('/brainstorm-studio/screenplay', { method: 'POST', body: JSON.stringify(data), ...options }),
-    chat: (data, options = {}) => apiFetch('/brainstorm-studio/chat', { method: 'POST', body: JSON.stringify(data), ...options }),
+    start: (data) => apiFetch('/brainstorm-studio/start', { method: 'POST', body: JSON.stringify(data) }),
+    confirm: (data) => apiFetch('/brainstorm-studio/confirm', { method: 'POST', body: JSON.stringify(data) }),
+    generate: (data) => apiFetch('/brainstorm-studio/generate', { method: 'POST', body: JSON.stringify(data) }),
+    refine: (data) => apiFetch('/brainstorm-studio/refine', { method: 'POST', body: JSON.stringify(data) }),
+    feedback: (data) => apiFetch('/brainstorm-studio/feedback', { method: 'POST', body: JSON.stringify(data) }),
+    screenplay: (data) => apiFetch('/brainstorm-studio/screenplay', { method: 'POST', body: JSON.stringify(data) }),
+    chat: (data) => apiFetch('/brainstorm-studio/chat', { method: 'POST', body: JSON.stringify(data) }),
     // Brand Strategy
     strategy: (data) => apiFetch('/brainstorm-studio/strategy', { method: 'POST', body: JSON.stringify(data) }),
     strategySlides: (data) => apiFetch('/brainstorm-studio/strategy-slides', { method: 'POST', body: JSON.stringify(data) }),
@@ -564,7 +495,7 @@ export const pmStudio = {
 };
 
 export const seoStudio = {
-    healthCheck: (data) => apiFetch('/seo-studio/health-check', { method: 'POST', body: JSON.stringify(data), timeout: 360000 }),
+    healthCheck: (data) => apiFetch('/seo-studio/health-check', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
     traffic: (data) => apiFetch('/seo-studio/traffic', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
     competitors: (data) => apiFetch('/seo-studio/competitors', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
     aiVisibility: (data) => apiFetch('/seo-studio/ai-visibility', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
@@ -601,12 +532,7 @@ export const seoStudio = {
     // Phase 3: Advanced
     jsCrawl: (data) => apiFetch('/seo-studio/js-crawl', { method: 'POST', body: JSON.stringify(data), timeout: 240000 }),
     contentScore: (data) => apiFetch('/seo-studio/content-score', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
-    contentFix: (data) => apiFetch('/seo-studio/content-fix', { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
     competitorMonitor: (data) => apiFetch('/seo-studio/competitor-monitor', { method: 'POST', body: JSON.stringify(data), timeout: 300000 }),
-    geoHistory: (params = {}) => {
-        const query = new URLSearchParams(params).toString();
-        return apiFetch(`/seo-studio/geo-history?${query}`);
-    },
 };
 
 // ============ Skills System API ============
@@ -635,8 +561,6 @@ export const googleAnalytics = {
     report: (data) => apiFetch('/google-analytics/report', { method: 'POST', body: JSON.stringify(data) }),
     searchConsoleSites: (brandId) => apiFetch(`/google-analytics/search-console/sites${brandId ? `?brandId=${brandId}` : ''}`),
     searchConsoleReport: (data) => apiFetch('/google-analytics/search-console/report', { method: 'POST', body: JSON.stringify(data) }),
-    adsenseAccounts: (brandId) => apiFetch(`/google-analytics/adsense/accounts${brandId ? `?brandId=${brandId}` : ''}`),
-    adsenseReport: (data) => apiFetch('/google-analytics/adsense/report', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ============ Conversations API (Conversation Studio) ============
@@ -704,8 +628,6 @@ export const routingRules = {
 // ============ Payments & Subscriptions API ============
 export const payments = {
     getPackages: () => apiFetch('/payments/packages'),
-    getStoreVisibility: () => apiFetch('/payments/store-visibility'),
-    getTopupPacks: () => apiFetch('/payments/topup-packs'),
     createOrder: (packageId, billingCycle = 'monthly') =>
         apiFetch('/payments/create-order', {
             method: 'POST',
@@ -725,39 +647,6 @@ export const payments = {
         apiFetch('/payments/verify-topup', {
             method: 'POST',
             body: JSON.stringify(paymentData)
-        }),
-    subscriptionStatus: () => apiFetch('/payments/subscription-status'),
-    upgradePreview: (packageId, billingCycle = 'monthly') =>
-        apiFetch(`/payments/upgrade-preview?packageId=${packageId}&billingCycle=${billingCycle}`),
-    cancelSubscription: (reason = '') =>
-        apiFetch('/payments/cancel-subscription', {
-            method: 'POST',
-            body: JSON.stringify({ reason })
-        }),
-    acceptRetentionOffer: (offerId) =>
-        apiFetch('/payments/accept-retention-offer', {
-            method: 'POST',
-            body: JSON.stringify({ offerId })
-        }),
-};
-
-// ============ Rewards & Gamification API ============
-export const rewards = {
-    status: () => apiFetch('/rewards/status'),
-    claimMilestone: (milestoneId) =>
-        apiFetch('/rewards/claim-milestone', {
-            method: 'POST',
-            body: JSON.stringify({ milestoneId }),
-        }),
-    applyReferral: (referralCode) =>
-        apiFetch('/rewards/apply-referral', {
-            method: 'POST',
-            body: JSON.stringify({ referralCode }),
-        }),
-    videoCostPreview: (data) =>
-        apiFetch('/rewards/video-cost-preview', {
-            method: 'POST',
-            body: JSON.stringify(data),
         }),
 };
 
@@ -901,139 +790,4 @@ export const socialMediaStudio = {
     list: (params = {}) => apiFetch(`/social-media-studio/strategies?${new URLSearchParams(params)}`),
     get: (id) => apiFetch(`/social-media-studio/strategies/${id}`),
     delete: (id) => apiFetch(`/social-media-studio/strategies/${id}`, { method: 'DELETE' }),
-};
-
-// ============ Canvas Assets API ============
-export const canvasAssets = {
-    aiEdit: (data) => apiFetch('/canvas-assets/ai-edit', { method: 'POST', body: JSON.stringify(data) }),
-    aiEditVisual: (data) => apiFetch('/canvas-assets/ai-edit-visual', { method: 'POST', body: JSON.stringify(data) }),
-    aiRetouch: (data) => apiFetch('/canvas-assets/ai-retouch', { method: 'POST', body: JSON.stringify(data) }),
-    aiBackground: (data) => apiFetch('/canvas-assets/ai-background', { method: 'POST', body: JSON.stringify(data) }),
-    aiAnalyze: (data) => apiFetch('/canvas-assets/ai-analyze', { method: 'POST', body: JSON.stringify(data) }),
-    aiAnalyzeTemplate: (data) => apiFetch('/canvas-assets/ai-analyze-template', { method: 'POST', body: JSON.stringify(data) }),
-    aiGenerate: (data) => apiFetch('/canvas-assets/ai-generate', { method: 'POST', body: JSON.stringify(data) }),
-    aiCreativeGenerate: (data) => apiFetch('/canvas-assets/ai-creative-generate', { method: 'POST', body: JSON.stringify(data) }),
-    getPhotos: (params = {}) => {
-        const query = new URLSearchParams(params).toString();
-        return apiFetch(`/canvas-assets/photos?${query}`);
-    },
-    getTextures: (params = {}) => {
-        const query = new URLSearchParams(params).toString();
-        return apiFetch(`/canvas-assets/textures?${query}`);
-    },
-};
-
-// ============ Video Studio API ============
-export const videoStudio = {
-    advancedGenerate: (data) => apiFetch('/video-studio/advanced/generate', { method: 'POST', body: JSON.stringify(data) }),
-    advancedI2V: (data) => apiFetch('/video-studio/advanced/image-to-video', { method: 'POST', body: JSON.stringify(data) }),
-    getStatus: (id) => apiFetch(`/video-studio/${id}/status`),
-};
-
-// ============ Voice API ============
-export const voice = {
-    transcribe: (formData) => {
-        const token = localStorage.getItem('mantram_token') || '';
-        return fetch(`${API_BASE}/voice/transcribe`, {
-            method: 'POST',
-            headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-            body: formData,
-        }).then(async (r) => {
-            if (!r.ok) {
-                const errData = await r.json().catch(() => ({}));
-                throw new Error(errData.error || 'Transcription failed');
-            }
-            return r.json();
-        });
-    },
-};
-
-// ============ Retention Studio API ============
-export const retentionStudio = {
-    // Campaign CRUD
-    list: (params = {}) => {
-        const query = new URLSearchParams(params).toString();
-        return apiFetch(`/retention-studio/campaigns?${query}`);
-    },
-    get: (id) => apiFetch(`/retention-studio/campaigns/${id}`),
-    create: (data) => apiFetch('/retention-studio/campaigns', { method: 'POST', body: JSON.stringify(data) }),
-    delete: (id) => apiFetch(`/retention-studio/campaigns/${id}`, { method: 'DELETE' }),
-
-    // Pipeline nodes
-    ingest: (id, data) => apiFetch(`/retention-studio/campaigns/${id}/ingest`, { method: 'POST', body: JSON.stringify(data) }),
-    match: (id) => apiFetch(`/retention-studio/campaigns/${id}/match`, { method: 'POST' }),
-    creative: (id, data) => apiFetch(`/retention-studio/campaigns/${id}/creative`, { method: 'POST', body: JSON.stringify(data) }),
-    compose: (id, data) => apiFetch(`/retention-studio/campaigns/${id}/compose`, { method: 'POST', body: JSON.stringify(data) }),
-    approve: (id, data) => apiFetch(`/retention-studio/campaigns/${id}/approve`, { method: 'POST', body: JSON.stringify(data) }),
-    send: (id) => apiFetch(`/retention-studio/campaigns/${id}/send`, { method: 'POST' }),
-    preview: (id) => apiFetch(`/retention-studio/campaigns/${id}/preview`),
-    testEmail: (id, testEmail) => apiFetch(`/retention-studio/campaigns/${id}/test-email`, { method: 'POST', body: JSON.stringify({ testEmail }) }),
-    generateImage: (id) => apiFetch(`/retention-studio/campaigns/${id}/generate-image`, { method: 'POST' }),
-    emailStatus: () => apiFetch('/retention-studio/email-status'),
-
-    // Analytics & Pipeline
-    analytics: (id) => apiFetch(`/retention-studio/campaigns/${id}/analytics`),
-    pipeline: () => apiFetch('/retention-studio/pipeline'),
-
-    // ── Phase 1: RFM Segmentation ──
-    rfmAnalysis: (brandId) => apiFetch(`/retention-studio/rfm?brandId=${brandId}`),
-    rfmSegment: (segment, brandId, params = {}) => {
-        const query = new URLSearchParams({ brandId, ...params }).toString();
-        return apiFetch(`/retention-studio/rfm/${segment}?${query}`);
-    },
-
-    // ── Phase 1: Win-Back ──
-    winbackCandidates: (brandId, inactiveDays = 60) =>
-        apiFetch(`/retention-studio/winback?brandId=${brandId}&inactiveDays=${inactiveDays}`),
-
-    // ── Phase 1: Price Drops ──
-    priceDrops: (brandId) => apiFetch(`/retention-studio/price-drops?brandId=${brandId}`),
-
-    // ── Phase 1: Post-Purchase ──
-    recentBuyers: (brandId, daysBack = 7) =>
-        apiFetch(`/retention-studio/recent-buyers?brandId=${brandId}&daysBack=${daysBack}`),
-
-    // ── Phase 1: A/B Testing ──
-    createABTest: (id, variants) =>
-        apiFetch(`/retention-studio/campaigns/${id}/ab-test`, { method: 'POST', body: JSON.stringify({ variants }) }),
-    abResults: (id) => apiFetch(`/retention-studio/campaigns/${id}/ab-results`),
-
-    // ── Phase 1: UTM ──
-    utm: (id) => apiFetch(`/retention-studio/campaigns/${id}/utm`),
-
-    // ── Phase 1: Flow Templates ──
-    templates: () => apiFetch('/retention-studio/templates'),
-    templateCategories: () => apiFetch('/retention-studio/templates/categories'),
-    template: (id) => apiFetch(`/retention-studio/templates/${id}`),
-
-    // ── Phase 2: Unified Contacts ──
-    unifiedContacts: (brandId, params = {}) => {
-        const query = new URLSearchParams({ brandId, ...params }).toString();
-        return apiFetch(`/retention-studio/contacts/unified?${query}`);
-    },
-    duplicateContacts: (brandId) => apiFetch(`/retention-studio/contacts/duplicates?brandId=${brandId}`),
-    marketableContacts: (brandId) => apiFetch(`/retention-studio/contacts/marketable?brandId=${brandId}`),
-
-    // ── Phase 2: SMS ──
-    smsStatus: () => apiFetch('/retention-studio/sms/status'),
-    sendSMS: (to, message) => apiFetch('/retention-studio/sms/send', { method: 'POST', body: JSON.stringify({ to, message }) }),
-    sendBulkSMS: (recipients, message) => apiFetch('/retention-studio/sms/bulk', { method: 'POST', body: JSON.stringify({ recipients, message }) }),
-
-    // ── Phase 3: Push Notifications ──
-    pushStatus: () => apiFetch('/retention-studio/push/status'),
-    sendPush: (token, notification) => apiFetch('/retention-studio/push/send', { method: 'POST', body: JSON.stringify({ token, ...notification }) }),
-    sendBulkPush: (tokens, notification) => apiFetch('/retention-studio/push/bulk', { method: 'POST', body: JSON.stringify({ tokens, ...notification }) }),
-    sendTopicPush: (topic, notification) => apiFetch('/retention-studio/push/topic', { method: 'POST', body: JSON.stringify({ topic, ...notification }) }),
-    subscribeToPush: (tokens, topic) => apiFetch('/retention-studio/push/subscribe', { method: 'POST', body: JSON.stringify({ tokens, topic }) }),
-
-    // ── Phase 3: Lead Form Widget ──
-    widgetConfig: () => apiFetch('/retention-studio/widget/config'),
-    widgetEmbed: (brandId) => apiFetch(`/retention-studio/widget/embed?brandId=${brandId}`),
-
-    // ── Phase 3: Browse Abandonment ──
-    browseAbandonCandidates: (params = {}) => {
-        const query = new URLSearchParams(params).toString();
-        return apiFetch(`/retention-studio/track/candidates?${query}`);
-    },
-    browseTrackerStats: () => apiFetch('/retention-studio/track/stats'),
 };

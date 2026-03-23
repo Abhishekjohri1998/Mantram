@@ -1,253 +1,36 @@
-import { setMaxListeners } from 'events';
 /**
  * Mantram AI — Web Research Utility
  * Real internet research for SEO Studio.
  * Crawls pages, extracts structured data, and builds site intelligence.
  */
 
-const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+const USER_AGENT = 'MantramAI-SEOBot/1.0 (+https://mantram.ai)';
 const FETCH_TIMEOUT = 12000; // 12s
-
-// ============================================================================
-// BOT CHALLENGE DETECTION (Cloudflare, hCaptcha, etc.)
-// ============================================================================
-
-function isBotChallengePage(html) {
-  if (!html || html.length < 100) return false;
-  const lowerHtml = html.toLowerCase();
-  
-  // Check the <title> — Cloudflare/bot challenge pages have specific titles
-  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  const title = (titleMatch?.[1] || '').trim().toLowerCase();
-  
-  // Known challenge page titles (Cloudflare + similar WAFs)
-  const cfChallengeTitles = [
-    'just a moment...',
-    'checking if the site connection is secure',
-    'verifying your connection',                     // NEW: seen in acwo.com logs
-    'attention required',                            // NEW: Cloudflare variant
-    'one more step',                                 // NEW: Cloudflare variant
-    'access denied',
-    'please wait...',
-    'checking your browser',
-  ];
-  
-  // Cloudflare-specific HTML markers (only present on actual challenge pages)
-  const hasCfMarkers = lowerHtml.includes('cf_chl_opt') ||
-                       lowerHtml.includes('cf-challenge-running') ||
-                       lowerHtml.includes('cf-browser-verification') ||
-                       lowerHtml.includes('cdn-cgi/challenge-platform') ||
-                       lowerHtml.includes('_cf_chl_tk') ||
-                       lowerHtml.includes('challenge-form');
-  
-  // Title match + CF markers = definitely a challenge
-  if (cfChallengeTitles.some(ct => title.includes(ct)) && hasCfMarkers) return true;
-  
-  // CF markers combo = definitely a challenge (even without title match)
-  if (lowerHtml.includes('cf-challenge-running') && lowerHtml.includes('cf_chl_opt')) return true;
-  if (lowerHtml.includes('cf-browser-verification') && lowerHtml.includes('cdn-cgi/challenge-platform')) return true;
-  
-  // Challenge title + short/empty page = challenge (no real content on these pages)
-  if (cfChallengeTitles.some(ct => title.includes(ct)) && html.length < 50000) return true;
-  
-  // Fallback: title exactly matches + page has very few visible words (challenge pages are mostly JS)
-  if (cfChallengeTitles.some(ct => title === ct)) return true;
-  
-  return false;
-}
-
-// ============================================================================
-// CLOUDFLARE SOLVER (FlareSolverr-style — solve once, reuse cookies)
-// ============================================================================
-
-let _cfSession = null; // { cookies: string, userAgent: string, solved: boolean }
-
-/**
- * Solve Cloudflare challenge for a domain using Playwright.
- * Launches Chromium ONCE, navigates to the site, waits for challenge to pass,
- * then extracts cookies + UA for all subsequent HTTP requests.
- */
-async function solveCloudflare(url) {
-  if (_cfSession?.solved) return _cfSession;
-
-  let pw;
-  try {
-    pw = await import('playwright');
-    pw = pw.default || pw;
-  } catch {
-    console.warn('⚠️  Playwright not available — cannot solve Cloudflare');
-    return { cookies: '', userAgent: USER_AGENT, solved: false };
-  }
-
-  let browser;
-  try {
-    console.log(`🛡️  Cloudflare Solver: launching Chromium for ${url}...`);
-    browser = await pw.chromium.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage']
-    });
-    const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-      viewport: { width: 1280, height: 800 },
-      ignoreHTTPSErrors: true,
-    });
-
-    const page = await context.newPage();
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
-
-    // Wait for Cloudflare challenge to be solved (poll up to 30s)
-    const solveStart = Date.now();
-    let solved = false;
-    for (let i = 0; i < 30; i++) {
-      await page.waitForTimeout(1000);
-      const title = await page.title();
-      const hasCfChallenge = await page.evaluate(() => {
-        return !!(document.querySelector('#cf-challenge-running') ||
-                  document.querySelector('.cf-browser-verification') ||
-                  document.title.includes('Just a moment') ||
-                  document.title.includes('Verifying'));
-      });
-      if (!hasCfChallenge && !title.includes('Verifying') && !title.includes('Just a moment')) {
-        solved = true;
-        console.log(`🛡️  Cloudflare solved in ${((Date.now() - solveStart) / 1000).toFixed(1)}s — title: "${title.substring(0, 60)}"`);
-        break;
-      }
-    }
-
-    if (!solved) {
-      console.warn('🛡️  Cloudflare challenge NOT solved after 30s');
-      await browser.close();
-      return { cookies: '', userAgent: USER_AGENT, solved: false };
-    }
-
-    // Extract cookies and user-agent
-    const cookies = await context.cookies();
-    const cookieStr = cookies.map(c => `${c.name}=${c.value}`).join('; ');
-    const ua = await page.evaluate(() => navigator.userAgent);
-
-    // Also extract H1 from the rendered page as bonus data
-    const h1Data = await page.evaluate(() => {
-      const h1s = document.querySelectorAll('h1');
-      return Array.from(h1s).map(h => h.textContent?.trim()).filter(Boolean);
-    });
-
-    console.log(`🛡️  Extracted ${cookies.length} cookies, UA: ${ua.substring(0, 50)}...`);
-    console.log(`🛡️  Homepage H1 (JS rendered): ${h1Data.length > 0 ? h1Data.join(', ').substring(0, 80) : 'NONE'}`);
-
-    _cfSession = { cookies: cookieStr, userAgent: ua, solved: true, homepageH1: h1Data };
-    await browser.close();
-    return _cfSession;
-  } catch (e) {
-    console.error('🛡️  Cloudflare solver error:', e.message);
-    if (browser) await browser.close().catch(() => {});
-    return { cookies: '', userAgent: USER_AGENT, solved: false };
-  }
-}
-
-function resetCfSession() { _cfSession = null; }
 
 // ============================================================================
 // FETCH HELPER
 // ============================================================================
 
 async function safeFetch(url, options = {}) {
-    const MAX_RETRIES = 3;
-    // Use CF session cookies/UA if available
-    const effectiveUA = _cfSession?.solved ? _cfSession.userAgent : USER_AGENT;
-    const cfCookies = _cfSession?.solved ? _cfSession.cookies : '';
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-        const controller = new AbortController();
-        try { setMaxListeners(30, controller.signal); } catch (e) {}
-        const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
-        try {
-            const resp = await fetch(url, {
-                ...options,
-                signal: controller.signal,
-                headers: {
-                    'User-Agent': effectiveUA,
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Accept-Language': 'en-US,en;q=0.9',
-                    ...(cfCookies ? { 'Cookie': cfCookies } : {}),
-                    ...options.headers,
-                },
-                redirect: 'follow',
-            });
-            clearTimeout(timer);
-            // Retry on 429 (rate limit) and 503 (service unavailable) with backoff
-            if ((resp.status === 429 || resp.status === 503) && attempt < MAX_RETRIES) {
-                const delay = Math.pow(2, attempt + 1) * 1000; // 2s, 4s, 8s
-                console.log(`⏳ HTTP ${resp.status} on ${url} — retrying in ${delay / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
-                await new Promise(r => setTimeout(r, delay));
-                continue;
-            }
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            return await resp.text();
-        } catch (e) {
-            clearTimeout(timer);
-            if (attempt < MAX_RETRIES && (e.name === 'AbortError' || e.message?.includes('429') || e.message?.includes('503'))) {
-                const delay = Math.pow(2, attempt + 1) * 1000;
-                console.log(`⏳ Fetch error on ${url}: ${e.message} — retrying in ${delay / 1000}s`);
-                await new Promise(r => setTimeout(r, delay));
-                continue;
-            }
-            throw e;
-        }
-    }
-}
-
-/**
- * Enhanced fetch that returns response metadata (status, headers, timing, size)
- * Used for advanced SEO auditing — Semrush/Ahrefs-level data collection
- */
-async function safeFetchWithMeta(url, options = {}) {
     const controller = new AbortController();
-    try { setMaxListeners(30, controller.signal); } catch (e) {}
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
-    const startTime = Date.now();
-    const effectiveUA = _cfSession?.solved ? _cfSession.userAgent : USER_AGENT;
-    const cfCookies = _cfSession?.solved ? _cfSession.cookies : '';
     try {
         const resp = await fetch(url, {
             ...options,
             signal: controller.signal,
             headers: {
-                'User-Agent': effectiveUA,
+                'User-Agent': USER_AGENT,
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                ...(cfCookies ? { 'Cookie': cfCookies } : {}),
                 ...options.headers,
             },
             redirect: 'follow',
         });
         clearTimeout(timer);
-        const html = await resp.text();
-        const responseTimeMs = Date.now() - startTime;
-        return {
-            html,
-            status: resp.status,
-            ok: resp.ok,
-            responseTimeMs,
-            pageSizeBytes: new Blob([html]).size,
-            headers: {
-                contentType: resp.headers.get('content-type') || '',
-                server: resp.headers.get('server') || '',
-                cacheControl: resp.headers.get('cache-control') || '',
-                // Security headers
-                csp: resp.headers.get('content-security-policy') || '',
-                hsts: resp.headers.get('strict-transport-security') || '',
-                xFrameOptions: resp.headers.get('x-frame-options') || '',
-                xContentType: resp.headers.get('x-content-type-options') || '',
-                xXssProtection: resp.headers.get('x-xss-protection') || '',
-                referrerPolicy: resp.headers.get('referrer-policy') || '',
-                permissionsPolicy: resp.headers.get('permissions-policy') || '',
-            },
-        };
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        return await resp.text();
     } catch (e) {
         clearTimeout(timer);
-        return {
-            html: '', status: e.message.includes('HTTP') ? parseInt(e.message.replace('HTTP ', '')) || 0 : 0,
-            ok: false, responseTimeMs: Date.now() - startTime, pageSizeBytes: 0,
-            headers: {}, error: e.message,
-        };
+        throw e;
     }
 }
 
@@ -304,76 +87,36 @@ function extractJsonLd(html) {
 function extractLinks(html, baseUrl) {
     const internal = new Set();
     const external = new Set();
-    const externalUrls = []; // full URLs for broken link checking
-    let emptyAnchors = 0;
-    let nofollowInternalLinks = 0;
-    // Capture full anchor tag including inner text
-    const linkPattern = /<a\s+([^>]*)href\s*=\s*["']([^"'#]+)["']([^>]*)>(.*?)<\/a>/gis;
+    const linkPattern = /<a\s+[^>]*href\s*=\s*["']([^"'#]+)["'][^>]*>/gi;
     let m;
     let baseDomain;
-    try { baseDomain = new URL(baseUrl).hostname.replace(/^www\./, ''); } catch { return { internal: [], external: [], externalUrls: [], emptyAnchors: 0, nofollowInternalLinks: 0 }; }
+    try { baseDomain = new URL(baseUrl).hostname.replace(/^www\./, ''); } catch { return { internal: [], external: [] }; }
 
     while ((m = linkPattern.exec(html)) !== null) {
-        const preAttrs = m[1] || '';
-        let href = m[2].trim();
-        const postAttrs = m[3] || '';
-        const anchorText = stripTags(m[4] || '').trim();
+        let href = m[1].trim();
         if (href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:')) continue;
-
-        // Check for empty anchor text
-        if (!anchorText && !m[0].includes('<img')) emptyAnchors++;
-
-        // Check for rel="nofollow"
-        const allAttrs = preAttrs + ' ' + postAttrs;
-        const hasNofollow = /rel\s*=\s*["'][^"']*nofollow[^"']*["']/i.test(allAttrs);
-
         try {
             const resolved = new URL(href, baseUrl);
             const linkDomain = resolved.hostname.replace(/^www\./, '');
             if (linkDomain === baseDomain) {
                 internal.add(resolved.pathname);
-                if (hasNofollow) nofollowInternalLinks++;
             } else {
                 external.add(resolved.hostname);
-                if (externalUrls.length < 30) externalUrls.push(resolved.href);
             }
         } catch { /* skip invalid href */ }
     }
-    return {
-        internal: [...internal].slice(0, 50),
-        external: [...external].slice(0, 30),
-        externalUrls: externalUrls.slice(0, 30),
-        emptyAnchors,
-        nofollowInternalLinks,
-    };
+    return { internal: [...internal].slice(0, 50), external: [...external].slice(0, 30) };
 }
 
 function extractImages(html) {
-    // Strip <noscript> blocks first — images inside them aren't rendered
-    const cleanHtml = html.replace(/<noscript[\s\S]*?<\/noscript>/gi, '');
     const imgs = [];
     const imgPattern = /<img\s+[^>]*>/gi;
     let m;
-    while ((m = imgPattern.exec(cleanHtml)) !== null) {
-        const tag = m[0];
-        const src = getAttr(tag, 'src') || '';
-        const alt = getAttr(tag, 'alt') || '';
-        const width = parseInt(getAttr(tag, 'width') || '999', 10);
-        const height = parseInt(getAttr(tag, 'height') || '999', 10);
-
-        // Skip tracking pixels, spacers, beacons, data URIs, hidden images
-        if (width < 3 || height < 3) continue;
-        if (src.startsWith('data:')) continue;
-        if (/pixel|beacon|track|spacer|blank\.gif|1x1|transparent/i.test(src)) continue;
-        if (/aria-hidden\s*=\s*["']true["']/i.test(tag)) continue;
-        if (/display\s*:\s*none|visibility\s*:\s*hidden/i.test(getAttr(tag, 'style') || '')) continue;
-        if (!src || src === '#') continue;
-
-        imgs.push({ src, hasAlt: alt.trim().length > 0 });
+    while ((m = imgPattern.exec(html)) !== null) {
+        const alt = getAttr(m[0], 'alt') || '';
+        imgs.push({ hasAlt: alt.length > 0 });
     }
-    // Return src URLs of images missing alt for cross-page dedup
-    const srcsMissingAlt = imgs.filter(i => !i.hasAlt).map(i => i.src);
-    return { total: imgs.length, withAlt: imgs.filter(i => i.hasAlt).length, withoutAlt: srcsMissingAlt.length, srcsMissingAlt };
+    return { total: imgs.length, withAlt: imgs.filter(i => i.hasAlt).length, withoutAlt: imgs.filter(i => !i.hasAlt).length };
 }
 
 function extractCanonical(html) {
@@ -412,152 +155,6 @@ function getWordCount(text) {
     return text.split(/\s+/).filter(w => w.length > 1).length;
 }
 
-// ============================================================================
-// ADVANCED EXTRACTION — Beats Semrush/Ahrefs
-// ============================================================================
-
-/** Extract hreflang tags for international SEO */
-function extractHreflang(html) {
-    const hreflangs = [];
-    const pattern = /<link\s+[^>]*rel\s*=\s*["']alternate["'][^>]*hreflang\s*=\s*["']([^"']+)["'][^>]*href\s*=\s*["']([^"']+)["'][^>]*>/gi;
-    let m;
-    while ((m = pattern.exec(html)) !== null) {
-        hreflangs.push({ lang: m[1], url: m[2] });
-    }
-    // Also try reversed attribute order
-    const pattern2 = /<link\s+[^>]*hreflang\s*=\s*["']([^"']+)["'][^>]*href\s*=\s*["']([^"']+)["'][^>]*>/gi;
-    while ((m = pattern2.exec(html)) !== null) {
-        if (!hreflangs.find(h => h.lang === m[1])) hreflangs.push({ lang: m[1], url: m[2] });
-    }
-    return hreflangs;
-}
-
-/** Detect mixed content (HTTP resources on HTTPS pages) */
-function detectMixedContent(html, pageUrl) {
-    if (!pageUrl.startsWith('https')) return { hasMixed: false, count: 0, examples: [] };
-    const mixed = [];
-    // Check src= and href= attributes for http:// (not https://)
-    const pattern = /(?:src|href)\s*=\s*["'](http:\/\/[^"']+)["']/gi;
-    let m;
-    while ((m = pattern.exec(html)) !== null) {
-        const resource = m[1];
-        // Exclude common false positives (schema.org, xmlns, etc.)
-        if (!resource.includes('schema.org') && !resource.includes('w3.org') && !resource.includes('xmlns')) {
-            mixed.push(resource);
-        }
-    }
-    return { hasMixed: mixed.length > 0, count: mixed.length, examples: mixed.slice(0, 5) };
-}
-
-/** Extract lang attribute from <html> tag */
-function extractLangAttribute(html) {
-    const m = html.match(/<html[^>]*\slang\s*=\s*["']([^"']+)["']/i);
-    return m ? m[1] : '';
-}
-
-/** Count CSS and JS resources */
-function countResources(html) {
-    const cssLinks = (html.match(/<link[^>]*rel\s*=\s*["']stylesheet["'][^>]*>/gi) || []).length;
-    const cssInline = (html.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || []).length;
-    const jsExternal = (html.match(/<script[^>]*src\s*=\s*["'][^"']+["'][^>]*>/gi) || []).length;
-    const jsInline = (html.match(/<script[^>]*>[\s\S]+?<\/script>/gi) || []).filter(s => !s.includes('application/ld+json')).length;
-    return {
-        cssExternal: cssLinks, cssInline, cssTotal: cssLinks + cssInline,
-        jsExternal, jsInline, jsTotal: jsExternal + jsInline,
-        totalResources: cssLinks + jsExternal,
-    };
-}
-
-/** Extract all external JS/CSS resource URLs (for cache/minification scanning — Semrush parity) */
-function extractResourceUrls(html, baseUrl) {
-    const resources = [];
-    // External CSS stylesheets
-    const cssPattern = /<link[^>]*rel\s*=\s*["']stylesheet["'][^>]*href\s*=\s*["']([^"']+)["'][^>]*>/gi;
-    let m;
-    while ((m = cssPattern.exec(html)) !== null && resources.length < 50) {
-        const href = m[1].trim();
-        if (href && !href.startsWith('data:')) {
-            try {
-                const fullUrl = new URL(href, baseUrl).href;
-                resources.push({ url: fullUrl, type: 'css', isMinified: /\.min\.css/i.test(href) });
-            } catch { /* skip invalid */ }
-        }
-    }
-    // Also try reversed attribute order (href before rel)
-    const cssPattern2 = /<link[^>]*href\s*=\s*["']([^"']+)["'][^>]*rel\s*=\s*["']stylesheet["'][^>]*>/gi;
-    while ((m = cssPattern2.exec(html)) !== null && resources.length < 50) {
-        const href = m[1].trim();
-        if (href && !href.startsWith('data:')) {
-            try {
-                const fullUrl = new URL(href, baseUrl).href;
-                if (!resources.find(r => r.url === fullUrl)) {
-                    resources.push({ url: fullUrl, type: 'css', isMinified: /\.min\.css/i.test(href) });
-                }
-            } catch { /* skip invalid */ }
-        }
-    }
-    // External JS scripts
-    const jsPattern = /<script[^>]*src\s*=\s*["']([^"']+)["'][^>]*>/gi;
-    while ((m = jsPattern.exec(html)) !== null && resources.length < 100) {
-        const src = m[1].trim();
-        if (src && !src.startsWith('data:') && !src.includes('application/ld+json')) {
-            try {
-                const fullUrl = new URL(src, baseUrl).href;
-                if (!resources.find(r => r.url === fullUrl)) {
-                    resources.push({ url: fullUrl, type: 'js', isMinified: /\.min\.js/i.test(src) });
-                }
-            } catch { /* skip invalid */ }
-        }
-    }
-    return resources;
-}
-
-/** Validate heading hierarchy (no skipped levels) */
-function validateHeadingHierarchy(headings) {
-    const issues = [];
-    let lastLevel = 0;
-    for (const h of headings) {
-        if (h.level > lastLevel + 1 && lastLevel > 0) {
-            issues.push({ from: `H${lastLevel}`, to: `H${h.level}`, text: h.text.substring(0, 60) });
-        }
-        lastLevel = h.level;
-    }
-    return { valid: issues.length === 0, skippedLevels: issues };
-}
-
-/** Extract meta robots directives */
-function extractMetaRobots(meta) {
-    const robotsStr = (meta.robots || '').toLowerCase();
-    return {
-        raw: robotsStr,
-        noindex: robotsStr.includes('noindex'),
-        nofollow: robotsStr.includes('nofollow'),
-        noarchive: robotsStr.includes('noarchive'),
-        nosnippet: robotsStr.includes('nosnippet'),
-        hasDirectives: robotsStr.length > 0,
-    };
-}
-
-/** Analyze security headers — beats all competitors (Semrush/Ahrefs don't check this) */
-function analyzeSecurityHeaders(headers) {
-    if (!headers) return { score: 0, total: 7, details: [] };
-    const checks = [
-        { name: 'Content-Security-Policy', present: !!headers.csp, importance: 'critical' },
-        { name: 'Strict-Transport-Security', present: !!headers.hsts, importance: 'critical' },
-        { name: 'X-Frame-Options', present: !!headers.xFrameOptions, importance: 'high' },
-        { name: 'X-Content-Type-Options', present: !!headers.xContentType, importance: 'high' },
-        { name: 'Referrer-Policy', present: !!headers.referrerPolicy, importance: 'medium' },
-        { name: 'Permissions-Policy', present: !!headers.permissionsPolicy, importance: 'medium' },
-        { name: 'X-XSS-Protection', present: !!headers.xXssProtection, importance: 'low' },
-    ];
-    return {
-        score: checks.filter(c => c.present).length,
-        total: checks.length,
-        percentage: Math.round((checks.filter(c => c.present).length / checks.length) * 100),
-        details: checks,
-    };
-}
-
 // Helpers
 function getAttr(tag, name) {
     const m = tag.match(new RegExp(`${name}\\s*=\\s*["']([^"']*)["']`, 'i'));
@@ -579,27 +176,7 @@ function decodeEntities(str) {
 
 export async function crawlPage(url) {
     try {
-        // Use enhanced fetch for response metadata (status, timing, headers, size)
-        const fetchResult = await safeFetchWithMeta(url);
-        const html = fetchResult.html;
-
-        // If fetch completely failed (no HTML), return error with status
-        if (!html && !fetchResult.ok) {
-            return {
-                url, success: false, error: fetchResult.error || `HTTP ${fetchResult.status}`,
-                statusCode: fetchResult.status, responseTimeMs: fetchResult.responseTimeMs,
-            };
-        }
-
-        // Detect Cloudflare/bot challenge pages — these look like real pages but have fake H1/content
-        if (isBotChallengePage(html)) {
-            return {
-                url, success: false, error: 'Bot challenge page (Cloudflare)',
-                statusCode: fetchResult.status, responseTimeMs: fetchResult.responseTimeMs,
-                isBotChallenge: true,
-            };
-        }
-
+        const html = await safeFetch(url);
         const meta = extractMeta(html);
         const headings = extractHeadings(html);
         const jsonLd = extractJsonLd(html);
@@ -610,45 +187,12 @@ export async function crawlPage(url) {
         const bodyText = getBodyText(html);
         const wordCount = getWordCount(bodyText);
 
-        // ── Soft-404 detection (SPA sites return 200 with a 404 page body) ──
-        const titleLower = (meta.title || '').toLowerCase().trim();
-        const h1Texts = headings.filter(h => h.level === 1).map(h => h.text.trim());
-        const isSoft404 = (
-            titleLower === '404' ||
-            titleLower === '404 not found' ||
-            titleLower === 'page not found' ||
-            titleLower === 'not found' ||
-            (h1Texts.length === 1 && /^(404|page not found|not found)$/i.test(h1Texts[0])) ||
-            (titleLower === 'user' && h1Texts.some(h => /^404$/i.test(h)))
-        );
-
-        // ── NEW: Advanced extraction (beats Semrush/Ahrefs) ──
-        const hreflang = extractHreflang(html);
-        const mixedContent = detectMixedContent(html, url);
-        const langAttr = extractLangAttribute(html);
-        const resources = countResources(html);
-        const headingHierarchy = validateHeadingHierarchy(headings);
-        const metaRobots = extractMetaRobots(meta);
-        const securityHeaders = analyzeSecurityHeaders(fetchResult.headers);
-
-        // Full body text for duplicate detection + text-to-HTML ratio (capped at 10K for memory)
+        // Extract a meaningful content snippet (first 500 chars of body text)
         const contentSnippet = bodyText.substring(0, 500);
-        const bodyTextFull = bodyText.substring(0, 10000);
-        const textToHtmlRatio = html.length > 0 ? Math.round((bodyText.length / html.length) * 100) : 0;
 
         return {
             url,
             success: true,
-            isSoft404,
-            // ── Response metadata ──
-            statusCode: fetchResult.status,
-            responseTimeMs: fetchResult.responseTimeMs,
-            pageSizeBytes: fetchResult.pageSizeBytes,
-            pageSizeKB: Math.round(fetchResult.pageSizeBytes / 1024),
-            htmlSizeOver2MB: fetchResult.pageSizeBytes > 2 * 1024 * 1024,
-            redirectChain: fetchResult.redirectChain || [],
-            redirectCount: (fetchResult.redirectChain || []).length,
-            // ── SEO data ──
             title: meta.title || '',
             metaDescription: meta.description || '',
             ogTitle: meta['og:title'] || '',
@@ -669,40 +213,12 @@ export async function crawlPage(url) {
             tech,
             wordCount,
             contentSnippet,
-            bodyTextFull,
-            textToHtmlRatio,
             robots: meta.robots || '',
             viewport: meta.viewport || '',
             charset: (html.match(/charset\s*=\s*["']?([^"'\s;>]+)/i) || ['', ''])[1] || '',
-            // ── Advanced data ──
-            hreflang,
-            hasHreflang: hreflang.length > 0,
-            mixedContent,
-            langAttr,
-            hasLangAttr: !!langAttr,
-            resources,
-            headingHierarchy,
-            metaRobots,
-            securityHeaders,
-            urlLength: url.length,
-            urlTooLong: url.length > 75,
-            // ── Title/meta quality flags ──
-            titleLength: (meta.title || '').length,
-            titleTooShort: (meta.title || '').length > 0 && (meta.title || '').length < 30,
-            titleTooLong: (meta.title || '').length > 70,
-            metaDescLength: (meta.description || '').length,
-            metaDescTooShort: (meta.description || '').length > 0 && (meta.description || '').length < 120,
-            metaDescTooLong: (meta.description || '').length > 160,
-            // ── Enhanced link data ──
-            emptyAnchors: links.emptyAnchors || 0,
-            nofollowInternalLinks: links.nofollowInternalLinks || 0,
-            externalUrls: links.externalUrls || [],
-            hasCacheControl: !!(fetchResult.headers?.cacheControl),
-            // ── Resource URLs for cache/minification scanning (Semrush parity) ──
-            resourceUrls: extractResourceUrls(html, url),
         };
     } catch (e) {
-        return { url, success: false, error: e.message, statusCode: 0, responseTimeMs: 0 };
+        return { url, success: false, error: e.message };
     }
 }
 
@@ -719,19 +235,12 @@ async function safeFetchWithRedirects(url) {
 
     while (maxHops-- > 0) {
         const controller = new AbortController();
-        try { setMaxListeners(30, controller.signal); } catch (e) {}
         const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
-        const effectiveUA = _cfSession?.solved ? _cfSession.userAgent : USER_AGENT;
-        const cfCookies = _cfSession?.solved ? _cfSession.cookies : '';
         try {
             const resp = await fetch(currentUrl, {
                 signal: controller.signal,
-                headers: {
-                    'User-Agent': effectiveUA,
-                    'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
-                    ...(cfCookies ? { 'Cookie': cfCookies } : {}),
-                },
-                redirect: 'manual',
+                headers: { 'User-Agent': USER_AGENT, 'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8' },
+                redirect: 'manual', // Don't auto-follow — we want to track the chain
             });
             clearTimeout(timer);
 
@@ -786,16 +295,16 @@ async function fetchSitemap(baseUrl) {
                 const locPattern = /<sitemap>\s*<loc>([^<]+)<\/loc>/gi;
                 let m;
                 const childSitemaps = [];
-                while ((m = locPattern.exec(xml)) !== null && childSitemaps.length < 20) {
+                while ((m = locPattern.exec(xml)) !== null && childSitemaps.length < 3) {
                     childSitemaps.push(m[1].trim());
                 }
-                // Fetch first 10 child sitemaps for full coverage
-                for (const childUrl of childSitemaps.slice(0, 10)) {
+                // Fetch first 2 child sitemaps
+                for (const childUrl of childSitemaps.slice(0, 2)) {
                     try {
                         const childXml = await safeFetch(childUrl);
                         const childLocPattern = /<url>\s*<loc>([^<]+)<\/loc>/gi;
                         let cm;
-                        while ((cm = childLocPattern.exec(childXml)) !== null && urls.length < 2000) {
+                        while ((cm = childLocPattern.exec(childXml)) !== null && urls.length < 50) {
                             urls.push(cm[1].trim());
                         }
                     } catch { /* skip failed child sitemap */ }
@@ -804,7 +313,7 @@ async function fetchSitemap(baseUrl) {
                 // Standard sitemap — extract URLs
                 const locPattern = /<url>\s*<loc>([^<]+)<\/loc>/gi;
                 let m;
-                while ((m = locPattern.exec(xml)) !== null && urls.length < 2000) {
+                while ((m = locPattern.exec(xml)) !== null && urls.length < 50) {
                     urls.push(m[1].trim());
                 }
             }
@@ -863,35 +372,6 @@ async function fetchRobotsTxt(baseUrl) {
     }
 }
 
-/**
- * Fetch /llms.txt — AI crawler accessibility file (like robots.txt for LLMs)
- * Semrush 2025 checks for this. We beat them by also parsing its sections.
- */
-async function fetchLlmsTxt(baseUrl) {
-    try {
-        const text = await safeFetch(`${baseUrl}/llms.txt`);
-        if (!text || text.length < 10 || text.includes('<html')) {
-            return { found: false, content: '', sections: [] };
-        }
-        // Parse sections (# headers)
-        const sections = [];
-        const lines = text.split('\n');
-        let currentSection = null;
-        for (const line of lines) {
-            if (line.startsWith('#')) {
-                if (currentSection) sections.push(currentSection);
-                currentSection = { title: line.replace(/^#+\s*/, ''), content: '' };
-            } else if (currentSection) {
-                currentSection.content += line + '\n';
-            }
-        }
-        if (currentSection) sections.push(currentSection);
-        return { found: true, content: text.substring(0, 2000), sections, lineCount: lines.length };
-    } catch {
-        return { found: false, content: '', sections: [] };
-    }
-}
-
 
 // ============================================================================
 // DUPLICATE CONTENT DETECTION (3-gram shingling + Jaccard)
@@ -916,227 +396,26 @@ function jaccardSimilarity(setA, setB) {
 }
 
 function computeDuplicates(pages) {
-    // Aggressive boilerplate stripping — shared nav/footer/sidebar causes false positives
-    // Strip first/last 200 words AND remove common boilerplate patterns
-    const stripBoilerplate = (text) => {
-        const words = text.split(/\s+/);
-        if (words.length < 500) return ''; // Pages under 500 words: skip content comparison entirely (too short for reliable fingerprinting)
-        // Strip 200 words from each end (header/nav + footer/CTA)
-        const core = words.slice(200, words.length - 200).join(' ');
-        // Remove common boilerplate phrases that inflate similarity
-        return core
-            .replace(/copyright\s*\d{4}.*$/gi, '')
-            .replace(/all rights reserved/gi, '')
-            .replace(/privacy policy|terms of service|cookie policy/gi, '')
-            .replace(/\s+/g, ' ').trim();
-    };
+    const fingerprints = pages.map(p => ({
+        url: p.url,
+        fp: contentFingerprint(p.contentSnippet || p.bodyTextFull || ''),
+    }));
 
-    // Only fingerprint pages with sufficient content (500+ words)
-    const fingerprints = pages
-        .map(p => {
-            const stripped = stripBoilerplate(p.bodyTextFull || p.contentSnippet || '');
-            return { url: p.url, fp: stripped ? contentFingerprint(stripped) : new Set(), wordCount: p.wordCount || 0 };
-        })
-        .filter(p => p.fp.size > 0); // Exclude pages with empty fingerprints
-
-    // Content duplicates — 99%+ similarity ONLY (Semrush reports near-0 for most sites)
-    // 95% was catching templated pages (same layout, different products) as duplicates
-    const contentDuplicates = [];
+    const duplicates = [];
     for (let i = 0; i < fingerprints.length; i++) {
         for (let j = i + 1; j < fingerprints.length; j++) {
             const sim = jaccardSimilarity(fingerprints[i].fp, fingerprints[j].fp);
-            if (sim > 0.99) {
-                contentDuplicates.push({
+            if (sim > 0.6) { // 60%+ similarity = near-duplicate
+                duplicates.push({
                     page1: fingerprints[i].url,
                     page2: fingerprints[j].url,
                     similarity: Math.round(sim * 100),
-                    level: 'exact-duplicate',
+                    level: sim > 0.85 ? 'duplicate' : 'near-duplicate',
                 });
             }
         }
     }
-
-    // Duplicate titles (exact match, non-empty) — Semrush reports these separately
-    const titleMap = new Map();
-    for (const p of pages) {
-        const t = (p.title || '').trim().toLowerCase();
-        if (t.length < 5) continue; // skip empty/too-short
-        if (!titleMap.has(t)) titleMap.set(t, []);
-        titleMap.get(t).push(p.url);
-    }
-    const duplicateTitles = [...titleMap.entries()]
-        .filter(([, urls]) => urls.length > 1)
-        .map(([title, urls]) => ({ title, count: urls.length, urls: urls.slice(0, 5) }));
-
-    // Duplicate meta descriptions (exact match, non-empty) — Semrush reports these separately
-    const metaMap = new Map();
-    for (const p of pages) {
-        const d = (p.metaDescription || '').trim().toLowerCase();
-        if (d.length < 10) continue;
-        if (!metaMap.has(d)) metaMap.set(d, []);
-        metaMap.get(d).push(p.url);
-    }
-    const duplicateMetaDescriptions = [...metaMap.entries()]
-        .filter(([, urls]) => urls.length > 1)
-        .map(([desc, urls]) => ({ description: desc.substring(0, 80) + '...', count: urls.length, urls: urls.slice(0, 5) }));
-
-    // Total duplicate count: Semrush-style (separate categories)
-    const titleDuplicateCount = duplicateTitles.reduce((s, d) => s + d.count, 0);
-    const metaDuplicateCount = duplicateMetaDescriptions.reduce((s, d) => s + d.count, 0);
-
-    return {
-        contentDuplicates,
-        duplicateTitles,
-        duplicateMetaDescriptions,
-        contentDuplicateCount: contentDuplicates.length,
-        titleDuplicateCount,
-        metaDuplicateCount,
-        // Semrush-parity: combined count reported as "X duplicate content issues"
-        totalDuplicateIssues: contentDuplicates.length + titleDuplicateCount + metaDuplicateCount,
-    };
-}
-
-
-// ============================================================================
-// RESEARCH DOMAIN LIGHT — Homepage only (3-5s) for backlinks, warroom, etc.
-// Returns same shape as researchDomain() for compatibility with formatSiteResearch()
-// ============================================================================
-
-export async function researchDomainLight(baseUrl) {
-    let normalizedUrl = baseUrl.trim();
-    if (!/^https?:\/\//i.test(normalizedUrl)) normalizedUrl = `https://${normalizedUrl}`;
-    const cleanBase = normalizedUrl.replace(/\/+$/, '');
-
-    console.log(`🕷️  Light crawl (homepage only): ${cleanBase}`);
-    const startTime = Date.now();
-
-    // Fetch homepage + robots.txt + sitemap in parallel (no CF solving, no Playwright)
-    const [homepageHtml, robotsTxt, sitemap] = await Promise.all([
-        safeFetch(cleanBase).catch(() => ''),
-        fetchRobotsTxt(cleanBase),
-        fetchSitemap(cleanBase),
-    ]);
-
-    if (!homepageHtml) {
-        return { url: cleanBase, pages: [{ url: cleanBase, success: false, error: 'Empty response' }], homepage: {}, siteIntelligence: { totalPages: 0 }, robotsTxt, sitemap };
-    }
-
-    // Parse homepage
-    const meta = extractMeta(homepageHtml);
-    const headings = extractHeadings(homepageHtml);
-    const jsonLd = extractJsonLd(homepageHtml);
-    const links = extractLinks(homepageHtml, cleanBase);
-    const images = extractImages(homepageHtml);
-    const canonical = extractCanonical(homepageHtml);
-    const tech = detectTechSignals(homepageHtml);
-    const bodyText = getBodyText(homepageHtml);
-    const wordCount = getWordCount(bodyText);
-
-    const homepage = {
-        url: cleanBase,
-        success: true,
-        title: meta.title || '',
-        metaDescription: meta.description || '',
-        ogTitle: meta['og:title'] || '',
-        ogDescription: meta['og:description'] || '',
-        ogImage: meta['og:image'] || '',
-        canonical,
-        headings,
-        h1: headings.filter(h => h.level === 1).map(h => h.text),
-        h2: headings.filter(h => h.level === 2).map(h => h.text),
-        h3: headings.filter(h => h.level === 3).map(h => h.text),
-        jsonLd,
-        hasSchemaOrg: jsonLd.length > 0,
-        schemaTypes: jsonLd.map(s => s['@type']).filter(Boolean),
-        links,
-        internalLinkCount: links.internal.length,
-        externalLinkCount: links.external.length,
-        images,
-        tech,
-        wordCount,
-        contentSnippet: bodyText.substring(0, 500),
-        bodyTextFull: bodyText.substring(0, 2000),
-        robots: meta.robots || '',
-        viewport: meta.viewport || '',
-    };
-
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`🕷️  Light crawl complete: 1 page in ${elapsed}s (sitemap: ${sitemap.found ? sitemap.count + ' URLs' : 'not found'})`);
-
-    // Return same shape as researchDomain() — compatible with formatSiteResearch()
-    return {
-        url: normalizedUrl,
-        pages: [{
-            url: homepage.url,
-            title: homepage.title,
-            metaDescription: homepage.metaDescription,
-            h1: homepage.h1,
-            h2: homepage.h2,
-            wordCount: homepage.wordCount,
-            contentSnippet: homepage.contentSnippet,
-            statusCode: 200,
-            images: homepage.images,
-            canonical: homepage.canonical,
-            hasSchemaOrg: homepage.hasSchemaOrg,
-            textToHtmlRatio: 0,
-        }],
-        homepage: {
-            title: homepage.title,
-            metaDescription: homepage.metaDescription,
-            ogTitle: homepage.ogTitle,
-            ogDescription: homepage.ogDescription,
-            ogImage: homepage.ogImage,
-            h1: homepage.h1,
-            h2: homepage.h2,
-            h3: homepage.h3,
-            contentSnippet: homepage.contentSnippet,
-            redirectChain: [],
-        },
-        robotsTxt: {
-            found: robotsTxt.found,
-            disallowCount: robotsTxt.disallowRules?.length || 0,
-            disallowRules: (robotsTxt.disallowRules || []).slice(0, 20),
-            sitemapUrls: robotsTxt.sitemapUrls || [],
-            crawlDelay: robotsTxt.crawlDelay,
-            raw: robotsTxt.raw?.substring(0, 500) || '',
-        },
-        sitemap: {
-            found: sitemap.found,
-            urlCount: sitemap.count,
-            sampleUrls: sitemap.urls.slice(0, 10),
-        },
-        siteIntelligence: {
-            totalPages: 1,
-            totalWordCount: homepage.wordCount,
-            avgWordCount: homepage.wordCount,
-            totalImages: homepage.images?.total || 0,
-            imagesWithoutAlt: homepage.images?.withoutAlt || 0,
-            schemaTypes: homepage.schemaTypes || [],
-            hasSchemaOrg: homepage.hasSchemaOrg,
-            techStack: homepage.tech || [],
-            hasCanonical: !!homepage.canonical,
-            hasViewport: !!homepage.viewport,
-            hasFAQ: homepage.h2?.some(h => h.toLowerCase().includes('faq') || h.toLowerCase().includes('frequently')) || false,
-            hasRobots: !!homepage.robots,
-            hasRobotsTxt: robotsTxt.found,
-            hasSitemap: sitemap.found,
-            sitemapUrlCount: sitemap.count,
-            internalLinkCount: homepage.internalLinkCount || 0,
-            externalLinkCount: homepage.externalLinkCount || 0,
-            externalDomains: homepage.links?.external || [],
-            // Empty arrays for deep-crawl fields (not applicable in light mode)
-            thinPages: [], thinPageCount: 0,
-            missingMetaDescriptions: [], missingH1Tags: [],
-            redirectChains: [], redirectChainCount: 0,
-            duplicateContent: [], duplicateContentCount: 0,
-            duplicateTitles: [], titleDuplicateCount: 0,
-            duplicateMetaDescriptions: [], metaDuplicateCount: 0,
-            missingH1Count: 0, multipleH1Pages: [], multipleH1Count: 0,
-            deepPages: [], clickDepthIssues: 0,
-            brokenInternalLinks: [], brokenInternalCount: 0,
-            brokenExternalLinks: [], brokenExternalCount: 0,
-        },
-    };
+    return duplicates;
 }
 
 
@@ -1144,63 +423,20 @@ export async function researchDomainLight(baseUrl) {
 // RESEARCH DOMAIN — Deep crawl: sitemap + robots.txt + 20+ pages
 // ============================================================================
 
-export async function researchDomain(baseUrl, options = {}) {
+export async function researchDomain(baseUrl) {
     // Normalize URL
     let normalizedUrl = baseUrl.trim();
     if (!/^https?:\/\//i.test(normalizedUrl)) normalizedUrl = `https://${normalizedUrl}`;
     // Strip trailing slash for consistency
     const cleanBase = normalizedUrl.replace(/\/+$/, '');
 
-    // Configurable crawl limits — callers can reduce for speed
-    const MAX_PAGES = options.maxPages || 800;
-    const CRAWL_TIMEOUT_MS = options.timeout || 180000;
-    const skipCfSolve = options.skipCfSolve || false;
+    console.log(`🕷️  Deep crawl starting: ${cleanBase}`);
 
-    console.log(`🕷️  Deep crawl starting: ${cleanBase} (max ${MAX_PAGES} pages, timeout ${CRAWL_TIMEOUT_MS / 1000}s)`);
-
-    // PHASE 0: Conditional Cloudflare challenge detection
-    // Try a quick fetch first — only launch the expensive Playwright solver if CF is detected
-    resetCfSession(); // Fresh session for each domain
-    let _cfNeeded = false;
-    if (!skipCfSolve) {
-      try {
-        const probeCtrl = new AbortController();
-        try { setMaxListeners(30, probeCtrl.signal); } catch (e) {}
-        const probeTimer = setTimeout(() => probeCtrl.abort(), 8000);
-        const probeResp = await fetch(cleanBase, {
-            signal: probeCtrl.signal,
-            headers: { 'User-Agent': USER_AGENT, 'Accept': 'text/html,*/*;q=0.8' },
-            redirect: 'follow',
-        });
-        clearTimeout(probeTimer);
-        const probeHtml = await probeResp.text();
-        _cfNeeded = isBotChallengePage(probeHtml);
-        if (_cfNeeded) {
-            console.log(`🛡️  Cloudflare challenge DETECTED — launching solver...`);
-            await solveCloudflare(cleanBase);
-        } else {
-            console.log(`🛡️  No Cloudflare challenge — skipping solver (saved 15-30s)`);
-        }
-      } catch (probeErr) {
-        console.log(`🛡️  Homepage probe failed (${probeErr.message}) — trying solver as fallback`);
-        await solveCloudflare(cleanBase);
-      }
-    } else {
-      console.log(`🛡️  CF solve skipped (fast mode)`);
-    }
-
-    // PHASE 1: Fetch homepage + robots.txt + sitemap.xml
-    // For CF-protected sites: serialize with gaps to avoid 429 rate limiting
-    // For open sites: parallel for speed
-    let homepageResult, robotsTxt, sitemap, llmsTxt;
-
-    const _homepageFetchFn = async () => {
+    // PHASE 1: Fetch homepage + robots.txt + sitemap.xml in parallel
+    const [homepageResult, robotsTxt, sitemap] = await Promise.all([
+        (async () => {
             const { html, redirectChain, finalUrl } = await safeFetchWithRedirects(cleanBase);
             if (!html) return { success: false, error: 'Empty response', redirectChain };
-
-            // Also fetch metadata (status, timing, headers) via enhanced fetch
-            const metaFetch = await safeFetchWithMeta(finalUrl);
-
             const meta = extractMeta(html);
             const headings = extractHeadings(html);
             const jsonLd = extractJsonLd(html);
@@ -1210,25 +446,9 @@ export async function researchDomain(baseUrl, options = {}) {
             const tech = detectTechSignals(html);
             const bodyText = getBodyText(html);
             const wordCount = getWordCount(bodyText);
-
-            // ── NEW: Advanced extraction for homepage ──
-            const hreflang = extractHreflang(html);
-            const mixedContent = detectMixedContent(html, finalUrl);
-            const langAttr = extractLangAttribute(html);
-            const resources = countResources(html);
-            const headingHierarchy = validateHeadingHierarchy(headings);
-            const metaRobots = extractMetaRobots(meta);
-            const securityHeaders = analyzeSecurityHeaders(metaFetch.headers);
-
             return {
                 url: finalUrl,
                 success: true,
-                // Response metadata
-                statusCode: metaFetch.status || 200,
-                responseTimeMs: metaFetch.responseTimeMs || 0,
-                pageSizeBytes: metaFetch.pageSizeBytes || new Blob([html]).size,
-                pageSizeKB: Math.round((metaFetch.pageSizeBytes || new Blob([html]).size) / 1024),
-                // Existing fields
                 title: meta.title || '',
                 metaDescription: meta.description || '',
                 ogTitle: meta['og:title'] || '',
@@ -1249,733 +469,106 @@ export async function researchDomain(baseUrl, options = {}) {
                 tech,
                 wordCount,
                 contentSnippet: bodyText.substring(0, 500),
-                bodyTextFull: bodyText.substring(0, 2000),
+                bodyTextFull: bodyText.substring(0, 2000), // More text for duplicate detection
                 robots: meta.robots || '',
                 viewport: meta.viewport || '',
                 redirectChain,
-                // ── NEW: Advanced data ──
-                hreflang,
-                hasHreflang: hreflang.length > 0,
-                mixedContent,
-                langAttr,
-                hasLangAttr: !!langAttr,
-                resources,
-                headingHierarchy,
-                metaRobots,
-                securityHeaders,
-                urlLength: finalUrl.length,
-                urlTooLong: finalUrl.length > 75,
-                titleLength: (meta.title || '').length,
-                titleTooShort: (meta.title || '').length > 0 && (meta.title || '').length < 30,
-                titleTooLong: (meta.title || '').length > 60,
-                metaDescLength: (meta.description || '').length,
-                metaDescTooShort: (meta.description || '').length > 0 && (meta.description || '').length < 120,
-                metaDescTooLong: (meta.description || '').length > 160,
-                // ── NEW: Enhanced link data ──
-                emptyAnchors: links.emptyAnchors || 0,
-                nofollowInternalLinks: links.nofollowInternalLinks || 0,
-                externalUrls: links.externalUrls || [],
-                hasCacheControl: !!(metaFetch.headers?.cacheControl),
             };
-    };
-
-    if (_cfNeeded) {
-        // CF-protected site: serialize with 500ms gaps to avoid thundering herd 429s
-        console.log(`🛡️  CF-protected site — serializing initial fetches with 500ms gaps...`);
-        await new Promise(r => setTimeout(r, 1000)); // 1s cooldown after CF solve
-        homepageResult = await _homepageFetchFn().catch(e => ({ success: false, error: e.message, url: cleanBase }));
-        await new Promise(r => setTimeout(r, 500));
-        robotsTxt = await fetchRobotsTxt(cleanBase).catch(() => ({ found: false }));
-        await new Promise(r => setTimeout(r, 500));
-        sitemap = await fetchSitemap(cleanBase).catch(() => ({ found: false, count: 0, urls: [] }));
-        await new Promise(r => setTimeout(r, 300));
-        llmsTxt = await fetchLlmsTxt(cleanBase).catch(() => ({ found: false }));
-    } else {
-        // Open site: parallel for speed
-        [homepageResult, robotsTxt, sitemap, llmsTxt] = await Promise.all([
-            _homepageFetchFn(),
-            fetchRobotsTxt(cleanBase),
-            fetchSitemap(cleanBase),
-            fetchLlmsTxt(cleanBase),
-        ]);
-    }
+        })(),
+        fetchRobotsTxt(cleanBase),
+        fetchSitemap(cleanBase),
+    ]);
 
     if (!homepageResult.success) {
-        return { url: cleanBase, pages: [homepageResult], summary: null, error: homepageResult.error, robotsTxt, sitemap, llmsTxt };
+        return { url: cleanBase, pages: [homepageResult], summary: null, error: homepageResult.error, robotsTxt, sitemap };
     }
 
-    let homepage = homepageResult;
-
-    // ── Puppeteer JS-rendering fallback for SPA sites ──
-    // If fetch() gets <300 words, the site is likely JS-rendered (React/Angular/Vue)
-    // Re-render with headless Chrome to get the actual DOM content
-    if ((homepage.wordCount || 0) < 300) {
-        try {
-            console.log(`🖥️  Homepage has ${homepage.wordCount} words — likely SPA. Trying Puppeteer JS rendering (12s timeout)...`);
-            const puppeteerTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Puppeteer timeout (12s)')), 12000));
-            const puppeteerRender = (async () => {
-                const { jsRenderCrawl } = await import('./js-crawler.js');
-                return jsRenderCrawl(cleanBase, { maxPages: 1, mobile: false });
-            })();
-            const jsResult = await Promise.race([puppeteerRender, puppeteerTimeout]);
-            if (jsResult?.pages?.[0]?.wordCount > homepage.wordCount) {
-                const jp = jsResult.pages[0];
-                console.log(`🖥️  Puppeteer got ${jp.wordCount} words (vs ${homepage.wordCount} from fetch). Using rendered content.`);
-                // Merge Puppeteer data into homepage
-                homepage = {
-                    ...homepage,
-                    wordCount: jp.wordCount,
-                    bodyTextFull: jp.bodyText || homepage.bodyTextFull,
-                    contentSnippet: (jp.bodyText || '').substring(0, 500),
-                    title: jp.title || homepage.title,
-                    h1: jp.h1s || homepage.h1,
-                    h2: jp.h2s || homepage.h2,
-                    images: jp.images ? { total: jp.images.length, withAlt: jp.images.filter(i => i.hasAlt).length, withoutAlt: jp.imagesWithoutAlt || 0 } : homepage.images,
-                    jsRendered: true,
-                };
-                
-                // If the original fetch got blocked (0 headers), try to recover from Puppeteer's headers
-                if (homepage.securityHeaders?.score === 0 && jp.headers) {
-                    const pwHeaders = {
-                        csp: jp.headers['content-security-policy'] || '',
-                        hsts: jp.headers['strict-transport-security'] || '',
-                        xFrameOptions: jp.headers['x-frame-options'] || '',
-                        xContentType: jp.headers['x-content-type-options'] || '',
-                        xXssProtection: jp.headers['x-xss-protection'] || '',
-                        referrerPolicy: jp.headers['referrer-policy'] || '',
-                        permissionsPolicy: jp.headers['permissions-policy'] || '',
-                    };
-                    const pwSecurityHeaders = analyzeSecurityHeaders(pwHeaders);
-                    if (pwSecurityHeaders.score > 0) {
-                        homepage.securityHeaders = pwSecurityHeaders;
-                        console.log(`🖥️  Recovered ${pwSecurityHeaders.score}/7 security headers via Puppeteer`);
-                    }
-                }
-            }
-        } catch (puppeteerErr) {
-            console.warn(`🖥️  Puppeteer fallback skipped: ${puppeteerErr.message}`);
-        }
-    }
-
+    const homepage = homepageResult;
     const internalLinks = homepage.links?.internal || [];
 
-    // PHASE 2: Build priority crawl queue (expanded for Semrush-level coverage)
-    const crawlStartTime = Date.now();
+    // PHASE 2: Build priority crawl queue (sitemap URLs first, then key paths, then discovery)
     const crawled = new Set([cleanBase, homepage.url]);
     const toCrawl = [];
 
-    // Helper: add URL to queue if not already seen
-    const enqueue = (url) => {
-        if (crawled.size >= MAX_PAGES) return;
-        try {
-            const resolved = new URL(url).href;
-            if (!crawled.has(resolved)) {
-                toCrawl.push(resolved);
-                crawled.add(resolved);
-            }
-        } catch { /* skip invalid */ }
-    };
-
-    // Helper: check if URL is crawlable (not a file, fragment, or query)
-    const isCrawlable = (link) => {
-        if (!link || link === '/' || link.includes('#')) return false;
-        const lower = link.toLowerCase();
-        if (['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.zip', '.mp4', '.mp3', '.css', '.js'].some(ext => lower.endsWith(ext))) return false;
-        return true;
-    };
-
-    // Priority 1: Sitemap URLs (up to 200 — covers most of the site)
+    // Priority 1: Sitemap URLs (up to 15)
     if (sitemap.found) {
-        for (const sUrl of sitemap.urls) {
-            enqueue(sUrl);
+        for (const sUrl of sitemap.urls.slice(0, 15)) {
+            try {
+                const resolved = new URL(sUrl).href;
+                if (!crawled.has(resolved)) {
+                    toCrawl.push(resolved);
+                    crawled.add(resolved);
+                }
+            } catch { /* skip invalid */ }
         }
     }
 
     // Priority 2: Key structural pages
-    const keyPaths = ['/about', '/about-us', '/services', '/products', '/contact', '/blog', '/faq', '/pricing', '/team', '/case-studies', '/portfolio', '/news', '/careers', '/features', '/terms', '/privacy', '/shop', '/store', '/testimonials', '/reviews'];
+    const keyPaths = ['/about', '/about-us', '/services', '/products', '/contact', '/blog', '/faq', '/pricing', '/team', '/case-studies', '/portfolio', '/news', '/careers', '/features'];
     for (const path of keyPaths) {
-        if (crawled.size >= MAX_PAGES) break;
+        if (toCrawl.length >= 25) break;
         const match = internalLinks.find(l => l.toLowerCase().includes(path));
         if (match) {
-            try { enqueue(new URL(match, cleanBase).href); } catch { /* skip */ }
+            try {
+                const fullUrl = new URL(match, cleanBase).href;
+                if (!crawled.has(fullUrl)) {
+                    toCrawl.push(fullUrl);
+                    crawled.add(fullUrl);
+                }
+            } catch { /* skip */ }
         }
     }
 
-    // Priority 3: All homepage internal links
+    // Priority 3: Discovery from internal links (fill up to 20)
     for (const link of internalLinks) {
-        if (crawled.size >= MAX_PAGES) break;
-        if (!isCrawlable(link)) continue;
-        try { enqueue(new URL(link, cleanBase).href); } catch { /* skip */ }
+        if (toCrawl.length >= 20) break;
+        if (link === '/' || link.includes('#') || link.includes('?') || link.endsWith('.pdf') || link.endsWith('.jpg') || link.endsWith('.png')) continue;
+        try {
+            const fullUrl = new URL(link, cleanBase).href;
+            if (!crawled.has(fullUrl)) {
+                toCrawl.push(fullUrl);
+                crawled.add(fullUrl);
+            }
+        } catch { /* skip */ }
     }
 
-    console.log(`🕷️  Initial crawl queue: ${toCrawl.length} pages (sitemap: ${sitemap.found ? sitemap.count : 0}, robots: ${robotsTxt.found})`);
+    console.log(`🕷️  Crawl queue: ${toCrawl.length} pages (sitemap: ${sitemap.found ? sitemap.count : 0}, robots: ${robotsTxt.found})`);
 
-    // PHASE 3: Crawl with recursive link discovery — ADAPTIVE THROTTLING
+    // PHASE 3: Crawl in batches of 5 to avoid overwhelming the server
     const allSubPages = [];
-    let batchSize = _cfNeeded ? 4 : 10; // Start moderate, adapt based on success rate
-    let batchDelay = _cfNeeded ? 500 : 50;
-    let queueIndex = 0;
-    const allFailedUrls = [];
-    let consecutiveFailedBatches = 0;
-    let totalBatchesTried = 0;
-    let totalSuccesses = 0;
-
-    while (queueIndex < toCrawl.length) {
-        if (Date.now() - crawlStartTime > CRAWL_TIMEOUT_MS) {
-            console.log(`🕷️  Crawl timeout (${CRAWL_TIMEOUT_MS / 1000}s) — stopping with ${allSubPages.length + 1} pages`);
-            break;
-        }
-        if (allSubPages.length + 1 >= MAX_PAGES) break;
-
-        // EARLY BAIL: if 8 consecutive batches had 0 success after trying 80+ URLs
-        if (consecutiveFailedBatches >= 8 && allFailedUrls.length > 80) {
-            const remaining = toCrawl.length - queueIndex;
-            console.log(`🕷️  Early bail: ${consecutiveFailedBatches} consecutive failed batches — skipping ${remaining} remaining URLs (will use Playwright)`);
-            allFailedUrls.push(...toCrawl.slice(queueIndex));
-            break;
-        }
-
-        const batch = toCrawl.slice(queueIndex, queueIndex + batchSize);
-        queueIndex += batchSize;
-        totalBatchesTried++;
-
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < toCrawl.length; i += BATCH_SIZE) {
+        const batch = toCrawl.slice(i, i + BATCH_SIZE);
         const batchResults = await Promise.all(
             batch.map(url => crawlPage(url).catch(e => ({ url, success: false, error: e.message })))
         );
-
-        const successPages = batchResults.filter(p => p.success);
-        const failedBatch = batchResults.filter(p => !p.success);
-        allSubPages.push(...successPages);
-        allFailedUrls.push(...failedBatch.map(p => p.url).filter(Boolean));
-        totalSuccesses += successPages.length;
-
-        // ── ADAPTIVE THROTTLING ──
-        const batchSuccessRate = successPages.length / batch.length;
-        if (batchSuccessRate === 0) {
-            consecutiveFailedBatches++;
-            // Aggressive throttle-down: reduce batch size, increase delay
-            if (batchSize > 3) {
-                batchSize = Math.max(3, Math.floor(batchSize * 0.5));
-                batchDelay = Math.min(3000, batchDelay * 2);
-                console.log(`🕷️  Throttle down: batch=${batchSize}, delay=${batchDelay}ms (${consecutiveFailedBatches} consecutive failures)`);
-            }
-        } else if (batchSuccessRate < 0.5) {
-            consecutiveFailedBatches = 0;
-            // Moderate throttle: reduce batch size slightly
-            if (batchSize > 5) {
-                batchSize = Math.max(5, batchSize - 2);
-                batchDelay = Math.min(2000, batchDelay + 100);
-            }
-        } else {
-            consecutiveFailedBatches = 0;
-            // Good success rate: cautiously increase speed
-            if (batchSize < 15 && batchSuccessRate > 0.8) {
-                batchSize = Math.min(15, batchSize + 1);
-                batchDelay = Math.max(30, batchDelay - 20);
-            }
-        }
-
-        // Recursive discovery
-        for (const page of successPages) {
-            const pageLinks = page.links?.internal || [];
-            for (const link of pageLinks) {
-                if (crawled.size >= MAX_PAGES) break;
-                if (!isCrawlable(link)) continue;
-                try { enqueue(new URL(link, cleanBase).href); } catch {}
-            }
-        }
-
-        if (queueIndex < toCrawl.length) await new Promise(r => setTimeout(r, batchDelay));
+        allSubPages.push(...batchResults.filter(p => p.success));
+        // Stop if we've taken too long (keep total under 15s for sub-crawl)
+        if (i + BATCH_SIZE >= 15 && allSubPages.length >= 10) break;
     }
 
     const allPages = [homepage, ...allSubPages];
-    const crawlElapsed = ((Date.now() - crawlStartTime) / 1000).toFixed(1);
-
-    // CRAWL TELEMETRY — detailed breakdown for debugging
-    console.log(`🕷️  Fetch crawl complete: ${allPages.length} pages in ${crawlElapsed}s (queue had ${toCrawl.length} URLs, ${allFailedUrls.length} failed)`);
-    console.log(`🕷️  Breakdown: ${allPages.filter(p => p.success).length} success, ${allFailedUrls.length} failed`);
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // PHASE 3.5: PLAYWRIGHT HYBRID RE-CRAWL
-    // Fires when: (a) >50% of pages failed, OR (b) many pages have <300 words / no H1
-    // This catches SPA sites that return app-shell HTML without rendered content.
-    // ═══════════════════════════════════════════════════════════════════════
-    const fetchSuccessRate = allPages.filter(p => p.success).length / Math.max(toCrawl.length, 1);
-    // Also identify pages that need JS rendering — low word count or missing H1
-    const pagesNeedingRender = allPages.filter(p => p.success && !p.isSoft404 && !p.jsRendered && ((p.wordCount || 0) < 300 || !p.h1?.length));
-    if (pagesNeedingRender.length > 10) {
-        // Add these to the re-crawl list so Playwright can render them properly
-        console.log(`🖥️  ${pagesNeedingRender.length} pages need JS rendering (<300 words or no H1) — adding to Playwright queue`);
-        for (const p of pagesNeedingRender) {
-            if (!allFailedUrls.includes(p.url)) allFailedUrls.push(p.url);
-        }
-    }
-    if (allFailedUrls.length > 10 && (fetchSuccessRate < 0.5 || pagesNeedingRender.length > 10)) {
-        console.log(`🖥️  Hybrid re-crawl: ${allFailedUrls.length} pages failed (${(fetchSuccessRate * 100).toFixed(0)}% success rate) — launching Playwright batch...`);
-        let pw;
-        try { pw = await import('playwright'); pw = pw.default || pw; } catch { pw = null; }
-
-        if (pw) {
-            let browser;
-            try {
-                browser = await pw.chromium.launch({
-                    headless: true,
-                    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
-                });
-                const ctx = await browser.newContext({
-                    userAgent: _cfSession?.solved ? _cfSession.userAgent : 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                    viewport: { width: 1280, height: 800 },
-                    ignoreHTTPSErrors: true,
-                });
-                // Inject CF cookies if available
-                if (_cfSession?.solved && _cfSession.cookies) {
-                    try {
-                        const domain = new URL(cleanBase).hostname;
-                        const cookiePairs = _cfSession.cookies.split('; ').map(c => {
-                            const [name, ...rest] = c.split('=');
-                            return { name, value: rest.join('='), domain, path: '/' };
-                        });
-                        await ctx.addCookies(cookiePairs);
-                    } catch { /* skip cookie injection */ }
-                }
-
-                // Use N_TABS parallel pages for speed
-                const N_TABS = 6;
-                const PW_BATCH_LIMIT = 800;
-                const PW_PAGE_TIMEOUT = 6000;
-                const PW_TOTAL_TIMEOUT = 150000; // 2.5 minutes
-                const pwStart = Date.now();
-                let pwSuccess = 0;
-
-                // Create multiple page tabs for parallel crawling
-                const tabs = [];
-                for (let t = 0; t < N_TABS; t++) {
-                    const p = await ctx.newPage();
-                    await p.route('**/*', (route) => {
-                        const type = route.request().resourceType();
-                        if (['image', 'media', 'font', 'stylesheet'].includes(type)) {
-                            route.abort().catch(() => {});
-                        } else {
-                            route.continue().catch(() => {});
-                        }
-                    });
-                    tabs.push(p);
-                }
-
-                const urlsToReCrawl = allFailedUrls.slice(0, PW_BATCH_LIMIT);
-
-                // Process URLs in parallel batches of N_TABS
-                for (let i = 0; i < urlsToReCrawl.length; i += N_TABS) {
-                    if (Date.now() - pwStart > PW_TOTAL_TIMEOUT) {
-                        console.log(`🖥️  Playwright re-crawl timeout (150s) — got ${pwSuccess} pages`);
-                        break;
-                    }
-
-                    const chunk = urlsToReCrawl.slice(i, i + N_TABS);
-                    const chunkResults = await Promise.all(chunk.map(async (url, idx) => {
-                        const tab = tabs[idx % tabs.length];
-                        try {
-                            await tab.goto(url, { waitUntil: 'networkidle', timeout: 15000 });
-                            await tab.waitForSelector('h1', { timeout: 8000 }).catch(() => {}); // Wait for H1 to render
-
-                            // CHECK FOR CLOUDFLARE CHALLENGE — skip if page is a CF interstitial
-                            const pageTitle = await tab.title();
-                            const titleLower = (pageTitle || '').toLowerCase();
-                            if (titleLower.includes('just a moment') ||
-                                titleLower.includes('attention required') ||
-                                titleLower.includes('checking your browser') ||
-                                titleLower.includes('please wait') ||
-                                titleLower.includes('verifying your connection') ||
-                                titleLower.includes('one more step')) {
-                                return null; // CF challenge page — skip
-                            }
-
-                            const pageData = await tab.evaluate(() => {
-                                const title = document.title || '';
-                                const metaDesc = document.querySelector('meta[name="description"]')?.content || '';
-                                const h1 = Array.from(document.querySelectorAll('h1')).map(h => h.textContent?.trim()).filter(t => t && t.length > 0);
-                                const h2 = Array.from(document.querySelectorAll('h2')).map(h => h.textContent?.trim()).filter(t => t && t.length > 0);
-                                const bodyText = document.body?.innerText || '';
-                                const wordCount = bodyText.split(/\s+/).filter(w => w.length > 1).length;
-                                const imgs = document.querySelectorAll('img');
-                                let imgTotal = 0, imgNoAlt = 0;
-                                const srcsMissingAlt = [];
-                                imgs.forEach(img => {
-                                    const src = img.src || img.getAttribute('src') || '';
-                                    if (!src || src.startsWith('data:') || src === '#') return;
-                                    if (img.width < 3 || img.height < 3) return;
-                                    imgTotal++;
-                                    if (!(img.alt || '').trim()) { imgNoAlt++; srcsMissingAlt.push(src); }
-                                });
-                                const links = [];
-                                document.querySelectorAll('a[href]').forEach(a => {
-                                    try { const href = new URL(a.href, location.origin).href; if (href.startsWith(location.origin)) links.push(href); } catch {}
-                                });
-                                const canonical = document.querySelector('link[rel="canonical"]')?.href || '';
-                                return { title, metaDesc, h1, h2, wordCount, imgTotal, imgNoAlt, srcsMissingAlt, links, canonical, bodyText: bodyText.substring(0, 500) };
-                            });
-
-                            // Double-check: skip pages with CF challenge H1
-                            const h1Lower = (pageData.h1?.[0] || '').toLowerCase();
-                            if (h1Lower.includes('verify') || h1Lower.includes('checking') ||
-                                h1Lower.includes('just a moment') || h1Lower.includes('please wait')) {
-                                return null; // CF challenge in body
-                            }
-
-                            // Skip empty/broken pages (didn't render properly)
-                            if (pageData.wordCount < 5 && !pageData.title) return null;
-
-                            const titleLwr = (pageData.title || '').toLowerCase();
-                            const isSoft404 = titleLwr === '404' || titleLwr === '404 not found' ||
-                                titleLwr === 'page not found' || titleLwr === 'not found' ||
-                                (pageData.h1.length === 1 && /^(404|page not found|not found)$/i.test(pageData.h1[0]));
-
-                            return {
-                                url, success: true, isSoft404, jsRendered: true,
-                                statusCode: 200, responseTimeMs: 0, pageSizeBytes: 0, pageSizeKB: 0,
-                                title: pageData.title, metaDescription: pageData.metaDesc, canonical: pageData.canonical,
-                                headings: [...pageData.h1.map(t => ({ level: 1, text: t })), ...pageData.h2.map(t => ({ level: 2, text: t }))],
-                                h1: pageData.h1, h2: pageData.h2, h3: [],
-                                images: { total: pageData.imgTotal, withAlt: pageData.imgTotal - pageData.imgNoAlt, withoutAlt: pageData.imgNoAlt, srcsMissingAlt: pageData.srcsMissingAlt },
-                                wordCount: pageData.wordCount, contentSnippet: pageData.bodyText, bodyTextFull: pageData.bodyText,
-                                textToHtmlRatio: 50, links: { internal: pageData.links, external: [] },
-                                internalLinkCount: pageData.links.length, externalLinkCount: 0,
-                                titleLength: (pageData.title || '').length, metaDescLength: (pageData.metaDesc || '').length,
-                                viewport: 'width=device-width',
-                            };
-                        } catch {
-                            return null;
-                        }
-                    }));
-
-                    for (const result of chunkResults) {
-                        if (result && result.success) {
-                            allSubPages.push(result);
-                            pwSuccess++;
-                            // Discover links
-                            for (const link of (result.links?.internal || [])) {
-                                if (crawled.size >= MAX_PAGES) break;
-                                if (!isCrawlable(link)) continue;
-                                try { enqueue(new URL(link, cleanBase).href); } catch {}
-                            }
-                        }
-                    }
-                }
-
-                for (const t of tabs) await t.close().catch(() => {});
-                await ctx.close().catch(() => {});
-                await browser.close().catch(() => {});
-                const pwElapsed = ((Date.now() - pwStart) / 1000).toFixed(1);
-                console.log(`🖥️  Playwright re-crawl complete: ${pwSuccess} pages recovered in ${pwElapsed}s (${N_TABS} parallel tabs)`);
-
-                // Rebuild allPages
-                allPages.length = 0;
-                allPages.push(homepage, ...allSubPages);
-            } catch (pwErr) {
-                console.warn(`🖥️  Playwright re-crawl error: ${pwErr.message}`);
-                if (browser) await browser.close().catch(() => {});
-            }
-        } else {
-            console.warn(`🖥️  Playwright re-crawl skipped — Playwright not available`);
-        }
-    }
-
-    // PHASE 3.5: SPA / Soft-404 Detection + Template Stripping
-    // On SPA sites, fetch() returns the app shell (same title/H1/content on every page)
-    // We must detect and strip this template data to get accurate metrics
-    const soft404Pages = allPages.filter(p => p.isSoft404);
-    if (soft404Pages.length > 0) {
-        console.log(`🔍  Soft-404 detected: ${soft404Pages.length} pages have 404 title/H1 (SPA shell returning 200 with 404 body)`);
-    }
-
-    // Filter to only "real" (non-soft-404) pages for content analysis
-    const realPages = allPages.filter(p => p.success && !p.isSoft404);
-    console.log(`🔍  Real pages for content analysis: ${realPages.length} (${soft404Pages.length} soft-404 excluded)`);
-
-    // Template title detection: if a title appears on >50% of real pages, it's a template
-    const titleFreq = {};
-    for (const p of realPages) {
-        const t = (p.title || '').trim().toLowerCase();
-        if (t) titleFreq[t] = (titleFreq[t] || 0) + 1;
-    }
-    const templateTitles = Object.entries(titleFreq)
-        .filter(([, count]) => count / Math.max(realPages.length, 1) > 0.5)
-        .map(([title]) => title);
-    if (templateTitles.length > 0) {
-        console.log(`🔍  Template title detected: "${templateTitles[0]}" (on ${titleFreq[templateTitles[0]]} pages) — stripping from analysis`);
-        for (const p of allPages) {
-            if (templateTitles.includes((p.title || '').trim().toLowerCase())) {
-                p._originalTitle = p.title; // preserve for reference
-                p.title = ''; // strip template title
-                p.titleLength = 0;
-            }
-        }
-    }
-
-    // Template H1 detection: if an H1 appears on >30% of real pages, it's a template
-    const h1Freq = {};
-    for (const p of realPages) {
-        for (const h of (p.h1 || [])) {
-            const ht = h.trim().toLowerCase();
-            if (ht) h1Freq[ht] = (h1Freq[ht] || 0) + 1;
-        }
-    }
-    const templateH1s = Object.entries(h1Freq)
-        .filter(([, count]) => count / Math.max(realPages.length, 1) > 0.3)
-        .map(([text]) => text);
-    if (templateH1s.length > 0) {
-        console.log(`🔍  Template H1 detected: ${templateH1s.map(h => `"${h}" (${h1Freq[h]} pages)`).join(', ')} — stripping`);
-        for (const p of allPages) {
-            if (p.h1) {
-                p._originalH1 = [...p.h1]; // preserve for reference
-                p.h1 = p.h1.filter(h => !templateH1s.includes(h.trim().toLowerCase()));
-                // Also strip from headings array
-                if (p.headings) {
-                    p.headings = p.headings.filter(h => {
-                        if (h.level !== 1) return true;
-                        return !templateH1s.includes(h.text.trim().toLowerCase());
-                    });
-                }
-            }
-        }
-    }
-
-    // PHASE 3.6: H1 re-scan for NON-Playwright pages that still have missing H1
-    // (Playwright pages already have rendered H1 — only need to re-scan fetch-based pages)
-    const pagesNeedingH1Scan = allPages.filter(p =>
-        p.success && !p.isSoft404 && !p.jsRendered && (!p.h1 || p.h1.length === 0)
-    );
-    if (pagesNeedingH1Scan.length > 0 && pagesNeedingH1Scan.length <= 50) {
-        // Only do H1-only re-scan if there are few pages (if many, the hybrid re-crawl above handles it)
-        console.log(`🖥️  H1 re-scan: ${pagesNeedingH1Scan.length} fetch-based pages need H1 check — launching Playwright...`);
-        let pw;
-        try { pw = await import('playwright'); pw = pw.default || pw; } catch { pw = null; }
-        if (pw) {
-            let h1Browser;
-            try {
-                h1Browser = await pw.chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'] });
-                const h1Context = await h1Browser.newContext({
-                    userAgent: _cfSession?.solved ? _cfSession.userAgent : 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                    viewport: { width: 1280, height: 800 }, ignoreHTTPSErrors: true,
-                });
-                if (_cfSession?.solved && _cfSession.cookies) {
-                    try {
-                        const domain = new URL(cleanBase).hostname;
-                        const cookiePairs = _cfSession.cookies.split('; ').map(c => { const [name, ...rest] = c.split('='); return { name, value: rest.join('='), domain, path: '/' }; });
-                        await h1Context.addCookies(cookiePairs);
-                    } catch {}
-                }
-                const h1Page = await h1Context.newPage();
-                await h1Page.route('**/*', (route) => { const type = route.request().resourceType(); if (['image', 'media', 'font', 'stylesheet'].includes(type)) { route.abort().catch(() => {}); } else { route.continue().catch(() => {}); } });
-                const h1ScanStart = Date.now();
-                let h1Found = 0;
-                for (const pg of pagesNeedingH1Scan.slice(0, 50)) {
-                    if (Date.now() - h1ScanStart > 60000) break;
-                    try {
-                        await h1Page.goto(pg.url, { waitUntil: 'domcontentloaded', timeout: 8000 });
-                        await h1Page.waitForTimeout(1500);
-                        const h1Data = await h1Page.evaluate(() => Array.from(document.querySelectorAll('h1')).map(h => h.textContent?.trim()).filter(t => t && t.length > 0));
-                        if (h1Data.length > 0) { pg.h1 = h1Data; pg.headings = [...h1Data.map(text => ({ level: 1, text })), ...(pg.headings || []).filter(h => h.level !== 1)]; pg.jsRenderedH1 = true; h1Found++; }
-                    } catch {}
-                }
-                await h1Page.close().catch(() => {}); await h1Context.close().catch(() => {}); await h1Browser.close().catch(() => {});
-                console.log(`🖥️  H1 re-scan complete: ${h1Found} H1s found in ${((Date.now() - h1ScanStart) / 1000).toFixed(1)}s`);
-            } catch (h1Err) { console.warn(`🖥️  H1 re-scan error: ${h1Err.message}`); if (h1Browser) await h1Browser.close().catch(() => {}); }
-        }
-    }
+    console.log(`🕷️  Crawl complete: ${allPages.length} pages successfully crawled`);
 
     // PHASE 4: Compute duplicate content
     const duplicateContent = computeDuplicates(allPages);
 
-    // PHASE 4.5: Probe external links for broken ones (HEAD, 2s timeout, max 15)
-    const externalUrlSet = new Set();
-    for (const p of allPages) {
-        for (const u of (p.externalUrls || [])) {
-            externalUrlSet.add(JSON.stringify({ url: u, from: p.url }));
-            if (externalUrlSet.size >= 50) break;
-        }
-        if (externalUrlSet.size >= 50) break;
-    }
-    const brokenExternal = [];
-    const externalToProbe = [...externalUrlSet].map(s => JSON.parse(s));
-    if (externalToProbe.length > 0) {
-        console.log(`🔗  Probing ${externalToProbe.length} external links...`);
-        const probeResults = await Promise.all(
-            externalToProbe.map(async ({ url, from }) => {
-                const ctrl = new AbortController();
-                try { setMaxListeners(30, ctrl.signal); } catch (e) {}
-                const t = setTimeout(() => ctrl.abort(), 2000);
-                try {
-                    const r = await fetch(url, { method: 'HEAD', signal: ctrl.signal, headers: { 'User-Agent': USER_AGENT }, redirect: 'follow' });
-                    clearTimeout(t);
-                    return { url, from, status: r.status, broken: r.status >= 400 };
-                } catch (e) {
-                    clearTimeout(t);
-                    return { url, from, status: 0, broken: true, error: e.message };
-                }
-            })
-        );
-        brokenExternal.push(...probeResults.filter(r => r.broken).map(r => ({ url: r.url, linkedFrom: r.from, statusCode: r.status })));
-        console.log(`🔗  External links: ${probeResults.length} probed, ${brokenExternal.length} broken`);
-    }
-
-    // PHASE 4.6: Broken internal links detection (like Semrush)
-    const brokenInternal = [];
-    const crawledUrls = new Set(allPages.map(p => p.url));
-    const internalUrlGraph = new Map(); // url → Set of source pages
-    for (const p of allPages) {
-        for (const link of (p.links?.internal || [])) {
-            if (!isCrawlable(link)) continue;
-            try {
-                const fullUrl = new URL(link, cleanBase).href;
-                if (!internalUrlGraph.has(fullUrl)) internalUrlGraph.set(fullUrl, new Set());
-                internalUrlGraph.get(fullUrl).add(p.url);
-            } catch { /* skip */ }
-        }
-    }
-    // Check pages that returned non-200 status during crawl
-    for (const p of allPages) {
-        if (p.statusCode && p.statusCode >= 400) {
-            const sources = internalUrlGraph.get(p.url);
-            brokenInternal.push({ url: p.url, statusCode: p.statusCode, linkedFrom: sources ? [...sources].slice(0, 3) : [] });
-        }
-    }
-    // HEAD-probe uncrawled internal URLs (max 30, 2s timeout each) — reduced from 200 to avoid over-counting
-    const uncrawledInternal = [...internalUrlGraph.entries()]
-        .filter(([url]) => !crawledUrls.has(url))
-        .slice(0, 30);
-    if (uncrawledInternal.length > 0) {
-        console.log(`🔗  Probing ${uncrawledInternal.length} uncrawled internal URLs for broken links...`);
-        const internalProbeResults = await Promise.all(
-            uncrawledInternal.map(async ([url, sources]) => {
-                const ctrl = new AbortController();
-                try { setMaxListeners(30, ctrl.signal); } catch (e) {}
-                const t = setTimeout(() => ctrl.abort(), 2000);
-                try {
-                    const r = await fetch(url, { method: 'HEAD', signal: ctrl.signal, headers: { 'User-Agent': USER_AGENT }, redirect: 'follow' });
-                    clearTimeout(t);
-                    return { url, status: r.status, broken: r.status >= 400, sources: [...sources].slice(0, 3) };
-                } catch (e) {
-                    clearTimeout(t);
-                    return { url, status: 0, broken: true, error: e.message, sources: [...sources].slice(0, 3) };
-                }
-            })
-        );
-        for (const r of internalProbeResults) {
-            if (r.broken) brokenInternal.push({ url: r.url, statusCode: r.status, linkedFrom: r.sources });
-        }
-        console.log(`🔗  Internal links: ${uncrawledInternal.length} probed, ${brokenInternal.length} total broken`);
-    }
-
-    // PHASE 4.7: JS/CSS Resource Scanning (Semrush parity: blocked resources, uncached, unminified)
-    const resourceStats = { totalResources: 0, blockedResources: [], uncachedResources: [], unminifiedResources: [], probedCount: 0 };
-    const allResourceUrls = new Map(); // url → { type, isMinified, pages }
-    for (const p of allPages) {
-        for (const r of (p.resourceUrls || [])) {
-            if (!allResourceUrls.has(r.url)) {
-                allResourceUrls.set(r.url, { ...r, pages: [p.url] });
-            } else {
-                allResourceUrls.get(r.url).pages.push(p.url);
-            }
-        }
-    }
-    resourceStats.totalResources = allResourceUrls.size;
-    // HEAD-probe up to 50 unique resources (2s timeout each, parallel)
-    const resourcesToProbe = [...allResourceUrls.entries()].slice(0, 50);
-    if (resourcesToProbe.length > 0) {
-        console.log(`📦  Probing ${resourcesToProbe.length} JS/CSS resources for cache/minification...`);
-        const resourceProbes = await Promise.all(
-            resourcesToProbe.map(async ([url, info]) => {
-                const ctrl = new AbortController();
-                try { setMaxListeners(30, ctrl.signal); } catch (e) {}
-                const t = setTimeout(() => ctrl.abort(), 2000);
-                try {
-                    const r = await fetch(url, { method: 'HEAD', signal: ctrl.signal, headers: { 'User-Agent': USER_AGENT }, redirect: 'follow' });
-                    clearTimeout(t);
-                    const cacheControl = r.headers.get('cache-control') || '';
-                    const contentLength = parseInt(r.headers.get('content-length') || '0', 10);
-                    return {
-                        url, type: info.type, status: r.status, blocked: r.status === 403,
-                        hasCacheControl: !!cacheControl, cacheControl,
-                        isMinified: info.isMinified, contentLength,
-                        // Heuristic: >50KB and not .min. = probably unminified
-                        likelyUnminified: contentLength > 50000 && !info.isMinified,
-                        pages: info.pages.slice(0, 3),
-                    };
-                } catch (e) {
-                    clearTimeout(t);
-                    return { url, type: info.type, status: 0, blocked: false, error: e.message, pages: info.pages.slice(0, 3) };
-                }
-            })
-        );
-        resourceStats.probedCount = resourceProbes.length;
-        resourceStats.blockedResources = resourceProbes.filter(r => r.blocked).map(r => ({ url: r.url, type: r.type, pages: r.pages }));
-        resourceStats.uncachedResources = resourceProbes.filter(r => r.status === 200 && !r.hasCacheControl).map(r => ({ url: r.url, type: r.type, pages: r.pages }));
-        resourceStats.unminifiedResources = resourceProbes.filter(r => r.likelyUnminified).map(r => ({ url: r.url, type: r.type, sizeKB: Math.round(r.contentLength / 1024), pages: r.pages }));
-        console.log(`📦  Resources: ${resourceStats.blockedResources.length} blocked, ${resourceStats.uncachedResources.length} uncached, ${resourceStats.unminifiedResources.length} unminified`);
-    }
-
     // PHASE 5: Build comprehensive site intelligence
-    // Use realPages (non-soft-404) for content analysis to avoid SPA shell pollution
-    const analysisPages = allPages.filter(p => p.success && !p.isSoft404);
-    const allHeadings = analysisPages.flatMap(p => p.headings || []);
-    const allSchemaTypes = [...new Set(analysisPages.flatMap(p => p.schemaTypes || []))];
-    const allTech = [...new Set(analysisPages.flatMap(p => p.tech || []))];
-    const totalWordCount = analysisPages.reduce((s, p) => s + (p.wordCount || 0), 0);
-    // Image dedup: count UNIQUE image src URLs missing alt across all pages
-    // Normalize URLs: strip query params, fragments, CDN version hashes
-    const normalizeImgSrc = (src) => {
-        try {
-            const u = new URL(src);
-            // Keep only protocol + host + pathname (strip ?v=123, #fragment, etc.)
-            return u.origin + u.pathname;
-        } catch {
-            // Not a full URL — strip query/fragment with regex
-            return src.replace(/[?#].*$/, '');
-        }
-    };
-    const globalMissingAltSrcs = new Set();
-    for (const p of analysisPages) {
-        const srcs = p.images?.srcsMissingAlt || [];
-        for (const src of srcs) globalMissingAltSrcs.add(normalizeImgSrc(src));
-    }
-    const totalImages = analysisPages.reduce((s, p) => s + (p.images?.total || 0), 0);
-    const rawImagesWithoutAlt = analysisPages.reduce((s, p) => s + (p.images?.withoutAlt || 0), 0);
-    // Use normalized unique src count
-    const imagesWithoutAlt = globalMissingAltSrcs.size > 0 ? globalMissingAltSrcs.size : rawImagesWithoutAlt;
-    console.log(`🖼️  Images: ${totalImages} total, ${rawImagesWithoutAlt} raw missing alt, ${imagesWithoutAlt} unique normalized URLs missing alt`);
-
-    const hasCanonical = analysisPages.some(p => p.canonical);
-    const hasViewport = analysisPages.every(p => p.viewport);
+    const allHeadings = allPages.flatMap(p => p.headings || []);
+    const allSchemaTypes = [...new Set(allPages.flatMap(p => p.schemaTypes || []))];
+    const allTech = [...new Set(allPages.flatMap(p => p.tech || []))];
+    const totalWordCount = allPages.reduce((s, p) => s + (p.wordCount || 0), 0);
+    const totalImages = allPages.reduce((s, p) => s + (p.images?.total || 0), 0);
+    const imagesWithoutAlt = allPages.reduce((s, p) => s + (p.images?.withoutAlt || 0), 0);
+    const hasCanonical = allPages.some(p => p.canonical);
+    const hasViewport = allPages.every(p => p.viewport);
     const hasFAQ = allHeadings.some(h => h.text.toLowerCase().includes('faq') || h.text.toLowerCase().includes('frequently'));
     const hasRobots = homepage.robots;
-    const avgWordCount = analysisPages.length > 0 ? Math.round(totalWordCount / analysisPages.length) : 0;
-    // Thin pages: exclude soft-404 pages (they're not real pages)
-    const thinPages = analysisPages.filter(p => (p.wordCount || 0) < 300);
-    const missingMeta = analysisPages.filter(p => !p.metaDescription);
-    // H1 metrics: simple direct count from all analysis pages
-    // Template stripping and CF detection already handle bad data
-    const missingH1 = analysisPages.filter(p => !p.h1?.length);
-    const multipleH1 = analysisPages.filter(p => (p.h1?.length || 0) > 1);
-    const missingH1Count = missingH1.length;
-    const multipleH1Count = multipleH1.length;
-    console.log(`🏷️  H1 stats: ${missingH1Count} missing, ${multipleH1Count} multiple (from ${analysisPages.length} analysis pages)`);
-    const pagesWithRedirects = analysisPages.filter(p => p.redirectChain?.length > 0);
-    const lowTextRatioPages = analysisPages.filter(p => (p.textToHtmlRatio || 100) < 10);
-    const oversizedPages = analysisPages.filter(p => p.htmlSizeOver2MB);
-    const avgTextToHtmlRatio = analysisPages.length > 0 ? Math.round(analysisPages.reduce((s, p) => s + (p.textToHtmlRatio || 0), 0) / analysisPages.length) : 0;
-
-    // Incoming internal link count per page (for single-incoming-link detection)
-    const incomingLinkCount = new Map();
-    for (const p of allPages) {
-        for (const link of (p.links?.internal || [])) {
-            try {
-                const target = new URL(link, cleanBase).href;
-                incomingLinkCount.set(target, (incomingLinkCount.get(target) || 0) + 1);
-            } catch { /* skip */ }
-        }
-    }
-    const singleIncomingPages = allSubPages.filter(p => (incomingLinkCount.get(p.url) || 0) <= 1);
+    const avgWordCount = Math.round(totalWordCount / allPages.length);
+    const thinPages = allPages.filter(p => (p.wordCount || 0) < 300);
+    const missingMeta = allPages.filter(p => !p.metaDescription);
+    const missingH1 = allPages.filter(p => !p.h1?.length);
+    const pagesWithRedirects = allPages.filter(p => p.redirectChain?.length > 0);
 
     // Compute click depth (how many clicks from homepage)
     const clickDepthMap = {};
@@ -2000,26 +593,6 @@ export async function researchDomain(baseUrl, options = {}) {
             wordCount: p.wordCount,
             contentSnippet: p.contentSnippet,
             redirectChain: p.redirectChain,
-            // ── Per-page enhanced data ──
-            statusCode: p.statusCode || 200,
-            responseTimeMs: p.responseTimeMs || 0,
-            pageSizeKB: p.pageSizeKB || 0,
-            pageSizeBytes: p.pageSizeBytes || 0,
-            titleLength: p.titleLength || 0,
-            metaDescLength: p.metaDescLength || 0,
-            headingHierarchy: p.headingHierarchy || { valid: true, skippedLevels: [] },
-            metaRobots: p.metaRobots || {},
-            securityHeaders: p.securityHeaders || {},
-            resources: p.resources || {},
-            mixedContent: p.mixedContent || { hasMixed: false },
-            urlTooLong: p.urlTooLong || false,
-            hasHreflang: p.hasHreflang || false,
-            hasLangAttr: p.hasLangAttr || false,
-            // ── Previously missing fields (critical for Semrush parity) ──
-            images: p.images || { total: 0, withAlt: 0, withoutAlt: 0 },
-            canonical: p.canonical || '',
-            hasSchemaOrg: p.hasSchemaOrg || false,
-            textToHtmlRatio: p.textToHtmlRatio || 0,
         })),
         homepage: {
             title: homepage.title,
@@ -2065,477 +638,17 @@ export async function researchDomain(baseUrl, options = {}) {
             internalLinkCount: homepage.internalLinkCount || 0,
             externalLinkCount: homepage.externalLinkCount || 0,
             externalDomains: homepage.links?.external || [],
-            // Deep crawl metrics
+            // New deep crawl metrics
             thinPages: thinPages.map(p => ({ url: p.url, wordCount: p.wordCount })),
             thinPageCount: thinPages.length,
             missingMetaDescriptions: missingMeta.map(p => p.url),
             missingH1Tags: missingH1.map(p => p.url),
             redirectChains: pagesWithRedirects.map(p => ({ url: p.url, chain: p.redirectChain })),
             redirectChainCount: pagesWithRedirects.length,
-            // Duplicate detection (structured — separate content vs title vs meta)
-            duplicateContent: duplicateContent.contentDuplicates || [],
-            duplicateContentCount: duplicateContent.contentDuplicateCount || 0,
-            duplicateTitles: duplicateContent.duplicateTitles || [],
-            titleDuplicateCount: duplicateContent.titleDuplicateCount || 0,
-            duplicateMetaDescriptions: duplicateContent.duplicateMetaDescriptions || [],
-            metaDuplicateCount: duplicateContent.metaDuplicateCount || 0,
-            // H1 issues (split — Semrush reports separately, uses fetch-based H1 for parity)
-            missingH1Count,
-            multipleH1Pages: multipleH1.map(p => ({ url: p.url, h1Count: p.h1.length, h1s: p.h1.slice(0, 3) })),
-            multipleH1Count,
-            // Deep page analysis
+            duplicateContent,
+            duplicateContentCount: duplicateContent.length,
             deepPages: deepPages.map(p => p.url),
             clickDepthIssues: deepPages.length,
-            // New metrics
-            avgTextToHtmlRatio,
-            lowTextRatioPages: lowTextRatioPages.map(p => ({ url: p.url, ratio: p.textToHtmlRatio })),
-            lowTextRatioCount: lowTextRatioPages.length,
-            oversizedPages: oversizedPages.map(p => ({ url: p.url, sizeKB: p.pageSizeKB })),
-            oversizedPageCount: oversizedPages.length,
-            singleIncomingPages: singleIncomingPages.map(p => p.url).slice(0, 20),
-            singleIncomingCount: singleIncomingPages.length,
-
-            // ── Broken Internal Links (Semrush critical metric — was completely missing) ──
-            brokenInternalLinks: brokenInternal,
-            brokenInternalCount: brokenInternal.length,
-            // ── Broken External Links ──
-            brokenExternalLinks: brokenExternal,
-            brokenExternalCount: brokenExternal.length,
-            // ── Permanent Redirects (301/308 — pages that followed redirects to reach final URL) ──
-            permanentRedirects: allPages.filter(p => (p.redirectChain?.length || 0) > 0).map(p => ({
-                url: p.url, statusCode: p.redirectChain?.[0]?.status || 301, finalUrl: p.redirectChain?.[p.redirectChain.length - 1]?.to || p.url,
-                chainLength: p.redirectChain?.length || 0,
-            })),
-            permanentRedirectCount: allPages.filter(p => (p.redirectChain?.length || 0) > 0).length,
-            // ── Blocked by robots.txt (only Googlebot / * agent rules — SEO relevant) ──
-            blockedByRobotsTxt: (() => {
-                if (!robotsTxt.found || !robotsTxt.disallowRules?.length) return { internal: [], external: [], internalCount: 0, externalCount: 0 };
-                // Only consider rules for Googlebot or * (all bots) — not bot-specific rules like AhrefsBot, SemrushBot
-                const seoRules = robotsTxt.disallowRules.filter(rule => {
-                    const agent = (rule.agent || '*').toLowerCase();
-                    return agent === '*' || agent === 'googlebot' || agent === 'googlebot-mobile';
-                });
-                if (!seoRules.length) return { internal: [], external: [], internalCount: 0, externalCount: 0 };
-                const blockedInternal = allPages.filter(p => {
-                    try {
-                        const path = new URL(p.url).pathname;
-                        return seoRules.some(rule => path.startsWith(rule.path || rule));
-                    } catch { return false; }
-                });
-                return {
-                    internal: blockedInternal.map(p => p.url),
-                    internalCount: blockedInternal.length,
-                    rules: seoRules.slice(0, 30),
-                };
-            })(),
-
-            // ══════════════════════════════════════════════════════
-            // NEW: Advanced metrics (beats Semrush/Ahrefs)
-            // ══════════════════════════════════════════════════════
-
-            // Page status distribution (like Semrush/Ahrefs)
-            pageStatusDistribution: {
-                status200: allPages.filter(p => (p.statusCode || 200) >= 200 && (p.statusCode || 200) < 300).length,
-                status301: allPages.filter(p => (p.statusCode || 200) >= 300 && (p.statusCode || 200) < 400).length,
-                status404: allPages.filter(p => (p.statusCode || 200) === 404).length,
-                status5xx: allPages.filter(p => (p.statusCode || 200) >= 500).length,
-                broken: allPages.filter(p => !p.success).length,
-            },
-
-            // Orphan pages (not linked from any other crawled page)
-            orphanPages: (() => {
-                const linkedPaths = new Set();
-                for (const page of allPages) {
-                    (page.links?.internal || []).forEach(l => linkedPaths.add(l));
-                }
-                return allSubPages.filter(p => {
-                    try { return !linkedPaths.has(new URL(p.url).pathname); } catch { return false; }
-                }).map(p => p.url);
-            })(),
-
-            // Mixed content detection
-            mixedContentPages: allPages.filter(p => p.mixedContent?.hasMixed).map(p => ({
-                url: p.url, count: p.mixedContent.count, examples: p.mixedContent.examples,
-            })),
-            mixedContentCount: allPages.filter(p => p.mixedContent?.hasMixed).length,
-
-            // Response time analysis (like Ahrefs)
-            responseTime: {
-                avg: Math.round(allPages.reduce((s, p) => s + (p.responseTimeMs || 0), 0) / allPages.length),
-                fastest: Math.min(...allPages.map(p => p.responseTimeMs || 9999)),
-                slowest: Math.max(...allPages.map(p => p.responseTimeMs || 0)),
-                slowPages: allPages.filter(p => (p.responseTimeMs || 0) > 3000).map(p => ({ url: p.url, ms: p.responseTimeMs })),
-                slowPageCount: allPages.filter(p => (p.responseTimeMs || 0) > 3000).length,
-            },
-
-            // Page size analysis
-            pageSize: {
-                avg: Math.round(allPages.reduce((s, p) => s + (p.pageSizeKB || 0), 0) / allPages.length),
-                largest: Math.max(...allPages.map(p => p.pageSizeKB || 0)),
-                heavyPages: allPages.filter(p => (p.pageSizeKB || 0) > 3000).map(p => ({ url: p.url, sizeKB: p.pageSizeKB })),
-                heavyPageCount: allPages.filter(p => (p.pageSizeKB || 0) > 3000).length,
-            },
-
-            // Heading hierarchy issues
-            headingIssues: {
-                skippedLevels: allPages.filter(p => !p.headingHierarchy?.valid).map(p => ({
-                    url: p.url, issues: p.headingHierarchy?.skippedLevels || [],
-                })),
-                multipleH1: allPages.filter(p => (p.h1?.length || 0) > 1).map(p => ({ url: p.url, count: p.h1.length })),
-                noH1: allPages.filter(p => !p.h1?.length).map(p => p.url),
-                skippedCount: allPages.filter(p => !p.headingHierarchy?.valid).length,
-                multipleH1Count: allPages.filter(p => (p.h1?.length || 0) > 1).length,
-            },
-
-            // Title quality
-            titleQuality: {
-                missing: allPages.filter(p => !p.title).map(p => p.url),
-                tooShort: allPages.filter(p => p.titleTooShort).map(p => ({ url: p.url, length: p.titleLength })),
-                tooLong: allPages.filter(p => p.titleTooLong).map(p => ({ url: p.url, length: p.titleLength })),
-                duplicates: (() => {
-                    const titles = {};
-                    allPages.forEach(p => { if (p.title) (titles[p.title] = titles[p.title] || []).push(p.url); });
-                    return Object.entries(titles).filter(([, urls]) => urls.length > 1).map(([title, urls]) => ({ title, urls, count: urls.length }));
-                })(),
-            },
-
-            // Meta description quality
-            metaDescQuality: {
-                missing: missingMeta.map(p => p.url),
-                tooShort: allPages.filter(p => p.metaDescTooShort).map(p => ({ url: p.url, length: p.metaDescLength })),
-                tooLong: allPages.filter(p => p.metaDescTooLong).map(p => ({ url: p.url, length: p.metaDescLength })),
-                duplicates: (() => {
-                    const descs = {};
-                    allPages.forEach(p => { if (p.metaDescription) (descs[p.metaDescription] = descs[p.metaDescription] || []).push(p.url); });
-                    return Object.entries(descs).filter(([, urls]) => urls.length > 1).map(([desc, urls]) => ({ desc: desc.substring(0, 80), urls, count: urls.length }));
-                })(),
-            },
-
-            // Hreflang
-            hreflangPresent: allPages.some(p => p.hasHreflang),
-            hreflangPages: allPages.filter(p => p.hasHreflang).map(p => ({ url: p.url, langs: p.hreflang?.map(h => h.lang) || [] })),
-
-            // Lang attribute
-            langAttribute: homepage.langAttr || '',
-            hasLangAttribute: !!homepage.langAttr,
-            langMismatch: allPages.filter(p => p.langAttr && p.langAttr !== homepage.langAttr).map(p => ({
-                url: p.url, lang: p.langAttr, expected: homepage.langAttr,
-            })),
-
-            // Resource bloat (CSS/JS counts — unique to us)
-            resourceBloat: {
-                homepage: homepage.resources || {},
-                avgCss: Math.round(allPages.reduce((s, p) => s + (p.resources?.cssTotal || 0), 0) / allPages.length),
-                avgJs: Math.round(allPages.reduce((s, p) => s + (p.resources?.jsTotal || 0), 0) / allPages.length),
-                avgTotal: Math.round(allPages.reduce((s, p) => s + (p.resources?.totalResources || 0), 0) / allPages.length),
-                bloatedPages: allPages.filter(p => (p.resources?.totalResources || 0) > 30).map(p => ({
-                    url: p.url, total: p.resources?.totalResources || 0,
-                })),
-            },
-
-            // Security headers (unique — competitors don't check this)
-            securityScore: homepage.securityHeaders || { score: 0, total: 7, details: [] },
-
-            // Meta robots (noindex/nofollow detection)
-            metaRobotsIssues: {
-                noindexPages: allPages.filter(p => p.metaRobots?.noindex).map(p => p.url),
-                nofollowPages: allPages.filter(p => p.metaRobots?.nofollow).map(p => p.url),
-                noindexCount: allPages.filter(p => p.metaRobots?.noindex).length,
-                nofollowCount: allPages.filter(p => p.metaRobots?.nofollow).length,
-            },
-
-            // URL issues
-            urlIssues: {
-                tooLong: allPages.filter(p => p.urlTooLong).map(p => ({ url: p.url, length: p.urlLength })),
-                tooLongCount: allPages.filter(p => p.urlTooLong).length,
-            },
-
-            // ══════════════════════════════════════════════════════
-            // NEW ROUND 2: Missing Semrush checks
-            // ══════════════════════════════════════════════════════
-
-            // llms.txt (AI crawler accessibility — Semrush 2025)
-            llmsTxt: llmsTxt || { found: false },
-
-            // Empty anchor text
-            emptyAnchorCount: allPages.reduce((s, p) => s + (p.emptyAnchors || 0), 0),
-            emptyAnchorPages: allPages.filter(p => (p.emptyAnchors || 0) > 0).map(p => ({ url: p.url, count: p.emptyAnchors })),
-
-            // Nofollow internal links
-            nofollowInternalCount: allPages.reduce((s, p) => s + (p.nofollowInternalLinks || 0), 0),
-            nofollowInternalPages: allPages.filter(p => (p.nofollowInternalLinks || 0) > 0).map(p => ({ url: p.url, count: p.nofollowInternalLinks })),
-
-            // Cache-Control headers
-            cacheControlPresent: !!(homepage.hasCacheControl),
-
-            // Conflicting canonicals — pages where canonical doesn't point to self
-            conflictingCanonicals: (() => {
-                const conflicts = [];
-                for (const p of allPages) {
-                    if (p.canonical && p.url) {
-                        try {
-                            const canonUrl = new URL(p.canonical, p.url).href;
-                            const pageUrl = new URL(p.url).href;
-                            if (canonUrl !== pageUrl && !canonUrl.endsWith(new URL(p.url).pathname)) {
-                                conflicts.push({ url: p.url, canonical: canonUrl });
-                            }
-                        } catch { /* skip */ }
-                    }
-                }
-                return conflicts;
-            })(),
-
-            // Sitemap coverage — cross-reference
-            sitemapCoverage: (() => {
-                if (!sitemap.found) return { available: false };
-                const sitemapUrls = new Set(sitemap.urls.map(u => { try { return new URL(u).pathname; } catch { return u; } }));
-                const crawledPaths = new Set(allPages.map(p => { try { return new URL(p.url).pathname; } catch { return p.url; } }));
-                const pagesNotInSitemap = [...crawledPaths].filter(p => !sitemapUrls.has(p) && p !== '/');
-                const sitemapUrlsNotCrawled = [...sitemapUrls].filter(u => !crawledPaths.has(u));
-                const totalUnique = new Set([...sitemapUrls, ...crawledPaths]).size;
-                return {
-                    available: true,
-                    pagesNotInSitemap,
-                    pagesNotInSitemapCount: pagesNotInSitemap.length,
-                    sitemapUrlsNotCrawled,
-                    sitemapUrlsNotCrawledCount: sitemapUrlsNotCrawled.length,
-                    coveragePercent: totalUnique > 0 ? Math.round((sitemapUrls.size / totalUnique) * 100) : 0,
-                };
-            })(),
-
-            // Broken external links (probed after crawl)
-            brokenExternalLinks: brokenExternal,
-            brokenExternalCount: brokenExternal.length,
-
-            // Broken internal links (Semrush parity)
-            brokenInternalLinks: brokenInternal,
-            brokenInternalCount: brokenInternal.length,
-
-            // ── JS/CSS Resource Scanning (Semrush: Blocked Resources, Uncached/Unminified JS/CSS) ──
-            resourceScanning: {
-                totalResources: resourceStats.totalResources,
-                probedCount: resourceStats.probedCount,
-                blockedResources: resourceStats.blockedResources,
-                blockedResourceCount: resourceStats.blockedResources.length,
-                uncachedResources: resourceStats.uncachedResources,
-                uncachedResourceCount: resourceStats.uncachedResources.length,
-                unminifiedResources: resourceStats.unminifiedResources,
-                unminifiedResourceCount: resourceStats.unminifiedResources.length,
-            },
-
-            // ══════════════════════════════════════════════════════
-            // PHASE 2: Full Redirect Chain Analysis (Semrush parity)
-            // ══════════════════════════════════════════════════════
-            redirectAnalysis: (() => {
-                const allRedirects = allPages.filter(p => p.redirectChain?.length > 0);
-                // Typed classification
-                const by301 = allRedirects.filter(p => p.redirectChain.some(r => r.status === 301));
-                const by302 = allRedirects.filter(p => p.redirectChain.some(r => r.status === 302));
-                const by307 = allRedirects.filter(p => p.redirectChain.some(r => r.status === 307));
-                const by308 = allRedirects.filter(p => p.redirectChain.some(r => r.status === 308));
-                // Chain length distribution
-                const longChains = allRedirects.filter(p => p.redirectChain.length >= 3);
-                // Loop detection
-                const loops = [];
-                for (const p of allRedirects) {
-                    const seen = new Set();
-                    for (const hop of p.redirectChain) {
-                        if (seen.has(hop.to)) { loops.push({ url: p.url, loopUrl: hop.to, chain: p.redirectChain }); break; }
-                        seen.add(hop.from); seen.add(hop.to);
-                    }
-                }
-                // Self-referencing redirects (A → A)
-                const selfRedirects = allRedirects.filter(p => p.redirectChain.some(r => r.from === r.to));
-                return {
-                    totalRedirects: allRedirects.length,
-                    permanent301: by301.map(p => ({ url: p.url, chain: p.redirectChain })),
-                    permanent301Count: by301.length,
-                    temporary302: by302.map(p => ({ url: p.url, chain: p.redirectChain })),
-                    temporary302Count: by302.length,
-                    temporary307: by307.map(p => ({ url: p.url, chain: p.redirectChain })).slice(0, 10),
-                    temporary307Count: by307.length,
-                    permanent308: by308.map(p => ({ url: p.url, chain: p.redirectChain })).slice(0, 10),
-                    permanent308Count: by308.length,
-                    longChains: longChains.map(p => ({ url: p.url, chainLength: p.redirectChain.length, chain: p.redirectChain })),
-                    longChainCount: longChains.length,
-                    loops,
-                    loopCount: loops.length,
-                    selfRedirects: selfRedirects.map(p => p.url),
-                    selfRedirectCount: selfRedirects.length,
-                    avgChainLength: allRedirects.length > 0 ? Math.round(allRedirects.reduce((s, p) => s + p.redirectChain.length, 0) / allRedirects.length * 10) / 10 : 0,
-                };
-            })(),
-
-            // ══════════════════════════════════════════════════════
-            // PHASE 2: Schema Validation (Semrush parity)
-            // ══════════════════════════════════════════════════════
-            schemaValidation: (() => {
-                const REQUIRED_FIELDS = {
-                    'Organization': ['name', 'url', 'logo'],
-                    'LocalBusiness': ['name', 'address', 'telephone', 'url'],
-                    'Product': ['name', 'image', 'description'],
-                    'Article': ['headline', 'author', 'datePublished', 'image'],
-                    'BlogPosting': ['headline', 'author', 'datePublished', 'image'],
-                    'FAQPage': ['mainEntity'],
-                    'HowTo': ['name', 'step'],
-                    'BreadcrumbList': ['itemListElement'],
-                    'WebSite': ['name', 'url'],
-                    'WebPage': ['name', 'url'],
-                    'Review': ['itemReviewed', 'author', 'reviewRating'],
-                    'Event': ['name', 'startDate', 'location'],
-                    'Course': ['name', 'description', 'provider'],
-                    'VideoObject': ['name', 'description', 'thumbnailUrl', 'uploadDate'],
-                };
-                const issues = [];
-                const typeCounts = {};
-                for (const page of analysisPages) {
-                    for (const schema of (page.jsonLd || [])) {
-                        const type = schema['@type'];
-                        if (!type) continue;
-                        typeCounts[type] = (typeCounts[type] || 0) + 1;
-                        const required = REQUIRED_FIELDS[type];
-                        if (required) {
-                            const missing = required.filter(f => !schema[f] && !schema[f.toLowerCase()]);
-                            if (missing.length > 0) {
-                                issues.push({ url: page.url, type, missingFields: missing });
-                            }
-                        }
-                    }
-                }
-                const pagesWithSchema = analysisPages.filter(p => p.jsonLd?.length > 0);
-                const pagesWithoutSchema = analysisPages.filter(p => !p.jsonLd?.length);
-                return {
-                    totalSchemas: Object.values(typeCounts).reduce((a, b) => a + b, 0),
-                    typeCounts,
-                    pagesWithSchema: pagesWithSchema.length,
-                    pagesWithoutSchema: pagesWithoutSchema.length,
-                    pagesWithoutSchemaUrls: pagesWithoutSchema.map(p => p.url).slice(0, 20),
-                    validationIssues: issues,
-                    validationIssueCount: issues.length,
-                    hasOrganization: !!typeCounts['Organization'],
-                    hasBreadcrumb: !!typeCounts['BreadcrumbList'],
-                    hasFAQ: !!typeCounts['FAQPage'],
-                    hasArticle: !!(typeCounts['Article'] || typeCounts['BlogPosting']),
-                    hasProduct: !!typeCounts['Product'],
-                    missingCritical: (() => {
-                        const missing = [];
-                        if (!typeCounts['Organization'] && !typeCounts['LocalBusiness']) missing.push('Organization/LocalBusiness');
-                        if (!typeCounts['BreadcrumbList']) missing.push('BreadcrumbList');
-                        if (!typeCounts['WebSite']) missing.push('WebSite');
-                        return missing;
-                    })(),
-                };
-            })(),
-
-            // ══════════════════════════════════════════════════════
-            // PHASE 2: Internal Link Flow & PageRank Distribution
-            // ══════════════════════════════════════════════════════
-            internalLinkFlow: (() => {
-                // Build full link graph
-                const linkGraph = new Map(); // url → { outgoing: [], incoming: [], pageRank: 1 }
-                for (const p of allPages) {
-                    if (!linkGraph.has(p.url)) linkGraph.set(p.url, { outgoing: [], incoming: [], pageRank: 1 });
-                    for (const link of (p.links?.internal || [])) {
-                        try {
-                            const target = new URL(link, cleanBase).href;
-                            if (!linkGraph.has(target)) linkGraph.set(target, { outgoing: [], incoming: [], pageRank: 1 });
-                            linkGraph.get(p.url).outgoing.push(target);
-                            linkGraph.get(target).incoming.push(p.url);
-                        } catch { /* skip */ }
-                    }
-                }
-                // Simple PageRank (3 iterations) — enough for distribution insight
-                const damping = 0.85;
-                const pages = [...linkGraph.keys()];
-                const n = pages.length || 1;
-                for (let iter = 0; iter < 3; iter++) {
-                    const newRanks = new Map();
-                    for (const url of pages) {
-                        let rank = (1 - damping) / n;
-                        const node = linkGraph.get(url);
-                        for (const src of node.incoming) {
-                            const srcNode = linkGraph.get(src);
-                            if (srcNode && srcNode.outgoing.length > 0) {
-                                rank += damping * (srcNode.pageRank / srcNode.outgoing.length);
-                            }
-                        }
-                        newRanks.set(url, rank);
-                    }
-                    for (const [url, rank] of newRanks) linkGraph.get(url).pageRank = rank;
-                }
-                // Build distribution: top pages, orphans, link juice concentration
-                const ranked = [...linkGraph.entries()]
-                    .map(([url, data]) => ({ url, pageRank: Math.round(data.pageRank * 1000) / 1000, incoming: data.incoming.length, outgoing: data.outgoing.length }))
-                    .sort((a, b) => b.pageRank - a.pageRank);
-                const topPages = ranked.slice(0, 15);
-                const bottomPages = ranked.filter(p => p.incoming === 0 && p.url !== homepage.url);
-                // Link juice concentration: what % of total PageRank do top 10% of pages hold
-                const totalPR = ranked.reduce((s, p) => s + p.pageRank, 0);
-                const top10pct = ranked.slice(0, Math.max(1, Math.floor(ranked.length * 0.1)));
-                const top10pctPR = top10pct.reduce((s, p) => s + p.pageRank, 0);
-                return {
-                    totalNodes: linkGraph.size,
-                    topPages,
-                    orphanPages: bottomPages.map(p => p.url).slice(0, 20),
-                    orphanCount: bottomPages.length,
-                    linkJuiceConcentration: totalPR > 0 ? Math.round((top10pctPR / totalPR) * 100) : 0,
-                    avgIncoming: Math.round(ranked.reduce((s, p) => s + p.incoming, 0) / Math.max(ranked.length, 1)),
-                    avgOutgoing: Math.round(ranked.reduce((s, p) => s + p.outgoing, 0) / Math.max(ranked.length, 1)),
-                    distribution: {
-                        noIncoming: ranked.filter(p => p.incoming === 0).length,
-                        oneIncoming: ranked.filter(p => p.incoming === 1).length,
-                        twoToFive: ranked.filter(p => p.incoming >= 2 && p.incoming <= 5).length,
-                        sixToTen: ranked.filter(p => p.incoming >= 6 && p.incoming <= 10).length,
-                        moreThanTen: ranked.filter(p => p.incoming > 10).length,
-                    },
-                };
-            })(),
-
-            // ══════════════════════════════════════════════════════
-            // PHASE 2: Enhanced Crawl Depth Analysis
-            // ══════════════════════════════════════════════════════
-            crawlDepthAnalysis: (() => {
-                // BFS from homepage to compute actual click depth
-                const depthMap = new Map();
-                depthMap.set(homepage.url, 0);
-                const queue = [homepage.url];
-                const visited = new Set([homepage.url]);
-                while (queue.length > 0) {
-                    const current = queue.shift();
-                    const currentDepth = depthMap.get(current);
-                    const page = allPages.find(p => p.url === current);
-                    if (!page) continue;
-                    for (const link of (page.links?.internal || [])) {
-                        try {
-                            const target = new URL(link, cleanBase).href;
-                            if (!visited.has(target)) {
-                                visited.add(target);
-                                depthMap.set(target, currentDepth + 1);
-                                queue.push(target);
-                            }
-                        } catch { /* skip */ }
-                    }
-                }
-                const depths = [...depthMap.entries()].map(([url, depth]) => ({ url, depth }));
-                const distribution = { depth0: 0, depth1: 0, depth2: 0, depth3: 0, depth4plus: 0 };
-                for (const { depth } of depths) {
-                    if (depth === 0) distribution.depth0++;
-                    else if (depth === 1) distribution.depth1++;
-                    else if (depth === 2) distribution.depth2++;
-                    else if (depth === 3) distribution.depth3++;
-                    else distribution.depth4plus++;
-                }
-                const deeperThan3 = depths.filter(d => d.depth > 3);
-                return {
-                    distribution,
-                    maxDepth: Math.max(...depths.map(d => d.depth), 0),
-                    avgDepth: depths.length > 0 ? Math.round(depths.reduce((s, d) => s + d.depth, 0) / depths.length * 10) / 10 : 0,
-                    deeperThan3: deeperThan3.map(d => ({ url: d.url, depth: d.depth })).slice(0, 20),
-                    deeperThan3Count: deeperThan3.length,
-                    unreachable: allPages.filter(p => !depthMap.has(p.url) && p.success).map(p => p.url),
-                    unreachableCount: allPages.filter(p => !depthMap.has(p.url) && p.success).length,
-                };
-            })(),
         },
     };
 }
@@ -2611,8 +724,8 @@ export function formatSiteResearch(research) {
     text += `- Total word count: ${si.totalWordCount} (avg ${si.avgWordCount || 0} per page)\n`;
     text += `- Total images: ${si.totalImages} (${si.imagesWithoutAlt} missing alt text)\n`;
     text += `- Internal links: ${si.internalLinkCount}, External links: ${si.externalLinkCount}\n`;
-    text += `- Schema/JSON-LD: ${si.hasSchemaOrg ? `Yes (${(si.schemaTypes || []).join(', ')})` : 'NONE FOUND'}\n`;
-    text += `- Tech Stack: ${(si.techStack || []).join(', ') || 'Unknown'}\n`;
+    text += `- Schema/JSON-LD: ${si.hasSchemaOrg ? `Yes (${si.schemaTypes.join(', ')})` : 'NONE FOUND'}\n`;
+    text += `- Tech Stack: ${si.techStack.join(', ') || 'Unknown'}\n`;
     text += `- Canonical: ${si.hasCanonical ? 'Yes' : 'MISSING'}\n`;
     text += `- Mobile viewport: ${si.hasViewport ? 'Yes' : 'MISSING'}\n`;
     text += `- FAQ section: ${si.hasFAQ ? 'Yes' : 'Not found'}\n`;
@@ -2642,20 +755,12 @@ export function formatSiteResearch(research) {
 
     // NEW: Issues detected
     const issues = [];
-    if (si.thinPageCount > 0) issues.push(`${si.thinPageCount} THIN PAGES (<300 words): ${(si.thinPages || []).slice(0, 3).map(p => p.url).join(', ')}`);
+    if (si.thinPageCount > 0) issues.push(`${si.thinPageCount} THIN PAGES (<300 words): ${si.thinPages.slice(0, 3).map(p => p.url).join(', ')}`);
     if (si.missingMetaDescriptions?.length > 0) issues.push(`${si.missingMetaDescriptions.length} pages MISSING meta descriptions: ${si.missingMetaDescriptions.slice(0, 3).join(', ')}`);
     if (si.missingH1Tags?.length > 0) issues.push(`${si.missingH1Tags.length} pages MISSING H1 tags: ${si.missingH1Tags.slice(0, 3).join(', ')}`);
-    if (si.redirectChainCount > 0) issues.push(`${si.redirectChainCount} pages have REDIRECT CHAINS: ${(si.redirectChains || []).slice(0, 2).map(r => `${r.url} (${r.chain?.length || 0} hops)`).join(', ')}`);
-    if (si.duplicateContentCount > 0) issues.push(`${si.duplicateContentCount} DUPLICATE content pairs (85%+ similarity): ${(si.duplicateContent || []).slice(0, 2).map(d => `${d.page1} ↔ ${d.page2} (${d.similarity}%)`).join(', ')}`);
-    if (si.titleDuplicateCount > 0) issues.push(`${si.titleDuplicateCount} pages with DUPLICATE TITLE TAGS: ${(si.duplicateTitles || []).slice(0, 2).map(d => `"${d.title}" (${d.count} pages)`).join(', ')}`);
-    if (si.metaDuplicateCount > 0) issues.push(`${si.metaDuplicateCount} pages with DUPLICATE META DESCRIPTIONS`);
-    if (si.multipleH1Count > 0) issues.push(`${si.multipleH1Count} pages with MULTIPLE H1 TAGS: ${(si.multipleH1Pages || []).slice(0, 3).map(p => `${p.url || p} (${p.h1Count || '?'} H1s)`).join(', ')}`);
-    if (si.lowTextRatioCount > 0) issues.push(`${si.lowTextRatioCount} pages with LOW TEXT-TO-HTML RATIO (<10%): ${(si.lowTextRatioPages || []).slice(0, 3).map(p => `${p.url || p} (${p.ratio || '?'}%)`).join(', ')}`);
-    if (si.oversizedPageCount > 0) issues.push(`${si.oversizedPageCount} pages LARGER THAN 2MB`);
-    if (si.singleIncomingCount > 0) issues.push(`${si.singleIncomingCount} pages with ONLY 1 INCOMING INTERNAL LINK (low link equity)`);
+    if (si.redirectChainCount > 0) issues.push(`${si.redirectChainCount} pages have REDIRECT CHAINS: ${si.redirectChains.slice(0, 2).map(r => `${r.url} (${r.chain.length} hops)`).join(', ')}`);
+    if (si.duplicateContentCount > 0) issues.push(`${si.duplicateContentCount} DUPLICATE/NEAR-DUPLICATE content pairs: ${si.duplicateContent.slice(0, 2).map(d => `${d.page1} ↔ ${d.page2} (${d.similarity}% ${d.level})`).join(', ')}`);
     if (si.clickDepthIssues > 0) issues.push(`${si.clickDepthIssues} pages have DEEP CLICK DEPTH (not directly linked from homepage)`);
-
-
 
     if (issues.length > 0) {
         text += `\n--- ISSUES DETECTED ---\n`;
@@ -2667,9 +772,9 @@ export function formatSiteResearch(research) {
     text += `\n`;
 
     // Sub-pages
-    if ((research.pages || []).length > 1) {
+    if (research.pages.length > 1) {
         text += `Sub-pages crawled:\n`;
-        for (const p of (research.pages || []).slice(1, 15)) { // Show up to 15
+        for (const p of research.pages.slice(1, 15)) { // Show up to 15
             text += `- ${p.url}: "${p.title}" (${p.wordCount} words)`;
             if (p.h1?.length) text += ` | H1: ${p.h1.join(', ')}`;
             if (!p.metaDescription) text += ` | ⚠️ no meta desc`;
