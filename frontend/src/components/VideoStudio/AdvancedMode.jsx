@@ -56,9 +56,9 @@ const css = `
 .adv-ac-item span { font-size: 11px; color: #c4b5fd; font-weight: 600; }
 
 /* Enhance Button */
-.adv-enhance { display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 12px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid rgba(139,92,246,0.25); background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(6,182,212,0.15)); color: #c4b5fd; -webkit-appearance: none; appearance: none; transition: all .15s; }
-.adv-enhance:hover { border-color: rgba(139,92,246,0.4); background: linear-gradient(135deg, rgba(124,58,237,0.25), rgba(6,182,212,0.25)); }
-.adv-enhance:disabled { opacity: 0.4; cursor: default; }
+.adv-enhance { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 24px; font-size: 13px; font-weight: 700; cursor: pointer; border: 1px solid rgba(139,92,246,0.3); background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(6,182,212,0.15)); color: #d8b4fe; -webkit-appearance: none; appearance: none; transition: all .2s; box-shadow: 0 4px 14px rgba(124,58,237,0.1); }
+.adv-enhance:hover { border-color: rgba(139,92,246,0.6); background: linear-gradient(135deg, rgba(124,58,237,0.25), rgba(6,182,212,0.25)); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(124,58,237,0.2); }
+.adv-enhance:disabled { opacity: 0.4; cursor: default; transform: none; box-shadow: none; }
 .adv-chars { font-size: 12px; color: #475569; }
 
 /* Config Row */
@@ -66,20 +66,30 @@ const css = `
 @media (max-width: 640px) { .adv-config { gap: 14px; padding: 16px; } }
 .adv-config-item { display: flex; flex-direction: column; gap: 6px; }
 .adv-config-label { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; }
-.adv-select { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px 14px; color: #e2e8f0; font-size: 14px; outline: none; cursor: pointer; font-weight: 600; -webkit-appearance: menulist-button; appearance: auto; }
-.adv-select option { background: #1c1c20; color: #e2e8f0; }
+
+/* Custom Select */
+.adv-select-btn { width: 100%; display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px 14px; color: #e2e8f0; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .2s; }
+.adv-select-btn:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.15); }
+.adv-select-btn.open { background: rgba(139,92,246,0.08); border-color: rgba(139,92,246,0.4); box-shadow: 0 0 0 2px rgba(139,92,246,0.15); }
+.adv-select-menu { position: absolute; top: calc(100% + 6px); left: 0; width: 100%; max-height: 240px; overflow-y: auto; background: #1e1e26; border: 1px solid rgba(139,92,246,0.25); border-radius: 12px; padding: 6px; z-index: 50; box-shadow: 0 10px 30px rgba(0,0,0,0.6); display: flex; flex-direction: column; gap: 2px; }
+.adv-select-menu::-webkit-scrollbar { width: 6px; }
+.adv-select-menu::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+.adv-select-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 12px; border: none; background: transparent; color: #94a3b8; font-size: 14px; font-weight: 500; cursor: pointer; border-radius: 8px; text-align: left; transition: all .15s; }
+.adv-select-item:hover { background: rgba(255,255,255,0.05); color: #e2e8f0; }
+.adv-select-item.selected { background: rgba(139,92,246,0.15); color: #c4b5fd; font-weight: 600; }
+
 .adv-quality-row { display: flex; gap: 6px; }
-.adv-pill { padding: 10px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.03); color: #94a3b8; -webkit-appearance: none; appearance: none; transition: all .15s; }
-.adv-pill:hover { border-color: rgba(255,255,255,0.12); }
-.adv-pill.active { background: rgba(139,92,246,0.12); color: #c4b5fd; border-color: rgba(139,92,246,0.3); }
+.adv-pill { padding: 10px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02); color: #94a3b8; -webkit-appearance: none; appearance: none; transition: all .2s; }
+.adv-pill:hover { border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.05); color: #e2e8f0; }
+.adv-pill.active { background: linear-gradient(135deg, rgba(139,92,246,0.15), rgba(6,182,212,0.15)); color: #d8b4fe; border-color: rgba(139,92,246,0.4); box-shadow: 0 4px 12px rgba(139,92,246,0.1); }
 
 /* Feature Cards Grid */
 .adv-features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 28px; }
 @media (max-width: 768px) { .adv-features { grid-template-columns: 1fr; } }
 @media (max-width: 560px) { .adv-features { grid-template-columns: 1fr; } }
-.adv-fcard { padding: 20px; border-radius: 18px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); transition: border-color .2s; }
-.adv-fcard:hover { border-color: rgba(255,255,255,0.1); }
-.adv-fcard.has-content { background: rgba(139,92,246,0.05); border-color: rgba(139,92,246,0.2); }
+.adv-fcard { padding: 20px; border-radius: 18px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); transition: all .3s cubic-bezier(0.4, 0, 0.2, 1); }
+.adv-fcard:hover { border-color: rgba(139,92,246,0.25); background: rgba(255,255,255,0.03); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(139,92,246,0.05); }
+.adv-fcard.has-content { background: linear-gradient(135deg, rgba(139,92,246,0.04), rgba(6,182,212,0.04)); border-color: rgba(139,92,246,0.2); }
 .adv-fcard-head { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
 .adv-fcard-head .icon { font-size: 20px; }
 .adv-fcard-head .title { font-size: 15px; font-weight: 700; color: #e2e8f0; }
@@ -169,6 +179,52 @@ const css = `
 .adv-btn-extend:hover { transform: translateY(-1px); }
 .adv-btn-extend:disabled { opacity: 0.4; cursor: default; transform: none; }
 `
+
+function CustomSelect({ value, onChange, options, minWidth = '140px' }) {
+    const [open, setOpen] = useState(false)
+    const ref = useRef(null)
+    useEffect(() => {
+        function handleClickOutside(event) {
+            if (ref.current && !ref.current.contains(event.target)) setOpen(false)
+        }
+        document.addEventListener("mousedown", handleClickOutside)
+        return () => document.removeEventListener("mousedown", handleClickOutside)
+    }, [ref])
+
+    const selectedOpt = options.find(o => o.value === value) || options[0]
+
+    return (
+        <div ref={ref} style={{ position: 'relative', minWidth }}>
+            <button 
+                type="button"
+                onClick={() => setOpen(!open)}
+                className={`adv-select-btn ${open ? 'open' : ''}`}
+            >
+                <span style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+                    {selectedOpt?.icon && <span>{selectedOpt.icon}</span>}
+                    {selectedOpt?.label}
+                </span>
+                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#64748b', transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'none' }}>expand_more</span>
+            </button>
+            {open && (
+                <div className="adv-select-menu">
+                    {options.map(opt => (
+                        <button 
+                            key={opt.value} 
+                            type="button"
+                            className={`adv-select-item ${opt.value === value ? 'selected' : ''}`}
+                            onClick={() => { onChange(opt.value); setOpen(false) }}
+                        >
+                            {opt.icon && <span>{opt.icon}</span>}
+                            {opt.label}
+                            {opt.value === value && <span className="material-symbols-outlined" style={{ fontSize: '14px', marginLeft:'auto', color:'#c4b5fd' }}>check</span>}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    )
+}
 
 export default function AdvancedMode({ activeBrand, initialData }) {
     const [model, setModel] = useState('seedance-2.0')
@@ -530,9 +586,12 @@ export default function AdvancedMode({ activeBrand, initialData }) {
                                     <h4><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>add_circle</span> Extend this video</h4>
                                     <div className="adv-extend-row">
                                         <input className="adv-extend-input" value={extendPrompt} onChange={e => setExtendPrompt(e.target.value)} placeholder="What should happen next? (optional)" />
-                                        <select className="adv-select" value={extendDuration} onChange={e => setExtendDuration(Number(e.target.value))} style={{ width: '80px' }}>
-                                            {[4, 5, 6, 7, 8, 9, 10].map(d => <option key={d} value={d}>{d}s</option>)}
-                                        </select>
+                                        <CustomSelect 
+                                            value={extendDuration} 
+                                            onChange={setExtendDuration} 
+                                            options={[4, 5, 6, 7, 8, 9, 10].map(d => ({ value: d, label: `${d}s` }))} 
+                                            minWidth="100px" 
+                                        />
                                         <button className="adv-btn-extend" onClick={handleExtend} disabled={extending}>
                                             {extending ? <><span className="material-symbols-outlined adv-spin" style={{ fontSize: '14px' }}>progress_activity</span> Extending...</>
                                                 : <>🔗 Extend +{extendDuration}s</>}
@@ -685,33 +744,42 @@ export default function AdvancedMode({ activeBrand, initialData }) {
                                 </div>
                             )}
                             <div className="adv-prompt-footer">
-                                <button className="adv-enhance" onClick={handleEnhance} disabled={enhancing || !prompt.trim()}>
-                                    {enhancing ? <><span className="material-symbols-outlined adv-spin" style={{ fontSize: '14px' }}>progress_activity</span> Enhancing...</> : <>✨ Enhance as Ad Film</>}
-                                </button>
                                 <span className="adv-chars">{prompt.length} chars</span>
+                                <button className="adv-enhance" onClick={handleEnhance} disabled={enhancing || !prompt.trim()}>
+                                    {enhancing ? <><span className="material-symbols-outlined adv-spin" style={{ fontSize: '14px' }}>progress_activity</span> Enhancing...</> : <><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>auto_awesome</span> Enhance as Ad Film</>}
+                                </button>
                             </div>
                         </div>
                     )}
 
                     {/* §2 — CONFIG ROW */}
                     <div className="adv-config">
-                        <div className="adv-config-item">
+                        <div className="adv-config-item" style={{ zIndex: 40 }}>
                             <span className="adv-config-label">Model</span>
-                            <select className="adv-select" value={model} onChange={e => setModel(e.target.value)}>
-                                {Object.values(MODELS).map(mod => <option key={mod.id} value={mod.id}>{mod.icon} {mod.name}</option>)}
-                            </select>
+                            <CustomSelect 
+                                value={model} 
+                                onChange={setModel} 
+                                options={Object.values(MODELS).map(mod => ({ value: mod.id, label: mod.name, icon: mod.icon }))} 
+                                minWidth="180px" 
+                            />
                         </div>
-                        <div className="adv-config-item">
+                        <div className="adv-config-item" style={{ zIndex: 30 }}>
                             <span className="adv-config-label">Ratio</span>
-                            <select className="adv-select" value={aspectRatio} onChange={e => setAspectRatio(e.target.value)}>
-                                {m.ratios.map(r => <option key={r} value={r}>{r}</option>)}
-                            </select>
+                            <CustomSelect 
+                                value={aspectRatio} 
+                                onChange={setAspectRatio} 
+                                options={m.ratios.map(r => ({ value: r, label: r }))} 
+                                minWidth="100px" 
+                            />
                         </div>
-                        <div className="adv-config-item">
+                        <div className="adv-config-item" style={{ zIndex: 20 }}>
                             <span className="adv-config-label">Duration</span>
-                            <select className="adv-select" value={duration} onChange={e => setDuration(Number(e.target.value))}>
-                                {Array.from({ length: m.dur[1] - m.dur[0] + 1 }, (_, i) => m.dur[0] + i).map(d => <option key={d} value={d}>{d}s</option>)}
-                            </select>
+                            <CustomSelect 
+                                value={duration} 
+                                onChange={setDuration} 
+                                options={Array.from({ length: m.dur[1] - m.dur[0] + 1 }, (_, i) => m.dur[0] + i).map(d => ({ value: d, label: `${d}s` }))} 
+                                minWidth="100px" 
+                            />
                         </div>
                         <div className="adv-config-item">
                             <span className="adv-config-label">Quality</span>

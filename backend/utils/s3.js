@@ -87,4 +87,5 @@ export const mirrorUrlToS3 = async (url, targetKey, defaultMimeType = "image/png
     }
 };
 
+export { s3Client };
 export default { uploadToS3, mirrorUrlToS3 };

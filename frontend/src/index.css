@@ -338,6 +338,78 @@
     padding-right: 1rem;
   }
   @media (min-width: 1024px) { .responsive-container { padding-left: 2rem; padding-right: 2rem; } }
+
+  /* ═══════════ Creative Studio — Freepik-Inspired Split Panel ═══════════ */
+  .creative-split {
+    display: flex;
+    gap: 1.25rem;
+    min-height: calc(100vh - 180px);
+    align-items: flex-start;
+  }
+
+  .creative-tools-panel {
+    width: 340px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 80px;
+    max-height: calc(100vh - 110px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 1rem;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.06) transparent;
+  }
+
+  .creative-tools-panel::-webkit-scrollbar { width: 4px; }
+  .creative-tools-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 99px; }
+
+  .creative-gallery {
+    flex: 1;
+    min-width: 0;
+    padding: 0 0 2rem;
+  }
+
+  .generation-card {
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 1rem;
+    padding: 1rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .generation-card:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+  }
+
+  .generation-card--new {
+    border-color: rgba(43, 75, 238, 0.3);
+    box-shadow: 0 0 30px rgba(43, 75, 238, 0.1);
+    animation: cardHighlight 2s ease-out;
+  }
+
+  @keyframes cardHighlight {
+    0% { border-color: rgba(43, 75, 238, 0.6); box-shadow: 0 0 40px rgba(43, 75, 238, 0.25); transform: scale(1.01); }
+    100% { border-color: rgba(43, 75, 238, 0.3); box-shadow: 0 0 30px rgba(43, 75, 238, 0.1); transform: scale(1); }
+  }
+
+  /* Mobile + Tablet: stack vertically */
+  @media (max-width: 1024px) {
+    .creative-split {
+      flex-direction: column;
+    }
+    .creative-tools-panel {
+      width: 100%;
+      position: static;
+      max-height: none;
+    }
+  }
 }
 
 @layer utilities {

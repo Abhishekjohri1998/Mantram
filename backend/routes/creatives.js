@@ -5,7 +5,7 @@ import Feedback from '../models/Feedback.js';
 import Brand from '../models/Brand.js';
 import { protect } from '../middleware/auth.js';
 import { requireStudio } from '../middleware/studioAccess.js';
-import { requireCredits } from '../middleware/credits.js';
+import { requireCredits, refundCredits } from '../middleware/credits.js';
 import { getOrchestrator } from '../agents/orchestrator.js';
 import { addWatermark } from '../utils/watermark.js';
 import { getSetting } from '../models/SystemSettings.js';
@@ -655,6 +655,9 @@ The output must fill the entire canvas edge-to-edge. No frames, borders, or mock
         res.json({ success: true, creative });
     } catch (error) {
         console.error('❌ CREATIVE GENERATE ERROR:', error.message, error.stack?.split('\n').slice(0,3).join('\n'));
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'creativeGenerate', `Refund: Image Generation Sync Failure (${safeErrorMessage(error)})`, 'creative');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -1108,6 +1111,9 @@ router.get('/vto-status/:requestId', protect, async (req, res) => {
         res.json({ success: true, status: 'pending' });
     } catch (error) {
         console.error('VTO status error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'vtoGenerate', `Refund: Virtual Try-On Sync Failure (${safeErrorMessage(error)})`, 'creative');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -1117,7 +1123,7 @@ router.get('/vto-status/:requestId', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/lifestyle-mockup', protect, requireStudio('creativeStudio'), requireCredits('creative'), async (req, res) => {
     try {
-        const { productImage, scenePrompt, brandId, aspectRatio = '1:1' } = req.body;
+        const { productImage, scenePrompt, brandId, aspectRatio = '1:1', templateImage, harmonizeWithBrand } = req.body;
         if (!productImage) {
             return res.status(400).json({ success: false, error: 'Product image is required' });
         }
@@ -1125,10 +1131,12 @@ router.post('/lifestyle-mockup', protect, requireStudio('creativeStudio'), requi
         console.log(`\n══════ LIFESTYLE MOCKUP ══════`);
         console.log(`📐 Aspect ratio: ${aspectRatio}`);
         console.log(`🎬 Scene: ${scenePrompt?.substring(0, 100) || '(auto)'}`);
+        console.log(`📸 Template image: ${templateImage ? 'YES' : 'no'}`);
+        console.log(`🎨 Brand harmonize: ${harmonizeWithBrand ? 'YES' : 'no'}`);
 
         const imageParts = [];
 
-        // Product image
+        // Product image (always first)
         if (productImage.startsWith('data:image/')) {
             imageParts.push({ inlineData: extractBase64(productImage) });
         } else if (productImage.startsWith('http')) {
@@ -1140,20 +1148,62 @@ router.post('/lifestyle-mockup', protect, requireStudio('creativeStudio'), requi
             }
         }
 
+        // Template/reference scene image (second image — optional)
+        if (templateImage) {
+            if (templateImage.startsWith('data:image/')) {
+                imageParts.push({ inlineData: extractBase64(templateImage) });
+                console.log(`📸 Template scene image loaded (base64)`);
+            } else if (templateImage.startsWith('http')) {
+                try {
+                    const resp = await fetch(templateImage, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+                    if (resp.ok) {
+                        const buf = await resp.arrayBuffer();
+                        const ct = (resp.headers.get('content-type') || 'image/jpeg').split(';')[0];
+                        imageParts.push({ inlineData: { mimeType: ct, data: Buffer.from(buf).toString('base64') } });
+                        console.log(`📸 Template scene image loaded from URL (${Math.round(buf.byteLength / 1024)}KB)`);
+                    }
+                } catch (e) { console.warn('⚠️ Could not fetch template image:', e.message); }
+            }
+        }
+
         // Get brand context if available
         let brandContext = '';
+        let brandColorHarmonize = '';
         if (brandId) {
             const brand = await Brand.findById(brandId).lean();
             if (brand) {
                 brandContext = `Brand: ${brand.name}. ${buildVisualContext(brand)}`;
+
+                // Brand DNA color harmonization
+                if (harmonizeWithBrand && brand.dna?.colors?.length > 0) {
+                    const colorList = brand.dna.colors.slice(0, 6).map(c => `${c.name || 'color'}: ${c.hex}`).join(', ');
+                    brandColorHarmonize = `\nBRAND COLOR HARMONIZATION: Adapt the scene's color palette to harmonize with the brand colors: ${colorList}. Use these as accent tones, background tints, surface colors, and atmospheric lighting. The color grading, ambient light, and decorative elements should feel like part of the ${brand.name} visual family. Do NOT recolor the product itself — only the environment, lighting, and scene elements.`;
+                    console.log(`🎨 Brand harmonize colors: ${colorList}`);
+                }
             }
         }
 
         const scene = scenePrompt || 'a premium professional product photography setting with beautiful lighting';
-        const mockupPrompt = `PRODUCT LIFESTYLE MOCKUP: Place the product from the provided image into a new lifestyle scene.
+        const hasTemplate = imageParts.length > 1; // second image = template
+
+        const mockupPrompt = hasTemplate
+            ? `PRODUCT PLACEMENT IN REFERENCE SCENE: Place the product from the FIRST image into the scene shown in the SECOND image.
+
+SCENE DESCRIPTION: ${scene}
+${brandContext ? `BRAND CONTEXT: ${brandContext}` : ''}${brandColorHarmonize}
+
+CRITICAL RULES:
+- Keep the product COMPLETELY IDENTICAL — same colors, labels, text, shape, proportions, and branding
+- Match the SECOND image's layout, lighting direction, perspective, atmosphere, and visual style
+- Place the product naturally in the reference scene — correct shadows, reflections, and scale
+- The product should look like it was PHOTOGRAPHED in that exact setting
+- Professional product photography quality — the result should look like a real photo, not a composite
+- The output must fill the entire canvas edge-to-edge
+- No frames, borders, watermarks, or text overlays`
+            : `PRODUCT LIFESTYLE MOCKUP: Place the product from the provided image into a new lifestyle scene.
 
 SCENE: ${scene}
-${brandContext ? `BRAND CONTEXT: ${brandContext}` : ''}
+${brandContext ? `BRAND CONTEXT: ${brandContext}` : ''}${brandColorHarmonize}
 
 CRITICAL RULES:
 - Keep the product COMPLETELY IDENTICAL — same colors, labels, text, shape, proportions, and branding
@@ -1202,6 +1252,9 @@ CRITICAL RULES:
         res.json({ success: true, imageUrl, model: genResult.model });
     } catch (error) {
         console.error('❌ Lifestyle Mockup error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'lifestyleMockup', `Refund: Lifestyle Mockup Sync Failure (${safeErrorMessage(error)})`, 'creative');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });

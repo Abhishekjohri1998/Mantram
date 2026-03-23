@@ -26,6 +26,7 @@ const router = Router();
 const GOOGLE_SCOPES = [
     'https://www.googleapis.com/auth/analytics.readonly',
     'https://www.googleapis.com/auth/webmasters.readonly',
+    'https://www.googleapis.com/auth/adsense.readonly',
     'openid',
     'email',
     'profile',
@@ -255,7 +256,7 @@ router.post('/report', protect, async (req, res) => {
         if (!propertyId) return res.status(400).json({ success: false, error: 'Property ID required' });
 
         // Run multiple reports in parallel
-        const [trafficReport, pagesReport, channelReport] = await Promise.all([
+        const [trafficReport, pagesReport, channelReport, deviceReport, countryReport, cityReport] = await Promise.all([
             // Daily traffic
             googleAPIFetch(
                 `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
@@ -306,6 +307,49 @@ router.post('/report', protect, async (req, res) => {
                     }),
                 }
             ),
+            // Device breakdown
+            googleAPIFetch(
+                `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
+                auth.token,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        dateRanges: [{ startDate, endDate }],
+                        dimensions: [{ name: 'deviceCategory' }],
+                        metrics: [{ name: 'sessions' }, { name: 'activeUsers' }],
+                        orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+                    }),
+                }
+            ),
+            // Country breakdown
+            googleAPIFetch(
+                `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
+                auth.token,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        dateRanges: [{ startDate, endDate }],
+                        dimensions: [{ name: 'country' }],
+                        metrics: [{ name: 'sessions' }, { name: 'activeUsers' }],
+                        orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+                    }),
+                }
+            ),
+            // City breakdown
+            googleAPIFetch(
+                `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
+                auth.token,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        dateRanges: [{ startDate, endDate }],
+                        dimensions: [{ name: 'city' }],
+                        metrics: [{ name: 'sessions' }, { name: 'activeUsers' }],
+                        orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+                        limit: 15,
+                    }),
+                }
+            ),
         ]);
 
         // Parse traffic data
@@ -337,6 +381,25 @@ router.post('/report', protect, async (req, res) => {
             pageViews: parseInt(row.metricValues?.[2]?.value || 0),
         }));
 
+        // Parse device split
+        const deviceSplit = (deviceReport.rows || []).map(row => ({
+            device: row.dimensionValues?.[0]?.value,
+            sessions: parseInt(row.metricValues?.[0]?.value || 0),
+            users: parseInt(row.metricValues?.[1]?.value || 0),
+        }));
+
+        // Parse geo
+        const geoCountry = (countryReport.rows || []).map(row => ({
+            country: row.dimensionValues?.[0]?.value,
+            sessions: parseInt(row.metricValues?.[0]?.value || 0),
+            users: parseInt(row.metricValues?.[1]?.value || 0),
+        }));
+        const geoCity = (cityReport.rows || []).map(row => ({
+            city: row.dimensionValues?.[0]?.value,
+            sessions: parseInt(row.metricValues?.[0]?.value || 0),
+            users: parseInt(row.metricValues?.[1]?.value || 0),
+        }));
+
         // Compute totals
         const totalUsers = traffic.reduce((s, d) => s + d.users, 0);
         const totalSessions = traffic.reduce((s, d) => s + d.sessions, 0);
@@ -349,6 +412,9 @@ router.post('/report', protect, async (req, res) => {
             traffic,
             topPages,
             channels,
+            deviceSplit,
+            geoCountry,
+            geoCity,
         });
     } catch (e) {
         console.error('GA report error:', e);
@@ -389,6 +455,11 @@ router.post('/search-console/report', protect, async (req, res) => {
 
         const start = startDate || new Date(Date.now() - 28 * 86400000).toISOString().split('T')[0];
         const end = endDate || new Date(Date.now() - 2 * 86400000).toISOString().split('T')[0];
+        
+        // Calculate previous period dates (28 days before start)
+        const sDate = new Date(start);
+        const prevEnd = new Date(sDate.getTime() - 1 * 86400000).toISOString().split('T')[0];
+        const prevStart = new Date(sDate.getTime() - 28 * 86400000).toISOString().split('T')[0];
 
         // Keywords report
         const keywordsData = await googleAPIFetch(
@@ -404,6 +475,20 @@ router.post('/search-console/report', protect, async (req, res) => {
                 }),
             }
         );
+
+        // Previous Keywords report
+        const keywordsPrevData = await googleAPIFetch(
+            `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
+            auth.token,
+            {
+                method: 'POST',
+                body: JSON.stringify({
+                    startDate: prevStart, endDate: prevEnd,
+                    dimensions: ['query'],
+                    rowLimit: 50,
+                }),
+            }
+        ).catch(() => ({ rows: [] }));
 
         // Pages report
         const pagesData = await googleAPIFetch(
@@ -432,13 +517,18 @@ router.post('/search-console/report', protect, async (req, res) => {
             }
         );
 
-        const keywords = (keywordsData.rows || []).map(r => ({
-            keyword: r.keys[0],
-            clicks: r.clicks,
-            impressions: r.impressions,
-            ctr: r.ctr,
-            position: r.position,
-        }));
+        const keywords = (keywordsData.rows || []).map(r => {
+            const prev = (keywordsPrevData.rows || []).find(p => p.keys[0] === r.keys[0]);
+            return {
+                keyword: r.keys[0],
+                clicks: r.clicks,
+                impressions: r.impressions,
+                ctr: r.ctr,
+                position: r.position,
+                prevClicks: prev?.clicks || 0,
+                prevImpressions: prev?.impressions || 0,
+            };
+        });
 
         const pages = (pagesData.rows || []).map(r => ({
             page: r.keys[0],
@@ -462,9 +552,19 @@ router.post('/search-console/report', protect, async (req, res) => {
         const avgPosition = keywords.length ? keywords.reduce((s, k) => s + k.position, 0) / keywords.length : 0;
         const avgCtr = keywords.length ? keywords.reduce((s, k) => s + k.ctr, 0) / keywords.length : 0;
 
+        const prevTotalClicks = (keywordsPrevData.rows || []).reduce((s, k) => s + k.clicks, 0);
+        const prevTotalImpressions = (keywordsPrevData.rows || []).reduce((s, k) => s + k.impressions, 0);
+
         res.json({
             success: true,
-            summary: { totalClicks, totalImpressions, avgPosition, avgCtr },
+            summary: { 
+                totalClicks, 
+                totalImpressions, 
+                avgPosition, 
+                avgCtr,
+                prevTotalClicks,
+                prevTotalImpressions
+            },
             keywords,
             pages,
             daily,
@@ -475,5 +575,54 @@ router.post('/search-console/report', protect, async (req, res) => {
     }
 });
 
+
+// ============================================================================
+// GOOGLE ADSENSE DATA
+// ============================================================================
+
+// GET /api/google-analytics/adsense/accounts — List AdSense accounts
+router.get('/adsense/accounts', protect, async (req, res) => {
+    try {
+        const auth = await getValidToken(req.user._id, req.query.brandId);
+        if (!auth) return res.status(401).json({ success: false, error: 'Not connected' });
+
+        const data = await googleAPIFetch('https://adsense.googleapis.com/v2/accounts', auth.token);
+        const accounts = (data.accounts || []).map(a => ({
+            id: a.name, // e.g., accounts/pub-1234567890
+            displayName: a.displayName,
+            state: a.state,
+        }));
+        res.json({ success: true, accounts });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// POST /api/google-analytics/adsense/report — AdSense Daily & Totals
+router.post('/adsense/report', protect, async (req, res) => {
+    try {
+        const auth = await getValidToken(req.user._id, req.body.brandId);
+        if (!auth) return res.status(401).json({ success: false, error: 'Not connected' });
+
+        const { accountId, startDate = '30daysAgo', endDate = 'today' } = req.body;
+        if (!accountId) return res.status(400).json({ success: false, error: 'Account ID required' });
+
+        const sDate = startDate === '14daysAgo' ? new Date(Date.now() - 14 * 86400000).toISOString().split('T')[0]
+             : startDate === '30daysAgo' ? new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0]
+             : startDate;
+        
+        const eDate = endDate === 'today' ? new Date().toISOString().split('T')[0] : endDate;
+
+        const data = await googleAPIFetch(
+            `https://adsense.googleapis.com/v2/${accountId}/reports:generate?startDate.year=${sDate.split('-')[0]}&startDate.month=${sDate.split('-')[1]}&startDate.day=${sDate.split('-')[2]}&endDate.year=${eDate.split('-')[0]}&endDate.month=${eDate.split('-')[1]}&endDate.day=${eDate.split('-')[2]}&metrics=PAGE_VIEWS,IMPRESSIONS,CLICKS,ACTIVE_VIEW_VIEWABILITY,ESTIMATED_EARNINGS&dimensions=DATE`,
+            auth.token
+        );
+
+        res.json({ success: true, report: data });
+    } catch (e) {
+        console.error('AdSense error:', e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
 
 export default router;

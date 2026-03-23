@@ -635,6 +635,8 @@ export const googleAnalytics = {
     report: (data) => apiFetch('/google-analytics/report', { method: 'POST', body: JSON.stringify(data) }),
     searchConsoleSites: (brandId) => apiFetch(`/google-analytics/search-console/sites${brandId ? `?brandId=${brandId}` : ''}`),
     searchConsoleReport: (data) => apiFetch('/google-analytics/search-console/report', { method: 'POST', body: JSON.stringify(data) }),
+    adsenseAccounts: (brandId) => apiFetch(`/google-analytics/adsense/accounts${brandId ? `?brandId=${brandId}` : ''}`),
+    adsenseReport: (data) => apiFetch('/google-analytics/adsense/report', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ============ Conversations API (Conversation Studio) ============

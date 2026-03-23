@@ -7,7 +7,7 @@
 
 import { Router } from 'express';
 import { protect } from '../middleware/auth.js';
-import { requireCredits } from '../middleware/credits.js';
+import { requireCredits, refundCredits } from '../middleware/credits.js';
 import AdReport from '../models/AdReport.js';
 import AdCampaign from '../models/AdCampaign.js';
 import AdLearning from '../models/AdLearning.js';
@@ -215,6 +215,9 @@ router.post('/strategy', protect, requireCredits('adCreative'), async (req, res)
         res.json({ success: true, report: updatedReport, pipeline: getPipelineInfo(updatedReport.status) });
     } catch (error) {
         console.error('PM Strategy error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'adCreative', `Refund: PM Strategy Sync Failure (${safeErrorMessage(error)})`, 'performance');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -257,6 +260,9 @@ router.post('/budget', protect, requireCredits('brainstorm'), async (req, res) =
         res.json({ success: true, report: updatedReport, pipeline: getPipelineInfo(updatedReport.status) });
     } catch (error) {
         console.error('PM Budget error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'brainstorm', `Refund: PM Budget Plan Sync Failure (${safeErrorMessage(error)})`, 'performance');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -467,6 +473,9 @@ router.post('/analyze', protect, requireCredits('adCreative'), async (req, res) 
         res.json({ success: true, report: updatedReport });
     } catch (error) {
         console.error('PM Analysis error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'adCreative', `Refund: PM Analysis Sync Failure (${safeErrorMessage(error)})`, 'performance');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -504,6 +513,9 @@ router.post('/report', protect, requireCredits('adCreative'), async (req, res) =
         res.json({ success: true, report: { ...updatedReport, generatedReport: state.report } });
     } catch (error) {
         console.error('PM Report error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'adCreative', `Refund: PM Report Sync Failure (${safeErrorMessage(error)})`, 'performance');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -538,6 +550,9 @@ router.post('/generate-creatives', protect, requireCredits('adCreative'), async 
         res.json({ success: true, creatives: state.adCreatives || [] });
     } catch (error) {
         console.error('PM Creative generation error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'adCreative', `Refund: PM Creative Generation Sync Failure (${safeErrorMessage(error)})`, 'performance');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -788,6 +803,9 @@ router.post('/generate-ad-image', protect, requireCredits('adCreative'), async (
         res.json({ success: true, imageUrl, model: usedModel, platform: platform || 'meta-feed' });
     } catch (error) {
         console.error('PM Ad image generation error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'adCreative', `Refund: PM Ad Image Sync Failure (${safeErrorMessage(error)})`, 'performance');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });

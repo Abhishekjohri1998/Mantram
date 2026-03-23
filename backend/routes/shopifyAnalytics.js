@@ -76,7 +76,7 @@ async function callGrok(systemPrompt, userPrompt, maxTokens = 1500) {
 }
 
 // ── Compute analytics from raw orders (Now using ShopifyOrder model fields) ──
-function computeOrderAnalytics(orders) {
+function computeOrderAnalytics(orders, chartDays = 30) {
     const totalOrders = orders.length;
     const now = Date.now();
     const msDay = 24 * 60 * 60 * 1000;
@@ -95,9 +95,10 @@ function computeOrderAnalytics(orders) {
     const lastWeekRevenue = lastWeekOrders.reduce((s, o) => s + (o.totalPrice || 0), 0);
     const revenueGrowth = lastWeekRevenue > 0 ? Math.round(((thisWeekRevenue - lastWeekRevenue) / lastWeekRevenue) * 100) : 0;
 
-    // Daily revenue for chart (last 30 days)
+    // Daily revenue for chart (respects days param)
+    const numDays = Math.min(chartDays, 90);
     const dailyRevenue = [];
-    for (let i = 29; i >= 0; i--) {
+    for (let i = numDays - 1; i >= 0; i--) {
         const dayStart = new Date(now - i * msDay);
         dayStart.setHours(0, 0, 0, 0);
         const dayEnd = new Date(dayStart.getTime() + msDay);
@@ -328,29 +329,29 @@ function computeAdvancedAnalytics(orders, products) {
     const now = Date.now();
     const msDay = 24 * 60 * 60 * 1000;
 
-    // 1. Order Geo Radar — from shipping addresses
+    // 1. Order Geo Radar — from customer addresses (using ShopifyOrder model fields)
     const cityOrders = {}, stateOrders = {}, countryOrders = {};
     orders.forEach(o => {
-        const addr = o.shipping_address || o.billing_address;
-        if (!addr) return;
-        if (addr.city) cityOrders[addr.city] = (cityOrders[addr.city] || 0) + 1;
-        if (addr.province) stateOrders[addr.province] = (stateOrders[addr.province] || 0) + 1;
-        if (addr.country) countryOrders[addr.country] = (countryOrders[addr.country] || 0) + 1;
+        const cust = o.customer;
+        if (!cust) return;
+        if (cust.city) cityOrders[cust.city] = (cityOrders[cust.city] || 0) + 1;
+        if (cust.province) stateOrders[cust.province] = (stateOrders[cust.province] || 0) + 1;
+        if (cust.country) countryOrders[cust.country] = (countryOrders[cust.country] || 0) + 1;
     });
     const colors = ['#8b5cf6', '#06b6d4', '#34d399', '#f59e0b', '#f43f5e', '#ec4899', '#3b82f6', '#a855f7', '#fb923c', '#14b8a6'];
     const geoRadar = {
-        cities: Object.entries(cityOrders).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([name, count], i) => ({ name, orders: count, pct: Math.round((count / orders.length) * 100), color: colors[i % colors.length] })),
-        states: Object.entries(stateOrders).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({ name, orders: count, pct: Math.round((count / orders.length) * 100) })),
-        countries: Object.entries(countryOrders).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => ({ name, orders: count, pct: Math.round((count / orders.length) * 100) })),
+        cities: Object.entries(cityOrders).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([name, count], i) => ({ name, orders: count, pct: Math.round((count / (orders.length || 1)) * 100), color: colors[i % colors.length] })),
+        states: Object.entries(stateOrders).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({ name, orders: count, pct: Math.round((count / (orders.length || 1)) * 100) })),
+        countries: Object.entries(countryOrders).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => ({ name, orders: count, pct: Math.round((count / (orders.length || 1)) * 100) })),
         totalLocations: Object.keys(cityOrders).length,
     };
 
-    // 2. Product Velocity — WoW acceleration
-    const thisWeek = orders.filter(o => (now - new Date(o.created_at).getTime()) < 7 * msDay);
-    const lastWeek = orders.filter(o => { const age = now - new Date(o.created_at).getTime(); return age >= 7 * msDay && age < 14 * msDay; });
+    // 2. Product Velocity — WoW acceleration (using ShopifyOrder model fields)
+    const thisWeek = orders.filter(o => (now - new Date(o.shopifyCreatedAt).getTime()) < 7 * msDay);
+    const lastWeek = orders.filter(o => { const age = now - new Date(o.shopifyCreatedAt).getTime(); return age >= 7 * msDay && age < 14 * msDay; });
     const productThisWeek = {}, productLastWeek = {};
-    thisWeek.forEach(o => (o.line_items || []).forEach(li => { const k = li.product_id || li.title; productThisWeek[k] = (productThisWeek[k] || { title: li.title, units: 0, revenue: 0 }); productThisWeek[k].units += li.quantity || 1; productThisWeek[k].revenue += parseFloat(li.price || 0) * (li.quantity || 1); }));
-    lastWeek.forEach(o => (o.line_items || []).forEach(li => { const k = li.product_id || li.title; productLastWeek[k] = (productLastWeek[k] || { title: li.title, units: 0 }); productLastWeek[k].units += li.quantity || 1; }));
+    thisWeek.forEach(o => (o.lineItems || []).forEach(li => { const k = li.productId || li.title; productThisWeek[k] = (productThisWeek[k] || { title: li.title, units: 0, revenue: 0 }); productThisWeek[k].units += li.quantity || 1; productThisWeek[k].revenue += parseFloat(li.price || 0) * (li.quantity || 1); }));
+    lastWeek.forEach(o => (o.lineItems || []).forEach(li => { const k = li.productId || li.title; productLastWeek[k] = (productLastWeek[k] || { title: li.title, units: 0 }); productLastWeek[k].units += li.quantity || 1; }));
     const allProductKeys = new Set([...Object.keys(productThisWeek), ...Object.keys(productLastWeek)]);
     const productVelocity = [];
     allProductKeys.forEach(k => {
@@ -394,6 +395,208 @@ function computeAdvancedAnalytics(orders, products) {
     return { geoRadar, productVelocity, popularVariants, abandonmentSignals };
 }
 
+// ── RFM Customer Segmentation ──
+function computeRFMSegmentation(customers, orders) {
+    const now = Date.now();
+    const msDay = 24 * 60 * 60 * 1000;
+
+    // Build per-customer order history
+    const customerOrders = {};
+    orders.forEach(o => {
+        const cid = o.customer?.shopifyCustomerId || o.customer?.email;
+        if (!cid) return;
+        if (!customerOrders[cid]) customerOrders[cid] = { orders: 0, totalSpend: 0, lastOrderAt: null, firstOrderAt: null };
+        customerOrders[cid].orders++;
+        customerOrders[cid].totalSpend += o.totalPrice || 0;
+        const d = new Date(o.shopifyCreatedAt);
+        if (!customerOrders[cid].lastOrderAt || d > customerOrders[cid].lastOrderAt) customerOrders[cid].lastOrderAt = d;
+        if (!customerOrders[cid].firstOrderAt || d < customerOrders[cid].firstOrderAt) customerOrders[cid].firstOrderAt = d;
+    });
+
+    const entries = Object.entries(customerOrders);
+    if (entries.length === 0) return { segments: [], summary: {} };
+
+    // Score each customer 1-5 on R, F, M
+    const recencies = entries.map(([, v]) => v.lastOrderAt ? (now - v.lastOrderAt.getTime()) / msDay : 999);
+    const frequencies = entries.map(([, v]) => v.orders);
+    const monetaries = entries.map(([, v]) => v.totalSpend);
+
+    const percentile = (arr, p) => { const s = [...arr].sort((a, b) => a - b); return s[Math.floor(s.length * p)] || 0; };
+    const rThresholds = [percentile(recencies, 0.2), percentile(recencies, 0.4), percentile(recencies, 0.6), percentile(recencies, 0.8)];
+    const fThresholds = [percentile(frequencies, 0.2), percentile(frequencies, 0.4), percentile(frequencies, 0.6), percentile(frequencies, 0.8)];
+    const mThresholds = [percentile(monetaries, 0.2), percentile(monetaries, 0.4), percentile(monetaries, 0.6), percentile(monetaries, 0.8)];
+
+    const score5 = (val, thresholds, invert = false) => {
+        if (invert) { // lower is better (recency)
+            if (val <= thresholds[0]) return 5;
+            if (val <= thresholds[1]) return 4;
+            if (val <= thresholds[2]) return 3;
+            if (val <= thresholds[3]) return 2;
+            return 1;
+        }
+        if (val >= thresholds[3]) return 5;
+        if (val >= thresholds[2]) return 4;
+        if (val >= thresholds[1]) return 3;
+        if (val >= thresholds[0]) return 2;
+        return 1;
+    };
+
+    const segmentLabels = {
+        '55': 'Champions', '54': 'Champions', '45': 'Champions',
+        '44': 'Loyal', '43': 'Loyal', '34': 'Loyal', '35': 'Loyal',
+        '53': 'Potential Loyalists', '52': 'Potential Loyalists',
+        '33': 'Promising', '32': 'Promising', '42': 'Promising',
+        '51': 'New Customers', '41': 'New Customers',
+        '23': 'At Risk', '22': 'At Risk', '13': 'At Risk',
+        '24': 'At Risk', '25': 'At Risk', '14': 'At Risk', '15': 'At Risk',
+        '31': 'About to Sleep', '21': 'About to Sleep',
+        '12': 'Hibernating', '11': 'Lost',
+    };
+
+    const segmentColors = {
+        'Champions': '#34d399', 'Loyal': '#8b5cf6', 'Potential Loyalists': '#06b6d4',
+        'Promising': '#3b82f6', 'New Customers': '#a855f7', 'At Risk': '#f59e0b',
+        'About to Sleep': '#fb923c', 'Hibernating': '#94a3b8', 'Lost': '#f43f5e',
+    };
+
+    const segmentActions = {
+        'Champions': 'Reward with exclusive offers; ask for reviews & referrals',
+        'Loyal': 'Upsell premium products; offer loyalty rewards',
+        'Potential Loyalists': 'Offer membership/subscription; engage with personalized content',
+        'Promising': 'Send targeted recommendations; nurture with email sequences',
+        'New Customers': 'Welcome email series; first-purchase discount for next order',
+        'At Risk': '🚨 Win-back campaign needed; send personalized offers now',
+        'About to Sleep': 'Re-engage with limited-time offers before they churn',
+        'Hibernating': 'Aggressive reactivation — deep discounts or exclusive drops',
+        'Lost': 'Survey for feedback; test with brand-new product announcements',
+    };
+
+    const segmentCounts = {};
+
+    entries.forEach(([cid, data], i) => {
+        const r = score5(recencies[i], rThresholds, true);
+        const f = score5(frequencies[i], fThresholds);
+        const rfKey = `${r}${f}`;
+        const segment = segmentLabels[rfKey] || 'Promising';
+        if (!segmentCounts[segment]) segmentCounts[segment] = { segment, count: 0, totalSpend: 0, avgOrders: 0, ordersSum: 0 };
+        segmentCounts[segment].count++;
+        segmentCounts[segment].totalSpend += data.totalSpend;
+        segmentCounts[segment].ordersSum += data.orders;
+    });
+
+    const segments = Object.values(segmentCounts).map(s => ({
+        segment: s.segment,
+        count: s.count,
+        pct: Math.round((s.count / entries.length) * 100),
+        totalSpend: Math.round(s.totalSpend),
+        avgSpend: Math.round(s.totalSpend / (s.count || 1)),
+        avgOrders: Math.round((s.ordersSum / (s.count || 1)) * 10) / 10,
+        color: segmentColors[s.segment] || '#64748b',
+        action: segmentActions[s.segment] || '',
+    })).sort((a, b) => b.totalSpend - a.totalSpend);
+
+    return {
+        segments,
+        totalSegmented: entries.length,
+        summary: {
+            champions: segmentCounts['Champions']?.count || 0,
+            atRisk: (segmentCounts['At Risk']?.count || 0) + (segmentCounts['About to Sleep']?.count || 0),
+            lost: (segmentCounts['Lost']?.count || 0) + (segmentCounts['Hibernating']?.count || 0),
+        },
+    };
+}
+
+// ── Inventory Forecasting: Days Until Stockout ──
+function computeInventoryForecast(products, orders) {
+    const now = Date.now();
+    const msDay = 24 * 60 * 60 * 1000;
+    const last30 = orders.filter(o => (now - new Date(o.shopifyCreatedAt).getTime()) < 30 * msDay);
+
+    // Sales per product in last 30d
+    const salesMap = {};
+    last30.forEach(o => (o.lineItems || []).forEach(li => {
+        const k = String(li.productId);
+        salesMap[k] = (salesMap[k] || 0) + (li.quantity || 1);
+    }));
+
+    return products.map(p => {
+        const totalInventory = (p.variants || []).reduce((s, v) => s + (v.inventoryQuantity || 0), 0);
+        const sold30d = salesMap[String(p.shopifyId)] || 0;
+        const dailyRate = sold30d / 30;
+        const daysUntilStockout = dailyRate > 0 ? Math.round(totalInventory / dailyRate) : totalInventory > 0 ? 999 : 0;
+        const urgency = daysUntilStockout <= 7 ? 'critical' : daysUntilStockout <= 14 ? 'warning' : daysUntilStockout <= 30 ? 'watch' : 'healthy';
+
+        return {
+            productId: p.shopifyId,
+            title: p.title,
+            image: p.images?.[0]?.url || p.images?.[0]?.src || null,
+            currentStock: totalInventory,
+            sold30d,
+            dailyRate: Math.round(dailyRate * 10) / 10,
+            daysUntilStockout,
+            urgency,
+            reorderSuggestion: dailyRate > 0 ? `Reorder ${Math.ceil(dailyRate * 30)} units to cover next 30 days` : null,
+        };
+    })
+    .filter(p => p.currentStock > 0 || p.sold30d > 0)
+    .sort((a, b) => a.daysUntilStockout - b.daysUntilStockout)
+    .slice(0, 20);
+}
+
+// ── Predictive LTV: 90-day and 365-day projections ──
+function computePredictiveLTV(customers, orders) {
+    const now = Date.now();
+    const msDay = 24 * 60 * 60 * 1000;
+
+    const customerData = {};
+    orders.forEach(o => {
+        const cid = o.customer?.shopifyCustomerId || o.customer?.email;
+        if (!cid) return;
+        if (!customerData[cid]) customerData[cid] = { spend: 0, orders: 0, firstOrder: null, lastOrder: null };
+        customerData[cid].spend += o.totalPrice || 0;
+        customerData[cid].orders++;
+        const d = new Date(o.shopifyCreatedAt);
+        if (!customerData[cid].firstOrder || d < customerData[cid].firstOrder) customerData[cid].firstOrder = d;
+        if (!customerData[cid].lastOrder || d > customerData[cid].lastOrder) customerData[cid].lastOrder = d;
+    });
+
+    const entries = Object.values(customerData).filter(c => c.orders > 0);
+    if (entries.length === 0) return { avg90d: 0, avg365d: 0, projections: [] };
+
+    // Calculate per-customer daily spend rate, then project
+    const projections = entries.map(c => {
+        const lifespanDays = Math.max(1, (now - c.firstOrder.getTime()) / msDay);
+        const dailyRate = c.spend / lifespanDays;
+        return {
+            totalSpend: Math.round(c.spend),
+            orders: c.orders,
+            lifespanDays: Math.round(lifespanDays),
+            projected90d: Math.round(dailyRate * 90),
+            projected365d: Math.round(dailyRate * 365),
+        };
+    });
+
+    const avg90d = Math.round(projections.reduce((s, p) => s + p.projected90d, 0) / projections.length);
+    const avg365d = Math.round(projections.reduce((s, p) => s + p.projected365d, 0) / projections.length);
+    const median365d = (() => { const sorted = projections.map(p => p.projected365d).sort((a, b) => a - b); return sorted[Math.floor(sorted.length / 2)] || 0; })();
+    const top10pct = (() => { const sorted = projections.map(p => p.projected365d).sort((a, b) => b - a); return sorted[Math.floor(sorted.length * 0.1)] || 0; })();
+
+    // Distribution buckets
+    const buckets = [
+        { label: '₹0-500', min: 0, max: 500, count: 0 },
+        { label: '₹500-2K', min: 500, max: 2000, count: 0 },
+        { label: '₹2K-5K', min: 2000, max: 5000, count: 0 },
+        { label: '₹5K-10K', min: 5000, max: 10000, count: 0 },
+        { label: '₹10K+', min: 10000, max: Infinity, count: 0 },
+    ];
+    projections.forEach(p => {
+        const b = buckets.find(b => p.projected365d >= b.min && p.projected365d < b.max);
+        if (b) b.count++;
+    });
+
+    return { avg90d, avg365d, median365d, top10pctLTV: top10pct, distribution: buckets, totalCustomers: projections.length };
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // GET /api/shopify-analytics/overview — Complete D2C analytics overview
 // ═══════════════════════════════════════════════════════════════════════════
@@ -415,17 +618,22 @@ router.get('/overview', protect, async (req, res) => {
         const dateLimit = new Date(Date.now() - parseInt(days) * 24 * 60 * 60 * 1000);
 
         // Fetch from OUR Database instead of live API
-        const [orders, products, customers] = await Promise.all([
+        // Fetch ALL orders (not date-limited) for RFM/LTV full-history analysis
+        const [orders, allOrders, products, customers] = await Promise.all([
             ShopifyOrder.find({ ...brandFilter, shopifyCreatedAt: { $gte: dateLimit } }).lean(),
+            ShopifyOrder.find(brandFilter).lean(),
             Product.find({ ...brandFilter, source: 'shopify' }).lean(),
             ShopifyCustomer.find(brandFilter).lean(),
         ]);
 
-        const orderAnalytics = computeOrderAnalytics(orders);
+        const orderAnalytics = computeOrderAnalytics(orders, parseInt(days));
         const customerAnalytics = computeCustomerAnalytics(customers, orders);
         const productHealth = computeProductHealth(orderAnalytics.topProducts, products);
         const redFlags = computeRedFlags(orderAnalytics, products, customerAnalytics);
         const advanced = computeAdvancedAnalytics(orders, products);
+        const rfmSegmentation = computeRFMSegmentation(customers, allOrders);
+        const inventoryForecast = computeInventoryForecast(products, orders);
+        const predictiveLTV = computePredictiveLTV(customers, allOrders);
 
         // Extract shop info from integration
         const shopDomain = integration.platformData?.shopDomain || integration.platformData?.shop || '';
@@ -462,6 +670,9 @@ router.get('/overview', protect, async (req, res) => {
             productVelocity: advanced.productVelocity,
             popularVariants: advanced.popularVariants,
             abandonmentSignals: advanced.abandonmentSignals,
+            rfmSegmentation,
+            inventoryForecast,
+            predictiveLTV,
         };
 
         setCache(cacheKey, result);
@@ -507,7 +718,7 @@ router.get('/snapshot', protect, async (req, res) => {
 
         const result = {
             connected: true,
-            shopName: integration.platformData.shopName || shopDomain,
+            shopName: integration.platformData?.shopName || integration.platformData?.shopDomain || integration.platformData?.shop || 'Store',
             weeklyRevenue: Math.round(revenue),
             weeklyOrders: orders.length,
             aov: Math.round(aov),

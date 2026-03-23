@@ -302,6 +302,53 @@ const MODEL_COSTS = {
 export { MODEL_COSTS };
 
 /**
+ * Refund credits to a user — used when async generation jobs fail
+ * @param {string} userId - User ID
+ * @param {number} amount - Amount of credits to refund
+ * @param {string} actionName - Name of the action that failed (e.g. 'videoGenerate')
+ * @param {string} description - Description for the logs
+ * @param {string} studio - Studio name for the logs
+ * @param {Object} metadata - Additional info (e.g. { projectId, route })
+ */
+export const refundCredits = async (userId, amount, actionName, description, studio = 'unknown', metadata = {}) => {
+    if (!userId || !amount || amount <= 0) return;
+    try {
+        const updateOps = [
+            User.findByIdAndUpdate(userId, { $inc: { 'credits.used': -amount } }, { returnDocument: 'after' })
+        ];
+
+        // We need the user to check activeSubscription
+        const user = await User.findById(userId).select('activeSubscription credits');
+        if (user?.activeSubscription) {
+            const Subscription = (await import('../models/Subscription.js')).default;
+            updateOps.push(Subscription.findByIdAndUpdate(user.activeSubscription, { $inc: { 'credits.used': -amount } }));
+        }
+
+        const [updated] = await Promise.all(updateOps);
+        
+        // Log the refund
+        const updTopUp = (updated?.credits?.topUp > 0 && updated?.credits?.topUpExpiry && new Date(updated.credits.topUpExpiry) > new Date()) ? updated.credits.topUp : 0;
+        const balanceAfter = (updated?.credits?.total || 0) + (updated?.credits?.bonus || 0) + updTopUp - (updated?.credits?.used || 0);
+
+        await CreditUsage.create({
+            user: userId,
+            action: actionName || 'refund',
+            cost: -amount, // Negative cost for refund
+            balanceAfter: Math.max(0, balanceAfter),
+            description: description || 'Refund for failed generation',
+            studio,
+            metadata: {
+                ...metadata,
+                isRefund: true
+            },
+        });
+        console.log(`💰 Refunded ${amount} credits to user ${userId} for ${actionName}`);
+    } catch (err) {
+        console.error('❌ Failed to process credit refund:', err);
+    }
+};
+
+/**
  * Log AI token usage — call this after an AI response to track actual consumption
  * @param {string} userId - User ID
  * @param {Object} tokenData - { inputTokens, outputTokens, model, provider }

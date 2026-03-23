@@ -382,6 +382,7 @@ export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, a
         prompt: finalPrompt,
         aspect_ratio: aspectRatio || '16:9',
         duration: dur,
+        generate_audio: generateAudio !== false,
     };
 
     if (imageUrls.length > 0) {

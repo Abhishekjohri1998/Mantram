@@ -116,6 +116,7 @@ export default function D2CAnalytics() {
         { id: 'overview', label: '📊 Overview', icon: 'dashboard' },
         { id: 'products', label: '📦 Products', icon: 'inventory_2' },
         { id: 'customers', label: '👥 Customers', icon: 'group' },
+        { id: 'inventory', label: '📦 Inventory', icon: 'warehouse', badge: (data?.inventoryForecast || []).filter(p => p.urgency === 'critical').length || 0 },
         { id: 'alerts', label: '🚨 Red Flags', icon: 'warning', badge: data?.redFlags?.length },
         { id: 'creative', label: '🎨 Creative Cockpit', icon: 'palette' },
         { id: 'cohort', label: '📈 Cohort & LTV', icon: 'timeline' },
@@ -778,6 +779,106 @@ export default function D2CAnalytics() {
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* RFM Customer Segmentation */}
+                                {data.rfmSegmentation?.segments?.length > 0 && (
+                                    <div className="md:col-span-2 glass-panel rounded-2xl p-6 border border-white/[0.06]">
+                                        <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-1">
+                                            <span className="material-symbols-outlined text-violet-400">hub</span>RFM Customer Segmentation
+                                        </h3>
+                                        <p className="text-xs text-slate-500 mb-4">Customers scored by Recency, Frequency, and Monetary value</p>
+                                        <div className="grid grid-cols-3 gap-3 mb-5">
+                                            {[
+                                                { label: 'Champions', value: data.rfmSegmentation.summary?.champions || 0, icon: 'emoji_events', color: '#34d399' },
+                                                { label: 'At Risk', value: data.rfmSegmentation.summary?.atRisk || 0, icon: 'warning', color: '#f59e0b' },
+                                                { label: 'Lost / Hibernating', value: data.rfmSegmentation.summary?.lost || 0, icon: 'person_off', color: '#f43f5e' },
+                                            ].map((m, i) => (
+                                                <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] text-center">
+                                                    <span className="material-symbols-outlined text-sm mb-1 block" style={{ color: m.color }}>{m.icon}</span>
+                                                    <p className="text-xl font-extrabold text-white">{m.value}</p>
+                                                    <p className="text-[10px] text-slate-500">{m.label}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="space-y-2.5">
+                                            {data.rfmSegmentation.segments.map((seg, i) => (
+                                                <div key={i} className="group">
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="size-2.5 rounded-full" style={{ background: seg.color }} />
+                                                            <span className="text-xs text-white font-medium">{seg.segment}</span>
+                                                            <span className="text-[10px] text-slate-500">{seg.count} customers ({seg.pct}%)</span>
+                                                        </div>
+                                                        <span className="text-xs font-bold text-white">₹{seg.totalSpend?.toLocaleString()} total</span>
+                                                    </div>
+                                                    <div className="h-2 rounded-full bg-white/[0.04] overflow-hidden mb-1">
+                                                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${seg.pct}%`, background: seg.color }} />
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">💡 {seg.action}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* INVENTORY FORECAST TAB */}
+                        {activeTab === 'inventory' && (
+                            <div className="space-y-4">
+                                <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
+                                    <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-1">
+                                        <span className="material-symbols-outlined text-amber-400">warehouse</span>Inventory Forecast — Days Until Stockout
+                                    </h3>
+                                    <p className="text-xs text-slate-500 mb-5">Based on last 30-day sales velocity. Products sorted by urgency.</p>
+                                    {(data.inventoryForecast || []).length === 0 ? (
+                                        <div className="text-center py-10 text-slate-500">No active inventory data</div>
+                                    ) : (
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-xs">
+                                                <thead>
+                                                    <tr className="text-slate-500 uppercase border-b border-white/[0.04]">
+                                                        <th className="text-left py-2 px-3">Product</th>
+                                                        <th className="text-center py-2 px-2">Stock</th>
+                                                        <th className="text-center py-2 px-2">Sold (30d)</th>
+                                                        <th className="text-center py-2 px-2">Daily Rate</th>
+                                                        <th className="text-center py-2 px-2">Stockout In</th>
+                                                        <th className="text-center py-2 px-2">Status</th>
+                                                        <th className="text-left py-2 px-3">Reorder Suggestion</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {data.inventoryForecast.map((item, i) => {
+                                                        const urgColors = { critical: { bg: 'bg-rose-500/10', text: 'text-rose-400', label: '🔴 CRITICAL' }, warning: { bg: 'bg-amber-500/10', text: 'text-amber-400', label: '🟡 WARNING' }, watch: { bg: 'bg-blue-500/10', text: 'text-blue-400', label: '🔵 WATCH' }, healthy: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', label: '🟢 HEALTHY' } }
+                                                        const uc = urgColors[item.urgency] || urgColors.healthy
+                                                        return (
+                                                            <tr key={i} className={`border-b border-white/[0.02] ${item.urgency === 'critical' ? 'bg-rose-500/[0.03]' : ''}`}>
+                                                                <td className="py-3 px-3">
+                                                                    <div className="flex items-center gap-2">
+                                                                        {item.image && <img src={item.image} alt="" className="size-8 rounded-lg object-cover" />}
+                                                                        <span className="text-white font-medium truncate max-w-[200px]">{item.title}</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="py-3 px-2 text-center text-white font-bold">{item.currentStock}</td>
+                                                                <td className="py-3 px-2 text-center text-slate-400">{item.sold30d}</td>
+                                                                <td className="py-3 px-2 text-center text-slate-300">{item.dailyRate}/day</td>
+                                                                <td className="py-3 px-2 text-center">
+                                                                    <span className={`font-extrabold text-sm ${uc.text}`}>
+                                                                        {item.daysUntilStockout >= 999 ? '∞' : `${item.daysUntilStockout}d`}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="py-3 px-2 text-center">
+                                                                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${uc.bg} ${uc.text}`}>{uc.label}</span>
+                                                                </td>
+                                                                <td className="py-3 px-3 text-slate-400 text-[11px]">{item.reorderSuggestion || '—'}</td>
+                                                            </tr>
+                                                        )
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
 
@@ -947,6 +1048,42 @@ export default function D2CAnalytics() {
                                             <p className="text-xs text-slate-400 mt-3">Customers who ordered 30-120 days ago but haven't returned in the last 30 days.</p>
                                         </div>
                                     </div>
+
+                                    {/* Predictive LTV (from overview data) */}
+                                    {data?.predictiveLTV?.totalCustomers > 0 && (
+                                        <div className="glass-panel rounded-2xl p-6 border border-primary/15 bg-gradient-to-br from-primary/[0.03] to-violet-500/[0.03]">
+                                            <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
+                                                <span className="material-symbols-outlined text-primary">auto_graph</span>Predictive LTV (AI Projected)
+                                            </h3>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                                                {[
+                                                    { label: 'Avg 90-Day LTV', value: `₹${data.predictiveLTV.avg90d?.toLocaleString()}`, color: '#06b6d4' },
+                                                    { label: 'Avg 365-Day LTV', value: `₹${data.predictiveLTV.avg365d?.toLocaleString()}`, color: '#8b5cf6' },
+                                                    { label: 'Median 365d', value: `₹${data.predictiveLTV.median365d?.toLocaleString()}`, color: '#34d399' },
+                                                    { label: 'Top 10% LTV', value: `₹${data.predictiveLTV.top10pctLTV?.toLocaleString()}`, color: '#f59e0b' },
+                                                ].map((m, i) => (
+                                                    <div key={i} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center">
+                                                        <p className="text-lg font-extrabold text-white">{m.value}</p>
+                                                        <p className="text-[10px] text-slate-500">{m.label}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <p className="text-xs text-slate-500 mb-3">365-Day Projected LTV Distribution</p>
+                                            <div className="flex items-end gap-2 h-24">
+                                                {(data.predictiveLTV.distribution || []).map((bucket, i) => {
+                                                    const maxCount = Math.max(...data.predictiveLTV.distribution.map(b => b.count), 1)
+                                                    const pct = (bucket.count / maxCount) * 100
+                                                    return (
+                                                        <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                                                            <span className="text-[10px] font-bold text-white">{bucket.count}</span>
+                                                            <div className="w-full rounded-t-lg transition-all duration-500" style={{ height: `${Math.max(4, pct)}%`, background: `hsl(${260 - i * 30}, 70%, 60%)` }} />
+                                                            <span className="text-[9px] text-slate-500 text-center leading-tight">{bucket.label}</span>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ) : <div className="text-center py-16 text-slate-500">Connect Shopify to view cohort data</div>
                         )}

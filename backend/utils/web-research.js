@@ -1333,6 +1333,24 @@ export async function researchDomain(baseUrl, options = {}) {
                     images: jp.images ? { total: jp.images.length, withAlt: jp.images.filter(i => i.hasAlt).length, withoutAlt: jp.imagesWithoutAlt || 0 } : homepage.images,
                     jsRendered: true,
                 };
+                
+                // If the original fetch got blocked (0 headers), try to recover from Puppeteer's headers
+                if (homepage.securityHeaders?.score === 0 && jp.headers) {
+                    const pwHeaders = {
+                        csp: jp.headers['content-security-policy'] || '',
+                        hsts: jp.headers['strict-transport-security'] || '',
+                        xFrameOptions: jp.headers['x-frame-options'] || '',
+                        xContentType: jp.headers['x-content-type-options'] || '',
+                        xXssProtection: jp.headers['x-xss-protection'] || '',
+                        referrerPolicy: jp.headers['referrer-policy'] || '',
+                        permissionsPolicy: jp.headers['permissions-policy'] || '',
+                    };
+                    const pwSecurityHeaders = analyzeSecurityHeaders(pwHeaders);
+                    if (pwSecurityHeaders.score > 0) {
+                        homepage.securityHeaders = pwSecurityHeaders;
+                        console.log(`🖥️  Recovered ${pwSecurityHeaders.score}/7 security headers via Puppeteer`);
+                    }
+                }
             }
         } catch (puppeteerErr) {
             console.warn(`🖥️  Puppeteer fallback skipped: ${puppeteerErr.message}`);

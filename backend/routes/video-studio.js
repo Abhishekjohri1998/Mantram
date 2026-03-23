@@ -17,11 +17,12 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
 import multer from 'multer';
+import { s3Client } from '../utils/s3.js';
 import VideoProject from '../models/VideoProject.js';
 import ClonedVoice from '../models/ClonedVoice.js';
 import Brand from '../models/Brand.js';
 import { protect } from '../middleware/auth.js';
-import { requireCredits } from '../middleware/credits.js';
+import { requireCredits, refundCredits } from '../middleware/credits.js';
 import { runStep, advanceWithApproval, getPipelineInfo } from '../agents/videoStudio/engine.js';
 import {
     brainstormNode,
@@ -120,6 +121,9 @@ router.post('/advanced/image-to-video', protect, requireCredits('videoGenerate')
         });
     } catch (error) {
         console.error('I2V generate error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'videoGenerateRefund', `Refund: Image-to-Video Sync Failure (${safeErrorMessage(error)})`, 'video');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -200,6 +204,9 @@ router.post('/extend-video', protect, requireCredits('videoGenerate'), async (re
         });
     } catch (error) {
         console.error('Video extend error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'videoGenerateRefund', `Refund: Video Extend Sync Failure (${safeErrorMessage(error)})`, 'video');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -249,6 +256,7 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
                 resolution: resolution || '1080p',
                 mode: qualityMode || 'fast',
             },
+            creditsUsed: req.creditsDeducted || 0,
         });
 
         // Plan duration if needed
@@ -289,9 +297,851 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
         });
     } catch (error) {
         console.error('Advanced generate error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'videoGenerateRefund', `Refund: Advanced Video Generation sync failure (${safeErrorMessage(error)})`, 'video');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
+// ══════════════════════════════════════════════════════════════════════════════
+// GET /api/video-studio/agent/products — List brand products with images for Video Agent UI
+// ══════════════════════════════════════════════════════════════════════════════
+router.get('/agent/products', protect, async (req, res) => {
+    try {
+        const { brandId } = req.query;
+        if (!brandId) return res.json({ success: true, products: [], brandImages: [] });
+
+        const Product = (await import('../models/Product.js')).default;
+        const products = await Product.find({ brand: brandId, status: 'active' })
+            .select('title shortDescription category images price features')
+            .limit(30)
+            .lean();
+
+        // Also return brand images
+        const brand = await Brand.findById(brandId).select('dna.brandImages dna.bannerImages name logo').lean();
+        const brandImages = [
+            ...(brand?.dna?.brandImages || []).map(i => ({ url: i.url, alt: i.alt || 'Brand image', source: 'brand' })),
+            ...(brand?.dna?.bannerImages || []).map(i => ({ url: i.url || i, alt: 'Banner', source: 'banner' })),
+        ].filter(i => i.url);
+
+        res.json({
+            success: true,
+            products: products.map(p => ({
+                _id: p._id,
+                title: p.title,
+                shortDescription: p.shortDescription || '',
+                category: p.category || '',
+                price: p.price,
+                features: (p.features || []).slice(0, 3),
+                images: (p.images || []).map(i => ({ url: i.url, alt: i.alt || p.title })),
+            })),
+            brandImages,
+            brandName: brand?.name || '',
+            brandLogo: brand?.logo || '',
+        });
+    } catch (error) {
+        console.error('Agent products error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/video-studio/agent/upload — Multipart file upload (images + audio)
+// Returns S3 URL for use in the Video Agent pipeline
+// ══════════════════════════════════════════════════════════════════════════════
+const agentUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+router.post('/agent/upload', protect, agentUpload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, error: 'No file provided' });
+        }
+
+        const mimeType = req.file.mimetype || 'application/octet-stream';
+        const ext = req.file.originalname?.split('.').pop() || 'bin';
+        const folder = mimeType.startsWith('audio/') ? 'agent-audio' : 'agent-uploads';
+        const s3Key = `${folder}/${req.user._id}/${Date.now()}-${req.file.originalname || `upload.${ext}`}`;
+
+        console.log(`📤 Agent upload: ${req.file.originalname} (${Math.round(req.file.size / 1024)}KB, ${mimeType}) → s3://${s3Key}`);
+
+        const s3Url = await uploadToS3(req.file.buffer, s3Key, mimeType);
+
+        console.log(`✅ Agent upload complete: ${s3Url.substring(0, 80)}`);
+
+        res.json({ success: true, url: s3Url });
+    } catch (error) {
+        console.error('Agent upload error:', error);
+        res.status(500).json({ success: false, error: `Upload failed: ${error.message}` });
+    }
+});
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/video-studio/agent/create — Full Agentic Video Pipeline
+// User prompt → character ref sheet → AI storyboard → per-scene gen → VO → music → compile
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/agent/create', protect, requireCredits('videoGenerate'), async (req, res) => {
+    try {
+        const {
+            prompt,            // Natural language creative brief
+            productId,         // Optional: specific product to feature
+            referenceImages,   // Optional: user-uploaded reference images
+            characterPhoto,    // Optional: model/character photo URL for consistency
+            audioFileUrl,      // Optional: user-uploaded audio (VO/music) — video syncs to this
+            characterDescriptions, // Optional: user-defined character descriptions
+            brandId,
+            voiceover,         // { enabled, provider, voiceId, speed, langCode }
+            music,             // { enabled, mood, genre }
+            textOverlays,      // { enabled, brandName, ctaText, language }
+            aspectRatio,       // Optional override
+            qualityMode,       // Optional override
+        } = req.body;
+
+        if (!prompt?.trim()) {
+            return res.status(400).json({ success: false, error: 'Creative brief/prompt is required' });
+        }
+
+        console.log(`🤖 Video Agent: "${prompt.substring(0, 80)}..." | brand=${brandId || "none"} | product=${productId || "none"}`);
+        console.log(`   🎧 audioFileUrl: ${audioFileUrl ? audioFileUrl.substring(0, 80) : "NOT PROVIDED"} | charPhoto: ${characterPhoto ? "yes" : "no"} | charDesc: ${characterDescriptions ? "yes" : "no"}`);
+
+        // ── Step 1: Load full brand context (DNA + products + images + knowledge) ──
+        const { brand, brandContext, products } = await (await import('../agents/shared/agentUtils.js')).loadBrandContext(brandId);
+
+        // ── Step 2: Load specific product if selected ──
+        let productContext = '';
+        let productImages = [];
+        if (productId) {
+            const Product = (await import('../models/Product.js')).default;
+            const product = await Product.findById(productId).lean();
+            if (product) {
+                productContext = `\n\nFEATURED PRODUCT:\nName: ${product.title}\nDescription: ${product.shortDescription || product.description || ''}\nCategory: ${product.category || ''}\nPrice: ${product.price?.currency || 'INR'} ${product.price?.amount || ''}\nFeatures: ${(product.features || []).join(', ')}\nKeywords: ${(product.keywords || []).join(', ')}`;
+                productImages = (product.images || []).filter(i => i.url).map(i => i.url);
+            }
+        }
+
+        // ── Step 3: Collect all available images (product + brand + user uploads) ──
+        const allImages = [
+            ...productImages,
+            ...(referenceImages || []).filter(u => u && !u.startsWith('data:')),
+            ...(brand?.dna?.brandImages || []).filter(i => i.url).map(i => i.url).slice(0, 5),
+        ];
+
+        // ── Step 3.5: Character Consistency — Generate reference sheet from character photo ──
+        let characterRefUrl = '';
+        if (characterPhoto && !characterPhoto.startsWith('data:')) {
+            try {
+                console.log('   \u{1F464} Generating character reference sheet from photo...');
+                const { geminiImageGenerate } = await import('../agents/videoStudio/firstFrame.js');
+                const charResp = await fetch(characterPhoto);
+                const charBuffer = await charResp.arrayBuffer();
+                const charBase64 = Buffer.from(charBuffer).toString('base64');
+                const charMime = charResp.headers.get('content-type') || 'image/jpeg';
+                const refResult = await geminiImageGenerate(
+                    'Generate a character reference sheet showing this exact same person from 4 different angles: front view, 3/4 view, side profile, and a full body shot. Keep the face, hair, clothing, and overall appearance perfectly consistent across all 4 views. White background, professional character sheet layout.',
+                    [{ mimeType: charMime, data: charBase64 }],
+                    0.3
+                );
+                if (refResult?.imageUrl) {
+                    characterRefUrl = refResult.imageUrl;
+                    console.log('   \u2705 Character ref sheet generated');
+                }
+            } catch (charErr) {
+                console.warn('   \u26A0\uFE0F Character ref sheet failed:', charErr.message);
+                characterRefUrl = characterPhoto;
+            }
+        }
+
+        // ── Step 3.6: Audio Transcription — transcribe uploaded audio so AI knows the script ──
+        let audioTranscript = '';
+        if (audioFileUrl) {
+            try {
+                console.log('   🎧 Transcribing uploaded audio...');
+                const audioResp = await fetch(audioFileUrl);
+                if (audioResp.ok) {
+                    const audioBuffer = Buffer.from(await audioResp.arrayBuffer());
+                    const audioMime = audioResp.headers.get('content-type') || 'audio/mpeg';
+                    const ext = audioMime.includes('wav') ? 'wav' : audioMime.includes('mp4') || audioMime.includes('m4a') ? 'm4a' : audioMime.includes('ogg') ? 'ogg' : 'mp3';
+
+                    // Try OpenAI Whisper first (best for all languages)
+                    const openaiKey = process.env.OPENAI_API_KEY;
+                    if (openaiKey) {
+                        const form = new FormData();
+                        const audioBlob = new Blob([audioBuffer], { type: audioMime });
+                        form.append('file', audioBlob, `audio.${ext}`);
+                        form.append('model', 'whisper-1');
+                        form.append('response_format', 'json');
+
+                        const whisperResp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${openaiKey}` },
+                            body: form,
+                        });
+
+                        if (whisperResp.ok) {
+                            const whisperData = await whisperResp.json();
+                            audioTranscript = whisperData.text || '';
+                            console.log(`   ✅ Audio transcribed (${audioTranscript.length} chars): "${audioTranscript.substring(0, 80)}..."`);
+                        } else {
+                            console.warn('   ⚠️ Whisper transcription failed:', (await whisperResp.json().catch(() => ({}))).error?.message);
+                        }
+                    }
+
+                    // Fallback: try Sarvam STT for Indian languages
+                    if (!audioTranscript) {
+                        const sarvamKey = process.env.SARVAM_API_KEY;
+                        if (sarvamKey) {
+                            const form = new FormData();
+                            const audioBlob = new Blob([audioBuffer], { type: audioMime });
+                            form.append('file', audioBlob, `audio.${ext}`);
+                            form.append('model', 'saaras:v3');
+                            form.append('language_code', 'unknown');
+                            form.append('mode', 'transcribe');
+
+                            const sarvamResp = await fetch('https://api.sarvam.ai/speech-to-text', {
+                                method: 'POST',
+                                headers: { 'api-subscription-key': sarvamKey },
+                                body: form,
+                            });
+                            if (sarvamResp.ok) {
+                                const sarvamData = await sarvamResp.json();
+                                audioTranscript = sarvamData.transcript || '';
+                                console.log(`   ✅ Audio transcribed via Sarvam (${audioTranscript.length} chars)`);
+                            }
+                        }
+                    }
+                }
+            } catch (transcribeErr) {
+                console.warn('   ⚠️ Audio transcription failed:', transcribeErr.message);
+            }
+        }
+
+        // ── Step 4: AI Storyboard — break the brief into scenes + VO script + text overlays ──
+        const ai = getAIRouter();
+        const storyboardPrompt = `You are a professional video production AI director. Given a creative brief and brand context, break it down into a shot-by-shot video storyboard.
+
+${brandContext}
+${productContext}
+
+AVAILABLE IMAGES: ${allImages.length} reference images available for use as first frames.
+
+USER'S CREATIVE BRIEF: "${prompt}"
+
+CHARACTER REFERENCE: ${characterRefUrl ? 'A character reference sheet is available. Include this person in all scenes featuring people, maintaining their exact appearance.' : 'No character reference provided.'}
+${characterDescriptions ? `\nCHARACTER DESCRIPTIONS (user-defined):\n${characterDescriptions}\n\nIMPORTANT: Design and maintain these characters consistently across ALL scenes. Each scene should clearly describe the character appearances.` : ''}
+${audioFileUrl ? `\nAUDIO-DRIVEN MODE: The user has uploaded their own audio track. This video MUST be synced to the audio.${audioTranscript ? `\n\nTRANSCRIPT OF UPLOADED AUDIO (this is the EXACT text from the user's audio — use this as the voiceover script):\n"${audioTranscript}"\n\nCRITICAL RULES FOR AUDIO-DRIVEN MODE:\n- The voiceoverScript MUST be the exact transcript above — do NOT write your own script\n- Each scene's voiceoverText should be a segment of this transcript\n- Design visuals that illustrate what is being said in each segment\n- Total video duration should match the natural length of this audio\n- Scene transitions should align with natural breaks in the speech` : `\n- Split the audio timeline into scene segments\n- Each scene visual should match the mood/content of that audio segment\n- The total video duration must match the audio duration`}\n- Do NOT generate separate voiceover — the user's audio IS the soundtrack` : ''}
+TEXT OVERLAY LANGUAGE: ${textOverlays?.language || voiceover?.langCode || brand?.dna?.defaultLanguage || 'english'}
+BRAND NAME FOR OVERLAYS: ${textOverlays?.brandName || brand?.name || ''}
+CTA TEXT: ${textOverlays?.ctaText || ''}
+
+RULES:
+- Each scene should be 5-10 seconds (video models max at 15s)
+- For a 1-minute story: create 6-12 scenes
+- For a short ad: 2-4 scenes
+- Write a voiceover script that flows naturally across all scenes
+- Each scene visual prompt should be detailed and cinematic
+- If a product is featured, show it prominently in key scenes
+- Match the brand visual identity (colors, style, mood)
+- For EACH scene, suggest a text overlay (brand name, CTA, price, subtitle)
+- If text overlay language is NOT english, write overlays in that language script
+
+Output ONLY valid JSON:
+{
+    "title": "Video title",
+    "totalDuration": number (total seconds),
+    "scenes": [
+        {
+            "sceneNumber": 1,
+            "duration": 5,
+            "visualPrompt": "Detailed cinematic prompt for this scene",
+            "voiceoverText": "What the narrator says during this scene",
+            "useProductImage": boolean,
+            "useCharacterRef": boolean,
+            "mood": "energetic/calm/dramatic/warm/etc",
+            "textOverlay": { "text": "Brand Name or CTA", "position": "bottom-center", "style": "bold" }
+        }
+    ],
+    "voiceoverScript": "Full combined voiceover script",
+    "suggestedModel": "kling-3.0 or seedance-2.0 or veo-3.1 or hunyuan",
+    "suggestedAspectRatio": "16:9 or 9:16 or 1:1",
+    "suggestedMusicMood": "upbeat/epic/calm/emotional/corporate",
+    "reasoning": "Why these choices"
+}`;
+
+        const storyboardResult = await ai.generateText({
+            systemPrompt: 'You are a JSON generator. Output ONLY valid JSON, no markdown, no explanation.',
+            userPrompt: storyboardPrompt,
+            maxTokens: 4096,
+            temperature: 0.7,
+        });
+
+        const raw = (storyboardResult.text || storyboardResult.content || '{}')
+            .replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        let storyboard;
+        try {
+            storyboard = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
+        } catch {
+            // Fallback: single scene
+            storyboard = {
+                title: prompt.substring(0, 60),
+                totalDuration: 10,
+                scenes: [{ sceneNumber: 1, duration: 10, visualPrompt: prompt, voiceoverText: '', useProductImage: !!productId, mood: 'professional' }],
+                voiceoverScript: '',
+                suggestedModel: 'kling-3.0',
+                suggestedAspectRatio: aspectRatio || '16:9',
+            };
+        }
+
+        if (!storyboard.scenes?.length) {
+            storyboard.scenes = [{ sceneNumber: 1, duration: 10, visualPrompt: prompt, voiceoverText: '', useProductImage: false, mood: 'professional' }];
+        }
+
+        console.log(`   📋 Storyboard: ${storyboard.scenes.length} scenes, ~${storyboard.totalDuration}s total`);
+
+        // ── Step 5: Determine model ──
+        const videoModel = req.body.videoModel || 'auto';
+        const model = videoModel === 'auto'
+            ? (qualityMode === 'draft' ? 'hunyuan' : (storyboard.suggestedModel || 'kling-3.0'))
+            : videoModel;
+
+        console.log(`   📋 Storyboard: ${storyboard.scenes.length} scenes, ~${storyboard.totalDuration}s total | model: ${model}`);
+
+        // ── Save session for multi-step flow ──
+        const sessionId = `agent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const AgentSession = (await import('../models/AgentSession.js')).default;
+        await AgentSession.create({
+            sessionId,
+            user: req.user._id,
+            brand: brandId || null,
+            prompt,
+            storyboard,
+            model,
+            audioFileUrl: audioFileUrl || null,
+            audioTranscript: audioTranscript || null,
+            characterRefUrl: characterRefUrl || null,
+            characterDescriptions: characterDescriptions || null,
+            allImages,
+            productId: productId || null,
+            productImages,
+            referenceImages: (referenceImages || []).filter(u => u && !u.startsWith('data:')),
+            voiceover: voiceover || {},
+            music: music || {},
+            textOverlays: textOverlays || {},
+            aspectRatio: storyboard.suggestedAspectRatio || aspectRatio || '16:9',
+            qualityMode: qualityMode || 'fast',
+            status: 'storyboard-ready',
+        });
+
+        // ── Return storyboard for user review (NO video gen yet) ──
+        res.json({
+            success: true,
+            sessionId,
+            pipeline: {
+                title: storyboard.title,
+                totalDuration: storyboard.totalDuration,
+                totalScenes: storyboard.scenes.length,
+                model,
+                aspectRatio: storyboard.suggestedAspectRatio || aspectRatio || '16:9',
+                reasoning: storyboard.reasoning || '',
+                characterRefUsed: !!characterRefUrl,
+            },
+            storyboard: {
+                voiceoverScript: storyboard.voiceoverScript || '',
+                scenes: storyboard.scenes.map(s => ({
+                    sceneNumber: s.sceneNumber,
+                    duration: s.duration,
+                    voiceoverText: s.voiceoverText || '',
+                    mood: s.mood || '',
+                    visualPrompt: s.visualPrompt || '',
+                    textOverlay: s.textOverlay || null,
+                    useProductImage: s.useProductImage || false,
+                    useCharacterRef: s.useCharacterRef || false,
+                })),
+            },
+            audioFile: audioFileUrl ? { url: audioFileUrl, isBase: true, transcript: audioTranscript || null } : null,
+            textOverlays: storyboard.scenes.map(s => s.textOverlay).filter(Boolean),
+            productUsed: productId ? { id: productId, imagesCount: productImages.length } : null,
+        });
+
+    } catch (error) {
+        console.error('Video Agent create error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'videoGenerateRefund', `Refund: Video Agent Sync Failure (${safeErrorMessage(error)})`, 'video');
+        }
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/video-studio/agent/first-frames — Generate preview first-frame images
+// User approves storyboard → we generate 1 image per scene for preview
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/agent/first-frames', protect, async (req, res) => {
+    try {
+        const { sessionId } = req.body;
+        if (!sessionId) return res.status(400).json({ success: false, error: 'sessionId is required' });
+
+        const AgentSession = (await import('../models/AgentSession.js')).default;
+        const session = await AgentSession.findOne({ sessionId, user: req.user._id });
+        if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+
+        console.log(`🖼️ Generating first frames for session ${sessionId} (${session.storyboard.scenes.length} scenes)`);
+
+        const { geminiImageGenerate } = await import('../agents/videoStudio/firstFrame.js');
+        const frames = [];
+
+        for (let i = 0; i < session.storyboard.scenes.length; i++) {
+            const scene = session.storyboard.scenes[i];
+            try {
+                // Determine context images for the first frame
+                const contextImages = [];
+                if (scene.useCharacterRef && session.characterRefUrl) {
+                    const charResp = await fetch(session.characterRefUrl);
+                    const charBuf = await charResp.arrayBuffer();
+                    contextImages.push({
+                        mimeType: charResp.headers.get('content-type') || 'image/jpeg',
+                        data: Buffer.from(charBuf).toString('base64'),
+                    });
+                } else if (scene.useProductImage && session.productImages?.length > 0) {
+                    const prodResp = await fetch(session.productImages[0]);
+                    const prodBuf = await prodResp.arrayBuffer();
+                    contextImages.push({
+                        mimeType: prodResp.headers.get('content-type') || 'image/jpeg',
+                        data: Buffer.from(prodBuf).toString('base64'),
+                    });
+                }
+
+                const framePrompt = `Generate a high-quality cinematic first frame for a video scene:\n${scene.visualPrompt}\n\nMood: ${scene.mood || 'professional'}. This should look like a movie still or the opening frame of a commercial. Photorealistic, high production value.`;
+
+                const result = await geminiImageGenerate(framePrompt, contextImages, 0.5);
+
+                if (result?.imageUrl) {
+                    frames.push({ sceneNumber: scene.sceneNumber || i + 1, imageUrl: result.imageUrl, status: 'done' });
+                    console.log(`   ✅ Frame ${i + 1} generated`);
+                } else {
+                    frames.push({ sceneNumber: scene.sceneNumber || i + 1, imageUrl: null, status: 'failed', error: 'No image generated' });
+                }
+            } catch (err) {
+                console.error(`   ❌ Frame ${i + 1} failed:`, err.message);
+                frames.push({ sceneNumber: scene.sceneNumber || i + 1, imageUrl: null, status: 'failed', error: err.message });
+            }
+        }
+
+        // Update session status
+        await AgentSession.findOneAndUpdate({ sessionId }, { status: 'frames-ready', firstFrames: frames });
+
+        res.json({ success: true, sessionId, frames });
+    } catch (error) {
+        console.error('Agent first-frames error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/video-studio/agent/generate — Generate actual videos after approval
+// User approves first frames → we create VideoProjects and start generation
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/agent/generate', protect, requireCredits('videoGenerate'), async (req, res) => {
+    try {
+        const { sessionId, selectedModel } = req.body;
+        if (!sessionId) return res.status(400).json({ success: false, error: 'sessionId is required' });
+
+        const AgentSession = (await import('../models/AgentSession.js')).default;
+        const session = await AgentSession.findOne({ sessionId, user: req.user._id });
+        if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+
+        const model = selectedModel || session.model || 'kling-3.0';
+        const storyboard = session.storyboard;
+        const aspectRatio = session.aspectRatio || '16:9';
+        const qualityMode = session.qualityMode || 'fast';
+
+        console.log(`🎬 Generating videos for session ${sessionId} (${storyboard.scenes.length} scenes, model: ${model})`);
+
+        const sceneProjects = [];
+
+        for (let i = 0; i < storyboard.scenes.length; i++) {
+            const scene = storyboard.scenes[i];
+            const dur = Math.min(Math.max(scene.duration || 5, 3), 15);
+
+            // Use first frame from preview step if available
+            let firstImageUrl = '';
+            const savedFrames = session.firstFrames || [];
+            const savedFrame = savedFrames.find(f => f.sceneNumber === (scene.sceneNumber || i + 1));
+            if (savedFrame?.imageUrl) {
+                firstImageUrl = savedFrame.imageUrl;
+            } else if (scene.useCharacterRef && session.characterRefUrl) {
+                firstImageUrl = session.characterRefUrl;
+            } else if (scene.useProductImage && session.productImages?.length > 0) {
+                firstImageUrl = session.productImages[0];
+            } else if (session.allImages?.length > 0 && i === 0) {
+                firstImageUrl = session.allImages[0];
+            }
+
+            try {
+                const project = await VideoProject.create({
+                    user: req.user._id,
+                    brand: session.brand || null,
+                    title: `${storyboard.title} — Scene ${i + 1}`,
+                    status: 'advanced-generating',
+                    mode: 'agent-scene',
+                    advancedConfig: {
+                        prompt: scene.visualPrompt,
+                        firstImageUrl,
+                        aspectRatio,
+                        duration: dur,
+                        generateAudio: !(session.voiceover?.enabled || session.audioFileUrl),
+                    },
+                    routing: {
+                        selectedModel: model,
+                        resolution: '1080p',
+                        mode: qualityMode,
+                    },
+                });
+
+                const state = await advancedGenerateNode({
+                    prompt: scene.visualPrompt,
+                    model,
+                    duration: dur,
+                    resolution: '1080p',
+                    qualityMode,
+                    firstImageUrl: firstImageUrl || '',
+                    generateAudio: session.voiceover?.enabled !== true,
+                    aspectRatio,
+                    referenceImages: (session.referenceImages || []).filter(u => u && !u.startsWith('data:')),
+                });
+
+                await VideoProject.findByIdAndUpdate(project._id, {
+                    generation: state.generation,
+                    backendPrompt: scene.visualPrompt,
+                });
+
+                sceneProjects.push({
+                    projectId: project._id,
+                    sceneNumber: scene.sceneNumber || i + 1,
+                    duration: dur,
+                    voiceoverText: scene.voiceoverText || '',
+                    generation: state.generation,
+                });
+
+                console.log(`   🎥 Scene ${i + 1}: submitted (${model}, ${dur}s)`);
+            } catch (sceneErr) {
+                console.error(`   ❌ Scene ${i + 1} failed:`, sceneErr.message);
+                sceneProjects.push({
+                    projectId: null,
+                    sceneNumber: scene.sceneNumber || i + 1,
+                    duration: dur,
+                    error: sceneErr.message,
+                });
+            }
+        }
+
+        // ── Generate voiceover if requested ──
+        let voiceoverUrl = null;
+        if (session.voiceover?.enabled && storyboard.voiceoverScript) {
+            try {
+                const voProvider = session.voiceover.provider || 'minimax';
+                console.log(`   🎙️ Generating voiceover: ${voProvider}`);
+
+                if (voProvider === 'minimax' || voProvider === 'elevenlabs') {
+                    const falKey = process.env.FAL_API_KEY;
+                    if (falKey) {
+                        const ttsResp = await fetch('https://queue.fal.run/fal-ai/minimax/speech/text-to-speech', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                text: storyboard.voiceoverScript,
+                                voice_setting: { voice_id: session.voiceover.voiceId || 'moss_en_hd', speed: session.voiceover.speed || 1.0 },
+                                model: 'speech-02-hd',
+                            }),
+                        });
+                        if (ttsResp.ok) {
+                            const ttsData = await ttsResp.json();
+                            if (ttsData.request_id) voiceoverUrl = `fal-pending:${ttsData.request_id}`;
+                        }
+                    }
+                } else if (voProvider === 'sarvam') {
+                    const sarvamKey = process.env.SARVAM_API_KEY;
+                    if (sarvamKey) {
+                        const ttsResp = await fetch('https://api.sarvam.ai/text-to-speech', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'api-subscription-key': sarvamKey },
+                            body: JSON.stringify({
+                                inputs: [storyboard.voiceoverScript.substring(0, 2000)],
+                                target_language_code: session.voiceover.langCode || 'en-IN',
+                                speaker: session.voiceover.voiceId || 'anushka',
+                                model: 'bulbul:v2',
+                                pace: session.voiceover.speed || 1.0,
+                            }),
+                        });
+                        if (ttsResp.ok) {
+                            const ttsData = await ttsResp.json();
+                            const audioBase64 = ttsData.audios?.[0];
+                            if (audioBase64) {
+                                const buffer = Buffer.from(audioBase64, 'base64');
+                                const s3Key = `agent-vo/${req.user._id}/${Date.now()}.wav`;
+                                voiceoverUrl = await uploadToS3(buffer, s3Key, 'audio/wav');
+                            }
+                        }
+                    }
+                }
+            } catch (voErr) {
+                console.error('   ⚠️ Voiceover generation failed:', voErr.message);
+            }
+        }
+
+        // ── Generate AI background music if requested ──
+        let musicUrl = null;
+        if (session.music?.enabled) {
+            try {
+                const falKey = process.env.FAL_API_KEY;
+                if (falKey) {
+                    const musicMood = storyboard.suggestedMusicMood || session.music.mood || 'corporate';
+                    const musicDuration = Math.min(storyboard.totalDuration || 30, 60);
+                    const musicPrompt = `${musicMood} background music for a ${storyboard.title || 'brand'} video. Professional, modern, suitable for advertising. No vocals. Duration: ${musicDuration} seconds.`;
+
+                    const musicResp = await fetch('https://queue.fal.run/fal-ai/stable-audio', {
+                        method: 'POST',
+                        headers: { 'Authorization': 'Key ' + falKey, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: musicPrompt, seconds_total: musicDuration, steps: 100 }),
+                    });
+                    if (musicResp.ok) {
+                        const musicData = await musicResp.json();
+                        if (musicData.request_id) musicUrl = 'fal-pending:' + musicData.request_id;
+                        else if (musicData.audio_file?.url) musicUrl = musicData.audio_file.url;
+                    }
+                }
+            } catch (musicErr) {
+                console.error('   ⚠️ AI music gen failed:', musicErr.message);
+            }
+        }
+
+        // Update session
+        await AgentSession.findOneAndUpdate({ sessionId }, { status: 'generating', sceneProjects });
+
+        const successfulScenes = sceneProjects.filter(s => s.projectId);
+
+        res.json({
+            success: true,
+            sessionId,
+            pipeline: {
+                title: storyboard.title,
+                totalDuration: storyboard.totalDuration,
+                totalScenes: storyboard.scenes.length,
+                model,
+                aspectRatio,
+            },
+            scenes: sceneProjects,
+            voiceover: {
+                url: voiceoverUrl,
+                script: storyboard.voiceoverScript || '',
+                provider: session.voiceover?.provider || 'none',
+            },
+            music: { url: musicUrl, mood: storyboard.suggestedMusicMood || session.music?.mood || '' },
+            audioFile: session.audioFileUrl ? { url: session.audioFileUrl, isBase: true, transcript: session.audioTranscript || null } : null,
+        });
+
+    } catch (error) {
+        console.error('Video Agent generate error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'videoGenerateRefund', `Refund: Video Agent Gen Failure (${safeErrorMessage(error)})`, 'video');
+        }
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+router.post('/compile', protect, async (req, res) => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const os = await import('os');
+
+    try {
+        const { clips, voiceover, music, branding, brandId } = req.body;
+
+        if (!clips || clips.length === 0) {
+            return res.status(400).json({ success: false, error: 'At least one clip is required' });
+        }
+
+        console.log(`🎬 Video Agent: Compiling ${clips.length} clips`);
+
+        // Create temp directory
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mantram-compile-'));
+
+        try {
+            // Step 1: Download all video clips
+            const clipPaths = [];
+            for (let i = 0; i < clips.length; i++) {
+                const clip = clips[i];
+                console.log(`   📥 Downloading clip ${i + 1}/${clips.length}: ${clip.title || 'clip'}`);
+
+                const clipPath = path.join(tmpDir, `clip_${i}.mp4`);
+                const resp = await fetch(clip.videoUrl, {
+                    headers: { Authorization: req.headers.authorization || '' },
+                    signal: AbortSignal.timeout(60000),
+                }).catch(() => null);
+
+                if (!resp || !resp.ok) {
+                    // Retry without auth (external URLs)
+                    const resp2 = await fetch(clip.videoUrl, {
+                        signal: AbortSignal.timeout(60000),
+                    });
+                    if (!resp2.ok) throw new Error(`Failed to download clip ${i + 1}: ${resp2.status}`);
+                    const buffer = Buffer.from(await resp2.arrayBuffer());
+                    fs.writeFileSync(clipPath, buffer);
+                } else {
+                    const buffer = Buffer.from(await resp.arrayBuffer());
+                    fs.writeFileSync(clipPath, buffer);
+                }
+                clipPaths.push(clipPath);
+            }
+
+            // Step 2: Download voiceover if provided
+            let voiceoverPath = null;
+            if (voiceover?.audioUrl) {
+                console.log(`   🎙️ Downloading voiceover...`);
+                voiceoverPath = path.join(tmpDir, 'voiceover.wav');
+                const voResp = await fetch(voiceover.audioUrl, { signal: AbortSignal.timeout(30000) });
+                if (voResp.ok) {
+                    fs.writeFileSync(voiceoverPath, Buffer.from(await voResp.arrayBuffer()));
+                }
+            }
+
+            // Step 3: Download music if provided
+            let musicPath = null;
+            if (music?.audioUrl && !music.audioUrl.startsWith('blob:')) {
+                console.log(`   🎵 Downloading music track...`);
+                musicPath = path.join(tmpDir, 'music.mp3');
+                const musicResp = await fetch(music.audioUrl, { signal: AbortSignal.timeout(30000) });
+                if (musicResp.ok) {
+                    fs.writeFileSync(musicPath, Buffer.from(await musicResp.arrayBuffer()));
+                }
+            }
+
+            // Step 4: Try FFmpeg compilation
+            let outputPath = path.join(tmpDir, 'compiled.mp4');
+            let usedFfmpeg = false;
+
+            try {
+                const { execSync } = await import('child_process');
+                // Check if ffmpeg is available
+                execSync('ffmpeg -version', { stdio: 'pipe' });
+
+                // Write concat file
+                const concatFile = path.join(tmpDir, 'concat.txt');
+                const concatContent = clipPaths.map(p => `file '${p}'`).join('\n');
+                fs.writeFileSync(concatFile, concatContent);
+
+                // Build ffmpeg command
+                let ffmpegCmd = `ffmpeg -y -f concat -safe 0 -i "${concatFile}"`;
+
+                // Add voiceover as audio overlay
+                if (voiceoverPath && fs.existsSync(voiceoverPath)) {
+                    ffmpegCmd += ` -i "${voiceoverPath}"`;
+                }
+
+                // Add music as audio overlay
+                if (musicPath && fs.existsSync(musicPath)) {
+                    ffmpegCmd += ` -i "${musicPath}"`;
+                }
+
+                // Build filter complex for audio mixing
+                const audioInputs = [];
+                let inputIdx = 1; // 0 is video concat
+                if (voiceoverPath && fs.existsSync(voiceoverPath)) {
+                    audioInputs.push({ idx: inputIdx++, volume: 1.0, label: 'vo' });
+                }
+                if (musicPath && fs.existsSync(musicPath)) {
+                    audioInputs.push({ idx: inputIdx++, volume: music?.volume || 0.3, label: 'music' });
+                }
+
+                if (audioInputs.length > 0) {
+                    let filterComplex = '';
+                    const mixInputs = ['[0:a]']; // original video audio
+
+                    audioInputs.forEach(a => {
+                        filterComplex += `[${a.idx}:a]volume=${a.volume}[${a.label}];`;
+                        mixInputs.push(`[${a.label}]`);
+                    });
+
+                    filterComplex += `${mixInputs.join('')}amix=inputs=${mixInputs.length}:duration=longest[aout]`;
+                    ffmpegCmd += ` -filter_complex "${filterComplex}" -map 0:v -map "[aout]"`;
+                } else {
+                    ffmpegCmd += ` -c copy`;
+                }
+
+                ffmpegCmd += ` -movflags +faststart "${outputPath}"`;
+
+                console.log(`   🔧 FFmpeg command: ${ffmpegCmd.substring(0, 200)}...`);
+                execSync(ffmpegCmd, { stdio: 'pipe', timeout: 120000 });
+                usedFfmpeg = true;
+                console.log(`   ✅ FFmpeg compilation complete`);
+
+            } catch (ffmpegErr) {
+                // FFmpeg not available — fall back to returning first clip or simple concat
+                console.log(`   ⚠️ FFmpeg not available: ${ffmpegErr.message?.substring(0, 100)}`);
+
+                if (clipPaths.length === 1) {
+                    outputPath = clipPaths[0];
+                    usedFfmpeg = false;
+                } else {
+                    // Without FFmpeg, return the clips as a sequence
+                    // Upload each to S3 and return the list
+                    const clipUrls = [];
+                    for (let i = 0; i < clipPaths.length; i++) {
+                        const clipBuffer = fs.readFileSync(clipPaths[i]);
+                        const s3Key = `compiled-video/${req.user._id}/${Date.now()}-clip-${i}.mp4`;
+                        const url = await uploadToS3(clipBuffer, s3Key, 'video/mp4');
+                        clipUrls.push(url);
+                    }
+
+                    // Upload voiceover separately if present
+                    let voiceoverUrl = voiceover?.audioUrl || null;
+
+                    // Clean up
+                    fs.rmSync(tmpDir, { recursive: true, force: true });
+
+                    return res.json({
+                        success: true,
+                        compiled: false,
+                        message: 'FFmpeg not installed — returning clips as sequence. Install FFmpeg on server for auto-compilation.',
+                        clipUrls,
+                        voiceoverUrl,
+                        totalClips: clips.length,
+                    });
+                }
+            }
+
+            // Step 5: Upload compiled video to S3
+            const compiledBuffer = fs.readFileSync(outputPath);
+            const compiledKey = `compiled-video/${req.user._id}/${Date.now()}-compiled.mp4`;
+            const videoUrl = await uploadToS3(compiledBuffer, compiledKey, 'video/mp4');
+
+            console.log(`   ✅ Compiled video uploaded: ${videoUrl.substring(0, 80)}...`);
+
+            // Clean up temp files
+            fs.rmSync(tmpDir, { recursive: true, force: true });
+
+            res.json({
+                success: true,
+                compiled: true,
+                videoUrl,
+                totalClips: clips.length,
+                usedFfmpeg,
+            });
+
+        } catch (innerErr) {
+            // Clean up on error
+            try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+            throw innerErr;
+        }
+
+    } catch (error) {
+        console.error('Video compile error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 
 // Validate :id parameter — skip non-ObjectId values so named routes like /models work
 router.param('id', (req, res, next, id) => {
@@ -362,6 +1212,9 @@ router.post('/start', protect, requireCredits('videoBrainstorm'), async (req, re
         });
     } catch (error) {
         console.error('Video Studio start error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'videoBrainstorm', `Refund: Video Brainstorm Sync Failure (${safeErrorMessage(error)})`, 'video');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -631,6 +1484,9 @@ router.post('/ugc/voice-clone/clone', protect, requireCredits('voiceClone'), asy
         });
     } catch (error) {
         console.error('Voice clone error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'voiceCloneRefund', `Refund: Voice Cloning Sync Failure (${safeErrorMessage(error)})`, 'video');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -1266,6 +2122,9 @@ router.post('/ugc/placement-video', protect, requireCredits('videoGenerate'), as
         res.json({ success: true, videoId: result.videoId, projectId: project._id });
     } catch (error) {
         console.error('Placement video error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'videoGenerateRefund', `Refund: Placement Video Sync Failure (${safeErrorMessage(error)})`, 'video');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -1317,6 +2176,10 @@ router.post('/ugc/webhook-callback', async (req, res) => {
             if (project) {
                 project.status = 'failed';
                 project.generation.error = event_data.error || 'Video generation failed';
+                if (project.creditsUsed > 0) {
+                    await refundCredits(project.user, project.creditsUsed, 'videoGenerateRefund', `Refund: HeyGen Webhook Failure`, 'video', { projectId: project._id });
+                    project.creditsUsed = 0;
+                }
                 await project.save();
                 console.log(`❌ Webhook: Project ${project._id} marked failed`);
             }
@@ -1378,6 +2241,9 @@ router.post('/ugc/generate-agent', protect, requireCredits('videoGenerate'), asy
         });
     } catch (error) {
         console.error('UGC Video Agent error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'videoGenerateRefund', `Refund: UGC Agent Sync Failure (${safeErrorMessage(error)})`, 'video');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -1472,6 +2338,7 @@ router.post('/ugc/generate', protect, requireCredits('videoGenerate'), async (re
             routing: {
                 selectedModel: resolvedPhotoUrl ? 'heygen-photo-avatar' : (audioUrl ? 'heygen-audio-avatar' : 'heygen-avatar'),
             },
+            creditsUsed: req.creditsDeducted || 0,
             input: {
                 videoType: 'ugc',
                 brief: (script || '').trim().substring(0, 200),
@@ -1546,6 +2413,9 @@ router.post('/ugc/generate', protect, requireCredits('videoGenerate'), async (re
         });
     } catch (error) {
         console.error('UGC generate error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'videoGenerateRefund', `Refund: UGC Video Sync Failure (${safeErrorMessage(error)})`, 'video');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -1931,7 +2801,10 @@ router.post('/:id/generate', protect, requireCredits('videoGenerate'), async (re
                 routing.resolution,
                 routing.mode
             );
-            await VideoProject.findByIdAndUpdate(project._id, { routing });
+            await VideoProject.findByIdAndUpdate(project._id, { routing, creditsUsed: req.creditsDeducted || 0 });
+        } else {
+            // Even if no routing updates, track deducted credits
+            await VideoProject.findByIdAndUpdate(project._id, { creditsUsed: req.creditsDeducted || 0 });
         }
 
         // Build state and run video generator
@@ -1959,6 +2832,9 @@ router.post('/:id/generate', protect, requireCredits('videoGenerate'), async (re
         });
     } catch (error) {
         console.error('Video Studio generate error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'videoGenerateRefund', `Refund: Video Generation Sync Failure (${safeErrorMessage(error)})`, 'video', { projectId: req.params.id });
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -2019,6 +2895,11 @@ router.get('/:id/status', protect, async (req, res) => {
                         generation: updatedGen,
                     });
 
+                    if (project.creditsUsed > 0) {
+                        await refundCredits(project.user, project.creditsUsed, 'videoGenerateRefund', `Refund: HeyGen Video Generation Async Failure (${heygenStatus.error || 'Unknown'})`, 'video', { projectId: project._id });
+                        await VideoProject.findByIdAndUpdate(project._id, { creditsUsed: 0 });
+                    }
+
                     return res.json({
                         success: true,
                         project: {
@@ -2056,6 +2937,11 @@ router.get('/:id/status', protect, async (req, res) => {
                     status: updated.status,
                     generation: updated.generation,
                 });
+
+                if (updated.status === 'failed' && project.creditsUsed > 0) {
+                    await refundCredits(project.user, project.creditsUsed, 'videoGenerateRefund', `Refund: Video Generation Async Failure (${updated.generation?.error || 'Unknown'})`, 'video', { projectId: project._id });
+                    await VideoProject.findByIdAndUpdate(project._id, { creditsUsed: 0 });
+                }
 
                 // If completed, auto-upload video to S3 before CDN URL expires, then run critic
                 if (updated.status === 'critique') {
@@ -2165,6 +3051,9 @@ router.post('/:id/edit', protect, requireCredits('videoEdit'), async (req, res) 
         });
     } catch (error) {
         console.error('Video Studio edit error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'videoEditRefund', `Refund: Video Edit Sync Failure (${safeErrorMessage(error)})`, 'video', { projectId: req.params.id });
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -2279,6 +3168,10 @@ router.get('/', protect, async (req, res) => {
                         } else if (hStatus.status === 'FAILED') {
                             await VideoProject.findByIdAndUpdate(p._id, { status: 'failed', 'generation.error': hStatus.error });
                             p.status = 'failed';
+                            if (p.creditsUsed > 0) {
+                                await refundCredits(p.user, p.creditsUsed, 'videoGenerateRefund', `Refund: Stuck HeyGen Video Generation Failed`, 'video', { projectId: p._id });
+                                await VideoProject.findByIdAndUpdate(p._id, { creditsUsed: 0 });
+                            }
                         }
                         return;
                     }

@@ -474,7 +474,16 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
 
     // Cleanup animate polling on unmount
     useEffect(() => () => { if (animatePollRef.current) clearInterval(animatePollRef.current) }, [])
-    const [studioMode, setStudioMode] = useState('create')
+    
+    // ── Studio Mode — driven by URL ?mode= param ──
+    const studioMode = searchParams.get('mode') || 'create'
+    const setStudioMode = useCallback((mode) => {
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev)
+            next.set('mode', mode)
+            return next
+        }, { replace: true })
+    }, [setSearchParams])
 
     // ── Virtual Try-On State ──
     const [vtoPersonImage, setVtoPersonImage] = useState(null)
@@ -494,6 +503,8 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [mockupAspectRatio, setMockupAspectRatio] = useState('1:1')
     const [mockupSceneCategory, setMockupSceneCategory] = useState('all')
     const [mockupSubMode, setMockupSubMode] = useState('lifestyle') // lifestyle | logo
+    const [mockupTemplateImage, setMockupTemplateImage] = useState(null)
+    const [mockupHarmonize, setMockupHarmonize] = useState(false)
 
     // ── Logo/Brand Mockup State ──
     const [logoImage, setLogoImage] = useState(null)
@@ -636,6 +647,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [addLogo, setAddLogo] = useState(() => !!activeBrand?.dna?.logo?.url)
     const [logoPosition, setLogoPosition] = useState('bottom-right')
     const [logoSize, setLogoSize] = useState('medium')
+    const [galleryFilter, setGalleryFilter] = useState('All')
     const [showAdvanced, setShowAdvanced] = useState(false)
     const [activeQuickTemplate, setActiveQuickTemplate] = useState(null)
     const [showQuickStart, setShowQuickStart] = useState(true)
@@ -778,24 +790,32 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 setSelectedType('instagram-post')
             }
 
-            setSearchParams({}, { replace: true })
+            // Clean up cross-studio params but preserve mode
+            setSearchParams(prev => {
+                const next = new URLSearchParams(prev)
+                next.delete('fromContent'); next.delete('prompt'); next.delete('type')
+                return next
+            }, { replace: true })
         }
 
         // Check if coming with mode=photoshoot from Content Studio or Brand DNA
-        const mode = searchParams.get('mode')
-        if (mode === 'photoshoot') {
-            setStudioMode('photoshoot')
+        if (studioMode === 'photoshoot') {
             const brief = searchParams.get('brief')
-            if (brief) setPhotoshootBrief(brief)
-
-            // Read image passed from Brand DNA via sessionStorage
-            const passedImage = window.sessionStorage.getItem('photoshootImage')
-            if (passedImage) {
-                setProductImage(passedImage)
-                window.sessionStorage.removeItem('photoshootImage')
+            if (brief) {
+                setPhotoshootBrief(brief)
+                // Read image passed from Brand DNA via sessionStorage
+                const passedImage = window.sessionStorage.getItem('photoshootImage')
+                if (passedImage) {
+                    setProductImage(passedImage)
+                    window.sessionStorage.removeItem('photoshootImage')
+                }
+                // Clean up brief param but preserve mode
+                setSearchParams(prev => {
+                    const next = new URLSearchParams(prev)
+                    next.delete('brief')
+                    return next
+                }, { replace: true })
             }
-
-            setSearchParams({}, { replace: true })
         } else if (searchParams.get('fromBrainstorm') === 'true') {
             const bsCtx = window.sessionStorage.getItem('brainstormContext')
             if (bsCtx) {
@@ -807,7 +827,11 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                     }
                 } catch (e) { console.error('Failed to parse brainstorm context:', e) }
             }
-            setSearchParams({}, { replace: true })
+            setSearchParams(prev => {
+                const next = new URLSearchParams(prev)
+                next.delete('fromBrainstorm')
+                return next
+            }, { replace: true })
         }
     }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1546,6 +1570,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
     return (
         <DashboardLayout title="Creative Studio" subtitle="AI-powered image generation & design">
             <SEOHead title="Creative Studio — Mantram AI" noIndex={true} />
+
             {/* ══ Unified Studio Navigation ══ */}
             <div className="flex items-center gap-1.5 p-1 rounded-2xl glass-panel mb-6 fade-up overflow-x-auto scrollbar-hide whitespace-nowrap">
                 {[
@@ -1577,14 +1602,13 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                 ))}
             </div>
 
-            {/* ====================== UNIFIED CREATE MODE ====================== */}
+            {/* ====================== UNIFIED CREATE MODE — SPLIT PANEL ====================== */}
             {studioMode === 'create' && (
-                <div className="max-w-4xl mx-auto fade-up">
+                <div className="creative-split fade-up">
 
-                    {/* ── Hero Prompt Bar ── */}
-                    <div className="glow-border rounded-2xl p-6 mb-6 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(43,75,238,0.06), rgba(139,92,246,0.04), rgba(6,182,212,0.03))' }}>
-                        {/* Subtle mesh gradient overlay */}
-                        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(139,92,246,0.08) 0%, transparent 50%), radial-gradient(circle at 20% 80%, rgba(43,75,238,0.06) 0%, transparent 50%)' }} />
+                    {/* ═══════════ LEFT TOOLS PANEL ═══════════ */}
+                    <div className="creative-tools-panel">
+
                         {/* Content-linked banner */}
                         {fromContent && (
                             <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/20 mb-4">
@@ -1907,7 +1931,6 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 <span className="material-symbols-outlined text-sm">inventory_2</span>
                             </button>
                         </div>
-                    </div>
 
                     {/* ── Collapsible Advanced Options Drawer ── */}
                     {showAdvanced && (
@@ -2087,351 +2110,255 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         </div>
                     )}
 
-                    {/* ── Error ── */}
-                    {error && (
-                        <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
-                            <span className="material-symbols-outlined text-sm align-middle mr-1">error</span> {error}
-                        </div>
-                    )}
+                    </div>{/* ═══════════ END LEFT TOOLS PANEL ═══════════ */}
 
-                    {/* ── Result Area ── */}
-                    {result && !generating && (
-                        <div className="studio-card p-6 mb-6 fade-up">
-                            <div className="flex items-center justify-between mb-4">
-                                <div>
-                                    <h3 className="text-lg font-bold text-white">{result.title || 'Generated Creative'}</h3>
-                                    <p className="text-sm text-slate-400">{selectedTypeInfo?.label} • {selectedTypeInfo?.size} • {style}</p>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => handleFeedback('thumbs', { thumbs: 'up' })}
-                                        className={`btn-glass p-2 rounded-xl cursor-pointer transition-all ${feedbackState === 'liked' ? 'text-emerald-400 bg-emerald-400/15 border border-emerald-400/30 scale-110' : 'text-slate-400 hover:text-emerald-400'}`}>
-                                        <span className="material-symbols-outlined">thumb_up</span>
-                                    </button>
-                                    <button onClick={() => handleFeedback('thumbs', { thumbs: 'down' })}
-                                        className={`btn-glass p-2 rounded-xl cursor-pointer transition-all ${feedbackState === 'disliked' ? 'text-rose-400 bg-rose-400/15 border border-rose-400/30 scale-110' : 'text-slate-400 hover:text-rose-400'}`}>
-                                        <span className="material-symbols-outlined">thumb_down</span>
-                                    </button>
-                                    <button onClick={handleGenerate} className="btn-glass p-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
-                                        <span className="material-symbols-outlined">refresh</span>
-                                    </button>
-                                </div>
-                            </div>
 
-                            {/* Display area — respects actual aspect ratio */}
-                            <div className="relative rounded-xl overflow-hidden border border-white/[0.08] bg-black/20 cursor-pointer group"
-                                style={{ maxHeight: '600px' }}
-                                onClick={() => result.imageUrl && setZoomImage(result.imageUrl)}>
-                                {result.imageUrl ? (
-                                    <>
-                                        <img src={result.imageUrl} alt={result.title || 'Generated creative'} loading="lazy" decoding="async"
-                                            className="w-full h-auto object-contain"
-                                            style={{ maxHeight: '600px' }}
-                                            onError={(e) => { e.target.style.display = 'none'; }} />
-                                        {/* Zoom overlay */}
-                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                            <span className="material-symbols-outlined text-3xl text-white bg-black/50 rounded-full p-2">zoom_in</span>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div className="flex flex-col items-center justify-center p-8 text-center"
-                                        style={{ aspectRatio: aspectRatio?.replace(':', '/') || '1/1', background: `linear-gradient(135deg, ${activeBrand?.dna?.colors?.[0]?.hex || '#2B4BEE'}40, ${activeBrand?.dna?.colors?.[1]?.hex || '#8B5CF6'}40)` }}>
-                                        <span className="material-symbols-outlined text-6xl text-white/20 mb-4 block">image</span>
-                                        <p className="text-white font-bold text-lg mb-2">{textOverlay || result.title || prompt.substring(0, 40)}</p>
-                                        <p className="text-sm text-white/50">{activeBrand?.name}</p>
-                                    </div>
-                                )}
-                            </div>
+                    {/* ═══════════ RIGHT GALLERY PANEL ═══════════ */}
+                    <div className="creative-gallery">
 
-                            {result.aiMeta && (
-                                <div className="flex items-center gap-4 mt-4 text-sm text-slate-500">
-                                    <span>Provider: {result.aiMeta.provider}</span>
-                                    <span>Model: {result.aiMeta.model}</span>
-                                    {result.aiMeta.brandAlignmentScore && (
-                                        <span className="text-emerald-400 font-bold">{result.aiMeta.brandAlignmentScore}% Brand Match</span>
-                                    )}
-                                </div>
-                            )}
-
-                            {feedbackToast && (
-                                <div className="mt-3 py-2 px-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-medium text-center animate-fade-in">
-                                    {feedbackToast}
-                                </div>
-                            )}
-
-                            <div className="flex gap-3 mt-4">
-                                <button onClick={() => handleFeedback('accept')}
-                                    className={`py-2.5 px-6 rounded-xl text-sm flex-1 transition-all duration-200 cursor-pointer ${feedbackState === 'accepted' ? 'bg-emerald-500 text-white font-bold' : 'btn-primary'}`}>
-                                    <span className="material-symbols-outlined text-sm">{feedbackState === 'accepted' ? 'check_circle' : 'check'}</span>
-                                    {feedbackState === 'accepted' ? ' Accepted ✓' : ' Accept'}
-                                </button>
-                                <button onClick={() => handleDownloadImage(result?.imageUrl, `${result?.title || 'creative'}.png`)}
-                                    className="btn-glass py-2.5 px-6 rounded-xl text-sm border border-white/[0.1] text-white cursor-pointer hover:bg-white/[0.06]">
-                                    <span className="material-symbols-outlined text-sm">download</span> Export
-                                </button>
-                                <button onClick={() => setPublishData({ image: result?.imageUrl, text: result?.title || '' })}
-                                    className="btn-glass py-2.5 px-6 rounded-xl text-sm font-bold bg-[#1877F2]/10 text-[#1877F2] hover:bg-[#1877F2]/20 border border-[#1877F2]/30 cursor-pointer transition-all">
-                                    <span className="material-symbols-outlined text-sm">share</span> Publish
-                                </button>
-                                <button onClick={handleAnimateClick}
-                                    className="py-2.5 px-6 rounded-xl text-sm font-bold cursor-pointer transition-all duration-200 hover:scale-[1.03] flex items-center gap-1.5"
-                                    style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(236,72,153,0.15))', color: '#c084fc', border: '1px solid rgba(139,92,246,0.3)' }}>
-                                    <span className="material-symbols-outlined text-sm">animation</span> Animate
-                                </button>
-                            </div>
-
-                            {/* Open Canvas Editor */}
-                            {result?.imageUrl && (
-                                <button onClick={() => {
-                                    const typeInfo = creativeTypes.find(t => t.id === selectedType)
-                                    const [w, h] = (typeInfo?.size || '1080×1080').split('×').map(Number)
-                                    sessionStorage.setItem('canvasEditorImage', result.imageUrl)
-                                    navigate(`/creative-studio/editor?w=${w}&h=${h}`)
-                                }}
-                                    className="w-full mt-3 py-3 px-6 rounded-xl text-base font-bold text-white cursor-pointer transition-all duration-200 hover:scale-[1.02] flex items-center justify-center gap-2"
-                                    style={{ background: 'linear-gradient(135deg, #2563eb, #6366f1)', boxShadow: '0 4px 20px rgba(99,102,241,0.4)' }}>
-                                    <span className="material-symbols-outlined">edit</span>
-                                    Open Canvas Editor
-                                </button>
-                            )}
-
-                            {/* ═══ ANIMATE MODAL ═══ */}
-                            {animateModalOpen && (
-                                <div className="mt-4 studio-card p-6 fade-up border border-violet-500/20" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.03), rgba(236,72,153,0.03))' }}>
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="flex items-center gap-3">
-                                            {/* Image thumbnail preview */}
-                                            {result?.imageUrl && (
-                                                <img src={result.imageUrl} alt="Source" className="w-10 h-10 rounded-lg object-cover border border-violet-500/30" />
-                                            )}
-                                            <div>
-                                                <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                                                    <span className="material-symbols-outlined text-violet-400">animation</span>
-                                                    Animate Creative
-                                                </h4>
-                                                <p className="text-[10px] text-slate-500 mt-0.5">{ANIMATE_MODELS[animateModel]?.desc || ''}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            {/* Dynamic capability badges based on selected model */}
-                                            <div className="flex gap-1">
-                                                {ANIMATE_MODELS[animateModel]?.firstFrame && (
-                                                    <span className="text-[9px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full border border-emerald-500/20">🖼️ First Frame</span>
-                                                )}
-                                                {ANIMATE_MODELS[animateModel]?.nativeAudio && (
-                                                    <span className="text-[9px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded-full border border-cyan-500/20">🔊 Audio</span>
-                                                )}
-                                                {ANIMATE_MODELS[animateModel]?.refImages && (
-                                                    <span className="text-[9px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-full border border-amber-500/20">📎 Ref Images</span>
-                                                )}
-                                            </div>
-                                            <span className="text-xs text-slate-500 bg-white/[0.05] px-2 py-0.5 rounded-full">
-                                                {animateAspectRatio}
-                                            </span>
-                                            <button onClick={() => { setAnimateModalOpen(false); if (animatePollRef.current) clearInterval(animatePollRef.current) }}
-                                                className="text-slate-500 hover:text-white cursor-pointer">
-                                                <span className="material-symbols-outlined text-sm">close</span>
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* AI-suggested prompt */}
-                                    {animateAnalyzing ? (
-                                        <div className="flex items-center gap-3 py-6 justify-center">
-                                            <span className="material-symbols-outlined text-violet-400 animate-spin">progress_activity</span>
-                                            <span className="text-sm text-slate-400">AI is analyzing your image for the best animation...</span>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <textarea
-                                                value={animatePrompt}
-                                                onChange={e => setAnimatePrompt(e.target.value)}
-                                                placeholder="Describe the animation motion..."
-                                                className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 outline-none focus:border-violet-500/40 resize-none mb-3"
-                                                rows={3}
-                                                disabled={animateGenerating}
-                                            />
-
-                                            {/* Config Row */}
-                                            <div className="flex flex-wrap gap-3 mb-4">
-                                                {/* Model Selector */}
-                                                <div className="flex flex-col gap-1">
-                                                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Model</span>
-                                                    <select value={animateModel} onChange={e => {
-                                                        setAnimateModel(e.target.value)
-                                                        const m = ANIMATE_MODELS[e.target.value]
-                                                        if (m && animateDuration < m.dur[0]) setAnimateDuration(m.dur[0])
-                                                        if (m && animateDuration > m.dur[1]) setAnimateDuration(m.dur[1])
-                                                        if (m && !m.ratios.includes(animateAspectRatio)) setAnimateAspectRatio(m.ratios[0])
-                                                    }}
-                                                        className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white outline-none cursor-pointer"
-                                                        disabled={animateGenerating}>
-                                                        {Object.entries(ANIMATE_MODELS).map(([id, m]) => (
-                                                            <option key={id} value={id}>{m.icon} {m.name}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                                {/* Duration */}
-                                                <div className="flex flex-col gap-1">
-                                                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Duration</span>
-                                                    <select value={animateDuration} onChange={e => setAnimateDuration(Number(e.target.value))}
-                                                        className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white outline-none cursor-pointer"
-                                                        disabled={animateGenerating}>
-                                                        {(() => {
-                                                            const m = ANIMATE_MODELS[animateModel]
-                                                            return Array.from({ length: (m?.dur[1] || 15) - (m?.dur[0] || 1) + 1 }, (_, i) => (m?.dur[0] || 1) + i)
-                                                                .map(d => <option key={d} value={d}>{d}s</option>)
-                                                        })()}
-                                                    </select>
-                                                </div>
-                                                {/* Aspect Ratio */}
-                                                <div className="flex flex-col gap-1">
-                                                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Ratio</span>
-                                                    <div className="flex gap-1 flex-wrap">
-                                                        {(ANIMATE_MODELS[animateModel]?.ratios || ['1:1']).map(r => (
-                                                            <button key={r} onClick={() => setAnimateAspectRatio(r)}
-                                                                disabled={animateGenerating}
-                                                                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${animateAspectRatio === r
-                                                                    ? 'bg-violet-500/20 text-violet-300 border border-violet-500/40'
-                                                                    : 'bg-white/[0.03] text-slate-500 border border-transparent hover:text-white'}`}>
-                                                                {r}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Error */}
-                                            {animateError && (
-                                                <div className="mb-3 p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
-                                                    <span className="material-symbols-outlined text-sm">error</span> {animateError}
-                                                </div>
-                                            )}
-
-                                            {/* Generating Progress */}
-                                            {animateGenerating && (
-                                                <div className="mb-3">
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <span className="text-xs text-slate-400 flex items-center gap-2">
-                                                            <span className="material-symbols-outlined text-violet-400 animate-spin text-sm">progress_activity</span>
-                                                            Animating — usually 1-3 minutes...
-                                                        </span>
-                                                        <span className="text-xs text-violet-400 font-bold">{animateProgress}%</span>
-                                                    </div>
-                                                    <div className="w-full h-1.5 rounded-full bg-white/[0.05] overflow-hidden">
-                                                        <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${animateProgress}%`, background: 'linear-gradient(90deg, #7c3aed, #ec4899)' }} />
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Video Result */}
-                                            {animateVideoUrl && (
-                                                <div className="mb-3 rounded-xl overflow-hidden border border-violet-500/20">
-                                                    <video controls autoPlay className="w-full" style={{ maxHeight: '400px' }}
-                                                    src={animateProjectId ? `${API_BASE}/video-studio/${animateProjectId}/video` : animateVideoUrl} />
-                                                    <div className="flex gap-2 p-3 bg-black/20">
-                                                        <button onClick={async () => {
-                                                            try {
-                                                                const src = animateProjectId ? `${API_BASE}/video-studio/${animateProjectId}/video` : animateVideoUrl
-                                                                const resp = await fetch(src)
-                                                                const blob = await resp.blob()
-                                                                const url = URL.createObjectURL(blob)
-                                                                const a = document.createElement('a'); a.href = url; a.download = 'animation.mp4'; a.click()
-                                                                setTimeout(() => URL.revokeObjectURL(url), 100)
-                                                            } catch { window.open(animateVideoUrl, '_blank') }
-                                                        }}
-                                                            className="flex-1 py-2 rounded-lg text-xs font-bold text-white cursor-pointer flex items-center justify-center gap-1.5"
-                                                            style={{ background: 'linear-gradient(135deg, #7c3aed, #06b6d4)' }}>
-                                                            <span className="material-symbols-outlined text-sm">download</span> Download Video
-                                                        </button>
-                                                        <button onClick={() => { setAnimateVideoUrl(null); setAnimateProgress(0); setAnimateProjectId(null) }}
-                                                            className="py-2 px-4 rounded-lg text-xs font-bold bg-white/[0.06] text-slate-300 cursor-pointer hover:bg-white/[0.1] transition-all">
-                                                            <span className="material-symbols-outlined text-sm">refresh</span> Retry
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Generate Button */}
-                                            {!animateVideoUrl && (
-                                                <button onClick={handleAnimateGenerate} disabled={animateGenerating || !animatePrompt.trim()}
-                                                    className="w-full py-3 rounded-xl text-sm font-bold text-white cursor-pointer transition-all duration-200 disabled:opacity-30 flex items-center justify-center gap-2"
-                                                    style={{ background: animateGenerating ? 'rgba(139,92,246,0.15)' : 'linear-gradient(135deg, #7c3aed, #ec4899)', boxShadow: animateGenerating ? 'none' : '0 4px 20px rgba(139,92,246,0.3)' }}>
-                                                    {animateGenerating ? (
-                                                        <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Generating Animation...</>
-                                                    ) : (
-                                                        <><span className="material-symbols-outlined text-sm">play_arrow</span> Generate Animation</>
-                                                    )}
-                                                </button>
-                                            )}
-                                        </>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* ── Action Cards — Only shown when no result and prompt is empty ── */}
-                    {!result && !generating && !prompt.trim() && (
-                        <div className="fade-up-2">
-                            <p className="text-sm text-slate-500 text-center mb-5 font-medium">— or choose a starting point —</p>
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                                {/* Quick-create cards that pre-fill prompts */}
-                                {[
-                                    {
-                                        id: 'social', icon: 'share', label: 'Social Media Post', desc: 'Instagram, Facebook, LinkedIn', color: '#6366f1',
-                                        prompt: `Create a visually stunning social media post for ${activeBrand?.name || 'the brand'}. Make it eye-catching, on-brand, and shareable. Include a catchy headline and professional layout.`
-                                    },
-                                    {
-                                        id: 'product', icon: 'inventory_2', label: 'Product Showcase', desc: 'Feature your product beautifully', color: '#f59e0b',
-                                        prompt: `Create a premium product showcase for ${activeBrand?.name || 'the brand'}. Feature the product prominently with brand colors, modern layout, and a subtle call-to-action.`
-                                    },
-                                    {
-                                        id: 'promo', icon: 'local_offer', label: 'Sale / Offer', desc: 'Discounts, deals, promotions', color: '#ef4444',
-                                        template: templateCategories.find(c => c.id === 'sales')?.subTemplates?.[0]
-                                    },
-                                    {
-                                        id: 'quote', icon: 'format_quote', label: 'Quote / Testimonial', desc: 'Reviews and brand quotes', color: '#10b981',
-                                        template: templateCategories.find(c => c.id === 'quotes')?.subTemplates?.[0]
-                                    },
-                                    {
-                                        id: 'announce', icon: 'campaign', label: 'Announcement', desc: 'Launches, updates, news', color: '#8b5cf6',
-                                        template: templateCategories.find(c => c.id === 'announcement')?.subTemplates?.[0]
-                                    },
-                                    {
-                                        id: 'event', icon: 'event', label: 'Event Promo', desc: 'Events, birthdays, milestones', color: '#ec4899',
-                                        template: templateCategories.find(c => c.id === 'events')?.subTemplates?.[0]
-                                    },
-                                    {
-                                        id: 'info', icon: 'analytics', label: 'Infographic', desc: 'Data, tips, educational', color: '#0ea5e9',
-                                        template: templateCategories.find(c => c.id === 'content')?.subTemplates?.[0]
-                                    },
-                                    {
-                                        id: 'story', icon: 'auto_stories', label: 'Brand Story', desc: 'Tell your brand narrative', color: '#f97316',
-                                        prompt: `Create a compelling brand story visual for ${activeBrand?.name || 'the brand'}. Tell the brand narrative through imagery, use brand colors, and convey authenticity with a warm, premium feel.`
-                                    },
-                                ].map((card, idx) => (
-                                    <button key={card.id} onClick={() => {
-                                        if (card.template && card.template.fields?.length > 0) {
-                                            setActiveQuickTemplate(card.template)
-                                            setTemplateFields({})
-                                        } else if (card.prompt) {
-                                            setPrompt(card.prompt)
-                                        }
-                                    }}
-                                        className={`studio-card flex flex-col items-center gap-2.5 p-5 cursor-pointer group text-center fade-up-${Math.min(idx + 1, 5)}`}>
-                                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg" style={{ background: `linear-gradient(135deg, ${card.color}30, ${card.color}10)`, boxShadow: `0 4px 15px ${card.color}15` }}>
-                                            <span className="material-symbols-outlined text-2xl" style={{ color: card.color }}>{card.icon}</span>
-                                        </div>
-                                        <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{card.label}</p>
-                                        <p className="text-xs text-slate-500 leading-relaxed">{card.desc}</p>
+                        {/* ── Gallery Filter Bar ── */}
+                        <div className="flex items-center justify-between mb-4 px-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                                {['All', 'Social', 'Product', 'Promo', 'Quote', 'Event'].map(cat => (
+                                    <button key={cat}
+                                        onClick={() => setGalleryFilter(cat)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                                            galleryFilter === cat
+                                                ? 'bg-primary/15 text-primary border-primary/25'
+                                                : 'bg-white/[0.04] text-slate-400 hover:text-white border-transparent hover:border-white/[0.08]'
+                                        }`}
+                                    >
+                                        {cat}
                                     </button>
                                 ))}
                             </div>
-
+                            <div className="flex items-center gap-1.5">
+                                <div className="flex rounded-lg border border-white/[0.08] overflow-hidden">
+                                    <button className="p-1.5 bg-white/[0.08] text-white cursor-pointer" title="List view">
+                                        <span className="material-symbols-outlined text-sm">view_list</span>
+                                    </button>
+                                    <button className="p-1.5 text-slate-600 hover:text-slate-400 cursor-pointer" title="Grid view">
+                                        <span className="material-symbols-outlined text-sm">grid_view</span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    )}
+
+                        {/* ── Error ── */}
+                        {error && (
+                            <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
+                                <span className="material-symbols-outlined text-sm align-middle mr-1">error</span> {error}
+                            </div>
+                        )}
+
+                        {/* ── Current Result (newest generation, highlighted) ── */}
+                        {result && !generating && (
+                            <div className="generation-card generation-card--new mb-5">
+                                {/* Prompt text */}
+                                <p className="text-xs text-slate-400 mb-2.5 line-clamp-2 leading-relaxed">
+                                    {prompt || 'Generated creative'}
+                                </p>
+
+                                {/* Generated Image */}
+                                <div className="relative rounded-xl overflow-hidden border border-white/[0.08] bg-black/20 cursor-pointer group mb-3"
+                                    style={{ maxHeight: '500px' }}
+                                    onClick={() => result.imageUrl && setZoomImage(result.imageUrl)}>
+                                    {result.imageUrl ? (
+                                        <>
+                                            <img src={result.imageUrl} alt={result.title || 'Generated creative'} loading="lazy" decoding="async"
+                                                className="w-full h-auto object-contain"
+                                                style={{ maxHeight: '500px' }}
+                                                onError={(e) => { e.target.style.display = 'none'; }} />
+                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                                <span className="material-symbols-outlined text-3xl text-white bg-black/50 rounded-full p-2">zoom_in</span>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center p-8 text-center"
+                                            style={{ aspectRatio: aspectRatio?.replace(':', '/') || '1/1', background: `linear-gradient(135deg, ${activeBrand?.dna?.colors?.[0]?.hex || '#2B4BEE'}40, ${activeBrand?.dna?.colors?.[1]?.hex || '#8B5CF6'}40)` }}>
+                                            <span className="material-symbols-outlined text-6xl text-white/20 mb-4 block">image</span>
+                                            <p className="text-white font-bold text-lg mb-2">{textOverlay || result.title || prompt.substring(0, 40)}</p>
+                                            <p className="text-sm text-white/50">{activeBrand?.name}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Metadata Row */}
+                                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-primary/15 text-primary border border-primary/20">
+                                        {selectedTypeInfo?.label || 'Creative'}
+                                    </span>
+                                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-white/[0.04] text-slate-500">
+                                        {style}
+                                    </span>
+                                    <span className="text-[10px] text-slate-600">Just now</span>
+                                </div>
+
+                                {/* Action Bar */}
+                                <div className="flex items-center gap-1.5 pt-2 border-t border-white/[0.05]">
+                                    <button onClick={() => handleFeedback('accept')}
+                                        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${feedbackState === 'accepted' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10'}`}>
+                                        <span className="material-symbols-outlined text-sm">{feedbackState === 'accepted' ? 'check_circle' : 'check'}</span>
+                                        {feedbackState === 'accepted' ? 'Accepted' : 'Accept'}
+                                    </button>
+                                    <button onClick={() => handleDownloadImage(result?.imageUrl, `${result?.title || 'creative'}.png`)}
+                                        className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] cursor-pointer transition-all" title="Download">
+                                        <span className="material-symbols-outlined text-sm">download</span>
+                                    </button>
+                                    <button onClick={() => setPublishData({ image: result?.imageUrl, text: result?.title || '' })}
+                                        className="p-1.5 rounded-lg text-slate-500 hover:text-[#1877F2] hover:bg-[#1877F2]/10 cursor-pointer transition-all" title="Publish">
+                                        <span className="material-symbols-outlined text-sm">share</span>
+                                    </button>
+                                    <button onClick={handleAnimateClick}
+                                        className="p-1.5 rounded-lg text-slate-500 hover:text-purple-400 hover:bg-purple-400/10 cursor-pointer transition-all" title="Animate">
+                                        <span className="material-symbols-outlined text-sm">animation</span>
+                                    </button>
+                                    <button onClick={handleGenerate}
+                                        className="ml-auto p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] cursor-pointer transition-all" title="Regenerate">
+                                        <span className="material-symbols-outlined text-sm">refresh</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Generating Indicator ── */}
+                        {generating && (
+                            <div className="generation-card mb-5 animate-pulse">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-primary animate-spin text-lg">progress_activity</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-white">Creating your visual...</p>
+                                        <p className="text-[11px] text-slate-500">{prompt.substring(0, 50)}{prompt.length > 50 ? '...' : ''}</p>
+                                    </div>
+                                </div>
+                                <div className="w-full rounded-xl bg-white/[0.02] border border-white/[0.04]" style={{ aspectRatio: aspectRatio?.replace(':', '/') || '1/1', maxHeight: '300px' }}>
+                                    <div className="flex items-center justify-center h-full">
+                                        <div className="w-16 h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                                            <div className="h-full rounded-full bg-primary animate-[shimmer_1.5s_infinite]" style={{ width: '60%' }} />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Generation History (from Image Bank) ── */}
+                        {(() => {
+                            const allGenerated = bankImages.filter(img => img.source === 'ai-generated' || img.category === 'generated' || img.type === 'creative');
+                            const filtered = galleryFilter === 'All' ? allGenerated : allGenerated.filter(img => {
+                                const tags = (img.tags || []).map(t => t.toLowerCase());
+                                const title = (img.title || '').toLowerCase();
+                                const prmpt = (img.prompt || '').toLowerCase();
+                                const filterLower = galleryFilter.toLowerCase();
+                                return tags.some(t => t.includes(filterLower)) || title.includes(filterLower) || prmpt.includes(filterLower) || (img.type || '').toLowerCase().includes(filterLower);
+                            });
+                            if (filtered.length === 0 && allGenerated.length > 0) {
+                                return (
+                                    <div className="text-center py-10">
+                                        <span className="material-symbols-outlined text-4xl text-slate-700 mb-2 block">filter_alt_off</span>
+                                        <p className="text-sm text-slate-500">No results matching "{galleryFilter}"</p>
+                                        <button onClick={() => setGalleryFilter('All')} className="mt-2 text-xs text-primary hover:text-primary-light cursor-pointer">Show all</button>
+                                    </div>
+                                );
+                            }
+                            if (filtered.length === 0) return null;
+                            return (
+                                <div className="space-y-4">
+                                    {filtered.map(img => (
+                                    <div key={img._id} className="generation-card">
+                                        {/* Prompt */}
+                                        <p className="text-xs text-slate-400 mb-2 line-clamp-2 leading-relaxed">
+                                            {img.prompt || img.title || 'AI Generated'}
+                                        </p>
+
+                                        {/* Image */}
+                                        <div className="relative rounded-xl overflow-hidden border border-white/[0.06] bg-black/20 cursor-pointer group mb-2.5"
+                                            onClick={() => setZoomImage(img.imageUrl || img.thumbnailUrl)}>
+                                            <img src={img.imageUrl || img.thumbnailUrl} alt={img.title || 'Creative'}
+                                                loading="lazy" decoding="async"
+                                                className="w-full h-full object-cover"
+                                                style={{ maxHeight: '400px' }} />
+                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                                <span className="material-symbols-outlined text-2xl text-white bg-black/50 rounded-full p-2">zoom_in</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Metadata */}
+                                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                            {img.aspectRatio && (
+                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/[0.06] text-slate-300">
+                                                    {img.aspectRatio}
+                                                </span>
+                                            )}
+                                            {img.model && (
+                                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-white/[0.04] text-slate-500">
+                                                    {img.model}
+                                                </span>
+                                            )}
+                                            <span className="text-[10px] text-slate-600">{getTimeAgo(img.createdAt)}</span>
+                                        </div>
+
+                                        {/* Actions */}
+                                        <div className="flex gap-1.5">
+                                            <button onClick={() => handleDownloadImage(img.imageUrl || img.thumbnailUrl, `${img.title || 'creative'}.png`)}
+                                                className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] cursor-pointer transition-all" title="Download">
+                                                <span className="material-symbols-outlined text-sm">download</span>
+                                            </button>
+                                            <button onClick={() => { setDesignBaseImage(img.imageUrl || img.thumbnailUrl); setPrompt(img.prompt || ''); }}
+                                                className="p-1.5 rounded-lg text-slate-500 hover:text-primary hover:bg-primary/10 cursor-pointer transition-all" title="Edit">
+                                                <span className="material-symbols-outlined text-sm">edit</span>
+                                            </button>
+                                            <button onClick={() => setPublishData({ image: img.imageUrl || img.thumbnailUrl, text: img.title || '' })}
+                                                className="p-1.5 rounded-lg text-slate-500 hover:text-[#1877F2] hover:bg-[#1877F2]/10 cursor-pointer transition-all" title="Publish">
+                                                <span className="material-symbols-outlined text-sm">share</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    ))}
+                                </div>
+                            );
+                        })()}
+
+                        {/* ── Empty State with Inline Suggestions ── */}
+                        {!result && !generating && bankImages.filter(img => img.source === 'ai-generated' || img.category === 'generated' || img.type === 'creative').length === 0 && (
+                            <div className="flex flex-col items-center justify-center py-12 px-4">
+                                <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-4">
+                                    <span className="material-symbols-outlined text-3xl text-slate-600">palette</span>
+                                </div>
+                                <h3 className="text-base font-bold text-white mb-1">No generations yet</h3>
+                                <p className="text-sm text-slate-500 max-w-xs text-center mb-6">Describe your vision in the prompt panel and hit Generate to create your first brand visual.</p>
+
+                                <p className="text-[11px] text-slate-600 uppercase tracking-wider font-bold mb-3">Try a quick prompt</p>
+                                <div className="flex flex-wrap justify-center gap-2">
+                                    {[
+                                        { icon: 'share', label: 'Social Post', color: '#6366f1', prompt: `Create a visually stunning social media post for ${activeBrand?.name || 'the brand'}. Make it eye-catching, on-brand, and shareable.` },
+                                        { icon: 'inventory_2', label: 'Product Shot', color: '#f59e0b', prompt: `Create a premium product showcase for ${activeBrand?.name || 'the brand'}. Feature the product prominently with brand colors.` },
+                                        { icon: 'local_offer', label: 'Sale / Offer', color: '#ef4444', template: templateCategories.find(c => c.id === 'sales')?.subTemplates?.[0] },
+                                        { icon: 'format_quote', label: 'Quote', color: '#10b981', template: templateCategories.find(c => c.id === 'quotes')?.subTemplates?.[0] },
+                                        { icon: 'campaign', label: 'Announcement', color: '#8b5cf6', template: templateCategories.find(c => c.id === 'announcement')?.subTemplates?.[0] },
+                                        { icon: 'auto_stories', label: 'Brand Story', color: '#f97316', prompt: `Create a compelling brand story visual for ${activeBrand?.name || 'the brand'}. Tell the brand narrative through imagery.` },
+                                    ].map(chip => (
+                                        <button key={chip.label} onClick={() => {
+                                            if (chip.template && chip.template.fields?.length > 0) { setActiveQuickTemplate(chip.template); setTemplateFields({}); }
+                                            else if (chip.prompt) setPrompt(chip.prompt);
+                                        }}
+                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer hover:scale-[1.03] border border-white/[0.06] hover:border-white/[0.12]"
+                                            style={{ background: `linear-gradient(135deg, ${chip.color}08, ${chip.color}04)` }}>
+                                            <span className="material-symbols-outlined text-sm" style={{ color: chip.color }}>{chip.icon}</span>
+                                            <span className="text-slate-300">{chip.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                    </div>{/* ═══════════ END RIGHT GALLERY PANEL ═══════════ */}
+
                 </div>
             )}
+
+
 
 
             {/* =================== AI PHOTOSHOOT MODE =================== */}
@@ -6646,6 +6573,41 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                 )}
                             </div>
 
+                            {/* Reference Scene Template */}
+                            <div className="studio-card p-5">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
+                                    <span className="material-symbols-outlined text-violet-400 text-lg">photo_library</span>
+                                    Reference Scene
+                                    <span className="text-[10px] font-medium bg-violet-500/20 text-violet-300 px-1.5 py-0.5 rounded-full ml-auto">Optional</span>
+                                </h3>
+                                <p className="text-xs text-slate-500 mb-3 leading-relaxed">Upload a reference scene image — the product will be placed into this exact setting</p>
+                                {!mockupTemplateImage ? (
+                                    <label className="flex flex-col items-center justify-center h-28 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-400/30 bg-white/[0.02] cursor-pointer transition-all group">
+                                        <span className="material-symbols-outlined text-2xl text-slate-600 group-hover:text-violet-400 transition-colors mb-1">add_photo_alternate</span>
+                                        <span className="text-xs text-slate-500 group-hover:text-slate-300">Upload scene template</span>
+                                        <span className="text-[10px] text-slate-600 mt-0.5">e.g. a lifestyle photo, store shelf, ad layout</span>
+                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                            const file = e.target.files?.[0]
+                                            if (file) {
+                                                const reader = new FileReader()
+                                                reader.onload = (ev) => setMockupTemplateImage(ev.target.result)
+                                                reader.readAsDataURL(file)
+                                            }
+                                        }} />
+                                    </label>
+                                ) : (
+                                    <div className="relative rounded-xl overflow-hidden group">
+                                        <img src={mockupTemplateImage} alt="Template Scene" className="w-full h-28 object-cover rounded-xl" />
+                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all" />
+                                        <button onClick={() => { setMockupTemplateImage(null); setMockupResult(null) }}
+                                            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                            <span className="material-symbols-outlined text-sm">close</span>
+                                        </button>
+                                        <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-violet-500/80 text-white text-[10px] font-bold">Template Active</div>
+                                    </div>
+                                )}
+                            </div>
+
                             {/* Scene Library */}
                             <div className="studio-card p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
@@ -6897,6 +6859,38 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                 />
                             </div>
 
+                            {/* Brand DNA Harmonize Toggle */}
+                            <div className="studio-card p-5">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-lg" style={{ color: activeBrand?.dna?.colors?.[0]?.hex || '#6366f1' }}>palette</span>
+                                        <div>
+                                            <h3 className="font-bold text-white text-sm">Brand Harmonize</h3>
+                                            <p className="text-[10px] text-slate-500">Adapt scene colors to brand palette</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setMockupHarmonize(!mockupHarmonize)}
+                                        className={`relative w-10 h-5.5 rounded-full transition-all cursor-pointer ${
+                                            mockupHarmonize ? 'bg-primary' : 'bg-white/[0.1]'
+                                        }`}
+                                        style={{ width: '40px', height: '22px' }}>
+                                        <div className={`absolute top-0.5 w-4.5 h-4.5 rounded-full bg-white shadow transition-all ${
+                                            mockupHarmonize ? 'left-[20px]' : 'left-[2px]'
+                                        }`} style={{ width: '18px', height: '18px' }} />
+                                    </button>
+                                </div>
+                                {mockupHarmonize && activeBrand?.dna?.colors?.length > 0 && (
+                                    <div className="mt-3 flex items-center gap-1.5 pt-2.5 border-t border-white/[0.05]">
+                                        <span className="text-[10px] text-slate-500 mr-1">Using:</span>
+                                        {activeBrand.dna.colors.slice(0, 5).map((c, i) => (
+                                            <div key={i} className="w-5 h-5 rounded-md border border-white/10 shadow-sm" style={{ background: c.hex }} title={c.name || c.hex} />
+                                        ))}
+                                        <span className="text-[10px] text-slate-600 ml-1">{activeBrand.name}</span>
+                                    </div>
+                                )}
+                            </div>
+
                             {/* Aspect Ratio */}
                             <div className="studio-card p-5">
                                 <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3">
@@ -6926,7 +6920,9 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                             productImage: mockupProductImage,
                                             scenePrompt: mockupScenePrompt,
                                             brandId: activeBrand?._id,
-                                            aspectRatio: mockupAspectRatio
+                                            aspectRatio: mockupAspectRatio,
+                                            templateImage: mockupTemplateImage || undefined,
+                                            harmonizeWithBrand: mockupHarmonize || undefined
                                         })
                                         if (res.success && res.imageUrl) setMockupResult(res.imageUrl)
                                         else setMockupError(res.error || 'Mockup generation failed')

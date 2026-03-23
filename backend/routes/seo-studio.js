@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { protect, optionalAuth } from '../middleware/auth.js';
 import { requireStudio } from '../middleware/studioAccess.js';
-import { requireCredits, logTokenUsage } from '../middleware/credits.js';
+import { requireCredits, refundCredits, logTokenUsage } from '../middleware/credits.js';
 import Brand from '../models/Brand.js';
 import SeoAudit from '../models/SeoAudit.js';
 import GeoProbeHistory from '../models/GeoProbeHistory.js';
@@ -449,6 +449,7 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
               lowTextRatioCount: ps.lowTextRatioCount || 0,
               avgTextToHtmlRatio: ps.avgTextToHtmlRatio || 0,
               metaRobotsIssues: { noindexCount: ps.noindexCount || 0 },
+              securityScore: { score: parseInt(ps.securityHeaderScore?.split('/')[0]) || 0, total: 7, details: ps.securityHeaders || [] },
             },
             _fallbackFromPrevious: true,
           };
@@ -1178,6 +1179,9 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
 
     res.json({ success: true, ...parsed });
   } catch (error) {
+    if (req.creditsDeducted > 0) {
+      await refundCredits(req.user._id, req.creditsDeducted, 'seoHealthCheck', `Refund: SEO Health Check Failure (${error.message?.substring(0, 80) || 'Unknown'})`, 'seo');
+    }
     next(error);
   }
 });
@@ -1506,6 +1510,9 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
 
     res.json({ success: true, ...parsed });
   } catch (error) {
+    if (req.creditsDeducted > 0) {
+      await refundCredits(req.user._id, req.creditsDeducted, 'seoTraffic', `Refund: SEO Traffic Analysis Failure (${error.message?.substring(0, 80) || 'Unknown'})`, 'seo');
+    }
     next(error);
   }
 });
@@ -1733,6 +1740,9 @@ Be STRATEGIC and SPECIFIC. Every insight must have a WHY and an actionable HOW. 
     res.json({ success: true, ...parsed });
   } catch (error) {
     console.error('SEO Competitors error:', error);
+    if (req.creditsDeducted > 0) {
+      await refundCredits(req.user._id, req.creditsDeducted, 'seoCompetitors', `Refund: SEO Competitors Failure (${safeErrorMessage(error)})`, 'seo');
+    }
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
@@ -2033,6 +2043,9 @@ STRATEGIC RULES (MANDATORY):
 
     res.json({ success: true, ...parsed });
   } catch (error) {
+    if (req.creditsDeducted > 0) {
+      await refundCredits(req.user._id, req.creditsDeducted, 'seoAiVisibility', `Refund: SEO AI Visibility Failure (${error.message?.substring(0, 80) || 'Unknown'})`, 'seo');
+    }
     next(error);
   }
 });
@@ -2128,6 +2141,9 @@ Respond in JSON:
 
     res.json({ success: true, ...parsed });
   } catch (error) {
+    if (req.creditsDeducted > 0) {
+      await refundCredits(req.user._id, req.creditsDeducted, 'seoAuditPage', `Refund: SEO Page Audit Failure (${error.message?.substring(0, 80) || 'Unknown'})`, 'seo');
+    }
     next(error);
   }
 });
@@ -2222,6 +2238,9 @@ CRITICAL: Only include REAL existing companies. Do not make up fictional compani
 
     res.json({ success: true, competitors: brand.competitors });
   } catch (error) {
+    if (req.creditsDeducted > 0) {
+      await refundCredits(req.user._id, req.creditsDeducted, 'seoCompetitorDiscover', `Refund: SEO Competitor Discover Failure (${safeErrorMessage(error)})`, 'seo');
+    }
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
@@ -2471,6 +2490,9 @@ Generate 5-10 discovered backlinks (from real DataForSEO data), 5-8 link gap ite
     res.json({ success: true, ...parsed });
   } catch (error) {
     console.error(`Backlink Intelligence error [${brandDomain || 'unknown'}]:`, error.stack || error);
+    if (req.creditsDeducted > 0) {
+      await refundCredits(req.user._id, req.creditsDeducted, 'seoBacklinks', `Refund: SEO Backlink Intelligence Failure (${error.message?.substring(0, 80) || 'Unknown'})`, 'seo');
+    }
     
     const isTimeout = error.name === 'AbortError' || 
                       error.message.toLowerCase().includes('timeout') || 
@@ -2644,6 +2666,9 @@ Respond in STRICT JSON:
     res.json({ success: true, ...parsed });
   } catch (error) {
     console.error('War Room error:', error);
+    if (req.creditsDeducted > 0) {
+      await refundCredits(req.user._id, req.creditsDeducted, 'seoWarRoom', `Refund: SEO War Room Failure (${safeErrorMessage(error)})`, 'seo');
+    }
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
@@ -2812,6 +2837,9 @@ CRITICAL: Use the REAL mention rate (${probeData.aggregate.mentionRate}%) as the
     res.json({ success: true, ...parsed });
   } catch (error) {
     console.error('LLM Probe error:', error);
+    if (req.creditsDeducted > 0) {
+      await refundCredits(req.user._id, req.creditsDeducted, 'seoLlmProbe', `Refund: SEO LLM Probe Failure (${safeErrorMessage(error)})`, 'seo');
+    }
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
@@ -2929,6 +2957,9 @@ Generate production-ready code. Every fix must be copy-paste ready. Use the bran
     res.json({ success: true, ...parsed });
   } catch (error) {
     console.error('Auto-Fix error:', error);
+    if (req.creditsDeducted > 0) {
+      await refundCredits(req.user._id, req.creditsDeducted, 'seoAutoFix', `Refund: SEO Auto-Fix Failure (${safeErrorMessage(error)})`, 'seo');
+    }
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
@@ -3105,6 +3136,9 @@ Generate 15-20 mined prompts. Be specific to this brand's industry. Think about 
     res.json({ success: true, ...parsed });
   } catch (error) {
     console.error('Prompt Mining error:', error);
+    if (req.creditsDeducted > 0) {
+      await refundCredits(req.user._id, req.creditsDeducted, 'seoPromptMining', `Refund: SEO Prompt Mining Failure (${safeErrorMessage(error)})`, 'seo');
+    }
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
@@ -3293,6 +3327,9 @@ router.post('/js-crawl', protect, requireCredits('seoHealthCheck'), async (req, 
     res.json({ success: true, ...crawlData });
   } catch (error) {
     console.error('JS Crawl error:', error);
+    if (req.creditsDeducted > 0) {
+      await refundCredits(req.user._id, req.creditsDeducted, 'seoHealthCheck', `Refund: SEO JS Crawl Failure (${safeErrorMessage(error)})`, 'seo');
+    }
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
@@ -3326,6 +3363,9 @@ router.post('/content-score', protect, requireCredits('seoHealthCheck'), async (
     res.json({ success: true, ...siteScores });
   } catch (error) {
     console.error('Content scoring error:', error);
+    if (req.creditsDeducted > 0) {
+      await refundCredits(req.user._id, req.creditsDeducted, 'seoHealthCheck', `Refund: SEO Content Score Failure (${safeErrorMessage(error)})`, 'seo');
+    }
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
@@ -3386,6 +3426,9 @@ router.post('/competitor-monitor', protect, requireCredits('seoCompetitors'), as
     });
   } catch (error) {
     console.error('Competitor monitor error:', error);
+    if (req.creditsDeducted > 0) {
+      await refundCredits(req.user._id, req.creditsDeducted, 'seoCompetitors', `Refund: SEO Competitor Monitor Failure (${safeErrorMessage(error)})`, 'seo');
+    }
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
@@ -3595,6 +3638,9 @@ Respond in JSON:
 
     res.json({ success: true, ...parsed });
   } catch (error) {
+    if (req.creditsDeducted > 0) {
+      await refundCredits(req.user._id, req.creditsDeducted, 'seoAsk', `Refund: SEO Ask Failure (${error.message?.substring(0, 80) || 'Unknown'})`, 'seo');
+    }
     next(error);
   }
 });
@@ -3690,6 +3736,9 @@ Generate the content now.`;
     });
   } catch (error) {
     console.error('SEO content-fix error:', error);
+    if (req.creditsDeducted > 0) {
+      await refundCredits(req.user._id, req.creditsDeducted, 'contentRefine', `Refund: SEO Content Fix Failure (${error.message?.substring(0, 80) || 'Unknown'})`, 'seo');
+    }
     next(error);
   }
 });

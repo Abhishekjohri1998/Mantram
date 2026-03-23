@@ -138,6 +138,7 @@ async function renderPage(page, url, viewport = { width: 1440, height: 900 }) {
       url,
       status: response?.status() || 0,
       rendered: true,
+      headers: response?.headers() || {},
       ...data,
       internalLinks: data.links.filter(l => !l.isExternal),
       externalLinks: data.links.filter(l => l.isExternal),
@@ -150,7 +151,7 @@ async function renderPage(page, url, viewport = { width: 1440, height: 900 }) {
       error: e.message,
       title: '', metaDesc: '', wordCount: 0,
       h1s: [], h2s: [], links: [], internalLinks: [], externalLinks: [],
-      images: [], schemas: [], ogTags: {}, timing: {},
+      images: [], schemas: [], ogTags: {}, timing: {}, headers: {},
     };
   }
 }
@@ -256,6 +257,7 @@ export async function jsRenderCrawl(startUrl, options = {}) {
         externalLinkCount: p.externalLinks.length,
         schemas: p.schemas, imagesWithoutAlt: p.imagesWithoutAlt,
         timing: p.timing, clickDepth: depthMap[normalizeUrl(p.url)] ?? -1,
+        headers: p.headers || {},
       })),
       // Issues
       issues: {
@@ -292,7 +294,7 @@ export async function jsRenderCrawl(startUrl, options = {}) {
     return {
       pagesRendered: pages.length,
       error: e.message,
-      pages: pages.map(p => ({ url: p.url, status: p.status, title: p.title, wordCount: p.wordCount })),
+      pages: pages.map(p => ({ url: p.url, status: p.status, title: p.title, wordCount: p.wordCount, headers: p.headers || {} })),
       issues: {},
     };
   }

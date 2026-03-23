@@ -116,7 +116,7 @@ export default function SeoStudio() {
     // Check GA connection on mount AND on brand change
     useEffect(() => {
         // Reset GA state on brand switch
-        setGaConnected(false); setGaEmail(''); setGaProperties([]); setGaSelectedProp(''); setGaReport(null); setGaSites([]); setGaSelectedSite(''); setGscReport(null);
+        setGaConnected(false); setGaEmail(''); setGaProperties([]); setGaSelectedProp(''); setGaReport(null); setGaSites([]); setGaSelectedSite(''); setGscReport(null); setGaAuthError('');
         const brandId = activeBrand?._id;
         gaAPI.status(brandId).then(d => {
             setGaConnected(d.connected); setGaEmail(d.email || '')
@@ -126,6 +126,8 @@ export default function SeoStudio() {
         window.addEventListener('message', handler)
         return () => window.removeEventListener('message', handler)
     }, [activeBrand])
+
+    const [gaAuthError, setGaAuthError] = useState('');
 
     const loadGAProperties = async () => {
         try {
@@ -138,7 +140,11 @@ export default function SeoStudio() {
                 setGaSelectedProp(firstProp)
                 loadGAReport(firstProp)
             }
-        } catch { }
+        } catch (e) {
+            if (e.message.includes('Not connected') || e.message.includes('invalid') || e.message.includes('expired')) {
+                setGaAuthError('Your Google connection has expired. Please reconnect.');
+            }
+        }
     }
     const loadGSCSites = async () => {
         try {
@@ -151,18 +157,39 @@ export default function SeoStudio() {
                 setGaSelectedSite(firstSite)
                 loadGSCReport(firstSite)
             }
-        } catch { }
+        } catch (e) {
+            if (e.message.includes('Not connected') || e.message.includes('invalid') || e.message.includes('expired')) {
+                setGaAuthError('Your Google connection has expired. Please reconnect.');
+            }
+        }
     }
     const loadGAReport = async (propId) => {
         if (!propId) return; setGaLoading(true)
-        try { const d = await gaAPI.report({ propertyId: propId, brandId: activeBrand?._id }); if (d.success) setGaReport(d) } catch { }
-        finally { setGaLoading(false) }
+        try { const d = await gaAPI.report({ propertyId: propId, brandId: activeBrand?._id }); if (d.success) setGaReport(d) } catch (e) {
+            if (e.message.includes('Not connected') || e.message.includes('invalid') || e.message.includes('expired')) setGaAuthError('Your Google connection has expired. Please reconnect.');
+        } finally { setGaLoading(false) }
     }
     const loadGSCReport = async (siteUrl) => {
         if (!siteUrl) return; setGaLoading(true)
-        try { const d = await gaAPI.searchConsoleReport({ siteUrl, brandId: activeBrand?._id }); if (d.success) setGscReport(d) } catch { }
-        finally { setGaLoading(false) }
+        try { const d = await gaAPI.searchConsoleReport({ siteUrl, brandId: activeBrand?._id }); if (d.success) setGscReport(d) } catch (e) {
+            if (e.message.includes('Not connected') || e.message.includes('invalid') || e.message.includes('expired')) setGaAuthError('Your Google connection has expired. Please reconnect.');
+        } finally { setGaLoading(false) }
     }
+
+    const reconnectGA = async () => {
+        setGaAuthError('');
+        try {
+            const { url } = await gaAPI.connect(activeBrand?._id);
+            if (url) {
+                const width = 600, height = 700;
+                const left = window.screenX + (window.outerWidth - width) / 2;
+                const top = window.screenY + (window.outerHeight - height) / 2;
+                window.open(url, 'ConnectGoogle', `width=${width},height=${height},left=${left},top=${top},sandbox=allow-scripts allow-same-origin allow-popups`);
+            }
+        } catch (e) {
+            console.error('GA Reconnect Error:', e.message);
+        }
+    };
     // Connect/disconnect now happens in the Integrations hub — SEO Studio only reads status
 
     const brandPayload = activeBrand ? { name: activeBrand.name, website: activeBrand.website, _id: activeBrand._id, dna: activeBrand.dna } : null
@@ -1222,6 +1249,8 @@ small{color:#94a3b8;font-size:10px}
                                 gaReport={gaReport}
                                 gscReport={gscReport}
                                 gaLoading={gaLoading}
+                                gaAuthError={gaAuthError}
+                                reconnectGA={reconnectGA}
                                 hideNav
                             />
                         )}

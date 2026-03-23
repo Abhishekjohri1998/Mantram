@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import DashboardLayout from '../components/DashboardLayout'
 import StudioReportButton from '../components/reports/StudioReportButton'
-import { apiFetch as api } from '../services/api'
+import { apiFetch as api, googleAnalytics } from '../services/api'
 
 // ── Tab config ──
 const TABS = [
@@ -82,6 +82,13 @@ export default function PerformanceMarketing() {
     const [grokSeoKeywords, setGrokSeoKeywords] = useState(null)
     const [grokContent, setGrokContent] = useState([])
     const [loadingGrok, setLoadingGrok] = useState(false)
+    
+    // AdSense state
+    const [adsenseAccounts, setAdsenseAccounts] = useState([])
+    const [adsenseSelected, setAdsenseSelected] = useState('')
+    const [adsenseReport, setAdsenseReport] = useState(null)
+    const [adsenseLoading, setAdsenseLoading] = useState(false)
+    const [adsenseError, setAdsenseError] = useState('')
 
     // ── Load dashboard data ──
     const loadDashboard = useCallback(async () => {
@@ -142,6 +149,27 @@ export default function PerformanceMarketing() {
         finally { setLoadingGrok(false) }
     }, [activeBrand])
 
+    // ── Load AdSense data ──
+    const loadAdSense = useCallback(async () => {
+        setAdsenseLoading(true); setAdsenseError('');
+        try {
+            const data = await googleAnalytics.adsenseAccounts(activeBrand?._id)
+            if (data.accounts?.length > 0) {
+                setAdsenseAccounts(data.accounts)
+                const first = data.accounts[0].id
+                setAdsenseSelected(first)
+                const rep = await googleAnalytics.adsenseReport({ accountId: first, brandId: activeBrand?._id })
+                if (rep.success) setAdsenseReport(rep.report)
+            } else {
+                setAdsenseError('No AdSense accounts found.')
+            }
+        } catch (e) {
+            setAdsenseError(e.message.includes('expired') || e.message.includes('connected') || e.message.includes('401') ? 'Google connection expired or missing AdSense permissions. Reconnect Google Ads.' : 'Failed to load AdSense.')
+        } finally {
+            setAdsenseLoading(false)
+        }
+    }, [activeBrand])
+
     useEffect(() => {
         loadDashboard()
         loadCampaigns()
@@ -151,6 +179,12 @@ export default function PerformanceMarketing() {
         loadGrokTrends()
         loadStrategyHealth()
     }, [loadDashboard, loadCampaigns, loadReports, loadLearnings, loadConnections, loadGrokTrends])
+
+    useEffect(() => {
+        if (connections.google?.status === 'connected') {
+            loadAdSense()
+        }
+    }, [connections.google?.status, loadAdSense])
 
     // ── Load strategy health ──
     const loadStrategyHealth = useCallback(async () => {
@@ -493,6 +527,133 @@ export default function PerformanceMarketing() {
                                 </div>
                             </div>
                         </div>
+
+                        {/* ── 🔥 ADSENSE REVENUE (Conditionally rendered if connected) ── */}
+                        {connections.google?.status === 'connected' && (adsenseLoading || adsenseReport || adsenseError) && (
+                            <div className="glass-panel rounded-2xl p-6 border border-emerald-500/20">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-emerald-400">monetization_on</span>
+                                        Google AdSense Revenue
+                                    </h3>
+                                    {adsenseAccounts.length > 1 && (
+                                        <select
+                                            value={adsenseSelected}
+                                            onChange={(e) => {
+                                                setAdsenseSelected(e.target.value);
+                                                setAdsenseLoading(true);
+                                                googleAnalytics.adsenseReport({ accountId: e.target.value, brandId: activeBrand?._id })
+                                                    .then(res => setAdsenseReport(res.report))
+                                                    .finally(() => setAdsenseLoading(false));
+                                            }}
+                                            className="bg-slate-800/50 border border-slate-700 text-white text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-emerald-500 transition-colors"
+                                        >
+                                            {adsenseAccounts.map(a => <option key={a.id} value={a.id}>{a.displayName}</option>)}
+                                        </select>
+                                    )}
+                                </div>
+                                
+                                {adsenseLoading ? (
+                                    <div className="flex items-center justify-center p-8">
+                                        <span className="material-symbols-outlined animate-spin text-emerald-400 text-3xl">progress_activity</span>
+                                    </div>
+                                ) : adsenseError ? (
+                                    <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-sm">
+                                        {adsenseError}
+                                    </div>
+                                ) : adsenseReport ? (
+                                    <div className="space-y-6">
+                                        {/* AdSense KPI Summary */}
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                            {[
+                                                { label: 'Estimated Earnings', value: `₹${parseFloat(adsenseReport.totals?.cells?.[5]?.value || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: 'payments', color: 'emerald' },
+                                                { label: 'Page Views', value: parseInt(adsenseReport.totals?.cells?.[1]?.value || 0).toLocaleString(), icon: 'visibility', color: 'blue' },
+                                                { label: 'Clicks', value: parseInt(adsenseReport.totals?.cells?.[3]?.value || 0).toLocaleString(), icon: 'ads_click', color: 'amber' },
+                                                { label: 'Avg CTR', value: `${(parseFloat(adsenseReport.totals?.cells?.[3]?.value || 0) / parseFloat(adsenseReport.totals?.cells?.[1]?.value || 1) * 100).toFixed(2)}%`, icon: 'percent', color: 'violet' }
+                                            ].map((s, i) => (
+                                                <div key={i} className={`p-4 rounded-xl border border-${s.color}-500/20 bg-${s.color}-500/5 text-center`}>
+                                                    <span className={`material-symbols-outlined text-2xl text-${s.color}-400 mb-2 block`}>{s.icon}</span>
+                                                    <p className="text-xl font-black text-white">{s.value}</p>
+                                                    <p className="text-[10px] uppercase font-bold text-slate-400 mt-1">{s.label}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        {/* AdSense Trend Sparkline */}
+                                        <div className="p-4 bg-white/[0.02] border border-white/[0.05] rounded-xl">
+                                            <p className="text-xs text-slate-400 font-bold uppercase mb-4">Daily Revenue (Last 30 Days)</p>
+                                            <div className="h-24 w-full relative">
+                                                {(() => {
+                                                    const rows = adsenseReport.rows || [];
+                                                    if (rows.length < 2) return <p className="text-slate-500 text-xs text-center pt-8">Not enough data to trend</p>;
+                                                    const maxV = Math.max(...rows.map(r => parseFloat(r.cells[5].value)), 1);
+                                                    const minV = Math.min(...rows.map(r => parseFloat(r.cells[5].value)));
+                                                    const w = 100, h = 100;
+                                                    const points = rows.map((r, i) => {
+                                                        const x = (i / (rows.length - 1)) * w;
+                                                        const y = h - ((parseFloat(r.cells[5].value) - minV) / (maxV - minV || 1)) * (h - 10) - 5;
+                                                        return `${x},${y}`;
+                                                    }).join(' ');
+                                                    const areaPath = `M 0,${h} L ${rows.map((r, i) => { const x = (i / (rows.length - 1)) * w; const y = h - ((parseFloat(r.cells[5].value) - minV) / (maxV - minV || 1)) * (h - 10) - 5; return `${x},${y}`; }).join(' L ')} L ${w},${h} Z`;
+                                                    return (
+                                                        <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-full" preserveAspectRatio="none">
+                                                            <defs>
+                                                                <linearGradient id="adsenseGrad" x1="0" y1="0" x2="0" y2="1">
+                                                                    <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
+                                                                    <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+                                                                </linearGradient>
+                                                            </defs>
+                                                            <path d={areaPath} fill="url(#adsenseGrad)" />
+                                                            <polyline points={points} fill="none" stroke="#34d399" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+                                                        </svg>
+                                                    );
+                                                })()}
+                                            </div>
+                                        </div>
+
+                                        {/* Monetization Insights */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {/* Ad Blindness Alert */}
+                                            {(() => {
+                                                const ctr = (parseFloat(adsenseReport.totals?.cells?.[3]?.value || 0) / parseFloat(adsenseReport.totals?.cells?.[1]?.value || 1)) * 100;
+                                                const impressions = parseInt(adsenseReport.totals?.cells?.[2]?.value || 0);
+                                                
+                                                return (
+                                                    <div className="p-4 bg-violet-500/5 border border-violet-500/10 rounded-xl relative overflow-hidden group">
+                                                        <div className="absolute top-0 right-0 w-24 h-24 bg-violet-500/10 blur-2xl rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-150" />
+                                                        <h4 className="text-sm font-bold text-violet-400 flex items-center gap-2 mb-2">
+                                                            <span className="material-symbols-outlined text-base">visibility_off</span>
+                                                            Ad Blindness Risk
+                                                        </h4>
+                                                        {(ctr < 1.0 && impressions > 1000) ? (
+                                                            <p className="text-xs text-slate-300 mb-2">Your ad CTR is low (<span className="font-bold text-violet-400">{ctr.toFixed(2)}%</span>). Visitors might be experiencing ad blindness. Consider testing new ad placements.</p>
+                                                        ) : (
+                                                            <p className="text-xs text-emerald-400 mb-2">Ad engagement is healthy. CTR is stable relative to your page views.</p>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
+
+                                            {/* Revenue Potential */}
+                                            {(() => {
+                                                const rpm = (parseFloat(adsenseReport.totals?.cells?.[5]?.value || 0) / parseFloat(adsenseReport.totals?.cells?.[1]?.value || 1)) * 1000;
+
+                                                
+                                                return (
+                                                    <div className="p-4 bg-cyan-500/5 border border-cyan-500/10 rounded-xl relative overflow-hidden group">
+                                                        <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 blur-2xl rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-150" />
+                                                        <h4 className="text-sm font-bold text-cyan-400 flex items-center gap-2 mb-2">
+                                                            <span className="material-symbols-outlined text-base">trending_up</span>
+                                                            Revenue Potential (RPM)
+                                                        </h4>
+                                                        <p className="text-xs text-slate-300 mb-2">You are earning <span className="font-bold text-cyan-400">₹{rpm.toFixed(2)}</span> per 1,000 page views. Focus on driving organic traffic to high-RPM pages to scale earnings.</p>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                    </div>
+                                ) : null}
+                            </div>
+                        )}
 
                         {/* ── 🔥 GROK TRENDING NOW ── */}
                         <div className="glass-panel rounded-2xl p-6 border border-orange-500/20">

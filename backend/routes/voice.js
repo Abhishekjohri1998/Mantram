@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { protect, optionalAuth } from '../middleware/auth.js';
-import { requireCredits } from '../middleware/credits.js';
+import { requireCredits, refundCredits } from '../middleware/credits.js';
 import multer from 'multer';
 import { safeErrorMessage } from '../utils/safeError.js';
 
@@ -82,6 +82,9 @@ router.post('/transcribe', protect, requireCredits('voiceTranscribe'), upload.si
 
     } catch (error) {
         console.error('Voice transcription error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'voiceTranscribe', `Refund: Voice Transcription Sync Failure (${safeErrorMessage(error)})`, 'voice');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -178,6 +181,9 @@ async function transcribeWithWhisper(req, res, language) {
 
     if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'voiceTranscribe', `Refund: Whisper STT Failure (${errData.error?.message || 'Unknown'})`, 'voice');
+        }
         return res.status(response.status).json({
             success: false,
             error: errData.error?.message || 'Transcription failed',

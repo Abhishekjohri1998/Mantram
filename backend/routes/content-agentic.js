@@ -13,7 +13,7 @@ import { Router } from 'express';
 import Content from '../models/Content.js';
 import Brand from '../models/Brand.js';
 import { protect } from '../middleware/auth.js';
-import { requireCredits } from '../middleware/credits.js';
+import { requireCredits, refundCredits } from '../middleware/credits.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import {
     researchNode,
@@ -90,6 +90,9 @@ router.post('/start', protect, requireCredits('content'), async (req, res) => {
         });
     } catch (error) {
         console.error('Content agentic start error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'contentGenerate', `Refund: Agentic Content Start Failure (${safeErrorMessage(error)})`, 'content');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -155,6 +158,9 @@ router.post('/:id/refine', protect, requireCredits('contentRefine'), async (req,
         });
     } catch (error) {
         console.error('Content agentic refine error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'contentRefine', `Refund: Agentic Content Refine Failure (${safeErrorMessage(error)})`, 'content');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -278,6 +284,9 @@ router.post('/youtube', protect, requireCredits('content'), async (req, res) => 
         });
     } catch (error) {
         console.error('YouTube content generation error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'contentGenerate', `Refund: YouTube Content Generation Failure (${safeErrorMessage(error)})`, 'content');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -355,6 +364,9 @@ router.post('/youtube-seo', protect, requireCredits('content'), async (req, res)
         });
     } catch (error) {
         console.error('YouTube SEO generation error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'contentGenerate', `Refund: YouTube SEO Generation Failure (${safeErrorMessage(error)})`, 'content');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });

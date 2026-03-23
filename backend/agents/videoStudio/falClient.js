@@ -51,6 +51,11 @@ const MODEL_ENDPOINTS = {
         textToVideo: 'fal-ai/bytedance/seedance/v2/pro/text-to-video',
         imageToVideo: 'fal-ai/bytedance/seedance/v2/pro/image-to-video',
     },
+    // HunyuanVideo 1.5 — Tencent, cheapest draft tier
+    'hunyuan': {
+        textToVideo: 'fal-ai/hunyuan-video/video-to-video',
+        imageToVideo: 'fal-ai/hunyuan-video/image-to-video',
+    },
 };
 
 // ── Model availability ──
@@ -61,6 +66,7 @@ const MODEL_AVAILABLE = {
     'seedance-1.0': true,
     'seedance-2.0': true,
     'grok-imagine': true,
+    'hunyuan': true,
 };
 
 // ── Cost table (USD per second of video) ──
@@ -71,6 +77,7 @@ export const COST_PER_SECOND = {
     'seedance-1.0': { fast: 0.05, quality: 0.08 },
     'seedance-2.0': { fast: 0.08, quality: 0.15 },
     'grok-imagine': { fast: 0.08, quality: 0.08 },
+    'hunyuan': { fast: 0.03, quality: 0.05 },
 };
 
 // ── Duration limits per model ──
@@ -81,6 +88,7 @@ const DURATION_LIMITS = {
     'seedance-1.0': { min: 5, max: 10, supported: [5, 10] },
     'seedance-2.0': { min: 5, max: 15, supported: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] },
     'grok-imagine': { min: 1, max: 15, supported: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] },
+    'hunyuan': { min: 3, max: 10, supported: [3, 4, 5, 6, 7, 8, 9, 10] },
 };
 
 // ── Resolution config ──
@@ -187,6 +195,22 @@ export const MODEL_CAPABILITIES = {
         costPerSecond: COST_PER_SECOND['grok-imagine'],
         recommended: false,
     },
+    'hunyuan': {
+        id: 'hunyuan', name: 'HunyuanVideo', icon: '🎨', provider: 'fal',
+        description: 'Tencent draft-tier — cheapest model, great for fast iterations',
+        bestFor: 'Quick drafts, prototyping, budget-friendly iterations',
+        duration: { min: 3, max: 10, native: 10, step: 1 },
+        resolutions: ['480p', '720p', '1080p'],
+        aspectRatios: ['16:9', '9:16', '1:1'],
+        features: {
+            firstFrame: true, lastFrame: false, referenceImages: false,
+            extendVideo: false, multiShot: false, nativeAudio: false,
+            voiceIds: false, cameraControl: false,
+        },
+        maxReferenceImages: 0,
+        costPerSecond: COST_PER_SECOND['hunyuan'],
+        recommended: false,
+    },
 };
 
 /**
@@ -280,6 +304,15 @@ function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, sho
             aspect_ratio: '16:9',
             generate_audio: generateAudio !== false,
             seed: Math.floor(Math.random() * 999999),
+        };
+    }
+
+    if (model === 'hunyuan') {
+        return {
+            prompt,
+            video_length: dur,
+            seed: Math.floor(Math.random() * 999999),
+            resolution: resolution === '1080p' ? '1080p' : '720p',
         };
     }
 
@@ -717,6 +750,17 @@ export function getModelsInfo() {
             duration: DURATION_LIMITS['seedance-2.0'],
             features: ['native-audio', 'camera-control', 'cinematic', 'image-to-video', '4-15s'],
             available: !!(config.kie?.apiKey || process.env.KIE_API_KEY),
+            recommended: false,
+        },
+        {
+            id: 'hunyuan',
+            name: 'HunyuanVideo',
+            description: 'Tencent draft-tier — cheapest model for fast iterations & prototyping',
+            bestFor: 'Quick drafts, prototyping, budget-friendly iterations',
+            costPerSecond: COST_PER_SECOND['hunyuan'],
+            duration: DURATION_LIMITS['hunyuan'],
+            features: ['text-to-video', 'image-to-video', '3-10s', 'cheapest', 'draft'],
+            available: true,
             recommended: false,
         },
     ];

@@ -7,6 +7,7 @@ import DashboardLayout from '../components/DashboardLayout'
 import { creatives as creativesAPI } from '../services/api'
 import AdvancedMode from '../components/VideoStudio/AdvancedMode'
 import UGCCreator from '../components/VideoStudio/UGCCreator'
+import VideoAgent from '../components/VideoStudio/VideoAgent'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -99,6 +100,7 @@ export default function VideoStudio() {
     const [showLibrary, setShowLibrary] = useState(false)
     const [libraryImages, setLibraryImages] = useState([])
     const [libraryLoading, setLibraryLoading] = useState(false)
+    const [modelCapabilities, setModelCapabilities] = useState(null)
 
     // File input ref
     const fileInputRef = useRef(null)
@@ -194,6 +196,7 @@ export default function VideoStudio() {
     // Load history on mount
     useEffect(() => {
         api('/video-studio?limit=50').then(d => setProjects(d.projects || [])).catch(() => { })
+        api('/video-studio/models/capabilities').then(d => setModelCapabilities(d.capabilities || null)).catch(() => { })
 
         // Check for brainstorm context
         if (searchParams.get('fromBrainstorm') === 'true') {
@@ -303,7 +306,11 @@ export default function VideoStudio() {
                 method: 'POST',
                 body: JSON.stringify({ editedPrompt: backendPrompt }),
             })
-            setRouting({ ...data.project.routing, aspectRatio: data.project.routing?.aspectRatio || '16:9' })
+            setRouting({ 
+                ...data.project.routing, 
+                aspectRatio: data.project.routing?.aspectRatio || '16:9',
+                generateAudio: data.project.routing?.generateAudio !== false // Default to true unless explicitly false
+            })
             setReferences(data.project.references)
             setPipeline(data.project.pipeline)
             // Show first frame if auto-generated
@@ -498,6 +505,12 @@ export default function VideoStudio() {
                             ? 'bg-gradient-to-r from-amber-500 to-pink-600 text-white shadow-lg shadow-amber-500/20'
                             : 'text-slate-500 hover:text-white hover:bg-white/[0.03]'}`}>
                         <span className="material-symbols-outlined text-lg">person_play</span> UGC Creator
+                    </button>
+                    <button onClick={() => setStudioMode('agent')}
+                        className={`px-6 py-3 rounded-xl text-base font-semibold transition-all cursor-pointer flex items-center gap-2.5 ${studioMode === 'agent'
+                            ? 'bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-lg shadow-teal-500/20'
+                            : 'text-slate-500 hover:text-white hover:bg-white/[0.03]'}`}>
+                        <span className="material-symbols-outlined text-lg">smart_display</span> Video Agent
                     </button>
                 </div>
 
@@ -747,6 +760,11 @@ export default function VideoStudio() {
                 {/* ── UGC CREATOR MODE (HeyGen) ── */}
                 {studioMode === 'ugc' && (
                     <UGCCreator activeBrand={activeBrand} />
+                )}
+
+                {/* ── VIDEO AGENT MODE ── */}
+                {studioMode === 'agent' && (
+                    <VideoAgent activeBrand={activeBrand} />
                 )}
 
                 {/* ── STORYBOARD MODE ── */}
@@ -1402,7 +1420,7 @@ export default function VideoStudio() {
                                 <div className="flex items-center gap-3 mb-3 flex-wrap">
                                     <span className="text-sm text-slate-500">Resolution:</span>
                                     <div className="flex flex-wrap gap-2">
-                                        {['720p', '1080p', '4k'].map(r => (
+                                        {(modelCapabilities?.[routing.selectedModel]?.resolutions || ['720p', '1080p', '4k']).map(r => (
                                             <button key={r} onClick={() => setRouting(prev => ({ ...prev, resolution: r }))}
                                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${routing.resolution === r
                                                     ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
@@ -1416,7 +1434,7 @@ export default function VideoStudio() {
                                 <div className="flex items-center gap-3 mb-3 flex-wrap">
                                     <span className="text-sm text-slate-500">Ratio:</span>
                                     <div className="flex flex-wrap gap-2">
-                                        {['16:9', '9:16', '1:1', '4:3', '3:4'].map(r => (
+                                        {(modelCapabilities?.[routing.selectedModel]?.aspectRatios || ['16:9', '9:16', '1:1', '4:3', '3:4']).map(r => (
                                             <button key={r} onClick={() => setRouting(prev => ({ ...prev, aspectRatio: r }))}
                                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${(routing.aspectRatio || '16:9') === r
                                                     ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
@@ -1427,7 +1445,7 @@ export default function VideoStudio() {
                                 </div>
 
                                 {/* Mode Selector */}
-                                <div className="flex items-center gap-3 flex-wrap">
+                                <div className="flex items-center gap-3 mb-3 flex-wrap">
                                     <span className="text-sm text-slate-500">Mode:</span>
                                     <div className="flex flex-wrap gap-2">
                                         {['fast', 'quality'].map(m => (
@@ -1439,6 +1457,34 @@ export default function VideoStudio() {
                                         ))}
                                     </div>
                                 </div>
+
+                                {/* Audio Generation Toggle */}
+                                {modelCapabilities?.[routing.selectedModel]?.features?.nativeAudio && (
+                                    <div className="flex items-center gap-3 mb-3 flex-wrap">
+                                        <span className="text-sm text-slate-500">Audio:</span>
+                                        <div className="flex items-center gap-2">
+                                            <button 
+                                                onClick={() => setRouting(prev => ({ ...prev, generateAudio: true }))}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${
+                                                    routing.generateAudio !== false
+                                                        ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                                                        : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'
+                                                }`}>
+                                                <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">volume_up</span> With Audio</span>
+                                            </button>
+                                            <button 
+                                                onClick={() => setRouting(prev => ({ ...prev, generateAudio: false }))}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${
+                                                    routing.generateAudio === false
+                                                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                                        : 'bg-white/[0.03] text-slate-500 border border-white/[0.06] hover:text-white'
+                                                }`}>
+                                                <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">volume_off</span> No Audio</span>
+                                            </button>
+                                        </div>
+                                        <span className="text-xs text-slate-500 italic ml-2">Native sound effects and ambiance</span>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Generate Button */}

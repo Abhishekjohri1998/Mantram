@@ -315,7 +315,7 @@ export async function videoGeneratorNode(state) {
         resolution,
         mode,
         shots: shots.length > 1 ? shots : undefined, // Only use multi-prompt if 2+ shots
-        generateAudio: true,
+        generateAudio: state.routing?.generateAudio !== false,
         aspectRatio: state.routing?.aspectRatio || '16:9',
     });
 

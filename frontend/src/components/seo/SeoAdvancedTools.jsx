@@ -43,7 +43,7 @@ const TAB_TO_AUDIT_TYPE = {
     'backlinks': 'backlinks',
 };
 
-export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, website, competitors, brandPayload, gaConnected, gaReport, gscReport, gaLoading, hideNav }) {
+export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, website, competitors, brandPayload, gaConnected, gaReport, gscReport, gaLoading, gaAuthError, reconnectGA, hideNav }) {
     // Per-tab data cache
     const [tabData, setTabData] = useState({});
     const [loadingAction, setLoadingAction] = useState('');
@@ -370,6 +370,49 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                     </SectionCard>
                                 )}
 
+                                {/* Device Split & Geo */}
+                                {gaReport.deviceSplit?.length > 0 && (
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                        <SectionCard title="Device Split" icon="devices">
+                                            <div className="flex flex-col gap-3 mt-2">
+                                                {gaReport.deviceSplit.map((d, i) => {
+                                                    const icon = d.device.toLowerCase() === 'mobile' ? 'smartphone' : d.device.toLowerCase() === 'tablet' ? 'tablet_mac' : 'desktop_windows';
+                                                    const color = d.device.toLowerCase() === 'mobile' ? '#34d399' : d.device.toLowerCase() === 'tablet' ? '#fbbf24' : '#60a5fa';
+                                                    const pct = ((d.sessions / gaReport.summary.totalSessions) * 100).toFixed(1);
+                                                    return (
+                                                        <div key={i} className="flex items-center gap-3 bg-white/[0.02] p-3 rounded-xl border border-white/[0.05]">
+                                                            <span className="material-symbols-outlined text-xl" style={{ color }}>{icon}</span>
+                                                            <div className="flex-1">
+                                                                <p className="text-xs font-bold text-white uppercase">{d.device}</p>
+                                                                <div className="mt-1 h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
+                                                                    <div className="h-full bg-gradient-to-r transition-all duration-700 rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <p className="text-sm font-bold text-white">{pct}%</p>
+                                                                <p className="text-[10px] text-slate-500">{d.sessions.toLocaleString()} sessions</p>
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </SectionCard>
+                                        {gaReport.geoCountry?.length > 0 && (
+                                            <SectionCard title="Top Countries" icon="public">
+                                                <DataTable columns={[
+                                                    { key: 'country', label: 'Country' },
+                                                    { key: 'sessions', label: 'Sessions' },
+                                                    { key: 'users', label: 'Users' }
+                                                ]} rows={gaReport.geoCountry.slice(0, 5).map(c => ({
+                                                    country: <span className="text-xs font-semibold">{c.country}</span>,
+                                                    sessions: c.sessions?.toLocaleString(),
+                                                    users: c.users?.toLocaleString()
+                                                }))} />
+                                            </SectionCard>
+                                        )}
+                                    </div>
+                                )}
+
                                 {/* Top Pages */}
                                 {gaReport.topPages?.length > 0 && (
                                     <SectionCard title={`Top Pages (${gaReport.topPages.length})`} icon="description">
@@ -397,20 +440,74 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 {/* GSC KPI Summary */}
                                 <SectionCard title="Search Console — Last 28 Days" icon="travel_explore">
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                        {[
-                                            { l: 'Total Clicks', v: gscReport.summary?.totalClicks?.toLocaleString(), icon: 'ads_click', color: '#34d399' },
-                                            { l: 'Impressions', v: gscReport.summary?.totalImpressions?.toLocaleString(), icon: 'visibility', color: '#60a5fa' },
-                                            { l: 'Avg CTR', v: `${((gscReport.summary?.avgCtr || 0) * 100).toFixed(2)}%`, icon: 'percent', color: '#fbbf24' },
-                                            { l: 'Avg Position', v: (gscReport.summary?.avgPosition || 0).toFixed(1), icon: 'format_list_numbered', color: '#a78bfa' },
-                                        ].map(s => (
-                                            <div key={s.l} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.05] text-center">
-                                                <span className="material-symbols-outlined text-sm mb-1 block" style={{ color: s.color }}>{s.icon}</span>
-                                                <p className="text-lg font-black text-white">{s.v || '—'}</p>
-                                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{s.l}</p>
-                                            </div>
-                                        ))}
+                                        {(() => {
+                                            const cCurr = gscReport.summary?.totalClicks || 0;
+                                            const cPrev = gscReport.summary?.prevTotalClicks || 0;
+                                            const cDelta = cCurr > 0 && cPrev > 0 ? ((cCurr - cPrev) / cPrev) * 100 : 0;
+                                            
+                                            const iCurr = gscReport.summary?.totalImpressions || 0;
+                                            const iPrev = gscReport.summary?.prevTotalImpressions || 0;
+                                            const iDelta = iCurr > 0 && iPrev > 0 ? ((iCurr - iPrev) / iPrev) * 100 : 0;
+
+                                            return [
+                                                { l: 'Total Clicks', v: cCurr.toLocaleString(), icon: 'ads_click', color: '#34d399', delta: cDelta },
+                                                { l: 'Impressions', v: iCurr.toLocaleString(), icon: 'visibility', color: '#60a5fa', delta: iDelta },
+                                                { l: 'Avg CTR', v: `${((gscReport.summary?.avgCtr || 0) * 100).toFixed(2)}%`, icon: 'percent', color: '#fbbf24' },
+                                                { l: 'Avg Position', v: (gscReport.summary?.avgPosition || 0).toFixed(1), icon: 'format_list_numbered', color: '#a78bfa' },
+                                            ].map(s => (
+                                                <div key={s.l} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.05] text-center relative group">
+                                                    <span className="material-symbols-outlined text-sm mb-1 block" style={{ color: s.color }}>{s.icon}</span>
+                                                    <p className="text-lg font-black text-white flex items-center justify-center gap-2">
+                                                        {s.v || '—'}
+                                                        {s.delta !== undefined && s.delta !== 0 && (
+                                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${s.delta > 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                                                                {s.delta > 0 ? '▲' : '▼'} {Math.abs(s.delta).toFixed(1)}%
+                                                            </span>
+                                                        )}
+                                                    </p>
+                                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{s.l}</p>
+                                                </div>
+                                            ))
+                                        })()}
                                     </div>
                                 </SectionCard>
+
+                                {/* GSC Trend Sparkline */}
+                                {gscReport.daily?.length > 1 && (
+                                    <SectionCard title="Daily Search Clicks — 28-Day Trend" icon="show_chart">
+                                        <div className="h-32 w-full">
+                                            {(() => {
+                                                const dData = gscReport.daily;
+                                                const maxV = Math.max(...dData.map(d => d.clicks), 1);
+                                                const minV = Math.min(...dData.map(d => d.clicks));
+                                                const w = 100, h = 100;
+                                                const points = dData.map((d, i) => {
+                                                    const x = (i / (dData.length - 1)) * w;
+                                                    const y = h - ((d.clicks - minV) / (maxV - minV || 1)) * (h - 10) - 5;
+                                                    return `${x},${y}`;
+                                                }).join(' ');
+                                                const areaPath = `M 0,${h} L ${dData.map((d, i) => { const x = (i / (dData.length - 1)) * w; const y = h - ((d.clicks - minV) / (maxV - minV || 1)) * (h - 10) - 5; return `${x},${y}`; }).join(' L ')} L ${w},${h} Z`;
+                                                return (
+                                                    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-full" preserveAspectRatio="none">
+                                                        <defs>
+                                                            <linearGradient id="sparkGradGSC" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="0%" stopColor="#34d399" stopOpacity="0.3" />
+                                                                <stop offset="100%" stopColor="#34d399" stopOpacity="0" />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <path d={areaPath} fill="url(#sparkGradGSC)" />
+                                                        <polyline points={points} fill="none" stroke="#10b981" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+                                                    </svg>
+                                                );
+                                            })()}
+                                        </div>
+                                        <div className="flex justify-between text-[10px] text-slate-600 mt-1 px-1">
+                                            <span>{gscReport.daily[0]?.date?.replace(/(\d{4})-(\d{2})-(\d{2})/, '$2/$3')}</span>
+                                            <span className="text-emerald-400 font-bold">{Math.max(...gscReport.daily.map(d => d.clicks)).toLocaleString()} peak</span>
+                                            <span>{gscReport.daily[gscReport.daily.length - 1]?.date?.replace(/(\d{4})-(\d{2})-(\d{2})/, '$2/$3')}</span>
+                                        </div>
+                                    </SectionCard>
+                                )}
 
                                 {/* GSC Top Keywords */}
                                 {gscReport.keywords?.length > 0 && (
@@ -469,21 +566,87 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                         }))} />
                                     </SectionCard>
                                 )}
+
+                                {/* SEO Growth Insights */}
+                                <SectionCard title="SEO Growth Insights" icon="lightbulb">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {/* Traffic Decay Alert */}
+                                        {(() => {
+                                            const cCurr = gscReport.summary?.totalClicks || 0;
+                                            const cPrev = gscReport.summary?.prevTotalClicks || 0;
+                                            const cDelta = cCurr > 0 && cPrev > 0 ? ((cCurr - cPrev) / cPrev) * 100 : 0;
+                                            
+                                            const droppingKeywords = gscReport.keywords?.filter(k => k.position > 10 && k.impressions > 100 && k.ctr < 0.02) || [];
+
+                                            return (
+                                                <div className="p-4 bg-rose-500/5 border border-rose-500/10 rounded-xl relative overflow-hidden group">
+                                                    <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/10 blur-2xl rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-150" />
+                                                    <h4 className="text-sm font-bold text-rose-400 flex items-center gap-2 mb-2">
+                                                        <span className="material-symbols-outlined text-base">warning</span>
+                                                        Traffic Decay Risk
+                                                    </h4>
+                                                    {cDelta < -5 ? (
+                                                        <p className="text-xs text-slate-300 mb-2">Search clicks are down <span className="font-bold text-rose-400">{Math.abs(cDelta).toFixed(1)}%</span> period-over-period. Review top losing pages.</p>
+                                                    ) : droppingKeywords.length > 0 ? (
+                                                        <p className="text-xs text-slate-300 mb-2">You have <span className="font-bold text-rose-400">{droppingKeywords.length}</span> high-impression keywords with poor CTR (&lt;2%) ranking past page 1.</p>
+                                                    ) : (
+                                                        <p className="text-xs text-emerald-400 mb-2">Traffic trends are stable or growing. No immediate decay detected.</p>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
+
+                                        {/* Audience Gap */}
+                                        {(() => {
+                                            const mobileSplit = gaReport?.deviceSplit?.find(d => d.device.toLowerCase() === 'mobile');
+                                            const desktopSplit = gaReport?.deviceSplit?.find(d => d.device.toLowerCase() === 'desktop');
+                                            
+                                            return (
+                                                <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-xl relative overflow-hidden group">
+                                                    <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 blur-2xl rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-150" />
+                                                    <h4 className="text-sm font-bold text-amber-400 flex items-center gap-2 mb-2">
+                                                        <span className="material-symbols-outlined text-base">devices_other</span>
+                                                        Mobile vs Desktop Gap
+                                                    </h4>
+                                                    {(mobileSplit && desktopSplit && mobileSplit.sessions > desktopSplit.sessions * 1.5) ? (
+                                                        <p className="text-xs text-slate-300 mb-2">Mobile traffic is significantly higher than desktop. Ensure your site's mobile experience and Core Web Vitals are fully optimized.</p>
+                                                    ) : (
+                                                        <p className="text-xs text-slate-300 mb-2">Device distribution is balanced. Continue monitoring mobile usability issues in Search Console.</p>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                </SectionCard>
                             </>
                         )}
 
                         {/* ═══ CONNECT ANALYTICS CTA (when not connected) ═══ */}
                         {!gaConnected && (
-                            <div className="rounded-2xl p-6 text-center" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.06), rgba(139,92,246,0.03))', border: '1px dashed rgba(99,102,241,0.25)' }}>
-                                <span className="material-symbols-outlined text-4xl mb-3 block" style={{ color: '#818cf8' }}>link</span>
-                                <h3 className="text-base font-bold text-white mb-1">Connect Google Analytics & Search Console</h3>
-                                <p className="text-xs text-slate-400 max-w-md mx-auto mb-4">See live traffic, top pages, search keywords, and performance data. Just like your Google dashboard — right here in SEO Studio.</p>
-                                <button onClick={() => window.location.href = '/integrations'}
-                                    className="px-6 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer transition-all hover:shadow-lg flex items-center gap-2 mx-auto"
-                                    style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 20px rgba(99,102,241,0.35)' }}>
-                                    <span className="material-symbols-outlined text-sm">link</span> Go to Integrations
-                                </button>
-                            </div>
+                            <>
+                                {gaAuthError ? (
+                                    <div className="rounded-2xl p-6 text-center bg-rose-500/10 border border-rose-500/20">
+                                        <span className="material-symbols-outlined text-4xl mb-3 block text-rose-400">gpp_bad</span>
+                                        <h3 className="text-base font-bold text-white mb-1">Connection Expired</h3>
+                                        <p className="text-sm text-slate-400 max-w-md mx-auto mb-4">{gaAuthError}</p>
+                                        <button onClick={reconnectGA}
+                                            className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-rose-500 hover:bg-rose-600 cursor-pointer transition-all shadow-[0_4px_20px_rgba(244,63,94,0.35)] flex items-center gap-2 mx-auto">
+                                            <span className="material-symbols-outlined text-sm">refresh</span> Re-authenticate
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="rounded-2xl p-6 text-center" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.06), rgba(139,92,246,0.03))', border: '1px dashed rgba(99,102,241,0.25)' }}>
+                                        <span className="material-symbols-outlined text-4xl mb-3 block" style={{ color: '#818cf8' }}>link</span>
+                                        <h3 className="text-base font-bold text-white mb-1">Connect Google Analytics & Search Console</h3>
+                                        <p className="text-xs text-slate-400 max-w-md mx-auto mb-4">See live traffic, top pages, search keywords, and performance data. Just like your Google dashboard — right here in SEO Studio.</p>
+                                        <button onClick={() => window.location.href = '/integrations'}
+                                            className="px-6 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer transition-all hover:shadow-lg flex items-center gap-2 mx-auto"
+                                            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 20px rgba(99,102,241,0.35)' }}>
+                                            <span className="material-symbols-outlined text-sm">link</span> Go to Integrations
+                                        </button>
+                                    </div>
+                                )}
+                            </>
                         )}
 
                         {/* ═══ SEO HEALTH CHECK (Secondary — collapsible) ═══ */}

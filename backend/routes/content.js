@@ -5,7 +5,7 @@ import Brand from '../models/Brand.js';
 import { protect, optionalAuth } from '../middleware/auth.js';
 import { requireStudio } from '../middleware/studioAccess.js';
 import { getOrchestrator } from '../agents/orchestrator.js';
-import { requireCredits } from '../middleware/credits.js';
+import { requireCredits, refundCredits } from '../middleware/credits.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { mineAutocomplete } from '../utils/autocomplete.js';
 
@@ -266,6 +266,9 @@ router.post('/generate', protect, requireStudio('contentStudio'), requireCredits
         res.json({ success: true, content, brandAlignmentScore: result.aiMeta?.brandAlignmentScore });
     } catch (error) {
         console.error('Content generation error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'contentGenerate', `Refund: Content Generation Sync Failure (${safeErrorMessage(error)})`, 'content');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -417,6 +420,10 @@ router.post('/:id/regenerate', protect, requireCredits('contentRefine'), async (
 
         res.json({ success: true, content });
     } catch (error) {
+        console.error('Content regenerate error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'contentRegenerate', `Refund: Content Regeneration Sync Failure (${safeErrorMessage(error)})`, 'content', { contentId: req.params.id });
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
@@ -488,6 +495,9 @@ RULES:
         });
     } catch (error) {
         console.error('Content refine error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'contentRefine', `Refund: Content Refinement Sync Failure (${safeErrorMessage(error)})`, 'content', { contentId: req.params.id });
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
