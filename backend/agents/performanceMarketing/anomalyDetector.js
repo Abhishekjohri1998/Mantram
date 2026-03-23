@@ -157,16 +157,13 @@ Return STRICT JSON:
 }`;
 
     try {
-        const response = await ai.chat({
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: `Campaign anomalies detected:\n\n${anomalySummary}\n\nRecommend actions.` },
-            ],
+        const response = await ai.generateText({
+            systemPrompt: systemPrompt,
+            userPrompt: `Campaign anomalies detected:\n\n${anomalySummary}\n\nRecommend actions.`,
             temperature: 0.4,
-            response_format: { type: 'json_object' },
         });
 
-        const text = response.choices?.[0]?.message?.content || '{}';
+        const text = response.text || '{}';
         const parsed = JSON.parse(text.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
         return parsed;
     } catch (e) {
