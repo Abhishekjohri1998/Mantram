@@ -62,6 +62,25 @@ jobs:
     runs-on: ubuntu-latest
     needs: deploy-frontend
     steps:
+      - name: ⚙️ Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.MEDIA_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.MEDIA_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: 🔍 Get Runner IP
+        id: ip
+        run: echo "ipv4=$(curl -s https://checkip.amazonaws.com)" >> $GITHUB_OUTPUT
+
+      - name: 🔓 Whitelist Runner IP (Port 22)
+        run: |
+          aws ec2 authorize-security-group-ingress \
+            --group-id ${{ secrets.AWS_SECURITY_GROUP_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.ip.outputs.ipv4 }}/32 || echo "Rule already exists"
+
       - name: 🚀 Deploy via SSH
         uses: appleboy/ssh-action@v1.2.5
         env:
@@ -213,6 +232,14 @@ jobs:
             fi
             
             # 7. Cleanup old releases (keep last 5)
-            cd $BASE_DIR
             ls -1t | tail -n +6 | xargs rm -rf || true
             echo "🧹 Old releases cleaned up"
+
+      - name: 🔒 Revoke Runner IP (Cleanup)
+        if: always()
+        run: |
+          aws ec2 revoke-security-group-ingress \
+            --group-id ${{ secrets.AWS_SECURITY_GROUP_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.ip.outputs.ipv4 }}/32 || echo "Rule already removed or not found"

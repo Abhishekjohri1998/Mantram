@@ -8,6 +8,25 @@ jobs:
     name: 🔙 Revert Backend to Previous Release
     runs-on: ubuntu-latest
     steps:
+      - name: ⚙️ Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.MEDIA_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.MEDIA_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: 🔍 Get Runner IP
+        id: ip
+        run: echo "ipv4=$(curl -s https://checkip.amazonaws.com)" >> $GITHUB_OUTPUT
+
+      - name: 🔓 Whitelist Runner IP (Port 22)
+        run: |
+          aws ec2 authorize-security-group-ingress \
+            --group-id ${{ secrets.AWS_SECURITY_GROUP_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.ip.outputs.ipv4 }}/32 || echo "Rule already exists"
+
       - name: ⚙️ Rollback via SSH
         uses: appleboy/ssh-action@v1.2.5
         with:
@@ -40,3 +59,12 @@ jobs:
             
             echo "✅ Rollback successful. Now running: $PREVIOUS_RELEASE"
             curl -sf http://localhost:3001/api/health || echo "⚠️ Warning: Health check missed, check manually."
+
+      - name: 🔒 Revoke Runner IP (Cleanup)
+        if: always()
+        run: |
+          aws ec2 revoke-security-group-ingress \
+            --group-id ${{ secrets.AWS_SECURITY_GROUP_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.ip.outputs.ipv4 }}/32 || echo "Rule already removed or not found"
