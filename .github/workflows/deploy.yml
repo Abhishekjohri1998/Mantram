@@ -75,11 +75,19 @@ jobs:
 
       - name: 🔓 Whitelist Runner IP (Port 22)
         run: |
+          RUNNER_IP=${{ steps.ip.outputs.ipv4 }}
+          SG_ID=${{ secrets.AWS_SECURITY_GROUP_ID }}
+          echo "🌐 Runner IP: $RUNNER_IP"
+          echo "🛡️ SG ID: ${SG_ID:0:10}..."
+          
           aws ec2 authorize-security-group-ingress \
-            --group-id ${{ secrets.AWS_SECURITY_GROUP_ID }} \
+            --group-id $SG_ID \
             --protocol tcp \
             --port 22 \
-            --cidr ${{ steps.ip.outputs.ipv4 }}/32 || echo "Rule already exists"
+            --cidr $RUNNER_IP/32 || echo "Rule already exists"
+          
+          echo "🔍 Verifying connectivity to port 22..."
+          timeout 5s nc -zv ${{ secrets.EC2_HOST }} 22 || echo "⚠️ Warning: Port 22 is still not reachable after whitelisting"
 
       - name: 🚀 Deploy via SSH
         uses: appleboy/ssh-action@v1.2.5
