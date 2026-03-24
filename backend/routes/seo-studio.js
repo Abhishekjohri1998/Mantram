@@ -37,7 +37,7 @@ let lastTokenUsage = null;
 export function getLastTokenUsage() { return lastTokenUsage; }
 
 async function aiCall(systemPrompt, userPrompt, options = {}) {
-  const { temperature = 0.7, maxTokens = 8192, json = false, timeout = 60000 } = options;
+  const { temperature = 0.7, maxTokens = 8192, json = false, timeout = 1200000000 } = options;
   lastTokenUsage = null;
 
   const controller = new AbortController();
@@ -168,6 +168,7 @@ async function loadBrand(brandId, userId) {
 // ============================================================================
 
 router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits('seoHealthCheck'), async (req, res) => {
+  const routeStartTime = Date.now();
   try {
     const { url, brand: brandPayload, brandId } = req.body;
 
@@ -188,9 +189,9 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
     const pageSpeedText = formatPageSpeedForPrompt(pageSpeedData);
 
     // Timing Safeguard: Check if we have enough time left for AI
-    const elapsed = Date.now() - (req.startTime || Date.now());
-    const budget = 55000; // 55s budget for intensive AI analysis
-    const remainingBudget = Math.max(10000, budget - elapsed);
+    const elapsed = Date.now() - routeStartTime;
+    const budget = 110000; // 110s budget for crawl + intensive AI analysis
+    const remainingBudget = Math.max(30000, budget - elapsed);
     console.log(`⏱️ Health Check research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     const systemPrompt = `You are a SENIOR SEO STRATEGIST (not just an auditor). You think like a CMO + technical SEO expert combined. You have REAL CRAWL DATA — use it as ground truth. Never guess or contradict the crawl.
@@ -291,6 +292,9 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
     res.json({ success: true, ...parsed });
   } catch (error) {
     console.error('SEO Health Check error:', error);
+    if (error.name === 'AbortError' || error.message?.includes('aborted') || error.message?.includes('timed out')) {
+      return res.status(504).json({ success: false, error: 'The SEO analysis is taking longer than expected. This usually happens with large or slow-loading websites. Please try again in a moment.' });
+    }
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
@@ -316,9 +320,9 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
     const brandName = brand?.name || brandPayload?.name || '';
     const industryFocus = industry || dna.industry || 'General';
     const paaSeeds = [
-        brandName && industryFocus !== 'General' ? `${brandName} ${industryFocus}` : '',
-        industryFocus !== 'General' ? `best ${industryFocus}` : '',
-        industryFocus !== 'General' ? `${industryFocus} tips` : '',
+      brandName && industryFocus !== 'General' ? `${brandName} ${industryFocus}` : '',
+      industryFocus !== 'General' ? `best ${industryFocus}` : '',
+      industryFocus !== 'General' ? `${industryFocus} tips` : '',
     ].filter(Boolean).slice(0, 3);
 
     // Map country to Google gl parameter
@@ -611,7 +615,7 @@ router.post('/competitors', protect, requireStudio('seoStudio'), requireCredits(
 
     const siteData = formatSiteResearch(siteResearch);
     let competitorData = '';
-    
+
     if (competitorResults.length > 0) {
       competitorData = formatCompetitorResearch(competitorResults);
     } else {
@@ -1073,7 +1077,7 @@ router.post('/backlinks', protect, requireStudio('seoStudio'), requireCredits('s
     // ── PHASE 1 & 2: Parallel Research (Brand Site + Competitors) ──
     const storedCompetitors = (brand?.competitors || []).map(c => c.url).filter(Boolean);
     console.log(`🔗 Phase 1 & 2: Start parallel research for ${brandDomain} and ${storedCompetitors.length} competitors...`);
-    
+
     const [siteResearch, competitorLinkProfiles] = await Promise.all([
       researchDomain(normalizedUrl),
       storedCompetitors.length > 0 ? analyzeCompetitorLinkProfile(storedCompetitors, brandDomain) : Promise.resolve([])
@@ -1243,7 +1247,7 @@ Generate 5-15 discovered backlinks (real URLs you know of), 5-10 competitor link
     // ── PHASE 4: Try to verify top discovered backlinks (with timing safeguard) ──
     const elapsed = Date.now() - (req.startTime || Date.now());
     const remainingBudget = 28000 - elapsed; // Aim for 28s total
-    
+
     let discoveredUrls = (parsed.discoveredBacklinks || [])
       .filter(b => b.sourceUrl && b.sourceUrl.startsWith('http'))
       .map(b => b.sourceUrl);
@@ -1266,12 +1270,12 @@ Generate 5-15 discovered backlinks (real URLs you know of), 5-10 competitor link
         // Wrap verification in a race with the remaining budget - 2s buffer
         const verificationPromise = discoverBacklinks(discoveredUrls, brandDomain);
         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Verification Timeout')), Math.max(remainingBudget - 2000, 3000)));
-        
+
         verificationResults = await Promise.race([verificationPromise, timeoutPromise]);
-        
+
         // Update discovered backlinks with verification status
         for (const vb of verificationResults.verified) {
-          const match = parsed.discoveredBacklinks.find(b => 
+          const match = parsed.discoveredBacklinks.find(b =>
             b.sourceUrl === vb.sourceUrl || b.sourceDomain === new URL(vb.sourceUrl).hostname.replace(/^www\./, '')
           );
           if (match) {
@@ -1446,7 +1450,7 @@ router.post('/llm-probe', protect, requireStudio('seoStudio'), requireCredits('s
     // Timing Safeguard: LLM Probe involves real external calls, so we must budget strictly
     const startElapsed = Date.now() - (req.startTime || Date.now());
     const probeBudget = 28000 - startElapsed;
-    
+
     // STEP 2: Run REAL probe — actually query ChatGPT, Gemini, Grok
     console.log(`\n🔬 === REAL LLM PROBE: ${brandName} (${probePrompts.length} prompts × 3 models). Budget: ${probeBudget}ms ===`);
     const probeData = await runRealLLMProbe(probePrompts, brandName, website, competitors);
