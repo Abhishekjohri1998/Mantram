@@ -322,19 +322,20 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
         const imageParts = [];
         const referenceInstructions = [];
 
-        // Reference images: style, character, upload — support both base64 data URIs and HTTP URLs
+        // Reference images: style, character, upload, template base, product — support both base64 data URIs and HTTP URLs
         const refs = options?.referenceImages || {};
+        const characters = options?.characters || [];
+        const templateRefUrl = options?.templateInpainting ? options?.templateRefImageUrl : null;
+        const productUrl = options?.productImageUrl && !options?.baseImage ? options.productImageUrl : null;
 
         // Helper: resolve a reference image (base64 or HTTP URL) to an image part
         async function resolveRefImage(src, label) {
             if (!src) return null;
             if (src.startsWith('data:image/')) {
-                console.log(`🖼️  Ref image (${label}): base64 data URI, ${Math.round(src.length / 1024)}KB`);
                 return { part: extractBase64(src), label };
             }
             if (src.startsWith('http')) {
                 try {
-                    console.log(`📎 Fetching reference image (${label}): ${src.substring(0, 80)}...`);
                     const imgResp = await fetch(src, {
                         headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'image/*' },
                         redirect: 'follow',
@@ -345,66 +346,46 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
                         let imgData = Buffer.from(buf);
 
                         // Convert webp/gif to JPEG — Gemini docs only show jpeg/png examples
-                        // webp may silently fail as a reference image
                         if (ct === 'image/webp' || ct === 'image/gif') {
                             try {
                                 const sharp = (await import('sharp')).default;
                                 imgData = await sharp(imgData).jpeg({ quality: 90 }).toBuffer();
                                 ct = 'image/jpeg';
-                                console.log(`🔄 Ref image (${label}): converted from webp/gif to JPEG (${Math.round(imgData.length / 1024)}KB)`);
-                            } catch (convErr) {
-                                console.warn(`⚠️ Ref image (${label}): webp→jpeg conversion failed, using original:`, convErr.message);
-                            }
+                            } catch (convErr) {}
                         }
-
-                        console.log(`✅ Ref image (${label}) fetched: ${Math.round(imgData.length / 1024)}KB, ${ct}`);
                         return { part: { mimeType: ct, data: imgData.toString('base64') }, label };
-                    } else {
-                        console.warn(`⚠️ Ref image (${label}) fetch returned ${imgResp.status}`);
                     }
-                } catch (e) { console.warn(`⚠️ Could not fetch ref image (${label}):`, e.message); }
+                } catch (e) {}
             }
-            console.warn(`⚠️ Ref image (${label}): unrecognized format — not base64 and not HTTP URL`);
             return null;
         }
 
-        const [styleRef, uploadRef] = await Promise.all([
+        // Parallelize ALL external fetches
+        const [styleRef, uploadRef, ...otherRefs] = await Promise.all([
             resolveRefImage(refs.style, 'style'),
             resolveRefImage(refs.upload, 'upload'),
+            resolveRefImage(templateRefUrl, 'template-base'),
+            resolveRefImage(productUrl, 'product'),
+            ...characters.slice(0, 5).map((char, i) => resolveRefImage(char.image, `character-${char.name || i + 1}`))
         ]);
 
-        // Multi-character references from options.characters array
-        const characterRefs = [];
-        if (options?.characters?.length > 0) {
-            console.log(`👥 Processing ${options.characters.length} character reference(s)...`);
-            for (let i = 0; i < Math.min(options.characters.length, 5); i++) {
-                const char = options.characters[i];
-                if (char?.image) {
-                    const resolved = await resolveRefImage(char.image, `character-${char.name || i + 1}`);
-                    if (resolved) {
-                        characterRefs.push({ ...resolved, name: char.name || `Character ${i + 1}` });
-                    }
-                }
-            }
-        }
+        const templateRef = otherRefs[0];
+        const productRef = otherRefs[1];
+        const characterRefsRaw = otherRefs.slice(2);
+        const characterRefs = characterRefsRaw.filter(Boolean).map((resolved, i) => ({
+            ...resolved,
+            name: characters[i]?.name || `Character ${i + 1}`
+        }));
 
-        console.log(`🖼️  Reference image results: style=${!!styleRef}, characters=${characterRefs.length}, upload=${!!uploadRef}`);
+        console.log(`🖼️  Reference image results: style=${!!styleRef}, upload=${!!uploadRef}, template=${!!templateRef}, product=${!!productRef}, characters=${characterRefs.length}`);
 
-        // Build image parts — MINIMAL labels, images first, like AI Photoshoot pattern
-        // Key insight: the Photoshoot uses [image, prompt] simply. Too many verbose text parts
-        // between images confuse the model. Keep labels SHORT.
-        // Add reference images as pure inlineData (NO text labels — Gemini API
-        // treats extra text parts as separate prompts, not labels)
+        // Build image parts — MINIMAL labels, images first
         if (styleRef) {
             imageParts.push({ inlineData: { mimeType: styleRef.part.mimeType, data: styleRef.part.data } });
             referenceInstructions.push('Match the visual style, colors, and mood of the provided style reference image.');
         }
 
-        // Character references — NATURAL LANGUAGE referencing per official Gemini API docs
-        // Gemini uses deictic references: "this person", "the person in the provided photo"
-        // NOT @tags or Character1 markers (those are ignored by the model)
-        for (let i = 0; i < characterRefs.length; i++) {
-            const charRef = characterRefs[i];
+        for (const charRef of characterRefs) {
             imageParts.push({ inlineData: { mimeType: charRef.part.mimeType, data: charRef.part.data } });
         }
         if (characterRefs.length > 0) {
@@ -419,82 +400,44 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
             imageParts.push({ inlineData: { mimeType: uploadRef.part.mimeType, data: uploadRef.part.data } });
             referenceInstructions.push('Use the provided reference image as contextual inspiration for the composition.');
         }
+
         // ── Template Inpainting Mode ──────────────────────────────────────
-        // When templateInpainting is true, the reference image is THE BASE to edit.
-        // Gemini will keep layout/colors/logo/text placement and swap product + person.
         let isInpainting = false;
-        if (options?.templateInpainting && options?.templateRefImageUrl) {
+        if (options?.templateInpainting && templateRef) {
             isInpainting = true;
             const hasCharacter = characterRefs.length > 0;
             const swapWhat = hasCharacter ? 'model/person AND product' : 'product';
             console.log(`🎨 TEMPLATE INPAINTING MODE — keeping layout, swapping ${swapWhat}`);
 
-            // Resolve the template reference image (always first — it's the base)
-            const templateRef = await resolveRefImage(options.templateRefImageUrl, 'template-base');
-            if (templateRef) {
-                imageParts.push({ inlineData: { mimeType: templateRef.part.mimeType, data: templateRef.part.data } });
-            }
+            imageParts.push({ inlineData: { mimeType: templateRef.part.mimeType, data: templateRef.part.data } });
 
-            // If character references exist alongside inpainting, update instructions for person swap
             if (hasCharacter) {
-                // Remove previously added generic character instruction — we need a template-specific one
                 const charIdx = referenceInstructions.findIndex(r => r.includes('EXACT same person'));
                 if (charIdx !== -1) referenceInstructions.splice(charIdx, 1);
                 referenceInstructions.push('INPAINTING — PERSON SWAP: Replace the model/person in the template with the person from the provided character reference photo. Use their EXACT face, skin tone, hair, body type, and appearance. Keep the same pose, clothing style, and positioning as in the template.');
             }
 
-            // If a new product image is provided, add it as the replacement
             if (options?.baseImage && options.baseImage.startsWith('data:image/')) {
                 imageParts.push({ inlineData: extractBase64(options.baseImage) });
                 referenceInstructions.push('INPAINTING — PRODUCT SWAP: Replace ONLY the product in the template with the new product image. Keep everything else: same layout, colors, typography, logo placement, background, and content positions.');
-            } else if (options?.productImageUrl) {
-                try {
-                    console.log(`📦 Fetching product image for inpainting: ${options.productImageUrl.substring(0, 80)}...`);
-                    const prodResp = await fetch(options.productImageUrl, {
-                        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'image/*' },
-                        redirect: 'follow',
-                    });
-                    if (prodResp.ok) {
-                        const prodBuf = await prodResp.arrayBuffer();
-                        const prodCt = (prodResp.headers.get('content-type') || 'image/jpeg').split(';')[0];
-                        imageParts.push({ inlineData: { mimeType: prodCt, data: Buffer.from(prodBuf).toString('base64') } });
-                        referenceInstructions.push('INPAINTING — PRODUCT SWAP: Replace ONLY the product in the template with the new product image. Keep everything else: same layout, colors, typography, logo placement, background, and content positions.');
-                        console.log(`✅ Product image for inpainting loaded (${Math.round(prodBuf.byteLength / 1024)}KB)`);
-                    }
-                } catch (e) { console.warn('⚠️ Could not fetch product for inpainting:', e.message); }
+            } else if (productRef) {
+                imageParts.push({ inlineData: { mimeType: productRef.part.mimeType, data: productRef.part.data } });
+                referenceInstructions.push('INPAINTING — PRODUCT SWAP: Replace ONLY the product in the template with the new product image. Keep everything else: same layout, colors, typography, logo placement, background, and content positions.');
             } else if (!hasCharacter) {
-                // No product image and no character — just regenerate with same layout but different content
                 referenceInstructions.push('INPAINTING: Recreate this exact design with the same layout, colors, typography, logo, and content placement. Replace the placeholder text ({{HEADLINE}}, {{SUBTEXT}}, {{CTA}}) with the content specified in the prompt.');
             }
         }
 
-        // Base image from AI Photoshoot (skip if inpainting mode already handled it)
+        // Base image from AI Photoshoot (skip if inpainting handled it)
         if (!isInpainting && options?.baseImage && options.baseImage.startsWith('data:image/')) {
             imageParts.push({ inlineData: extractBase64(options.baseImage) });
             referenceInstructions.push('PRODUCT IMAGE: Keep this product exactly as-is — same colors, labels, text, shape. Only change background and styling.');
         }
 
-        // Product image from catalog (remote URL — fetch and convert to base64)
-        if (!isInpainting && options?.productImageUrl && !options?.baseImage) {
-            try {
-                console.log(`📦 Fetching product image: ${options.productImageUrl}`);
-                const imgResponse = await fetch(options.productImageUrl, {
-                    headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'image/*' },
-                    redirect: 'follow',
-                });
-                if (imgResponse.ok) {
-                    const imgBuffer = await imgResponse.arrayBuffer();
-                    const contentType = imgResponse.headers.get('content-type') || 'image/jpeg';
-                    const base64 = Buffer.from(imgBuffer).toString('base64');
-                    // Must match extractBase64 format: { mimeType, data } — NOT wrapped in inlineData
-                    const mimeType = (contentType || 'image/jpeg').split(';')[0];
-                    imageParts.push({ inlineData: { mimeType, data: base64 } });
-                    referenceInstructions.push('PRODUCT IMAGE: This is the ACTUAL product being promoted. Feature this exact product prominently in the creative — preserve its real appearance, colors, shape, and branding. Place it as the hero element of the design.');
-                    console.log(`✅ Product image loaded (${Math.round(imgBuffer.byteLength / 1024)}KB)`);
-                }
-            } catch (imgErr) {
-                console.warn('⚠️ Could not fetch product image:', imgErr.message);
-            }
+        // Product image from catalog (remote URL)
+        if (!isInpainting && productRef) {
+            imageParts.push({ inlineData: { mimeType: productRef.part.mimeType, data: productRef.part.data } });
+            referenceInstructions.push('PRODUCT IMAGE: This is the ACTUAL product being promoted. Feature this exact product prominently in the creative — preserve its real appearance, colors, shape, and branding. Place it as the hero element of the design.');
         }
 
         // Determine the aspect ratio and resolution to pass to Gemini API
