@@ -383,7 +383,7 @@ function contentFingerprint(text) {
     if (words.length < 10) return new Set();
     const shingles = new Set();
     for (let i = 0; i < words.length - 2; i++) {
-        shingles.add(`${words[i]} ${words[i+1]} ${words[i+2]}`);
+        shingles.add(`${words[i]} ${words[i + 1]} ${words[i + 2]}`);
     }
     return shingles;
 }
@@ -490,9 +490,9 @@ export async function researchDomain(baseUrl) {
     const crawled = new Set([cleanBase, homepage.url]);
     const toCrawl = [];
 
-    // Priority 1: Sitemap URLs (up to 15)
+    // Priority 1: Sitemap URLs (up to 50)
     if (sitemap.found) {
-        for (const sUrl of sitemap.urls.slice(0, 15)) {
+        for (const sUrl of sitemap.urls.slice(0, 50)) {
             try {
                 const resolved = new URL(sUrl).href;
                 if (!crawled.has(resolved)) {
@@ -506,7 +506,7 @@ export async function researchDomain(baseUrl) {
     // Priority 2: Key structural pages
     const keyPaths = ['/about', '/about-us', '/services', '/products', '/contact', '/blog', '/faq', '/pricing', '/team', '/case-studies', '/portfolio', '/news', '/careers', '/features'];
     for (const path of keyPaths) {
-        if (toCrawl.length >= 25) break;
+        if (toCrawl.length >= 100) break;
         const match = internalLinks.find(l => l.toLowerCase().includes(path));
         if (match) {
             try {
@@ -521,7 +521,7 @@ export async function researchDomain(baseUrl) {
 
     // Priority 3: Discovery from internal links (fill up to 20)
     for (const link of internalLinks) {
-        if (toCrawl.length >= 20) break;
+        if (toCrawl.length >= 100) break;
         if (link === '/' || link.includes('#') || link.includes('?') || link.endsWith('.pdf') || link.endsWith('.jpg') || link.endsWith('.png')) continue;
         try {
             const fullUrl = new URL(link, cleanBase).href;
@@ -543,8 +543,7 @@ export async function researchDomain(baseUrl) {
             batch.map(url => crawlPage(url).catch(e => ({ url, success: false, error: e.message })))
         );
         allSubPages.push(...batchResults.filter(p => p.success));
-        // Stop if we've taken too long (keep total under 15s for sub-crawl)
-        if (i + BATCH_SIZE >= 15 && allSubPages.length >= 10) break;
+        // No pre-emptive stop — crawl all queued pages
     }
 
     const allPages = [homepage, ...allSubPages];
