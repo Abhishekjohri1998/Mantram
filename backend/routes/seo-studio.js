@@ -1363,8 +1363,8 @@ router.post('/competitor-warroom', protect, requireStudio('seoStudio'), requireC
 
     // Timing Safeguard: Check if we have enough time left for AI
     const elapsed = Date.now() - (req.startTime || Date.now());
-    const budget = 28000; // 28s budget
-    const remainingBudget = Math.max(5000, budget - elapsed);
+    const budget = 600000; // 600s budget
+    const remainingBudget = Math.max(300000, budget - elapsed);
     console.log(`⏱️ War Room research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     const systemPrompt = `You are a COMPETITIVE WAR ROOM STRATEGIST — create a 90-day battle plan to systematically outrank competitors. You have REAL CRAWL DATA.
@@ -1403,7 +1403,7 @@ Respond in STRICT JSON:
 }`;
 
     const userPrompt = `Build 90-day war room plan for: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192, timeout: remainingBudget });
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192 });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoWarRoom', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
@@ -1453,15 +1453,14 @@ router.post('/llm-probe', protect, requireStudio('seoStudio'), requireCredits('s
 
     // Timing Safeguard: LLM Probe involves real external calls, so we must budget strictly
     const startElapsed = Date.now() - (req.startTime || Date.now());
-    const probeBudget = 28000 - startElapsed;
+    const probeBudget = 600000 - startElapsed;
 
     // STEP 2: Run REAL probe — actually query ChatGPT, Gemini, Grok
     console.log(`\n🔬 === REAL LLM PROBE: ${brandName} (${probePrompts.length} prompts × 3 models). Budget: ${probeBudget}ms ===`);
     const probeData = await runRealLLMProbe(probePrompts, brandName, website, competitors);
-
     // Final Timing Check for Analysis AI
     const finalElapsed = Date.now() - (req.startTime || Date.now());
-    const remainingBudget = Math.max(5000, 28000 - finalElapsed);
+    const remainingBudget = Math.max(300000, 600000 - finalElapsed);
     console.log(`⏱️ LLM Probe real queries took ${finalElapsed}ms. Remaining budget for AI analysis: ${remainingBudget}ms`);
 
     // STEP 3: Feed real probe results to AI for strategic analysis
@@ -1525,7 +1524,7 @@ Respond in STRICT JSON:
 CRITICAL: Use the REAL mention rate (${probeData.aggregate.mentionRate}%) as the overall visibility score. Reference ACTUAL probe results. Every recommendation must tie back to specific prompts where the brand was NOT mentioned.`;
 
     const userPrompt = `Analyze real LLM probe results for: ${brandName} (${website})`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6144, timeout: remainingBudget });
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6144 });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoLlmProbe', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
 
@@ -1631,8 +1630,8 @@ Generate production-ready code. Every fix must be copy-paste ready. Use the bran
 
     const userPrompt = `Generate auto-fix code for: ${website}`;
     const elapsed = Date.now() - (req.startTime || Date.now());
-    const remainingBudget = Math.max(5000, 28000 - elapsed);
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.4, maxTokens: 8192, timeout: remainingBudget });
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.4, maxTokens: 8192 });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoAutoFix', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
 
@@ -1764,8 +1763,8 @@ Generate 15-20 mined prompts. Be specific to this brand's industry. Think about 
 
     // STEP 3: AI call enriched with real autocomplete data
     const elapsed = Date.now() - (req.startTime || Date.now());
-    const remainingBudget = Math.max(5000, 28000 - elapsed);
-    const aiResult = await aiCall(systemPrompt, userPrompt + autocompleteContext, { json: true, temperature: 0.6, maxTokens: 8192, timeout: remainingBudget });
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
+    const aiResult = await aiCall(systemPrompt, userPrompt + autocompleteContext, { json: true, temperature: 0.6, maxTokens: 8192 });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoPromptMining', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(aiResult);
     parsed.researchSources = [website];
@@ -2217,7 +2216,7 @@ Respond in JSON:
   "followUpQuestions": ["Follow-up 1", "Follow-up 2", "Follow-up 3"]
 }`;
 
-    const result = await aiCall(systemPrompt, question, { json: true, temperature: 0.7, maxTokens: 4096, timeout: 15000 });
+    const result = await aiCall(systemPrompt, question, { json: true, temperature: 0.7, maxTokens: 4096 });
     const parsed = parseJSON(result);
 
     res.json({ success: true, ...parsed });

@@ -17,7 +17,7 @@
 import puppeteer from 'puppeteer';
 
 const MAX_PAGES = 30;
-const PAGE_TIMEOUT = 15000; // 15s per page
+const PAGE_TIMEOUT = 30000; // 30s per page
 const RENDER_WAIT = 2000;   // 2s for JS to execute
 
 /**
