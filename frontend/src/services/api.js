@@ -432,6 +432,11 @@ export const superadmin = {
     resetCredits: (id) => apiFetch(`/superadmin/users/${id}/reset-credits`, { method: 'POST' }),
     approveUser: (id) => apiFetch(`/superadmin/users/${id}/approve`, { method: 'PUT' }),
     rejectUser: (id) => apiFetch(`/superadmin/users/${id}/reject`, { method: 'PUT' }),
+
+    // Waitlist
+    approveWaitlist: (id) => apiFetch(`/superadmin/waitlist/${id}/approve`, { method: 'POST' }),
+    deleteWaitlist: (id) => apiFetch(`/superadmin/waitlist/${id}`, { method: 'DELETE' }),
+
     // Subscriptions
     getSubscriptions: (params = {}) => {
         const query = new URLSearchParams(params).toString();
@@ -488,7 +493,31 @@ export const superadmin = {
         const query = new URLSearchParams(params).toString();
         return apiFetch(`/superadmin/system-logs?${query}`);
     },
-    impersonateUser: (id) => apiFetch(`/superadmin/users/${id}/impersonate`, { method: 'POST' }),
+
+    // API Keys & Providers
+    getApiKeys: () => apiFetch('/superadmin/api-keys'),
+    updateApiKeys: (provider, keys) => apiFetch('/superadmin/api-keys', { method: 'PUT', body: JSON.stringify({ provider, keys }) }),
+    deleteApiKeys: (provider) => apiFetch(`/superadmin/api-keys/${provider}`, { method: 'DELETE' }),
+    testApiKey: (provider) => apiFetch(`/superadmin/api-keys/${provider}/test`, { method: 'POST' }),
+
+    // Budgets & Usage
+    getProviderBudgets: () => apiFetch('/superadmin/provider-budgets'),
+    updateProviderBudgets: (data) => apiFetch('/superadmin/provider-budgets', { method: 'PUT', body: JSON.stringify(data) }),
+    getProviderUsage: (days) => apiFetch(`/superadmin/provider-usage?days=${days}`),
+
+    // Credit Packs
+    getCreditPacks: () => apiFetch('/superadmin/credit-packs'),
+    createCreditPack: (data) => apiFetch('/superadmin/credit-packs', { method: 'POST', body: JSON.stringify(data) }),
+    updateCreditPack: (id, data) => apiFetch(`/superadmin/credit-packs/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteCreditPack: (id) => apiFetch(`/superadmin/credit-packs/${id}`, { method: 'DELETE' }),
+    toggleCreditPack: (id) => apiFetch(`/superadmin/credit-packs/${id}/toggle`, { method: 'POST' }),
+    seedCreditPacks: () => apiFetch('/superadmin/credit-packs/seed-defaults', { method: 'POST' }),
+
+    // Watermark
+    uploadWatermarkLogo: (dataUrl) => apiFetch('/superadmin/watermark/upload', { method: 'POST', body: JSON.stringify({ logo: dataUrl }) }),
+    updateWatermarkSettings: (data) => apiFetch('/superadmin/watermark/settings', { method: 'PUT', body: JSON.stringify(data) }),
+    getWatermarkOverrides: () => apiFetch('/superadmin/watermark/overrides'),
+    updateWatermarkOverride: (data) => apiFetch('/superadmin/watermark/override', { method: 'PUT', body: JSON.stringify(data) }),
 };
 
 // ============ Credits API ============

@@ -37,7 +37,7 @@ let lastTokenUsage = null;
 export function getLastTokenUsage() { return lastTokenUsage; }
 
 async function aiCall(systemPrompt, userPrompt, options = {}) {
-  const { temperature = 0.7, maxTokens = 8192, json = false, timeout = 30000 } = options;
+  const { temperature = 0.7, maxTokens = 8192, json = false, timeout = 60000 } = options;
   lastTokenUsage = null;
 
   const controller = new AbortController();
@@ -189,8 +189,8 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
 
     // Timing Safeguard: Check if we have enough time left for AI
     const elapsed = Date.now() - (req.startTime || Date.now());
-    const budget = 28000; // 28s budget for Gateway
-    const remainingBudget = Math.max(5000, budget - elapsed);
+    const budget = 55000; // 55s budget for intensive AI analysis
+    const remainingBudget = Math.max(10000, budget - elapsed);
     console.log(`⏱️ Health Check research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     const systemPrompt = `You are a SENIOR SEO STRATEGIST (not just an auditor). You think like a CMO + technical SEO expert combined. You have REAL CRAWL DATA — use it as ground truth. Never guess or contradict the crawl.
@@ -380,8 +380,8 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
 
     // Timing Safeguard: Check if we have enough time left for AI
     const elapsed = Date.now() - (req.startTime || Date.now());
-    const budget = 28000; // 28s budget for Gateway
-    const remainingBudget = Math.max(5000, budget - elapsed);
+    const budget = 55000; // 55s budget
+    const remainingBudget = Math.max(10000, budget - elapsed);
     console.log(`⏱️ Traffic research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     // Build enriched signal data for AI prompt
@@ -620,8 +620,8 @@ router.post('/competitors', protect, requireStudio('seoStudio'), requireCredits(
 
     // Timing Safeguard: Check if we have enough time left for AI
     const elapsed = Date.now() - (req.startTime || Date.now());
-    const budget = 28000; // 28s budget
-    const remainingBudget = Math.max(5000, budget - elapsed);
+    const budget = 55000; // 55s budget
+    const remainingBudget = Math.max(10000, budget - elapsed);
     console.log(`⏱️ Competitor research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     const systemPrompt = `You are a COMPETITIVE INTELLIGENCE STRATEGIST — you think like a war-room strategist, not a data reporter. You have REAL CRAWL DATA from both the brand and competitor websites. Your job is to explain WHY competitors win, WHAT their strategy is, and HOW to beat them.
@@ -760,8 +760,8 @@ router.post('/ai-visibility', protect, requireStudio('seoStudio'), requireCredit
 
     // Timing Safeguard: Check if we have enough time left for AI
     const elapsed = Date.now() - (req.startTime || Date.now());
-    const budget = 28000; // 28s budget
-    const remainingBudget = Math.max(5000, budget - elapsed);
+    const budget = 55000; // 55s budget
+    const remainingBudget = Math.max(10000, budget - elapsed);
     console.log(`⏱️ AI Visibility research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     const systemPrompt = `You are an AI SEARCH STRATEGIST — the world's foremost expert on making brands visible in AI-powered search (Google AI Overviews, ChatGPT + Bing, Perplexity, Gemini, Claude, etc.) in 2026.
