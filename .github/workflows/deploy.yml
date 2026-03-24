@@ -75,19 +75,39 @@ jobs:
 
       - name: 🔓 Whitelist Runner IP (Port 22)
         run: |
-          RUNNER_IP=${{ steps.ip.outputs.ipv4 }}
-          SG_ID=${{ secrets.AWS_SECURITY_GROUP_ID }}
-          echo "🌐 Runner IP: $RUNNER_IP"
-          echo "🛡️ SG ID: ${SG_ID:0:10}..."
+          RUNNER_IP="${{ steps.ip.outputs.ipv4 }}"
+          SG_ID="${{ secrets.AWS_SECURITY_GROUP_ID }}"
           
+          if [ -z "$SG_ID" ]; then
+            echo "❌ ERROR: AWS_SECURITY_GROUP_ID secret is missing or empty!"
+            exit 1
+          fi
+          
+          if [ -z "$RUNNER_IP" ]; then
+            echo "❌ ERROR: Could not determine Runner IP!"
+            exit 1
+          fi
+
+          echo "🌐 Runner IP: $RUNNER_IP"
+          echo "🛡️ SG ID: $SG_ID"
+          
+          # Authorize Ingress
           aws ec2 authorize-security-group-ingress \
-            --group-id $SG_ID \
+            --group-id "$SG_ID" \
             --protocol tcp \
             --port 22 \
-            --cidr $RUNNER_IP/32 || echo "Rule already exists"
+            --cidr "$RUNNER_IP/32" || {
+              # Check if it's already authorized (InvalidPermission.Duplicate)
+              if aws ec2 describe-security-groups --group-ids "$SG_ID" --query 'SecurityGroups[0].IpPermissions[*].IpRanges[*].CidrIp' --output text | grep -q "$RUNNER_IP/32"; then
+                echo "✅ Rule already exists, proceeding..."
+              else
+                echo "❌ Failed to authorize Security Group ingress!"
+                exit 1
+              fi
+            }
           
-          echo "🔍 Verifying connectivity to port 22..."
-          timeout 5s nc -zv ${{ secrets.EC2_HOST }} 22 || echo "⚠️ Warning: Port 22 is still not reachable after whitelisting"
+          echo "🔍 Verifying connectivity to port 22 on ${{ secrets.EC2_HOST }}..."
+          timeout 10s nc -zv ${{ secrets.EC2_HOST }} 22 || echo "⚠️ Warning: Port 22 is still not reachable after whitelisting. Check if EC2_HOST is correct."
 
       - name: 🚀 Deploy via SSH
         uses: appleboy/ssh-action@v1.2.5
