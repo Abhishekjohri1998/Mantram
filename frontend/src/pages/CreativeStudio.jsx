@@ -3388,15 +3388,46 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     const v=clgResults.length+1;
                                     const prompt=`Generate a CAMPAIGN LOGO / EVENT BADGE design.\n\nTEXT: "${clgText}"\nSTYLE: ${clgStyle||'modern'}\n${clgOccasion?`OCCASION: ${clgOccasion}\n`:''}${clgIcon?`ICON ELEMENTS: Include ${clgIcon} visual elements\n`:''}COLORS: Use ${brandColors||'vibrant, eye-catching colors'}\nBACKGROUND: ${clgBg==='transparent'?'transparent/alpha background (PNG-ready)':clgBg}\nSHAPE: ${clgShape}\n${clgEnhance?`STYLE KEYWORDS: ${clgEnhance}\n`:''}VARIANT: ${v} — create a unique, visually distinctive design\n\nCRITICAL RULES:\n- This is a LOGO/BADGE, not a poster — keep it compact and icon-like\n- The text "${clgText}" must be clearly readable and be the HERO element\n- Use professional typography — bold, impactful lettering\n- Make it suitable for use as a campaign identifier across marketing materials\n- ${clgBg==='transparent'?'Ensure the background is fully transparent':'Fill the background as specified'}\n- Do NOT add placeholder text or watermarks`;
                                     const res=await creativesAPI.generate({prompt,brandId:activeBrand?._id,type:'campaign-logo',options:{aspectRatio:'1:1',style:'logo'}});
+                                    if (res.warnings?.length > 0) {
+                                        setAiWarnings(prev => [...new Set([...prev, ...res.warnings])]);
+                                    }
                                     const url=res.creative?.imageUrl||res.imageUrl;
                                     if(url)setClgResults(prev=>[...prev,url]);
                                     else setClgError('No image returned — try again');
-                                }catch(err){setClgError(err.message||'Generation failed — please try again')}
-                                finally{setClgLoading(false)}
-                            }} className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
-                                {clgLoading?(<><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>Generating Logo...</>):(<><span className="material-symbols-outlined text-lg">auto_awesome</span>{clgResults.length>0?'Generate Another Variant':'Generate Campaign Logo'}<span className="text-xs opacity-60 ml-1">~₹0.25</span></>)}
-                            </button>
-                            {clgError&&<div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-center gap-2"><span className="material-symbols-outlined text-lg">warning</span>{clgError}</div>}
+                                }catch(err){
+                                    console.error('❌ Logo generation error:', err);
+                                    if (err.name === 'AbortError' || err.message?.toLowerCase().includes('timeout') || err.message?.toLowerCase().includes('failed to fetch') || err.status === 504) {
+                                        setClgError('Generation is taking longer than usual. Your logo is likely still processing — please check the Image Bank in a minute.');
+                                    } else {
+                                        setClgError(err.message||'Generation failed — please try again');
+                                    }
+                                } finally {
+                                    setClgLoading(false);
+                                }
+                            }}
+                            className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                            {clgLoading ? (
+                                <><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>Generating Logo...</>
+                            ) : (
+                                <><span className="material-symbols-outlined text-lg">auto_awesome</span>{clgResults.length > 0 ? 'Generate Another Variant' : 'Generate Campaign Logo'}<span className="text-xs opacity-60 ml-1">~₹0.25</span></>
+                            )}
+                        </button>
+
+                            {clgLoading&&<div className="w-full bg-white/[0.06] rounded-full h-1 mt-4"><div className="bg-gradient-to-r from-amber-500 to-orange-500 h-1 rounded-full animate-pulse shadow-[0_0_10px_rgba(245,158,11,0.3)]" style={{width:'100%'}}/></div>}
+
+                            {aiWarnings.length > 0 && (
+                                <div className="space-y-2 mt-4">
+                                    {aiWarnings.map((warn, i) => (
+                                        <div key={i} className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] flex items-center gap-2 animate-fade-in font-medium">
+                                            <span className="material-symbols-outlined text-sm">warning</span>
+                                            <span>{warn}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {clgError&&<div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-center gap-2"><span className="material-symbols-outlined text-lg">warning</span>{clgError}</div>}
                         </div>
 
                         {/* Right — Results */}
@@ -4043,7 +4074,7 @@ setCampCopies(errCopies);}
                             {/* Generate */}
                             {campResults.length===0&&(
                                 <button disabled={campGenerating} onClick={async()=>{
-                                    setCampGenerating(true);setCampError('');setCampResults([]);setCampProgress(0);
+                                    setCampGenerating(true);setCampError('');setCampResults([]);setCampProgress(0);setAiWarnings([]);
                                     try{
                                         const results=[];
                                         const total=campCount*(campSizes.length||1);
@@ -4093,10 +4124,19 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                                 for(let attempt=0;attempt<2;attempt++){
                                                     try{
                                                         res=await creativesAPI.generate(payload);
+                                                        if (res.warnings?.length > 0) {
+                                                            setAiWarnings(prev => [...new Set([...prev, ...res.warnings])]);
+                                                        }
                                                         break; // success
                                                     }catch(retryErr){
                                                         if(attempt===0){console.warn(`⚠️ Creative #${i+1} attempt 1 failed, retrying...`,retryErr.message);await new Promise(r=>setTimeout(r,1500))}
-                                                        else{console.error(`❌ Creative #${i+1} failed after 2 attempts:`,retryErr.message);res=null}
+                                                        else{
+                                                            console.error(`❌ Creative #${i+1} failed after 2 attempts:`,retryErr.message);
+                                                            if (retryErr.name === 'AbortError' || retryErr.message?.toLowerCase().includes('timeout') || retryErr.message?.toLowerCase().includes('failed to fetch') || retryErr.status === 504) {
+                                                                setCampError('Generation is taking longer than usual. Your images are likely still processing — please check the Image Bank in a minute.');
+                                                            }
+                                                            res=null;
+                                                        }
                                                     }
                                                 }
                                                 if(res){
@@ -4107,14 +4147,33 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                             }
                                         }
                                         setCampResults(results);
-                                    }catch(err){setCampError(err.message)}
+                                    }catch(err){
+                                        console.error('❌ Campaign generation error:', err);
+                                        if (err.name === 'AbortError' || err.message?.toLowerCase().includes('timeout') || err.message?.toLowerCase().includes('failed to fetch') || err.status === 504) {
+                                            setCampError('Generation is taking longer than usual. Your images are likely still processing — please check the Image Bank in a minute.');
+                                        } else {
+                                            setCampError(err.message);
+                                        }
+                                    }
                                     finally{setCampGenerating(false)}
                                 }} className="w-full py-4 rounded-xl font-bold text-base transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500 hover:from-blue-400 hover:via-indigo-400 hover:to-violet-400 text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
                                     {campGenerating?(<><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>Generating... {Math.round(campProgress)}%</>):(<><span className="material-symbols-outlined text-lg">rocket_launch</span>Generate All {campCount * campSizes.length} Creatives<span className="text-xs opacity-60 ml-1">~₹{(campCount*campSizes.length*0.25).toFixed(2)}</span></>)}
                                 </button>
                             )}
-                            {campGenerating&&<div className="w-full bg-white/[0.06] rounded-full h-2"><div className="bg-gradient-to-r from-blue-500 to-violet-500 h-2 rounded-full transition-all" style={{width:`${campProgress}%`}}/></div>}
-                            {campError&&<div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-center gap-2"><span className="material-symbols-outlined text-lg">warning</span>{campError}</div>}
+                            {campGenerating&&<div className="w-full bg-white/[0.06] rounded-full h-2 mt-4"><div className="bg-gradient-to-r from-blue-500 to-violet-500 h-2 rounded-full transition-all" style={{width:`${campProgress}%`}}/></div>}
+
+                            {aiWarnings.length > 0 && (
+                                <div className="space-y-2 mt-4">
+                                    {aiWarnings.map((warn, i) => (
+                                        <div key={i} className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] flex items-center gap-2 animate-fade-in font-medium">
+                                            <span className="material-symbols-outlined text-sm">warning</span>
+                                            <span>{warn}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {campError&&<div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-center gap-2"><span className="material-symbols-outlined text-lg">warning</span>{campError}</div>}
                             {/* Results Grid */}
                             {campResults.length>0&&(
                                 <div>
