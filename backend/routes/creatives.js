@@ -128,6 +128,8 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
         parts[lastPartIdx].text = arInstruction + parts[lastPartIdx].text;
     }
 
+    const warnings = [];
+
     for (const modelId of models) {
         try {
             console.log(`🎨 Trying: ${modelId}...`);
@@ -146,7 +148,15 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
 
             const data = await resp.json();
             if (data.error) {
-                console.warn(`⚠️ ${modelId}: ${data.error.message || JSON.stringify(data.error)}`);
+                const errMsg = data.error.message || JSON.stringify(data.error);
+                console.warn(`⚠️ ${modelId}: ${errMsg}`);
+                
+                // Propagate "high demand" or other provider-side warnings to the user
+                if (errMsg.toLowerCase().includes('high demand') || errMsg.toLowerCase().includes('busy') || resp.status === 503) {
+                    warnings.push(`${modelId} is currently experiencing high demand. Falling back to an alternative model.`);
+                } else {
+                    warnings.push(`${modelId} failed: ${errMsg.substring(0, 100)}...`);
+                }
                 continue; // try fallback
             }
 
@@ -164,8 +174,10 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
                 break;
             }
             console.warn(`⚠️ ${modelId}: no image in response`);
+            warnings.push(`${modelId} returned no image.`);
         } catch (e) {
             console.error(`❌ ${modelId} error:`, e.message);
+            warnings.push(`${modelId} connection error: ${e.message}`);
             continue;
         }
     }
@@ -205,7 +217,7 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
     if (!imageUrl) throw new Error('Image generation failed — all models unavailable (Google Direct + Lao Zhang)');
 
     console.log(`══════ END IMAGE GENERATION ══════\n`);
-    return { imageUrl, model: usedModel, textResponse };
+    return { imageUrl, model: usedModel, textResponse, warnings };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -684,7 +696,7 @@ The output must fill the entire canvas edge-to-edge. No frames, borders, or mock
         });
 
         await req.user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } });
-        res.json({ success: true, creative });
+        res.json({ success: true, creative, warnings: result.warnings || [] });
     } catch (error) {
         console.error('❌ CREATIVE GENERATE ERROR:', error.message, error.stack?.split('\n').slice(0,3).join('\n'));
         if (req.creditsDeducted > 0) {

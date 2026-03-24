@@ -4,7 +4,7 @@
  * Handles auth tokens, error handling, and response parsing.
  */
 
-const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`;
+export const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`;
 
 // Token management
 let authToken = localStorage.getItem('mantram_token') || '';
@@ -159,6 +159,10 @@ export const creatives = {
         return apiFetch(`/creatives/image-bank?${query}`);
     },
     uploadToBank: (data) => apiFetch('/creatives/upload-to-bank', { method: 'POST', body: JSON.stringify(data) }),
+    // Additional methods for CreativeStudio.jsx
+    lifestyleMockup: (data) => apiFetch('/creatives/lifestyle-mockup', { method: 'POST', body: JSON.stringify(data) }),
+    virtualTryon: (data) => apiFetch('/creatives/virtual-tryon', { method: 'POST', body: JSON.stringify(data) }),
+    vtoStatus: (requestId, brandId) => apiFetch(`/creatives/virtual-tryon/status/${requestId}?brandId=${brandId}`),
 };
 
 // ============ Agent API ============
@@ -267,6 +271,8 @@ export const team = {
     updateApproval: (id, data) => apiFetch(`/team/approvals/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     // AI
     teamHealth: () => apiFetch('/team/ai/team-health', { method: 'POST' }),
+    // Additional methods for TeamDashboard.jsx
+    revokeInvite: (inviteId) => apiFetch(`/team/invites/${inviteId}`, { method: 'DELETE' }),
 };
 
 // ============ Fidato AI Assistant ============
@@ -318,6 +324,85 @@ export const social = {
     status: () => apiFetch('/social/status'),
     getPosts: (accountId) => apiFetch(`/social/accounts/${accountId}/posts`),
     getInsights: (accountId, postId) => apiFetch(`/social/accounts/${accountId}/posts/${postId}/insights`),
+    // Additional methods for SocialMediaStudio.jsx
+    connect: (platform) => apiFetch(`/social/connect/${platform}`, { method: 'POST' }),
+};
+
+// ============ Voice API ============
+export const voice = {
+    transcribe: (formData) => {
+        const token = localStorage.getItem('mantram_token') || '';
+        return fetch(`${API_BASE}/voice/transcribe`, {
+            method: 'POST',
+            headers: {
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: formData,
+        }).then(res => res.json());
+    },
+};
+
+// ============ Rewards API ============
+export const rewards = {
+    status: () => apiFetch('/rewards/status'),
+    claimMilestone: (milestoneId) => apiFetch(`/rewards/milestones/${milestoneId}/claim`, { method: 'POST' }),
+    applyReferral: (code) => apiFetch('/rewards/referral/apply', { method: 'POST', body: JSON.stringify({ code }) }),
+};
+
+// ============ Canvas Assets API (Creative Studio) ============
+export const canvasAssets = {
+    aiEdit: (data) => apiFetch('/canvas-assets/ai-edit', { method: 'POST', body: JSON.stringify(data) }),
+    aiEditVisual: (data) => apiFetch('/canvas-assets/ai-edit-visual', { method: 'POST', body: JSON.stringify(data) }),
+    aiRetouch: (data) => apiFetch('/canvas-assets/ai-retouch', { method: 'POST', body: JSON.stringify(data) }),
+    aiBackground: (data) => apiFetch('/canvas-assets/ai-background', { method: 'POST', body: JSON.stringify(data) }),
+    aiAnalyze: (data) => apiFetch('/canvas-assets/ai-analyze', { method: 'POST', body: JSON.stringify(data) }),
+    aiAnalyzeTemplate: (data) => apiFetch('/canvas-assets/ai-analyze-template', { method: 'POST', body: JSON.stringify(data) }),
+};
+
+// ============ Video Studio API ============
+export const videoStudio = {
+    list: () => apiFetch('/video-studio'),
+    get: (id) => apiFetch(`/video-studio/${id}`),
+    start: (data) => apiFetch('/video-studio/start', { method: 'POST', body: JSON.stringify(data) }),
+    select: (id, data) => apiFetch(`/video-studio/${id}/select`, { method: 'POST', body: JSON.stringify(data) }),
+    approve: (id, data) => apiFetch(`/video-studio/${id}/approve`, { method: 'POST', body: JSON.stringify(data) }),
+    voiceoverPreview: (id, data) => apiFetch(`/video-studio/${id}/voiceover-preview`, { method: 'POST', body: JSON.stringify(data) }),
+    generate: (id, data) => apiFetch(`/video-studio/${id}/generate`, { method: 'POST', body: JSON.stringify(data) }),
+    getStatus: (id) => apiFetch(`/video-studio/${id}/status`),
+    edit: (id, data) => apiFetch(`/video-studio/${id}/edit`, { method: 'POST', body: JSON.stringify(data) }),
+    finalize: (id, data) => apiFetch(`/video-studio/${id}/finalize`, { method: 'POST', body: JSON.stringify(data) }),
+    modelsCapabilities: () => apiFetch('/video-studio/models/capabilities'),
+    // Backward compatibility for CreativeStudio.jsx
+    advancedI2V: (data) => apiFetch('/video-studio/advanced/i2v', { method: 'POST', body: JSON.stringify(data) }),
+    advancedGenerate: (data) => apiFetch('/video-studio/advanced/generate', { method: 'POST', body: JSON.stringify(data) }),
+};
+
+// ============ Retention Studio API ============
+export const retentionStudio = {
+    list: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/retention-studio?${query}`);
+    },
+    get: (id) => apiFetch(`/retention-studio/${id}`),
+    analytics: (id) => apiFetch(`/retention-studio/${id}/analytics`),
+    create: (data) => apiFetch('/retention-studio', { method: 'POST', body: JSON.stringify(data) }),
+    ingest: (id, formData) => {
+        const token = localStorage.getItem('mantram_token') || '';
+        return fetch(`${API_BASE}/retention-studio/${id}/ingest`, {
+            method: 'POST',
+            headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: formData,
+        }).then(res => res.json());
+    },
+    match: (id, data) => apiFetch(`/retention-studio/${id}/match`, { method: 'POST', body: JSON.stringify(data) }),
+    creative: (id, data) => apiFetch(`/retention-studio/${id}/creative`, { method: 'POST', body: JSON.stringify(data) }),
+    compose: (id, data) => apiFetch(`/retention-studio/${id}/compose`, { method: 'POST', body: JSON.stringify(data) }),
+    approve: (id, data) => apiFetch(`/retention-studio/${id}/approve`, { method: 'POST', body: JSON.stringify(data) }),
+    send: (id, data) => apiFetch(`/retention-studio/${id}/send`, { method: 'POST', body: JSON.stringify(data) }),
+    preview: (id) => apiFetch(`/retention-studio/${id}/preview`, { method: 'POST' }),
+    testEmail: (id, email) => apiFetch(`/retention-studio/${id}/test-email`, { method: 'POST', body: JSON.stringify({ email }) }),
+    generateImage: (id, data) => apiFetch(`/retention-studio/${id}/generate-image`, { method: 'POST', body: JSON.stringify(data) }),
+    delete: (id) => apiFetch(`/retention-studio/${id}`, { method: 'DELETE' }),
 };
 
 // ============ Admin API ============
@@ -347,6 +432,11 @@ export const superadmin = {
     resetCredits: (id) => apiFetch(`/superadmin/users/${id}/reset-credits`, { method: 'POST' }),
     approveUser: (id) => apiFetch(`/superadmin/users/${id}/approve`, { method: 'PUT' }),
     rejectUser: (id) => apiFetch(`/superadmin/users/${id}/reject`, { method: 'PUT' }),
+
+    // Waitlist
+    approveWaitlist: (id) => apiFetch(`/superadmin/waitlist/${id}/approve`, { method: 'POST' }),
+    deleteWaitlist: (id) => apiFetch(`/superadmin/waitlist/${id}`, { method: 'DELETE' }),
+
     // Subscriptions
     getSubscriptions: (params = {}) => {
         const query = new URLSearchParams(params).toString();
@@ -403,7 +493,31 @@ export const superadmin = {
         const query = new URLSearchParams(params).toString();
         return apiFetch(`/superadmin/system-logs?${query}`);
     },
-    impersonateUser: (id) => apiFetch(`/superadmin/users/${id}/impersonate`, { method: 'POST' }),
+
+    // API Keys & Providers
+    getApiKeys: () => apiFetch('/superadmin/api-keys'),
+    updateApiKeys: (provider, keys) => apiFetch('/superadmin/api-keys', { method: 'PUT', body: JSON.stringify({ provider, keys }) }),
+    deleteApiKeys: (provider) => apiFetch(`/superadmin/api-keys/${provider}`, { method: 'DELETE' }),
+    testApiKey: (provider) => apiFetch(`/superadmin/api-keys/${provider}/test`, { method: 'POST' }),
+
+    // Budgets & Usage
+    getProviderBudgets: () => apiFetch('/superadmin/provider-budgets'),
+    updateProviderBudgets: (data) => apiFetch('/superadmin/provider-budgets', { method: 'PUT', body: JSON.stringify(data) }),
+    getProviderUsage: (days) => apiFetch(`/superadmin/provider-usage?days=${days}`),
+
+    // Credit Packs
+    getCreditPacks: () => apiFetch('/superadmin/credit-packs'),
+    createCreditPack: (data) => apiFetch('/superadmin/credit-packs', { method: 'POST', body: JSON.stringify(data) }),
+    updateCreditPack: (id, data) => apiFetch(`/superadmin/credit-packs/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteCreditPack: (id) => apiFetch(`/superadmin/credit-packs/${id}`, { method: 'DELETE' }),
+    toggleCreditPack: (id) => apiFetch(`/superadmin/credit-packs/${id}/toggle`, { method: 'POST' }),
+    seedCreditPacks: () => apiFetch('/superadmin/credit-packs/seed-defaults', { method: 'POST' }),
+
+    // Watermark
+    uploadWatermarkLogo: (dataUrl) => apiFetch('/superadmin/watermark/upload', { method: 'POST', body: JSON.stringify({ logo: dataUrl }) }),
+    updateWatermarkSettings: (data) => apiFetch('/superadmin/watermark/settings', { method: 'PUT', body: JSON.stringify(data) }),
+    getWatermarkOverrides: () => apiFetch('/superadmin/watermark/overrides'),
+    updateWatermarkOverride: (data) => apiFetch('/superadmin/watermark/override', { method: 'PUT', body: JSON.stringify(data) }),
 };
 
 // ============ Credits API ============
@@ -414,6 +528,13 @@ export const credits = {
         return apiFetch(`/credits/usage?${query}`);
     },
     summary: () => apiFetch('/credits/summary'),
+    // Additional methods for CreditsPage.jsx
+    history: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/credits/history?${query}`);
+    },
+    plans: () => apiFetch('/credits/plans'),
+    buy: (data) => apiFetch('/credits/buy', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ============ Brainstorm Studio API ============
@@ -649,6 +770,10 @@ export const payments = {
             method: 'POST',
             body: JSON.stringify(paymentData)
         }),
+    // Additional methods for CreditsPage.jsx
+    getStoreVisibility: () => apiFetch('/payments/store-visibility'),
+    subscriptionStatus: () => apiFetch('/payments/subscription-status'),
+    getTopupPacks: () => apiFetch('/payments/topup-packs'),
 };
 
 // ============ Funnel Studio API ============
@@ -783,12 +908,16 @@ export const studioReports = {
 
 // ============ Social Media Studio API ============
 export const socialMediaStudio = {
+    list: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/social-media-studio?${query}`);
+    },
     generateStrategy: (data) => apiFetch('/social-media-studio/generate-strategy', { method: 'POST', body: JSON.stringify(data) }),
     generateCalendar: (data) => apiFetch('/social-media-studio/generate-calendar', { method: 'POST', body: JSON.stringify(data) }),
     accountAudit: (data) => apiFetch('/social-media-studio/account-audit', { method: 'POST', body: JSON.stringify(data) }),
-    competitorAnalysis: (data) => apiFetch('/social-media-studio/competitor-analysis', { method: 'POST', body: JSON.stringify(data) }),
     profileScore: (data) => apiFetch('/social-media-studio/profile-score', { method: 'POST', body: JSON.stringify(data) }),
-    list: (params = {}) => apiFetch(`/social-media-studio/strategies?${new URLSearchParams(params)}`),
-    get: (id) => apiFetch(`/social-media-studio/strategies/${id}`),
-    delete: (id) => apiFetch(`/social-media-studio/strategies/${id}`, { method: 'DELETE' }),
+    competitorAnalysis: (data) => apiFetch('/social-media-studio/competitor-analysis', { method: 'POST', body: JSON.stringify(data) }),
+    // Strategy methods
+    getStrategy: (id) => apiFetch(`/social-media-studio/strategies/${id}`),
+    deleteStrategy: (id) => apiFetch(`/social-media-studio/strategies/${id}`, { method: 'DELETE' }),
 };
