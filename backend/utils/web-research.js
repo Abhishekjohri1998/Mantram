@@ -304,16 +304,16 @@ async function fetchSitemap(baseUrl) {
                         const childXml = await safeFetch(childUrl);
                         const childLocPattern = /<url>\s*<loc>([^<]+)<\/loc>/gi;
                         let cm;
-                        while ((cm = childLocPattern.exec(childXml)) !== null && urls.length < 50) {
+                        while ((cm = childLocPattern.exec(childXml)) !== null && urls.length < 15) {
                             urls.push(cm[1].trim());
                         }
                     } catch { /* skip failed child sitemap */ }
                 }
             } else {
-                // Standard sitemap — extract URLs
+                // Standard sitemap — extract URLs (capped at 15 for memory safety)
                 const locPattern = /<url>\s*<loc>([^<]+)<\/loc>/gi;
                 let m;
-                while ((m = locPattern.exec(xml)) !== null && urls.length < 50) {
+                while ((m = locPattern.exec(xml)) !== null && urls.length < 15) {
                     urls.push(m[1].trim());
                 }
             }
@@ -420,8 +420,11 @@ function computeDuplicates(pages) {
 
 
 // ============================================================================
-// RESEARCH DOMAIN — Deep crawl: sitemap + robots.txt + 20+ pages
+// RESEARCH DOMAIN — Deep crawl: sitemap + robots.txt + up to 15 pages
+// MAX_CRAWL_PAGES = 15 — keeps memory safe on 1GB EC2 instances
 // ============================================================================
+
+const MAX_CRAWL_PAGES = 15;
 
 export async function researchDomain(baseUrl) {
     // Normalize URL
@@ -486,13 +489,14 @@ export async function researchDomain(baseUrl) {
     const homepage = homepageResult;
     const internalLinks = homepage.links?.internal || [];
 
-    // PHASE 2: Build priority crawl queue (sitemap URLs first, then key paths, then discovery)
+    // PHASE 2: Build priority crawl queue — hard cap at MAX_CRAWL_PAGES
     const crawled = new Set([cleanBase, homepage.url]);
     const toCrawl = [];
 
-    // Priority 1: Sitemap URLs (up to 50)
+    // Priority 1: Sitemap URLs (up to MAX_CRAWL_PAGES)
     if (sitemap.found) {
-        for (const sUrl of sitemap.urls.slice(0, 50)) {
+        for (const sUrl of sitemap.urls.slice(0, MAX_CRAWL_PAGES)) {
+            if (toCrawl.length >= MAX_CRAWL_PAGES) break;
             try {
                 const resolved = new URL(sUrl).href;
                 if (!crawled.has(resolved)) {
@@ -506,7 +510,7 @@ export async function researchDomain(baseUrl) {
     // Priority 2: Key structural pages
     const keyPaths = ['/about', '/about-us', '/services', '/products', '/contact', '/blog', '/faq', '/pricing', '/team', '/case-studies', '/portfolio', '/news', '/careers', '/features'];
     for (const path of keyPaths) {
-        if (toCrawl.length >= 100) break;
+        if (toCrawl.length >= MAX_CRAWL_PAGES) break;
         const match = internalLinks.find(l => l.toLowerCase().includes(path));
         if (match) {
             try {
@@ -519,9 +523,9 @@ export async function researchDomain(baseUrl) {
         }
     }
 
-    // Priority 3: Discovery from internal links (fill up to 20)
+    // Priority 3: Discovery from internal links (fill up to MAX_CRAWL_PAGES)
     for (const link of internalLinks) {
-        if (toCrawl.length >= 100) break;
+        if (toCrawl.length >= MAX_CRAWL_PAGES) break;
         if (link === '/' || link.includes('#') || link.includes('?') || link.endsWith('.pdf') || link.endsWith('.jpg') || link.endsWith('.png')) continue;
         try {
             const fullUrl = new URL(link, cleanBase).href;
@@ -534,7 +538,7 @@ export async function researchDomain(baseUrl) {
 
     console.log(`🕷️  Crawl queue: ${toCrawl.length} pages (sitemap: ${sitemap.found ? sitemap.count : 0}, robots: ${robotsTxt.found})`);
 
-    // PHASE 3: Crawl in batches of 5 to avoid overwhelming the server
+    // PHASE 3: Crawl in batches of 5
     const allSubPages = [];
     const BATCH_SIZE = 5;
     for (let i = 0; i < toCrawl.length; i += BATCH_SIZE) {
@@ -543,7 +547,6 @@ export async function researchDomain(baseUrl) {
             batch.map(url => crawlPage(url).catch(e => ({ url, success: false, error: e.message })))
         );
         allSubPages.push(...batchResults.filter(p => p.success));
-        // No pre-emptive stop — crawl all queued pages
     }
 
     const allPages = [homepage, ...allSubPages];
@@ -637,7 +640,7 @@ export async function researchDomain(baseUrl) {
             internalLinkCount: homepage.internalLinkCount || 0,
             externalLinkCount: homepage.externalLinkCount || 0,
             externalDomains: homepage.links?.external || [],
-            // New deep crawl metrics
+            // Deep crawl metrics
             thinPages: thinPages.map(p => ({ url: p.url, wordCount: p.wordCount })),
             thinPageCount: thinPages.length,
             missingMetaDescriptions: missingMeta.map(p => p.url),
@@ -730,7 +733,7 @@ export function formatSiteResearch(research) {
     text += `- FAQ section: ${si.hasFAQ ? 'Yes' : 'Not found'}\n`;
     text += `- Robots meta: ${si.hasRobots ? 'Yes' : 'Not found'}\n`;
 
-    // NEW: Robots.txt + Sitemap intelligence
+    // Robots.txt + Sitemap intelligence
     if (research.robotsTxt) {
         text += `\n--- robots.txt ---\n`;
         text += `- robots.txt found: ${research.robotsTxt.found ? 'YES' : 'MISSING ⚠️'}\n`;
@@ -752,7 +755,7 @@ export function formatSiteResearch(research) {
         }
     }
 
-    // NEW: Issues detected
+    // Issues detected
     const issues = [];
     if (si.thinPageCount > 0) issues.push(`${si.thinPageCount} THIN PAGES (<300 words): ${si.thinPages.slice(0, 3).map(p => p.url).join(', ')}`);
     if (si.missingMetaDescriptions?.length > 0) issues.push(`${si.missingMetaDescriptions.length} pages MISSING meta descriptions: ${si.missingMetaDescriptions.slice(0, 3).join(', ')}`);
@@ -915,7 +918,7 @@ export async function discoverBacklinks(potentialPages, targetDomain) {
  */
 export async function analyzeCompetitorLinkProfile(competitorUrls, brandDomain) {
     const profiles = [];
-    const baseBrandDomain = brandDomain.replace(/^www\./, '').replace(/^https?:\/\//, '').toLowerCase();
+    const baseBrandDomain = brandDomain.replace(/^www\./).replace(/^https?:\/\//, '').toLowerCase();
 
     for (const compUrl of competitorUrls.slice(0, 3)) { // max 3 competitors
         try {
@@ -949,4 +952,3 @@ export async function analyzeCompetitorLinkProfile(competitorUrls, brandDomain) 
 
     return profiles;
 }
-
