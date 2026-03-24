@@ -448,9 +448,9 @@ const server = app.listen(config.port, () => {
 server.keepAliveTimeout = 65000;
 server.headersTimeout = 66000;
 
-// AI image generation (Gemini) + S3 upload + DB save can take 2-4 minutes
-// Default Node.js HTTP timeout is 2 minutes — extend to 5 minutes for heavy operations
-server.timeout = 300000;
+// Timeout set to 1000 minutes (60,000,000ms) to support long-running AI operations
+// (SEO audits, crawls, multi-model AI chains, image generation + S3 uploads)
+server.timeout = 60000000; // 1000 minutes
 
 // ══════════════════════════════════════════════════════════════
 // SCALING: GRACEFUL SHUTDOWN
