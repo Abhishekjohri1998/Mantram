@@ -272,6 +272,7 @@ export const team = {
 // ============ Fidato AI Assistant ============
 export const fidato = {
     chat: (message, brandId) => apiFetch('/fidato/chat', { method: 'POST', body: JSON.stringify({ message, brandId }) }),
+    canvasDirect: (data) => apiFetch('/fidato/canvas-direct', { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
     briefing: (brandId) => apiFetch('/fidato/briefing', { method: 'POST', body: JSON.stringify({ brandId }) }),
     notifications: (brandId) => apiFetch(`/fidato/notifications${brandId ? `?brandId=${brandId}` : ''}`),
     updatePreferences: (prefs) => apiFetch('/fidato/preferences', { method: 'POST', body: JSON.stringify(prefs) }),

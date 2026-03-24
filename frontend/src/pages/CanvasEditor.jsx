@@ -4,7 +4,7 @@ import { useBrand } from '../context/BrandContext'
 import SEOHead from '../components/SEOHead'
 import FormattedText from '../components/FormattedText'
 import * as fabric from 'fabric'
-import { media as mediaAPI, creatives as creativesAPI, nexus as nexusAPI, voice as voiceAPI, canvasAssets, API_BASE } from '../services/api'
+import { media as mediaAPI, creatives as creativesAPI, nexus as nexusAPI, voice as voiceAPI, canvasAssets, fidato as fidatoAPI, API_BASE } from '../services/api'
 import { TEMPLATE_LIBRARY, TEMPLATE_CATEGORIES } from './canvasTemplates'
 import { SVG_ELEMENT_CATEGORIES } from './canvasElements'
 import './CanvasEditor.css'
@@ -3074,7 +3074,7 @@ function CanvasEditorInner() {
         } catch (err) { showToast('Failed to add image') }
     }, [])
 
-    // ── Fidato Canvas Chat Handler ──
+    // ── Fidato Canvas Chat Handler — Claude Tool-Use Powered ──
     const handleFidatoSend = useCallback(async (voiceText) => {
         const msg = (voiceText || fidatoInput).trim()
         if (!msg || fidatoLoading) return
@@ -3083,188 +3083,288 @@ function CanvasEditorInner() {
         setFidatoLoading(true)
         setTimeout(() => fidatoMsgEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
 
-        // Helper: extract individual image data URLs from canvas objects
-        const extractObjectImages = (fc) => {
-            const imgs = []
-            const activeObj = fc.getActiveObject()
-            // If there's a multi-selection (ActiveSelection), extract each selected object
-            const selectedObjs = activeObj?.type === 'activeselection'
-                ? activeObj.getObjects()
-                : activeObj ? [activeObj] : []
-
-            // Use selected objects if any, otherwise all image objects on canvas (excluding artboard)
-            const targets = selectedObjs.length > 0 ? selectedObjs : fc.getObjects().filter(o => o.id !== 'artboard')
-
-            for (const obj of targets) {
-                if (obj.type === 'image' && obj.getSrc) {
-                    try {
-                        const tc = document.createElement('canvas')
-                        const w = obj.width * (obj.scaleX || 1)
-                        const h = obj.height * (obj.scaleY || 1)
-                        tc.width = Math.min(w, 1024); tc.height = Math.min(h, 1024)
-                        const ctx = tc.getContext('2d')
-                        const el = obj.getElement ? obj.getElement() : obj._element
-                        if (el) {
-                            ctx.drawImage(el, 0, 0, tc.width, tc.height)
-                            imgs.push(tc.toDataURL('image/png', 0.85))
-                        }
-                    } catch (e) { console.warn('Could not extract object image:', e) }
-                }
+        // Helper: position element based on named position
+        const positionElement = (obj, position, fc) => {
+            const cw = fc.width, ch = fc.height
+            const padding = 40
+            const positions = {
+                'center':       { left: cw / 2, top: ch / 2, originX: 'center', originY: 'center' },
+                'top-center':   { left: cw / 2, top: padding, originX: 'center', originY: 'top' },
+                'bottom-center':{ left: cw / 2, top: ch - padding, originX: 'center', originY: 'bottom' },
+                'top-left':     { left: padding, top: padding, originX: 'left', originY: 'top' },
+                'top-right':    { left: cw - padding, top: padding, originX: 'right', originY: 'top' },
+                'bottom-left':  { left: padding, top: ch - padding, originX: 'left', originY: 'bottom' },
+                'bottom-right': { left: cw - padding, top: ch - padding, originX: 'right', originY: 'bottom' },
             }
-            return imgs
+            const pos = positions[position] || positions['center']
+            obj.set(pos)
+        }
+
+        // Helper: find element by name or index
+        const findElement = (name, index, fc) => {
+            const objs = fc.getObjects().filter(o => o.id !== 'artboard')
+            if (typeof index === 'number' && index >= 0 && index < objs.length) {
+                return objs[objs.length - 1 - index] // layers are reversed (top-first)
+            }
+            if (name) {
+                const lower = name.toLowerCase()
+                return objs.find(o => 
+                    (o.customName || o._customName || '').toLowerCase().includes(lower) ||
+                    (o.id || '').toLowerCase().includes(lower) ||
+                    (o.type || '').toLowerCase().includes(lower)
+                )
+            }
+            return null
+        }
+
+        // ── Tool Call Executors ──
+        const executeToolCall = async (toolCall, fc) => {
+            const { name, args } = toolCall
+            const brandFont = activeBrand?.dna?.fonts?.[0] || 'Inter'
+            const brandColor = activeBrand?.dna?.colors?.[0]?.hex || '#ffffff'
+            const brandColor2 = activeBrand?.dna?.colors?.[1]?.hex || activeBrand?.dna?.colors?.[0]?.hex || '#6366f1'
+
+            switch (name) {
+                case 'add_text': {
+                    const text = args.text || 'Your text here'
+                    const isH = args.isHeading || false
+                    const textObj = new fabric.Textbox(text, {
+                        left: fc.width / 2,
+                        top: fc.height / 2,
+                        originX: 'center',
+                        originY: 'center',
+                        fontSize: args.fontSize || (isH ? 48 : 24),
+                        fontWeight: args.fontWeight || (isH ? '800' : '400'),
+                        fontFamily: args.fontFamily || brandFont,
+                        fill: args.color || brandColor,
+                        textAlign: 'center',
+                        width: fc.width * 0.6,
+                        editable: true,
+                        customName: isH ? 'Heading' : 'Text',
+                        id: `text-${Date.now()}`,
+                    })
+                    if (args.position) positionElement(textObj, args.position, fc)
+                    fc.add(textObj)
+                    fc.setActiveObject(textObj)
+                    return `Added text: "${text.substring(0, 30)}..."`
+                }
+
+                case 'add_shape': {
+                    const st = args.shapeType || 'shape-rect'
+                    const fill = args.fillColor || (brandColor2 + '40')
+                    const stroke = args.strokeColor || brandColor2
+                    addShape(st) // reuse existing addShape
+                    // After addShape, apply custom properties
+                    const added = fc.getActiveObject()
+                    if (added) {
+                        if (args.fillColor) added.set('fill', args.fillColor)
+                        if (args.strokeColor) added.set('stroke', args.strokeColor)
+                        if (args.opacity !== undefined) added.set('opacity', args.opacity)
+                        if (args.width && args.height) {
+                            const sx = args.width / (added.width || 200)
+                            const sy = args.height / (added.height || 150)
+                            added.set({ scaleX: sx, scaleY: sy })
+                        }
+                        if (args.position) positionElement(added, args.position, fc)
+                        fc.renderAll()
+                    }
+                    return `Added ${st.replace('shape-', '')} shape`
+                }
+
+                case 'add_logo': {
+                    const logoUrl = activeBrand?.dna?.logo?.url
+                    if (!logoUrl) return 'No brand logo available'
+                    try {
+                        const img = await fabric.FabricImage.fromURL(logoUrl, { crossOrigin: 'anonymous' })
+                        const scaleFactor = args.scale || 0.15
+                        const s = (fc.width * scaleFactor) / Math.max(img.width, img.height)
+                        img.set({ scaleX: s, scaleY: s, customName: 'Brand Logo', id: `logo-${Date.now()}` })
+                        positionElement(img, args.position || 'top-right', fc)
+                        fc.add(img)
+                        fc.setActiveObject(img)
+                        return 'Added brand logo'
+                    } catch { return 'Failed to load brand logo' }
+                }
+
+                case 'set_background': {
+                    const artboard = fc.getObjects().find(o => o.id === 'artboard')
+                    if (artboard) {
+                        artboard.set('fill', args.color)
+                    } else {
+                        fc.backgroundColor = args.color
+                    }
+                    fc.renderAll()
+                    return `Background set to ${args.color}`
+                }
+
+                case 'change_element_property': {
+                    const el = findElement(args.elementName, args.elementIndex, fc)
+                    if (!el) return `Element "${args.elementName || args.elementIndex}" not found`
+                    const prop = args.property
+                    let val = args.value
+                    // Auto-convert numeric values
+                    if (['fontSize', 'opacity', 'left', 'top', 'scaleX', 'scaleY', 'angle'].includes(prop)) {
+                        val = parseFloat(val)
+                    }
+                    el.set(prop, val)
+                    fc.renderAll()
+                    return `Changed ${prop} of "${el.customName || el.type}" to ${args.value}`
+                }
+
+                case 'remove_element': {
+                    const el2 = findElement(args.elementName, args.elementIndex, fc)
+                    if (!el2) return `Element not found`
+                    fc.remove(el2)
+                    fc.renderAll()
+                    return `Removed "${el2.customName || el2.type}"`
+                }
+
+                case 'set_canvas_size': {
+                    const preset = PRESETS.find(p => p.id === args.preset)
+                    if (preset) {
+                        resizeToPreset(preset)
+                        return `Canvas resized to ${preset.label} (${preset.w}×${preset.h})`
+                    }
+                    return `Preset "${args.preset}" not found`
+                }
+
+                case 'move_element': {
+                    const el3 = findElement(args.elementName, args.elementIndex, fc)
+                    if (!el3) return `Element not found`
+                    positionElement(el3, args.position, fc)
+                    fc.renderAll()
+                    return `Moved "${el3.customName || el3.type}" to ${args.position}`
+                }
+
+                case 'reorder_layer': {
+                    const el4 = findElement(args.elementName, args.elementIndex, fc)
+                    if (!el4) return `Element not found`
+                    switch (args.action) {
+                        case 'bring-front': fc.bringObjectToFront(el4); break
+                        case 'send-back': fc.sendObjectToBack(el4); break
+                        case 'bring-forward': fc.bringObjectForward(el4); break
+                        case 'send-backward': fc.sendObjectBackward(el4); break
+                    }
+                    // Keep artboard always at back
+                    const ab = fc.getObjects().find(o => o.id === 'artboard')
+                    if (ab) fc.sendObjectToBack(ab)
+                    fc.renderAll()
+                    return `Layer reorder: ${args.action} on "${el4.customName || el4.type}"`
+                }
+
+                case 'generate_image': {
+                    const brandName = activeBrand?.name || 'Brand'
+                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎨 Generating: "${args.prompt?.substring(0, 50)}..."` }])
+                    try {
+                        const data = await canvasAssets.aiGenerate({ prompt: args.prompt, size: args.size || '1024x1024' })
+                        if (data.imageUrl) {
+                            await addImageUrlToCanvas(data.imageUrl, 'AI Generated')
+                            if (args.position) {
+                                const lastObj = fc.getActiveObject()
+                                if (lastObj) positionElement(lastObj, args.position, fc)
+                                fc.renderAll()
+                            }
+                            return `Image generated and added`
+                        }
+                    } catch (e) { return `Image generation failed: ${e.message}` }
+                    return 'Image generation failed'
+                }
+
+                default:
+                    return `Unknown tool: ${name}`
+            }
         }
 
         try {
             const fc = fabricRef.current
-            const hasObjects = fc && fc.getObjects().filter(o => o.id !== 'artboard').length > 0
             const lowerMsg = msg.toLowerCase()
 
-            // Build brand context for all prompts
-            const brandName = activeBrand?.name || 'Brand'
-            const brandDna = activeBrand?.dna || {}
-            const brandColors = [brandDna.colors?.primary, brandDna.colors?.secondary, brandDna.colors?.accent].filter(Boolean)
-            const brandTagline = brandDna.tagline || activeBrand?.tagline || ''
-            const brandIndustry = brandDna.industry || activeBrand?.industry || ''
-            const brandProducts = (activeBrand?.products || []).slice(0, 3).map(p => p.name).filter(Boolean)
-            const brandWebsite = activeBrand?.website || ''
-            const brandContext = [
-                `Brand: ${brandName}`,
-                brandTagline ? `Tagline: "${brandTagline}"` : '',
-                brandIndustry ? `Industry: ${brandIndustry}` : '',
-                brandColors.length ? `Brand Colors: ${brandColors.join(', ')}` : '',
-                brandProducts.length ? `Products: ${brandProducts.join(', ')}` : '',
-            ].filter(Boolean).join('. ')
+            // Build canvas state snapshot for Claude
+            const canvasElements = fc ? fc.getObjects()
+                .filter(o => o.id !== 'artboard')
+                .map((obj, i) => ({
+                    type: obj.type,
+                    name: obj.customName || obj._customName || obj.type,
+                    left: Math.round(obj.left || 0),
+                    top: Math.round(obj.top || 0),
+                    width: Math.round((obj.width || 0) * (obj.scaleX || 1)),
+                    height: Math.round((obj.height || 0) * (obj.scaleY || 1)),
+                    fill: obj.fill,
+                    text: obj.text?.substring(0, 50),
+                })) : []
 
-            const isGenerateOnly = /\b(generate|create|make|design|draw|produce|craft)\b/i.test(lowerMsg) && /\b(image|photo|visual|graphic|creative|poster|banner|ad|flyer|post|thumbnail|cover|artwork|illustration|picture)s?\b/i.test(lowerMsg)
-            const isMerge = /\b(merge|combine|blend|mix|fuse|stitch|overlay|composite|mashup|put together|integrate|unify|make one image|create from these|join|collage|montage)\b/.test(lowerMsg)
-            const isPalette = lowerMsg.includes('palette') || lowerMsg.includes('extract color')
-            const batchMatch = lowerMsg.match(/(\d+)\s*(image|post|creative|slide|variation|design|visual|banner|card|frame)/i)
-            const isBatchGenerate = batchMatch || /\b(carousel|series|batch|set of|multiple|campaign set)\b/i.test(lowerMsg)
-            const batchCount = batchMatch ? Math.min(parseInt(batchMatch[1]), 8) : 4
-            const isAdapt = /\b(adapt|resize|convert|fit|scale|repurpose|reformat)\b/i.test(lowerMsg) && /\b(size|format|platform|dimension|social|media|story|reel|post|banner)\b/i.test(lowerMsg)
-
-            if (isBatchGenerate && !isMerge && !isAdapt) {
-                const count = batchCount
-                const theme = msg.replace(/\d+\s*(image|post|creative|slide|variation|design|visual|banner|card|frame)s?/i, '').trim() || 'brand campaign'
-                setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎬 **Creative Director Mode**\n\nGenerating **${count} unique creatives** for: *"${theme}"*...` }])
-                const slides = [{ label: 'Hook' }, { label: 'Benefit' }, { label: 'Feature' }, { label: 'Lifestyle' }, { label: 'BTS' }, { label: 'Quote' }, { label: 'Offer' }, { label: 'CTA' }]
-                const results = []
-                for (let i = 0; i < count; i++) {
-                    const slide = slides[i % slides.length]
-                    const prompt = `Fidato Creative Director Mode. Brand: ${brandName}. Slide ${i + 1}/${count} ("${slide.label}"). Theme: ${theme}. Palette: ${brandColors.join(', ')}. Format: Square.`
-                    try {
-                        const data = await canvasAssets.aiGenerate({ prompt, size: '1024x1024' })
-                        if (data.imageUrl) {
-                            results.push({ url: data.imageUrl, label: `${slide.label} (${i + 1}/${count})` })
-                            const cols = Math.ceil(Math.sqrt(count))
-                            const gridX = (i % cols) * 280 + 50
-                            const gridY = Math.floor(i / cols) * 280 + 50
-                            const img = await fabric.FabricImage.fromURL(data.imageUrl, { crossOrigin: 'anonymous' })
-                            const scale = 250 / Math.max(img.width, img.height)
-                            img.set({ left: gridX, top: gridY, scaleX: scale, scaleY: scale, customName: `${slide.label} ${i + 1}` })
-                            fc.add(img); fc.renderAll()
-                            setGeneratedImages(prev => [{ url: data.imageUrl, label: `${theme} — ${slide.label}`, timestamp: Date.now() }, ...prev])
-                        }
-                    } catch (err) { console.warn(`Slide ${i + 1} failed:`, err.message) }
-                }
-                saveHistory()
-                setFidatoMessages(prev => {
-                    const updated = [...prev]
-                    updated[updated.length - 1] = { role: 'assistant', content: `✅ **Campaign Complete!** Generated **${results.length}/${count}** creatives.`, images: results.map(r => ({ url: r.url, label: r.label })) }
-                    return updated
-                })
-            } else if (isAdapt && hasObjects) {
-                let mentionedSizes = parseMentionedSizes(lowerMsg)
-                const wantsAll = /\b(all\s*(size|format|platform|social|media))\b/i.test(lowerMsg)
-                if (wantsAll || mentionedSizes.length === 0) mentionedSizes = [SIZE_PRESETS['ig post'], SIZE_PRESETS['ig story'], SIZE_PRESETS['fb post']]
-                const canvasDataUrl = fc.toDataURL({ format: 'png', quality: 0.92 })
-                setFidatoMessages(prev => [...prev, { role: 'assistant', content: `📐 **Adapting creative for ${mentionedSizes.length} formats...**` }])
-                const adaptResults = []
-                for (let i = 0; i < mentionedSizes.length; i++) {
-                    const size = mentionedSizes[i]
-                    try {
-                        const data = await canvasAssets.aiEdit({ prompt: `Outpaint for ${size.label} (${size.w}x${size.h})`, imageBase64: canvasDataUrl })
-                        if (data.imageUrl) {
-                            adaptResults.push({ url: data.imageUrl, label: size.label, size: `${size.w}×${size.h}` })
-                            const img = await fabric.FabricImage.fromURL(data.imageUrl, { crossOrigin: 'anonymous' })
-                            const scale = 300 / Math.max(img.width, img.height)
-                            img.set({ left: (i + 1) * 320 + 50, top: 50, scaleX: scale, scaleY: scale, _customName: `${size.label} Adapted` })
-                            fc.add(img); fc.renderAll()
-                            setGeneratedImages(prev => [{ url: data.imageUrl, label: `${size.label}`, timestamp: Date.now() }, ...prev])
-                        }
-                    } catch (err) { console.warn(`Adapt ${size.label} failed:`, err.message) }
-                }
-                saveHistory()
-                setFidatoMessages(prev => {
-                    const updated = [...prev]
-                    updated[updated.length - 1] = { role: 'assistant', content: `✅ **Adaptation Complete!**`, images: adaptResults.map(r => ({ url: r.url, label: r.label })) }
-                    return updated
-                })
-            } else if (isMerge && hasObjects) {
-                const selectedImages = extractObjectImages(fc)
-                if (selectedImages.length < 2) {
-                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: `📸 I need at least 2 images to merge! Select multiple on canvas first.` }])
-                } else {
-                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎨 **Creative Director Mode** — Merging ${selectedImages.length} images...` }])
-                    const data = await canvasAssets.aiGenerate({ prompt: `${msg}.\n\nBrand Context: ${brandContext}. Merge these seamlessly.`, size: '1024x1024', referenceImages: selectedImages })
-                    if (data.error) throw new Error(data.error)
-                    addImageUrlToCanvas(data.imageUrl)
-                    setFidatoMessages(prev => {
-                        const updated = [...prev]
-                        updated[updated.length - 1] = { role: 'assistant', content: `✨ Done! Merged images added to canvas.`, images: [{ url: data.imageUrl }] }
-                        return updated
-                    })
-                }
-            } else if (isGenerateOnly) {
-                setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎨 Generating image for ${brandName}...` }])
-                const data = await canvasAssets.aiGenerate({ prompt: `${msg}\n\nBrand Context: ${brandContext}`, size: '1024x1024' })
-                if (data.error) throw new Error(data.error)
-                addImageUrlToCanvas(data.imageUrl)
-                setFidatoMessages(prev => {
-                    const updated = [...prev]
-                    updated[updated.length - 1] = { role: 'assistant', content: '✨ Image generated and added to canvas!', images: [{ url: data.imageUrl }] }
-                    return updated
-                })
-            } else if (hasObjects) {
-                const selectedImages = extractObjectImages(fc)
-                setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎨 Analyzing canvas and applying changes...` }])
-                const canvasDataUrl = fc.toDataURL({ format: 'png', quality: 0.92 })
-                const data = await canvasAssets.aiEdit({ prompt: msg, imageBase64: canvasDataUrl, additionalImages: selectedImages })
-                if (data.error) throw new Error(data.error)
-                addImageUrlToCanvas(data.imageUrl)
-                setFidatoMessages(prev => {
-                    const updated = [...prev]
-                    updated[updated.length - 1] = { role: 'assistant', content: `✅ Done! Result added to canvas.`, images: [{ url: data.imageUrl }] }
-                    return updated
-                })
-            } else {
-                const seemsCreative = /\b(image|photo|visual|graphic|creative|poster|banner|ad|flyer|post|thumbnail|social media|instagram|facebook|linkedin)\b/i.test(lowerMsg)
-                if (seemsCreative) {
-                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎨 I sense a creative request! Generating for ${brandName}...` }])
-                    try {
-                        const data = await canvasAssets.aiGenerate({ prompt: `${msg}. ${brandContext}`, size: '1024x1024' })
-                        if (data.error) throw new Error(data.error)
-                        addImageUrlToCanvas(data.imageUrl)
-                        setFidatoMessages(prev => {
-                            const updated = [...prev]
-                            updated[updated.length - 1] = { role: 'assistant', content: '✨ Creative generated and added to canvas!', images: [{ url: data.imageUrl }] }
-                            return updated
-                        })
-                    } catch (genErr) {
-                        const data = await nexusAPI.chat({ message: `[Canvas Creative Director for ${brandName}] ${brandContext}. The user said: "${msg}". Help them.`, brandId: activeBrand?._id })
-                        setFidatoMessages(prev => [...prev, { role: 'assistant', content: data.reply || data.message || 'Error occurred.' }])
-                    }
-                } else {
-                    const data = await nexusAPI.chat({ message: `[Canvas Creative Director for ${brandName}] ${brandContext}. The user said: "${msg}". Help them with their creative task.`, brandId: activeBrand?._id })
-                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: data.reply || data.message || 'Error occurred.' }])
-                }
+            const artboard = fc?.getObjects().find(o => o.id === 'artboard')
+            const canvasState = {
+                width: artboard ? Math.round(artboard.width) : fc?._logicalWidth || 1080,
+                height: artboard ? Math.round(artboard.height) : fc?._logicalHeight || 1080,
+                elements: canvasElements,
             }
+
+            // Build conversation history (last few messages)
+            const conversationHistory = fidatoMessages.slice(-6).map(m => ({
+                role: m.role,
+                content: typeof m.content === 'string' ? m.content : 'image',
+            }))
+
+            // Show thinking indicator
+            setFidatoMessages(prev => [...prev, { role: 'assistant', content: '🎨 **Creative Director** thinking...' }])
+
+            // Call Claude tool-use endpoint
+            const result = await fidatoAPI.canvasDirect({
+                message: msg,
+                canvasState,
+                conversationHistory,
+            })
+
+            // Execute tool calls against the canvas
+            const toolResults = []
+            if (result.toolCalls?.length > 0 && fc) {
+                for (const tc of result.toolCalls) {
+                    console.log(`🎨 Executing tool: ${tc.name}`, tc.args)
+                    const result = await executeToolCall(tc, fc)
+                    toolResults.push(`✅ ${result}`)
+                }
+                saveHistory()
+                updateLayers()
+            }
+
+            // Build final response
+            const reply = result.reply || 'Done!'
+            const actionSummary = toolResults.length > 0
+                ? `\n\n**Actions:**\n${toolResults.join('\n')}`
+                : ''
+            const providerNote = result.fallback ? ` *(via ${result.provider})* ` : ''
+
+            // Update the "thinking..." message with the real response
+            setFidatoMessages(prev => {
+                const updated = [...prev]
+                // Replace the last assistant "thinking" message
+                const lastIdx = updated.length - 1
+                if (lastIdx >= 0 && updated[lastIdx].role === 'assistant') {
+                    updated[lastIdx] = { role: 'assistant', content: `${reply}${actionSummary}${providerNote}` }
+                } else {
+                    updated.push({ role: 'assistant', content: `${reply}${actionSummary}${providerNote}` })
+                }
+                return updated
+            })
+
         } catch (err) {
-            setFidatoMessages(prev => [...prev, { role: 'assistant', content: `❌ Error: ${err.message}` }])
+            console.error('Fidato Canvas error:', err)
+            // Remove the "thinking" message and show error
+            setFidatoMessages(prev => {
+                const updated = [...prev]
+                const lastIdx = updated.length - 1
+                if (lastIdx >= 0 && updated[lastIdx].content?.includes('thinking')) {
+                    updated[lastIdx] = { role: 'assistant', content: `❌ Error: ${err.message}` }
+                } else {
+                    updated.push({ role: 'assistant', content: `❌ Error: ${err.message}` })
+                }
+                return updated
+            })
         }
         setFidatoLoading(false)
         setTimeout(() => fidatoMsgEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 200)
-    }, [fidatoInput, fidatoLoading, activeBrand, addImageUrlToCanvas, saveHistory])
+    }, [fidatoInput, fidatoLoading, activeBrand, addImageUrlToCanvas, saveHistory, updateLayers, addShape, resizeToPreset, fidatoMessages])
 
     const SIDEBAR_TABS = [
         { id: 'ai', emoji: '✦', label: 'AI', isAi: true },
