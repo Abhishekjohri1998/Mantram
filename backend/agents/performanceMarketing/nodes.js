@@ -47,7 +47,7 @@ async function callAgent(systemPrompt, userPrompt, temperature = 0.7) {
         userPrompt,
         temperature,
         maxTokens: 8192,
-    }, { provider: 'anthropic' });
+    }); // Router auto-selects cheapest provider
 
     const text = result.text || '';
     try {

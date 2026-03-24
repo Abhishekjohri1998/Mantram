@@ -10,29 +10,31 @@ const router = Router();
 async function aiCall(systemPrompt, userPrompt, options = {}) {
     const { temperature = 0.7, maxTokens = 4096, json = false } = options;
 
-    // Try Claude first (best at intent classification & reasoning)
-    if (process.env.ANTHROPIC_API_KEY) {
+    // Try Gemini first (cheapest and fast)
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (geminiKey) {
         try {
-            const resp = await fetch('https://api.anthropic.com/v1/messages', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-api-key': process.env.ANTHROPIC_API_KEY,
-                    'anthropic-version': '2023-06-01',
-                },
-                body: JSON.stringify({
-                    model: process.env.DEFAULT_TEXT_MODEL || 'claude-sonnet-4-20250514',
-                    max_tokens: maxTokens,
-                    system: systemPrompt,
-                    messages: [{ role: 'user', content: userPrompt }],
-                    ...(json ? {} : {}),
-                }),
-            });
+            const resp = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        systemInstruction: { parts: [{ text: systemPrompt }] },
+                        contents: [{ parts: [{ text: userPrompt }] }],
+                        generationConfig: {
+                            temperature,
+                            maxOutputTokens: maxTokens,
+                            ...(json ? { responseMimeType: 'application/json' } : {}),
+                        },
+                    }),
+                }
+            );
             const data = await resp.json();
-            if (data.content?.[0]?.text) return data.content[0].text;
-            if (data.error) console.warn('Claude failed:', data.error.message);
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) return text;
         } catch (e) {
-            console.warn('Claude error:', e.message);
+            console.warn('Gemini error:', e.message);
         }
     }
 
@@ -63,31 +65,28 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
         }
     }
 
-    // Fallback to Gemini
-    const geminiKey = process.env.GEMINI_API_KEY;
-    if (geminiKey) {
+    // Last resort: Claude (premium — most expensive)
+    if (process.env.ANTHROPIC_API_KEY) {
         try {
-            const resp = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        systemInstruction: { parts: [{ text: systemPrompt }] },
-                        contents: [{ parts: [{ text: userPrompt }] }],
-                        generationConfig: {
-                            temperature,
-                            maxOutputTokens: maxTokens,
-                            ...(json ? { responseMimeType: 'application/json' } : {}),
-                        },
-                    }),
-                }
-            );
+            const resp = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': process.env.ANTHROPIC_API_KEY,
+                    'anthropic-version': '2023-06-01',
+                },
+                body: JSON.stringify({
+                    model: process.env.DEFAULT_TEXT_MODEL || 'claude-sonnet-4-20250514',
+                    max_tokens: maxTokens,
+                    system: systemPrompt,
+                    messages: [{ role: 'user', content: userPrompt }],
+                }),
+            });
             const data = await resp.json();
-            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (text) return text;
+            if (data.content?.[0]?.text) return data.content[0].text;
+            if (data.error) console.warn('Claude failed:', data.error.message);
         } catch (e) {
-            console.warn('Gemini fallback error:', e.message);
+            console.warn('Claude error:', e.message);
         }
     }
 

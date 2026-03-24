@@ -163,7 +163,7 @@ RESPONSE FORMAT (respond in valid JSON only):
         userPrompt: prompt,
         temperature: 0.8,
         maxTokens: 1000,
-    }, { provider: 'anthropic' });
+    }); // Router auto-selects cheapest provider
 
     // Extract text from result (providers return { text, tokensUsed })
     const response = aiResult.text || aiResult;

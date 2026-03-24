@@ -197,7 +197,7 @@ export async function generateMetaLearnings(brandId, userId) {
         userPrompt: learnings.map(l => `[${l.type}] ${l.title}: ${l.insight.summary} (${l.insight.actionable})`).join('\n'),
         temperature: 0.4,
         maxTokens: 2048,
-    }, { provider: 'anthropic' });
+    }); // Router auto-selects cheapest provider
 
     try {
         const text = result.text || '';

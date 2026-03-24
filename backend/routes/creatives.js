@@ -224,7 +224,7 @@ RESPOND WITH ONLY THE ENHANCED PROMPT TEXT. Nothing else.`;
             userPrompt,
             temperature: 0.7,
             maxTokens: 300,
-        }, { provider: 'anthropic' });
+        }); // Router auto-selects cheapest provider
 
         // Clean up the response — remove quotes, "Generate:" prefixes, etc.
         let enhanced = (result.text || '').trim();

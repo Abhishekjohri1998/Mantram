@@ -65,8 +65,8 @@ router.post('/start', protect, requireCredits('content'), async (req, res) => {
             platform: platform || 'instagram',
             originalContent: state.draft?.content || '',
             aiMeta: {
-                provider: 'anthropic',
-                model: 'claude-sonnet',
+                provider: 'router', // Uses default (gemini) unless user selects Claude
+                model: 'auto',
                 agenticPipeline: true,
                 pipelineStep: 'draft',
                 research: state.research,
@@ -247,8 +247,8 @@ router.post('/youtube', protect, requireCredits('content'), async (req, res) => 
             platform: 'youtube',
             originalContent: yt.script || '',
             aiMeta: {
-                provider: 'anthropic',
-                model: 'claude-sonnet',
+                provider: 'router', // Uses default (gemini) unless user selects Claude
+                model: 'auto',
                 agenticPipeline: true,
                 pipelineStep: 'youtube_complete',
             },
@@ -329,8 +329,8 @@ router.post('/youtube-seo', protect, requireCredits('content'), async (req, res)
             platform: 'youtube',
             originalContent: seo.description || '',
             aiMeta: {
-                provider: 'anthropic',
-                model: 'claude-sonnet',
+                provider: 'router', // Uses default (gemini) unless user selects Claude
+                model: 'auto',
                 agenticPipeline: true,
                 pipelineStep: 'youtube_seo',
             },

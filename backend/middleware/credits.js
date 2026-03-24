@@ -34,7 +34,18 @@ const ACTION_LABELS = {
     socialMedia: 'Social Media Strategy', socialMediaCalendar: 'Social Calendar', socialMediaAudit: 'Social Account Audit',
     socialMediaCompetitor: 'Social Competitor Analysis', socialMediaScore: 'Social Profile Score',
     canvasGenerate: 'Canvas AI Generate', canvasBgRemove: 'Canvas BG Remove', canvasExtend: 'Canvas Extend/Fill',
+    fidatoCanvas: 'Fidato Canvas (AI Director)', fidatoCanvasClaude: 'Fidato Canvas (Claude Premium)',
     adCreative: 'Ad Creative Image', voiceClone: 'Voice Clone', voiceTranscribe: 'Voice Transcribe',
+};
+
+// Provider credit multipliers — Claude is premium (higher API cost to us)
+// Users choosing Claude explicitly will be charged more credits
+export const PROVIDER_MULTIPLIERS = {
+    gemini: 1.0,      // Base cost — cheapest
+    openai: 1.0,      // Same tier as Gemini for credit purposes
+    grok: 1.0,        // Same tier
+    sarvam: 1.0,      // Regional — same tier
+    anthropic: 2.0,   // Premium — Claude is ~10-30x more expensive per token
 };
 
 // Default credit costs (used when SystemSettings has no override)
@@ -71,6 +82,8 @@ const DEFAULT_CREDIT_COSTS = {
     canvasGenerate: 3,             // ↑ from 2 (same image model cost)
     canvasBgRemove: 2,
     canvasExtend: 3,               // ↑ from 2
+    fidatoCanvas: 2,               // Fidato Canvas AI Director (Gemini fallback)
+    fidatoCanvasClaude: 4,         // Fidato Canvas with Claude tool-use (premium)
     adCreative: 5,
     voiceClone: 5,                 // ↑ from 3 (Minimax cost + storage)
     voiceTranscribe: 1,
@@ -143,6 +156,16 @@ export const requireCredits = (actionOrCost = 1) => {
                 }
             }
 
+            // Provider-based credit multiplier — Claude usage costs more
+            const requestedProvider = (req.body?.provider || req.body?.model || '').toLowerCase();
+            let providerMultiplier = 1.0;
+            if (requestedProvider.includes('anthropic') || requestedProvider.includes('claude')) {
+                providerMultiplier = PROVIDER_MULTIPLIERS.anthropic || 2.0;
+                cost = Math.ceil(cost * providerMultiplier);
+                console.log(`💎 Claude premium: ${actionName} cost multiplied by ${providerMultiplier}x → ${cost} credits`);
+            }
+            req.providerMultiplier = providerMultiplier;
+
             // Bypass credit checks ONLY for superadmins
             const isSuperAdmin = user.role === 'superadmin' || user.plan === 'enterprise';
 
@@ -199,7 +222,7 @@ export const requireCredits = (actionOrCost = 1) => {
             const updTopUp = (updated.credits?.topUp > 0 && updated.credits?.topUpExpiry && new Date(updated.credits.topUpExpiry) > new Date()) ? updated.credits.topUp : 0;
             const balanceAfter = (updated.credits?.total || 0) + (updated.credits?.bonus || 0) + updTopUp - (updated.credits?.used || 0);
             // Detect studio from action name
-            const studioMap = { content: 'content', contentRefine: 'content', creative: 'creative', photoshoot: 'creative', brainstorm: 'brainstorm', brainstormRefine: 'brainstorm', brainstormChat: 'brainstorm', brainstormScreenplay: 'brainstorm', trendRefresh: 'brainstorm', videoBrainstorm: 'video', videoGenerate: 'video', videoEdit: 'video', socialMedia: 'social', socialMediaCalendar: 'social', socialMediaAudit: 'social', socialMediaCompetitor: 'social', socialMediaScore: 'social', canvasGenerate: 'creative', canvasBgRemove: 'creative', canvasExtend: 'creative', adCreative: 'performance', voiceClone: 'voice', voiceTranscribe: 'voice' };
+            const studioMap = { content: 'content', contentRefine: 'content', creative: 'creative', photoshoot: 'creative', brainstorm: 'brainstorm', brainstormRefine: 'brainstorm', brainstormChat: 'brainstorm', brainstormScreenplay: 'brainstorm', trendRefresh: 'brainstorm', videoBrainstorm: 'video', videoGenerate: 'video', videoEdit: 'video', socialMedia: 'social', socialMediaCalendar: 'social', socialMediaAudit: 'social', socialMediaCompetitor: 'social', socialMediaScore: 'social', canvasGenerate: 'creative', canvasBgRemove: 'creative', canvasExtend: 'creative', fidatoCanvas: 'creative', fidatoCanvasClaude: 'creative', adCreative: 'performance', voiceClone: 'voice', voiceTranscribe: 'voice' };
             const studio = studioMap[actionName] || (actionName?.startsWith('seo') ? 'seo' : 'unknown');
 
             CreditUsage.create({
@@ -207,13 +230,15 @@ export const requireCredits = (actionOrCost = 1) => {
                 action: actionName || 'unknown',
                 cost,
                 balanceAfter: Math.max(0, balanceAfter),
-                description: ACTION_LABELS[actionName] || actionName || 'AI Operation',
+                description: (ACTION_LABELS[actionName] || actionName || 'AI Operation') + (providerMultiplier > 1 ? ` (Claude Premium ${providerMultiplier}x)` : ''),
                 studio,
                 metadata: {
                     route: req.originalUrl,
                     brandId: req.body?.brandId || req.params?.brandId,
                     brandName: req.body?.brandName,
                     subscriptionId: user.activeSubscription,
+                    provider: requestedProvider || undefined,
+                    providerMultiplier: providerMultiplier > 1 ? providerMultiplier : undefined,
                 },
             }).catch(err => console.warn('Credit usage log failed:', err.message));
 

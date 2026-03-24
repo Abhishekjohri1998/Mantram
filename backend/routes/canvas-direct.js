@@ -1,6 +1,7 @@
 import express from 'express';
 import { getRouter as getAIRouter } from '../ai/router.js';
 import { protect } from '../middleware/auth.js';
+import { requireCredits } from '../middleware/credits.js';
 
 const router = express.Router();
 
@@ -148,7 +149,7 @@ const CANVAS_TOOLS = [
 ];
 
 // ── POST /api/fidato/canvas-direct ──
-router.post('/canvas-direct', protect, async (req, res) => {
+router.post('/canvas-direct', protect, requireCredits('fidatoCanvas'), async (req, res) => {
     const startTime = Date.now();
     try {
         const { message, canvasState, conversationHistory } = req.body;

@@ -48,7 +48,7 @@ async function callAgent(systemPrompt, userPrompt, temperature = 0.7) {
         userPrompt,
         temperature,
         maxTokens: 4096,
-    }, { provider: 'anthropic' }); // Preferred, but router will fallback if quota hit
+    }); // Router auto-selects; video-studio.js handles claude fallback separately
     return parseAgentJSON(result.text || '');
 }
 

@@ -23,7 +23,7 @@ export async function callAgent(systemPrompt, userPrompt, temperature = 0.7, max
         userPrompt,
         temperature,
         maxTokens,
-    }, { provider: 'anthropic' });
+    }); // Router auto-selects cheapest provider
 
     const text = result.text || '';
     try {
@@ -45,7 +45,7 @@ export async function callAgentText(systemPrompt, userPrompt, temperature = 0.7,
         userPrompt,
         temperature,
         maxTokens,
-    }, { provider: 'anthropic' });
+    }); // Router auto-selects cheapest provider
     return result.text || '';
 }
 
