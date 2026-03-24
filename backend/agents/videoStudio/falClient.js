@@ -77,7 +77,7 @@ export const COST_PER_SECOND = {
     'veo-3.1': { fast: 0.15, quality: 0.40 },
     'veo-3.1-fast': { fast: 0.05, quality: 0.10 },  // ↓ Lao Zhang pricing
     'seedance-1.0': { fast: 0.05, quality: 0.08 },
-    'seedance-2.0': { fast: 0.08, quality: 0.15 },  // PiAPI (not on Lao Zhang)
+    'seedance-2.0': { fast: 0.04, quality: 0.08 },  // Lao Zhang primary (PiAPI fallback: 0.08/0.15)
     'grok-imagine': { fast: 0.08, quality: 0.08 },
     'hunyuan': { fast: 0.03, quality: 0.05 },
 };
@@ -486,8 +486,37 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         };
     }
 
-    // ── PiAPI: Seedance 2.0 (NOT available on Lao Zhang) ──
+    // ── Seedance 2.0: Lao Zhang PRIMARY → PiAPI FALLBACK ──
+    // Lao Zhang has seedance-2.0 (hidden/unlisted) — needs billing channel activation
+    // Once enabled: 50% cheaper than PiAPI ($0.05 vs $0.10)
     if (model === 'seedance-2.0') {
+        if (isLaozhangAvailable()) {
+            try {
+                console.log(`🎬 [Seedance 2.0] Trying Lao Zhang (primary — 50% cheaper)...`);
+                const lzResult = await submitLaozhangVideoGeneration({
+                    model: 'seedance-2.0',
+                    prompt,
+                    imageUrl,
+                    duration,
+                    aspectRatio: aspectRatio || '16:9',
+                    generateAudio,
+                });
+                // SYNCHRONOUS: Lao Zhang returns the video URL immediately
+                return {
+                    requestId: `lz-${Date.now()}`,
+                    endpoint: 'laozhang-seedance-2.0',
+                    statusUrl: null,
+                    resultUrl: null,
+                    provider: 'laozhang',
+                    _laozhangVideoUrl: lzResult.videoUrl, // Pre-resolved URL
+                };
+            } catch (lzErr) {
+                console.warn(`⚠️ [Seedance 2.0] Lao Zhang failed (${lzErr.message}), falling back to PiAPI...`);
+            }
+        }
+
+        // Fallback to PiAPI
+        console.log(`🎬 [Seedance 2.0] Using PiAPI (fallback)...`);
         const result = await submitPiApiVideoGeneration({ prompt, imageUrl, duration, aspectRatio: aspectRatio || '16:9', generateAudio, referenceImages: referenceImages || [], qualityMode: mode || 'fast' });
         return {
             requestId: result.taskId,

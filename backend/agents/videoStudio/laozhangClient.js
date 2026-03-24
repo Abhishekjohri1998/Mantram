@@ -10,7 +10,8 @@
  *   - sora_video2, sora_video2-15s, sora_video2-landscape, sora_video2-landscape-15s
  *   - sora-2, sora-2-character, sora2_video
  *   - veo-3.1, veo-3.1-fast, veo-3.1-4k, veo-3.1-relaxed (38 total variants)
- *   ⚠️ NO Seedance, NO Kling on this API
+ *   - seedance-2.0, seedance-2, seedance-2-pro (HIDDEN — not in /v1/models, needs billing channel)
+ *     ⚠️ Requires billing channel activation: configure via Lao Zhang dashboard
  * 
  * Available IMAGE models (confirmed):
  *   - gemini-3.1-flash-image-preview (NanoBanana 2) ✅ tested
@@ -49,7 +50,11 @@ export function isLaozhangAvailable() {
 
 // Model mapping: our internal IDs → Lao Zhang model IDs
 const LZ_VIDEO_MODELS = {
-    // Sora 2 variants
+    // Seedance (ByteDance) — HIDDEN models, need billing channel activation
+    'seedance-2.0':   'seedance-2.0',          // Seedance 2.0 Pro (primary target)
+    'seedance-2':     'seedance-2',             // Alias
+    'seedance-2-pro': 'seedance-2-pro',         // Pro variant
+    // Sora 2 variants (confirmed working)
     'sora-2':         'sora_video2',           // 10s portrait ~$0.15
     'sora-2-15s':     'sora_video2-15s',       // 15s portrait ~$0.15
     'sora-2-land':    'sora_video2-landscape',  // 10s landscape
