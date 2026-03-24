@@ -1,15 +1,27 @@
 /**
- * Lao Zhang API Client — Unified AI Gateway for cheaper image/video generation
+ * Lao Zhang API Client — Unified AI Gateway
  * 
- * OpenAI-compatible API format — uses same endpoints as OpenAI but at 50-80% lower cost.
- * Base URL: https://api.laozhang.ai/v1
+ * CONFIRMED via live testing (March 2026):
+ *   Video: Uses /v1/chat/completions — returns video URL in markdown format
+ *   Image: Uses /v1/images/generations — returns b64_json
+ *   Models endpoint: /v1/models (432 models available)
  * 
- * Supported models:
- *   Image: NanoBanana 2 (gemini-3.1-flash-image), Imagen 4, GPT-4o Image, Grok Imagine
- *   Video: Seedance 2.0, Sora 2, Kling (async task-based)
- *   Text:  All major LLMs (Claude, GPT, Gemini, Grok, Deepseek)
+ * Available VIDEO models (confirmed from /v1/models):
+ *   - sora_video2, sora_video2-15s, sora_video2-landscape, sora_video2-landscape-15s
+ *   - sora-2, sora-2-character, sora2_video
+ *   - veo-3.1, veo-3.1-fast, veo-3.1-4k, veo-3.1-relaxed (38 total variants)
+ *   ⚠️ NO Seedance, NO Kling on this API
  * 
- * Usage: Primary for video generation (50% savings), fallback for images
+ * Available IMAGE models (confirmed):
+ *   - gemini-3.1-flash-image-preview (NanoBanana 2) ✅ tested
+ *   - gemini-3-pro-image-preview
+ *   - gpt-image-1, gpt-image-1-mini, gpt-image-1.5
+ *   - gpt-4o-image, gpt-4o-image-vip
+ *   - grok-3-image, dall-e-3
+ *   - seedream-5-0-260128 (ByteDance image gen)
+ *   - flux-kontext-pro, flux-kontext-max
+ * 
+ * API Base: https://api.laozhang.ai/v1
  */
 
 const LAOZHANG_BASE_URL = process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1';
@@ -28,25 +40,36 @@ export function isLaozhangAvailable() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// VIDEO GENERATION — Async task-based API (Seedance 2.0, Kling, Sora)
+// VIDEO GENERATION — via /v1/chat/completions (synchronous, returns URL)
+// 
+// Key discovery: Lao Zhang video uses the chat completions endpoint.
+// The model determines video generation. Response contains a markdown
+// download link: [download file](https://...mp4)
 // ══════════════════════════════════════════════════════════════════════════════
 
-// Lao Zhang video model IDs
+// Model mapping: our internal IDs → Lao Zhang model IDs
 const LZ_VIDEO_MODELS = {
-    'seedance-2.0': 'seedance-2.0',       // ByteDance Seedance 2.0 Pro
-    'seedance-1.0': 'seedance-1.0',       // ByteDance Seedance 1.0 Lite
-    'kling-3.0': 'kling-video',            // Kuaishou Kling 3.0
-    'sora-2': 'sora_video2',               // OpenAI Sora 2
+    // Sora 2 variants
+    'sora-2':         'sora_video2',           // 10s portrait ~$0.15
+    'sora-2-15s':     'sora_video2-15s',       // 15s portrait ~$0.15
+    'sora-2-land':    'sora_video2-landscape',  // 10s landscape
+    'sora-2-land-15': 'sora_video2-landscape-15s', // 15s landscape
+    'sora-2-pro':     'sora-2',                // Pro quality
+    // Veo 3.1 variants
+    'veo-3.1':        'veo-3.1',               // Standard
+    'veo-3.1-fast':   'veo-3.1-fast',          // Faster, cheaper
+    'veo-3.1-4k':     'veo-3.1-4k',           // 4K resolution
+    'veo-3.1-relaxed': 'veo-3.1-relaxed',      // Cheapest, queue-based
 };
 
 /**
  * Submit video generation to Lao Zhang API
- * Uses OpenAI-compatible /v1/videos/generations format
+ * Uses /v1/chat/completions — video models return download URLs in content
  * 
- * @returns {{ requestId: string, provider: 'laozhang' }}
+ * @returns {{ videoUrl: string, provider: 'laozhang', model: string }}
  */
 export async function submitLaozhangVideoGeneration({
-    model = 'seedance-2.0',
+    model = 'sora-2',
     prompt,
     imageUrl,
     duration = 5,
@@ -56,110 +79,92 @@ export async function submitLaozhangVideoGeneration({
     const apiKey = getApiKey();
     const lzModel = LZ_VIDEO_MODELS[model] || model;
 
-    const payload = {
-        model: lzModel,
-        prompt,
-        duration,
-        aspect_ratio: aspectRatio,
-    };
-
-    // Image-to-video support
-    if (imageUrl) {
-        payload.image = { url: imageUrl };
+    // Build user message — include image as URL if provided
+    let userContent = prompt;
+    if (imageUrl && imageUrl.startsWith('http')) {
+        userContent = `Use this image as the first frame: ${imageUrl}\n\n${prompt}`;
     }
 
-    // Audio generation (Seedance 2.0 supports native audio)
-    if (generateAudio && (model === 'seedance-2.0' || model === 'sora-2')) {
-        payload.generate_audio = true;
-    }
-
-    console.log(`🎬 [LaoZhang] Submitting video: ${lzModel} (${duration}s, ${aspectRatio})`);
+    console.log(`🎬 [LaoZhang] Video generation via chat/completions: ${lzModel}`);
     console.log(`   📝 prompt: ${prompt?.substring(0, 120)}...`);
-    console.log(`   📸 image: ${imageUrl ? imageUrl.substring(0, 80) + '...' : 'NONE (text-to-video)'}`);
 
-    const response = await fetch(`${LAOZHANG_BASE_URL}/videos/generations`, {
+    const response = await fetch(`${LAOZHANG_BASE_URL}/chat/completions`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`,
         },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(30000),
+        body: JSON.stringify({
+            model: lzModel,
+            messages: [
+                { role: 'user', content: userContent },
+            ],
+        }),
+        signal: AbortSignal.timeout(180000), // Video gen can take 2-3 mins
     });
 
     if (!response.ok) {
         const errText = await response.text();
-        console.error(`❌ [LaoZhang] Video submission failed (${response.status}):`, errText);
-        throw new Error(`LaoZhang video submission failed (${response.status}): ${errText}`);
+        console.error(`❌ [LaoZhang] Video generation failed (${response.status}):`, errText);
+        // Parse error for quota check
+        try {
+            const errData = JSON.parse(errText);
+            if (errData.error?.code === 'insufficient_user_quota') {
+                throw new Error(`LaoZhang quota insufficient — need more credits. ${errData.error.message}`);
+            }
+        } catch (parseErr) { /* ignore parse errors */ }
+        throw new Error(`LaoZhang video failed (${response.status}): ${errText}`);
     }
 
     const data = await response.json();
-    const requestId = data.request_id || data.id || data.task_id;
-    console.log(`✅ [LaoZhang] Video queued: requestId=${requestId}`);
+    const content = data.choices?.[0]?.message?.content || '';
+
+    // Extract video URL from markdown: [download file](https://...mp4)
+    const urlMatch = content.match(/\[.*?\]\((https?:\/\/[^\s)]+)\)/);
+    const videoUrl = urlMatch ? urlMatch[1] : '';
+
+    if (!videoUrl) {
+        console.error(`❌ [LaoZhang] No video URL found in response:`, content.substring(0, 500));
+        throw new Error('LaoZhang returned response but no video URL found');
+    }
+
+    console.log(`✅ [LaoZhang] Video generated: ${videoUrl.substring(0, 80)}...`);
+    console.log(`   📊 Tokens used: ${data.usage?.total_tokens || 'unknown'}`);
 
     return {
-        requestId,
+        videoUrl,
         provider: 'laozhang',
+        model: lzModel,
+        tokensUsed: data.usage,
     };
 }
 
 /**
  * Poll Lao Zhang video generation status
- * @returns {{ status, progress, videoUrl }}
+ * NOTE: Lao Zhang video gen is SYNCHRONOUS via chat/completions.
+ * This function is kept for compatibility but should rarely be called.
+ * The video URL is returned directly from submitLaozhangVideoGeneration.
  */
 export async function getLaozhangVideoStatus(requestId) {
-    const apiKey = getApiKey();
-
-    const response = await fetch(`${LAOZHANG_BASE_URL}/videos/${requestId}`, {
-        headers: { 'Authorization': `Bearer ${apiKey}` },
-    });
-
-    if (!response.ok) {
-        console.error(`❌ [LaoZhang] Status check failed: ${response.status}`);
-        return { status: 'IN_PROGRESS', progress: 30 };
-    }
-
-    const data = await response.json();
-    console.log(`📊 [LaoZhang] Status for ${requestId}: ${data.status}`);
-
-    // Completed
-    if (data.status === 'done' || data.status === 'completed' || data.status === 'COMPLETED') {
-        const videoUrl = data.video?.url || data.video_url || data.output?.url || data.url || '';
-        return {
-            status: 'COMPLETED',
-            progress: 100,
-            videoUrl,
-            thumbnailUrl: data.thumbnail?.url || '',
-            audioUrl: data.audio?.url || '',
-            duration: data.video?.duration || data.duration || 0,
-        };
-    }
-
-    // Failed
-    if (data.status === 'failed' || data.status === 'error' || data.status === 'FAILED') {
-        return {
-            status: 'FAILED',
-            progress: 0,
-            error: data.error?.message || data.error || 'LaoZhang video generation failed',
-        };
-    }
-
-    // In progress
+    // Lao Zhang video is synchronous — if we have a requestId, 
+    // the video should already be complete (URL stored in generation.videoUrl)
     return {
-        status: 'IN_PROGRESS',
-        progress: data.progress || 40,
+        status: 'COMPLETED',
+        progress: 100,
+        videoUrl: '', // URL was already extracted during submission
     };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// IMAGE GENERATION — Fallback for when Google Direct is overloaded
+// IMAGE GENERATION — via /v1/images/generations (OpenAI compatible)
+// Confirmed: returns b64_json format
 // ══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Generate an image via Lao Zhang (OpenAI images/generations format)
- * Supports NanoBanana 2 (gemini-3.1-flash-image), Imagen 4, GPT-4o image
+ * Generate an image via Lao Zhang
+ * Confirmed models: gemini-3.1-flash-image-preview, gpt-image-1, seedream-5-0-260128
  * 
- * @returns {{ imageUrl: string, model: string }}
+ * @returns {{ imageUrl: string, model: string, provider: string }}
  */
 export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-image-preview', size = '1024x1024' } = {}) {
     const apiKey = getApiKey();
@@ -184,23 +189,23 @@ export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-
 
     if (!response.ok) {
         const errText = await response.text();
-        console.error(`❌ [LaoZhang] Image generation failed (${response.status}):`, errText);
-        throw new Error(`LaoZhang image generation failed (${response.status}): ${errText}`);
+        console.error(`❌ [LaoZhang] Image failed (${response.status}):`, errText);
+        throw new Error(`LaoZhang image failed (${response.status}): ${errText}`);
     }
 
     const data = await response.json();
-    const imageUrl = data.data?.[0]?.url || data.data?.[0]?.b64_json || '';
+    const imgData = data.data?.[0];
+    const imageUrl = imgData?.url || '';
+    const b64 = imgData?.b64_json || '';
 
-    if (!imageUrl) {
+    if (!imageUrl && !b64) {
         throw new Error('LaoZhang returned empty image response');
     }
 
-    // If b64_json is returned, convert to data URI
-    const finalUrl = imageUrl.startsWith('http')
-        ? imageUrl
-        : `data:image/png;base64,${imageUrl}`;
+    // b64_json is returned (confirmed via testing) — convert to data URI
+    const finalUrl = imageUrl || `data:image/png;base64,${b64}`;
 
-    console.log(`✅ [LaoZhang] Image generated via ${model}`);
+    console.log(`✅ [LaoZhang] Image generated via ${model} (${imageUrl ? 'URL' : 'base64'})`);
 
     return {
         imageUrl: finalUrl,
