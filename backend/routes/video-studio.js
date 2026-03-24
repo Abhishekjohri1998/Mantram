@@ -3230,7 +3230,7 @@ router.get('/', protect, async (req, res) => {
                     let provider = p.generation?.provider || '';
                     if (!provider) {
                         if (model === 'veo-3.1-fast') provider = 'kie';
-                        else if (model === 'seedance-2.0') provider = 'piapi';
+                        else if (model === 'seedance-2.0') provider = 'laozhang'; // Primary (was piapi)
                         else if (model === 'grok-imagine') provider = 'grok';
                         else if (model.startsWith('heygen')) provider = 'heygen';
                         else provider = 'fal';

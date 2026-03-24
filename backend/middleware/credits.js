@@ -316,7 +316,9 @@ const MODEL_COSTS = {
     // ── Video models (flat cost per generation in USD cents) ──
     'seedance-1.0': { flatCost: 10.0, type: 'video' },
     'piapi-seedance': { flatCost: 10.0, type: 'video' },
+    'laozhang-seedance': { flatCost: 5.0, type: 'video' },   // 50% cheaper via Lao Zhang
     'piapi-wan': { flatCost: 8.0, type: 'video' },
+    'laozhang-nanobanana2': { flatCost: 5.0, type: 'image' }, // Lao Zhang image fallback
     // ── Voice models (flat cost per call in USD cents) ──
     'sarvam-stt-saaras-v3': { flatCost: 0.5, type: 'voice' },
     'sarvam-tts-bulbul-v2': { flatCost: 1.0, type: 'voice' },

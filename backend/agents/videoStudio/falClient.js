@@ -18,6 +18,7 @@
 import config from '../../config/env.js';
 import { submitKieVideoGeneration } from './kieClient.js';
 import { submitPiApiVideoGeneration } from './piApiClient.js';
+import { submitLaozhangVideoGeneration, getLaozhangVideoStatus, isLaozhangAvailable } from './laozhangClient.js';
 
 const FAL_BASE_URL = 'https://queue.fal.run';
 const GROK_BASE_URL = 'https://api.x.ai/v1';
@@ -70,12 +71,13 @@ const MODEL_AVAILABLE = {
 };
 
 // ── Cost table (USD per second of video) ──
+// Lao Zhang pricing used for Seedance 2.0 (50% cheaper than PiAPI)
 export const COST_PER_SECOND = {
     'kling-3.0': { fast: 0.07, quality: 0.12 },
     'veo-3.1': { fast: 0.15, quality: 0.40 },
     'veo-3.1-fast': { fast: 0.08, quality: 0.15 },
     'seedance-1.0': { fast: 0.05, quality: 0.08 },
-    'seedance-2.0': { fast: 0.08, quality: 0.15 },
+    'seedance-2.0': { fast: 0.04, quality: 0.08 },  // ↓ from 0.08/0.15 — Lao Zhang pricing
     'grok-imagine': { fast: 0.08, quality: 0.08 },
     'hunyuan': { fast: 0.03, quality: 0.05 },
 };
@@ -456,8 +458,34 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         };
     }
 
-    // ── PiAPI: Seedance 2.0 ──
+    // ── Seedance 2.0: Lao Zhang PRIMARY → PiAPI FALLBACK ──
     if (model === 'seedance-2.0') {
+        // Try Lao Zhang first (50% cheaper)
+        if (isLaozhangAvailable()) {
+            try {
+                console.log(`🎬 [Seedance 2.0] Trying Lao Zhang (primary — 50% cheaper)...`);
+                const lzResult = await submitLaozhangVideoGeneration({
+                    model: 'seedance-2.0',
+                    prompt,
+                    imageUrl,
+                    duration,
+                    aspectRatio: aspectRatio || '16:9',
+                    generateAudio,
+                });
+                return {
+                    requestId: lzResult.requestId,
+                    endpoint: 'laozhang-seedance-2.0',
+                    statusUrl: null,
+                    resultUrl: null,
+                    provider: 'laozhang',
+                };
+            } catch (lzErr) {
+                console.warn(`⚠️ [Seedance 2.0] Lao Zhang failed, falling back to PiAPI: ${lzErr.message}`);
+            }
+        }
+
+        // Fallback to PiAPI
+        console.log(`🎬 [Seedance 2.0] Using PiAPI (fallback)...`);
         const result = await submitPiApiVideoGeneration({ prompt, imageUrl, duration, aspectRatio: aspectRatio || '16:9', generateAudio, referenceImages: referenceImages || [], qualityMode: mode || 'fast' });
         return {
             requestId: result.taskId,
@@ -465,7 +493,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             statusUrl: null,
             resultUrl: null,
             provider: 'piapi',
-            _piApiPayload: result._payload, // Store for auto-retry on intermittent failures
+            _piApiPayload: result._payload,
         };
     }
 

@@ -27,6 +27,7 @@ import {
 import { estimateCost, submitVideoGeneration, getGenerationStatus, getGrokGenerationStatus, MODEL_CAPABILITIES } from './falClient.js';
 import { getKieGenerationStatus } from './kieClient.js';
 import { getPiApiGenerationStatus, resubmitPiApiTask, uploadImageToHostedUrl } from './piApiClient.js';
+import { getLaozhangVideoStatus } from './laozhangClient.js';
 import { getPastProjects } from './selfLearning.js';
 
 // ── Helper: Parse JSON from any AI response ──
@@ -347,10 +348,13 @@ export async function pollGenerationStatus(state) {
     let statusResult;
 
     // Branch polling based on provider
-    if (state.generation?.provider === 'grok' || state.routing?.selectedModel === 'grok-imagine') {
+    if (state.generation?.provider === 'laozhang') {
+        // Lao Zhang polling — Seedance 2.0 primary
+        statusResult = await getLaozhangVideoStatus(state.generation.falRequestId);
+    } else if (state.generation?.provider === 'grok' || state.routing?.selectedModel === 'grok-imagine') {
         statusResult = await getGrokGenerationStatus(state.generation.falRequestId);
-    } else if (state.generation?.provider === 'piapi' || state.routing?.selectedModel === 'seedance-2.0') {
-        // PiAPI polling — Seedance 2.0
+    } else if (state.generation?.provider === 'piapi' || (state.routing?.selectedModel === 'seedance-2.0' && state.generation?.provider !== 'laozhang')) {
+        // PiAPI polling — Seedance 2.0 fallback
         statusResult = await getPiApiGenerationStatus(state.generation.falRequestId);
 
         // AUTO-RETRY: PiAPI intermittently fails with "failed to process task" (code 10000)
