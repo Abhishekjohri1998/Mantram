@@ -642,20 +642,20 @@ Output ONLY this JSON structure:
     "reasoning": "Why these creative choices — explain the visual narrative strategy"
 }`;
 
-        // Use Claude specifically for storyboard, or fall back to default router
-        const storyboardResult = storyboardProvider
-            ? await storyboardProvider.generateText({
-                systemPrompt,
-                userPrompt: storyboardPrompt,
-                maxTokens: 8192,
-                temperature: 0.6,
-            })
-            : await ai.generateText({
-                systemPrompt,
-                userPrompt: storyboardPrompt,
-                maxTokens: 8192,
-                temperature: 0.6,
-            });
+        // Use Claude specifically for storyboard, with fallback to router if Claude fails
+        let storyboardResult;
+        const storyboardParams = { systemPrompt, userPrompt: storyboardPrompt, maxTokens: 8192, temperature: 0.6 };
+
+        if (storyboardProvider) {
+            try {
+                storyboardResult = await storyboardProvider.generateText(storyboardParams);
+            } catch (claudeErr) {
+                console.warn(`   ⚠️ Claude failed (${claudeErr.message?.substring(0, 80)}), falling back to router...`);
+                storyboardResult = await ai.generateText(storyboardParams);
+            }
+        } else {
+            storyboardResult = await ai.generateText(storyboardParams);
+        }
 
         const raw = (storyboardResult.text || storyboardResult.content || '{}')
             .replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
