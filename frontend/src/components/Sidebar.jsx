@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { credits as creditsAPI, auth as authAPI } from '../services/api'
+import { credits as creditsAPI } from '../services/api'
 
 const navItems = [
     { icon: 'dashboard', label: 'Dashboard', to: '/dashboard' },
@@ -9,35 +9,32 @@ const navItems = [
     { icon: 'edit_note', label: 'Content Studio', to: '/content-studio', studioKey: 'contentStudio' },
     { icon: 'auto_fix_high', label: 'Creative Studio', to: '/creative-studio', studioKey: 'creativeStudio' },
     { icon: 'movie', label: 'Video Studio', to: '/video-studio', studioKey: 'videoStudio' },
-    { icon: 'share', label: 'Social Media Studio', to: '/social-media-studio', studioKey: 'socialMediaStudio' },
+    { icon: 'calendar_month', label: 'Smart Calendar', to: '/smart-calendar', studioKey: 'smartCalendar' },
+    { icon: 'send', label: 'Publish & Schedule', to: '/publish' },
     { icon: 'forum', label: 'Conversation Studio', to: '/conversations', studioKey: 'conversationStudio' },
     { icon: 'travel_explore', label: 'SEO Studio', to: '/seo-studio', studioKey: 'seoStudio' },
     { icon: 'monitoring', label: 'Performance Studio', to: '/performance-marketing', studioKey: 'adStudio' },
-    { icon: 'filter_alt', label: 'Funnel Studio', to: '/funnel-studio', studioKey: 'funnelStudio' },
     { icon: 'storefront', label: 'D2C Studio', to: '/d2c-analytics', studioKey: 'd2cAnalytics' },
-    { icon: 'loyalty', label: 'Retention Studio', to: '/retention-studio', studioKey: 'retentionStudio' },
-    { icon: 'auto_awesome', label: 'Skills Hub', to: '/skills', studioKey: 'skillsHub' },
+    { icon: 'auto_awesome', label: 'Skills Hub', to: '/skills' },
 ]
 
 const bottomItems = [
     { icon: 'cases', label: 'Brand Manager', to: '/brands' },
     { icon: 'electrical_services', label: 'Integrations', to: '/integrations' },
-    { icon: 'settings', label: 'Settings', to: '/settings' },
+    { icon: 'settings', label: 'Settings', to: '/team' },
 ]
 
-// Filter nav items based on studio access
-function filterNavByAccess(items, studioAccess) {
-    if (!studioAccess) return items; // fallback: show all
-    return items.filter(item => {
-        if (!item.studioKey) return true; // non-studio items always visible
-        return studioAccess[item.studioKey] !== false;
-    });
+// Filter nav items based on team member's studio access
+function getVisibleNavItems(user) {
+    if (!user?.organization || user.role === 'admin' || user.role === 'superadmin' || user.teamRole === 'owner') {
+        return navItems // owners see everything
+    }
+    return navItems.filter(item => !item.studioKey || user.studioAccess?.[item.studioKey] !== false)
 }
 
 export default function Sidebar({ mobileOpen, onClose }) {
     const { user } = useAuth()
     const [creditBalance, setCreditBalance] = useState(null)
-    const [studioAccess, setStudioAccess] = useState(null)
 
     // Fetch credit balance
     useEffect(() => {
@@ -51,21 +48,6 @@ export default function Sidebar({ mobileOpen, onClose }) {
         const interval = setInterval(fetchCredits, 2 * 60 * 1000)
         return () => clearInterval(interval)
     }, [user])
-
-    // Fetch studio access (3-tier portal/user/plan resolution)
-    useEffect(() => {
-        if (!user) return
-        ;(async () => {
-            try {
-                const data = await authAPI.getStudioAccess()
-                if (data?.access) setStudioAccess(data.access)
-            } catch { /* fail open — show all */ }
-        })()
-    }, [user])
-
-    // SuperAdmin sees everything; others get filtered
-    const isSuperAdmin = user?.role?.trim() === 'superadmin'
-    const visibleNavItems = !user ? [] : isSuperAdmin ? navItems : filterNavByAccess(navItems, studioAccess)
 
     // Close sidebar on route change (mobile)
     const handleNavClick = () => {
@@ -89,6 +71,7 @@ export default function Sidebar({ mobileOpen, onClose }) {
         return () => { document.body.style.overflow = '' }
     }, [mobileOpen])
 
+    const isSuperAdmin = user?.role?.trim() === 'superadmin'
 
     const sidebarContent = (
         <>
@@ -113,7 +96,7 @@ export default function Sidebar({ mobileOpen, onClose }) {
             {/* Main Nav */}
             <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
                 <p className="px-3 pt-4 pb-2 text-xs text-slate-600 uppercase tracking-widest font-bold">Create</p>
-                {visibleNavItems.map((item) => (
+                {getVisibleNavItems(user).map((item) => (
                     <NavLink
                         key={item.label}
                         to={item.to}
