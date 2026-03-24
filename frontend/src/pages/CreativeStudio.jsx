@@ -600,6 +600,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [psEditPrompt, setPsEditPrompt] = useState('')
     const [psEditLoading, setPsEditLoading] = useState(false)
     const [psEditError, setPsEditError] = useState('')
+    const [aiWarnings, setAiWarnings] = useState([])
     const [psBgAction, setPsBgAction] = useState('remove')
     const [psBgPrompt, setPsBgPrompt] = useState('')
     const [psMaskMode, setPsMaskMode] = useState(false)
@@ -1020,6 +1021,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 addLogo,
             })
 
+            setAiWarnings([])
             const signal = getSignal()
             const data = await creativesAPI.generate({
                 brandId: activeBrand._id,
@@ -1029,14 +1031,18 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             }, { signal })
 
             let creative = data.creative
-
-            // Logo overlay is now handled SERVER-SIDE in creatives.js
-            // using sharp (no CORS issues). The addLogo flag in options
-            // triggers server-side compositing after S3 upload.
+            if (data.warnings?.length > 0) {
+                setAiWarnings(data.warnings)
+            }
 
             setResult(creative)
         } catch (err) {
-            setError(err.message || 'Failed to generate creative.')
+            console.error('❌ Generation error:', err)
+            if (err.name === 'AbortError' || err.message?.toLowerCase().includes('timeout') || err.message?.toLowerCase().includes('failed to fetch') || err.status === 504) {
+                setError('Generation is taking longer than usual. The image might still be processing — please check the Image Bank in a minute.')
+            } else {
+                setError(err.message || 'Failed to generate creative.')
+            }
         } finally {
             setGenerating(false)
         }
@@ -1260,6 +1266,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 }
             }
 
+            setAiWarnings([])
             const signal = getSignal()
             const data = await creativesAPI.generate({
                 brandId: activeBrand._id,
@@ -1270,11 +1277,19 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
 
             if (data.success && data.creative) {
                 setTemplateResult(data.creative)
+                if (data.warnings?.length > 0) {
+                    setAiWarnings(data.warnings)
+                }
             } else {
-                setTemplateError(data.error || 'Generation failed')
+                throw new Error(data.error || 'Generation failed')
             }
         } catch (err) {
-            setTemplateError(err.message || 'Template generation failed')
+            console.error('❌ Template generation error:', err)
+            if (err.name === 'AbortError' || err.message?.toLowerCase().includes('timeout') || err.message?.toLowerCase().includes('failed to fetch') || err.status === 504) {
+                setTemplateError('Generation is taking longer than usual. The image might still be processing — please check the Image Bank in a minute.')
+            } else {
+                setTemplateError(err.message || 'Template generation failed')
+            }
         }
         setTemplateGenerating(false)
     }
@@ -2144,10 +2159,23 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         </div>
 
+                        {/* ── AI Provider Warnings ── */}
+                        {aiWarnings.length > 0 && (
+                            <div className="space-y-2 mb-4">
+                                {aiWarnings.map((warn, i) => (
+                                    <div key={i} className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs flex items-center gap-2 animate-fade-in">
+                                        <span className="material-symbols-outlined text-sm">warning</span>
+                                        <span>{warn}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
                         {/* ── Error ── */}
                         {error && (
-                            <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
-                                <span className="material-symbols-outlined text-sm align-middle mr-1">error</span> {error}
+                            <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm flex items-center gap-2">
+                                <span className="material-symbols-outlined text-sm">error</span>
+                                <span>{error}</span>
                             </div>
                         )}
 
