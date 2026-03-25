@@ -1844,11 +1844,18 @@ router.get('/reports/:type', protect, async (req, res) => {
     const { brandId } = req.query;
     if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
 
+    console.log(`📡 [SEO API] Fetching report: ${type} for brand: ${brandId} (user: ${req.user._id})`);
+
     const audit = await SeoAudit.findOne(
       { user: req.user._id, brand: brandId, type, status: 'completed' }
     ).sort('-updatedAt').lean();
 
-    if (!audit) return res.json({ success: true, found: false });
+    if (!audit) {
+      console.warn(`⚠️ [SEO API] No audit found for: ${type} (brand: ${brandId})`);
+      return res.json({ success: true, found: false });
+    }
+
+    console.log(`✅ [SEO API] Found audit for: ${type}. Issues count: ${audit.results?.issues?.length || 0}`);
 
     res.json({
       success: true,
@@ -1858,6 +1865,7 @@ router.get('/reports/:type', protect, async (req, res) => {
       scores: audit.scores,
     });
   } catch (error) {
+    console.error(`❌ [SEO API] Error fetching report:`, error);
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
