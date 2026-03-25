@@ -344,10 +344,12 @@ Respond in strict JSON:
 }`;
 
     try {
+        const elapsed = Date.now() - (req?.startTime || Date.now());
+        const remainingBudget = Math.max(300000, 600000 - elapsed);
         const result = await aiCall(
             'You are a cultural intelligence engine. You MUST use the verified dates provided — never change or guess festival dates. Only add additional events that are not in the verified list.',
             calendarPrompt,
-            { json: true, temperature: 0.3, maxTokens: 3000 }
+            { json: true, temperature: 0.3, maxTokens: 3000, timeout: remainingBudget }
         );
         return parseJSON(result);
     } catch (e) {
@@ -581,7 +583,9 @@ Respond in STRICT JSON:
 
         const userPrompt = `Generate a ${timeframeLabel} social media strategy for ${platforms.join(', ')}.\nGoals: ${goals || 'Growth'}\nIndustry: ${industry || dna.industry || 'General'}\nCurrent metrics: ${currentMetrics || 'See live data in context above'}\nToday's date: ${new Date().toISOString().split('T')[0]}`;
 
-        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, maxTokens: 8000 });
+        const elapsed = Date.now() - (req.startTime || Date.now());
+        const remainingBudget = Math.max(300000, 600000 - elapsed);
+        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, maxTokens: 8000, timeout: remainingBudget });
         const strategy = parseJSON(result);
 
         // Save to DB
@@ -679,7 +683,9 @@ Respond in STRICT JSON:
 
         const userPrompt = `Generate ${monthName} ${targetYear} content calendar for ${platforms.join(', ')}. ${themes ? `Themes: ${themes}` : ''}`;
 
-        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, maxTokens: 8000 });
+        const elapsed = Date.now() - (req.startTime || Date.now());
+        const remainingBudget = Math.max(300000, 600000 - elapsed);
+        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, maxTokens: 8000, timeout: remainingBudget });
         const calendar = parseJSON(result);
 
         const saved = await SocialStrategy.create({
@@ -790,7 +796,9 @@ Respond in STRICT JSON:
 
         const userPrompt = `Audit ${platform} account for ${brand?.name || 'this brand'}. Metrics: ${metricsText}`;
 
-        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 5000 });
+        const elapsed = Date.now() - (req.startTime || Date.now());
+        const remainingBudget = Math.max(300000, 600000 - elapsed);
+        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 5000, timeout: remainingBudget });
         const audit = parseJSON(result);
 
         const saved = await SocialStrategy.create({
@@ -870,7 +878,9 @@ Respond in STRICT JSON:
 
         const userPrompt = `Analyze competitors: ${competitors.map(c => c.name || c).join(', ')} vs ${brand?.name || 'our brand'} on ${(platforms || ['instagram']).join(', ')}`;
 
-        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, maxTokens: 6000 });
+        const elapsed = Date.now() - (req.startTime || Date.now());
+        const remainingBudget = Math.max(300000, 600000 - elapsed);
+        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, maxTokens: 6000, timeout: remainingBudget });
         const analysis = parseJSON(result);
 
         const saved = await SocialStrategy.create({
@@ -1042,7 +1052,9 @@ Respond in STRICT JSON:
 
         const userPrompt = `Score the ${rubric.label} profile for brand "${brand?.name || 'this brand'}" (Industry: ${brand?.dna?.industry || 'General'}). Grade each of the ${rubric.parameters.length} parameters 0-10 with measurable recommendations.`;
 
-        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6000 });
+        const elapsed = Date.now() - (req.startTime || Date.now());
+        const remainingBudget = Math.max(300000, 600000 - elapsed);
+        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6000, timeout: remainingBudget });
         const scoreCard = parseJSON(result);
 
         // Compute true overall score as average of parameter scores

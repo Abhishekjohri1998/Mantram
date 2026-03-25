@@ -1891,7 +1891,9 @@ Respond in JSON:
 }`;
 
     const userPrompt = `On-page SEO audit for: ${pageUrl}${keyword ? ` (targeting: ${keyword})` : ''}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6000 });
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6000, timeout: remainingBudget });
     const parsed = parseJSON(result);
 
     res.json({ success: true, ...parsed });
@@ -1966,7 +1968,9 @@ Respond in JSON:
 
 CRITICAL: Only include REAL existing companies. Do not make up fictional companies or URLs.`;
 
-    const result = await aiCall(systemPrompt, `Find competitors for: ${brand.name} (${brand.website || brand.dna?.industry || 'general'})`, { json: true, temperature: 0.5 });
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
+    const result = await aiCall(systemPrompt, `Find competitors for: ${brand.name} (${brand.website || brand.dna?.industry || 'general'})`, { json: true, temperature: 0.5, timeout: remainingBudget });
     const parsed = parseJSON(result);
 
     // Save to brand
@@ -2337,7 +2341,9 @@ Respond in STRICT JSON:
 }`;
 
     const userPrompt = `Build 90-day war room plan for: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192 });
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192, timeout: remainingBudget });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoWarRoom', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
@@ -2458,7 +2464,9 @@ Respond in STRICT JSON:
 CRITICAL: Use the REAL mention rate (${probeData.aggregate.mentionRate}%) as the overall visibility score. Reference ACTUAL probe results. Every recommendation must tie back to specific prompts where the brand was NOT mentioned.`;
 
     const userPrompt = `Analyze real LLM probe results for: ${brandName} (${website})`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6144 });
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6144, timeout: remainingBudget });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoLlmProbe', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
 
@@ -2565,7 +2573,7 @@ Generate production-ready code. Every fix must be copy-paste ready. Use the bran
     const userPrompt = `Generate auto-fix code for: ${website}`;
     const elapsed = Date.now() - (req.startTime || Date.now());
     const remainingBudget = Math.max(300000, 600000 - elapsed);
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.4, maxTokens: 8192 });
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.4, maxTokens: 8192, timeout: remainingBudget });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoAutoFix', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
 
@@ -3199,7 +3207,9 @@ Respond in JSON:
   "followUpQuestions": ["Follow-up 1", "Follow-up 2", "Follow-up 3"]
 }`;
 
-    const result = await aiCall(systemPrompt, question, { json: true, temperature: 0.7, maxTokens: 4096 });
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
+    const result = await aiCall(systemPrompt, question, { json: true, temperature: 0.7, maxTokens: 4096, timeout: remainingBudget });
     const parsed = parseJSON(result);
 
     res.json({ success: true, ...parsed });

@@ -70,9 +70,11 @@ app.use((req, res, next) => {
     
     // Immediate OPTIONS Intercept
     if (req.method === 'OPTIONS') {
-        console.log(`[PREFLIGHT-OK] Intercepted OPTIONS for ${req.path}`);
         return res.status(200).end();
     }
+    
+    // Start time for AI budgeting
+    req.startTime = Date.now();
     next();
 });
 

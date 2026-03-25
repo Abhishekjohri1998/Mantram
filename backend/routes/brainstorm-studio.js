@@ -285,7 +285,9 @@ Respond in JSON:
     const userPrompt = `Generate personalized brainstorm questions for a "${intent}" session for the brand "${brand.name}". Follow the question flow exactly.`;
 
     try {
-      const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7 });
+        const elapsed = Date.now() - (req.startTime || Date.now());
+        const remainingBudget = Math.max(300000, 600000 - elapsed);
+        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, timeout: remainingBudget });
       const parsed = parseJSON(result);
 
       if (parsed.questions && parsed.questions.length > 0) {
@@ -335,7 +337,9 @@ Respond in JSON format:
 
     const userPrompt = `Intent: ${intent}\n${brandContext}\n\nClient's answers:\n${answersText}`;
 
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6 });
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, timeout: remainingBudget });
     const parsed = parseJSON(result);
 
     res.json({ success: true, ...parsed });
@@ -497,7 +501,9 @@ ${outputFormat}`;
 
     const userPrompt = `Intent: ${intent}\n${brandContext}\n\nBrief:\n${answersText}`;
 
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.8, maxTokens: 6000 });
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.8, maxTokens: 6000, timeout: remainingBudget });
     const parsed = parseJSON(result);
 
     res.json({ success: true, ideas: parsed, intent });
@@ -530,7 +536,9 @@ ${isAdFilm ? 'Respond with: filmConcepts (3), productionApproaches (3), namingId
 
     const userPrompt = `Intent: ${intent}\n${brandContext}\nBrief:\n${answersText}\n\nRefinement: ${refinementPrompt}\n\nPrevious top idea: ${previousIdeas?.filmConcepts?.[0]?.title || previousIdeas?.campaignConcepts?.[0]?.title || 'N/A'}`;
 
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.85, maxTokens: 6000 });
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.85, maxTokens: 6000, timeout: remainingBudget });
     const parsed = parseJSON(result);
 
     res.json({ success: true, ideas: parsed, intent });
@@ -640,7 +648,9 @@ Music: ${filmConcept.musicMood || ''}
 
 ${brandContext}`;
 
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, maxTokens: 6000 });
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, maxTokens: 6000, timeout: remainingBudget });
     const parsed = parseJSON(result);
 
     res.json({ success: true, screenplay: parsed });
@@ -699,7 +709,9 @@ Respond in JSON:
       ? `CONVERSATION SO FAR:\n${historyText}\n\nUSER: ${userMessage}`
       : `USER: ${userMessage}`;
 
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.75, maxTokens: 4096 });
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.75, maxTokens: 4096, timeout: remainingBudget });
     const parsed = parseJSON(result);
 
     res.json({ success: true, ...parsed });
@@ -963,7 +975,9 @@ CLIENT BRIEF:
 
 IMPORTANT: Do NOT give generic advice.Analyze THIS specific brand's situation and create a strategy that a real CMO would stake their reputation on. Every budget allocation needs a "why". Every KPI needs a calculation basis. If a channel doesn't make sense for this budget / team, say so and explain why.`;
 
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.75, maxTokens: 8000 });
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.75, maxTokens: 8000, timeout: remainingBudget });
     const parsed = parseJSON(result);
 
     // Build KPIs list from all channels
@@ -1103,7 +1117,9 @@ IMPORTANT: Create slides that cover ALL major sections — summary, objectives, 
 
     const userPrompt = `Create a presentation from this strategy: \n${JSON.stringify(strategy).substring(0, 6000)} `;
 
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 6000 });
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 6000, timeout: remainingBudget });
     const parsed = parseJSON(result);
 
     // Save slides to strategy if we have an ID

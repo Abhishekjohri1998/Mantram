@@ -326,7 +326,9 @@ RESPONSE FORMAT — respond in STRICT JSON:
   "suggestions": ["Follow-up action 1", "Follow-up action 2", "Follow-up action 3"]
 }`;
 
-        const result = await aiCall(systemPrompt, `USER: ${userMsg}`, { json: true, temperature: 0.7 });
+        const elapsed = Date.now() - (req.startTime || Date.now());
+        const remainingBudget = Math.max(300000, 600000 - elapsed);
+        const result = await aiCall(systemPrompt, `USER: ${userMsg}`, { json: true, temperature: 0.7, timeout: remainingBudget });
         const parsed = parseJSON(result);
 
         // ===== CREATIVE INTENT — Auto-generate the branded image =====
