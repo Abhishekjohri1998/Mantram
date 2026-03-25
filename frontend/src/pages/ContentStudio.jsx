@@ -573,6 +573,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                                 title="Analyzing image with Gemini Vision AI" 
                                 currentStage="Detecting products, colors, mood, text, and marketing angles..." 
                                 icon="psychology"
+                                estimatedDuration={15}
                             />
 
                             {/* Analysis Error */}
@@ -708,6 +709,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                         title="AI finding relevant products..." 
                         currentStage="Matching your context to your product catalog" 
                         icon="smart_toy"
+                        estimatedDuration={10}
                     />
 
                     {showProductPanel && suggestedProducts.length > 0 && (
@@ -3155,7 +3157,7 @@ SPOKESPERSON QUOTES:`
                         title="Generating with brand intelligence..." 
                         currentStage={`Using ${activeBrand?.name}'s voice DNA for human-authentic output`}
                         icon="auto_awesome"
-                        elapsed={0}
+                        estimatedDuration={45}
                     />
                     {error && (
                         <div className="max-w-2xl mx-auto mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm text-center">
@@ -3181,7 +3183,7 @@ SPOKESPERSON QUOTES:`
                         title="Crafting your press release..." 
                         currentStage="Using brand DNA + PR best practices for professional output"
                         icon="newspaper"
-                        elapsed={0}
+                        estimatedDuration={45}
                     />
                     {error && (
                         <div className="max-w-2xl mx-auto mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm text-center">
@@ -3236,6 +3238,7 @@ SPOKESPERSON QUOTES:`
                         title="Generating YouTube content..." 
                         currentStage="Running YouTube Research Agent → YouTube Writer Agent pipeline"
                         icon="smart_display"
+                        estimatedDuration={60}
                     />
                     {error && (
                         <div className="max-w-2xl mx-auto mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm text-center">
@@ -3272,6 +3275,7 @@ SPOKESPERSON QUOTES:`
                         title="Optimizing for YouTube algorithm..." 
                         currentStage="Running YouTube Research Agent → SEO Optimizer Agent pipeline"
                         icon="troubleshoot"
+                        estimatedDuration={60}
                     />
                     {error && (
                         <div className="max-w-2xl mx-auto mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm text-center">
