@@ -42,6 +42,18 @@ import intelMissionRoutes from './routes/intelMissions.js';
 import paymentRoutes from './routes/payments.js';
 import waitlistRoutes from './routes/waitlist.js';
 import skillsRoutes from './routes/skills.js';
+import canvasDirectRoutes from './routes/canvas-direct.js';
+import rewardsRoutes from './routes/rewards.js';
+import funnelStudioRoutes from './routes/funnel-studio.js';
+import socialMediaStudioRoutes from './routes/social-media-studio.js';
+import nurtureSequenceRoutes from './routes/nurture-sequences.js';
+import funnelIntelligenceRoutes from './routes/funnel-intelligence.js';
+import funnelAutomationRoutes from './routes/funnel-automation.js';
+import funnelWebhookRoutes from './routes/funnel-webhooks.js';
+import mediaUploadRoutes from './routes/mediaUpload.js';
+import studioReportRoutes from './routes/studio-reports.js';
+import funnelAgenticRoutes from './routes/funnel-agentic.js';
+import retentionStudioRoutes from './routes/retention-studio.js';
 
 const HARDCODED_ORIGINS = [
     'https://mantram.ai',
@@ -119,6 +131,37 @@ connectDB().then(() => {
     import('./services/scheduledPostPublisher.js').then(({ startScheduledPostPublisher }) => {
         startScheduledPostPublisher();
     }).catch((err) => { console.warn('📅 Scheduled Post Publisher failed to start:', err.message); });
+
+    // Start pricing monitor (24h checks)
+    import('./agents/pricingMonitor.js').then(({ startPricingMonitor }) => {
+        startPricingMonitor();
+    }).catch(err => console.error('❌ Failed to load pricingMonitor.js:', err));
+
+    // Auto-seed credit packs if collection is empty
+    import('./models/CreditPack.js').then(async ({ default: CreditPack }) => {
+        const count = await CreditPack.countDocuments();
+        if (count === 0) {
+            const defaults = [
+                { name: '🔹 Micro', slug: 'micro', credits: 20, bonusCredits: 0, price: 149, icon: 'token', badge: '', displayOrder: 1, validityDays: 180, description: 'Try it out', color: '#64748b' },
+                { name: '⚡ Spark', slug: 'spark', credits: 50, bonusCredits: 0, price: 349, icon: 'bolt', badge: '', displayOrder: 2, validityDays: 180, description: 'Quick power-up', color: '#f59e0b' },
+                { name: '🚀 Boost', slug: 'boost', credits: 150, bonusCredits: 15, price: 899, icon: 'rocket_launch', badge: '', displayOrder: 3, validityDays: 180, description: '+15 bonus credits', color: '#3b82f6' },
+                { name: '💪 Power', slug: 'power', credits: 300, bonusCredits: 45, price: 1699, icon: 'fitness_center', badge: 'Flash Sale', badgeColor: '#ef4444', displayOrder: 4, validityDays: 180, description: '+45 bonus credits', color: '#ef4444' },
+                { name: '🔥 Ultra', slug: 'ultra', credits: 500, bonusCredits: 100, price: 2499, icon: 'local_fire_department', badge: 'Popular', badgeColor: '#f59e0b', displayOrder: 5, validityDays: 365, description: '+100 bonus! Best value', color: '#f97316' },
+                { name: '💎 Mega', slug: 'mega', credits: 1000, bonusCredits: 250, price: 4499, icon: 'diamond', badge: 'Best Value', badgeColor: '#06b6d4', displayOrder: 6, validityDays: 365, description: '+250 bonus! Pro creators', color: '#06b6d4' },
+                { name: '👑 Elite', slug: 'elite', credits: 2500, bonusCredits: 750, price: 9999, icon: 'military_tech', badge: 'Flash Sale', badgeColor: '#ef4444', displayOrder: 7, validityDays: 365, description: '+750 bonus! Agency tier', color: '#a855f7' },
+                { name: '🏢 Enterprise', slug: 'enterprise-pack', credits: 5000, bonusCredits: 2000, price: 17999, icon: 'corporate_fare', badge: 'Max Savings', badgeColor: '#8b5cf6', displayOrder: 8, validityDays: 365, description: '+2000 bonus! Enterprise power', color: '#8b5cf6' },
+            ];
+            await CreditPack.insertMany(defaults);
+            console.log('🛒 Seeded 8 default credit packs');
+        } else {
+            console.log(`🛒 Credit Store: ${count} packs loaded`);
+        }
+    }).catch(err => console.warn('⚠️ Credit pack seed check failed:', err.message));
+
+    // Start funnel scheduler (nurture sequences, automation, score decay)
+    import('./services/funnelScheduler.js').then(({ startFunnelScheduler }) => {
+        startFunnelScheduler();
+    }).catch(err => console.error('❌ Failed to load funnelScheduler.js:', err));
 }).catch(err => {
     console.error('❌ Critical failure during background agent initialization:', err.message);
 });
@@ -225,6 +268,18 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/social', socialRoutes);
 app.use('/api/waitlist', waitlistRoutes);
 app.use('/api/skills', skillsRoutes);
+app.use('/api/fidato', canvasDirectRoutes);
+app.use('/api/rewards', rewardsRoutes);
+app.use('/api/funnel-studio', funnelStudioRoutes);
+app.use('/api/social-media-studio', socialMediaStudioRoutes);
+app.use('/api/nurture-sequences', nurtureSequenceRoutes);
+app.use('/api/funnel-intelligence', funnelIntelligenceRoutes);
+app.use('/api/funnel-automation', funnelAutomationRoutes);
+app.use('/api/funnel-webhooks', funnelWebhookRoutes);
+app.use('/api/funnel-agentic', funnelAgenticRoutes);
+app.use('/api/media', mediaUploadRoutes);
+app.use('/api/studio-reports', studioReportRoutes);
+app.use('/api/retention-studio', retentionStudioRoutes);
 
 // Error handler
 app.use((err, req, res, next) => {

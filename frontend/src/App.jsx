@@ -1,44 +1,68 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
 import { AuthProvider } from './context/AuthContext'
 import { BrandProvider } from './context/BrandContext'
 import { CreditProvider } from './context/CreditContext'
 import { ShopifyProvider } from './context/ShopifyContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import PlanGatedRoute from './components/PlanGatedRoute'
+
+// ── Static Imports (Critical/Fast) ──
 import Auth from './pages/Auth'
 import Landing from './pages/Landing'
-import About from './pages/About'
-import BrandOnboarding from './pages/BrandOnboarding'
-import Nexus from './pages/Nexus'
-import BrandDNA from './pages/BrandDNA'
-import Analytics from './pages/Analytics'
-import UserDashboard from './pages/UserDashboard'
-import AdminDashboard from './pages/AdminDashboard'
-import TeamDashboard from './pages/TeamDashboard'
-import ContentStudio from './pages/ContentStudio'
-import CreativeStudio from './pages/CreativeStudio'
-import CanvasEditor from './pages/CanvasEditor'
-import Integrations from './pages/Integrations'
-import SmartCalendar from './pages/SmartCalendar'
-import PublishSchedule from './pages/PublishSchedule'
-import BrainstormStudio from './pages/BrainstormStudio'
-import SeoStudio from './pages/SeoStudio'
-import ConversationStudio from './pages/ConversationStudio'
-import Automations from './pages/Automations'
-import AISettings from './pages/AISettings'
-import Insights from './pages/Insights'
-import SuperAdminDashboard from './pages/SuperAdminDashboard'
-import CreditsPage from './pages/CreditsPage'
-import VideoStudio from './pages/VideoStudio'
-import PerformanceMarketing from './pages/PerformanceMarketing'
-import D2CAnalytics from './pages/D2CAnalytics'
-import BrandManagement from './pages/BrandManagement'
-import SkillsHub from './pages/SkillsHub'
+import VerifyEmail from './pages/VerifyEmail'
+import ResetPassword from './pages/ResetPassword'
 
-import PrivacyPolicy from './pages/PrivacyPolicy'
-import TermsOfService from './pages/TermsOfService'
-import DataDeletion from './pages/DataDeletion'
-import UnderConstruction from './pages/UnderConstruction'
-import StudioPreview from './pages/StudioPreview'
+// ── Lazy Imports (Heavy/Studio Pages) ──
+const About = lazy(() => import('./pages/About'))
+const BrandOnboarding = lazy(() => import('./pages/BrandOnboarding'))
+const Nexus = lazy(() => import('./pages/Nexus'))
+const BrandDNA = lazy(() => import('./pages/BrandDNA'))
+const Analytics = lazy(() => import('./pages/Analytics'))
+const UserDashboard = lazy(() => import('./pages/UserDashboard'))
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
+const TeamDashboard = lazy(() => import('./pages/TeamDashboard'))
+const ContentStudio = lazy(() => import('./pages/ContentStudio'))
+const CreativeStudio = lazy(() => import('./pages/CreativeStudio'))
+const CanvasEditor = lazy(() => import('./pages/CanvasEditor'))
+const Integrations = lazy(() => import('./pages/Integrations'))
+const SmartCalendar = lazy(() => import('./pages/SmartCalendar'))
+const PublishSchedule = lazy(() => import('./pages/PublishSchedule'))
+const BrainstormStudio = lazy(() => import('./pages/BrainstormStudio'))
+const SeoStudio = lazy(() => import('./pages/SeoStudio'))
+const ConversationStudio = lazy(() => import('./pages/ConversationStudio'))
+const Automations = lazy(() => import('./pages/Automations'))
+const AISettings = lazy(() => import('./pages/AISettings'))
+const Insights = lazy(() => import('./pages/Insights'))
+const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'))
+const CreditsPage = lazy(() => import('./pages/CreditsPage'))
+const VideoStudio = lazy(() => import('./pages/VideoStudio'))
+const PerformanceMarketing = lazy(() => import('./pages/PerformanceMarketing'))
+const D2CAnalytics = lazy(() => import('./pages/D2CAnalytics'))
+const FunnelStudio = lazy(() => import('./pages/FunnelStudio'))
+const SocialMediaStudio = lazy(() => import('./pages/SocialMediaStudio'))
+const BrandManagement = lazy(() => import('./pages/BrandManagement'))
+const SkillsHub = lazy(() => import('./pages/SkillsHub'))
+const StudioPreview = lazy(() => import('./pages/StudioPreview'))
+const JoinTeam = lazy(() => import('./pages/JoinTeam'))
+const RetentionStudio = lazy(() => import('./pages/RetentionStudio'))
+const UserSettings = lazy(() => import('./pages/UserSettings'))
+
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
+const TermsOfService = lazy(() => import('./pages/TermsOfService'))
+const DataDeletion = lazy(() => import('./pages/DataDeletion'))
+const UnderConstruction = lazy(() => import('./pages/UnderConstruction'))
+
+// ── Loading Fallback ──
+function LoadingSpinner() {
+  return (
+    <div className="min-h-screen bg-[#050510] flex flex-col items-center justify-center gap-4">
+      <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+      <p className="text-slate-500 font-medium animate-pulse">Initializing Mantram AI...</p>
+    </div>
+  )
+}
+
 
 function App() {
   // const isProduction = window.location.hostname.includes('mantram.ai');
@@ -52,45 +76,57 @@ function App() {
         <AuthProvider>
           <BrandProvider>
             <CreditProvider>
-              <Routes>
-                {/* Public routes */}
-                <Route path="/" element={<Landing />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/onboarding" element={<BrandOnboarding />} />
-                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-                <Route path="/terms" element={<TermsOfService />} />
-                <Route path="/data-deletion" element={<DataDeletion />} />
-                <Route path="/data-deletion-status" element={<DataDeletion />} />
-                <Route path="/studio/:slug" element={<StudioPreview />} />
+              <Suspense fallback={<LoadingSpinner />}>
+                <Routes>
+                  {/* Public routes */}
+                  <Route path="/" element={<Landing />} />
+                  <Route path="/about" element={<About />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/login" element={<Auth />} />
+                  <Route path="/signup" element={<Auth />} />
+                  <Route path="/verify-email" element={<VerifyEmail />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/onboarding" element={<BrandOnboarding />} />
+                  <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                  <Route path="/terms" element={<TermsOfService />} />
+                  <Route path="/data-deletion" element={<DataDeletion />} />
+                  <Route path="/data-deletion-status" element={<DataDeletion />} />
+                  <Route path="/studio/:slug" element={<StudioPreview />} />
+                  <Route path="/join/:token" element={<JoinTeam />} />
 
-                {/* Protected routes — require authentication */}
-                <Route path="/nexus" element={<ProtectedRoute><Nexus /></ProtectedRoute>} />
-                <Route path="/brand-dna" element={<ProtectedRoute><BrandDNA /></ProtectedRoute>} />
-                <Route path="/brands" element={<ProtectedRoute><BrandManagement /></ProtectedRoute>} />
-                <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
-                <Route path="/dashboard" element={<ProtectedRoute><UserDashboard /></ProtectedRoute>} />
-                <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin', 'superadmin']}><AdminDashboard /></ProtectedRoute>} />
-                <Route path="/team" element={<ProtectedRoute><TeamDashboard /></ProtectedRoute>} />
-                <Route path="/content-studio" element={<ProtectedRoute><ContentStudio /></ProtectedRoute>} />
-                <Route path="/creative-studio" element={<ProtectedRoute><CreativeStudio /></ProtectedRoute>} />
-                <Route path="/creative-studio/editor" element={<ProtectedRoute><CanvasEditor /></ProtectedRoute>} />
-                <Route path="/video-studio" element={<ProtectedRoute><VideoStudio /></ProtectedRoute>} />
-                <Route path="/performance-marketing" element={<ProtectedRoute><PerformanceMarketing /></ProtectedRoute>} />
-                <Route path="/d2c-analytics" element={<ProtectedRoute><D2CAnalytics /></ProtectedRoute>} />
-                <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
-                <Route path="/smart-calendar" element={<ProtectedRoute><SmartCalendar /></ProtectedRoute>} />
-                <Route path="/publish" element={<ProtectedRoute><PublishSchedule /></ProtectedRoute>} />
-                <Route path="/brainstorm" element={<ProtectedRoute><BrainstormStudio /></ProtectedRoute>} />
-                <Route path="/seo-studio" element={<ProtectedRoute><SeoStudio /></ProtectedRoute>} />
-                <Route path="/conversations" element={<ProtectedRoute><ConversationStudio /></ProtectedRoute>} />
-                <Route path="/conversations/automations" element={<ProtectedRoute><Automations /></ProtectedRoute>} />
-                <Route path="/conversations/ai-settings" element={<ProtectedRoute><AISettings /></ProtectedRoute>} />
-                <Route path="/conversations/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
-                <Route path="/credits" element={<ProtectedRoute><CreditsPage /></ProtectedRoute>} />
-                <Route path="/skills" element={<ProtectedRoute><SkillsHub /></ProtectedRoute>} />
-                <Route path="/superadmin" element={<ProtectedRoute allowedRoles={['superadmin']}><SuperAdminDashboard /></ProtectedRoute>} />
-              </Routes>
+                  {/* Protected routes — require authentication */}
+                  <Route path="/nexus" element={<ProtectedRoute><Nexus /></ProtectedRoute>} />
+                  <Route path="/brand-dna" element={<ProtectedRoute><BrandDNA /></ProtectedRoute>} />
+                  <Route path="/brands" element={<ProtectedRoute><BrandManagement /></ProtectedRoute>} />
+                  <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+                  <Route path="/dashboard" element={<ProtectedRoute><UserDashboard /></ProtectedRoute>} />
+                  <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin', 'superadmin']}><AdminDashboard /></ProtectedRoute>} />
+                  <Route path="/team" element={<ProtectedRoute><TeamDashboard /></ProtectedRoute>} />
+                  <Route path="/content-studio" element={<ProtectedRoute><ContentStudio /></ProtectedRoute>} />
+                  <Route path="/creative-studio" element={<ProtectedRoute><CreativeStudio /></ProtectedRoute>} />
+                  <Route path="/creative-studio/editor" element={<ProtectedRoute><CanvasEditor /></ProtectedRoute>} />
+                  <Route path="/video-studio" element={<ProtectedRoute><VideoStudio /></ProtectedRoute>} />
+                  <Route path="/performance-marketing" element={<ProtectedRoute><PerformanceMarketing /></ProtectedRoute>} />
+                  <Route path="/d2c-analytics" element={<ProtectedRoute><D2CAnalytics /></ProtectedRoute>} />
+                  <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
+                  <Route path="/funnel-studio" element={<ProtectedRoute><FunnelStudio /></ProtectedRoute>} />
+                  <Route path="/social-media-studio" element={<ProtectedRoute><SocialMediaStudio /></ProtectedRoute>} />
+                  <Route path="/smart-calendar" element={<Navigate to="/social-media-studio" replace />} />
+                  <Route path="/publish" element={<Navigate to="/social-media-studio" replace />} />
+                  <Route path="/brainstorm" element={<ProtectedRoute><BrainstormStudio /></ProtectedRoute>} />
+                  <Route path="/seo-studio" element={<ProtectedRoute><SeoStudio /></ProtectedRoute>} />
+                  <Route path="/conversations" element={<ProtectedRoute><ConversationStudio /></ProtectedRoute>} />
+                  <Route path="/conversations/automations" element={<ProtectedRoute><Automations /></ProtectedRoute>} />
+                  <Route path="/conversations/ai-settings" element={<ProtectedRoute><AISettings /></ProtectedRoute>} />
+                  <Route path="/conversations/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
+                  <Route path="/credits" element={<ProtectedRoute><CreditsPage /></ProtectedRoute>} />
+                  <Route path="/settings" element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
+                  <Route path="/skills" element={<ProtectedRoute><SkillsHub /></ProtectedRoute>} />
+                  <Route path="/superadmin" element={<ProtectedRoute allowedRoles={['superadmin']}><SuperAdminDashboard /></ProtectedRoute>} />
+                  <Route path="/retention-studio" element={<ProtectedRoute><RetentionStudio /></ProtectedRoute>} />
+                </Routes>
+              </Suspense>
+
             </CreditProvider>
           </BrandProvider>
         </AuthProvider>

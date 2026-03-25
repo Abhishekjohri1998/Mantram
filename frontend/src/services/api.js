@@ -387,14 +387,7 @@ export const retentionStudio = {
     get: (id) => apiFetch(`/retention-studio/${id}`),
     analytics: (id) => apiFetch(`/retention-studio/${id}/analytics`),
     create: (data) => apiFetch('/retention-studio', { method: 'POST', body: JSON.stringify(data) }),
-    ingest: (id, formData) => {
-        const token = localStorage.getItem('mantram_token') || '';
-        return fetch(`${API_BASE}/retention-studio/${id}/ingest`, {
-            method: 'POST',
-            headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-            body: formData,
-        }).then(res => res.json());
-    },
+    ingest: (id, data) => apiFetch(`/retention-studio/${id}/ingest`, { method: 'POST', body: JSON.stringify(data) }),
     match: (id, data) => apiFetch(`/retention-studio/${id}/match`, { method: 'POST', body: JSON.stringify(data) }),
     creative: (id, data) => apiFetch(`/retention-studio/${id}/creative`, { method: 'POST', body: JSON.stringify(data) }),
     compose: (id, data) => apiFetch(`/retention-studio/${id}/compose`, { method: 'POST', body: JSON.stringify(data) }),

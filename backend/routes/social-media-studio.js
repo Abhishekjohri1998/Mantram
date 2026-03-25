@@ -1084,7 +1084,26 @@ Respond in STRICT JSON:
 
 // ════════════════════════════════════════════════════════════════
 //  6. LIST STRATEGIES — Get all saved strategies for a brand
+//  GET / is an alias so frontend's socialMediaStudio.list() works
 // ════════════════════════════════════════════════════════════════
+
+router.get('/', protect, async (req, res) => {
+    try {
+        const { brandId, type } = req.query;
+        const filter = { user: req.user._id };
+        if (brandId) filter.brand = brandId;
+        if (type) filter.type = type;
+
+        const strategies = await SocialStrategy.find(filter)
+            .sort({ createdAt: -1 })
+            .limit(50)
+            .select('title type platforms timeframe status createdAt data.overallScore data.overview data.summary');
+
+        res.json({ success: true, strategies });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
 
 router.get('/strategies', protect, async (req, res) => {
     try {

@@ -86,7 +86,15 @@ router.get('/status', protect, async (req, res) => {
  * @route   POST /api/rewards/claim-milestone
  * @access  Private
  */
-router.post('/claim-milestone', protect, async (req, res) => {
+// Alias for frontend: /milestones/:milestoneId/claim
+router.post('/milestones/:milestoneId/claim', protect, async (req, res) => {
+    req.body = req.body || {};
+    req.body.milestoneId = req.params.milestoneId;
+    // Fall through to claim-milestone handler
+    return claimMilestoneHandler(req, res);
+});
+
+async function claimMilestoneHandler(req, res) {
     try {
         const { milestoneId } = req.body;
         const reward = MILESTONE_REWARDS[milestoneId];
@@ -97,12 +105,10 @@ router.post('/claim-milestone', protect, async (req, res) => {
 
         const user = req.user;
 
-        // Already claimed?
         if (user.milestones?.[milestoneId]) {
             return res.status(400).json({ success: false, error: 'Milestone already claimed' });
         }
 
-        // Award credits
         const updatedUser = await User.findByIdAndUpdate(
             user._id,
             {
@@ -124,47 +130,46 @@ router.post('/claim-milestone', protect, async (req, res) => {
         console.error('❌ Claim Milestone Error:', error);
         res.status(500).json({ success: false, error: 'Failed to claim milestone' });
     }
-});
+}
+
+router.post('/claim-milestone', protect, (req, res) => claimMilestoneHandler(req, res));
 
 /**
  * @desc    Apply referral code (on signup or later)
  * @route   POST /api/rewards/apply-referral
  * @access  Private
  */
-router.post('/apply-referral', protect, async (req, res) => {
+// Alias for frontend: /referral/apply
+router.post('/referral/apply', protect, async (req, res) => {
+    return applyReferralHandler(req, res);
+});
+
+async function applyReferralHandler(req, res) {
     try {
-        const { referralCode } = req.body;
+        const { referralCode, code } = req.body;
+        const refCode = referralCode || code;
         const user = req.user;
 
-        // Already referred
         if (user.referredBy) {
             return res.status(400).json({ success: false, error: 'You have already used a referral code' });
         }
 
-        // Find referrer
-        const referrer = await User.findOne({ referralCode });
+        const referrer = await User.findOne({ referralCode: refCode });
         if (!referrer) {
             return res.status(404).json({ success: false, error: 'Invalid referral code' });
         }
 
-        // Can't refer yourself
         if (referrer._id.toString() === user._id.toString()) {
             return res.status(400).json({ success: false, error: 'Cannot use your own referral code' });
         }
 
-        // Cap: 500 credits/month from referrals
-        const currentMonth = new Date().getMonth();
         const referrerMonthlyCredits = (referrer.referralCount || 0) * 50;
-        if (referrerMonthlyCredits >= 500) {
-            // Still give the friend bonus, but referrer is capped
-        } else {
-            // Award referrer: +50 credits
+        if (referrerMonthlyCredits < 500) {
             await User.findByIdAndUpdate(referrer._id, {
                 $inc: { 'credits.bonus': 50, referralCount: 1 },
             });
         }
 
-        // Award friend: +30 credits
         await User.findByIdAndUpdate(user._id, {
             $set: { referredBy: referrer._id },
             $inc: { 'credits.bonus': 30 },
@@ -181,7 +186,9 @@ router.post('/apply-referral', protect, async (req, res) => {
         console.error('❌ Apply Referral Error:', error);
         res.status(500).json({ success: false, error: 'Failed to apply referral' });
     }
-});
+}
+
+router.post('/apply-referral', protect, (req, res) => applyReferralHandler(req, res));
 
 /**
  * @desc    Preview video generation cost before generating

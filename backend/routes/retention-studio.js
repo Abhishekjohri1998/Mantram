@@ -24,9 +24,9 @@ import { trackPageView, getAbandonmentCandidates, generateTrackingScript, getTra
 const router = express.Router();
 
 // ══════════════════════════════════════════════════════════════
-// GET /campaigns — List all retention campaigns for current brand
+// GET / — List all retention campaigns for current brand
 // ══════════════════════════════════════════════════════════════
-router.get('/campaigns', protect, async (req, res) => {
+router.get('/', protect, async (req, res) => {
     try {
         const { brandId } = req.query;
         const query = { user: req.user._id };
@@ -49,7 +49,7 @@ router.get('/campaigns', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 // GET /campaigns/:id — Get full campaign details
 // ══════════════════════════════════════════════════════════════
-router.get('/campaigns/:id', protect, async (req, res) => {
+router.get('/:id', protect, async (req, res) => {
     try {
         const campaign = await RetentionCampaign.findOne({
             _id: req.params.id,
@@ -68,7 +68,7 @@ router.get('/campaigns/:id', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 // POST /campaigns — Create a new retention campaign
 // ══════════════════════════════════════════════════════════════
-router.post('/campaigns', protect, async (req, res) => {
+router.post('/', protect, async (req, res) => {
     try {
         const { brandId, title, description } = req.body;
         if (!brandId) return res.status(400).json({ success: false, error: 'brandId is required' });
@@ -97,7 +97,7 @@ router.post('/campaigns', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 // DELETE /campaigns/:id — Delete a campaign
 // ══════════════════════════════════════════════════════════════
-router.delete('/campaigns/:id', protect, async (req, res) => {
+router.delete('/:id', protect, async (req, res) => {
     try {
         const result = await RetentionCampaign.deleteOne({
             _id: req.params.id,
@@ -113,9 +113,9 @@ router.delete('/campaigns/:id', protect, async (req, res) => {
 
 
 // ══════════════════════════════════════════════════════════════
-// POST /campaigns/:id/ingest — Node 1: Ingest Amazon data
+// POST /:id/ingest — Node 1: Ingest Amazon data (accepts JSON or FormData)
 // ══════════════════════════════════════════════════════════════
-router.post('/campaigns/:id/ingest', protect, async (req, res) => {
+router.post('/:id/ingest', protect, async (req, res) => {
     try {
         const campaign = await RetentionCampaign.findOne({
             _id: req.params.id,
@@ -123,8 +123,22 @@ router.post('/campaigns/:id/ingest', protect, async (req, res) => {
         });
         if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
 
-        const { rawData, source } = req.body;
-        if (!rawData) return res.status(400).json({ success: false, error: 'rawData is required (CSV text)' });
+        // Support both JSON body and FormData
+        let rawData, source;
+        if (req.body && req.body.rawData) {
+            // JSON body
+            rawData = req.body.rawData;
+            source = req.body.source;
+        } else if (req.file) {
+            // FormData file upload
+            rawData = req.file.buffer.toString('utf8');
+            source = req.body?.source || 'csv';
+        } else if (req.body && typeof req.body === 'object') {
+            // FormData text fields (no file)
+            rawData = req.body.rawData || req.body.data || req.body.csv;
+            source = req.body.source;
+        }
+        if (!rawData) return res.status(400).json({ success: false, error: 'rawData is required (CSV text — send as JSON body or FormData file)' });
 
         // Run ingest node
         const state = {
@@ -158,7 +172,7 @@ router.post('/campaigns/:id/ingest', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 // POST /campaigns/:id/match — Node 2: Match & Enrich with Shopify
 // ══════════════════════════════════════════════════════════════
-router.post('/campaigns/:id/match', protect, async (req, res) => {
+router.post('/:id/match', protect, async (req, res) => {
     try {
         const campaign = await RetentionCampaign.findOne({
             _id: req.params.id,
@@ -195,7 +209,7 @@ router.post('/campaigns/:id/match', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 // POST /campaigns/:id/creative — Node 3: Generate creative
 // ══════════════════════════════════════════════════════════════
-router.post('/campaigns/:id/creative', protect, async (req, res) => {
+router.post('/:id/creative', protect, async (req, res) => {
     try {
         const campaign = await RetentionCampaign.findOne({
             _id: req.params.id,
@@ -234,7 +248,7 @@ router.post('/campaigns/:id/creative', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 // POST /campaigns/:id/compose — Node 4: Generate full mailer
 // ══════════════════════════════════════════════════════════════
-router.post('/campaigns/:id/compose', protect, async (req, res) => {
+router.post('/:id/compose', protect, async (req, res) => {
     try {
         const campaign = await RetentionCampaign.findOne({
             _id: req.params.id,
@@ -274,7 +288,7 @@ router.post('/campaigns/:id/compose', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 // POST /campaigns/:id/approve — Approve creative/mailer
 // ══════════════════════════════════════════════════════════════
-router.post('/campaigns/:id/approve', protect, async (req, res) => {
+router.post('/:id/approve', protect, async (req, res) => {
     try {
         const campaign = await RetentionCampaign.findOne({
             _id: req.params.id,
@@ -302,7 +316,7 @@ router.post('/campaigns/:id/approve', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 // POST /campaigns/:id/send — Node 5: Send emails
 // ══════════════════════════════════════════════════════════════
-router.post('/campaigns/:id/send', protect, async (req, res) => {
+router.post('/:id/send', protect, async (req, res) => {
     try {
         const campaign = await RetentionCampaign.findOne({
             _id: req.params.id,
@@ -345,7 +359,7 @@ router.post('/campaigns/:id/send', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 // GET /campaigns/:id/preview — Get email preview with real data
 // ══════════════════════════════════════════════════════════════
-router.get('/campaigns/:id/preview', protect, async (req, res) => {
+router.get('/:id/preview', protect, async (req, res) => {
     try {
         const campaign = await RetentionCampaign.findOne({
             _id: req.params.id,
@@ -395,7 +409,7 @@ router.get('/campaigns/:id/preview', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 // POST /campaigns/:id/test-email — Send a test email
 // ══════════════════════════════════════════════════════════════
-router.post('/campaigns/:id/test-email', protect, async (req, res) => {
+router.post('/:id/test-email', protect, async (req, res) => {
     try {
         const campaign = await RetentionCampaign.findOne({
             _id: req.params.id,
@@ -440,7 +454,7 @@ router.post('/campaigns/:id/test-email', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 // POST /campaigns/:id/generate-image — Generate product comparison image
 // ══════════════════════════════════════════════════════════════
-router.post('/campaigns/:id/generate-image', protect, async (req, res) => {
+router.post('/:id/generate-image', protect, async (req, res) => {
     try {
         const campaign = await RetentionCampaign.findOne({
             _id: req.params.id,
@@ -527,7 +541,7 @@ router.get('/pipeline', protect, (req, res) => {
 // ══════════════════════════════════════════════════════════════
 // GET /campaigns/:id/analytics — Campaign analytics
 // ══════════════════════════════════════════════════════════════
-router.get('/campaigns/:id/analytics', protect, async (req, res) => {
+router.get('/:id/analytics', protect, async (req, res) => {
     try {
         const campaign = await RetentionCampaign.findOne({
             _id: req.params.id,
@@ -679,7 +693,7 @@ router.get('/recent-buyers', protect, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 
 // POST /campaigns/:id/ab-test — Create A/B test for a campaign
-router.post('/campaigns/:id/ab-test', protect, async (req, res) => {
+router.post('/:id/ab-test', protect, async (req, res) => {
     try {
         const campaign = await RetentionCampaign.findOne({
             _id: req.params.id,
@@ -704,7 +718,7 @@ router.post('/campaigns/:id/ab-test', protect, async (req, res) => {
 });
 
 // GET /campaigns/:id/ab-results — Get A/B test results
-router.get('/campaigns/:id/ab-results', protect, async (req, res) => {
+router.get('/:id/ab-results', protect, async (req, res) => {
     try {
         const campaign = await RetentionCampaign.findOne({
             _id: req.params.id,
@@ -725,7 +739,7 @@ router.get('/campaigns/:id/ab-results', protect, async (req, res) => {
 });
 
 // GET /campaigns/:id/utm — Get UTM params for a campaign
-router.get('/campaigns/:id/utm', protect, async (req, res) => {
+router.get('/:id/utm', protect, async (req, res) => {
     try {
         const campaign = await RetentionCampaign.findOne({
             _id: req.params.id,

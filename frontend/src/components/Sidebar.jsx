@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { credits as creditsAPI } from '../services/api'
+import { credits as creditsAPI, auth as authAPI } from '../services/api'
 
 const navItems = [
     { icon: 'dashboard', label: 'Dashboard', to: '/dashboard' },
@@ -9,27 +9,29 @@ const navItems = [
     { icon: 'edit_note', label: 'Content Studio', to: '/content-studio', studioKey: 'contentStudio' },
     { icon: 'auto_fix_high', label: 'Creative Studio', to: '/creative-studio', studioKey: 'creativeStudio' },
     { icon: 'movie', label: 'Video Studio', to: '/video-studio', studioKey: 'videoStudio' },
-    { icon: 'calendar_month', label: 'Smart Calendar', to: '/smart-calendar', studioKey: 'smartCalendar' },
-    { icon: 'send', label: 'Publish & Schedule', to: '/publish' },
+    { icon: 'share', label: 'Social Media Studio', to: '/social-media-studio', studioKey: 'socialMediaStudio' },
     { icon: 'forum', label: 'Conversation Studio', to: '/conversations', studioKey: 'conversationStudio' },
     { icon: 'travel_explore', label: 'SEO Studio', to: '/seo-studio', studioKey: 'seoStudio' },
     { icon: 'monitoring', label: 'Performance Studio', to: '/performance-marketing', studioKey: 'adStudio' },
+    { icon: 'filter_alt', label: 'Funnel Studio', to: '/funnel-studio', studioKey: 'funnelStudio' },
     { icon: 'storefront', label: 'D2C Studio', to: '/d2c-analytics', studioKey: 'd2cAnalytics' },
-    { icon: 'auto_awesome', label: 'Skills Hub', to: '/skills' },
+    { icon: 'loyalty', label: 'Retention Studio', to: '/retention-studio', studioKey: 'retentionStudio' },
+    { icon: 'auto_awesome', label: 'Skills Hub', to: '/skills', studioKey: 'skillsHub' },
 ]
 
 const bottomItems = [
     { icon: 'cases', label: 'Brand Manager', to: '/brands' },
     { icon: 'electrical_services', label: 'Integrations', to: '/integrations' },
-    { icon: 'settings', label: 'Settings', to: '/team' },
+    { icon: 'settings', label: 'Settings', to: '/settings' },
 ]
 
-// Filter nav items based on team member's studio access
-function getVisibleNavItems(user) {
-    if (!user?.organization || user.role === 'admin' || user.role === 'superadmin' || user.teamRole === 'owner') {
-        return navItems // owners see everything
-    }
-    return navItems.filter(item => !item.studioKey || user.studioAccess?.[item.studioKey] !== false)
+// Filter nav items based on studio access
+function filterNavByAccess(items, studioAccess) {
+    if (!studioAccess) return items; // fallback: show all
+    return items.filter(item => {
+        if (!item.studioKey) return true; // non-studio items always visible
+        return studioAccess[item.studioKey] !== false;
+    });
 }
 
 export default function Sidebar({ mobileOpen, onClose }) {
@@ -96,7 +98,7 @@ export default function Sidebar({ mobileOpen, onClose }) {
             {/* Main Nav */}
             <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
                 <p className="px-3 pt-4 pb-2 text-xs text-slate-600 uppercase tracking-widest font-bold">Create</p>
-                {getVisibleNavItems(user).map((item) => (
+                {filterNavByAccess(navItems, user?.studioAccess).map((item) => (
                     <NavLink
                         key={item.label}
                         to={item.to}
