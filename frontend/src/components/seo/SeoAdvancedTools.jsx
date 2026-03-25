@@ -17,6 +17,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { seoStudio as seoAPI } from '../../services/api';
 import StudioReportButton from '../reports/StudioReportButton';
 import FormattedText from '../FormattedText';
+import GlobalLoader from '../GlobalLoader';
 
 const TABS = [
     { id: 'overview', icon: 'space_dashboard', label: 'Overview' },
@@ -31,6 +32,38 @@ const TABS = [
 ];
 
 const SEVERITY_COLORS = { critical: '#fb7185', high: '#fb923c', medium: '#fbbf24', low: '#94a3b8' };
+
+// Estimated durations (seconds) per workflow for accurate progress bar
+const ESTIMATED_DURATIONS = {
+    'site-audit': 120,
+    'overview': 90,
+    'keywords': 60,
+    'content-ops': 60,
+    'geo': 90,
+    'geo-llm': 90,
+    'geo-mining': 90,
+    'competitor-detail': 75,
+    'competitor-warroom': 75,
+    'on-page': 45,
+    'on-page-fix': 45,
+    'backlinks': 60,
+};
+
+// Loading stage descriptions per workflow
+const LOADING_STAGES = {
+    'site-audit': ['Crawling Pages', 'Checking Meta Tags', 'Analyzing Technical SEO', 'Building Report'],
+    'overview': ['Running Health Check', 'Analyzing Scores', 'Building Report'],
+    'keywords': ['Researching Keywords', 'Analyzing Volume & Difficulty', 'Clustering Topics'],
+    'content-ops': ['Analyzing Content Gaps', 'Finding Opportunities', 'Building Report'],
+    'geo': ['Checking AI Visibility', 'Probing LLMs', 'Mining Prompts'],
+    'geo-llm': ['Testing LLM Responses', 'Analyzing AI Coverage'],
+    'geo-mining': ['Mining AI Prompts', 'Analyzing Opportunities'],
+    'competitor-detail': ['Analyzing Competitors', 'Comparing Metrics', 'Building War Room'],
+    'competitor-warroom': ['Deep Competitor Intel', 'Building Strategy'],
+    'on-page': ['Auditing Page', 'Checking On-Page SEO', 'Generating Fixes'],
+    'on-page-fix': ['Applying AI Fixes', 'Optimizing Content'],
+    'backlinks': ['Analyzing Backlink Profile', 'Checking Authority', 'Building Report'],
+};
 
 // Map tab IDs to SeoAudit type values for persistence
 const TAB_TO_AUDIT_TYPE = {
@@ -1715,6 +1748,22 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                             {data.error}
                         </div>
                     )}
+                    {/* ── GlobalLoader Overlay ── */}
+                    {loading && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
+                            <div className="max-w-md w-full mx-4">
+                                <GlobalLoader
+                                    isActive={true}
+                                    title={loadingMsg || 'Analyzing...'}
+                                    icon="travel_explore"
+                                    estimatedDuration={ESTIMATED_DURATIONS[loadingAction] || 60}
+                                    stages={LOADING_STAGES[loadingAction] || ['Processing', 'Analyzing', 'Building Report']}
+                                    currentStage={LOADING_STAGES[loadingAction]?.[0] || 'Processing'}
+                                />
+                            </div>
+                        </div>
+                    )}
+
                     {renderTab()}
                 </div>
             </div>

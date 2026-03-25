@@ -2264,6 +2264,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             title="Creating your visual..." 
                             currentStage={`${prompt.substring(0, 50)}${prompt.length > 50 ? '...' : ''}`}
                             icon="photo_camera"
+                            estimatedDuration={30}
                         />
 
                         {/* ── Generation History (from Image Bank) ── */}
@@ -3075,6 +3076,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 title="Creating Your Photoshoot" 
                                 currentStage="Gemini AI is styling your product with professional lighting and composition..."
                                 icon="photo_camera"
+                                estimatedDuration={30}
                             />
 
                             {photoshootResult && (
@@ -5488,6 +5490,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                     title={`Creating Your ${activeTemplate.label}`}
                                     currentStage={`AI is designing with ${activeBrand.name}'s brand identity...`}
                                     icon={activeTemplate.icon}
+                                    estimatedDuration={25}
                                 />
 
                                 {!templateGenerating && !templateResult && (

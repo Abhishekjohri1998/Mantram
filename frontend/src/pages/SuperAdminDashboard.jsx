@@ -133,6 +133,7 @@ export default function SuperAdminDashboard() {
             { id: 'tokenUsage', label: 'Token Usage', icon: 'monitoring' },
         ]},
         { label: 'Platform', icon: 'settings', items: [
+            { id: 'studios', label: 'Studio Management', icon: 'rocket_launch' },
             { id: 'content', label: 'Content & Brands', icon: 'article' },
             { id: 'integrations', label: 'Integrations', icon: 'hub' },
             { id: 'logs', label: 'Audit Logs', icon: 'history' },
@@ -152,7 +153,8 @@ export default function SuperAdminDashboard() {
         if (tab === 'waitlist') loadWaitlist()
         if (tab === 'coupons') loadCoupons()
         if (tab === 'content') { loadBrands(); loadContent() }
-        if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts(); loadApiKeys(); loadStudioVisibility() }
+        if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts(); loadApiKeys() }
+        if (tab === 'studios') { loadStudioVisibility() }
         if (tab === 'integrations') loadIntegrations()
         if (tab === 'packages') loadPackages()
         if (tab === 'logs') loadLogs()
@@ -458,39 +460,48 @@ export default function SuperAdminDashboard() {
                 )}
 
 
-                {/* ═══════ MAIN CONTENT ═══════ */}
-                {/* Main Content Area */}
-                <div className="flex-1 min-w-0">
-                    {/* Top Tab Navigation - Always visible and scrollable */}
-                    <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide no-scrollbar border-b border-white/[0.05]">
-                        <div className="flex items-center gap-2 px-1">
+                {/* ═══════ SIDEBAR + MAIN LAYOUT ═══════ */}
+                <div className="flex gap-6">
+                    {/* Sidebar Navigation */}
+                    <div className={`${sidebarCollapsed ? 'w-14' : 'w-56'} flex-shrink-0 transition-all duration-300`}>
+                        <div className="sticky top-4">
+                            <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="w-full flex items-center justify-center mb-3 p-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] text-slate-500 cursor-pointer transition-all">
+                                <span className="material-symbols-outlined text-sm">{sidebarCollapsed ? 'chevron_right' : 'chevron_left'}</span>
+                            </button>
                             {navGroups.map(group => (
-                                <React.Fragment key={group.label}>
-                                    {/* Group Label (Optional, shown in sidebar style but for top nav we can omit or make subtle) */}
-                                    <div className="h-6 w-px bg-white/[0.08] mx-2 first:hidden" />
+                                <div key={group.label} className="mb-4">
+                                    {!sidebarCollapsed && (
+                                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 px-3 mb-1.5">
+                                            {group.label}
+                                        </p>
+                                    )}
                                     {group.items.map(item => (
                                         <button
                                             key={item.id}
                                             onClick={() => setTab(item.id)}
-                                            className={`whitespace-nowrap px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 h-10 ${
-                                                tab === item.id 
-                                                ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' 
-                                                : 'bg-white/[0.03] text-slate-400 border border-white/[0.06] hover:bg-white/[0.08] hover:text-white'
+                                            title={sidebarCollapsed ? item.label : ''}
+                                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all mb-0.5 cursor-pointer ${
+                                                tab === item.id
+                                                    ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20'
+                                                    : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'
                                             }`}
                                         >
                                             <span className="material-symbols-outlined text-sm">{item.icon}</span>
-                                            {item.label}
+                                            {!sidebarCollapsed && <span className="flex-1 text-left truncate">{item.label}</span>}
                                             {item.badge > 0 && (
-                                                <span className="ml-1 min-w-[16px] h-[16px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-black px-1 shadow-sm">
+                                                <span className="min-w-[16px] h-[16px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-black px-1">
                                                     {item.badge > 99 ? '99+' : item.badge}
                                                 </span>
                                             )}
                                         </button>
                                     ))}
-                                </React.Fragment>
+                                </div>
                             ))}
                         </div>
                     </div>
+
+                    {/* Main Content */}
+                    <div className="flex-1 min-w-0">
 
                     {/* ─── TOP BAR: Header + View as User ─── */}
                     <div className="mb-6">
@@ -1952,55 +1963,6 @@ export default function SuperAdminDashboard() {
                                     </div>
                                 </div>
 
-                                {/* Studio Launch Control - 3-tier visibility */}
-                                {studioVisibility && (
-                                    <div className="pt-4 border-t border-white/[0.06]">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <div className="flex items-center gap-2">
-                                                <span className="material-symbols-outlined text-violet-400">rocket_launch</span>
-                                                <p className="text-base font-bold text-white">Studio Launch Control</p>
-                                            </div>
-                                            <div className="flex gap-3 text-xs">
-                                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" />Public</span>
-                                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" />Private</span>
-                                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500" />Hidden</span>
-                                            </div>
-                                        </div>
-                                        <p className="text-sm text-slate-500 mb-4">Control which studios are available portal-wide. <b className="text-slate-400">Public</b> = everyone (per plan), <b className="text-amber-400">Private</b> = whitelisted users only, <b className="text-rose-400">Hidden</b> = off for all.</p>
-                                        <div className="space-y-2">
-                                            {studioKeys.map(key => {
-                                                const status = studioVisibility[key] || 'public';
-                                                const rowBorder = { public: 'border-emerald-500/20', private: 'border-amber-500/20', hidden: 'border-rose-500/20' };
-                                                const dotColor = { public: 'bg-emerald-500', private: 'bg-amber-500', hidden: 'bg-rose-500' };
-                                                const activeClasses = {
-                                                    public: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40',
-                                                    private: 'bg-amber-500/20 text-amber-400 border border-amber-500/40',
-                                                    hidden: 'bg-rose-500/20 text-rose-400 border border-rose-500/40',
-                                                };
-                                                return (
-                                                    <div key={key} className={`flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.02] border ${rowBorder[status]} transition-all`}>
-                                                        <div className="flex items-center gap-3">
-                                                            <span className={`w-2.5 h-2.5 rounded-full ${dotColor[status]}`} />
-                                                            <span className="text-sm font-bold text-white">{studioLabels[key] || key}</span>
-                                                        </div>
-                                                        <div className="flex gap-1">
-                                                            {['public', 'private', 'hidden'].map(state => (
-                                                                <button key={state} onClick={() => handleStudioVisibilityChange(key, state)}
-                                                                    className={`px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${status === state
-                                                                        ? activeClasses[state]
-                                                                        : 'text-slate-600 hover:text-slate-400 border border-transparent'
-                                                                    }`}
-                                                                >
-                                                                    {state.charAt(0).toUpperCase() + state.slice(1)}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
                                 <div className="flex items-center justify-between">
                                     <div><p className="text-base font-bold text-white">Default AI Provider</p><p className="text-sm text-slate-500">Primary model for content generation</p></div>
                                     <select value={systemSettings.defaultProvider || 'gemini'} onChange={e => handleToggleSetting('defaultProvider', e.target.value)}
@@ -2407,6 +2369,108 @@ export default function SuperAdminDashboard() {
                                             <pre className="text-[10px] text-slate-400 bg-white/[0.02] p-2 rounded overflow-auto max-h-24">{JSON.stringify(providerUsageData.piapiBalance, null, 2)}</pre>
                                         </div>
                                     )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+                {/* ════════════ STUDIO MANAGEMENT ════════════ */}
+                {tab === 'studios' && (
+                    <div>
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-violet-400">rocket_launch</span>
+                                    Studio Launch Control
+                                </h3>
+                                <p className="text-sm text-slate-500 mt-1">Control which studios are visible across the platform — globally or per user</p>
+                            </div>
+                            <button onClick={loadStudioVisibility} className="p-2 rounded-lg bg-white/[0.04] text-slate-400 hover:text-white cursor-pointer"><span className="material-symbols-outlined text-sm">refresh</span></button>
+                        </div>
+
+                        {/* Legend */}
+                        <div className="flex gap-6 mb-5 px-4 py-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                            <div className="flex items-center gap-2 text-xs"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /><span className="text-slate-400"><b className="text-emerald-400">Public</b> — visible to everyone (per plan)</span></div>
+                            <div className="flex items-center gap-2 text-xs"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" /><span className="text-slate-400"><b className="text-amber-400">Private</b> — whitelisted users only</span></div>
+                            <div className="flex items-center gap-2 text-xs"><span className="w-2.5 h-2.5 rounded-full bg-rose-500" /><span className="text-slate-400"><b className="text-rose-400">Hidden</b> — off for everyone</span></div>
+                        </div>
+
+                        {/* Global Studio Visibility */}
+                        {studioVisibility ? (
+                            <div className="space-y-2 mb-8">
+                                {studioKeys.map(key => {
+                                    const status = studioVisibility[key] || 'public';
+                                    const rowBorder = { public: 'border-emerald-500/20', private: 'border-amber-500/20', hidden: 'border-rose-500/20' };
+                                    const dotColor = { public: 'bg-emerald-500', private: 'bg-amber-500', hidden: 'bg-rose-500' };
+                                    const activeClasses = {
+                                        public: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40',
+                                        private: 'bg-amber-500/20 text-amber-400 border border-amber-500/40',
+                                        hidden: 'bg-rose-500/20 text-rose-400 border border-rose-500/40',
+                                    };
+                                    return (
+                                        <div key={key} className={`flex items-center justify-between px-5 py-4 rounded-xl bg-white/[0.02] border ${rowBorder[status]} transition-all`}>
+                                            <div className="flex items-center gap-3">
+                                                <span className={`w-3 h-3 rounded-full ${dotColor[status]}`} />
+                                                <span className="text-sm font-bold text-white">{studioLabels[key] || key}</span>
+                                                <span className="text-[10px] text-slate-600 font-mono bg-white/[0.04] px-2 py-0.5 rounded">{key}</span>
+                                            </div>
+                                            <div className="flex gap-1.5">
+                                                {['public', 'private', 'hidden'].map(state => (
+                                                    <button key={state} onClick={() => handleStudioVisibilityChange(key, state)}
+                                                        className={`px-4 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${status === state
+                                                            ? activeClasses[state]
+                                                            : 'text-slate-600 hover:text-slate-400 border border-transparent'
+                                                        }`}
+                                                    >
+                                                        {state.charAt(0).toUpperCase() + state.slice(1)}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-center py-12 text-slate-500 text-sm">
+                                <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>
+                                Loading studio visibility...
+                            </div>
+                        )}
+
+                        {/* Per-User Studio Access Section */}
+                        <div className="glass-panel rounded-2xl p-5 mt-6">
+                            <h4 className="text-sm font-bold text-white flex items-center gap-2 mb-3">
+                                <span className="material-symbols-outlined text-amber-400">shield_person</span>
+                                Per-User Studio Access
+                            </h4>
+                            <p className="text-xs text-slate-500 mb-4">Search for a user to grant or revoke individual studio access. User overrides take priority over global settings (except Hidden).</p>
+                            <div className="flex items-center gap-3 bg-white/[0.03] rounded-xl border border-white/[0.06] px-4 py-2.5">
+                                <span className="material-symbols-outlined text-slate-500 text-lg">search</span>
+                                <input
+                                    type="text"
+                                    placeholder="Search user to manage studio access..."
+                                    value={impersonateSearch}
+                                    onChange={e => setImpersonateSearch(e.target.value)}
+                                    className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none"
+                                />
+                            </div>
+                            {impersonateResults.length > 0 && impersonateSearch.length >= 2 && (
+                                <div className="mt-2 border border-white/[0.06] rounded-xl overflow-hidden">
+                                    {impersonateResults.map(u => (
+                                        <div key={u._id} className="flex items-center justify-between px-4 py-3 hover:bg-white/[0.04] transition-all border-b border-white/[0.04] last:border-b-0">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white text-xs font-black">{u.name?.charAt(0)?.toUpperCase() || '?'}</div>
+                                                <div>
+                                                    <p className="text-sm font-bold text-white">{u.name}</p>
+                                                    <p className="text-[10px] text-slate-500">{u.email} · {u.plan || 'free'}</p>
+                                                </div>
+                                            </div>
+                                            <button onClick={() => { openUserStudioModal(u._id); setImpersonateSearch(''); setImpersonateResults([]) }}
+                                                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 cursor-pointer transition-all flex items-center gap-1.5">
+                                                <span className="material-symbols-outlined text-xs">tune</span> Manage Access
+                                            </button>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
                         </div>
@@ -3300,7 +3364,8 @@ export default function SuperAdminDashboard() {
                 )}
 
             </div>{/* end flex-1 content */}
-            </div>{/* end flex min-h-screen */}
+            </div>{/* end sidebar+content flex */}
+            </div>{/* end outer wrapper */}
         </DashboardLayout>
     )
 }

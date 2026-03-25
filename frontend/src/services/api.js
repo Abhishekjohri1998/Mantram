@@ -519,6 +519,22 @@ export const superadmin = {
     updateWatermarkSettings: (data) => apiFetch('/superadmin/watermark/settings', { method: 'PUT', body: JSON.stringify(data) }),
     getWatermarkOverrides: () => apiFetch('/superadmin/watermark/overrides'),
     updateWatermarkOverride: (data) => apiFetch('/superadmin/watermark/override', { method: 'PUT', body: JSON.stringify(data) }),
+
+    // Studio Visibility (3-tier access control)
+    getStudioVisibility: () => apiFetch('/superadmin/studio-visibility'),
+    updateStudioVisibility: (data) => apiFetch('/superadmin/studio-visibility', { method: 'PUT', body: JSON.stringify(data) }),
+    getUserStudioAccess: (userId) => apiFetch(`/superadmin/users/${userId}/studio-access`),
+    updateUserStudioAccess: (userId, data) => apiFetch(`/superadmin/users/${userId}/studio-access`, { method: 'PUT', body: JSON.stringify(data) }),
+
+    // Waitlist
+    getWaitlist: () => apiFetch('/superadmin/waitlist'),
+
+    // Pricing Command Center
+    getPricingCalculator: (params = {}) => { const q = new URLSearchParams(params).toString(); return apiFetch(`/superadmin/pricing-calculator?${q}`); },
+    getPricingPolicy: () => apiFetch('/superadmin/pricing-policy'),
+    getPricingMonitor: () => apiFetch('/superadmin/pricing-monitor'),
+    triggerPricingCheck: () => apiFetch('/superadmin/pricing-monitor/check', { method: 'POST' }),
+    dismissPricingAlerts: () => apiFetch('/superadmin/pricing-monitor/dismiss', { method: 'POST' }),
 };
 
 // ============ Credits API ============
