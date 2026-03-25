@@ -15,6 +15,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { seoStudio as seoAPI } from '../../services/api';
+import { useSeoTasks } from '../../context/SeoTaskContext';
 import StudioReportButton from '../reports/StudioReportButton';
 import FormattedText from '../FormattedText';
 import GlobalLoader from '../GlobalLoader';
@@ -77,10 +78,8 @@ const TAB_TO_AUDIT_TYPE = {
 };
 
 export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, website, competitors, brandPayload, gaConnected, gaReport, gscReport, gaLoading, gaAuthError, reconnectGA, hideNav }) {
-    // Per-tab data cache
+    // Per-tab data cache (for saved reports)
     const [tabData, setTabData] = useState({});
-    const [loadingAction, setLoadingAction] = useState('');
-    const [loadingMsg, setLoadingMsg] = useState('');
     const [pageUrl, setPageUrl] = useState('');
     const [issueFilter, setIssueFilter] = useState('all');
     const [reportTimestamps, setReportTimestamps] = useState({});
@@ -91,10 +90,18 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
 
     const brandId = brand?._id;
 
-    // Auto-load saved report when switching tabs
+    // ── Context-driven background tasks ──
+    const ctx = useSeoTasks();
+    const contextTask = ctx?.tasks?.[advPage];
+    const loadingAction = contextTask?.status === 'running' ? advPage : '';
+    const loadingMsg = contextTask?.stage || '';
+
+    // Auto-load saved report when switching tabs (if no context result)
     useEffect(() => {
         const auditType = TAB_TO_AUDIT_TYPE[advPage];
         if (!auditType || !brandId || tabData[advPage]) return;
+        // Skip if context has results for this tab
+        if (contextTask?.results) return;
         let cancelled = false;
         (async () => {
             try {
@@ -106,20 +113,17 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
             } catch { /* silent — no cached report */ }
         })();
         return () => { cancelled = true; };
-    }, [advPage, brandId]);
+    }, [advPage, brandId, contextTask?.results]);
 
-    // Generic workflow runner
+    // Generic workflow runner — delegates to context
     const runAnalysis = useCallback(async (tabId, apiFn, payload, msg = 'Analyzing...', actionId = '') => {
         const aid = actionId || tabId;
-        setLoadingAction(aid); setLoadingMsg(msg);
-        try {
-            const data = await apiFn(payload);
-            setTabData(prev => ({ ...prev, [tabId]: data }));
-            setReportTimestamps(prev => ({ ...prev, [tabId]: new Date().toISOString() }));
-        } catch (err) {
-            setTabData(prev => ({ ...prev, [tabId]: { error: err.message } }));
-        } finally { setLoadingAction(''); setLoadingMsg(''); }
-    }, []);
+        const stages = LOADING_STAGES[aid] || ['Processing', 'Analyzing', 'Building Report'];
+        const duration = ESTIMATED_DURATIONS[aid] || 60;
+        if (ctx) {
+            ctx.startTask(aid, msg, apiFn, payload, stages, duration);
+        }
+    }, [ctx]);
 
     const buildPayload = (extra = {}) => ({
         url: website, brand: brandPayload, brandId, country: brand?.dna?.country || 'India', industry: brand?.dna?.industry, ...extra,
@@ -192,7 +196,8 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
         );
     };
 
-    const data = tabData[advPage];
+    // Read data: prefer context task results, then fallback to tabData cache
+    const data = contextTask?.results || tabData[advPage];
     const cachedAt = reportTimestamps[advPage];
     const hasData = data && !data.error;
 

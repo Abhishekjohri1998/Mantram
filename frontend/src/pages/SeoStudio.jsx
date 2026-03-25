@@ -2,11 +2,13 @@ import { useState, useRef, useEffect } from 'react'
 import SEOHead from '../components/SEOHead'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
 import { useBrand } from '../context/BrandContext'
+import { SeoTaskProvider, useSeoTasks } from '../context/SeoTaskContext'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { seoStudio as seoAPI, googleAnalytics as gaAPI } from '../services/api'
 import StudioReportButton from '../components/reports/StudioReportButton'
 import SeoAdvancedTools from '../components/seo/SeoAdvancedTools'
+import SeoTaskToast from '../components/seo/SeoTaskToast'
 
 import GlobalLoader from '../components/GlobalLoader'
 
@@ -72,10 +74,23 @@ function SeverityBadge({ severity }) {
 // ── Main Component ────────────────────────────────────────────────────────
 export default function SeoStudio() {
     const { activeBrand } = useBrand()
-    const navigate = useNavigate()
-
-    // Navigation — single active section drives all content
     const [activeSection, setActiveSection] = useState('overview')
+
+    return (
+        <SeoTaskProvider onNavigate={setActiveSection}>
+            <SeoStudioInner activeBrand={activeBrand} activeSection={activeSection} setActiveSection={setActiveSection} />
+            <SeoTaskToast />
+        </SeoTaskProvider>
+    )
+}
+
+function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
+    const navigate = useNavigate()
+    const { startTask, cancelTask, tasks } = useSeoTasks()
+
+    const SIDEBAR = SIDEBAR_SECTIONS
+    const allItems = SIDEBAR.flatMap(s => s.items)
+    const currentItem = allItems.find(i => i.id === activeSection)
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
     const [showGuide, setShowGuide] = useState(false)
     const [showSetup, setShowSetup] = useState(false)
@@ -88,15 +103,21 @@ export default function SeoStudio() {
     // Input state
     const [askQuery, setAskQuery] = useState('')
 
-    // Results state
-    const [loading, setLoading] = useState(false)
-    const [loadingStage, setLoadingStage] = useState('')
-    const [loadingElapsed, setLoadingElapsed] = useState(0)
-    const [results, setResults] = useState(null)
+    // Task-context driven results for current workflow
+    const currentTask = tasks[activeSection]
+    const loading = currentTask?.status === 'running'
+    const loadingStage = currentTask?.stage || ''
+    const loadingElapsed = currentTask?.elapsed || 0
+
+    // Results: prefer context task results, fallback to saved/baseline data
+    const [savedResults, setSavedResults] = useState(null)
+    const results = currentTask?.results || savedResults
     const [askResult, setAskResult] = useState(null)
     const [error, setError] = useState('')
-    const abortRef = useRef(null)
-    const elapsedTimerRef = useRef(null)
+    const [askLoading, setAskLoading] = useState(false)
+
+    // Sync error from context task
+    useEffect(() => { if (currentTask?.error) setError(currentTask.error) }, [currentTask?.error])
 
     // Google Analytics state
     const [gaConnected, setGaConnected] = useState(false)
@@ -114,6 +135,9 @@ export default function SeoStudio() {
 
     useEffect(() => { if (activeBrand?.competitors) setCompetitors(activeBrand.competitors) }, [activeBrand])
     useEffect(() => { if (results) resultRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [results])
+
+    // Sync error from context task
+    useEffect(() => { if (currentTask?.error) setError(currentTask.error) }, [currentTask?.error])
 
     // Check GA connection on mount AND on brand change
     useEffect(() => {
@@ -201,124 +225,83 @@ export default function SeoStudio() {
     }
 
     const cancelWorkflow = () => {
-        if (abortRef.current) abortRef.current.abort()
-        clearInterval(elapsedTimerRef.current)
-        setLoading(false); setLoadingStage(''); setLoadingElapsed(0)
+        cancelTask(activeSection)
     }
-
-    // Cleanup on unmount
-    useEffect(() => () => { if (abortRef.current) abortRef.current.abort(); clearInterval(elapsedTimerRef.current) }, [])
 
     // ── Auto-load saved results when switching to a workflow section ──
     const [savedAt, setSavedAt] = useState(null)
     useEffect(() => {
         const WORKFLOW_IDS = ['health-check', 'traffic', 'competitors', 'ai-visibility', 'competitor-warroom', 'llm-probe', 'auto-fix', 'prompt-mining']
         if (!activeBrand?._id || !WORKFLOW_IDS.includes(activeSection)) return
-        // Don't overwrite if user literally just generated fresh results
-        if (results && !savedAt) return
+        // Don't overwrite if context has fresh results or task is running
+        if (currentTask?.status === 'running' || currentTask?.results) return
 
         let cancelled = false
-        setResults(null); setSavedAt(null)
+        setSavedResults(null); setSavedAt(null)
         seoAPI.getSavedReport(activeBrand._id, activeSection)
             .then(data => {
                 if (cancelled) return
                 if (data?.found && data.report) {
-                    setResults({ success: true, ...data.report })
+                    setSavedResults({ success: true, ...data.report })
                     setSavedAt(data.generatedAt)
                 }
             })
             .catch(() => { /* silently fail — just means no saved data */ })
         return () => { cancelled = true }
-    }, [activeSection, activeBrand?._id])
+    }, [activeSection, activeBrand?._id, currentTask?.status])
 
     const runWorkflow = async (workflowId) => {
         if (!website) { setError('No website URL found. Please add a website to your brand.'); return }
-        // Cancel any running workflow first
-        if (abortRef.current) abortRef.current.abort()
-        clearInterval(elapsedTimerRef.current)
 
-        setError(''); setResults(null); setSavedAt(null); setLoading(true); setLoadingElapsed(0)
+        setError(''); setSavedResults(null); setSavedAt(null)
 
         const stages = STAGE_MESSAGES[workflowId] || ['Processing...']
-        let stageIdx = 0
-        setLoadingStage(stages[0])
-        const stageInterval = setInterval(() => { stageIdx = Math.min(stageIdx + 1, stages.length - 1); setLoadingStage(stages[stageIdx]) }, 8000)
-        elapsedTimerRef.current = setInterval(() => setLoadingElapsed(prev => prev + 1), 1000)
+        const payload = { url: website, brand: brandPayload, brandId: activeBrand?._id, country: activeBrand?.dna?.country || 'India', industry: activeBrand?.dna?.industry }
+        if (workflowId === 'competitors' || workflowId === 'competitor-warroom') payload.competitorUrls = competitors.map(c => c.url).filter(Boolean)
 
-        try {
-            const payload = { url: website, brand: brandPayload, brandId: activeBrand?._id, country: activeBrand?.dna?.country || 'India', industry: activeBrand?.dna?.industry }
-            if (workflowId === 'competitors' || workflowId === 'competitor-warroom') payload.competitorUrls = competitors.map(c => c.url).filter(Boolean)
-
-            // Auto-fix needs previous issues
-            if (workflowId === 'auto-fix') {
-                console.log('🛠️ [SeoStudio] Auto-fix triggered. Checking issues in memory...', results?.issues?.length || 0)
-                let lastIssues = results?.issues || []
-                // If no issues in memory, try fetching saved health-check report
-                if (lastIssues.length === 0) {
-                    try {
-                        console.log(`🔍 [SeoStudio] No issues in memory. Fetching saved 'health-check' report for brand: ${activeBrand._id}`)
-                        const saved = await seoAPI.getSavedReport(activeBrand._id, 'health-check')
-                        console.log('📡 [SeoStudio] Health-check fetch result:', saved)
-                        if (saved?.found && saved.report?.issues?.length > 0) {
-                            lastIssues = saved.report.issues
-                            console.log('✅ [SeoStudio] Found issues in saved report:', lastIssues.length)
-                        } else {
-                            console.warn('⚠️ [SeoStudio] No saved health-check report found or it has no issues.')
-                        }
-                    } catch (err) { 
-                        console.error('❌ [SeoStudio] Error fetching saved health-check:', err.message)
-                    }
-                }
-                if (lastIssues.length === 0) { 
-                    console.error('🛑 [SeoStudio] Blocking execution: No issues found for Auto-Fix.')
-                    setError('Run a Health Check first to find issues, then use Auto-Fix.'); 
-                    setLoading(false); clearInterval(stageInterval); clearInterval(elapsedTimerRef.current); return 
-                }
-                payload.issues = lastIssues
+        // Auto-fix needs previous issues
+        if (workflowId === 'auto-fix') {
+            let lastIssues = results?.issues || []
+            if (lastIssues.length === 0) {
+                try {
+                    const saved = await seoAPI.getSavedReport(activeBrand._id, 'health-check')
+                    if (saved?.found && saved.report?.issues?.length > 0) lastIssues = saved.report.issues
+                } catch { }
             }
-
-            const apiFn = {
-                'health-check': seoAPI.healthCheck, 'traffic': seoAPI.traffic,
-                'competitors': seoAPI.competitors, 'ai-visibility': seoAPI.aiVisibility,
-                'competitor-warroom': seoAPI.competitorWarRoom, 'llm-probe': seoAPI.llmProbe,
-                'auto-fix': seoAPI.autoFix, 'prompt-mining': seoAPI.promptMining,
-            }[workflowId]
-            const data = await apiFn(payload)
-            if (data.success !== false) {
-                setResults(data)
-                // Refresh competitors if competitor analysis discovered new ones
-                if (workflowId === 'competitors' && data.discoveredCompetitors?.length) {
-                    try {
-                        const newComps = data.discoveredCompetitors.map(c => ({ name: c.name, url: c.url, addedBy: 'ai' }));
-                        setCompetitors(prev => {
-                            const urls = new Set(prev.map(p => p.url));
-                            return [...prev, ...newComps.filter(n => !urls.has(n.url))].slice(0, 8);
-                        });
-                    } catch { }
-                }
-            } else setError(data.error || 'Analysis failed')
-        } catch (e) {
-            if (e.name !== 'AbortError') setError(e.message)
+            if (lastIssues.length === 0) {
+                setError('Run a Health Check first to find issues, then use Auto-Fix.')
+                return
+            }
+            payload.issues = lastIssues
         }
-        finally { clearInterval(stageInterval); clearInterval(elapsedTimerRef.current); setLoading(false); setLoadingElapsed(0) }
+
+        const API_MAP = {
+            'health-check': seoAPI.healthCheck, 'traffic': seoAPI.traffic,
+            'competitors': seoAPI.competitors, 'ai-visibility': seoAPI.aiVisibility,
+            'competitor-warroom': seoAPI.competitorWarRoom, 'llm-probe': seoAPI.llmProbe,
+            'auto-fix': seoAPI.autoFix, 'prompt-mining': seoAPI.promptMining,
+        }
+
+        const apiFn = API_MAP[workflowId]
+        const label = allItems.find(i => i.id === workflowId)?.label || workflowId
+        startTask(workflowId, label, apiFn, payload, stages, ESTIMATED_DURATIONS[workflowId] || 60)
     }
 
     const runAsk = async () => {
         if (!askQuery.trim()) return
-        setAskResult(null); setLoading(true); setLoadingStage('Thinking...')
+        setAskResult(null); setAskLoading(true)
         try {
             const data = await seoAPI.ask({ question: askQuery.trim(), brand: brandPayload, url: website })
             if (data.success !== false) setAskResult(data)
             else setError(data.error)
         } catch (e) { setError(e.message) }
-        finally { setLoading(false) }
+        finally { setAskLoading(false) }
     }
 
     // Determine what the content panel should show
     const WORKFLOW_IDS = ['health-check', 'traffic', 'competitors', 'ai-visibility', 'competitor-warroom', 'llm-probe', 'auto-fix', 'prompt-mining']
     const isWorkflow = WORKFLOW_IDS.includes(activeSection)
     const isAdvanced = !isWorkflow
-    const currentItem = SIDEBAR_SECTIONS.flatMap(s => s.items).find(i => i.id === activeSection)
 
     // ── PDF Download ───────────────────────────────────────────────────────
     const downloadSeoPdf = (type, data, brand) => {
@@ -932,9 +915,12 @@ small{color:#94a3b8;font-size:10px}
                                     {sidebarCollapsed && si > 0 && <div className="mx-2 my-1 border-t border-white/[0.04]" />}
                                     {section.items.map(item => {
                                         const isActive = activeSection === item.id
+                                        const itemTask = tasks[item.id]
+                                        const isRunning = itemTask?.status === 'running'
+                                        const isDone = itemTask?.status === 'done'
                                         return (
                                             <button key={item.id}
-                                                onClick={() => { setActiveSection(item.id); setError(''); if (item.type === 'workflow') { setResults(null) } }}
+                                                onClick={() => { setActiveSection(item.id); setError(''); if (item.type === 'workflow') { setSavedResults(null) } }}
                                                 title={sidebarCollapsed ? item.label : undefined}
                                                 className={`w-full flex items-center gap-2.5 px-3 py-2 text-left cursor-pointer transition-all duration-200 group relative ${isActive ? 'text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'}`}
                                                 style={isActive ? { background: `linear-gradient(90deg, ${item.color}12, transparent)` } : {}}>
@@ -946,7 +932,13 @@ small{color:#94a3b8;font-size:10px}
                                                         <p className="text-[9px] text-slate-600 leading-tight truncate">{item.desc}</p>
                                                     </div>
                                                 )}
-                                                {!sidebarCollapsed && item.type === 'workflow' && (
+                                                {!sidebarCollapsed && isRunning && (
+                                                    <span className="material-symbols-outlined text-xs animate-spin shrink-0" style={{ color: item.color }}>sync</span>
+                                                )}
+                                                {!sidebarCollapsed && isDone && !isActive && (
+                                                    <span className="material-symbols-outlined text-xs shrink-0" style={{ color: '#10b981' }}>check_circle</span>
+                                                )}
+                                                {!sidebarCollapsed && !isRunning && !isDone && item.type === 'workflow' && (
                                                     <span className="text-[8px] px-1 py-0.5 rounded bg-white/[0.04] text-slate-600 font-bold shrink-0">AI</span>
                                                 )}
                                             </button>
@@ -1029,7 +1021,7 @@ small{color:#94a3b8;font-size:10px}
                                 <span className="material-symbols-outlined text-violet-400 text-sm">auto_awesome</span>
                                 <input type="text" value={askQuery} onChange={e => setAskQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && runAsk()}
                                     placeholder="Ask anything about SEO..." className="flex-1 text-xs bg-transparent text-white placeholder:text-slate-600 outline-none border-none" />
-                                <button onClick={runAsk} disabled={loading || !askQuery.trim()}
+                                <button onClick={runAsk} disabled={askLoading || !askQuery.trim()}
                                     className="px-3 py-1 rounded-lg text-[10px] font-bold cursor-pointer disabled:opacity-30 transition-all"
                                     style={{ background: askQuery.trim() ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(255,255,255,0.03)', color: askQuery.trim() ? 'white' : '#475569' }}>Ask</button>
                             </div>
