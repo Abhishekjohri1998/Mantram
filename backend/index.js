@@ -45,14 +45,7 @@ import skillsRoutes from './routes/skills.js';
 
 const app = express();
 
-// Immediate health check (bypasses all middleware)
-app.get('/api/health', (req, res) => res.json({ status: 'ok', port: config.port }));
-app.get('/', (req, res) => res.json({ status: 'ok', message: 'Mantram AI API' }));
-
-// Connect Database
-connectDB();
-
-// ── CORS ──────────────────────────────────────────────────────
+// ── FAST START: LISTEN IMMEDIATELY ────────────────────────────
 // These are always allowed regardless of .env FRONTEND_URL value
 const HARDCODED_ORIGINS = [
     'https://mantram.ai',
@@ -61,6 +54,43 @@ const HARDCODED_ORIGINS = [
     'http://localhost:5173',
     'http://localhost:3000',
 ];
+
+// Immediate health check (bypasses all middleware)
+app.get('/api/health', (req, res) => res.json({ status: 'ok', port: config.port }));
+app.get('/', (req, res) => res.json({ status: 'ok', message: 'Mantram AI API' }));
+
+const server = app.listen(config.port, '0.0.0.0', () => {
+    console.log(`\n🚀 Mantram AI Server FAST-START on port ${config.port}`);
+    
+    // Signal PM2 immediately to pass health checks
+    if (process.send) {
+        process.send('ready');
+        console.log('✅ PM2 Ready signal sent (Fast-Start)');
+    }
+    
+    // Start schedulers in the background
+    import('./services/autonomousAgent.js').then(({ runFollowUpCheck }) => {
+        setInterval(() => {
+            runFollowUpCheck().catch(err => console.warn('⚠️ Follow-up check failed:', err.message));
+        }, 4 * 60 * 60 * 1000);
+        console.log('🤖 Autonomous Agent active');
+    }).catch(() => { });
+
+    import('./services/intelligenceAgent.js').then(({ runIntelMissions }) => {
+        setInterval(() => {
+            runIntelMissions().catch(err => console.warn('🕵️ Intel Agent check failed:', err.message));
+        }, 6 * 60 * 60 * 1000);
+        console.log('🕵️ Agent Intelligence active');
+    }).catch(() => { });
+
+    import('./services/scheduledPostPublisher.js').then(({ startScheduledPostPublisher }) => {
+        startScheduledPostPublisher();
+    }).catch(() => { });
+});
+
+// Connect Database
+connectDB();
+
 
 const corsOptions = {
     origin: (origin, callback) => {
@@ -187,39 +217,7 @@ app.use((err, req, res, next) => {
     });
 });
 
-const server = app.listen(config.port, '0.0.0.0', () => {
-    console.log(`\n🚀 Mantram AI Server running on port ${config.port}`);
-    console.log(`📡 AI Provider: ${config.ai.defaultTextProvider} (${config.ai.defaultTextModel})`);
-    console.log(`🌐 Frontend: ${config.frontendUrl}\n`);
-    console.log(`🔐 CORS Hardcoded Origins: ${HARDCODED_ORIGINS.join(', ')}`);
-
-    // Start follow-up scheduler (every 4 hours — Meta Compliance)
-    import('./services/autonomousAgent.js').then(({ runFollowUpCheck }) => {
-        setInterval(() => {
-            runFollowUpCheck().catch(err => console.warn('⚠️ Follow-up check failed:', err.message));
-        }, 4 * 60 * 60 * 1000);
-        console.log('🤖 Autonomous Agent active — Follow-up scheduler running every 4 hours (Compliance Optimized)');
-    }).catch(() => { });
-
-    // Start intelligence agent scheduler (every 6 hours — Meta Compliance)
-    import('./services/intelligenceAgent.js').then(({ runIntelMissions }) => {
-        setInterval(() => {
-            runIntelMissions().catch(err => console.warn('🕵️ Intel Agent check failed:', err.message));
-        }, 6 * 60 * 60 * 1000);
-        console.log('🕵️ Agent Intelligence active — Missions scheduler running every 6 hours (Compliance Optimized)');
-    }).catch(() => { });
-
-    // Start scheduled post publisher
-    import('./services/scheduledPostPublisher.js').then(({ startScheduledPostPublisher }) => {
-        startScheduledPostPublisher();
-    }).catch((err) => { console.warn('📅 Scheduled Post Publisher failed to start:', err.message); });
-
-    // Signal PM2 that we are ready to serve traffic
-    if (process.send) {
-        process.send('ready');
-        console.log('✅ PM2 Ready signal sent');
-    }
-});
+    // Schedulers and Ready signal moved higher
 
 // Configure Keep-Alive timeout larger than AWS ALB / CloudFront idle timeout (60s)
 server.keepAliveTimeout = 65000;
