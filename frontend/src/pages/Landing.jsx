@@ -1141,12 +1141,14 @@ export default function Landing() {
                             </div>
                         </div>
                         <div>
-                            <h4 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Platform</h4>
+                            <h4 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Studios</h4>
                             <ul className="space-y-3">
-                                <li><button onClick={() => scrollTo('studios')} className="text-slate-500 hover:text-primary text-sm transition-colors cursor-pointer">Studios</button></li>
-                                <li><Link to="/onboarding" className="text-slate-500 hover:text-primary text-sm transition-colors">Brand DNA</Link></li>
-                                <li><button onClick={() => scrollTo('early-access')} className="text-slate-500 hover:text-primary text-sm transition-colors cursor-pointer">Skill Hub</button></li>
-                                <li><button onClick={() => scrollTo('early-access')} className="text-slate-500 hover:text-primary text-sm transition-colors cursor-pointer">GEO</button></li>
+                                <li><Link to="/studio/content-studio" className="text-slate-500 hover:text-primary text-sm transition-colors">Content Studio</Link></li>
+                                <li><Link to="/studio/creative-studio" className="text-slate-500 hover:text-primary text-sm transition-colors">Creative Studio</Link></li>
+                                <li><Link to="/studio/video-studio" className="text-slate-500 hover:text-primary text-sm transition-colors">Video Studio</Link></li>
+                                <li><Link to="/studio/performance-studio" className="text-slate-500 hover:text-primary text-sm transition-colors">Performance Studio</Link></li>
+                                <li><Link to="/studio/seo-studio" className="text-slate-500 hover:text-primary text-sm transition-colors">SEO Studio</Link></li>
+                                <li><Link to="/studio/d2c-studio" className="text-slate-500 hover:text-primary text-sm transition-colors">D2C Studio</Link></li>
                             </ul>
                         </div>
                         <div>
