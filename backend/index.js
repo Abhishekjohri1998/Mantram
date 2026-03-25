@@ -46,7 +46,6 @@ import skillsRoutes from './routes/skills.js';
 const app = express();
 
 // ── FAST START: LISTEN IMMEDIATELY ────────────────────────────
-// These are always allowed regardless of .env FRONTEND_URL value
 const HARDCODED_ORIGINS = [
     'https://mantram.ai',
     'https://www.mantram.ai',
@@ -61,13 +60,13 @@ app.get('/', (req, res) => res.json({ status: 'ok', message: 'Mantram AI API' })
 
 const server = app.listen(config.port, '0.0.0.0', () => {
     console.log(`\n🚀 Mantram AI Server FAST-START on port ${config.port}`);
-    
+
     // Signal PM2 immediately to pass health checks
     if (process.send) {
         process.send('ready');
         console.log('✅ PM2 Ready signal sent (Fast-Start)');
     }
-    
+
     // Start schedulers in the background
     import('./services/autonomousAgent.js').then(({ runFollowUpCheck }) => {
         setInterval(() => {
@@ -91,20 +90,15 @@ const server = app.listen(config.port, '0.0.0.0', () => {
 // Connect Database
 connectDB();
 
-
 const corsOptions = {
     origin: (origin, callback) => {
-        // Allow requests with no origin (mobile apps, curl, server-to-server)
         if (!origin) return callback(null, true);
 
         const cleanOrigin = origin.toLowerCase().replace(/\/$/, '');
-
-        // Merge hardcoded + .env configured origins
         const envOrigins = (config.frontendUrl || []).map(u => u.toLowerCase().replace(/\/$/, ''));
         const allowedOrigins = [...new Set([...HARDCODED_ORIGINS.map(u => u.toLowerCase()), ...envOrigins])];
-        
-        // Definitive production allowance for mantram.ai
-        const isAllowed = allowedOrigins.includes(cleanOrigin); 
+
+        const isAllowed = allowedOrigins.includes(cleanOrigin);
         const isMantram = cleanOrigin.endsWith('mantram.ai') || cleanOrigin.includes('mantram.ai');
 
         if (isAllowed || isMantram) {
@@ -112,8 +106,6 @@ const corsOptions = {
         }
 
         console.error(`❌ CORS Rejected: "${origin}" not in allowed list.`);
-        // Return null, false instead of Error to avoid triggering Express error handlers
-        // that might strip headers.
         return callback(null, false);
     },
     credentials: true,
@@ -124,10 +116,10 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// Handle OPTIONS preflight globally for all routes
-app.options('*', cors(corsOptions));
+// Handle OPTIONS preflight globally — use '/(.*) ' NOT '*' (path-to-regexp v8 compatibility)
+app.options('/(.*)', cors(corsOptions));
 
-// Special middleware for Shopify Webhooks to ensure raw body capture for HMAC verification
+// Special middleware for Shopify Webhooks
 app.use('/api/shopify/webhooks', express.raw({ type: '*/*', limit: '50mb' }), (req, res, next) => {
     if (Buffer.isBuffer(req.body)) {
         req.rawBody = req.body;
@@ -143,18 +135,14 @@ app.use('/api/shopify/webhooks', express.raw({ type: '*/*', limit: '50mb' }), (r
     next();
 });
 
-// Regular body parsers - Skip for webhooks to avoid interference
+// Regular body parsers - skip for webhooks
 app.use((req, res, next) => {
-    if (req.originalUrl && req.originalUrl.includes('/api/shopify/webhooks')) {
-        return next();
-    }
+    if (req.originalUrl && req.originalUrl.includes('/api/shopify/webhooks')) return next();
     express.json({ limit: '50mb' })(req, res, next);
 });
 
 app.use((req, res, next) => {
-    if (req.originalUrl && req.originalUrl.includes('/api/shopify/webhooks')) {
-        return next();
-    }
+    if (req.originalUrl && req.originalUrl.includes('/api/shopify/webhooks')) return next();
     express.urlencoded({ extended: true, limit: '50mb' })(req, res, next);
 });
 
@@ -207,8 +195,6 @@ app.use('/api/social', socialRoutes);
 app.use('/api/waitlist', waitlistRoutes);
 app.use('/api/skills', skillsRoutes);
 
-// Health check moved to top
-
 // Error handler
 app.use((err, req, res, next) => {
     console.error('Server Error:', err.stack);
@@ -218,13 +204,9 @@ app.use((err, req, res, next) => {
     });
 });
 
-    // Schedulers and Ready signal moved higher
-
-// Configure Keep-Alive timeout larger than AWS ALB / CloudFront idle timeout (60s)
+// Keep-Alive timeouts
 server.keepAliveTimeout = 65000;
 server.headersTimeout = 66000;
-
-// Timeout set to 1000 minutes to support long-running AI operations
 server.timeout = 60000000;
 
 // ══════════════════════════════════════════════════════════════
@@ -232,13 +214,10 @@ server.timeout = 60000000;
 // ══════════════════════════════════════════════════════════════
 const gracefulShutdown = (signal) => {
     console.log(`\n🛑 ${signal} received. Starting graceful shutdown...`);
-
     server.close(async () => {
         console.log('HTTP server closed.');
         try {
-            if (mongoose.connection) {
-                mongoose.connection.isShuttingDown = true;
-            }
+            if (mongoose.connection) mongoose.connection.isShuttingDown = true;
             await mongoose.connection.close();
             console.log('MongoDB connection closed.');
             process.exit(0);
@@ -247,7 +226,6 @@ const gracefulShutdown = (signal) => {
             process.exit(1);
         }
     });
-
     setTimeout(() => {
         console.error('Could not close connections in time, forcefully shutting down');
         process.exit(1);
