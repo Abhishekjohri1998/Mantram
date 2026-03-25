@@ -3279,7 +3279,7 @@ Respond in JSON:
 // CONTENT FIX — AI-powered inline content fixes for SEO audit issues
 // ============================================================================
 
-router.post('/content-fix', protect, requireStudio('seoStudio'), requireCredits('seoGenerateFix', 1, false), async (req, res) => {
+router.post('/content-fix', protect, requireStudio('seoStudio'), requireCredits('seoGenerateFix'), async (req, res, next) => {
   try {
     const { brandId, issueTitle, issueDescription, pageUrl, fixType, currentContent, targetKeyword } = req.body;
 
@@ -3360,18 +3360,14 @@ QUALITY STANDARDS:
       timeout: remainingBudget
     });
 
-    // Charge credit since generation succeeded
-    if (req.user) {
-      await deductCredits(req.user._id, 'seoGenerateFix', 1, brandId);
-      
-      if (lastTokenUsage) {
-        logTokenUsage(req.user._id, lastTokenUsage, {
-          action: 'seoContentFix',
-          studio: 'seo',
-          route: req.originalUrl,
-          brandId: brand?._id,
-        });
-      }
+    // Log token usage if available
+    if (req.user && typeof lastTokenUsage === 'object' && lastTokenUsage !== null) {
+      logTokenUsage(req.user._id, lastTokenUsage, {
+        action: 'seoContentFix',
+        studio: 'seo',
+        route: req.originalUrl,
+        brandId: brand?._id,
+      });
     }
 
     const content = result?.trim();
@@ -3388,7 +3384,7 @@ QUALITY STANDARDS:
     if (error.name === 'AbortError' || error.message?.includes('aborted')) {
       return res.status(504).json({ success: false, error: 'Content generation timed out. Please try again.' });
     }
-    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    next(error);
   }
 });
 
