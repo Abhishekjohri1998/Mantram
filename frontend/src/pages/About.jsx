@@ -4,7 +4,26 @@ import SEOHead from '../components/SEOHead'
 
 /* ──────────────────────────────────────────────────────── */
 /*  MANTRAM AI — PREMIUM IMMERSIVE ABOUT PAGE              */
+/*  2026 redesign — Material Symbols + gradient glass      */
 /* ──────────────────────────────────────────────────────── */
+
+/* ── Reusable icon component with gradient glass background ── */
+function GlassIcon({ icon, color = '#4d6bff', size = 'md', className = '' }) {
+    const sizes = {
+        sm: { box: 'w-10 h-10', icon: 'text-lg' },
+        md: { box: 'w-12 h-12', icon: 'text-xl' },
+        lg: { box: 'w-16 h-16', icon: 'text-2xl' },
+        xl: { box: 'w-20 h-20', icon: 'text-3xl' },
+    }
+    const s = sizes[size] || sizes.md
+    return (
+        <div className={`${s.box} rounded-2xl flex items-center justify-center relative overflow-hidden ${className}`}
+            style={{ background: `linear-gradient(135deg, ${color}18, ${color}08)`, border: `1px solid ${color}25`, boxShadow: `0 4px 24px ${color}10` }}>
+            <div className="absolute inset-0 rounded-2xl" style={{ background: `radial-gradient(circle at 30% 30%, ${color}12, transparent 70%)` }} />
+            <span className={`material-symbols-outlined ${s.icon} relative z-10`} style={{ color }}>{icon}</span>
+        </div>
+    )
+}
 
 export default function About() {
     const [scrolled, setScrolled] = useState(false)
@@ -59,14 +78,8 @@ export default function About() {
                             "logo": "https://mantram.ai/vite.svg",
                             "description": "Mantram AI is an AI-powered Brand Operating System featuring 8 interconnected AI Studios.",
                             "founders": [
-                                {
-                                    "@type": "Person",
-                                    "name": "Arjun Kumar"
-                                },
-                                {
-                                    "@type": "Person",
-                                    "name": "Abhishek Johri"
-                                }
+                                { "@type": "Person", "name": "Arjun Kumar" },
+                                { "@type": "Person", "name": "Abhishek Johri" }
                             ]
                         },
                         {
@@ -74,12 +87,8 @@ export default function About() {
                             "@id": "https://mantram.ai/about/#webpage",
                             "url": "https://mantram.ai/about",
                             "name": "About Mantram AI — The Operating System for Modern Brands",
-                            "isPartOf": {
-                                "@id": "https://mantram.ai/#website"
-                            },
-                            "about": {
-                                "@id": "https://mantram.ai/#organization"
-                            }
+                            "isPartOf": { "@id": "https://mantram.ai/#website" },
+                            "about": { "@id": "https://mantram.ai/#organization" }
                         }
                     ]
                 }}
@@ -157,13 +166,13 @@ export default function About() {
                         {/* Pain points visual */}
                         <div className="grid grid-cols-2 gap-3">
                             {[
-                                { icon: '🔌', label: 'Disconnected tools', sublabel: '10+ platforms' },
-                                { icon: '🔁', label: 'Repetitive workflows', sublabel: 'Wasted hours' },
-                                { icon: '🎨', label: 'Inconsistent branding', sublabel: 'Off-brand outputs' },
-                                { icon: '🤖', label: 'AI without context', sublabel: 'Generic results' },
+                                { icon: 'cable', label: 'Disconnected tools', sublabel: '10+ platforms', color: '#f43f5e' },
+                                { icon: 'sync_problem', label: 'Repetitive workflows', sublabel: 'Wasted hours', color: '#f59e0b' },
+                                { icon: 'format_paint', label: 'Inconsistent branding', sublabel: 'Off-brand outputs', color: '#8b5cf6' },
+                                { icon: 'psychology_alt', label: 'AI without context', sublabel: 'Generic results', color: '#6366f1' },
                             ].map((p, i) => (
                                 <div key={i} className="p-5 rounded-2xl bg-white/[0.02] border border-white/[0.05] hover:border-[#f43f5e]/20 transition-all duration-500 group" style={{ transitionDelay: `${i * 100}ms` }}>
-                                    <div className="text-2xl mb-3">{p.icon}</div>
+                                    <GlassIcon icon={p.icon} color={p.color} size="md" className="mb-3" />
                                     <div className="text-sm font-semibold text-gray-200">{p.label}</div>
                                     <div className="text-xs text-gray-500 mt-1">{p.sublabel}</div>
                                 </div>
@@ -201,13 +210,13 @@ export default function About() {
                     {/* Three pillars */}
                     <div className={`grid md:grid-cols-3 gap-6 transition-all duration-1000 delay-200 ${isVisible('what') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
                         {[
-                            { icon: '🧬', title: 'No repeated brand inputs', desc: 'Brand DNA captures your identity once — every studio uses it automatically.', color: '#4d6bff' },
-                            { icon: '✦', title: 'No off-brand outputs', desc: 'Every piece of content, design, and ad is aligned to your brand voice and style.', color: '#8b5cf6' },
-                            { icon: '⚡', title: 'No disconnected workflows', desc: 'One system. All studios connected. Insights flow between them.', color: '#10b981' },
+                            { icon: 'genetics', title: 'No repeated brand inputs', desc: 'Brand DNA captures your identity once — every studio uses it automatically.', color: '#4d6bff' },
+                            { icon: 'deployed_code', title: 'No off-brand outputs', desc: 'Every piece of content, design, and ad is aligned to your brand voice and style.', color: '#8b5cf6' },
+                            { icon: 'bolt', title: 'No disconnected workflows', desc: 'One system. All studios connected. Insights flow between them.', color: '#10b981' },
                         ].map((item, i) => (
                             <div key={i} className="relative p-8 rounded-3xl bg-white/[0.02] border border-white/[0.05] overflow-hidden group hover:border-opacity-20 transition-all duration-500" style={{ '--accent': item.color }}>
                                 <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent" style={{ background: `linear-gradient(90deg, transparent, ${item.color}40, transparent)` }} />
-                                <div className="text-3xl mb-4">{item.icon}</div>
+                                <GlassIcon icon={item.icon} color={item.color} size="lg" className="mb-5" />
                                 <h3 className="text-lg font-bold mb-2">{item.title}</h3>
                                 <p className="text-gray-400 text-sm leading-relaxed">{item.desc}</p>
                             </div>
@@ -238,13 +247,13 @@ export default function About() {
                     {/* Audience cards */}
                     <div className={`grid grid-cols-2 md:grid-cols-4 gap-4 transition-all duration-1000 delay-200 ${isVisible('purpose') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
                         {[
-                            { icon: '🚀', label: 'Founders', desc: 'Building with limited resources' },
-                            { icon: '📊', label: 'Marketing Teams', desc: 'Scaling execution' },
-                            { icon: '🏢', label: 'Agencies', desc: 'Managing multiple brands' },
-                            { icon: '🛍️', label: 'D2C Businesses', desc: 'Driving growth' },
+                            { icon: 'rocket_launch', label: 'Founders', desc: 'Building with limited resources', color: '#f59e0b' },
+                            { icon: 'monitoring', label: 'Marketing Teams', desc: 'Scaling execution', color: '#10b981' },
+                            { icon: 'domain', label: 'Agencies', desc: 'Managing multiple brands', color: '#8b5cf6' },
+                            { icon: 'storefront', label: 'D2C Businesses', desc: 'Driving growth', color: '#ec4899' },
                         ].map((a, i) => (
                             <div key={i} className="text-center p-6 rounded-2xl bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.04] transition-all duration-500 group">
-                                <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">{a.icon}</div>
+                                <GlassIcon icon={a.icon} color={a.color} size="md" className="mx-auto mb-4 group-hover:scale-110 transition-transform" />
                                 <div className="font-bold text-sm mb-1">{a.label}</div>
                                 <div className="text-xs text-gray-500">{a.desc}</div>
                             </div>
@@ -264,7 +273,7 @@ export default function About() {
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0c0e1a] to-transparent pointer-events-none" />
                 <div className="max-w-5xl mx-auto relative z-10">
                     <div className={`grid md:grid-cols-2 gap-16 items-center transition-all duration-1000 ${isVisible('cocreation') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-                        {/* Visual */}
+                        {/* Visual — orbital animation */}
                         <div className="relative flex items-center justify-center">
                             <div className="relative w-72 h-72">
                                 {/* Outer ring */}
@@ -273,19 +282,17 @@ export default function About() {
                                 <div className="absolute inset-8 rounded-full border border-[#10b981]/10 abt-spin-slow" style={{ animationDuration: '25s' }} />
                                 {/* Center */}
                                 <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#4d6bff]/15 to-[#8b5cf6]/15 flex items-center justify-center border border-[#4d6bff]/20">
-                                        <span className="text-3xl">🤝</span>
-                                    </div>
+                                    <GlassIcon icon="handshake" color="#6366f1" size="xl" />
                                 </div>
                                 {/* Orbiting dots */}
                                 <div className="absolute top-2 left-1/2 -translate-x-1/2 abt-spin-slow" style={{ transformOrigin: '0 142px' }}>
-                                    <div className="w-8 h-8 rounded-full bg-[#4d6bff]/20 flex items-center justify-center text-sm abt-spin-slow-reverse">🧠</div>
+                                    <GlassIcon icon="neurology" color="#4d6bff" size="sm" className="abt-spin-slow-reverse" />
                                 </div>
                                 <div className="absolute bottom-2 left-1/2 -translate-x-1/2 abt-spin-slow-reverse" style={{ transformOrigin: '0 -130px', animationDelay: '3s' }}>
-                                    <div className="w-8 h-8 rounded-full bg-[#8b5cf6]/20 flex items-center justify-center text-sm abt-spin-slow">⚡</div>
+                                    <GlassIcon icon="electric_bolt" color="#8b5cf6" size="sm" className="abt-spin-slow" />
                                 </div>
                                 <div className="absolute right-0 top-1/2 -translate-y-1/2 abt-spin-slow" style={{ transformOrigin: '-128px 0', animationDelay: '6s' }}>
-                                    <div className="w-8 h-8 rounded-full bg-[#10b981]/20 flex items-center justify-center text-sm abt-spin-slow-reverse">✦</div>
+                                    <GlassIcon icon="auto_awesome" color="#10b981" size="sm" className="abt-spin-slow-reverse" />
                                 </div>
                             </div>
                         </div>
@@ -298,12 +305,12 @@ export default function About() {
                             <p className="text-lg text-gray-400 mb-8">Most platforms treat AI as a feature. Mantram is built on a different foundation: <strong className="text-white">AI is a creative partner — not just a tool.</strong></p>
                             <div className="space-y-4">
                                 {[
-                                    { icon: '🎯', label: 'Human intent and strategy', color: '#4d6bff' },
-                                    { icon: '⚙️', label: 'AI-powered execution', color: '#8b5cf6' },
-                                    { icon: '📈', label: 'Continuous learning and improvement', color: '#10b981' },
+                                    { icon: 'strategy', label: 'Human intent and strategy', color: '#4d6bff' },
+                                    { icon: 'manufacturing', label: 'AI-powered execution', color: '#8b5cf6' },
+                                    { icon: 'trending_up', label: 'Continuous learning and improvement', color: '#10b981' },
                                 ].map((item, i) => (
                                     <div key={i} className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
-                                        <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg" style={{ background: `${item.color}15` }}>{item.icon}</div>
+                                        <GlassIcon icon={item.icon} color={item.color} size="sm" />
                                         <span className="text-gray-200 font-medium">{item.label}</span>
                                     </div>
                                 ))}
@@ -408,16 +415,30 @@ export default function About() {
                                 </p>
 
                                 <div className="flex flex-wrap gap-2 mb-5">
-                                    {['🎨 Human Creativity', '⚙️ AI Intelligence', '📈 Business Impact'].map((tag, i) => (
-                                        <span key={i} className="px-3 py-1.5 rounded-lg bg-[#4d6bff]/8 border border-[#4d6bff]/12 text-xs font-semibold text-[#93a8ff]">{tag}</span>
+                                    {[
+                                        { icon: 'palette', label: 'Human Creativity', color: '#ec4899' },
+                                        { icon: 'smart_toy', label: 'AI Intelligence', color: '#8b5cf6' },
+                                        { icon: 'show_chart', label: 'Business Impact', color: '#10b981' },
+                                    ].map((tag, i) => (
+                                        <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: `${tag.color}12`, border: `1px solid ${tag.color}20`, color: `${tag.color}` }}>
+                                            <span className="material-symbols-outlined text-xs">{tag.icon}</span>
+                                            {tag.label}
+                                        </span>
                                     ))}
                                 </div>
 
                                 <div className="space-y-2 text-sm text-gray-400 mb-5">
-                                    <p>✦ Designed AI-powered marketing and content systems</p>
-                                    <p>✦ Built frameworks for brand consistency at scale</p>
-                                    <p>✦ Trained teams across marketing, strategy, design & leadership</p>
-                                    <p>✦ Consulted organizations on AI adoption and workflow transformation</p>
+                                    {[
+                                        { icon: 'design_services', text: 'Designed AI-powered marketing and content systems' },
+                                        { icon: 'hub', text: 'Built frameworks for brand consistency at scale' },
+                                        { icon: 'groups', text: 'Trained teams across marketing, strategy, design & leadership' },
+                                        { icon: 'school', text: 'Consulted organizations on AI adoption and workflow transformation' },
+                                    ].map((item, i) => (
+                                        <p key={i} className="flex items-start gap-2">
+                                            <span className="material-symbols-outlined text-sm mt-0.5" style={{ color: '#4d6bff' }}>{item.icon}</span>
+                                            {item.text}
+                                        </p>
+                                    ))}
                                 </div>
 
                                 <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] mb-4">
@@ -466,10 +487,17 @@ export default function About() {
                                 </div>
 
                                 <div className="space-y-2 text-sm text-gray-400 mb-5">
-                                    <p>✦ Backend architecture and APIs</p>
-                                    <p>✦ Cloud infrastructure (AWS, GCP)</p>
-                                    <p>✦ AI/ML integrations</p>
-                                    <p>✦ Cross-platform development</p>
+                                    {[
+                                        { icon: 'database', text: 'Backend architecture and APIs' },
+                                        { icon: 'cloud', text: 'Cloud infrastructure (AWS, GCP)' },
+                                        { icon: 'model_training', text: 'AI/ML integrations' },
+                                        { icon: 'devices', text: 'Cross-platform development' },
+                                    ].map((item, i) => (
+                                        <p key={i} className="flex items-start gap-2">
+                                            <span className="material-symbols-outlined text-sm mt-0.5" style={{ color: '#10b981' }}>{item.icon}</span>
+                                            {item.text}
+                                        </p>
+                                    ))}
                                 </div>
 
                                 <div className="p-4 rounded-xl bg-gradient-to-r from-[#10b981]/6 to-[#06b6d4]/6 border border-[#10b981]/10">
@@ -507,13 +535,13 @@ export default function About() {
                     {/* Vision pillars */}
                     <div className={`grid grid-cols-2 md:grid-cols-4 gap-4 mb-16 transition-all duration-1000 delay-200 ${isVisible('future') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
                         {[
-                            { icon: '🧬', label: 'Understands your brand', color: '#4d6bff' },
-                            { icon: '🎨', label: 'Creates with you', color: '#8b5cf6' },
-                            { icon: '📚', label: 'Learns from you', color: '#10b981' },
-                            { icon: '📈', label: 'Scales with you', color: '#ec4899' },
+                            { icon: 'genetics', label: 'Understands your brand', color: '#4d6bff' },
+                            { icon: 'brush', label: 'Creates with you', color: '#8b5cf6' },
+                            { icon: 'model_training', label: 'Learns from you', color: '#10b981' },
+                            { icon: 'stacked_line_chart', label: 'Scales with you', color: '#ec4899' },
                         ].map((v, i) => (
                             <div key={i} className="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.05] group hover:scale-105 transition-all duration-500" style={{ transitionDelay: `${i * 100}ms` }}>
-                                <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">{v.icon}</div>
+                                <GlassIcon icon={v.icon} color={v.color} size="md" className="mx-auto mb-4 group-hover:scale-110 transition-transform" />
                                 <p className="text-sm font-semibold" style={{ color: v.color }}>{v.label}</p>
                             </div>
                         ))}
@@ -538,11 +566,11 @@ export default function About() {
 
                                 <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
                                     <Link to="/auth" className="inline-flex items-center gap-2 px-8 py-4 text-sm font-bold rounded-full bg-gradient-to-r from-[#2b4bee] to-[#4d6bff] hover:shadow-xl hover:shadow-[#2b4bee]/30 transition-all hover:-translate-y-1">
-                                        <span className="material-symbols-rounded text-lg">rocket_launch</span>
+                                        <span className="material-symbols-outlined text-lg">rocket_launch</span>
                                         Start Building
                                     </Link>
                                     <Link to="/" className="inline-flex items-center gap-2 px-8 py-4 text-sm font-bold rounded-full bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] transition-all hover:-translate-y-1">
-                                        <span className="material-symbols-rounded text-lg">play_circle</span>
+                                        <span className="material-symbols-outlined text-lg">play_circle</span>
                                         Explore Studios
                                     </Link>
                                 </div>
