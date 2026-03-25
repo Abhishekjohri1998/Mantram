@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
+import GlobalLoader from '../components/GlobalLoader'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
 import SmartCommandBox from '../components/SmartCommandBox'
 import { stripMarkdown } from '../utils/stripMarkdown'
@@ -551,9 +552,15 @@ export default function BrainstormStudio() {
                     </div>
 
                     {loading && (
-                        <div className="text-center mt-8">
-                            <span className="material-symbols-outlined text-3xl text-primary animate-spin block mb-2">progress_activity</span>
-                            <p className="text-sm text-slate-400">{loadingMsg}</p>
+                        <div className="mt-8">
+                            <GlobalLoader
+                                isActive={true}
+                                title={loadingMsg || 'Preparing your brainstorm...'}
+                                icon="psychology"
+                                estimatedDuration={20}
+                                stages={['Analyzing Brief', 'Generating Questions']}
+                                currentStage="Analyzing Brief"
+                            />
                         </div>
                     )}
 
@@ -689,10 +696,15 @@ export default function BrainstormStudio() {
             {step === 2 && (
                 <div className="max-w-2xl mx-auto animate-fade-in">
                     {loading ? (
-                        <div className="text-center py-20">
-                            <span className="material-symbols-outlined text-5xl text-primary animate-spin block mb-4">psychology</span>
-                            <h3 className="text-lg font-bold text-white mb-2">Understanding your brief...</h3>
-                            <p className="text-sm text-slate-400">The strategy team is analyzing your inputs</p>
+                        <div className="py-10">
+                            <GlobalLoader
+                                isActive={true}
+                                title="Understanding your brief..."
+                                icon="psychology"
+                                estimatedDuration={25}
+                                stages={['Analyzing Inputs', 'Building Understanding']}
+                                currentStage="Analyzing Inputs"
+                            />
                         </div>
                     ) : confirmation && (
                         <div>
@@ -748,27 +760,15 @@ export default function BrainstormStudio() {
             {step === 3 && (
                 <div className="animate-fade-in">
                     {loading ? (
-                        <div className="text-center py-20">
-                            <div className="relative inline-block mb-6">
-                                <span className="material-symbols-outlined text-6xl text-primary animate-spin block">neurology</span>
-                                <span className="absolute -bottom-1 -right-1 material-symbols-outlined text-2xl text-amber-400 animate-pulse">stars</span>
-                            </div>
-                            <h3 className="text-lg font-bold text-white mb-2">{loadingMsg}</h3>
-                            <p className="text-sm text-slate-500 max-w-md mx-auto mt-2">
-                                5 specialist agents are working together: Strategist, Creative Director, Naming Expert, Execution Planner, and Performance Analyst
-                            </p>
-                            <div className="flex items-center justify-center gap-3 mt-6">
-                                {['Strategist', 'Creative', 'Naming', 'Execution', 'Scoring'].map((agent, i) => (
-                                    <div key={agent} className="flex flex-col items-center gap-1 animate-fade-in" style={{ animationDelay: `${i * 400}ms` }}>
-                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                            <span className="material-symbols-outlined text-primary text-sm">
-                                                {['psychology', 'palette', 'abc', 'assignment', 'assessment'][i]}
-                                            </span>
-                                        </div>
-                                        <span className="text-sm text-slate-500">{agent}</span>
-                                    </div>
-                                ))}
-                            </div>
+                        <div className="py-10">
+                            <GlobalLoader
+                                isActive={true}
+                                title={loadingMsg || 'Generating multi-layer strategy...'}
+                                icon="neurology"
+                                estimatedDuration={45}
+                                stages={['Strategist', 'Creative Director', 'Naming Expert', 'Execution Planner', 'Scoring']}
+                                currentStage="Creative Director"
+                            />
                         </div>
                     ) : ideas && (
                         <div>

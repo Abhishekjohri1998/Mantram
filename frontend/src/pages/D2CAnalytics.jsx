@@ -2,9 +2,11 @@ import { useState, useEffect, useCallback } from 'react'
 import SEOHead from '../components/SEOHead'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
+import GlobalLoader from '../components/GlobalLoader'
 import { useBrand } from '../context/BrandContext'
 import { shopifyAnalytics } from '../services/api'
 import StudioReportButton from '../components/reports/StudioReportButton'
+
 
 export default function D2CAnalytics() {
     const { activeBrand } = useBrand()
@@ -129,8 +131,15 @@ export default function D2CAnalytics() {
     const healthColors = { hot: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', label: '🟢 Hot' }, warm: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', label: '🟡 Warm' }, cold: { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/20', label: '🔴 Cold' } }
 
     return (
-        <DashboardLayout title="D2C Studio" subtitle="Shopify Intelligence Hub">
-            <SEOHead title="D2C Analytics — Mantram AI" noIndex={true} />
+        <DashboardLayout 
+            title={<h1 className="text-2xl font-black m-0">D2C Studio</h1>} 
+            subtitle="Shopify Intelligence Hub"
+        >
+            <SEOHead 
+                title="D2C Studio — Advanced Shopify Analytics & AI Insights | Mantram AI" 
+                description="Connect your Shopify store to Mantram AI's D2C Studio. Get predictive inventory alerts, AI-driven product velocity tracking, cohort LTV analysis, and actionable growth plans." 
+                canonical="/d2c-analytics"
+            />
             <style>{`
                 @keyframes radar-sweep { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
                 @keyframes blip-ping { 0%,100% { opacity:0.4; transform: scale(0.8) } 50% { opacity:1; transform: scale(1.3) } }
@@ -170,9 +179,15 @@ export default function D2CAnalytics() {
                     <D2CHelpView onBack={() => setActiveTab('overview')} />
                 </div>
             ) : loading ? (
-                <div className="flex items-center justify-center py-24 text-slate-400">
-                    <span className="material-symbols-outlined animate-spin mr-3 text-3xl">progress_activity</span>
-                    <span className="text-lg">Loading D2C Studio...</span>
+                <div className="py-16">
+                    <GlobalLoader
+                        isActive={true}
+                        title="Loading D2C Analytics..."
+                        icon="storefront"
+                        estimatedDuration={15}
+                        stages={['Syncing Shopify', 'Processing Metrics']}
+                        currentStage="Syncing Shopify"
+                    />
                 </div>
             ) : !data?.connected ? (
                 /* Not Connected State */
@@ -1185,6 +1200,7 @@ export default function D2CAnalytics() {
                     </div>
                 </>
             )}
+
         </DashboardLayout>
     )
 }

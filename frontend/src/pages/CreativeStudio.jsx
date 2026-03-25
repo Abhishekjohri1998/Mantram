@@ -7,8 +7,10 @@ import { creatives as creativesAPI, agents as agentsAPI, products as productsAPI
 import { useBrand } from '../context/BrandContext'
 import VoiceInput from '../components/VoiceInput'
 import PublishModal from '../components/PublishModal'
+import GlobalLoader from '../components/GlobalLoader'
 
 // ── Helper: Time Ago ──
+
 function getTimeAgo(dateStr) {
     if (!dateStr) return '';
     const diff = Date.now() - new Date(dateStr).getTime();
@@ -1583,8 +1585,15 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
 
     return (
-        <DashboardLayout title="Creative Studio" subtitle="AI-powered image generation & design">
-            <SEOHead title="Creative Studio — Mantram AI" noIndex={true} />
+        <DashboardLayout 
+            title={<h1 className="text-2xl font-black m-0">Creative Studio</h1>} 
+            subtitle="AI-powered image generation & design"
+        >
+            <SEOHead 
+                title="Creative Studio — Mantram AI Design & Photoshoots" 
+                description="Use Mantram AI Creative Studio to generate stunning, brand-aligned ad creatives, social media graphics, and AI product photoshoots without a graphic designer." 
+                canonical="/creative-studio"
+            />
 
             {/* ══ Unified Studio Navigation ══ */}
             <div className="flex items-center gap-1.5 p-1 rounded-2xl glass-panel mb-6 fade-up overflow-x-auto scrollbar-hide whitespace-nowrap">
@@ -2250,26 +2259,12 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         )}
 
                         {/* ── Generating Indicator ── */}
-                        {generating && (
-                            <div className="generation-card mb-5 animate-pulse">
-                                <div className="flex items-center gap-3 mb-3">
-                                    <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center">
-                                        <span className="material-symbols-outlined text-primary animate-spin text-lg">progress_activity</span>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-bold text-white">Creating your visual...</p>
-                                        <p className="text-[11px] text-slate-500">{prompt.substring(0, 50)}{prompt.length > 50 ? '...' : ''}</p>
-                                    </div>
-                                </div>
-                                <div className="w-full rounded-xl bg-white/[0.02] border border-white/[0.04]" style={{ aspectRatio: aspectRatio?.replace(':', '/') || '1/1', maxHeight: '300px' }}>
-                                    <div className="flex items-center justify-center h-full">
-                                        <div className="w-16 h-1 rounded-full bg-white/[0.06] overflow-hidden">
-                                            <div className="h-full rounded-full bg-primary animate-[shimmer_1.5s_infinite]" style={{ width: '60%' }} />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                        <GlobalLoader 
+                            isActive={generating} 
+                            title="Creating your visual..." 
+                            currentStage={`${prompt.substring(0, 50)}${prompt.length > 50 ? '...' : ''}`}
+                            icon="photo_camera"
+                        />
 
                         {/* ── Generation History (from Image Bank) ── */}
                         {(() => {
@@ -3075,24 +3070,12 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
                             )}
 
-                            {photoshootGenerating && (
-                                <div className="text-center animate-fade-in">
-                                    <div className="relative inline-block mb-4">
-                                        <span className="material-symbols-outlined text-5xl text-primary animate-pulse">photo_camera</span>
-                                        <span className="absolute -top-1 -right-1 flex h-4 w-4">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-4 w-4 bg-primary"></span>
-                                        </span>
-                                    </div>
-                                    <h3 className="text-lg font-bold text-white mb-2">Creating Your Photoshoot</h3>
-                                    <p className="text-sm text-slate-400">Gemini AI is styling your product with professional lighting and composition...</p>
-                                    <div className="mt-4 flex justify-center gap-1">
-                                        {[0, 1, 2, 3, 4].map(i => (
-                                            <span key={i} className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
+                            <GlobalLoader 
+                                isActive={photoshootGenerating} 
+                                title="Creating Your Photoshoot" 
+                                currentStage="Gemini AI is styling your product with professional lighting and composition..."
+                                icon="photo_camera"
+                            />
 
                             {photoshootResult && (
                                 <div className="w-full animate-fade-in">
@@ -5500,20 +5483,12 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                 )}
 
                                 {/* Result Display */}
-                                {templateGenerating && (
-                                    <div className="studio-card p-12 flex flex-col items-center justify-center min-h-[400px]">
-                                        <div className="relative inline-block mb-4">
-                                            <span className="material-symbols-outlined text-5xl text-primary animate-pulse">{activeTemplate.icon}</span>
-                                        </div>
-                                        <h3 className="text-lg font-bold text-white mb-2">Creating Your {activeTemplate.label}</h3>
-                                        <p className="text-sm text-slate-400 mb-4">AI is designing with {activeBrand.name}'s brand identity...</p>
-                                        <div className="flex gap-1">
-                                            {[0, 1, 2, 3, 4].map(i => (
-                                                <span key={i} className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
+                                <GlobalLoader 
+                                    isActive={templateGenerating} 
+                                    title={`Creating Your ${activeTemplate.label}`}
+                                    currentStage={`AI is designing with ${activeBrand.name}'s brand identity...`}
+                                    icon={activeTemplate.icon}
+                                />
 
                                 {!templateGenerating && !templateResult && (
                                     <div className="studio-card p-12 flex flex-col items-center justify-center min-h-[400px]">

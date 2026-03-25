@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import SEOHead from '../components/SEOHead'
 import { useNavigate, useLocation } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
+import GlobalLoader from '../components/GlobalLoader'
 import { useBrand } from '../context/BrandContext'
 import { conversations as conversationsAPI } from '../services/api'
 
@@ -287,8 +288,15 @@ export default function ConversationStudio() {
                             <p className="text-slate-500 text-sm max-w-sm">Pick a thread from the left to view messages, get AI suggestions, and reply in your brand voice.</p>
                         </div>
                     ) : detailLoading ? (
-                        <div className="flex-1 flex items-center justify-center">
-                            <span className="material-symbols-outlined text-primary text-4xl animate-spin">progress_activity</span>
+                        <div className="flex-1 flex items-center justify-center p-8">
+                            <GlobalLoader
+                                isActive={true}
+                                title="Loading conversation..."
+                                icon="forum"
+                                estimatedDuration={10}
+                                stages={['Fetching Messages', 'AI Suggestions']}
+                                currentStage="Fetching Messages"
+                            />
                         </div>
                     ) : (
                         <>

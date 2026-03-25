@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import SEOHead from '../components/SEOHead'
+import LandingSEOBlock from '../components/seo/LandingSEOBlock'
 
 /* ────────────────────────────────────────────── */
 /*  MANTRAM AI — PREMIUM LANDING PAGE            */
@@ -1102,6 +1103,11 @@ export default function Landing() {
                     </div>
                 </section>
             </main>
+
+            {/* ═══════════════════════════════════════════════════════ */}
+            {/*  SEO CONTENT — STUDIO DEEP DIVES & FAQS               */}
+            {/* ═══════════════════════════════════════════════════════ */}
+            <LandingSEOBlock />
 
             {/* ═══════════════════════════════════════════════════════ */}
             {/*  FOOTER                                                */}

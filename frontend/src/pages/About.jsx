@@ -48,6 +48,41 @@ export default function About() {
                 canonical="/about"
                 ogTitle="About Mantram AI"
                 ogDescription="The Operating System for Modern Brands — where human creativity meets intelligent systems."
+                jsonLd={{
+                    "@context": "https://schema.org",
+                    "@graph": [
+                        {
+                            "@type": "Organization",
+                            "@id": "https://mantram.ai/#organization",
+                            "name": "Mantram AI",
+                            "url": "https://mantram.ai",
+                            "logo": "https://mantram.ai/vite.svg",
+                            "description": "Mantram AI is an AI-powered Brand Operating System featuring 8 interconnected AI Studios.",
+                            "founders": [
+                                {
+                                    "@type": "Person",
+                                    "name": "Arjun Kumar"
+                                },
+                                {
+                                    "@type": "Person",
+                                    "name": "Abhishek Johri"
+                                }
+                            ]
+                        },
+                        {
+                            "@type": "AboutPage",
+                            "@id": "https://mantram.ai/about/#webpage",
+                            "url": "https://mantram.ai/about",
+                            "name": "About Mantram AI — The Operating System for Modern Brands",
+                            "isPartOf": {
+                                "@id": "https://mantram.ai/#website"
+                            },
+                            "about": {
+                                "@id": "https://mantram.ai/#organization"
+                            }
+                        }
+                    ]
+                }}
             />
 
             {/* ── Ambient Background ── */}

@@ -2838,12 +2838,26 @@ router.get('/reports/:type', protect, async (req, res, next) => {
 
     if (!audit) return res.json({ success: true, found: false });
 
+    // Backward compatibility for ai-visibility reports saved before score mappings
+    if (type === 'ai-visibility' && audit.results?.breakdown && audit.results.schemaScore === undefined) {
+      audit.results.schemaScore = audit.results.breakdown?.schemaReadiness?.score || 50;
+      audit.results.contentScore = audit.results.breakdown?.entityCoverage?.score || 50;
+      audit.results.authorityScore = audit.results.breakdown?.trustSignals?.score || 50;
+      audit.results.technicalScore = audit.results.breakdown?.snippetStructure?.score || 50;
+    }
+
+    // Merge missing DB scores from the detailed results if DB defaults to 0
+    const finalScores = audit.scores || {};
+    if (finalScores.contentScore === 0) finalScores.contentScore = audit.results?.contentScore || finalScores.contentScore;
+    if (finalScores.authorityScore === 0) finalScores.authorityScore = audit.results?.authorityScore || finalScores.authorityScore;
+    if (finalScores.technicalScore === 0) finalScores.technicalScore = audit.results?.technicalScore || finalScores.technicalScore;
+
     res.json({
       success: true,
       found: true,
       report: audit.results,
       generatedAt: audit.updatedAt || audit.createdAt,
-      scores: audit.scores,
+      scores: finalScores,
     });
   } catch (error) {
     console.error(`❌ [SEO API] Error fetching report:`, error);

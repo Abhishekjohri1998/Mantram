@@ -8,6 +8,8 @@ import { seoStudio as seoAPI, googleAnalytics as gaAPI } from '../services/api'
 import StudioReportButton from '../components/reports/StudioReportButton'
 import SeoAdvancedTools from '../components/seo/SeoAdvancedTools'
 
+import GlobalLoader from '../components/GlobalLoader'
+
 // ── Sidebar Navigation ────────────────────────────────────────────────────
 const SIDEBAR_SECTIONS = [
     { title: 'Quick Actions', items: [
@@ -879,8 +881,15 @@ small{color:#94a3b8;font-size:10px}
 
     // ── RENDER ────────────────────────────────────────────────────────────
     return (
-        <DashboardLayout title="SEO Studio" subtitle="AI-Powered SEO Intelligence">
-            <SEOHead title="SEO Studio — Mantram AI" noIndex={true} />
+        <DashboardLayout 
+            title={<h1 className="text-2xl font-black m-0">SEO Studio</h1>} 
+            subtitle="AI-Powered SEO Intelligence"
+        >
+            <SEOHead 
+                title="SEO Studio — AI SEO Audits & Keyword Intelligence | Mantram AI" 
+                description="Use Mantram AI SEO Studio to run technical SEO audits, perform AI-powered keyword clustering, and optimize your website for Google SGE and AI search visibility." 
+                canonical="/seo-studio"
+            />
 
             {!activeBrand ? (
                 <div className="max-w-7xl mx-auto">
@@ -1052,23 +1061,21 @@ small{color:#94a3b8;font-size:10px}
 
                         {/* ─── Loading State ─── */}
                         {loading && isWorkflow && (
-                            <div className="flex flex-col items-center justify-center py-24 animate-fade-in">
-                                <div className="w-20 h-20 rounded-full border-4 border-white/5 flex items-center justify-center mb-6">
-                                    <span className="material-symbols-outlined text-primary text-3xl animate-spin">progress_activity</span>
+                            <div className="relative pb-16">
+                                <GlobalLoader 
+                                    isActive={loading && isWorkflow}
+                                    title={`Running ${currentItem?.label || 'Analysis'}...`}
+                                    currentStage={loadingStage}
+                                    stages={STAGE_MESSAGES[activeSection] || []}
+                                    elapsed={loadingElapsed}
+                                    icon="troubleshoot"
+                                />
+                                <div className="absolute bottom-6 left-0 right-0 flex justify-center">
+                                    <button onClick={cancelWorkflow}
+                                        className="px-4 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-white bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] cursor-pointer transition-all flex items-center gap-1.5 z-10">
+                                        <span className="material-symbols-outlined text-xs">close</span> Cancel
+                                    </button>
                                 </div>
-                                <h3 className="text-base font-bold text-white mb-2">Running {currentItem?.label}...</h3>
-                                <p className="text-sm text-primary animate-pulse">{loadingStage}</p>
-                                <div className="flex gap-1.5 mt-5">{STAGE_MESSAGES[activeSection]?.map((_, i) => (
-                                    <div key={i} className={`w-1.5 h-1.5 rounded-full transition-all ${STAGE_MESSAGES[activeSection]?.indexOf(loadingStage) >= i ? 'bg-primary' : 'bg-white/10'}`} />
-                                ))}</div>
-                                <p className="text-[10px] text-slate-600 mt-4">
-                                    {loadingElapsed > 0 && `${Math.floor(loadingElapsed / 60)}:${String(loadingElapsed % 60).padStart(2, '0')} elapsed`}
-                                    {loadingElapsed > 15 && ' — full-site crawl (800+ pages) takes 3-5 minutes'}
-                                </p>
-                                <button onClick={cancelWorkflow}
-                                    className="mt-4 px-4 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-white bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] cursor-pointer transition-all flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined text-xs">close</span> Cancel
-                                </button>
                             </div>
                         )}
 
@@ -1228,6 +1235,8 @@ small{color:#94a3b8;font-size:10px}
                     </div>
                 </div>
             )}
+
+
         </DashboardLayout>
     )
 }
@@ -1668,7 +1677,7 @@ function HealthCheckResults({ results }) {
                 </div>
             </div>
             <div className="space-y-3">
-                {filtered.map((issue, i) => <IssueCard key={i} issue={issue} />)}
+                {filtered.map((issue, i) => <IssueCard key={i} issue={issue} url={results.targetUrl || results.domain} brandId={results.brand || results.brandId} />)}
             </div>
         </div>
     </>)
@@ -1830,12 +1839,15 @@ function AIVisibilityResults({ results }) {
     ]
     return (<>
         <div className="glass-panel rounded-2xl p-6 mb-6">
-            <div className="flex items-center gap-6">
-            <ScoreRing score={results.aiVisibilityScore || 0} size={100} label="AI Visibility" color="violet" />
-                <div className="flex-1">
-                    <p className="text-sm text-slate-300 leading-relaxed">{results.summary}</p>
-                    {results.scoreBreakdown && <p className="text-[10px] text-slate-600 mt-2">Score: {results.scoreBreakdown.formula} — On-page: {results.scoreBreakdown.onPageAnalysis}, Probe: {results.scoreBreakdown.realProbeScore}{results.scoreBreakdown.margin > 0 ? ` ±${results.scoreBreakdown.margin}` : ''} <span className={`ml-2 px-1.5 py-0.5 rounded-full ${results.scoreBreakdown.confidence === 'high' ? 'bg-emerald-500/15 text-emerald-400' : results.scoreBreakdown.confidence === 'medium' ? 'bg-amber-500/15 text-amber-400' : 'bg-red-500/15 text-red-400'}`}>{results.scoreBreakdown.confidence || 'unknown'} confidence</span></p>}
-                </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 items-center border-b border-white/[0.04] pb-6 mb-6">
+                <ScoreRing score={results.aiVisibilityScore || 0} size={100} label="AI Visibility" color="violet" />
+                <ScoreRing score={results.schemaScore || 50} size={100} label="Schema & Data" color="emerald" />
+                <ScoreRing score={results.contentScore || 50} size={100} label="Content" color="amber" />
+                <ScoreRing score={results.authorityScore || 50} size={100} label="Authority" color="blue" />
+            </div>
+            <div className="flex-1">
+                <p className="text-sm text-slate-300 leading-relaxed">{results.summary}</p>
+                {results.scoreBreakdown && <p className="text-[10px] text-slate-600 mt-2">Score: {results.scoreBreakdown.formula} — On-page: {results.scoreBreakdown.onPageAnalysis}, Probe: {results.scoreBreakdown.realProbeScore}{results.scoreBreakdown.margin > 0 ? ` ±${results.scoreBreakdown.margin}` : ''} <span className={`ml-2 px-1.5 py-0.5 rounded-full ${results.scoreBreakdown.confidence === 'high' ? 'bg-emerald-500/15 text-emerald-400' : results.scoreBreakdown.confidence === 'medium' ? 'bg-amber-500/15 text-amber-400' : 'bg-red-500/15 text-red-400'}`}>{results.scoreBreakdown.confidence || 'unknown'} confidence</span></p>}
             </div>
         </div>
 
@@ -2036,8 +2048,33 @@ function AIVisibilityResults({ results }) {
                 <div key={s.key} className="glass-panel rounded-2xl p-5">
                     <h4 className="text-sm font-bold text-white mb-2">{s.icon} {s.label} — <span className="text-primary">{bd[s.key].score}/100</span></h4>
                     <p className="text-[11px] text-slate-400 mb-3">{bd[s.key].currentState}</p>
-                    {bd[s.key].recommendations && <div className="space-y-2">{(Array.isArray(bd[s.key].recommendations) ? bd[s.key].recommendations : []).map((r, i) => (
-                        <div key={i} className="text-[11px] text-slate-300 flex items-start gap-2"><span className="text-emerald-400">✓</span>{typeof r === 'string' ? r : r.title || r.description}</div>
+                    {bd[s.key].recommendations && <div className="space-y-4">{(Array.isArray(bd[s.key].recommendations) ? bd[s.key].recommendations : []).map((r, i) => (
+                        <div key={i} className="text-[11px] text-slate-300 bg-white/[0.02] border border-white/[0.04] p-3 rounded-xl overflow-hidden">
+                            <div className="flex items-start gap-2 mb-2">
+                                <span className="text-emerald-400 mt-0.5">✓</span>
+                                <div className="flex-1">
+                                    {typeof r === 'string' ? <p>{r}</p> : (
+                                        <>
+                                            <p className="font-bold text-white text-sm mb-1">{r.title || r.description}</p>
+                                            {r.aiImpact && <p className="text-violet-400 text-[10px] mb-2">{r.aiImpact}</p>}
+                                            {r.codeSnippet && (
+                                                <div className="relative group mt-3">
+                                                    <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Generated Fix Code</p>
+                                                    <pre className="p-3 rounded-lg bg-[#080a14] border border-white/[0.06] overflow-x-auto text-[10px] text-slate-300 font-mono">
+                                                        <code>{r.codeSnippet}</code>
+                                                    </pre>
+                                                    <button onClick={() => navigator.clipboard.writeText(r.codeSnippet)}
+                                                        className="absolute top-6 right-2 p-1.5 rounded bg-white/10 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/20"
+                                                        title="Copy Code">
+                                                        <span className="material-symbols-outlined text-[14px]">content_copy</span>
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                     ))}</div>}
                     {bd[s.key].suggestions && <div className="space-y-2 mt-2">{bd[s.key].suggestions.map((sg, i) => (
                         <div key={i} className="text-[11px] text-slate-300 flex items-start gap-2"><span className="text-primary">▸</span>{typeof sg === 'string' ? sg : sg.question}</div>
@@ -2094,11 +2131,41 @@ function ActionBucket({ title, items, color }) {
     )
 }
 
-function IssueCard({ issue }) {
+function IssueCard({ issue, brandId, url }) {
     const [expanded, setExpanded] = useState(false)
+    const [fixing, setFixing] = useState(false)
+    const [fixData, setFixData] = useState(null)
+
+    const handleAutoFix = async (e) => {
+        e.stopPropagation()
+        if (fixing || fixData) return
+
+        setFixing(true)
+        try {
+            // we wrap the issue in an array since the backend expects 'issues'
+            const result = await seoAPI.autoFix({ 
+                brandId, 
+                url, 
+                issues: [{ title: issue.title, severity: issue.severity, description: issue.description, fix: issue.fix }] 
+            })
+            if (result.fixes && result.fixes.length > 0) {
+                setFixData(result.fixes[0])
+            } else if (result.schemaFixes && result.schemaFixes.length > 0) {
+                setFixData(result.schemaFixes[0])
+            } else {
+                setFixData({ code: '/* No specific code fix generated. Follow manual instructions. */', language: 'text', instructions: 'Review the issue details manually.' })
+            }
+        } catch (err) {
+            console.error(err)
+            setFixData({ code: '/* Error generating fix. Please try again or check your credit balance. */', language: 'text' })
+        }
+        setFixing(false)
+        if (!expanded) setExpanded(true)
+    }
+
     return (
-        <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] cursor-pointer hover:bg-white/[0.04] transition-all" onClick={() => setExpanded(!expanded)}>
-            <div className="flex items-center gap-3">
+        <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] transition-all">
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => setExpanded(!expanded)}>
                 <SeverityBadge severity={issue.severity} />
                 <span className={`text-xs px-1.5 py-0.5 rounded-full bg-white/5 text-slate-500`}>{issue.category}</span>
                 <p className="text-sm text-white font-medium flex-1">{issue.title}</p>
@@ -2135,6 +2202,41 @@ function IssueCard({ issue }) {
                             </div>
                         </div>
                     )}
+
+                    {/* ── Auto-Fix Engine UI ── */}
+                    <div className="mt-4 pt-3 border-t border-white/[0.04]">
+                        {!fixData && !fixing ? (
+                            <button onClick={handleAutoFix}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-primary/20 to-violet-500/20 border border-primary/30 text-primary text-[11px] font-bold hover:from-primary/30 transition-all cursor-pointer">
+                                <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
+                                Auto-Fix Issue with AI
+                            </button>
+                        ) : fixing ? (
+                            <div className="flex items-center gap-2 text-[11px] text-primary">
+                                <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
+                                Writing code fix...
+                            </div>
+                        ) : fixData && (
+                            <div className="space-y-2 animate-fade-in">
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[14px] text-emerald-400">check_circle</span>
+                                    <span className="text-[11px] font-bold text-emerald-400">Code Fix Generated</span>
+                                </div>
+                                {fixData.instructions && <p className="text-[10px] text-slate-400 mb-2">{fixData.instructions}</p>}
+                                {fixData.whereToAdd && <p className="text-[10px] text-slate-400 mb-2"><strong>Location:</strong> {fixData.whereToAdd}</p>}
+                                <div className="relative group">
+                                    <pre className="p-3 rounded-lg bg-[#080a14] border border-white/[0.06] overflow-x-auto text-[10px] text-slate-300 font-mono">
+                                        <code>{fixData.code}</code>
+                                    </pre>
+                                    <button onClick={() => navigator.clipboard.writeText(fixData.code)}
+                                        className="absolute top-2 right-2 p-1.5 rounded bg-white/10 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/20"
+                                        title="Copy Code">
+                                        <span className="material-symbols-outlined text-[14px]">content_copy</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>

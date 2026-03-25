@@ -5,7 +5,9 @@ import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import DashboardLayout from '../components/DashboardLayout'
 import StudioReportButton from '../components/reports/StudioReportButton'
+import GlobalLoader from '../components/GlobalLoader'
 import { apiFetch as api, googleAnalytics } from '../services/api'
+
 
 // ── Tab config ──
 const TABS = [
@@ -361,8 +363,15 @@ export default function PerformanceMarketing() {
     }
 
     return (
-        <DashboardLayout title="Performance Studio" subtitle="AI-powered ad research, strategy & management">
-            <SEOHead title="Performance Studio — Mantram AI" noIndex={true} />
+        <DashboardLayout 
+            title={<h1 className="text-2xl font-black m-0">Performance Studio</h1>} 
+            subtitle="AI-powered ad research, strategy & management"
+        >
+            <SEOHead 
+                title="Performance Studio — AI Ad Management for Google Ads & Meta" 
+                description="Use Mantram AI Performance Studio to completely automate media buying. Conduct AI competitor research, generate cross-platform ad strategies, and manage Google Ads and Meta Ads campaigns." 
+                canonical="/performance-marketing"
+            />
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* ── Error display ── */}
                 {error && (
@@ -797,6 +806,16 @@ export default function PerformanceMarketing() {
                 {/* ════════════════════════════════════════════════════════════ */}
                 {tab === 'research' && (
                     <div className="space-y-6">
+                        {loading && (
+                            <GlobalLoader
+                                isActive={true}
+                                title="Analyzing Competitors with AI..."
+                                icon="search_insights"
+                                estimatedDuration={45}
+                                stages={['Gathering Intel', 'Analyzing Ads', 'Building Report']}
+                                currentStage={loading ? 'Analyzing Ads' : ''}
+                            />
+                        )}
 
                         {/* ── 🔍 GROK TRENDING SEO KEYWORDS ── */}
                         {grokSeoKeywords?.risingKeywords?.length > 0 && (
@@ -997,6 +1016,16 @@ export default function PerformanceMarketing() {
                 {/* ════════════════════════════════════════════════════════════ */}
                 {tab === 'strategy' && (
                     <div className="space-y-6">
+                        {loading && (
+                            <GlobalLoader
+                                isActive={true}
+                                title="Building Expert Ad Strategy..."
+                                icon="strategy"
+                                estimatedDuration={60}
+                                stages={['Research Review', 'Channel Allocation', 'Budget Optimization', 'Report Generation']}
+                                currentStage={loading ? 'Channel Allocation' : ''}
+                            />
+                        )}
                         {/* Strategy Health Banner */}
                         {strategyHealth && strategyHealth.health !== null && (
                             <div className={`glass-panel rounded-2xl p-5 border ${
@@ -2247,6 +2276,7 @@ export default function PerformanceMarketing() {
                     </div>
                 )}
             </div>
+
         </DashboardLayout>
     )
 }

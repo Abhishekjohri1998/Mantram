@@ -5,6 +5,7 @@ import { content as contentAPI, agents as agentsAPI, creatives as creativesAPI, 
 import { useBrand } from '../context/BrandContext'
 import { stripMarkdown } from '../utils/stripMarkdown'
 import VoiceInput from '../components/VoiceInput'
+import GlobalLoader from '../components/GlobalLoader'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
 import PublishModal from '../components/PublishModal'
 
@@ -567,13 +568,12 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                             )}
 
                             {/* Analyzing spinner */}
-                            {analyzing && (
-                                <div className="glass-panel rounded-2xl p-6 text-center mb-4 animate-fade-in">
-                                    <span className="material-symbols-outlined text-3xl text-primary animate-spin block mb-2">progress_activity</span>
-                                    <p className="text-base font-bold text-white">Analyzing image with <span className="text-primary">Gemini Vision AI</span></p>
-                                    <p className="text-sm text-slate-500 mt-1">Detecting products, colors, mood, text, and marketing angles...</p>
-                                </div>
-                            )}
+                            <GlobalLoader 
+                                isActive={analyzing} 
+                                title="Analyzing image with Gemini Vision AI" 
+                                currentStage="Detecting products, colors, mood, text, and marketing angles..." 
+                                icon="psychology"
+                            />
 
                             {/* Analysis Error */}
                             {analysisError && (
@@ -703,15 +703,12 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                         </button>
                     )}
 
-                    {loadingSuggestions && (
-                        <div className="glass-panel p-4 rounded-xl border border-cyan-500/20 flex items-center gap-3 animate-fade-in">
-                            <span className="material-symbols-outlined text-xl text-cyan-400 animate-spin">progress_activity</span>
-                            <div>
-                                <p className="text-base font-bold text-white">AI finding relevant products...</p>
-                                <p className="text-sm text-slate-400">Matching your context to your product catalog</p>
-                            </div>
-                        </div>
-                    )}
+                    <GlobalLoader 
+                        isActive={loadingSuggestions} 
+                        title="AI finding relevant products..." 
+                        currentStage="Matching your context to your product catalog" 
+                        icon="smart_toy"
+                    />
 
                     {showProductPanel && suggestedProducts.length > 0 && (
                         <div className="animate-fade-in">
@@ -3153,22 +3150,13 @@ SPOKESPERSON QUOTES:`
                 <>
                     <StepTone goal={goal} activeBrand={activeBrand} onComplete={handleGenerate} onBack={() => setStep(3)}
                         availableProviders={availableProviders} modelOverride={modelOverride} setModelOverride={setModelOverride} />
-                    {generating && (
-                        <div className="max-w-2xl mx-auto mt-6 glass-panel rounded-2xl p-6 text-center animate-fade-in">
-                            <span className="material-symbols-outlined text-3xl text-primary animate-spin block mb-3">progress_activity</span>
-                            <p className="text-white font-bold">Generating with brand intelligence...</p>
-                            <p className="text-sm text-slate-400 mt-1">
-                                Using {activeBrand?.name}'s voice DNA + RLHF learnings for human-authentic output
-                            </p>
-                            <div className="flex items-center justify-center gap-2 mt-3">
-                                <span className="text-sm text-primary/70 bg-primary/10 px-2.5 py-0.5 rounded-full font-medium">
-                                    🤖 {modelOverride === 'auto'
-                                        ? `Smart routing: ${toneSettings?.language !== 'english' ? toneSettings?.language?.charAt(0).toUpperCase() + toneSettings?.language?.slice(1) + ' → best model' : 'English → optimal model'}`
-                                        : `Using: ${availableProviders.find(p => p.id === modelOverride)?.label || modelOverride}`}
-                                </span>
-                            </div>
-                        </div>
-                    )}
+                    <GlobalLoader 
+                        isActive={generating} 
+                        title="Generating with brand intelligence..." 
+                        currentStage={`Using ${activeBrand?.name}'s voice DNA for human-authentic output`}
+                        icon="auto_awesome"
+                        elapsed={0}
+                    />
                     {error && (
                         <div className="max-w-2xl mx-auto mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm text-center">
                             <span className="material-symbols-outlined align-middle mr-1">error</span> {error}
@@ -3188,13 +3176,13 @@ SPOKESPERSON QUOTES:`
                         modelOverride={modelOverride}
                         setModelOverride={setModelOverride}
                     />
-                    {generating && (
-                        <div className="max-w-2xl mx-auto mt-6 glass-panel rounded-2xl p-6 text-center animate-fade-in">
-                            <span className="material-symbols-outlined text-3xl text-rose-400 animate-spin block mb-3">progress_activity</span>
-                            <p className="text-white font-bold">Crafting your press release...</p>
-                            <p className="text-sm text-slate-400 mt-1">Using brand DNA + PR best practices for professional output</p>
-                        </div>
-                    )}
+                    <GlobalLoader 
+                        isActive={generating} 
+                        title="Crafting your press release..." 
+                        currentStage="Using brand DNA + PR best practices for professional output"
+                        icon="newspaper"
+                        elapsed={0}
+                    />
                     {error && (
                         <div className="max-w-2xl mx-auto mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm text-center">
                             <span className="material-symbols-outlined align-middle mr-1">error</span> {error}
@@ -3243,14 +3231,12 @@ SPOKESPERSON QUOTES:`
                         modelOverride={modelOverride}
                         setModelOverride={setModelOverride}
                     />
-                    {generating && (
-                        <div className="max-w-2xl mx-auto mt-6 glass-panel rounded-2xl p-6 text-center animate-fade-in">
-                            <span className="material-symbols-outlined text-3xl text-red-400 animate-spin block mb-3">progress_activity</span>
-                            <p className="text-white font-bold">Generating YouTube content...</p>
-                            <p className="text-sm text-slate-400 mt-1">Running YouTube Research Agent → YouTube Writer Agent pipeline</p>
-                            <p className="text-xs text-slate-600 mt-2">Script • Title • Description • Tags • Keywords • Timestamps</p>
-                        </div>
-                    )}
+                    <GlobalLoader 
+                        isActive={generating} 
+                        title="Generating YouTube content..." 
+                        currentStage="Running YouTube Research Agent → YouTube Writer Agent pipeline"
+                        icon="smart_display"
+                    />
                     {error && (
                         <div className="max-w-2xl mx-auto mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm text-center">
                             <span className="material-symbols-outlined align-middle mr-1">error</span> {error}
@@ -3281,14 +3267,12 @@ SPOKESPERSON QUOTES:`
                         modelOverride={modelOverride}
                         setModelOverride={setModelOverride}
                     />
-                    {generating && (
-                        <div className="max-w-2xl mx-auto mt-6 glass-panel rounded-2xl p-6 text-center animate-fade-in">
-                            <span className="material-symbols-outlined text-3xl text-emerald-400 animate-spin block mb-3">progress_activity</span>
-                            <p className="text-white font-bold">Optimizing for YouTube algorithm...</p>
-                            <p className="text-sm text-slate-400 mt-1">Running YouTube Research Agent → SEO Optimizer Agent pipeline</p>
-                            <p className="text-xs text-slate-600 mt-2">3 Title Options • Description • 20-30 Tags • Keywords • SEO Score</p>
-                        </div>
-                    )}
+                    <GlobalLoader 
+                        isActive={generating} 
+                        title="Optimizing for YouTube algorithm..." 
+                        currentStage="Running YouTube Research Agent → SEO Optimizer Agent pipeline"
+                        icon="troubleshoot"
+                    />
                     {error && (
                         <div className="max-w-2xl mx-auto mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm text-center">
                             <span className="material-symbols-outlined align-middle mr-1">error</span> {error}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import SEOHead from '../components/SEOHead'
 import DashboardLayout from '../components/DashboardLayout'
+import GlobalLoader from '../components/GlobalLoader'
 import { useBrand } from '../context/BrandContext'
 import { socialMediaStudio as api, social, content as contentAPI } from '../services/api'
 import { CreditBadge } from '../components/CreditBadge'
@@ -279,7 +280,7 @@ export default function SocialMediaStudio() {
 
             {error && <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm flex items-center gap-2"><span className="material-symbols-outlined text-base">error</span>{error}<button onClick={() => setError('')} className="ml-auto cursor-pointer">✕</button></div>}
 
-            {loading && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center"><div className="glass-panel rounded-2xl p-8 text-center max-w-sm"><span className="material-symbols-outlined text-5xl text-primary animate-spin block mb-4">progress_activity</span><p className="text-white font-bold text-lg mb-1">AI is thinking...</p><p className="text-sm text-slate-400">{loadingMsg}</p></div></div>}
+            {loading && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center"><div className="max-w-md w-full mx-4"><GlobalLoader isActive={true} title={loadingMsg || 'AI is thinking...'} icon="psychology" estimatedDuration={fullAnalysisRunning ? 90 : 45} stages={fullAnalysisRunning ? ['Strategy', 'Account Audit', 'Competitor Intel'] : ['Analyzing Data', 'Building Report']} currentStage={fullAnalysisRunning ? 'Strategy' : 'Analyzing Data'} /></div></div>}
 
             {/* ═══════ DASHBOARD ═══════ */}
             {tab === 'dashboard' && (

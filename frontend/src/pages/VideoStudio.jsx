@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import { useSearchParams } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
+import GlobalLoader from '../components/GlobalLoader'
 import { creatives as creativesAPI } from '../services/api'
 import AdvancedMode from '../components/VideoStudio/AdvancedMode'
 import UGCCreator from '../components/VideoStudio/UGCCreator'
@@ -1041,14 +1042,21 @@ export default function VideoStudio() {
                             </div>
 
                             {/* Start Button */}
-                            <button onClick={handleStart} disabled={loading}
-                                className="w-full py-4 rounded-2xl bg-gradient-to-r from-violet-600 to-cyan-600 text-white font-bold text-base hover:shadow-xl hover:shadow-violet-500/20 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-3">
-                                {loading ? (
-                                    <><span className="material-symbols-outlined animate-spin">progress_activity</span>AI is thinking...</>
-                                ) : (
-                                    <><span className="material-symbols-outlined">auto_awesome</span>Generate Video Concepts</>
-                                )}
-                            </button>
+                            {loading ? (
+                                <GlobalLoader
+                                    isActive={true}
+                                    title="AI is crafting video concepts..."
+                                    icon="auto_awesome"
+                                    estimatedDuration={30}
+                                    stages={['Analyzing Brief', 'Generating Concepts']}
+                                    currentStage="Generating Concepts"
+                                />
+                            ) : (
+                                <button onClick={handleStart}
+                                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-violet-600 to-cyan-600 text-white font-bold text-base hover:shadow-xl hover:shadow-violet-500/20 transition-all cursor-pointer flex items-center justify-center gap-3">
+                                    <span className="material-symbols-outlined">auto_awesome</span>Generate Video Concepts
+                                </button>
+                            )}
                         </div>
                     )}
 
@@ -1064,10 +1072,14 @@ export default function VideoStudio() {
                             <p className="text-sm text-slate-500 mb-6">Pick the concept that excites you most. AI will build a full script from it.</p>
 
                             {loading ? (
-                                <div className="flex items-center justify-center py-20 text-slate-500">
-                                    <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>
-                                    Writing your script...
-                                </div>
+                                <GlobalLoader
+                                    isActive={true}
+                                    title="Writing your script..."
+                                    icon="edit_note"
+                                    estimatedDuration={25}
+                                    stages={['Concept Analysis', 'Script Writing', 'Shot Planning']}
+                                    currentStage="Script Writing"
+                                />
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {concepts.map((c, i) => (
@@ -1159,14 +1171,21 @@ export default function VideoStudio() {
                             </div>
 
                             {/* Approve */}
-                            <button onClick={handleApproveScript} disabled={loading}
-                                className="w-full py-4 rounded-2xl bg-gradient-to-r from-violet-600 to-cyan-600 text-white font-bold hover:shadow-xl hover:shadow-violet-500/20 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-3">
-                                {loading ? (
-                                    <><span className="material-symbols-outlined animate-spin">progress_activity</span>Finding the best model...</>
-                                ) : (
-                                    <><span className="material-symbols-outlined">check_circle</span>Approve Script & Find Best Model</>
-                                )}
-                            </button>
+                            {loading ? (
+                                <GlobalLoader
+                                    isActive={true}
+                                    title="Finding the best model..."
+                                    icon="smart_toy"
+                                    estimatedDuration={20}
+                                    stages={['Analyzing Script', 'Model Selection', 'Cost Estimation']}
+                                    currentStage="Model Selection"
+                                />
+                            ) : (
+                                <button onClick={handleApproveScript}
+                                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-violet-600 to-cyan-600 text-white font-bold hover:shadow-xl hover:shadow-violet-500/20 transition-all cursor-pointer flex items-center justify-center gap-3">
+                                    <span className="material-symbols-outlined">check_circle</span>Approve Script & Find Best Model
+                                </button>
+                            )}
                         </div>
                     )}
 
