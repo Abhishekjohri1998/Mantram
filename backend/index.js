@@ -84,8 +84,13 @@ const server = app.listen(config.port, '0.0.0.0', () => {
         process.send('ready');
         console.log('✅ PM2 Ready signal sent (Fast-Start)');
     }
+});
 
-    // Start schedulers in the background
+// ── DEFERRED INITIALIZATION (WAIT FOR DB) ─────────────────────
+connectDB().then(() => {
+    console.log('✅ Database connected — Initializing background agents');
+
+    // Start follow-up scheduler (every 4 hours — Meta Compliance)
     import('./services/autonomousAgent.js').then(({ runFollowUpCheck }) => {
         setInterval(() => {
             runFollowUpCheck().catch(err => console.warn('⚠️ Follow-up check failed:', err.message));
@@ -93,6 +98,7 @@ const server = app.listen(config.port, '0.0.0.0', () => {
         console.log('🤖 Autonomous Agent active');
     }).catch(() => { });
 
+    // Start intelligence agent scheduler (every 6 hours — Meta Compliance)
     import('./services/intelligenceAgent.js').then(({ runIntelMissions }) => {
         setInterval(() => {
             runIntelMissions().catch(err => console.warn('🕵️ Intel Agent check failed:', err.message));
@@ -100,13 +106,13 @@ const server = app.listen(config.port, '0.0.0.0', () => {
         console.log('🕵️ Agent Intelligence active');
     }).catch(() => { });
 
+    // Start scheduled post publisher
     import('./services/scheduledPostPublisher.js').then(({ startScheduledPostPublisher }) => {
         startScheduledPostPublisher();
-    }).catch(() => { });
+    }).catch((err) => { console.warn('📅 Scheduled Post Publisher failed to start:', err.message); });
+}).catch(err => {
+    console.error('❌ Critical failure during background agent initialization:', err.message);
 });
-
-// Connect Database
-connectDB();
 
 const corsOptions = {
     origin: (origin, callback) => {
