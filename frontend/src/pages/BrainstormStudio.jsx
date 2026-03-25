@@ -1,5 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
-import SEOHead from '../components/SEOHead'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
@@ -46,11 +45,11 @@ function ScoreBar({ score, color, label, icon }) {
     return (
         <div className="flex items-center gap-2">
             <span className="text-xs w-4">{icon}</span>
-            <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden min-w-[60px]">
+            <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
                 <div className={`h-full rounded-full ${color} transition-all duration-700`}
                     style={{ width: `${score * 10}%` }} />
             </div>
-            <span className="text-[11px] text-slate-400 w-4 text-right font-mono">{score}</span>
+            <span className="text-sm text-slate-400 w-4 text-right">{score}</span>
         </div>
     )
 }
@@ -125,31 +124,27 @@ function IdeaCard({ idea, index, onExpand, onAction, isFilm, onFeedback, feedbac
             )}
 
             {/* Actions */}
-            <div className="flex flex-wrap gap-2 pt-3 border-t border-white/5">
+            <div className="flex gap-2 pt-3 border-t border-white/5">
                 <button onClick={() => onExpand(idea)}
-                    className="flex-1 min-w-[100px] py-2 rounded-xl bg-primary/10 text-primary text-[11px] font-bold hover:bg-primary/20 cursor-pointer transition-all flex items-center justify-center gap-1">
+                    className="flex-1 py-2 rounded-xl bg-primary/10 text-primary text-[11px] font-bold hover:bg-primary/20 cursor-pointer transition-all flex items-center justify-center gap-1">
                     <span className="material-symbols-outlined text-sm">unfold_more</span> Deep Dive
                 </button>
                 {isFilm && (
                     <button onClick={() => onScreenplay(idea)}
-                        className="flex-1 min-w-[100px] py-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-[11px] font-bold hover:bg-emerald-500/20 cursor-pointer transition-all flex items-center justify-center gap-1">
+                        className="flex-1 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-[11px] font-bold hover:bg-emerald-500/20 cursor-pointer transition-all flex items-center justify-center gap-1">
                         <span className="material-symbols-outlined text-sm">description</span> Screenplay
                     </button>
                 )}
-                <div className="flex gap-2 w-full sm:w-auto">
-                    <button onClick={() => onAction('content', idea)}
-                        className="flex-1 sm:flex-none py-2 px-3 rounded-xl bg-white/5 text-slate-300 text-[11px] font-bold hover:bg-white/10 cursor-pointer transition-all flex items-center justify-center"
-                        title="Generate Content">
-                        <span className="material-symbols-outlined text-sm">edit_note</span>
-                        <span className="sm:hidden ml-1">Content</span>
-                    </button>
-                    <button onClick={() => isFilm ? handleIdeaAction('creative', idea) : onAction('creative', idea)}
-                        className="flex-1 sm:flex-none py-2 px-3 rounded-xl bg-white/5 text-slate-300 text-[11px] font-bold hover:bg-white/10 cursor-pointer transition-all flex items-center justify-center"
-                        title={isFilm ? "Generate Film" : "Generate Visual"}>
-                        <span className="material-symbols-outlined text-sm">{isFilm ? "movie" : "palette"}</span>
-                        <span className="sm:hidden ml-1">{isFilm ? "Film" : "Visual"}</span>
-                    </button>
-                </div>
+                <button onClick={() => onAction('content', idea)}
+                    className="py-2 px-3 rounded-xl bg-white/5 text-slate-300 text-[11px] font-bold hover:bg-white/10 cursor-pointer transition-all"
+                    title="Generate Content">
+                    <span className="material-symbols-outlined text-sm">edit_note</span>
+                </button>
+                <button onClick={() => onAction('creative', idea)}
+                    className="py-2 px-3 rounded-xl bg-white/5 text-slate-300 text-[11px] font-bold hover:bg-white/10 cursor-pointer transition-all"
+                    title="Generate Visual">
+                    <span className="material-symbols-outlined text-sm">palette</span>
+                </button>
             </div>
         </div>
     )
@@ -199,27 +194,10 @@ export default function BrainstormStudio() {
     const [chatHistory, setChatHistory] = useState([])
     const [chatMessage, setChatMessage] = useState('')
     const [chatLoading, setChatLoading] = useState(false)
-    const [clickedSuggestions, setClickedSuggestions] = useState(new Set())
 
     const inputRef = useRef(null)
     const bottomRef = useRef(null)
     const chatBottomRef = useRef(null)
-    const activeBrandIdRef = useRef(activeBrand?._id)
-    const abortControllerRef = useRef(null)
-
-    const getSignal = useCallback(() => {
-        if (abortControllerRef.current) abortControllerRef.current.abort()
-        abortControllerRef.current = new AbortController()
-        return abortControllerRef.current.signal
-    }, [])
-
-    useEffect(() => {
-        return () => abortControllerRef.current?.abort()
-    }, [])
-
-    useEffect(() => {
-        activeBrandIdRef.current = activeBrand?._id
-    }, [activeBrand?._id])
 
     useEffect(() => {
         if (inputRef.current) inputRef.current.focus()
@@ -233,33 +211,21 @@ export default function BrainstormStudio() {
         chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [chatHistory, chatLoading])
 
-    // Reset loop if brand changes mid-process
-    useEffect(() => {
-        if (activeBrand?._id !== activeBrandIdRef.current) {
-            console.log('Brand changed mid-brainstorm, resetting state and aborting processing...')
-            abortControllerRef.current?.abort()
-            resetAll()
-        }
-    }, [activeBrand?._id])
-
     // ========== HANDLERS ==========
 
-    async function selectIntent(intentId) {
-        const brandIdAtStart = activeBrand?._id
+    const selectIntent = async (intentId) => {
         setIntent(intentId)
         setError('')
         setLoading(true)
         setLoadingMsg(activeBrand ? `Analyzing ${activeBrand.name}'s DNA for your brainstorm...` : 'Preparing questions...')
         try {
-            const signal = getSignal()
             const data = await bsAPI.start({
                 intent: intentId,
                 brand: activeBrand ? {
                     name: activeBrand.name,
                     dna: activeBrand.dna,
                 } : null,
-            }, { signal })
-            if (activeBrandIdRef.current !== brandIdAtStart) return
+            })
             if (data.success) {
                 setQuestions(data.questions)
                 setBrandInsight(data.brandInsight || null)
@@ -270,16 +236,13 @@ export default function BrainstormStudio() {
                 setError(data.error || 'Failed to start')
             }
         } catch (e) {
-            if (activeBrandIdRef.current !== brandIdAtStart) return
             setError(e.message)
         } finally {
-            if (activeBrandIdRef.current === brandIdAtStart) {
-                setLoading(false)
-            }
+            setLoading(false)
         }
     }
 
-    function submitAnswer() {
+    const submitAnswer = () => {
         if (!currentAnswer.trim() && !questions[currentQ]?.optional) return
         const q = questions[currentQ]
         const newAnswers = { ...answers, [q.id]: currentAnswer.trim() || '(skipped)' }
@@ -294,9 +257,7 @@ export default function BrainstormStudio() {
         }
     }
 
-
-    async function confirmUnderstanding(ans) {
-        const brandIdAtStart = activeBrand?._id
+    const confirmUnderstanding = async (ans) => {
         setLoading(true)
         setLoadingMsg('Analyzing your brief...')
         setStep(2)
@@ -306,25 +267,19 @@ export default function BrainstormStudio() {
                 answers: ans,
                 brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna } : null,
             })
-            if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success) {
                 setConfirmation(data)
             } else {
                 setError(data.error || 'Confirmation failed')
             }
         } catch (e) {
-            if (activeBrandIdRef.current !== brandIdAtStart) return
             setError(e.message)
         } finally {
-            if (activeBrandIdRef.current === brandIdAtStart) {
-                setLoading(false)
-            }
+            setLoading(false)
         }
     }
 
-
-    async function generateIdeas(refinementHint) {
-        const brandIdAtStart = activeBrand?._id
+    const generateIdeas = async (refinementHint) => {
         setLoading(true)
         setLoadingMsg(refinementHint ? 'Refining ideas...' : 'Generating multi-layer strategy...')
         setStep(3)
@@ -337,51 +292,33 @@ export default function BrainstormStudio() {
                 brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna } : null,
                 ...(refinementHint ? { refinementPrompt: refinementHint, previousIdeas: ideas } : {}),
             })
-            if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success && data.ideas) {
                 setIdeas(data.ideas)
             } else {
                 setError(data.error || 'Generation failed')
             }
         } catch (e) {
-            if (activeBrandIdRef.current !== brandIdAtStart) return
             setError(e.message)
         } finally {
-            if (activeBrandIdRef.current === brandIdAtStart) {
-                setLoading(false)
-            }
+            setLoading(false)
         }
     }
 
-
-    function handleIdeaAction(type, idea) {
+    const handleIdeaAction = (type, idea) => {
         const hook = idea.hook || idea.logline || ''
         const desc = idea.description || idea.synopsis || ''
         if (type === 'content') {
             sessionStorage.setItem('brainstormContext', JSON.stringify({ title: idea.title, hook, description: desc }))
             navigate('/content-studio?fromBrainstorm=true')
         } else if (type === 'creative') {
-            const hook = idea.hook || idea.logline || ''
-            const fullDesc = idea.synopsis || idea.description || ''
-            const prompt = `${idea.title}: ${hook}. ${fullDesc}`
-            sessionStorage.setItem('brainstormContext', JSON.stringify({ 
-                prompt,
-                title: idea.title,
-                description: fullDesc,
-                isFilm: intent === 'ad-film'
-            }))
-            if (intent === 'ad-film') {
-                navigate('/video-studio?fromBrainstorm=true')
-            } else {
-                navigate('/creative-studio?fromBrainstorm=true')
-            }
+            sessionStorage.setItem('brainstormContext', JSON.stringify({ prompt: `${idea.title} — ${idea.visualDirection || idea.visualStyle || hook}` }))
+            navigate('/creative-studio?fromBrainstorm=true')
         } else if (type === 'calendar') {
             navigate('/smart-calendar')
         }
     }
 
-
-    async function handleFeedback(idea, type) {
+    const handleFeedback = async (idea, type) => {
         const key = idea.title
         setIdeaFeedback(prev => ({ ...prev, [key]: type }))
         try {
@@ -395,31 +332,19 @@ export default function BrainstormStudio() {
         } catch (e) { console.warn('Feedback save failed:', e) }
     }
 
-
-    async function generateScreenplay(filmConcept) {
-        const brandIdAtStart = activeBrand?._id
+    const generateScreenplay = async (filmConcept) => {
         setScreenplayLoading(true)
         setScreenplay(null)
         try {
-            const signal = getSignal()
             const data = await bsAPI.screenplay({
                 filmConcept,
                 brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna } : null,
-            }, { signal })
-            if (activeBrandIdRef.current !== brandIdAtStart) return
+            })
             if (data.success) setScreenplay(data.screenplay)
             else setError(data.error || 'Screenplay generation failed')
-        } catch (e) {
-            if (activeBrandIdRef.current !== brandIdAtStart) return
-            setError(e.message)
-        }
-        finally {
-            if (activeBrandIdRef.current === brandIdAtStart) {
-                setScreenplayLoading(false)
-            }
-        }
+        } catch (e) { setError(e.message) }
+        finally { setScreenplayLoading(false) }
     }
-
 
     // Open interactive chat for a film concept
     const openFilmChat = (film) => {
@@ -431,27 +356,20 @@ export default function BrainstormStudio() {
     }
 
     // Send chat message for film refinement
-    async function sendChatMessage(msg) {
-        const brandIdAtStart = activeBrand?._id
+    const sendChatMessage = async (msg) => {
         const text = msg || chatMessage.trim()
         if (!text || chatLoading) return
-
-        if (msg) {
-            setClickedSuggestions(prev => new Set([...prev, msg]))
-        }
         setChatMessage('')
         const newHistory = [...chatHistory, { role: 'user', text }]
         setChatHistory(newHistory)
         setChatLoading(true)
         try {
-            const signal = getSignal()
             const data = await bsAPI.chat({
                 filmConcept: chatFilm,
                 chatHistory: newHistory,
                 userMessage: text,
                 brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna } : null,
-            }, { signal })
-            if (activeBrandIdRef.current !== brandIdAtStart) return
+            })
             if (data.success !== false) {
                 const aiMsg = { role: 'ai', text: data.message, suggestions: data.suggestions || [] }
                 setChatHistory(prev => [...prev, aiMsg])
@@ -462,29 +380,24 @@ export default function BrainstormStudio() {
                 setChatHistory(prev => [...prev, { role: 'ai', text: data.error || 'Sorry, I couldn\'t process that. Try again.' }])
             }
         } catch (e) {
-            if (activeBrandIdRef.current !== brandIdAtStart) return
             setChatHistory(prev => [...prev, { role: 'ai', text: `Error: ${e.message}` }])
         } finally {
-            if (activeBrandIdRef.current === brandIdAtStart) {
-                setChatLoading(false)
-            }
+            setChatLoading(false)
         }
     }
 
-
-    function resetAll() {
+    const resetAll = () => {
         setStep(0); setIntent(null); setQuestions([]); setCurrentQ(0); setAnswers({});
         setCurrentAnswer(''); setConfirmation(null); setIdeas(null); setExpandedIdea(null);
         setBrandInsight(null); setIdeaFeedback({}); setScreenplay(null); setError(''); setLoading(false);
-        setChatFilm(null); setChatHistory([]); setChatMessage(''); setChatLoading(false); setClickedSuggestions(new Set())
+        setChatFilm(null); setChatHistory([]); setChatMessage(''); setChatLoading(false)
         setStrategyData(null); setStrategyId(null); setStrategyKpis([]); setStrategyMilestones([]);
         setSlides(null); setSlideIndex(0); setSlidesLoading(false); setTrackerView(null); setKpiEditing(null)
     }
 
     // ========== STRATEGY HANDLERS ==========
 
-    async function generateStrategy() {
-        const brandIdAtStart = activeBrand?._id
+    const generateStrategy = async () => {
         setLoading(true)
         setLoadingMsg('Building your comprehensive brand strategy...')
         setStep(6)
@@ -494,7 +407,6 @@ export default function BrainstormStudio() {
                 answers,
                 brand: activeBrand ? { _id: activeBrand._id, name: activeBrand.name, dna: activeBrand.dna } : null,
             })
-            if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success && data.strategy) {
                 setStrategyData(data.strategy)
                 setStrategyId(data.strategyId)
@@ -503,20 +415,11 @@ export default function BrainstormStudio() {
             } else {
                 setError(data.error || 'Strategy generation failed')
             }
-        } catch (e) {
-            if (activeBrandIdRef.current !== brandIdAtStart) return
-            setError(e.message)
-        }
-        finally {
-            if (activeBrandIdRef.current === brandIdAtStart) {
-                setLoading(false)
-            }
-        }
+        } catch (e) { setError(e.message) }
+        finally { setLoading(false) }
     }
 
-
-    async function generateSlides() {
-        const brandIdAtStart = activeBrand?._id
+    const generateSlides = async () => {
         setSlidesLoading(true)
         setSlides(null)
         try {
@@ -525,25 +428,16 @@ export default function BrainstormStudio() {
                 strategy: strategyData,
                 brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna } : null,
             })
-            if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success && data.slides) {
                 setSlides(data.slides)
                 setSlideIndex(0)
                 setStep(7)
             } else { setError(data.error || 'Slides generation failed') }
-        } catch (e) {
-            if (activeBrandIdRef.current !== brandIdAtStart) return
-            setError(e.message)
-        }
-        finally {
-            if (activeBrandIdRef.current === brandIdAtStart) {
-                setSlidesLoading(false)
-            }
-        }
+        } catch (e) { setError(e.message) }
+        finally { setSlidesLoading(false) }
     }
 
-
-    async function updateKpiValue(kpiName, value) {
+    const updateKpiValue = async (kpiName, value) => {
         if (!strategyId) return
         try {
             const data = await bsAPI.updateKpi(strategyId, { kpiName, current: Number(value) })
@@ -551,8 +445,7 @@ export default function BrainstormStudio() {
         } catch (e) { console.warn('KPI update failed:', e) }
     }
 
-
-    async function toggleMilestone(milestoneId, completed) {
+    const toggleMilestone = async (milestoneId, completed) => {
         if (!strategyId) return
         try {
             const data = await bsAPI.toggleMilestone(strategyId, { milestoneId, completed })
@@ -560,21 +453,17 @@ export default function BrainstormStudio() {
         } catch (e) { console.warn('Milestone toggle failed:', e) }
     }
 
-
-    async function loadSavedStrategies() {
+    const loadSavedStrategies = async () => {
         try {
             const data = await bsAPI.listStrategies()
             if (data.success) setSavedStrategies(data.strategies || [])
         } catch (e) { console.warn('Failed to load strategies:', e) }
     }
 
-
-    async function openSavedStrategy(id) {
-        const brandIdAtStart = activeBrand?._id
+    const openSavedStrategy = async (id) => {
         setLoading(true); setLoadingMsg('Loading strategy...')
         try {
             const data = await bsAPI.getStrategy(id)
-            if (activeBrandIdRef.current !== brandIdAtStart) return
             if (data.success && data.strategy) {
                 const s = data.strategy
                 setStrategyData(s.strategy)
@@ -584,17 +473,9 @@ export default function BrainstormStudio() {
                 setIntent('brand-strategy')
                 setStep(6)
             }
-        } catch (e) {
-            if (activeBrandIdRef.current !== brandIdAtStart) return
-            setError(e.message)
-        }
-        finally {
-            if (activeBrandIdRef.current === brandIdAtStart) {
-                setLoading(false)
-            }
-        }
+        } catch (e) { setError(e.message) }
+        finally { setLoading(false) }
     }
-
 
     useEffect(() => { loadSavedStrategies() }, [])
 
@@ -604,7 +485,6 @@ export default function BrainstormStudio() {
 
     return (
         <DashboardLayout title="Brainstorm Studio" subtitle="Your agentic strategy partner">
-            <SEOHead title="Brainstorm Studio — Mantram AI" noIndex={true} />
             {/* Progress indicator */}
             {step > 0 && (
                 <div className="flex items-center gap-2 mb-6">
@@ -656,34 +536,23 @@ export default function BrainstormStudio() {
                         <div className="flex-1 h-px bg-white/[0.06]" />
                     </div>
 
-                    <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-                        {INTENTS.map((item, i) => {
-                            const isSelected = intent === item.id && loading;
-                            const isDimmed = loading && intent !== item.id;
-
-                            return (
-                                <button key={item.id} onClick={() => selectIntent(item.id)} disabled={loading}
-                                    className={`glass-panel rounded-2xl p-5 text-left hover:border-primary/30 hover:scale-[1.02] transition-all cursor-pointer group animate-fade-in ${isDimmed ? 'opacity-40 grayscale pointer-events-none' : ''}`}
-                                    style={{ animationDelay: `${i * 60}ms` }}>
-                                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
-                                        {isSelected ? (
-                                            <span className="material-symbols-outlined text-white text-lg animate-spin">progress_activity</span>
-                                        ) : (
-                                            <span className="material-symbols-outlined text-white text-lg">{item.icon}</span>
-                                        )}
-                                    </div>
-                                    <h3 className="text-base font-bold text-white mb-1">
-                                        {isSelected ? 'Processing...' : item.label}
-                                    </h3>
-                                    <p className="text-sm text-slate-500 leading-relaxed">{item.desc}</p>
-                                </button>
-                            );
-                        })}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
+                        {INTENTS.map((item, i) => (
+                            <button key={item.id} onClick={() => selectIntent(item.id)} disabled={loading}
+                                className="glass-panel rounded-2xl p-5 text-left hover:border-primary/30 hover:scale-[1.02] transition-all cursor-pointer group animate-fade-in"
+                                style={{ animationDelay: `${i * 60}ms` }}>
+                                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+                                    <span className="material-symbols-outlined text-white text-lg">{item.icon}</span>
+                                </div>
+                                <h3 className="text-base font-bold text-white mb-1">{item.label}</h3>
+                                <p className="text-sm text-slate-500 leading-relaxed">{item.desc}</p>
+                            </button>
+                        ))}
                     </div>
 
                     {loading && (
                         <div className="text-center mt-8">
-                            {step !== 0 && <span className="material-symbols-outlined text-3xl text-primary animate-spin block mb-2">progress_activity</span>}
+                            <span className="material-symbols-outlined text-3xl text-primary animate-spin block mb-2">progress_activity</span>
                             <p className="text-sm text-slate-400">{loadingMsg}</p>
                         </div>
                     )}
@@ -781,24 +650,16 @@ export default function BrainstormStudio() {
                                         {/* Keyword suggestion chips */}
                                         {q.keywords?.length > 0 && (
                                             <div className="flex flex-wrap gap-1.5">
-                                                {q.keywords
-                                                    .filter(kw => {
-                                                        const currentLower = currentAnswer.toLowerCase()
-                                                        const kwLower = kw.toLowerCase()
-                                                        // Filter out if exact match exists in answer (comma separated)
-                                                        const parts = currentLower.split(',').map(p => p.trim())
-                                                        return !parts.includes(kwLower)
-                                                    })
-                                                    .map(kw => (
-                                                        <button key={kw} onClick={() => {
-                                                            const sep = currentAnswer.trim() ? ', ' : ''
-                                                            setCurrentAnswer(prev => prev.trim() ? `${prev.trim()}, ${kw}` : kw)
-                                                            inputRef.current?.focus()
-                                                        }}
-                                                            className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
-                                                            {kw}
-                                                        </button>
-                                                    ))}
+                                                {q.keywords.map(kw => (
+                                                    <button key={kw} onClick={() => {
+                                                        const sep = currentAnswer.trim() ? ', ' : ''
+                                                        setCurrentAnswer(prev => prev.trim() ? `${prev.trim()}, ${kw}` : kw)
+                                                        inputRef.current?.focus()
+                                                    }}
+                                                        className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
+                                                        {kw}
+                                                    </button>
+                                                ))}
                                             </div>
                                         )}
                                     </div>
@@ -918,7 +779,7 @@ export default function BrainstormStudio() {
                                     <h3 className="text-lg font-bold text-white">{intent === 'ad-film' ? 'Film Concepts' : 'Campaign Concepts'}</h3>
                                     <span className="text-sm text-slate-500 ml-1">{intent === 'ad-film' ? '👍 Approve a film to generate screenplay' : 'Layer 1 — Big Ideas'}</span>
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     {(ideas.filmConcepts || ideas.campaignConcepts)?.map((idea, i) => (
                                         <IdeaCard key={i} idea={idea} index={i}
                                             isFilm={intent === 'ad-film'}
@@ -938,7 +799,7 @@ export default function BrainstormStudio() {
                                         <span className="material-symbols-outlined text-amber-400">videocam</span>
                                         <h3 className="text-lg font-bold text-white">Production Approaches</h3>
                                     </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         {ideas.productionApproaches.map((p, i) => (
                                             <div key={i} className="glass-panel rounded-2xl p-5 animate-fade-in">
                                                 <p className="text-sm text-primary font-bold mb-3 uppercase">{p.filmRef}</p>
@@ -969,7 +830,7 @@ export default function BrainstormStudio() {
                                         <h3 className="text-lg font-bold text-white">Tactical Ideas</h3>
                                         <span className="text-sm text-slate-500 ml-1">Layer 2 — Execution Angles</span>
                                     </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         {ideas.tacticalIdeas.map((t, i) => (
                                             <div key={i} className="glass-panel rounded-2xl p-5 animate-fade-in" style={{ animationDelay: `${i * 100}ms` }}>
                                                 <p className="text-sm text-primary font-bold mb-3 uppercase">{t.campaignRef}</p>
@@ -1020,7 +881,7 @@ export default function BrainstormStudio() {
                                         <span className="text-sm text-slate-500 ml-1">Layer 3 — Names & Taglines</span>
                                     </div>
                                     <div className="glass-panel rounded-2xl p-5">
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             {/* Product naming categories */}
                                             {Object.entries(ideas.namingIdeas).filter(([k]) => k !== 'taglines' && k !== 'hashtags').map(([cat, items]) => (
                                                 <div key={cat}>
@@ -1077,7 +938,7 @@ export default function BrainstormStudio() {
                                     </div>
                                     <div className="glass-panel rounded-2xl p-5">
                                         {/* Phases */}
-                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
                                             {ideas.executionPlan.phases?.map((phase, i) => (
                                                 <div key={i} className="p-4 rounded-xl bg-white/3 border border-white/5">
                                                     <div className="flex items-center gap-2 mb-2">
@@ -1204,7 +1065,7 @@ export default function BrainstormStudio() {
                             </div>
 
                             {/* Success Probability + Competitive Landscape */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                                 {strategyData.success_probability && (
                                     <div className="glass-panel rounded-2xl p-5">
                                         <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
@@ -1475,17 +1336,15 @@ export default function BrainstormStudio() {
                                     <div className="space-y-2">
                                         {strategyData.budget_breakdown.map((b, i) => (
                                             <div key={i}>
-                                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                                                    <span className="text-xs text-slate-300 w-full sm:w-32 truncate">{b.channel}</span>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-xs text-slate-300 w-32 truncate">{b.channel}</span>
                                                     <div className="flex-1 h-3 bg-white/5 rounded-full overflow-hidden">
                                                         <div className="h-full bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full transition-all" style={{ width: `${b.percentage}%` }} />
                                                     </div>
-                                                    <div className="flex items-center gap-2 min-w-[80px] justify-end">
-                                                        <span className="text-xs text-slate-400 text-right">{b.amount}</span>
-                                                        <span className="text-xs text-amber-400 text-right font-bold">{b.percentage}%</span>
-                                                    </div>
+                                                    <span className="text-xs text-slate-400 w-16 text-right">{b.amount}</span>
+                                                    <span className="text-xs text-amber-400 w-10 text-right font-bold">{b.percentage}%</span>
                                                 </div>
-                                                {b.rationale && <p className="text-[10px] text-slate-500 sm:ml-32 sm:pl-3 mt-1">↳ {b.rationale}</p>}
+                                                {b.rationale && <p className="text-[10px] text-slate-500 ml-32 pl-3 mt-0.5">↳ {b.rationale}</p>}
                                             </div>
                                         ))}
                                     </div>
@@ -1532,13 +1391,13 @@ export default function BrainstormStudio() {
                     </div>
 
                     {/* Slide */}
-                    <div className="flex-1 flex items-center justify-center p-4 sm:p-8 relative overflow-y-auto">
+                    <div className="flex-1 flex items-center justify-center p-8 relative">
                         {(() => {
                             const slide = slides[slideIndex]
                             if (!slide) return null
                             const accent = slide.accent_color || '#6366f1'
                             return (
-                                <div className="w-full max-w-4xl min-h-[60vh] sm:aspect-[16/9] rounded-2xl sm:rounded-3xl p-6 sm:p-10 flex flex-col justify-center relative overflow-hidden animate-fade-in"
+                                <div className="w-full max-w-4xl aspect-[16/9] rounded-3xl p-10 flex flex-col justify-center relative overflow-hidden animate-fade-in"
                                     style={{ background: `linear-gradient(135deg, ${accent}15, ${accent}05, #0f0f1a)`, border: `1px solid ${accent}25` }}>
                                     {slide.layout === 'hero' && (
                                         <div className="text-center">
@@ -1563,7 +1422,7 @@ export default function BrainstormStudio() {
                                         <div>
                                             <h2 className="text-2xl font-black text-white mb-2">{slide.title}</h2>
                                             {slide.subtitle && <p className="text-sm text-slate-400 mb-6">{slide.subtitle}</p>}
-                                            <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                                 {slide.content?.stats?.map((s, i) => (
                                                     <div key={i} className="text-center p-4 rounded-xl" style={{ background: `${accent}10`, border: `1px solid ${accent}20` }}>
                                                         <p className="text-2xl font-black text-white">{s.value}</p>
@@ -1577,7 +1436,7 @@ export default function BrainstormStudio() {
                                     {slide.layout === 'grid' && (
                                         <div>
                                             <h2 className="text-2xl font-black text-white mb-6">{slide.title}</h2>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                                 {slide.content?.cards?.map((card, i) => (
                                                     <div key={i} className="p-4 rounded-xl bg-white/5 border border-white/5">
                                                         <span className="text-xl mb-2 block">{card.icon}</span>
@@ -1591,7 +1450,7 @@ export default function BrainstormStudio() {
                                     {slide.layout === 'timeline' && (
                                         <div>
                                             <h2 className="text-2xl font-black text-white mb-6">{slide.title}</h2>
-                                            <div className="flex flex-col md:flex-row gap-3 sm:gap-4">
+                                            <div className="flex gap-4">
                                                 {slide.content?.phases?.map((phase, i) => (
                                                     <div key={i} className="flex-1 p-4 rounded-xl border border-white/5" style={{ background: `${accent}08` }}>
                                                         <p className="text-sm font-bold text-white mb-1">{phase.name}</p>
@@ -1732,19 +1591,14 @@ export default function BrainstormStudio() {
                                 </div>
 
                                 {/* Film-specific actions */}
-                                <div className="flex gap-2">
+                                <div className="flex gap-3">
                                     <button onClick={() => openFilmChat(expandedIdea)}
-                                        className="flex-1 btn-primary py-3 rounded-xl text-[11px] font-bold flex items-center justify-center gap-2 cursor-pointer">
-                                        <span className="material-symbols-outlined text-sm">chat</span> Refine Film
+                                        className="flex-1 btn-primary py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer">
+                                        <span className="material-symbols-outlined text-sm">chat</span> Refine This Film
                                     </button>
                                     <button onClick={() => { generateScreenplay(expandedIdea); setExpandedIdea(null) }}
-                                        className="flex-1 py-3 rounded-xl bg-emerald-500/10 text-emerald-400 text-[11px] font-bold hover:bg-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all">
-                                        <span className="material-symbols-outlined text-sm">description</span> Screenplay
-                                    </button>
-                                    <button onClick={() => { handleIdeaAction('creative', expandedIdea); setExpandedIdea(null) }}
-                                        className="px-4 py-3 rounded-xl glass-panel text-[11px] font-bold text-slate-300 hover:text-white flex items-center justify-center gap-2 cursor-pointer transition-all"
-                                        title="Generate Film">
-                                        <span className="material-symbols-outlined text-sm">movie</span>
+                                        className="flex-1 py-3 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all">
+                                        <span className="material-symbols-outlined text-sm">description</span> Generate Screenplay
                                     </button>
                                 </div>
                             </>
@@ -1812,17 +1666,10 @@ export default function BrainstormStudio() {
                             <h3 className="text-base font-bold text-white">{chatFilm.title}</h3>
                             <p className="text-sm text-slate-500">Refine this film concept with your creative director</p>
                         </div>
-                        <div className="flex gap-2">
-                             <button onClick={() => { handleIdeaAction('creative', chatFilm); setChatFilm(null); setStep(3) }}
-                                className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 text-xs font-bold hover:bg-white/10 cursor-pointer transition-all flex items-center gap-1.5"
-                                title="Generate Film">
-                                <span className="material-symbols-outlined text-sm">movie</span> Direct
-                            </button>
-                            <button onClick={() => generateScreenplay(chatFilm)}
-                                className="px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 cursor-pointer transition-all flex items-center gap-1.5">
-                                <span className="material-symbols-outlined text-sm">description</span> Screenplay
-                            </button>
-                        </div>
+                        <button onClick={() => generateScreenplay(chatFilm)}
+                            className="px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 cursor-pointer transition-all flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">description</span> Generate Screenplay
+                        </button>
                     </div>
 
                     {/* Current concept card (collapsible) */}
@@ -1855,14 +1702,12 @@ export default function BrainstormStudio() {
                                 <div className="glass-panel rounded-2xl rounded-tl-md px-4 py-3 max-w-lg">
                                     <p className="text-sm text-white">I love this concept! Let's refine it together. What would you like to change or improve? You can adjust the story, tone, visual style, cast, music — anything.</p>
                                     <div className="flex flex-wrap gap-1.5 mt-3">
-                                        {['Make it more emotional', 'Change the visual style', 'Adjust the story arc', 'Different music mood', 'Change the cast direction']
-                                            .filter(s => !clickedSuggestions.has(s))
-                                            .map(s => (
-                                                <button key={s} onClick={() => sendChatMessage(s)}
-                                                    className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
-                                                    {s}
-                                                </button>
-                                            ))}
+                                        {['Make it more emotional', 'Change the visual style', 'Adjust the story arc', 'Different music mood', 'Change the cast direction'].map(s => (
+                                            <button key={s} onClick={() => sendChatMessage(s)}
+                                                className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
+                                                {s}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
@@ -1882,14 +1727,12 @@ export default function BrainstormStudio() {
                                     <p className="text-sm text-white whitespace-pre-wrap">{stripMarkdown(msg.text)}</p>
                                     {msg.suggestions?.length > 0 && (
                                         <div className="flex flex-wrap gap-1.5 mt-3">
-                                            {msg.suggestions
-                                                .filter(s => !clickedSuggestions.has(s))
-                                                .map((s, j) => (
-                                                    <button key={j} onClick={() => sendChatMessage(s)}
-                                                        className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
-                                                        {s}
-                                                    </button>
-                                                ))}
+                                            {msg.suggestions.map((s, j) => (
+                                                <button key={j} onClick={() => sendChatMessage(s)}
+                                                    className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-slate-400 hover:bg-primary/10 hover:text-primary border border-white/5 hover:border-primary/20 cursor-pointer transition-all">
+                                                    {s}
+                                                </button>
+                                            ))}
                                         </div>
                                     )}
                                 </div>
@@ -2011,7 +1854,7 @@ export default function BrainstormStudio() {
                             <button onClick={() => {
                                 const prompt = `${screenplay.title}: ${screenplay.scenes?.map(s => s.visual).join('. ')}`
                                 sessionStorage.setItem('brainstormContext', JSON.stringify({ prompt }))
-                                navigate('/video-studio?fromBrainstorm=true')
+                                navigate('/creative-studio?fromBrainstorm=true')
                                 setScreenplay(null)
                             }}
                                 className="flex-1 btn-primary py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer">

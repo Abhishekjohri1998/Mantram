@@ -1,7 +1,7 @@
 /**
  * Scheduled Post Publisher — Background Service
  * 
- * Runs every 5 minutes, finds posts with status='scheduled' and scheduledFor <= now,
+ * Runs every 60 seconds, finds posts with status='scheduled' and scheduledFor <= now,
  * and publishes them via the platform-specific APIs.
  */
 
@@ -10,10 +10,7 @@ import SocialAccount from '../models/SocialAccount.js';
 import {
     publishToFacebook,
     publishToInstagram,
-    publishToLinkedIn,
-    publishCarouselToFacebook,
-    publishCarouselToInstagram,
-    publishCarouselToLinkedIn
+    publishToLinkedIn
 } from './socialService.js';
 import { uploadToS3 } from '../utils/s3.js';
 import config from '../config/env.js';
@@ -34,24 +31,12 @@ async function publishScheduledPost(post) {
             isActive: true,
         };
         if (post.accountId) accountQuery.accountId = post.accountId;
-        const account = await SocialAccount.findOne(accountQuery).select('+accessToken');
+        const account = await SocialAccount.findOne(accountQuery);
 
         if (!account) {
             console.warn(`[SCHEDULER] No active ${post.platform} account found for user ${post.user} — marking failed`);
             post.status = 'failed';
             post.error = `No active ${post.platform} account connected. Please reconnect and reschedule.`;
-            await post.save();
-            return;
-        }
-
-        // BUG-19 FIX: Check token expiry before attempting publish
-        if (account.tokenExpiresAt && new Date(account.tokenExpiresAt) < new Date()) {
-            console.warn(`[SCHEDULER] Token expired for ${post.platform} account ${account.accountId} — marking failed`);
-            post.status = 'failed';
-            post.error = `Your ${post.platform} access token has expired. Please reconnect your account and reschedule this post.`;
-            // Deactivate the expired account
-            account.isActive = false;
-            await account.save();
             await post.save();
             return;
         }
@@ -78,18 +63,8 @@ async function publishScheduledPost(post) {
         console.log(`[SCHEDULER] Publishing scheduled post ${post._id} to ${post.platform} (${account.accountName}) — Caption: ${caption.substring(0, 60)}...`);
 
         let postId = null;
-        const carouselUrls = Array.isArray(post.imageUrls) && post.imageUrls.length > 1 ? post.imageUrls : null;
 
-        if (carouselUrls) {
-            console.log(`[SCHEDULER] Carousel mode: ${carouselUrls.length} images`);
-            if (post.platform === 'facebook') {
-                postId = await publishCarouselToFacebook(account.accountId, account.accessToken, caption, carouselUrls);
-            } else if (post.platform === 'instagram') {
-                postId = await publishCarouselToInstagram(account.accountId, account.accessToken, caption, carouselUrls);
-            } else if (post.platform === 'linkedin') {
-                postId = await publishCarouselToLinkedIn(account.accountId, account.accessToken, caption, carouselUrls);
-            }
-        } else if (post.platform === 'facebook') {
+        if (post.platform === 'facebook') {
             postId = await publishToFacebook(account.accountId, account.accessToken, caption, absoluteImageUrl);
         } else if (post.platform === 'instagram') {
             postId = await publishToInstagram(account.accountId, account.accessToken, caption, absoluteImageUrl);
@@ -129,18 +104,11 @@ async function processDuePosts() {
     try {
         const now = new Date();
 
-        // BUG-16 FIX: Find and atomically lock each post before publishing
-        // Use findOneAndUpdate to set status='publishing' atomically, preventing duplicates
-        const duePosts = [];
-        for (let i = 0; i < 20; i++) {
-            const post = await SocialPost.findOneAndUpdate(
-                { status: 'scheduled', scheduledFor: { $lte: now } },
-                { $set: { status: 'publishing' } },
-                { returnDocument: 'after' }
-            );
-            if (!post) break;
-            duePosts.push(post);
-        }
+        // Find all posts that are scheduled and due
+        const duePosts = await SocialPost.find({
+            status: 'scheduled',
+            scheduledFor: { $lte: now },
+        }).limit(20); // Process max 20 per tick to avoid overwhelming APIs
 
         if (duePosts.length > 0) {
             console.log(`[SCHEDULER] Found ${duePosts.length} due post(s) — processing...`);

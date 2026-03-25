@@ -182,7 +182,39 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
         }
     }
 
-    if (!imageUrl) throw new Error('Image generation failed — all models unavailable');
+    if (!imageUrl) {
+        // ── Lao Zhang fallback — try proxy API when Google Direct fails ──
+        if (process.env.LAOZHANG_API_KEY) {
+            try {
+                console.log(`🔄 Google Direct failed — trying Lao Zhang fallback...`);
+                const lzResp = await fetch(`${process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1'}/images/generations`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${process.env.LAOZHANG_API_KEY}`,
+                    },
+                    body: JSON.stringify({
+                        model: 'gemini-3.1-flash-image-preview',
+                        prompt: promptText,
+                        n: 1,
+                        size: '1024x1024',
+                    }),
+                    signal: AbortSignal.timeout(60000),
+                });
+                const lzData = await lzResp.json();
+                const lzUrl = lzData.data?.[0]?.url || lzData.data?.[0]?.b64_json;
+                if (lzUrl) {
+                    imageUrl = lzUrl.startsWith('http') ? lzUrl : `data:image/png;base64,${lzUrl}`;
+                    usedModel = 'laozhang-nanobanana2';
+                    console.log(`✅ Image generated via Lao Zhang fallback`);
+                }
+            } catch (lzErr) {
+                console.warn(`❌ Lao Zhang image fallback also failed:`, lzErr.message);
+            }
+        }
+    }
+
+    if (!imageUrl) throw new Error('Image generation failed — all models unavailable (Google Direct + Lao Zhang)');
 
     console.log(`══════ END IMAGE GENERATION ══════\n`);
     return { imageUrl, model: usedModel, textResponse, warnings };

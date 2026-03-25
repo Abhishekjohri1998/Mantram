@@ -1,14 +1,12 @@
-import { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react'
-import SEOHead from '../components/SEOHead'
+import { useState, useRef, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
-import { content as contentAPI, agents as agentsAPI, creatives as creativesAPI, products as productsAPI, media as mediaAPI } from '../services/api'
+import { content as contentAPI, agents as agentsAPI, creatives as creativesAPI, products as productsAPI } from '../services/api'
 import { useBrand } from '../context/BrandContext'
 import { stripMarkdown } from '../utils/stripMarkdown'
 import VoiceInput from '../components/VoiceInput'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
 import PublishModal from '../components/PublishModal'
-const BlogEditor = lazy(() => import('../components/BlogEditor'))
 
 // ============================================================================
 // DATA: Goals, sub-types, channels, tones
@@ -124,19 +122,6 @@ const GOALS = [
             { id: 'explainer', icon: 'lightbulb', label: '📝 Explainer Video' },
         ],
     },
-    {
-        id: 'write_blog', icon: 'edit_note', label: 'Write Blog',
-        desc: 'AI-powered blog with rich text editor — publish-ready',
-        color: 'from-amber-500/20 to-orange-500/10', accent: '#F59E0B',
-        subTypes: [
-            { id: 'seo_article', icon: 'search', label: 'SEO Article' },
-            { id: 'thought_piece', icon: 'psychology', label: 'Thought Piece' },
-            { id: 'how_to_guide', icon: 'menu_book', label: 'How-To Guide' },
-            { id: 'listicle', icon: 'format_list_numbered', label: 'Listicle' },
-            { id: 'case_study_blog', icon: 'assignment', label: 'Case Study' },
-            { id: 'industry_analysis', icon: 'insights', label: 'Industry Analysis' },
-        ],
-    },
 ]
 
 const CHANNELS = [
@@ -181,7 +166,7 @@ function SmartInput({ onParse, onSkip }) {
     const [input, setInput] = useState('')
     const [parsing, setParsing] = useState(false)
 
-    async function handleSubmit() {
+    const handleSubmit = async () => {
         if (!input.trim()) return
         setParsing(true)
         // For now, do basic keyword detection. In future, this hits AI.
@@ -244,7 +229,7 @@ function SmartInput({ onParse, onSkip }) {
 
 function StepGoal({ onSelect }) {
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
             {GOALS.map((g, i) => (
                 <button key={g.id} onClick={() => onSelect(g.id)}
                     className="glass-panel rounded-2xl p-5 text-left hover:border-primary/30 hover:scale-[1.02] transition-all cursor-pointer group animate-fade-in"
@@ -274,7 +259,7 @@ function StepSubType({ goal, onSelect, onBack }) {
                     <p className="text-sm text-slate-400">What specifically?</p>
                 </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {goalData?.subTypes.map((st, i) => (
                     <button key={st.id} onClick={() => onSelect(st.id)}
                         className="glass-panel rounded-xl p-4 text-left hover:bg-white/[0.06] hover:border-primary/30 transition-all cursor-pointer animate-fade-in group"
@@ -292,7 +277,7 @@ function StepChannel({ onSelect, onBack, goal }) {
     const [selected, setSelected] = useState([])
     const isMulti = goal === 'educate' || goal === 'brand'
 
-    function handleToggle(id) {
+    const handleToggle = (id) => {
         if (id === 'multi') {
             setSelected(CHANNELS.filter(c => c.id !== 'multi').map(c => c.id))
             return
@@ -300,7 +285,7 @@ function StepChannel({ onSelect, onBack, goal }) {
         setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
     }
 
-    function handleContinue() {
+    const handleContinue = () => {
         if (selected.length > 0) onSelect(selected.length === 1 ? selected[0] : selected)
     }
 
@@ -311,7 +296,7 @@ function StepChannel({ onSelect, onBack, goal }) {
             </button>
             <h3 className="text-xl font-extrabold text-white mb-2">Where will this be <span className="text-primary">published?</span></h3>
             <p className="text-sm text-slate-400 mb-6">Content will be auto-optimized for the selected platform{selected.length > 1 ? 's' : ''}.</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {CHANNELS.map((ch, i) => (
                     <button key={ch.id} onClick={() => handleToggle(ch.id)}
                         className={`glass-panel rounded-xl p-4 text-center transition-all cursor-pointer animate-fade-in ${selected.includes(ch.id) || (ch.id === 'multi' && selected.length > 2)
@@ -377,7 +362,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
     }, [initialImage]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Load library images when library tab is selected
-    async function loadLibrary(cat = libraryCategory) {
+    const loadLibrary = async (cat = libraryCategory) => {
         setLibraryLoading(true)
         try {
             const data = await creativesAPI.imageBank({ category: cat })
@@ -396,7 +381,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
         if (contextType === 'library') loadLibrary()
     }, [contextType]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    function handleDrop(e) {
+    const handleDrop = (e) => {
         e.preventDefault()
         const dropped = Array.from(e.dataTransfer?.files || e.target.files || [])
         setFiles(prev => [...prev, ...dropped])
@@ -410,7 +395,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                     'Describe your brand, positioning, audience...'
 
     // Fetch smart product suggestions when details change
-    async function fetchSuggestions() {
+    const fetchSuggestions = async () => {
         if (!brandId || !details || details.length < 10) return
         setLoadingSuggestions(true)
         try {
@@ -426,7 +411,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
         }
     }
 
-    function toggleProduct(product) {
+    const toggleProduct = (product) => {
         setAttachedProducts(prev => {
             const exists = prev.find(p => p._id === product._id)
             if (exists) return prev.filter(p => p._id !== product._id)
@@ -434,7 +419,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
         })
     }
 
-    function handleContextComplete() {
+    const handleContextComplete = () => {
         let ctx = { details, url, contextType }
         // Inject attached product data into context
         if (attachedProducts.length > 0) {
@@ -517,16 +502,11 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                             if (file && file.type.startsWith('image/')) {
                                 setFiles([file])
                                 const reader = new FileReader()
-                                reader.onload = async (ev) => {
-                                    try {
-                                        const { url } = await mediaAPI.upload({ imageData: ev.target.result, folder: 'content-refs' })
-                                        setImagePreview(url)
-                                    } catch { setImagePreview(ev.target.result) }
-                                }
+                                reader.onload = (ev) => setImagePreview(ev.target.result)
                                 reader.readAsDataURL(file)
                             }
                         }} onDragOver={e => e.preventDefault()}
-                            className="border-2 border-dashed border-white/[0.1] rounded-2xl p-6 sm:p-10 text-center hover:border-primary/40 transition-colors">
+                            className="border-2 border-dashed border-white/[0.1] rounded-2xl p-10 text-center hover:border-primary/40 transition-colors">
                             <span className="material-symbols-outlined text-4xl text-slate-600 mb-3 block">add_photo_alternate</span>
                             <p className="text-slate-400 mb-2 text-sm">Drag & drop a product image or creative</p>
                             <p className="text-xs text-slate-600 mb-3">AI will analyze the image and create a content brief</p>
@@ -537,12 +517,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                                     if (file && file.type.startsWith('image/')) {
                                         setFiles([file])
                                         const reader = new FileReader()
-                                        reader.onload = async (ev) => {
-                                            try {
-                                                const { url } = await mediaAPI.upload({ imageData: ev.target.result, folder: 'content-refs' })
-                                                setImagePreview(url)
-                                            } catch { setImagePreview(ev.target.result) }
-                                        }
+                                        reader.onload = (ev) => setImagePreview(ev.target.result)
                                         reader.readAsDataURL(file)
                                     }
                                 }} accept="image/*" />
@@ -678,7 +653,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
 
                     {/* Image grid */}
                     {!libraryLoading && libraryImages.length > 0 && (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[400px] overflow-y-auto pr-1">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto pr-1">
                             {libraryImages.map(img => (
                                 <button key={img._id} onClick={() => {
                                     setImagePreview(img.imageUrl)
@@ -1182,7 +1157,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                                     </button>
                                 )}
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-2 gap-3">
                                 <input value={q.name} onChange={e => updateQuote(idx, 'name', e.target.value)}
                                     placeholder="Full Name" className="input-glass py-2 px-3 rounded-lg text-xs" />
                                 <input value={q.title} onChange={e => updateQuote(idx, 'title', e.target.value)}
@@ -1247,7 +1222,7 @@ function StepPressRelease({ onComplete, onBack, activeBrand, goal, availableProv
                     {/* Media Contact */}
                     <div>
                         <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">Media Contact</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                             <input value={contactName} onChange={e => setContactName(e.target.value)}
                                 placeholder="Contact Name" className="input-glass py-2 px-3 rounded-lg text-xs" />
                             <input value={contactEmail} onChange={e => setContactEmail(e.target.value)}
@@ -2209,13 +2184,13 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
     // Keep editContent in sync when result changes
     useEffect(() => { setEditContent(result?.content || '') }, [result?.content])
 
-    function handleCopy() {
+    const handleCopy = () => {
         navigator.clipboard.writeText(stripMarkdown(editing ? editContent : result.content))
         setCopied(true)
         setTimeout(() => setCopied(false), 2000)
     }
 
-    function handleSaveEdit() {
+    const handleSaveEdit = () => {
         if (editContent !== result.content) {
             // Save manual edit via callback
             onRefine && onRefine({ manualEdit: editContent })
@@ -2223,7 +2198,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
         setEditing(false)
     }
 
-    async function handleAIRefine() {
+    const handleAIRefine = async () => {
         if (!refineInput.trim() || refining) return
         setRefining(true)
         try {
@@ -2268,7 +2243,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     <p className="text-sm text-slate-300 leading-relaxed line-clamp-3">{result.content}</p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <button onClick={onCreateVisual}
                         className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-primary/30 transition-all cursor-pointer text-left group border border-white/[0.06]">
                         <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-3 group-hover:scale-110 transition-transform">
@@ -2590,7 +2565,7 @@ function StepProductPicker({ brandId, selectedProduct, onSelect, onBack }) {
                 </div>
             ) : (
                 <>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {filtered.map(p => {
                             const isSelected = selectedProduct?._id === p._id
                             return (
@@ -2639,11 +2614,7 @@ export default function ContentStudio() {
     const { activeBrand } = useBrand()
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
-    const [step, setStep] = useState(0)   // 0=goal, 1=subtype, 2=channel, 3=context, 4=tone, 5=result, 6=PR, 7=product, 8=youtube wizard, 9=youtube result, 10=youtube SEO wizard, 11=youtube SEO result, 12=blog input, 13=blog editor
-    const [blogBrief, setBlogBrief] = useState('')
-    const [blogHtml, setBlogHtml] = useState('')
-    const [blogTitle, setBlogTitle] = useState('')
-    const [blogGenerating, setBlogGenerating] = useState(false)
+    const [step, setStep] = useState(0)   // 0=goal, 1=subtype, 2=channel, 3=context, 4=tone, 5=result, 6=PR, 7=product, 8=youtube wizard, 9=youtube result, 10=youtube SEO wizard, 11=youtube SEO result
     const [goal, setGoal] = useState(null)
     const [subType, setSubType] = useState(null)
     const [channel, setChannel] = useState(null)
@@ -2663,10 +2634,6 @@ export default function ContentStudio() {
     const [availableProviders, setAvailableProviders] = useState([
         { id: 'auto', label: 'Auto (Recommended)', icon: 'auto_awesome', desc: 'AI picks the best model' },
     ])
-    // Trending Intelligence
-    const [trendingData, setTrendingData] = useState(null)
-    const [trendingLoading, setTrendingLoading] = useState(false)
-    const [selectedKeywords, setSelectedKeywords] = useState([])
 
     // Fetch available providers on mount
     useEffect(() => {
@@ -2674,40 +2641,6 @@ export default function ContentStudio() {
             .then(data => { if (data.providers?.length) setAvailableProviders(data.providers) })
             .catch(() => { })
     }, [])
-
-    // Fetch trending data when brand changes
-    useEffect(() => {
-        if (!activeBrand?._id) return
-        setTrendingLoading(true)
-        contentAPI.trending({ brandId: activeBrand._id })
-            .then(data => { if (data.success) setTrendingData(data) })
-            .catch(() => {})
-            .finally(() => setTrendingLoading(false))
-    }, [activeBrand?._id])
-
-    const abortControllerRef = useRef(null)
-    const activeBrandIdRef = useRef(activeBrand?._id)
-
-    function getSignal() {
-        if (abortControllerRef.current) abortControllerRef.current.abort()
-        abortControllerRef.current = new AbortController()
-        return abortControllerRef.current.signal
-    }
-
-    useEffect(() => {
-        return () => abortControllerRef.current?.abort()
-    }, [])
-
-    // Abort and reset on brand switch
-    useEffect(() => {
-        if (activeBrand?._id !== activeBrandIdRef.current) {
-            console.log('Brand changed, aborting content processing...')
-            abortControllerRef.current?.abort()
-            activeBrandIdRef.current = activeBrand?._id
-            if (generating) setGenerating(false)
-        }
-    }, [activeBrand?._id, generating])
-
 
     // Read URL params on mount (from Calendar, Dashboard, etc.)
     useEffect(() => {
@@ -2752,8 +2685,7 @@ export default function ContentStudio() {
             if (/promot|offer|sale|discount|deal|product/.test(lower)) detectedGoal = 'promote'
             else if (/festival|diwali|christmas|celebrat|occasion|milestone|holi|eid|navratri/.test(lower)) detectedGoal = 'celebrate'
             else if (/launch|new|announce|pr |press|collab/.test(lower)) detectedGoal = 'launch'
-            else if (/blog|seo.?article|how.?to.?guide|listicle|write.?a.?post/.test(lower)) detectedGoal = 'write_blog'
-            else if (/educat|tip|thought.?leader|insight/.test(lower)) detectedGoal = 'educate'
+            else if (/blog|seo|article|guide|how.to|educat|tip/.test(lower)) detectedGoal = 'educate'
             else if (/brand|story|about|tagline|website|vision/.test(lower)) detectedGoal = 'brand'
             else if (/youtube|yt |video script|shorts script/.test(lower)) detectedGoal = 'youtube_content'
 
@@ -2770,10 +2702,6 @@ export default function ContentStudio() {
             if (detectedGoal === 'youtube_content') {
                 setGoal('youtube_content')
                 setStep(1)  // Show YouTube sub-types (Script vs SEO)
-            } else if (detectedGoal === 'write_blog') {
-                setGoal('write_blog')
-                setBlogBrief(prompt)
-                setStep(12)  // Jump to blog input
             } else if (detectedGoal) {
                 setGoal(detectedGoal)
                 if (detectedChannel) {
@@ -2786,24 +2714,11 @@ export default function ContentStudio() {
                 setStep(0) // Show goal chooser
             }
             setSearchParams({}, { replace: true })
-        } else if (searchParams.get('fromBrainstorm') === 'true') {
-            const bsCtx = window.sessionStorage.getItem('brainstormContext')
-            if (bsCtx) {
-                try {
-                    const parsed = JSON.parse(bsCtx)
-                    if (parsed.description || parsed.prompt) {
-                        setContext({ details: parsed.description || parsed.prompt })
-                        setGoal('promote') // Default to promote for brainstorm ideas
-                        setStep(1) // Go to sub-type selection
-                    }
-                } catch (e) { console.error('Failed to parse brainstorm context:', e) }
-            }
-            setSearchParams({}, { replace: true })
         }
-    }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Smart input handler
-    function handleSmartParse(parsed) {
+    const handleSmartParse = (parsed) => {
         if (parsed.goal) {
             setGoal(parsed.goal)
             if (parsed.channel) {
@@ -2820,7 +2735,7 @@ export default function ContentStudio() {
     }
 
     // Build the full prompt from all selections
-    function buildPrompt(settings) {
+    const buildPrompt = (settings) => {
         // Use passed settings directly (React setState is async, can't rely on toneSettings state here)
         const ts = settings || toneSettings || {}
         const goalData = GOALS.find(g => g.id === goal)
@@ -2861,26 +2776,10 @@ export default function ContentStudio() {
             prompt += `SELLING APPROACH: ${sellLabel}\n`
         }
 
-        // === CONTEXT & KEYWORD INJECTION (STRENGTHENED) ===
-        if (context?.details) {
-            prompt += `\nBRIEF / CONTEXT FROM USER:\n${context.details}\n`
-
-            // Extract explicit keywords/features the user typed (pipe-separated, comma-separated, bullet-separated)
-            const rawDetails = context.details
-            const keywordPatterns = rawDetails.match(/[^|,\n•·–—]+/g) || []
-            const extractedKeywords = keywordPatterns
-                .map(k => k.trim())
-                .filter(k => k.length > 3 && k.length < 100 && !/^(ATTACHED|PRODUCT|FOR REFERENCE|CONTEXT)/i.test(k))
-            
-            if (extractedKeywords.length > 1) {
-                prompt += `\n⚠️ MANDATORY KEYWORDS/FEATURES — You MUST include ALL of these in the content:\n`
-                extractedKeywords.forEach(kw => { prompt += `• ${kw}\n` })
-                prompt += `Do NOT skip any of these. Weave each one naturally into the content.\n`
-            }
-        }
+        if (context?.details) prompt += `\nCONTEXT: ${context.details}\n`
         if (context?.url) prompt += `REFERENCE URL: ${context.url}\n`
 
-        // === PRODUCT INJECTION — works for ALL goals, not just product_content ===
+        // Product context injection for product_content goal
         if (goal === 'product_content' && selectedProduct) {
             prompt += `\nPRODUCT INFORMATION:\n`
             prompt += `- Product Name: ${selectedProduct.title}\n`
@@ -2894,18 +2793,6 @@ export default function ContentStudio() {
                 prompt += `- Specifications: ${JSON.stringify(selectedProduct.specifications)}\n`
             }
             prompt += `\nWrite a complete, platform-specific listing using ALL the product information above.\n`
-        } else if (context?.attachedProducts?.length > 0) {
-            // Inject attached products for promote, celebrate, launch, educate, brand goals too
-            prompt += `\n📦 PRODUCT DETAILS — Use these details in the content:\n`
-            context.attachedProducts.forEach(p => {
-                prompt += `• ${p.title}`
-                if (p.shortDescription) prompt += ` — ${p.shortDescription}`
-                if (p.price?.amount) prompt += ` | ₹${p.price.amount}`
-                if (p.features?.length) prompt += ` | Features: ${p.features.join(', ')}`
-                if (p.tags?.length) prompt += ` | Tags: ${p.tags.join(', ')}`
-                prompt += `\n`
-            })
-            prompt += `Mention product name(s), key features, and price in the content.\n`
         }
 
         // Platform-specific auto-optimization
@@ -2928,7 +2815,7 @@ export default function ContentStudio() {
         return prompt
     }
 
-    async function handleGenerate(settings) {
+    const handleGenerate = async (settings) => {
         setToneSettings(settings)
         if (!activeBrand) { setError('Please select a brand first.'); return }
         setGenerating(true)
@@ -2938,7 +2825,6 @@ export default function ContentStudio() {
         const prompt = buildPrompt(settings)
 
         try {
-            const signal = getSignal()
             const data = await contentAPI.generate({
                 brandId: activeBrand._id,
                 type: goal,
@@ -2946,9 +2832,8 @@ export default function ContentStudio() {
                 platform: Array.isArray(channel) ? channel.join(',') : channel,
                 prompt,
                 toneSettings: settings,
-                trendingKeywords: selectedKeywords.length > 0 ? selectedKeywords : undefined,
                 options: modelOverride !== 'auto' ? { modelOverride } : {},
-            }, { signal })
+            })
             setResult(data.content)
             setStep(5)
         } catch (err) {
@@ -2958,12 +2843,11 @@ export default function ContentStudio() {
         }
     }
 
-    async function handleRegenerate() {
+    const handleRegenerate = async () => {
         if (!result?._id) return
         setGenerating(true)
         try {
-            const signal = getSignal()
-            const data = await contentAPI.regenerate(result._id, {}, { signal })
+            const data = await contentAPI.regenerate(result._id, {})
             setResult(data.content)
         } catch (err) {
             console.error(err)
@@ -2974,7 +2858,7 @@ export default function ContentStudio() {
 
     const [contentFeedback, setContentFeedback] = useState(null) // 'liked' | 'disliked'
 
-    async function handleFeedback(signalType, extra = {}) {
+    const handleFeedback = async (signalType, extra = {}) => {
         // Immediate visual feedback regardless of _id
         if (signalType === 'thumbs') {
             setContentFeedback(extra.thumbs === 'up' ? 'liked' : 'disliked')
@@ -2993,7 +2877,7 @@ export default function ContentStudio() {
         }
     }
 
-    function handleCreateVisual() {
+    const handleCreateVisual = () => {
         // Navigate to Creative Studio with content context
         const contentSummary = result?.content?.substring(0, 200) || ''
         const params = new URLSearchParams({
@@ -3005,7 +2889,7 @@ export default function ContentStudio() {
     }
 
     // Press Release generation handler
-    async function handleGeneratePR(prData) {
+    const handleGeneratePR = async (prData) => {
         if (!activeBrand) { setError('Please select a brand first.'); return }
         setGenerating(true)
         setError('')
@@ -3061,7 +2945,6 @@ SPOKESPERSON QUOTES:`
 - Output ONLY the press release — no explanations`
 
         try {
-            const signal = getSignal()
             const data = await contentAPI.generate({
                 brandId: activeBrand._id,
                 type: 'press_release',
@@ -3070,7 +2953,7 @@ SPOKESPERSON QUOTES:`
                 prompt,
                 toneSettings: { language: prData.language, tone: prData.tone },
                 options: modelOverride !== 'auto' ? { modelOverride } : {},
-            }, { signal })
+            })
             setResult(data.content)
             setStep(5)
         } catch (err) {
@@ -3081,7 +2964,7 @@ SPOKESPERSON QUOTES:`
     }
 
     // Refine handler — updates content in-place
-    function handleRefine(refineData) {
+    const handleRefine = (refineData) => {
         if (refineData.manualEdit) {
             // User manually edited and saved
             setResult(prev => ({ ...prev, content: refineData.manualEdit }))
@@ -3098,30 +2981,27 @@ SPOKESPERSON QUOTES:`
         }
     }
 
-    function handleHistorySelect(item) {
+    const handleHistorySelect = (item) => {
         setResult(item)
         setStep(5)
         setAccepted(item.status === 'approved')
         setShowHistory(false)
     }
 
-    function resetAll() {
+    const resetAll = () => {
         setStep(0); setGoal(null); setSubType(null); setChannel(null)
         setContext(null); setToneSettings(null); setResult(null); setError('')
         setAccepted(false); setPrefilledOccasion(null); setSelectedProduct(null)
         setYoutubeData(null); setYoutubeSeoData(null); setContentFeedback(null)
-        setSelectedKeywords([])
-        setBlogBrief(''); setBlogHtml(''); setBlogTitle(''); setBlogGenerating(false)
     }
 
     // YouTube content generation handler (Script & Ideation)
-    async function handleGenerateYouTube(ytSettings) {
+    const handleGenerateYouTube = async (ytSettings) => {
         if (!activeBrand) { setError('Please select a brand first.'); return }
         setGenerating(true)
         setError('')
 
         try {
-            const signal = getSignal()
             const data = await contentAPI.youtube({
                 brandId: activeBrand._id,
                 brief: ytSettings.brief,
@@ -3131,7 +3011,7 @@ SPOKESPERSON QUOTES:`
                 style: ytSettings.style,
                 language: ytSettings.language,
                 subType: subType || '',
-            }, { signal })
+            })
             setResult(data.content)
             setYoutubeData(data.content?.youtubeData || {})
             setStep(9)  // YouTube result view
@@ -3143,7 +3023,7 @@ SPOKESPERSON QUOTES:`
     }
 
     // YouTube SEO / Publish Optimizer handler (metadata only)
-    async function handleGenerateYouTubeSeo(seoSettings) {
+    const handleGenerateYouTubeSeo = async (seoSettings) => {
         if (!activeBrand) { setError('Please select a brand first.'); return }
         setGenerating(true)
         setError('')
@@ -3173,7 +3053,6 @@ SPOKESPERSON QUOTES:`
 
     return (
         <DashboardLayout title="Content Studio" subtitle="AI-powered content for every channel">
-            <SEOHead title="Content Studio — Mantram AI" noIndex={true} />
             {/* Progress Stepper (shown at steps 1-4) */}
             {step > 0 && step < 5 && (
                 <div className="flex items-center gap-2 mb-8 max-w-3xl mx-auto">
@@ -3186,8 +3065,8 @@ SPOKESPERSON QUOTES:`
                                 ${step > i ? 'bg-primary text-white' : step === i ? 'bg-primary/20 text-primary border border-primary/40' : 'bg-white/5 text-slate-600'}`}>
                                 {step > i ? '✓' : i + 1}
                             </div>
-                            <span className={`text-xs font-bold hidden sm:inline ${step >= i ? 'text-slate-300' : 'text-slate-600'}`}>{lbl}</span>
-                            {i < 4 && <div className={`w-4 sm:w-8 h-px ${step > i ? 'bg-primary/40' : 'bg-white/5'}`} />}
+                            <span className={`text-xs font-bold ${step >= i ? 'text-slate-300' : 'text-slate-600'}`}>{lbl}</span>
+                            {i < 4 && <div className={`w-8 h-px ${step > i ? 'bg-primary/40' : 'bg-white/5'}`} />}
                         </div>
                     ))}
                     <div className="ml-auto">
@@ -3204,7 +3083,7 @@ SPOKESPERSON QUOTES:`
             {step === 0 && (
                 <div className="animate-fade-in">
                     {/* Hero Section */}
-                    <div className="text-center mb-8">
+                    <div className="text-center mb-10">
                         <span className="material-symbols-outlined text-5xl text-primary mb-3 block">edit_note</span>
                         <h2 className="text-2xl font-black text-white mb-2">What do you want to <span className="text-primary">create?</span></h2>
                         <p className="text-sm text-slate-400 max-w-lg mx-auto">Tell us what you need — we'll handle the rest.</p>
@@ -3213,93 +3092,10 @@ SPOKESPERSON QUOTES:`
                     {/* Smart Input */}
                     <SmartInput onParse={handleSmartParse} />
 
-                    {/* ═══ TRENDING INTELLIGENCE PANEL ═══ */}
-                    {activeBrand && (
-                        <div className="max-w-4xl mx-auto mb-8">
-                            <div className="flex items-center gap-2 mb-4">
-                                <span className="material-symbols-outlined text-amber-400 text-lg">trending_up</span>
-                                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Trending Now</h3>
-                                <span className="text-xs text-slate-600">for {trendingData?.industry || activeBrand?.dna?.industry || 'your industry'}</span>
-                                {trendingData?.cached && <span className="text-[9px] text-slate-700 bg-white/[0.03] px-1.5 py-0.5 rounded-full">cached</span>}
-                            </div>
-
-                            {trendingLoading ? (
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                    {[1,2,3,4].map(i => (
-                                        <div key={i} className="glass-panel rounded-xl p-4 animate-pulse">
-                                            <div className="h-3 bg-white/[0.06] rounded mb-2 w-3/4" />
-                                            <div className="h-2 bg-white/[0.04] rounded w-full" />
-                                            <div className="h-2 bg-white/[0.04] rounded w-2/3 mt-1" />
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : trendingData?.trending?.length > 0 ? (
-                                <>
-                                    {/* Trending Topic Cards */}
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                                        {trendingData.trending.slice(0, 4).map((t, i) => {
-                                            const icons = { trending: 'local_fire_department', emerging: 'rocket_launch', seasonal: 'event' };
-                                            const colors = { trending: 'text-orange-400', emerging: 'text-cyan-400', seasonal: 'text-violet-400' };
-                                            const bgColors = { trending: 'from-orange-500/10 to-amber-500/5', emerging: 'from-cyan-500/10 to-blue-500/5', seasonal: 'from-violet-500/10 to-purple-500/5' };
-                                            return (
-                                                <button key={i} onClick={() => {
-                                                    setContext({ details: `${t.topic}: ${t.description}` });
-                                                    const lower = (t.topic + ' ' + t.description).toLowerCase();
-                                                    if (/promot|offer|sale|product/.test(lower)) setGoal('promote');
-                                                    else if (/festival|celebrat/.test(lower)) setGoal('celebrate');
-                                                    else if (/launch|new|announce/.test(lower)) setGoal('launch');
-                                                    else setGoal('educate');
-                                                    setStep(2);
-                                                }}
-                                                    className={`glass-panel rounded-xl p-4 text-left hover:scale-[1.02] transition-all cursor-pointer group bg-gradient-to-br ${bgColors[t.type] || bgColors.trending} border border-white/[0.06] hover:border-white/[0.12]`}
-                                                    style={{ animationDelay: `${i * 80}ms` }}>
-                                                    <div className="flex items-center gap-1.5 mb-2">
-                                                        <span className={`material-symbols-outlined text-sm ${colors[t.type] || colors.trending}`}>{icons[t.type] || icons.trending}</span>
-                                                        {t.urgency === 'high' && <span className="text-[9px] bg-rose-500/20 text-rose-400 px-1.5 py-0.5 rounded-full font-bold">HOT</span>}
-                                                    </div>
-                                                    <p className="text-xs font-bold text-white mb-1 line-clamp-1">{t.topic}</p>
-                                                    <p className="text-[10px] text-slate-500 line-clamp-2 leading-relaxed">{t.description}</p>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-
-                                    {/* Keyword Pills */}
-                                    {trendingData?.keywords?.length > 0 && (
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {trendingData.keywords.slice(0, 12).map((kw, i) => {
-                                                const keyword = kw.keyword || kw;
-                                                const isSelected = selectedKeywords.includes(keyword);
-                                                return (
-                                                    <button key={i} onClick={() => {
-                                                        setSelectedKeywords(prev => isSelected ? prev.filter(k => k !== keyword) : [...prev, keyword]);
-                                                    }}
-                                                        className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer border ${isSelected
-                                                            ? 'bg-primary/15 text-primary border-primary/30'
-                                                            : 'bg-white/[0.02] text-slate-500 border-white/[0.06] hover:text-white hover:border-white/[0.12]'
-                                                        }`}>
-                                                        {isSelected && <span className="mr-0.5">✓</span>}
-                                                        {keyword}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                    {selectedKeywords.length > 0 && (
-                                        <p className="text-[10px] text-primary/70 mt-2 flex items-center gap-1">
-                                            <span className="material-symbols-outlined text-[10px]">auto_awesome</span>
-                                            {selectedKeywords.length} keyword{selectedKeywords.length > 1 ? 's' : ''} will be woven into your content
-                                        </p>
-                                    )}
-                                </>
-                            ) : null}
-                        </div>
-                    )}
-
                     {/* Divider */}
                     <div className="flex items-center gap-3 max-w-4xl mx-auto mb-6">
                         <div className="flex-1 h-px bg-white/[0.06]" />
-                        <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Pick your content type</span>
+                        <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Or pick your content type</span>
                         <div className="flex-1 h-px bg-white/[0.06]" />
                     </div>
 
@@ -3328,8 +3124,6 @@ SPOKESPERSON QUOTES:`
                             setGoal(g); setStep(7)  // Jump to product picker
                         } else if (g === 'youtube_content') {
                             setGoal(g); setStep(1)  // Show YouTube sub-types (Script vs Publish Optimizer)
-                        } else if (g === 'write_blog') {
-                            setGoal(g); setStep(12)  // Jump to blog input
                         } else {
                             setGoal(g); setStep(1)
                         }
@@ -3512,152 +3306,6 @@ SPOKESPERSON QUOTES:`
                 />
             )}
 
-            {/* ========== STEP 12: BLOG INPUT ========== */}
-            {step === 12 && (
-                <div className="animate-fade-in max-w-3xl mx-auto">
-                    <button onClick={() => { setStep(0); setGoal(null) }} className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white mb-6 cursor-pointer transition-all">
-                        <span className="material-symbols-outlined text-sm">arrow_back</span> Back
-                    </button>
-
-                    <div className="text-center mb-8">
-                        <span className="material-symbols-outlined text-4xl text-amber-400 mb-3 block">edit_note</span>
-                        <h2 className="text-2xl font-black text-white mb-2">Write a <span className="text-amber-400">Blog</span></h2>
-                        <p className="text-sm text-slate-400">Enter your topic, keywords, or brief — AI will generate a full blog in a rich editor.</p>
-                    </div>
-
-                    {/* Blog Type Selection */}
-                    {subType ? (
-                        <div className="flex items-center gap-2 mb-4">
-                            <span className="text-xs text-slate-500">Type:</span>
-                            <span className="bg-amber-500/15 text-amber-400 text-xs px-2.5 py-1 rounded-lg font-bold">
-                                {GOALS.find(g => g.id === 'write_blog')?.subTypes?.find(s => s.id === subType)?.label || subType}
-                            </span>
-                            <button onClick={() => setSubType(null)} className="text-slate-600 hover:text-white cursor-pointer">
-                                <span className="material-symbols-outlined text-xs">close</span>
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-6">
-                            {GOALS.find(g => g.id === 'write_blog')?.subTypes?.map(st => (
-                                <button key={st.id} onClick={() => setSubType(st.id)}
-                                    className="glass-panel rounded-xl px-3 py-2.5 text-left border border-white/[0.06] hover:border-amber-400/30 transition-all cursor-pointer">
-                                    <div className="flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-sm text-amber-400">{st.icon}</span>
-                                        <span className="text-xs font-bold text-white">{st.label}</span>
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Blog Brief/Topic Input */}
-                    <div className="glass-panel rounded-2xl p-5 border border-white/[0.06] mb-4">
-                        <label className="text-xs font-bold text-slate-400 mb-2 block">Topic, Keywords or Brief</label>
-                        <textarea value={blogBrief} onChange={e => setBlogBrief(e.target.value)}
-                            placeholder="e.g. Best wireless earbuds under ₹2000 in India 2024 | noise cancellation | battery life | bass quality"
-                            rows={4}
-                            className="w-full bg-transparent text-sm text-white outline-none resize-none placeholder-slate-600 leading-relaxed" />
-                    </div>
-
-                    {/* Trending Keywords for Blog */}
-                    {trendingData?.keywords?.length > 0 && (
-                        <div className="mb-5">
-                            <p className="text-xs font-bold text-slate-500 mb-2 flex items-center gap-1.5">
-                                <span className="material-symbols-outlined text-xs text-amber-400">trending_up</span>
-                                Suggested keywords to include
-                            </p>
-                            <div className="flex flex-wrap gap-1.5">
-                                {trendingData.keywords.slice(0, 10).map((kw, i) => {
-                                    const keyword = kw.keyword || kw;
-                                    const isSelected = selectedKeywords.includes(keyword);
-                                    return (
-                                        <button key={i} onClick={() => {
-                                            setSelectedKeywords(prev => isSelected ? prev.filter(k => k !== keyword) : [...prev, keyword]);
-                                        }}
-                                            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer border ${isSelected
-                                                ? 'bg-amber-400/15 text-amber-400 border-amber-400/30'
-                                                : 'bg-white/[0.02] text-slate-500 border-white/[0.06] hover:text-white hover:border-white/[0.12]'
-                                            }`}>
-                                            {isSelected && <span className="mr-0.5">✓</span>}
-                                            {keyword}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-
-                    {error && (
-                        <div className="glass-panel rounded-xl p-3 mb-4 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
-                            <span className="material-symbols-outlined text-sm">error</span> {error}
-                        </div>
-                    )}
-
-                    {/* Generate Button */}
-                    <button onClick={async () => {
-                        if (!blogBrief.trim()) { setError('Please enter a topic or brief.'); return }
-                        if (!activeBrand) { setError('Please select a brand first.'); return }
-                        setBlogGenerating(true); setError('')
-                        try {
-                            const signal = getSignal()
-                            const kwList = selectedKeywords.length > 0 ? `\nKEYWORDS TO INCLUDE: ${selectedKeywords.join(', ')}` : ''
-                            const blogType = subType ? `\nBLOG TYPE: ${GOALS.find(g => g.id === 'write_blog')?.subTypes?.find(s => s.id === subType)?.label || subType}` : ''
-                            const data = await contentAPI.generate({
-                                brandId: activeBrand._id,
-                                type: 'blog',
-                                prompt: `INTENT: Write a comprehensive, SEO-optimized blog article${blogType}\nTOPIC/BRIEF: ${blogBrief}${kwList}\n\nOUTPUT FORMAT: Return the blog as clean HTML using <h2>, <h3>, <p>, <ul>, <ol>, <li>, <blockquote>, <strong>, <em> tags. Do NOT use <h1> (the title will be separate). Do NOT use markdown. Write 800-1200 words. Include an engaging introduction, 3-5 main sections with subheadings, and a conclusion. Make it publish-ready.`,
-                                trendingKeywords: selectedKeywords.length > 0 ? selectedKeywords : undefined,
-                                options: modelOverride !== 'auto' ? { modelOverride } : {},
-                            }, { signal })
-
-                            const raw = data.content?.content || data.content || ''
-                            // Extract title from first heading if present
-                            const titleMatch = raw.match(/<h[12][^>]*>([^<]+)<\/h[12]>/i)
-                            setBlogTitle(titleMatch ? titleMatch[1] : blogBrief.split('|')[0].trim().slice(0, 80))
-                            // Remove the extracted title from content
-                            const htmlContent = titleMatch ? raw.replace(titleMatch[0], '') : raw
-                            setBlogHtml(htmlContent)
-                            setStep(13)
-                        } catch (err) {
-                            setError(err.message || 'Blog generation failed.')
-                        } finally {
-                            setBlogGenerating(false)
-                        }
-                    }}
-                        disabled={blogGenerating || !blogBrief.trim()}
-                        className={`btn-primary w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 ${blogGenerating ? 'animate-pulse' : ''}`}>
-                        {blogGenerating ? (
-                            <><span className="material-symbols-outlined text-lg animate-spin">progress_activity</span> Generating blog...</>
-                        ) : (
-                            <><span className="material-symbols-outlined text-lg">auto_awesome</span> Generate Blog</>  
-                        )}
-                    </button>
-                </div>
-            )}
-
-            {/* ========== STEP 13: BLOG EDITOR ========== */}
-            {step === 13 && (
-                <Suspense fallback={<div className="text-center py-20 text-slate-500"><span className="material-symbols-outlined text-3xl animate-spin">progress_activity</span><p className="mt-2 text-sm">Loading editor...</p></div>}>
-                    <BlogEditor
-                        initialContent={blogHtml}
-                        title={blogTitle}
-                        onBack={() => setStep(12)}
-                        brandId={activeBrand?._id}
-                        activeBrand={activeBrand}
-                        onSave={async (blogData) => {
-                            try {
-                                await contentAPI.generate({
-                                    brandId: activeBrand?._id,
-                                    type: 'blog',
-                                    prompt: blogData.title || blogBrief,
-                                    options: {},
-                                })
-                            } catch {}
-                        }}
-                    />
-                </Suspense>
-            )}
-
             {/* Content History Sidebar */}
             <ContentHistory
                 brandId={activeBrand?._id}
@@ -3668,4 +3316,3 @@ SPOKESPERSON QUOTES:`
         </DashboardLayout>
     )
 }
-
