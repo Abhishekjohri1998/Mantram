@@ -48,51 +48,53 @@ const app = express();
 // Connect Database
 connectDB();
 
-// Middleware
+// ── CORS ──────────────────────────────────────────────────────
+// These are always allowed regardless of .env FRONTEND_URL value
+const HARDCODED_ORIGINS = [
+    'https://mantram.ai',
+    'https://www.mantram.ai',
+    'https://djty1w4l0681b.cloudfront.net',
+    'http://localhost:5173',
+    'http://localhost:3000',
+];
+
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or curl)
+        // Allow requests with no origin (mobile apps, curl, server-to-server)
         if (!origin) return callback(null, true);
 
-        // Standardize origin for matching (lowercase, no trailing slash)
         const cleanOrigin = origin.toLowerCase().replace(/\/$/, '');
-        
-        // Define hardcoded safe domains as fallback
-        const safeDomains = [
-            'https://mantram.ai',
-            'https://www.mantram.ai',
-            'https://djty1w4l0681b.cloudfront.net'
-        ];
-        
-        const allowedOrigins = [
-            ...(config.frontendUrl || []),
-            ...safeDomains
-        ].map(url => url.toLowerCase().replace(/\/$/, ''));
 
-        // Check against allowed list or allow any mantram.ai subdomain in production
-        const isAllowed = allowedOrigins.includes(cleanOrigin) || 
-                         (cleanOrigin.endsWith('.mantram.ai') && !cleanOrigin.includes('..'));
+        // Merge hardcoded + .env configured origins
+        const envOrigins = (config.frontendUrl || []).map(u => u.toLowerCase().replace(/\/$/, ''));
+        const allowedOrigins = [...new Set([...HARDCODED_ORIGINS.map(u => u.toLowerCase()), ...envOrigins])];
+
+        const isAllowed =
+            allowedOrigins.includes(cleanOrigin) ||
+            (cleanOrigin.endsWith('.mantram.ai') && !cleanOrigin.includes('..'));
 
         if (isAllowed) {
-            callback(null, true);
-        } else {
-            console.error(`❌ CORS Rejected: Origin "${origin}" (cleaned: "${cleanOrigin}") is not in the allowed list.`, {
-                configured: config.frontendUrl,
-                allowedProcessed: allowedOrigins
-            });
-            // Still call callback with false to trigger standard CORS failure
-            // but we might want to allow it anyway if we suspect config issues
-            callback(null, false);
+            return callback(null, true);
         }
+
+        console.error(`❌ CORS Rejected: "${origin}" not in allowed list.`, { allowedOrigins });
+        // Return proper CORS error (not just false which gives confusing browser message)
+        return callback(new Error(`CORS policy: Origin "${origin}" not allowed`));
     },
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+    optionsSuccessStatus: 200, // For legacy browser compatibility (IE11)
 }));
+
+// Explicitly handle OPTIONS preflight for all routes
+app.options('*', cors());
+
 // Special middleware for Shopify Webhooks to ensure raw body capture for HMAC verification
 app.use('/api/shopify/webhooks', express.raw({ type: '*/*', limit: '50mb' }), (req, res, next) => {
     if (Buffer.isBuffer(req.body)) {
         req.rawBody = req.body;
         try {
-            // Attempt to parse JSON so subsequent handlers can use req.body
             const bodyString = req.body.toString('utf8');
             if (bodyString && (bodyString.startsWith('{') || bodyString.startsWith('['))) {
                 req.body = JSON.parse(bodyString);
@@ -174,7 +176,8 @@ app.get('/api/health', (req, res) => {
         status: 'ok',
         timestamp: new Date().toISOString(),
         cors: {
-            allowedOrigins: config.frontendUrl
+            hardcodedOrigins: HARDCODED_ORIGINS,
+            envOrigins: config.frontendUrl,
         },
         ai: {
             textProvider: config.ai.defaultTextProvider,
@@ -197,8 +200,9 @@ const server = app.listen(config.port, () => {
     console.log(`\n🚀 Mantram AI Server running on port ${config.port}`);
     console.log(`📡 AI Provider: ${config.ai.defaultTextProvider} (${config.ai.defaultTextModel})`);
     console.log(`🌐 Frontend: ${config.frontendUrl}\n`);
+    console.log(`🔐 CORS Hardcoded Origins: ${HARDCODED_ORIGINS.join(', ')}`);
 
-    // Start follow-up scheduler (every 4 hours — Meta Compliance: Decelerated from 30min)
+    // Start follow-up scheduler (every 4 hours — Meta Compliance)
     import('./services/autonomousAgent.js').then(({ runFollowUpCheck }) => {
         setInterval(() => {
             runFollowUpCheck().catch(err => console.warn('⚠️ Follow-up check failed:', err.message));
@@ -206,7 +210,7 @@ const server = app.listen(config.port, () => {
         console.log('🤖 Autonomous Agent active — Follow-up scheduler running every 4 hours (Compliance Optimized)');
     }).catch(() => { });
 
-    // Start intelligence agent scheduler (every 6 hours — Meta Compliance: Decelerated from 2hrs)
+    // Start intelligence agent scheduler (every 6 hours — Meta Compliance)
     import('./services/intelligenceAgent.js').then(({ runIntelMissions }) => {
         setInterval(() => {
             runIntelMissions().catch(err => console.warn('🕵️ Intel Agent check failed:', err.message));
@@ -221,26 +225,22 @@ const server = app.listen(config.port, () => {
 });
 
 // Configure Keep-Alive timeout to be larger than AWS ALB / CloudFront idle timeout (60s)
-// This prevents random 502 Bad Gateway errors caused by TCP connection race conditions
 server.keepAliveTimeout = 65000;
 server.headersTimeout = 66000;
 
-// Timeout set to 1000 minutes (60,000,000ms) to support long-running AI operations
-// (SEO audits, crawls, multi-model AI chains, image generation + S3 uploads)
-server.timeout = 60000000; // 1000 minutes
+// Timeout set to 1000 minutes to support long-running AI operations
+server.timeout = 60000000;
 
 // ══════════════════════════════════════════════════════════════
 // SCALING: GRACEFUL SHUTDOWN
 // ══════════════════════════════════════════════════════════════
 const gracefulShutdown = (signal) => {
     console.log(`\n🛑 ${signal} received. Starting graceful shutdown...`);
-    
-    // Stop accepting new connections
+
     server.close(async () => {
         console.log('HTTP server closed.');
-        
+
         try {
-            // Signal to db.js to not attempt reconnect
             if (mongoose.connection) {
                 mongoose.connection.isShuttingDown = true;
             }
@@ -253,7 +253,6 @@ const gracefulShutdown = (signal) => {
         }
     });
 
-    // Force exit after 30s if cleanup hangs
     setTimeout(() => {
         console.error('Could not close connections in time, forcefully shutting down');
         process.exit(1);
@@ -268,12 +267,10 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 // ══════════════════════════════════════════════════════════════
 process.on('unhandledRejection', (reason, promise) => {
     console.error('🚨 Unhandled Rejection at:', promise, 'reason:', reason);
-    // In production, we log but don't crash unless it's a critical boot error
 });
 
 process.on('uncaughtException', (err) => {
     console.error('🚨 Uncaught Exception:', err);
-    // Optional: Graceful shutdown if exception is too severe
-    // gracefulShutdown('UncaughtException');
 });
+
 export default app;
