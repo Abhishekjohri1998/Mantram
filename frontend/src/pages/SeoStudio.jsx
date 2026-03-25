@@ -84,6 +84,7 @@ export default function SeoStudio() {
     const [competitors, setCompetitors] = useState(activeBrand?.competitors || [])
     const [newCompUrl, setNewCompUrl] = useState('')
     const [compLoading, setCompLoading] = useState(false)
+    const [showComparePrompt, setShowComparePrompt] = useState(false)
 
     // Input state
     const [askQuery, setAskQuery] = useState('')
@@ -169,9 +170,13 @@ export default function SeoStudio() {
     const discoverCompetitors = async () => {
         if (!activeBrand?._id) return
         setCompLoading(true)
+        setShowComparePrompt(false)
         try {
             const d = await seoAPI.discoverCompetitors({ brandId: activeBrand._id })
-            if (d.competitors) setCompetitors(d.competitors)
+            if (d.competitors) {
+                setCompetitors(d.competitors)
+                setShowComparePrompt(true)
+            }
         } catch (e) { setError(e.message) }
         finally { setCompLoading(false) }
     }
@@ -976,9 +981,9 @@ small{color:#94a3b8;font-size:10px}
                                             <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Competitors ({competitors.length})</p>
                                             <div className="space-y-1 mb-2">
                                                 {competitors.slice(0, 4).map((c, i) => (
-                                                    <div key={i} className="flex items-center justify-between text-[10px] text-slate-400 px-2 py-1 rounded bg-white/[0.02]">
-                                                        <span className="truncate">{c.name || c.url}</span>
-                                                        <button onClick={() => removeCompetitor(c.url)} className="text-slate-600 hover:text-rose-400 cursor-pointer"><span className="material-symbols-outlined text-[10px]">close</span></button>
+                                                    <div key={i} className="flex items-center justify-between text-[10px] text-slate-400 px-2 py-1 rounded bg-white/[0.02] hover:bg-white/[0.05] transition-colors group">
+                                                        <span className="truncate cursor-pointer hover:text-white flex-1" onClick={() => { setActiveSection('competitors'); setShowSetup(false); }}>{c.name || c.url}</span>
+                                                        <button onClick={() => removeCompetitor(c.url)} className="text-slate-600 hover:text-rose-400 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"><span className="material-symbols-outlined text-[10px]">close</span></button>
                                                     </div>
                                                 ))}
                                                 {competitors.length > 4 && <p className="text-[9px] text-slate-600 px-2">+{competitors.length - 4} more</p>}
@@ -993,6 +998,13 @@ small{color:#94a3b8;font-size:10px}
                                                 {compLoading ? <span className="material-symbols-outlined text-[10px] animate-spin">sync</span> : <span className="material-symbols-outlined text-[10px]">auto_awesome</span>}
                                                 Auto-Discover
                                             </button>
+                                            {showComparePrompt && (
+                                                <button onClick={() => { setActiveSection('competitors'); setShowSetup(false); setShowComparePrompt(false); }}
+                                                    className="mt-2 w-full flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[9px] font-bold cursor-pointer transition-all text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:shadow-lg hover:shadow-violet-500/20">
+                                                    <span className="material-symbols-outlined text-[10px]">compare_arrows</span>
+                                                    Compare Performance Now
+                                                </button>
+                                            )}
                                         </div>
                                         <div>
                                             <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Analytics</p>
@@ -1242,6 +1254,7 @@ small{color:#94a3b8;font-size:10px}
                                 gaConnected={gaConnected}
                                 gaReport={gaReport}
                                 gscReport={gscReport}
+                                setCompetitors={setCompetitors}
                                 hideNav
                             />
                         )}
@@ -1794,9 +1807,26 @@ function CompetitorResults({ results }) {
                         <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${c.estimatedAuthority === 'high' ? 'bg-rose-500/10 text-rose-400' : c.estimatedAuthority === 'medium' ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}`}>{c.estimatedAuthority} authority</span>
                     </div>
                     <p className="text-sm text-slate-500 mb-3">{c.url} • {c.contentVelocity}</p>
+                    <div className="grid grid-cols-2 gap-4 mb-3">
+                        <div className="p-2 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+                            <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Benchmarking</p>
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                                {['technical', 'content', 'authority', 'aiReadiness'].map(k => (
+                                    <div key={k} className="flex items-center justify-between">
+                                        <span className="text-[9px] text-slate-500 capitalize">{k.replace('aiReadiness', 'AI Ready')}</span>
+                                        <span className={`text-[9px] font-bold ${c.scores?.[k] >= 70 ? 'text-emerald-400' : c.scores?.[k] >= 40 ? 'text-amber-400' : 'text-rose-400'}`}>{c.scores?.[k] || '—'}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="p-2 rounded-lg bg-white/[0.03] border border-white/[0.06] flex flex-col justify-center items-center">
+                            <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Overall</p>
+                            <p className={`text-xl font-black ${c.scores?.overall >= 70 ? 'text-emerald-400' : c.scores?.overall >= 40 ? 'text-amber-400' : 'text-rose-400'}`}>{c.scores?.overall || '—'}</p>
+                        </div>
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
-                        <div><p className="text-sm text-emerald-400 font-bold mb-1">STRENGTHS</p>{c.strengths?.map((s, j) => <p key={j} className="text-sm text-slate-400">+ {s}</p>)}</div>
-                        <div><p className="text-sm text-rose-400 font-bold mb-1">WEAKNESSES</p>{c.weaknesses?.map((w, j) => <p key={j} className="text-sm text-slate-400">- {w}</p>)}</div>
+                        <div><p className="text-[10px] text-emerald-400 font-bold mb-1 uppercase">Strengths</p>{c.strengths?.map((s, j) => <p key={j} className="text-[10px] text-slate-400 flex items-start gap-1"><span className="text-emerald-500/50 mt-0.5">+</span>{s}</p>)}</div>
+                        <div><p className="text-[10px] text-rose-400 font-bold mb-1 uppercase">Weaknesses</p>{c.weaknesses?.map((w, j) => <p key={j} className="text-[10px] text-slate-400 flex items-start gap-1"><span className="text-rose-500/50 mt-0.5">-</span>{w}</p>)}</div>
                     </div>
                 </div>
             ))}

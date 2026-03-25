@@ -21,7 +21,7 @@ const navItems = [
 const bottomItems = [
     { icon: 'cases', label: 'Brand Manager', to: '/brands' },
     { icon: 'electrical_services', label: 'Integrations', to: '/integrations' },
-    { icon: 'settings', label: 'Settings', to: '/team' },
+    { icon: 'settings', label: 'Settings', to: '/settings' },
 ]
 
 // Filter nav items based on team member's studio access

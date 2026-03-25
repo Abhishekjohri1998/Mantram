@@ -12,6 +12,7 @@ import Nexus from './pages/Nexus'
 import BrandDNA from './pages/BrandDNA'
 import Analytics from './pages/Analytics'
 import UserDashboard from './pages/UserDashboard'
+import UserSettings from './pages/UserSettings'
 import AdminDashboard from './pages/AdminDashboard'
 import TeamDashboard from './pages/TeamDashboard'
 import ContentStudio from './pages/ContentStudio'
@@ -68,6 +69,7 @@ function App() {
                 <Route path="/brands" element={<ProtectedRoute><BrandManagement /></ProtectedRoute>} />
                 <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
                 <Route path="/dashboard" element={<ProtectedRoute><UserDashboard /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin', 'superadmin']}><AdminDashboard /></ProtectedRoute>} />
                 <Route path="/team" element={<ProtectedRoute><TeamDashboard /></ProtectedRoute>} />
                 <Route path="/content-studio" element={<ProtectedRoute><ContentStudio /></ProtectedRoute>} />
