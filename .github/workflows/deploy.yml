@@ -226,6 +226,13 @@ jobs:
             # 5. Restart PM2
             echo "🔄 Restarting backend..."
             cd $CURRENT_LINK
+
+            # Guard: Fail deploy if bare wildcard still exists (Express 5 Compatibility)
+            if grep -q "options('\*')" "$CURRENT_LINK/backend/index.js"; then
+              echo "❌ DEPLOY BLOCKED: app.options('*') found — use '/(.*)' instead"
+              exit 1
+            fi
+
             pm2 delete mantram-server || true
             NODE_OPTIONS="--max-old-space-size=2048" pm2 start backend/deploy/ecosystem.config.cjs --update-env
             pm2 save

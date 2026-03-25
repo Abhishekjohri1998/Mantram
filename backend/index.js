@@ -116,7 +116,8 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// Handle OPTIONS preflight globally — use '/(.*) ' NOT '*' (path-to-regexp v8 compatibility)
+// Handle OPTIONS preflight globally for all routes
+// Note: '/(.*)' used instead of '*' for path-to-regexp v8+ compatibility (Express 5)
 app.options('/(.*)', cors(corsOptions));
 
 // Special middleware for Shopify Webhooks
