@@ -237,8 +237,29 @@ export default function SeoStudio() {
 
             // Auto-fix needs previous issues
             if (workflowId === 'auto-fix') {
-                const lastIssues = results?.issues || []
-                if (lastIssues.length === 0) { setError('Run a Health Check first to find issues, then use Auto-Fix.'); setLoading(false); clearInterval(stageInterval); clearInterval(elapsedTimerRef.current); return }
+                console.log('🛠️ [SeoStudio] Auto-fix triggered. Checking issues in memory...', results?.issues?.length || 0)
+                let lastIssues = results?.issues || []
+                // If no issues in memory, try fetching saved health-check report
+                if (lastIssues.length === 0) {
+                    try {
+                        console.log(`🔍 [SeoStudio] No issues in memory. Fetching saved 'health-check' report for brand: ${activeBrand._id}`)
+                        const saved = await seoAPI.getSavedReport(activeBrand._id, 'health-check')
+                        console.log('📡 [SeoStudio] Health-check fetch result:', saved)
+                        if (saved?.found && saved.report?.issues?.length > 0) {
+                            lastIssues = saved.report.issues
+                            console.log('✅ [SeoStudio] Found issues in saved report:', lastIssues.length)
+                        } else {
+                            console.warn('⚠️ [SeoStudio] No saved health-check report found or it has no issues.')
+                        }
+                    } catch (err) { 
+                        console.error('❌ [SeoStudio] Error fetching saved health-check:', err.message)
+                    }
+                }
+                if (lastIssues.length === 0) { 
+                    console.error('🛑 [SeoStudio] Blocking execution: No issues found for Auto-Fix.')
+                    setError('Run a Health Check first to find issues, then use Auto-Fix.'); 
+                    setLoading(false); clearInterval(stageInterval); clearInterval(elapsedTimerRef.current); return 
+                }
                 payload.issues = lastIssues
             }
 

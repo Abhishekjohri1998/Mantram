@@ -1,0 +1,43 @@
+name: Daily Master Backup & Tagging
+on:
+  schedule:
+    - cron: '30 18 * * *' # 12:00 AM IST (6:30 PM UTC)
+  workflow_dispatch: # Allow manual trigger from GitHub Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  backup-and-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sync Master Branch
+        run: |
+          git config user.name "GitHub Action [Backup]"
+          git config user.email "action@github.com"
+          
+          # Mirror main to master
+          git checkout master || git checkout -b master
+          git reset --hard origin/main
+          git push origin master --force
+
+      - name: Create Daily Tag
+        run: |
+          # Generate tag name based on current date (e.g., backup-2024-03-25)
+          TAG_NAME="backup-$(date +'%Y-%m-%d')"
+          
+          # Delete existing tag if it exists (for manual re-runs)
+          git tag -d "$TAG_NAME" || true
+          git push origin :refs/tags/"$TAG_NAME" || true
+          
+          # Create and push new tag
+          git tag "$TAG_NAME"
+          git push origin "$TAG_NAME"
+          
+          echo "✅ Backup and Tag ($TAG_NAME) completed successfully."

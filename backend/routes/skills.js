@@ -16,7 +16,7 @@ const router = Router();
 // ============================================================================
 
 async function aiCall(systemPrompt, userPrompt, options = {}) {
-    const { temperature = 0.7, maxTokens = 4096, json = false, timeoutMs = 120000 } = options;
+    const { temperature = 0.7, maxTokens = 4096, json = false, timeoutMs = 600000 } = options;
 
     const controller = new AbortController();
     try { setMaxListeners(30, controller.signal); } catch (e) {}
@@ -451,10 +451,13 @@ router.post('/:id/execute', protect, requireCredits('content'), async (req, res)
 
         // Execute
         const isJson = skill.outputFormat === 'json' || skill.outputFormat === 'structured';
+        const elapsed = Date.now() - (req.startTime || Date.now());
+        const remainingBudget = Math.max(300000, 600000 - elapsed);
         const result = await aiCall(systemPrompt, userPrompt, {
             temperature: skill.temperature,
             maxTokens: 4096,
             json: isJson,
+            timeout: remainingBudget
         });
 
         // Parse result
@@ -522,7 +525,9 @@ Respond in STRICT JSON:
 
 Make the skill highly specific to D2C marketing in India. Include Hinglish support where relevant.`;
 
-        const result = await aiCall(systemPrompt, `Create a skill for: ${prompt.trim()}`, { json: true, temperature: 0.5 });
+        const elapsed = Date.now() - (req.startTime || Date.now());
+        const remainingBudget = Math.max(300000, 600000 - elapsed);
+        const result = await aiCall(systemPrompt, `Create a skill for: ${prompt.trim()}`, { json: true, temperature: 0.5, timeout: remainingBudget });
         const parsed = parseJSON(result);
 
         res.json({ success: true, generated: parsed });
@@ -571,7 +576,9 @@ Rules:
             `\nEnhance these instructions to be comprehensive, detailed, and production-ready. Return ONLY the enhanced instructions text, nothing else.`,
         ].filter(Boolean).join('\n');
 
-        const result = await aiCall(systemPrompt, context, { temperature: 0.4 });
+        const elapsed = Date.now() - (req.startTime || Date.now());
+        const remainingBudget = Math.max(300000, 600000 - elapsed);
+        const result = await aiCall(systemPrompt, context, { temperature: 0.4, timeout: remainingBudget });
 
         // Clean any accidental markdown wrapping
         let enhanced = result.trim();

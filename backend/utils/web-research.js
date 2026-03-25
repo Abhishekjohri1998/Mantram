@@ -899,7 +899,7 @@ function contentFingerprint(text) {
     if (words.length < 10) return new Set();
     const shingles = new Set();
     for (let i = 0; i < words.length - 2; i++) {
-        shingles.add(`${words[i]} ${words[i+1]} ${words[i+2]}`);
+        shingles.add(`${words[i]} ${words[i + 1]} ${words[i + 2]}`);
     }
     return shingles;
 }
@@ -1149,7 +1149,7 @@ export async function researchDomain(baseUrl, options = {}) {
 
     // Configurable crawl limits — callers can reduce for speed
     const MAX_PAGES = options.maxPages || 800;
-    const CRAWL_TIMEOUT_MS = options.timeout || 180000;
+    const CRAWL_TIMEOUT_MS = options.timeout || 3600000; // 1 hour budget
     const skipCfSolve = options.skipCfSolve || false;
 
     console.log(`🕷️  Deep crawl starting: ${cleanBase} (max ${MAX_PAGES} pages, timeout ${CRAWL_TIMEOUT_MS / 1000}s)`);
@@ -1417,7 +1417,6 @@ export async function researchDomain(baseUrl, options = {}) {
         const batchResults = await Promise.all(
             batch.map(url => crawlPage(url).catch(e => ({ url, success: false, error: e.message })))
         );
-
         const successPages = batchResults.filter(p => p.success);
         const failedBatch = batchResults.filter(p => !p.success);
         allSubPages.push(...successPages);
@@ -2797,4 +2796,3 @@ export async function analyzeCompetitorLinkProfile(competitorUrls, brandDomain) 
 
     return profiles;
 }
-

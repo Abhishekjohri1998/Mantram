@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import connectDB from './config/db.js';
 import config from './config/env.js';
+import mongoose from 'mongoose';
 
 // Route imports
 import authRoutes from './routes/auth.js';
@@ -42,36 +43,118 @@ import paymentRoutes from './routes/payments.js';
 import waitlistRoutes from './routes/waitlist.js';
 import skillsRoutes from './routes/skills.js';
 
+const HARDCODED_ORIGINS = [
+    'https://mantram.ai',
+    'https://www.mantram.ai',
+    'https://djty1w4l0681b.cloudfront.net',
+    'http://localhost:5173',
+    'http://localhost:3000',
+];
+
 const app = express();
 
-// Connect Database
-connectDB();
+// ── ABSOLUTE TOP-LEVEL DIAGNOSTICS ────────────────────────────
+app.use((req, res, next) => {
+    const origin = req.headers.origin || 'none';
+    const path = req.path.toLowerCase();
+    const isBotScan = ['.php', '.xml', 'wp-admin', 'vendor', 'phpunit', '.env', '.git'].some(p => path.includes(p));
 
-// Middleware
-app.use(cors({
+    if (!isBotScan && path !== '/api/health' && path !== '/health') {
+        console.log(`[INCOMING] ${req.method} ${req.path} | Origin: ${origin} | User-Agent: ${req.headers['user-agent']}`);
+    }
+    
+    // Immediate CORS Force for mantram.ai
+    if (origin && (origin.toLowerCase().endsWith('mantram.ai') || origin.toLowerCase().includes('mantram.ai'))) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, Pragma');
+    }
+    
+    // Immediate OPTIONS Intercept
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    
+    // Start time for AI budgeting
+    req.startTime = Date.now();
+    next();
+});
+
+// Alias for health checks
+app.get(['/health', '/api/health'], (req, res) => res.json({ status: 'ok', port: config.port }));
+app.get('/', (req, res) => res.json({ status: 'ok', message: 'Mantram AI API' }));
+
+const server = app.listen(config.port, '0.0.0.0', () => {
+    console.log(`\n🚀 Mantram AI Server FAST-START on port ${config.port}`);
+
+    // Signal PM2 immediately to pass health checks
+    if (process.send) {
+        process.send('ready');
+        console.log('✅ PM2 Ready signal sent (Fast-Start)');
+    }
+});
+
+// ── DEFERRED INITIALIZATION (WAIT FOR DB) ─────────────────────
+connectDB().then(() => {
+    console.log('✅ Database connected — Initializing background agents');
+
+    // Start follow-up scheduler (every 4 hours — Meta Compliance)
+    import('./services/autonomousAgent.js').then(({ runFollowUpCheck }) => {
+        setInterval(() => {
+            runFollowUpCheck().catch(err => console.warn('⚠️ Follow-up check failed:', err.message));
+        }, 4 * 60 * 60 * 1000);
+        console.log('🤖 Autonomous Agent active');
+    }).catch(() => { });
+
+    // Start intelligence agent scheduler (every 6 hours — Meta Compliance)
+    import('./services/intelligenceAgent.js').then(({ runIntelMissions }) => {
+        setInterval(() => {
+            runIntelMissions().catch(err => console.warn('🕵️ Intel Agent check failed:', err.message));
+        }, 6 * 60 * 60 * 1000);
+        console.log('🕵️ Agent Intelligence active');
+    }).catch(() => { });
+
+    // Start scheduled post publisher
+    import('./services/scheduledPostPublisher.js').then(({ startScheduledPostPublisher }) => {
+        startScheduledPostPublisher();
+    }).catch((err) => { console.warn('📅 Scheduled Post Publisher failed to start:', err.message); });
+}).catch(err => {
+    console.error('❌ Critical failure during background agent initialization:', err.message);
+});
+
+const corsOptions = {
     origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or curl)
         if (!origin) return callback(null, true);
 
-        // Standardize origin for matching (lowercase, no trailing slash)
         const cleanOrigin = origin.toLowerCase().replace(/\/$/, '');
-        const allowedOrigins = config.frontendUrl.map(url => url.toLowerCase().replace(/\/$/, ''));
+        const envOrigins = (config.frontendUrl || []).map(u => u.toLowerCase().replace(/\/$/, ''));
+        const allowedOrigins = [...new Set([...HARDCODED_ORIGINS.map(u => u.toLowerCase()), ...envOrigins])];
 
-        if (allowedOrigins.includes(cleanOrigin)) {
-            callback(null, true);
-        } else {
-            console.warn(`⚠️ CORS Blocked: Origin "${origin}" (cleaned: "${cleanOrigin}") not in allowed list:`, allowedOrigins);
-            callback(null, false);
+        const isAllowed = allowedOrigins.includes(cleanOrigin);
+        const isMantram = cleanOrigin.endsWith('mantram.ai') || cleanOrigin.includes('mantram.ai');
+
+        if (isAllowed || isMantram) {
+            return callback(null, true);
         }
+
+        console.error(`❌ CORS Rejected: "${origin}" not in allowed list.`);
+        return callback(null, false);
     },
-    credentials: true
-}));
-// Special middleware for Shopify Webhooks to ensure raw body capture for HMAC verification
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+    optionsSuccessStatus: 200,
+};
+
+// Use the standard CORS package as a fallback but our brute-force above should catch most
+app.use(cors(corsOptions));
+
+// Special middleware for Shopify Webhooks
 app.use('/api/shopify/webhooks', express.raw({ type: '*/*', limit: '50mb' }), (req, res, next) => {
     if (Buffer.isBuffer(req.body)) {
         req.rawBody = req.body;
         try {
-            // Attempt to parse JSON so subsequent handlers can use req.body
             const bodyString = req.body.toString('utf8');
             if (bodyString && (bodyString.startsWith('{') || bodyString.startsWith('['))) {
                 req.body = JSON.parse(bodyString);
@@ -83,18 +166,14 @@ app.use('/api/shopify/webhooks', express.raw({ type: '*/*', limit: '50mb' }), (r
     next();
 });
 
-// Regular body parsers - Skip for webhooks to avoid interference
+// Regular body parsers - skip for webhooks
 app.use((req, res, next) => {
-    if (req.originalUrl && req.originalUrl.includes('/api/shopify/webhooks')) {
-        return next();
-    }
+    if (req.originalUrl && req.originalUrl.includes('/api/shopify/webhooks')) return next();
     express.json({ limit: '50mb' })(req, res, next);
 });
 
 app.use((req, res, next) => {
-    if (req.originalUrl && req.originalUrl.includes('/api/shopify/webhooks')) {
-        return next();
-    }
+    if (req.originalUrl && req.originalUrl.includes('/api/shopify/webhooks')) return next();
     express.urlencoded({ extended: true, limit: '50mb' })(req, res, next);
 });
 
@@ -147,22 +226,6 @@ app.use('/api/social', socialRoutes);
 app.use('/api/waitlist', waitlistRoutes);
 app.use('/api/skills', skillsRoutes);
 
-// Health check
-app.get('/api/health', (req, res) => {
-    res.json({
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        cors: {
-            allowedOrigins: config.frontendUrl
-        },
-        ai: {
-            textProvider: config.ai.defaultTextProvider,
-            imageProvider: config.ai.defaultImageProvider,
-            textModel: config.ai.defaultTextModel,
-        },
-    });
-});
-
 // Error handler
 app.use((err, req, res, next) => {
     console.error('Server Error:', err.stack);
@@ -172,36 +235,52 @@ app.use((err, req, res, next) => {
     });
 });
 
-const server = app.listen(config.port, () => {
-    console.log(`\n🚀 Mantram AI Server running on port ${config.port}`);
-    console.log(`📡 AI Provider: ${config.ai.defaultTextProvider} (${config.ai.defaultTextModel})`);
-    console.log(`🌐 Frontend: ${config.frontendUrl}\n`);
-
-    // Start follow-up scheduler (every 4 hours — Meta Compliance: Decelerated from 30min)
-    import('./services/autonomousAgent.js').then(({ runFollowUpCheck }) => {
-        setInterval(() => {
-            runFollowUpCheck().catch(err => console.warn('⚠️ Follow-up check failed:', err.message));
-        }, 4 * 60 * 60 * 1000);
-        console.log('🤖 Autonomous Agent active — Follow-up scheduler running every 4 hours (Compliance Optimized)');
-    }).catch(() => { });
-
-    // Start intelligence agent scheduler (every 6 hours — Meta Compliance: Decelerated from 2hrs)
-    import('./services/intelligenceAgent.js').then(({ runIntelMissions }) => {
-        setInterval(() => {
-            runIntelMissions().catch(err => console.warn('🕵️ Intel Agent check failed:', err.message));
-        }, 6 * 60 * 60 * 1000);
-        console.log('🕵️ Agent Intelligence active — Missions scheduler running every 6 hours (Compliance Optimized)');
-    }).catch(() => { });
-
-    // Start scheduled post publisher (every 60 seconds)
-    import('./services/scheduledPostPublisher.js').then(({ startScheduledPostPublisher }) => {
-        startScheduledPostPublisher();
-    }).catch((err) => { console.warn('📅 Scheduled Post Publisher failed to start:', err.message); });
-});
-
-// Configure Keep-Alive timeout to be larger than AWS ALB / CloudFront idle timeout (60s)
-// This prevents random 502 Bad Gateway errors caused by TCP connection race conditions
+// Keep-Alive timeouts
 server.keepAliveTimeout = 65000;
 server.headersTimeout = 66000;
+server.timeout = 60000000;
+
+// ══════════════════════════════════════════════════════════════
+// GRACEFUL SHUTDOWN
+// ══════════════════════════════════════════════════════════════
+const gracefulShutdown = (signal) => {
+    console.log(`\n🛑 ${signal} received. Starting graceful shutdown...`);
+    server.close(async () => {
+        console.log('HTTP server closed.');
+        try {
+            if (mongoose.connection) mongoose.connection.isShuttingDown = true;
+            await mongoose.connection.close();
+            console.log('MongoDB connection closed.');
+            process.exit(0);
+        } catch (err) {
+            console.error('Error during shutdown:', err);
+            process.exit(1);
+        }
+    });
+    setTimeout(() => {
+        console.error('Could not close connections in time, forcefully shutting down');
+        process.exit(1);
+    }, 30000);
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// ══════════════════════════════════════════════════════════════
+// ERROR GUARDS
+// ══════════════════════════════════════════════════════════════
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('🚨 Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('🚨 Uncaught Exception:', err);
+});
+
+// Catch-all 404 logger
+app.use((req, res) => {
+    console.warn(`[404] Not Found: ${req.method} ${req.originalUrl}`);
+    res.status(404).json({ success: false, error: `Route ${req.originalUrl} not found` });
+});
 
 export default app;

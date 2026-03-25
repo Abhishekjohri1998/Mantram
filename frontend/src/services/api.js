@@ -42,8 +42,8 @@ export async function apiFetch(endpoint, options = {}) {
         ...options.headers,
     };
 
-    // Configurable timeout — default 90s, heavy operations can pass longer
-    const { timeout: timeoutMs = 90000, ...fetchOptions } = options;
+    // Configurable timeout — default 1 hour (3,600,000ms), heavy operations can pass longer
+    const { timeout: timeoutMs = 3600000, ...fetchOptions } = options;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -141,11 +141,12 @@ export const content = {
     refineText: (data) => apiFetch('/content/refine-text', { method: 'POST', body: JSON.stringify(data) }),
     youtube: (data) => apiFetch('/content/agentic/youtube', { method: 'POST', body: JSON.stringify(data) }),
     youtubeSeo: (data) => apiFetch('/content/agentic/youtube-seo', { method: 'POST', body: JSON.stringify(data) }),
+    trending: (data) => apiFetch('/content/trending', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ============ Creatives API ============
 export const creatives = {
-    generate: (data) => apiFetch('/creatives/generate', { method: 'POST', body: JSON.stringify(data) }),
+    generate: (data, options = {}) => apiFetch('/creatives/generate', { method: 'POST', body: JSON.stringify(data), ...options }),
     enhancePrompt: (data) => apiFetch('/creatives/enhance-prompt', { method: 'POST', body: JSON.stringify(data) }),
     list: (params = {}) => {
         const query = new URLSearchParams(params).toString();
@@ -278,7 +279,7 @@ export const team = {
 // ============ Fidato AI Assistant ============
 export const fidato = {
     chat: (message, brandId) => apiFetch('/fidato/chat', { method: 'POST', body: JSON.stringify({ message, brandId }) }),
-    canvasDirect: (data) => apiFetch('/fidato/canvas-direct', { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
+    canvasDirect: (data) => apiFetch('/fidato/canvas-direct', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
     briefing: (brandId) => apiFetch('/fidato/briefing', { method: 'POST', body: JSON.stringify({ brandId }) }),
     notifications: (brandId) => apiFetch(`/fidato/notifications${brandId ? `?brandId=${brandId}` : ''}`),
     updatePreferences: (prefs) => apiFetch('/fidato/preferences', { method: 'POST', body: JSON.stringify(prefs) }),
@@ -617,22 +618,22 @@ export const pmStudio = {
 };
 
 export const seoStudio = {
-    healthCheck: (data) => apiFetch('/seo-studio/health-check', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
-    traffic: (data) => apiFetch('/seo-studio/traffic', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
-    competitors: (data) => apiFetch('/seo-studio/competitors', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
-    aiVisibility: (data) => apiFetch('/seo-studio/ai-visibility', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
-    auditPage: (data) => apiFetch('/seo-studio/audit-page', { method: 'POST', body: JSON.stringify(data), timeout: 150000 }),
+    healthCheck: (data) => apiFetch('/seo-studio/health-check', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
+    traffic: (data) => apiFetch('/seo-studio/traffic', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
+    competitors: (data) => apiFetch('/seo-studio/competitors', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
+    aiVisibility: (data) => apiFetch('/seo-studio/ai-visibility', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
+    auditPage: (data) => apiFetch('/seo-studio/audit-page', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
     ask: (data) => apiFetch('/seo-studio/ask', { method: 'POST', body: JSON.stringify(data) }),
     manageCompetitors: (data) => apiFetch('/seo-studio/competitors/manage', { method: 'POST', body: JSON.stringify(data) }),
     discoverCompetitors: (data) => apiFetch('/seo-studio/competitors/discover', { method: 'POST', body: JSON.stringify(data) }),
     // Agentic workflows — extended timeouts for heavy AI+crawl operations
-    competitorWarRoom: (data) => apiFetch('/seo-studio/competitor-warroom', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
-    backlinkIntelligence: (data) => apiFetch('/seo-studio/backlinks', { method: 'POST', body: JSON.stringify(data), timeout: 240000 }),
+    competitorWarRoom: (data) => apiFetch('/seo-studio/competitor-warroom', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
+    backlinkIntelligence: (data) => apiFetch('/seo-studio/backlinks', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
     getSavedReport: (brandId, type) => apiFetch(`/seo-studio/reports/${type}?brandId=${brandId}`),
-    llmProbe: (data) => apiFetch('/seo-studio/llm-probe', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
-    autoFix: (data) => apiFetch('/seo-studio/auto-fix', { method: 'POST', body: JSON.stringify(data), timeout: 150000 }),
-    contentFix: (data) => apiFetch('/seo-studio/content-fix', { method: 'POST', body: JSON.stringify(data), timeout: 150000 }),
-    promptMining: (data) => apiFetch('/seo-studio/prompt-mining', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
+    llmProbe: (data) => apiFetch('/seo-studio/llm-probe', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
+    autoFix: (data) => apiFetch('/seo-studio/auto-fix', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
+    contentFix: (data) => apiFetch('/seo-studio/content-fix', { method: 'POST', body: JSON.stringify(data), timeout: 600000 }),
+    promptMining: (data) => apiFetch('/seo-studio/prompt-mining', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
     history: (params = {}) => {
         const query = new URLSearchParams(params).toString();
         return apiFetch(`/seo-studio/history?${query}`);
@@ -653,9 +654,9 @@ export const seoStudio = {
         return apiFetch(`/seo-studio/gsc/rank-changes?${query}`);
     },
     // Phase 3: Advanced
-    jsCrawl: (data) => apiFetch('/seo-studio/js-crawl', { method: 'POST', body: JSON.stringify(data), timeout: 240000 }),
-    contentScore: (data) => apiFetch('/seo-studio/content-score', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
-    competitorMonitor: (data) => apiFetch('/seo-studio/competitor-monitor', { method: 'POST', body: JSON.stringify(data), timeout: 300000 }),
+    jsCrawl: (data) => apiFetch('/seo-studio/js-crawl', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
+    contentScore: (data) => apiFetch('/seo-studio/content-score', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
+    competitorMonitor: (data) => apiFetch('/seo-studio/competitor-monitor', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
 };
 
 // ============ Skills System API ============

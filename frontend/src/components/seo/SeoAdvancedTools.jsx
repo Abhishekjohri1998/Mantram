@@ -1114,6 +1114,176 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         {/* Audit results */}
                         {hasData && (
                             <>
+                                {/* Page Score */}
+                                {data.pageScore != null && (
+                                    <SectionCard title="Page Score" icon="speed">
+                                        <div className="flex items-center gap-5">
+                                            <div className="relative size-20 flex items-center justify-center">
+                                                <svg className="size-20 -rotate-90" viewBox="0 0 80 80">
+                                                    <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
+                                                    <circle cx="40" cy="40" r="34" fill="none" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${(data.pageScore / 100) * 213.6} 213.6`}
+                                                        stroke={data.pageScore >= 80 ? '#34d399' : data.pageScore >= 50 ? '#fbbf24' : '#fb7185'} />
+                                                </svg>
+                                                <span className="absolute text-xl font-black text-white">{data.pageScore}</span>
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="text-sm text-slate-400 mb-1">Overall on-page SEO score</p>
+                                                <p className="text-xs text-slate-500">{data.pageScore >= 80 ? 'Great! This page is well-optimized.' : data.pageScore >= 50 ? 'Needs improvement — review the suggestions below.' : 'Critical issues found — address the suggestions below urgently.'}</p>
+                                            </div>
+                                        </div>
+                                    </SectionCard>
+                                )}
+
+                                {/* Title Tag */}
+                                {(data.currentTitle || data.suggestedTitle) && (
+                                    <SectionCard title="Title Tag" icon="title">
+                                        {data.currentTitle && (
+                                            <div className="mb-3">
+                                                <p className="text-xs text-slate-500 mb-1 font-bold uppercase tracking-wider">Current</p>
+                                                <p className="text-sm text-slate-300 bg-white/[0.03] p-3 rounded-lg border border-white/[0.06]">{data.currentTitle}</p>
+                                            </div>
+                                        )}
+                                        {data.suggestedTitle && (
+                                            <div>
+                                                <p className="text-xs text-emerald-400 mb-1 font-bold uppercase tracking-wider">✨ Suggested</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm text-white bg-emerald-500/[0.07] p-3 rounded-lg border border-emerald-500/20 flex-1">{data.suggestedTitle}</p>
+                                                    <button onClick={() => navigator.clipboard.writeText(data.suggestedTitle)} className="text-xs text-primary font-bold cursor-pointer hover:underline whitespace-nowrap flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-xs">content_copy</span> Copy
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </SectionCard>
+                                )}
+
+                                {/* Meta Description */}
+                                {(data.currentMeta || data.suggestedMeta) && (
+                                    <SectionCard title="Meta Description" icon="description">
+                                        {data.currentMeta && (
+                                            <div className="mb-3">
+                                                <p className="text-xs text-slate-500 mb-1 font-bold uppercase tracking-wider">Current</p>
+                                                <p className="text-sm text-slate-300 bg-white/[0.03] p-3 rounded-lg border border-white/[0.06]">{data.currentMeta}</p>
+                                            </div>
+                                        )}
+                                        {data.suggestedMeta && (
+                                            <div>
+                                                <p className="text-xs text-emerald-400 mb-1 font-bold uppercase tracking-wider">✨ Suggested</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm text-white bg-emerald-500/[0.07] p-3 rounded-lg border border-emerald-500/20 flex-1">{data.suggestedMeta}</p>
+                                                    <button onClick={() => navigator.clipboard.writeText(data.suggestedMeta)} className="text-xs text-primary font-bold cursor-pointer hover:underline whitespace-nowrap flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-xs">content_copy</span> Copy
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </SectionCard>
+                                )}
+
+                                {/* H1 Suggestion */}
+                                {data.h1Suggestion && (
+                                    <SectionCard title="H1 Heading Suggestion" icon="format_h1">
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-sm text-white bg-violet-500/[0.07] p-3 rounded-lg border border-violet-500/20 flex-1">{data.h1Suggestion}</p>
+                                            <button onClick={() => navigator.clipboard.writeText(data.h1Suggestion)} className="text-xs text-primary font-bold cursor-pointer hover:underline whitespace-nowrap flex items-center gap-1">
+                                                <span className="material-symbols-outlined text-xs">content_copy</span> Copy
+                                            </button>
+                                        </div>
+                                    </SectionCard>
+                                )}
+
+                                {/* H2 Suggestions */}
+                                {data.h2Suggestions?.length > 0 && (
+                                    <SectionCard title="H2 Heading Suggestions" icon="format_h2">
+                                        <div className="space-y-2">{data.h2Suggestions.map((h2, i) => (
+                                            <div key={i} className="flex items-center gap-2 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                                                <span className="text-xs text-primary font-bold bg-primary/10 size-6 rounded-full flex items-center justify-center">{i + 1}</span>
+                                                <p className="text-sm text-white flex-1">{h2}</p>
+                                                <button onClick={() => navigator.clipboard.writeText(h2)} className="text-xs text-slate-400 hover:text-primary cursor-pointer">
+                                                    <span className="material-symbols-outlined text-xs">content_copy</span>
+                                                </button>
+                                            </div>
+                                        ))}</div>
+                                    </SectionCard>
+                                )}
+
+                                {/* Content Improvements */}
+                                {data.contentImprovements?.length > 0 && (
+                                    <SectionCard title="Content Improvements" icon="edit_note">
+                                        <div className="space-y-3">{data.contentImprovements.map((item, i) => (
+                                            <div key={i} className="p-3 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                                                <p className="text-sm font-bold text-white mb-1">{item.section}</p>
+                                                <p className="text-xs text-rose-400 mb-1 flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-xs">warning</span> {item.issue}
+                                                </p>
+                                                <p className="text-xs text-emerald-400 flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-xs">lightbulb</span> {item.suggestion}
+                                                </p>
+                                                <FixWithAI fixKey={`onpage-ci-${i}`} issueTitle={item.section} issueDescription={`${item.issue}. ${item.suggestion}`}
+                                                    pageUrl={pageUrl} fixType="content-rewrite" label="Fix with AI" />
+                                            </div>
+                                        ))}</div>
+                                    </SectionCard>
+                                )}
+
+                                {/* FAQ Blocks */}
+                                {data.faqBlocks?.length > 0 && (
+                                    <SectionCard title="Suggested FAQ Schema" icon="quiz">
+                                        <div className="space-y-3">{data.faqBlocks.map((faq, i) => (
+                                            <div key={i} className="p-3 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                                                <p className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
+                                                    <span className="material-symbols-outlined text-sm text-primary">help</span> {faq.question}
+                                                </p>
+                                                <p className="text-xs text-slate-300 pl-6">{faq.answer}</p>
+                                            </div>
+                                        ))}</div>
+                                        <button onClick={() => { const schema = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: data.faqBlocks.map(f => ({ '@type': 'Question', name: f.question, acceptedAnswer: { '@type': 'Answer', text: f.answer } })) }; navigator.clipboard.writeText(JSON.stringify(schema, null, 2)) }}
+                                            className="mt-3 text-xs text-primary font-bold cursor-pointer hover:underline flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-xs">code</span> Copy FAQ Schema JSON-LD
+                                        </button>
+                                    </SectionCard>
+                                )}
+
+                                {/* Internal Link Suggestions */}
+                                {data.internalLinkSuggestions?.length > 0 && (
+                                    <SectionCard title="Internal Linking Suggestions" icon="link">
+                                        <div className="space-y-2">{data.internalLinkSuggestions.map((link, i) => (
+                                            <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                                                <span className="material-symbols-outlined text-sm text-cyan-400 mt-0.5">arrow_outward</span>
+                                                <div className="flex-1">
+                                                    <p className="text-sm text-white font-bold">"{link.anchorText}" → <span className="text-cyan-400">{link.targetPage}</span></p>
+                                                    <p className="text-xs text-slate-400 mt-0.5">{link.reason}</p>
+                                                </div>
+                                            </div>
+                                        ))}</div>
+                                    </SectionCard>
+                                )}
+
+                                {/* Schema Recommendations */}
+                                {data.schemaRecommendations?.length > 0 && (
+                                    <SectionCard title="Schema Markup Recommendations" icon="data_object">
+                                        <div className="space-y-2">{data.schemaRecommendations.map((rec, i) => (
+                                            <div key={i} className="flex items-start gap-2 p-2.5 rounded-lg bg-white/[0.02]">
+                                                <span className="material-symbols-outlined text-xs text-amber-400 mt-0.5">star</span>
+                                                <p className="text-sm text-slate-300">{rec}</p>
+                                            </div>
+                                        ))}</div>
+                                    </SectionCard>
+                                )}
+
+                                {/* Snippet Paragraph */}
+                                {data.snippetParagraph && (
+                                    <SectionCard title="Optimized Snippet Paragraph" icon="auto_awesome">
+                                        <div className="flex items-start gap-2">
+                                            <p className="text-sm text-white bg-primary/[0.05] p-4 rounded-lg border border-primary/20 flex-1 leading-relaxed">{data.snippetParagraph}</p>
+                                            <button onClick={() => navigator.clipboard.writeText(data.snippetParagraph)} className="text-xs text-primary font-bold cursor-pointer hover:underline whitespace-nowrap flex items-center gap-1 mt-1">
+                                                <span className="material-symbols-outlined text-xs">content_copy</span> Copy
+                                            </button>
+                                        </div>
+                                    </SectionCard>
+                                )}
+
+                                {/* Legacy fields fallback — summary, issues, fixes, metaTags */}
                                 {data.summary && <SectionCard><FormattedText text={data.summary} /></SectionCard>}
 
                                 {data.issues?.length > 0 && (
@@ -1134,7 +1304,6 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                     </SectionCard>
                                 )}
 
-                                {/* Code fixes */}
                                 {data.fixes?.length > 0 && (
                                     <SectionCard title="Copy-Paste Fixes" icon="code">
                                         <div className="space-y-3">{data.fixes.map((fix, i) => (

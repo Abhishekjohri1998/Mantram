@@ -16,48 +16,63 @@ const router = Router();
 // ============================================================================
 
 async function aiCall(systemPrompt, userPrompt, options = {}) {
-    const { temperature = 0.7, maxTokens = 4096, json = false } = options;
+    const { temperature = 0.7, maxTokens = 4096, json = false, timeout = 600000 } = options;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
 
-    if (process.env.OPENAI_API_KEY) {
-        try {
-            const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-                body: JSON.stringify({
-                    model: 'gpt-4o-mini',
-                    messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-                    temperature, max_tokens: maxTokens,
-                    ...(json ? { response_format: { type: 'json_object' } } : {}),
-                }),
-            });
-            const data = await resp.json();
-            if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
-            if (data.error) console.warn('GPT-4o-mini failed:', data.error.message);
-        } catch (e) { console.warn('GPT-4o-mini error:', e.message); }
-    }
-
-    const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
-    if (geminiKey) {
-        for (const model of ['gemini-2.5-flash', 'gemini-2.5-flash-preview-05-20']) {
+    try {
+        if (process.env.OPENAI_API_KEY) {
             try {
-                const resp = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
-                    {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            systemInstruction: { parts: [{ text: systemPrompt }] },
-                            contents: [{ parts: [{ text: userPrompt }] }],
-                            generationConfig: { temperature, maxOutputTokens: maxTokens, ...(json ? { responseMimeType: 'application/json' } : {}) },
-                        }),
-                    }
-                );
+                const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    signal: controller.signal,
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+                    body: JSON.stringify({
+                        model: 'gpt-4o-mini',
+                        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+                        temperature, max_tokens: maxTokens,
+                        ...(json ? { response_format: { type: 'json_object' } } : {}),
+                    }),
+                });
                 const data = await resp.json();
-                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (text) return text;
-            } catch (e) { console.warn(`Gemini ${model} error:`, e.message); }
+                if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
+                if (data.error) console.warn('GPT-4o-mini failed:', data.error.message);
+            } catch (e) {
+                if (e.name === 'AbortError') throw e;
+                console.warn('GPT-4o-mini error:', e.message);
+            }
         }
+
+        const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
+        if (geminiKey) {
+            for (const model of ['gemini-2.0-flash', 'gemini-1.5-flash']) {
+                try {
+                    const resp = await fetch(
+                        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+                        {
+                            method: 'POST', 
+                            signal: controller.signal,
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                systemInstruction: { parts: [{ text: systemPrompt }] },
+                                contents: [{ parts: [{ text: userPrompt }] }],
+                                generationConfig: { temperature, maxOutputTokens: maxTokens, ...(json ? { responseMimeType: 'application/json' } : {}) },
+                            }),
+                        }
+                    );
+                    const data = await resp.json();
+                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (text) return text;
+                } catch (e) {
+                    if (e.name === 'AbortError') throw e;
+                    console.warn(`Gemini ${model} error:`, e.message);
+                }
+            }
+        }
+        throw new Error('All AI models failed');
+    } finally {
+        clearTimeout(timer);
     }
-    throw new Error('All AI models failed');
 }
 
 function parseJSON(text) {
@@ -329,10 +344,12 @@ Respond in strict JSON:
 }`;
 
     try {
+        const elapsed = Date.now() - (req?.startTime || Date.now());
+        const remainingBudget = Math.max(300000, 600000 - elapsed);
         const result = await aiCall(
             'You are a cultural intelligence engine. You MUST use the verified dates provided — never change or guess festival dates. Only add additional events that are not in the verified list.',
             calendarPrompt,
-            { json: true, temperature: 0.3, maxTokens: 3000 }
+            { json: true, temperature: 0.3, maxTokens: 3000, timeout: remainingBudget }
         );
         return parseJSON(result);
     } catch (e) {
@@ -566,7 +583,9 @@ Respond in STRICT JSON:
 
         const userPrompt = `Generate a ${timeframeLabel} social media strategy for ${platforms.join(', ')}.\nGoals: ${goals || 'Growth'}\nIndustry: ${industry || dna.industry || 'General'}\nCurrent metrics: ${currentMetrics || 'See live data in context above'}\nToday's date: ${new Date().toISOString().split('T')[0]}`;
 
-        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, maxTokens: 8000 });
+        const elapsed = Date.now() - (req.startTime || Date.now());
+        const remainingBudget = Math.max(300000, 600000 - elapsed);
+        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, maxTokens: 8000, timeout: remainingBudget });
         const strategy = parseJSON(result);
 
         // Save to DB
@@ -664,7 +683,9 @@ Respond in STRICT JSON:
 
         const userPrompt = `Generate ${monthName} ${targetYear} content calendar for ${platforms.join(', ')}. ${themes ? `Themes: ${themes}` : ''}`;
 
-        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, maxTokens: 8000 });
+        const elapsed = Date.now() - (req.startTime || Date.now());
+        const remainingBudget = Math.max(300000, 600000 - elapsed);
+        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, maxTokens: 8000, timeout: remainingBudget });
         const calendar = parseJSON(result);
 
         const saved = await SocialStrategy.create({
@@ -775,7 +796,9 @@ Respond in STRICT JSON:
 
         const userPrompt = `Audit ${platform} account for ${brand?.name || 'this brand'}. Metrics: ${metricsText}`;
 
-        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 5000 });
+        const elapsed = Date.now() - (req.startTime || Date.now());
+        const remainingBudget = Math.max(300000, 600000 - elapsed);
+        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 5000, timeout: remainingBudget });
         const audit = parseJSON(result);
 
         const saved = await SocialStrategy.create({
@@ -855,7 +878,9 @@ Respond in STRICT JSON:
 
         const userPrompt = `Analyze competitors: ${competitors.map(c => c.name || c).join(', ')} vs ${brand?.name || 'our brand'} on ${(platforms || ['instagram']).join(', ')}`;
 
-        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, maxTokens: 6000 });
+        const elapsed = Date.now() - (req.startTime || Date.now());
+        const remainingBudget = Math.max(300000, 600000 - elapsed);
+        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, maxTokens: 6000, timeout: remainingBudget });
         const analysis = parseJSON(result);
 
         const saved = await SocialStrategy.create({
@@ -1027,7 +1052,9 @@ Respond in STRICT JSON:
 
         const userPrompt = `Score the ${rubric.label} profile for brand "${brand?.name || 'this brand'}" (Industry: ${brand?.dna?.industry || 'General'}). Grade each of the ${rubric.parameters.length} parameters 0-10 with measurable recommendations.`;
 
-        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6000 });
+        const elapsed = Date.now() - (req.startTime || Date.now());
+        const remainingBudget = Math.max(300000, 600000 - elapsed);
+        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6000, timeout: remainingBudget });
         const scoreCard = parseJSON(result);
 
         // Compute true overall score as average of parameter scores

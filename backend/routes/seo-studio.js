@@ -49,7 +49,7 @@ let lastTokenUsage = null;
 export function getLastTokenUsage() { return lastTokenUsage; }
 
 async function aiCall(systemPrompt, userPrompt, options = {}) {
-  const { temperature = 0.7, maxTokens = 8192, json = false, timeout = 35000 } = options;
+  const { temperature = 0.7, maxTokens = 8192, json = false, timeout = 120000 } = options;
   lastTokenUsage = null;
 
   const overallController = new AbortController();
@@ -159,7 +159,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
         }
 
         if (provider.name === 'gemini') {
-          const models = ['gemini-2.5-flash'];
+          const models = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-2.5-flash'];
           for (const modelId of models) {
             if (overallController.signal.aborted) break;
             try {
@@ -408,10 +408,9 @@ Average text-to-HTML ratio: ${siMetrics.avgTextToHtmlRatio || 0}%
     // AI timeout: Phase 1 now completes in 5-10s (APIs), so AI gets max budget
     const routeStartTime = req._routeStartTime || (Date.now() - 5000);
     const elapsed = Date.now() - routeStartTime;
-    const AI_MIN_BUDGET = 120000; // Always give AI at least 120s
-    const remainingBudget = Math.max(AI_MIN_BUDGET, 180000 - elapsed);
-    
-    console.log(`⏱️ Data gathering complete (${siteIntel?.available ? 'with DataForSEO' : 'light crawl only'}). Elapsed: ${elapsed}ms. AI Budget: ${remainingBudget}ms`);
+    const budget = 3600000; // 60 min (1 hour) budget
+    const remainingBudget = Math.max(1800000, budget - elapsed);
+    console.log(`⏱️ Health Check research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     const systemPrompt = `You are a SENIOR SEO STRATEGIST (not just an auditor). You think like a CMO + technical SEO expert combined. You have REAL CRAWL DATA — use it as ground truth. Never guess or contradict the crawl.
 
@@ -502,7 +501,6 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
         parsed = parseJSON(result);
     } catch (aiErr) {
         console.warn(`⚠️ AI analysis failed (${aiErr.message}) — returning deterministic data only`);
-        try { require('fs').writeFileSync('/tmp/gemini-error.log', String(aiErr.stack || aiErr)); } catch(e){}
         // Return a minimal AI result so the deterministic crawl data is still available
         parsed = {
             seoHealthScore: 50,
@@ -1143,8 +1141,8 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
 
     // Timing Safeguard: Check if we have enough time left for AI
     const elapsed = Date.now() - (req.startTime || Date.now());
-    const budget = 55000; // Increased to 55s to allow for all fallbacks (ALB/CloudFront limit usually 60s)
-    const remainingBudget = Math.max(10000, budget - elapsed);
+    const budget = 3600000; // 60 min (unlimited for user)
+    const remainingBudget = Math.max(1800000, budget - elapsed);
     console.log(`⏱️ Traffic research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     // Build enriched signal data for AI prompt
@@ -1417,8 +1415,8 @@ router.post('/competitors', protect, requireStudio('seoStudio'), requireCredits(
 
     // Timing Safeguard: Check if we have enough time left for AI
     const elapsed = Date.now() - (req.startTime || Date.now());
-    const budget = 55000; // 55s budget
-    const remainingBudget = Math.max(10000, budget - elapsed);
+    const budget = 600000; // 600s (10 min) budget
+    const remainingBudget = Math.max(300000, budget - elapsed);
     console.log(`⏱️ Competitor research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     const systemPrompt = `You are a COMPETITIVE INTELLIGENCE STRATEGIST — you think like a war-room strategist, not a data reporter. You have REAL CRAWL DATA from both the brand and competitor websites. Your job is to explain WHY competitors win, WHAT their strategy is, and HOW to beat them.
@@ -1579,8 +1577,9 @@ router.post('/ai-visibility', protect, requireStudio('seoStudio'), requireCredit
 
     // Timing: data gathering is fast now, AI gets generous budget
     const elapsed = Date.now() - (req.startTime || Date.now());
-    const remainingBudget = Math.max(60000, 120000 - elapsed);
-    console.log(`⏱️ AI Visibility intelligence took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
+    const budget = 3600000; 
+    const remainingBudget = Math.max(1800000, budget - elapsed);
+    console.log(`⏱️ AI Visibility research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     const systemPrompt = `You are an AI SEARCH STRATEGIST — the world's foremost expert on making brands visible in AI-powered search (Google AI Overviews, ChatGPT + Bing, Perplexity, Gemini, Claude, etc.) in 2026.
 
@@ -1694,7 +1693,6 @@ STRATEGIC RULES (MANDATORY):
 5. Think like a consultant billing $500/hour — every recommendation must justify its existence with data`;
 
     const userPrompt = `AI Visibility audit for: ${website}`;
-
     // Run AI on-page analysis AND real LLM probing in parallel
     const brandName = brand?.name || brandPayload?.name || new URL(website).hostname.replace(/^www\./, '').split('.')[0];
     const industry = brand?.industry || brand?.businessCategory || brandPayload?.industry || '';
@@ -1720,15 +1718,8 @@ STRATEGIC RULES (MANDATORY):
         return null;
       }),
     ]);
-
     const parsed = parseJSON(result);
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
-    
-    // Map missing scores for the frontend GEO tab
-    parsed.schemaScore = parsed.breakdown?.schemaReadiness?.score || 50;
-    parsed.contentScore = parsed.breakdown?.entityCoverage?.score || 50;
-    parsed.authorityScore = parsed.breakdown?.trustSignals?.score || 50;
-    parsed.technicalScore = parsed.breakdown?.snippetStructure?.score || 50;
 
     // Merge real GEO probe data into response
     if (geoProbeResult) {
@@ -1900,7 +1891,9 @@ Respond in JSON:
 }`;
 
     const userPrompt = `On-page SEO audit for: ${pageUrl}${keyword ? ` (targeting: ${keyword})` : ''}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6000 });
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6000, timeout: remainingBudget });
     const parsed = parseJSON(result);
 
     res.json({ success: true, ...parsed });
@@ -1975,7 +1968,9 @@ Respond in JSON:
 
 CRITICAL: Only include REAL existing companies. Do not make up fictional companies or URLs.`;
 
-    const result = await aiCall(systemPrompt, `Find competitors for: ${brand.name} (${brand.website || brand.dna?.industry || 'general'})`, { json: true, temperature: 0.5 });
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
+    const result = await aiCall(systemPrompt, `Find competitors for: ${brand.name} (${brand.website || brand.dna?.industry || 'general'})`, { json: true, temperature: 0.5, timeout: remainingBudget });
     const parsed = parseJSON(result);
 
     // Save to brand
@@ -2299,9 +2294,10 @@ router.post('/competitor-warroom', protect, requireStudio('seoStudio'), requireC
     });
 
     // Timing Safeguard: AI gets generous budget since data gathering is now fast
-    const elapsed = Date.now() - (req.startTime || Date.now());
-    const remainingBudget = Math.max(60000, 120000 - elapsed);
-    console.log(`⏱️ War Room intelligence took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
+    const requestStart = Date.now();
+    const elapsed = Date.now() - (req.startTime || requestStart);
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
+    console.log(`⏱️ War Room research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     const systemPrompt = `You are a COMPETITIVE WAR ROOM STRATEGIST — create a 90-day battle plan to systematically outrank competitors. You have REAL DATA from DataForSEO and site analysis.
 
@@ -2344,8 +2340,9 @@ Respond in STRICT JSON:
   "researchSources": ["URLs crawled"]
 }`;
 
-    const userPrompt = `Build 90-day war room plan for: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192, timeout: remainingBudget });
+    const currentElapsed = Date.now() - (req.startTime || requestStart);
+    const finalBudget = Math.max(300000, 600000 - currentElapsed);
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192, timeout: finalBudget });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoWarRoom', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
@@ -2396,15 +2393,13 @@ router.post('/llm-probe', protect, requireStudio('seoStudio'), requireCredits('s
 
     // Timing Safeguard: LLM Probe involves real external calls, so we must budget strictly
     const startElapsed = Date.now() - (req.startTime || Date.now());
-    const probeBudget = 28000 - startElapsed;
-    
+    const probeBudget = 3600000 - startElapsed;
     // STEP 2: Run REAL probe — actually query ChatGPT, Gemini, Grok
     console.log(`\n🔬 === REAL LLM PROBE: ${brandName} (${probePrompts.length} prompts × 3 models). Budget: ${probeBudget}ms ===`);
     const probeData = await runRealLLMProbe(probePrompts, brandName, website, competitors);
-
     // Final Timing Check for Analysis AI
     const finalElapsed = Date.now() - (req.startTime || Date.now());
-    const remainingBudget = Math.max(5000, 28000 - finalElapsed);
+    const remainingBudget = Math.max(300000, 600000 - finalElapsed);
     console.log(`⏱️ LLM Probe real queries took ${finalElapsed}ms. Remaining budget for AI analysis: ${remainingBudget}ms`);
 
     // STEP 3: Feed real probe results to AI for strategic analysis
@@ -2467,8 +2462,9 @@ Respond in STRICT JSON:
 
 CRITICAL: Use the REAL mention rate (${probeData.aggregate.mentionRate}%) as the overall visibility score. Reference ACTUAL probe results. Every recommendation must tie back to specific prompts where the brand was NOT mentioned.`;
 
-    const userPrompt = `Analyze real LLM probe results for: ${brandName} (${website})`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6144, timeout: remainingBudget });
+    const currentElapsed = Date.now() - (req.startTime || Date.now());
+    const finalBudget = Math.max(300000, 600000 - currentElapsed);
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6144, timeout: finalBudget });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoLlmProbe', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
 
@@ -2488,8 +2484,6 @@ CRITICAL: Use the REAL mention rate (${probeData.aggregate.mentionRate}%) as the
       byModel: probeData.byModel,
     };
     parsed.overallVisibilityScore = probeData.aggregate.mentionRate;
-    parsed.aiVisibilityScore = probeData.aggregate.mentionRate;
-    parsed.probeResults = parsed.realProbeData.probeResults;
     parsed.dataSource = 'real-queries';
     parsed.researchSources = [website];
 
@@ -2576,7 +2570,7 @@ Generate production-ready code. Every fix must be copy-paste ready. Use the bran
 
     const userPrompt = `Generate auto-fix code for: ${website}`;
     const elapsed = Date.now() - (req.startTime || Date.now());
-    const remainingBudget = Math.max(5000, 28000 - elapsed);
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
     const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.4, maxTokens: 8192, timeout: remainingBudget });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoAutoFix', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
@@ -2709,12 +2703,11 @@ Generate 15-20 mined prompts. Be specific to this brand's industry. Think about 
 
     // STEP 3: AI call enriched with real autocomplete data
     const elapsed = Date.now() - (req.startTime || Date.now());
-    const remainingBudget = Math.max(5000, 28000 - elapsed);
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
     const aiResult = await aiCall(systemPrompt, userPrompt + autocompleteContext, { json: true, temperature: 0.6, maxTokens: 8192, timeout: remainingBudget });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoPromptMining', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(aiResult);
     parsed.researchSources = [website];
-    parsed.aiVisibilityScore = parsed.citationScore;
 
     // Attach real autocomplete data to response
     if (autocompleteData?.totalSuggestions > 0) {
@@ -2845,14 +2838,6 @@ router.get('/reports/:type', protect, async (req, res, next) => {
 
     if (!audit) return res.json({ success: true, found: false });
 
-    // Backward compatibility for ai-visibility reports saved before score mappings
-    if (type === 'ai-visibility' && audit.results?.breakdown && audit.results.schemaScore === undefined) {
-      audit.results.schemaScore = audit.results.breakdown?.schemaReadiness?.score || 50;
-      audit.results.contentScore = audit.results.breakdown?.entityCoverage?.score || 50;
-      audit.results.authorityScore = audit.results.breakdown?.trustSignals?.score || 50;
-      audit.results.technicalScore = audit.results.breakdown?.snippetStructure?.score || 50;
-    }
-
     res.json({
       success: true,
       found: true,
@@ -2861,6 +2846,7 @@ router.get('/reports/:type', protect, async (req, res, next) => {
       scores: audit.scores,
     });
   } catch (error) {
+    console.error(`❌ [SEO API] Error fetching report:`, error);
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
@@ -3219,7 +3205,9 @@ Respond in JSON:
   "followUpQuestions": ["Follow-up 1", "Follow-up 2", "Follow-up 3"]
 }`;
 
-    const result = await aiCall(systemPrompt, question, { json: true, temperature: 0.7, maxTokens: 4096, timeout: 15000 });
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
+    const result = await aiCall(systemPrompt, question, { json: true, temperature: 0.7, maxTokens: 4096, timeout: remainingBudget });
     const parsed = parseJSON(result);
 
     res.json({ success: true, ...parsed });
@@ -3228,57 +3216,120 @@ Respond in JSON:
   }
 });
 
-// ==========================================
-// AI Content Fix Generator
-// ==========================================
-router.post('/content-fix', protect, requireStudio('seoStudio'), requireCredits('seoGenerateFix', 1, false), async (req, res, next) => {
+// ============================================================================
+// CONTENT FIX — AI-powered inline content fixes for SEO audit issues
+// ============================================================================
+
+router.post('/content-fix', protect, requireStudio('seoStudio'), requireCredits('seoGenerateFix', 1, false), async (req, res) => {
   try {
     const { brandId, issueTitle, issueDescription, pageUrl, fixType, currentContent, targetKeyword } = req.body;
+
+    if (!issueTitle) {
+      return res.status(400).json({ success: false, error: 'Issue title is required.' });
+    }
+
     const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
     const brandContext = buildBrandContext(brand);
+    const website = pageUrl || brand?.website || '';
 
-    const systemPrompt = `You are an expert SEO Content Strategist and Developer.
-Your job is to generate highly optimized, ready-to-use content or code to fix a specific SEO issue.
+    // Build fix-type-specific instructions
+    const fixInstructions = {
+      'meta-title': {
+        task: 'Write an optimized SEO meta title tag',
+        constraints: 'Must be 50-60 characters. Include the primary keyword naturally. Make it compelling for click-through. Do NOT use pipes (|) excessively.',
+        format: 'Return ONLY the meta title text, nothing else. No quotes, no HTML tags, no explanation.',
+      },
+      'meta-description': {
+        task: 'Write an optimized SEO meta description',
+        constraints: 'Must be 150-160 characters. Include the primary keyword. Include a clear call-to-action. Make it compelling to increase CTR from search results.',
+        format: 'Return ONLY the meta description text, nothing else. No quotes, no HTML tags, no explanation.',
+      },
+      'h1': {
+        task: 'Write an optimized H1 heading tag for this page',
+        constraints: 'Must be clear, descriptive, and include the primary keyword naturally. Should accurately describe the page content. Keep it under 70 characters.',
+        format: 'Return ONLY the H1 text, nothing else. No HTML tags, no quotes, no explanation.',
+      },
+      'content-expand': {
+        task: 'Expand the thin content on this page to make it comprehensive and SEO-friendly',
+        constraints: 'Write 300-500 words of high-quality, original content. Include relevant keywords naturally. Use proper heading structure (H2, H3). Add value with specific details, examples, or actionable advice. Write in the brand\'s voice.',
+        format: 'Return the expanded content in clean markdown format with headings. No meta commentary.',
+      },
+      'content-rewrite': {
+        task: 'Rewrite and improve this content for better SEO performance',
+        constraints: 'Improve readability, keyword coverage, and user engagement. Maintain the original intent but make it more comprehensive and authoritative. Use proper heading structure.',
+        format: 'Return the rewritten content in clean markdown format. No meta commentary.',
+      },
+      'alt-text': {
+        task: 'Generate descriptive, SEO-friendly alt text for images on this page',
+        constraints: 'Each alt text should be 10-15 words, descriptive of the image content, and include relevant keywords where natural. Generate 5 alt text suggestions for common image types on this page.',
+        format: 'Return each alt text suggestion on a new line, numbered 1-5. Each should be a standalone description.',
+      },
+    };
 
-${brandContext ? 'BRAND CONTEXT:\\n' + brandContext + '\\n\\n' : ''}
-You will be provided with:
-1. Issue Title: The SEO problem to solve
-2. Issue Description: Details about why it's a problem
-3. Page URL: Where the issue was found
-4. Fix Type (e.g., meta-title, meta-description, h1, content-rewrite, new-content, code-snippet)
-5. Current Content (if available)
-6. Target Keyword (if applicable)
+    const fix = fixInstructions[fixType] || fixInstructions['content-rewrite'];
 
-Task:
-Generate the EXACT content or code the user needs to paste into their CMS or codebase to fix this issue.
-If it's content, make it engaging, brand-aligned (if context provided), and SEO-optimized.
-If it's code (like Schema JSON-LD or HTML), provide the exact valid code snippet.
-ALSO provide a brief instruction on WHERE to put this.
+    const systemPrompt = `You are a SENIOR SEO CONTENT SPECIALIST. Your job is to generate production-ready content fixes for specific SEO issues.
 
-Respond in JSON ONLY:
-{
-  "content": "The actual text or code snippet to use. Include instructions at the top like 'INSTRUCTIONS: Paste this in your <head> tag\\n\\nCONTENT:\\n...'"
-}`;
+${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
+${website ? `Page URL: ${website}` : ''}
+${targetKeyword ? `Target Keyword: ${targetKeyword}` : ''}
 
-    const userPrompt = `Issue: ${issueTitle || 'Unknown'}
-Description: ${issueDescription || 'No description provided.'}
-Page URL: ${pageUrl || 'Not provided'}
-Fix Type: ${fixType || 'misc'}
-Target Keyword: ${targetKeyword || 'N/A'}
-Current Content: ${currentContent ? '\\n' + currentContent + '\\n' : 'None provided.'}`;
+TASK: ${fix.task}
+CONSTRAINTS: ${fix.constraints}
 
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, maxTokens: 2048, timeout: 30000 });
-    const parsed = parseJSON(result);
+OUTPUT FORMAT: ${fix.format}
+
+QUALITY STANDARDS:
+- Write naturally — no keyword stuffing
+- Match the brand's industry and tone
+- Every word must add value
+- Optimize for both users AND search engines
+- Follow 2026 SEO best practices (E-E-A-T, helpful content signals)`;
+
+    let userPrompt = `Fix this SEO issue:\n\nIssue: ${issueTitle}`;
+    if (issueDescription) userPrompt += `\nDetails: ${issueDescription}`;
+    if (currentContent) userPrompt += `\nCurrent Content: ${currentContent}`;
+    if (targetKeyword) userPrompt += `\nTarget Keyword: ${targetKeyword}`;
+    userPrompt += `\n\nGenerate the fix now.`;
+
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
+    const result = await aiCall(systemPrompt, userPrompt, {
+      temperature: 0.6,
+      maxTokens: 2048,
+      json: false,
+      timeout: remainingBudget
+    });
 
     // Charge credit since generation succeeded
-    if (req.user) await deductCredits(req.user._id, 'seoGenerateFix', 1, brandId);
+    if (req.user) {
+      await deductCredits(req.user._id, 'seoGenerateFix', 1, brandId);
+      
+      if (lastTokenUsage) {
+        logTokenUsage(req.user._id, lastTokenUsage, {
+          action: 'seoContentFix',
+          studio: 'seo',
+          route: req.originalUrl,
+          brandId: brand?._id,
+        });
+      }
+    }
 
-    res.json({ success: true, content: parsed.content });
+    const content = result?.trim();
+    if (!content) {
+      return res.status(500).json({ success: false, error: 'AI did not generate content. Please try again.' });
+    }
+
+    res.json({ success: true, content, fixType });
   } catch (error) {
     if (error.message?.includes('Credit limit reached')) {
       return res.status(403).json({ success: false, error: 'Insufficient credits for AI Generation. Please upgrade your plan.' });
     }
-    next(error);
+    console.error('SEO Content Fix error:', error);
+    if (error.name === 'AbortError' || error.message?.includes('aborted')) {
+      return res.status(504).json({ success: false, error: 'Content generation timed out. Please try again.' });
+    }
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 

@@ -1273,7 +1273,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 type: tmpl.type,
                 prompt: builtPrompt,
                 options,
-            }, { signal })
+            }, { signal, timeout: 180000 })
 
             if (data.success && data.creative) {
                 setTemplateResult(data.creative)
@@ -3387,7 +3387,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     const brandColors=clgColorMode==='brand'&&activeBrand?.dna?.colors?.length?activeBrand.dna.colors.map(c=>typeof c==='string'?c:c.hex||c.name||'').filter(Boolean).join(', '):clgCustomColors;
                                     const v=clgResults.length+1;
                                     const prompt=`Generate a CAMPAIGN LOGO / EVENT BADGE design.\n\nTEXT: "${clgText}"\nSTYLE: ${clgStyle||'modern'}\n${clgOccasion?`OCCASION: ${clgOccasion}\n`:''}${clgIcon?`ICON ELEMENTS: Include ${clgIcon} visual elements\n`:''}COLORS: Use ${brandColors||'vibrant, eye-catching colors'}\nBACKGROUND: ${clgBg==='transparent'?'transparent/alpha background (PNG-ready)':clgBg}\nSHAPE: ${clgShape}\n${clgEnhance?`STYLE KEYWORDS: ${clgEnhance}\n`:''}VARIANT: ${v} — create a unique, visually distinctive design\n\nCRITICAL RULES:\n- This is a LOGO/BADGE, not a poster — keep it compact and icon-like\n- The text "${clgText}" must be clearly readable and be the HERO element\n- Use professional typography — bold, impactful lettering\n- Make it suitable for use as a campaign identifier across marketing materials\n- ${clgBg==='transparent'?'Ensure the background is fully transparent':'Fill the background as specified'}\n- Do NOT add placeholder text or watermarks`;
-                                    const res=await creativesAPI.generate({prompt,brandId:activeBrand?._id,type:'campaign-logo',options:{aspectRatio:'1:1',style:'logo'}});
+                                    const res=await creativesAPI.generate({prompt,brandId:activeBrand?._id,type:'campaign-logo',options:{aspectRatio:'1:1',style:'logo'}}, { timeout: 180000 });
                                     if (res.warnings?.length > 0) {
                                         setAiWarnings(prev => [...new Set([...prev, ...res.warnings])]);
                                     }
@@ -4123,7 +4123,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                                 let res=null;
                                                 for(let attempt=0;attempt<2;attempt++){
                                                     try{
-                                                        res=await creativesAPI.generate(payload);
+                                                        res=await creativesAPI.generate(payload, { timeout: 180000 });
                                                         if (res.warnings?.length > 0) {
                                                             setAiWarnings(prev => [...new Set([...prev, ...res.warnings])]);
                                                         }
