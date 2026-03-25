@@ -6,6 +6,7 @@ import { ShopifyProvider } from './context/ShopifyContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Auth from './pages/Auth'
 import Landing from './pages/Landing'
+import About from './pages/About'
 import BrandOnboarding from './pages/BrandOnboarding'
 import Nexus from './pages/Nexus'
 import BrandDNA from './pages/BrandDNA'
@@ -53,6 +54,7 @@ function App() {
               <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<Landing />} />
+                <Route path="/about" element={<About />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/onboarding" element={<BrandOnboarding />} />
                 <Route path="/privacy-policy" element={<PrivacyPolicy />} />
