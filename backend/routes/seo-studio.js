@@ -159,7 +159,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
         }
 
         if (provider.name === 'gemini') {
-          const models = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-2.5-flash'];
+          const models = ['gemini-2.5-flash'];
           for (const modelId of models) {
             if (overallController.signal.aborted) break;
             try {
@@ -502,6 +502,7 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
         parsed = parseJSON(result);
     } catch (aiErr) {
         console.warn(`⚠️ AI analysis failed (${aiErr.message}) — returning deterministic data only`);
+        try { require('fs').writeFileSync('/tmp/gemini-error.log', String(aiErr.stack || aiErr)); } catch(e){}
         // Return a minimal AI result so the deterministic crawl data is still available
         parsed = {
             seoHealthScore: 50,
@@ -1722,6 +1723,12 @@ STRATEGIC RULES (MANDATORY):
 
     const parsed = parseJSON(result);
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
+    
+    // Map missing scores for the frontend GEO tab
+    parsed.schemaScore = parsed.breakdown?.schemaReadiness?.score || 50;
+    parsed.contentScore = parsed.breakdown?.entityCoverage?.score || 50;
+    parsed.authorityScore = parsed.breakdown?.trustSignals?.score || 50;
+    parsed.technicalScore = parsed.breakdown?.snippetStructure?.score || 50;
 
     // Merge real GEO probe data into response
     if (geoProbeResult) {
@@ -2481,6 +2488,8 @@ CRITICAL: Use the REAL mention rate (${probeData.aggregate.mentionRate}%) as the
       byModel: probeData.byModel,
     };
     parsed.overallVisibilityScore = probeData.aggregate.mentionRate;
+    parsed.aiVisibilityScore = probeData.aggregate.mentionRate;
+    parsed.probeResults = parsed.realProbeData.probeResults;
     parsed.dataSource = 'real-queries';
     parsed.researchSources = [website];
 
@@ -2705,6 +2714,7 @@ Generate 15-20 mined prompts. Be specific to this brand's industry. Think about 
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoPromptMining', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(aiResult);
     parsed.researchSources = [website];
+    parsed.aiVisibilityScore = parsed.citationScore;
 
     // Attach real autocomplete data to response
     if (autocompleteData?.totalSuggestions > 0) {
@@ -2834,6 +2844,14 @@ router.get('/reports/:type', protect, async (req, res, next) => {
     }
 
     if (!audit) return res.json({ success: true, found: false });
+
+    // Backward compatibility for ai-visibility reports saved before score mappings
+    if (type === 'ai-visibility' && audit.results?.breakdown && audit.results.schemaScore === undefined) {
+      audit.results.schemaScore = audit.results.breakdown?.schemaReadiness?.score || 50;
+      audit.results.contentScore = audit.results.breakdown?.entityCoverage?.score || 50;
+      audit.results.authorityScore = audit.results.breakdown?.trustSignals?.score || 50;
+      audit.results.technicalScore = audit.results.breakdown?.snippetStructure?.score || 50;
+    }
 
     res.json({
       success: true,
@@ -3206,6 +3224,60 @@ Respond in JSON:
 
     res.json({ success: true, ...parsed });
   } catch (error) {
+    next(error);
+  }
+});
+
+// ==========================================
+// AI Content Fix Generator
+// ==========================================
+router.post('/content-fix', protect, requireStudio('seoStudio'), requireCredits('seoGenerateFix', 1, false), async (req, res, next) => {
+  try {
+    const { brandId, issueTitle, issueDescription, pageUrl, fixType, currentContent, targetKeyword } = req.body;
+    const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
+    const brandContext = buildBrandContext(brand);
+
+    const systemPrompt = `You are an expert SEO Content Strategist and Developer.
+Your job is to generate highly optimized, ready-to-use content or code to fix a specific SEO issue.
+
+${brandContext ? 'BRAND CONTEXT:\\n' + brandContext + '\\n\\n' : ''}
+You will be provided with:
+1. Issue Title: The SEO problem to solve
+2. Issue Description: Details about why it's a problem
+3. Page URL: Where the issue was found
+4. Fix Type (e.g., meta-title, meta-description, h1, content-rewrite, new-content, code-snippet)
+5. Current Content (if available)
+6. Target Keyword (if applicable)
+
+Task:
+Generate the EXACT content or code the user needs to paste into their CMS or codebase to fix this issue.
+If it's content, make it engaging, brand-aligned (if context provided), and SEO-optimized.
+If it's code (like Schema JSON-LD or HTML), provide the exact valid code snippet.
+ALSO provide a brief instruction on WHERE to put this.
+
+Respond in JSON ONLY:
+{
+  "content": "The actual text or code snippet to use. Include instructions at the top like 'INSTRUCTIONS: Paste this in your <head> tag\\n\\nCONTENT:\\n...'"
+}`;
+
+    const userPrompt = `Issue: ${issueTitle || 'Unknown'}
+Description: ${issueDescription || 'No description provided.'}
+Page URL: ${pageUrl || 'Not provided'}
+Fix Type: ${fixType || 'misc'}
+Target Keyword: ${targetKeyword || 'N/A'}
+Current Content: ${currentContent ? '\\n' + currentContent + '\\n' : 'None provided.'}`;
+
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.7, maxTokens: 2048, timeout: 30000 });
+    const parsed = parseJSON(result);
+
+    // Charge credit since generation succeeded
+    if (req.user) await deductCredits(req.user._id, 'seoGenerateFix', 1, brandId);
+
+    res.json({ success: true, content: parsed.content });
+  } catch (error) {
+    if (error.message?.includes('Credit limit reached')) {
+      return res.status(403).json({ success: false, error: 'Insufficient credits for AI Generation. Please upgrade your plan.' });
+    }
     next(error);
   }
 });
