@@ -1,8 +1,10 @@
+const path = require('path');
+
 module.exports = {
   apps: [
     {
       name: 'mantram-server',
-      script: '../index.js',
+      script: path.resolve(__dirname, '../index.js'),
       instances: 2,
       exec_mode: 'cluster',
       max_memory_restart: '2G',
