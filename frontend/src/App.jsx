@@ -38,6 +38,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
 import DataDeletion from './pages/DataDeletion'
 import UnderConstruction from './pages/UnderConstruction'
+import StudioPreview from './pages/StudioPreview'
 
 function App() {
   // const isProduction = window.location.hostname.includes('mantram.ai');
@@ -61,6 +62,7 @@ function App() {
                 <Route path="/terms" element={<TermsOfService />} />
                 <Route path="/data-deletion" element={<DataDeletion />} />
                 <Route path="/data-deletion-status" element={<DataDeletion />} />
+                <Route path="/studio/:slug" element={<StudioPreview />} />
 
                 {/* Protected routes — require authentication */}
                 <Route path="/nexus" element={<ProtectedRoute><Nexus /></ProtectedRoute>} />
