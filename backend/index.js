@@ -102,17 +102,19 @@ const corsOptions = {
         // Merge hardcoded + .env configured origins
         const envOrigins = (config.frontendUrl || []).map(u => u.toLowerCase().replace(/\/$/, ''));
         const allowedOrigins = [...new Set([...HARDCODED_ORIGINS.map(u => u.toLowerCase()), ...envOrigins])];
+        
+        // Definitive production allowance for mantram.ai
+        const isAllowed = allowedOrigins.includes(cleanOrigin); 
+        const isMantram = cleanOrigin.endsWith('mantram.ai') || cleanOrigin.includes('mantram.ai');
 
-        const isAllowed =
-            allowedOrigins.includes(cleanOrigin) ||
-            (cleanOrigin.endsWith('.mantram.ai') && !cleanOrigin.includes('..'));
-
-        if (isAllowed) {
+        if (isAllowed || isMantram) {
             return callback(null, true);
         }
 
-        console.error(`❌ CORS Rejected: "${origin}" not in allowed list.`, { allowedOrigins });
-        return callback(new Error(`CORS policy: Origin "${origin}" not allowed`));
+        console.error(`❌ CORS Rejected: "${origin}" not in allowed list.`);
+        // Return null, false instead of Error to avoid triggering Express error handlers
+        // that might strip headers.
+        return callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -122,9 +124,8 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// Handle OPTIONS preflight for all routes
-// Note: '/(.*) 'used instead of '*' for path-to-regexp v8+ compatibility (Express 5)
-app.options('/(.*)', cors(corsOptions));
+// Handle OPTIONS preflight globally for all routes
+app.options('*', cors(corsOptions));
 
 // Special middleware for Shopify Webhooks to ensure raw body capture for HMAC verification
 app.use('/api/shopify/webhooks', express.raw({ type: '*/*', limit: '50mb' }), (req, res, next) => {
