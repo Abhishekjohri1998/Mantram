@@ -58,6 +58,24 @@ const HARDCODED_ORIGINS = [
 app.get('/api/health', (req, res) => res.json({ status: 'ok', port: config.port }));
 app.get('/', (req, res) => res.json({ status: 'ok', message: 'Mantram AI API' }));
 
+// ── UNCONDITIONAL CORS (BRUTE FORCE) ──────────────────────────
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    // Allow all mantram.ai origins unconditionally
+    if (origin && (origin.toLowerCase().endsWith('mantram.ai') || origin.toLowerCase().includes('mantram.ai'))) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    }
+    
+    // Handle Preflight immediately
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    next();
+});
+
 const server = app.listen(config.port, '0.0.0.0', () => {
     console.log(`\n🚀 Mantram AI Server FAST-START on port ${config.port}`);
 
@@ -114,11 +132,8 @@ const corsOptions = {
     optionsSuccessStatus: 200,
 };
 
+// Use the standard CORS package as a fallback but our brute-force above should catch most
 app.use(cors(corsOptions));
-
-// Handle OPTIONS preflight globally for all routes
-// Note: '/(.*)' used instead of '*' for path-to-regexp v8+ compatibility (Express 5)
-app.options('/(.*)', cors(corsOptions));
 
 // Special middleware for Shopify Webhooks
 app.use('/api/shopify/webhooks', express.raw({ type: '*/*', limit: '50mb' }), (req, res, next) => {
