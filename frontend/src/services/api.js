@@ -141,6 +141,7 @@ export const content = {
     refineText: (data) => apiFetch('/content/refine-text', { method: 'POST', body: JSON.stringify(data) }),
     youtube: (data) => apiFetch('/content/agentic/youtube', { method: 'POST', body: JSON.stringify(data) }),
     youtubeSeo: (data) => apiFetch('/content/agentic/youtube-seo', { method: 'POST', body: JSON.stringify(data) }),
+    trending: (data) => apiFetch('/content/trending', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ============ Creatives API ============
