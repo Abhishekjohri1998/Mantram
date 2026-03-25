@@ -224,6 +224,12 @@ const server = app.listen(config.port, () => {
     import('./services/scheduledPostPublisher.js').then(({ startScheduledPostPublisher }) => {
         startScheduledPostPublisher();
     }).catch((err) => { console.warn('📅 Scheduled Post Publisher failed to start:', err.message); });
+
+    // Signal PM2 that we are ready to serve traffic
+    if (process.send) {
+        process.send('ready');
+        console.log('✅ PM2 Ready signal sent');
+    }
 });
 
 // Configure Keep-Alive timeout larger than AWS ALB / CloudFront idle timeout (60s)
