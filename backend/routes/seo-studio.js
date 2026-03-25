@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { protect, optionalAuth } from '../middleware/auth.js';
 import { requireStudio } from '../middleware/studioAccess.js';
-import { requireCredits, logTokenUsage } from '../middleware/credits.js';
+import { requireCredits, logTokenUsage, deductCredits } from '../middleware/credits.js';
 import Brand from '../models/Brand.js';
 import SeoAudit from '../models/SeoAudit.js';
 import GeoProbeHistory from '../models/GeoProbeHistory.js';

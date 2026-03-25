@@ -25,8 +25,9 @@ const ACTION_LABELS = {
     seoCompetitors: 'SEO Competitors', seoAiVisibility: 'SEO AI Visibility',
     seoAsk: 'SEO Ask', seoAuditPage: 'SEO Page Audit',
     seoCompetitorDiscover: 'SEO Discover Competitors', seoBacklinks: 'SEO Backlink Intelligence',
-    seoWarRoom: 'SEO War Room', seoLlmProbe: 'SEO LLM Probe',
+    seoWarRoom: 'SEO War Room',    seoLlmProbe: 'SEO LLM Probe',
     seoAutoFix: 'SEO Auto-Fix', seoPromptMining: 'SEO Prompt Mining',
+    seoGenerateFix: 'SEO Content Fix (AI)',
     brainstorm: 'Brainstorm Generate', brainstormRefine: 'Brainstorm Refine',
     brainstormChat: 'Brainstorm Chat', brainstormScreenplay: 'Screenplay Generation',
     trendRefresh: 'Trend Refresh',
@@ -66,6 +67,7 @@ const DEFAULT_CREDIT_COSTS = {
     seoLlmProbe: 3,
     seoAutoFix: 2,
     seoPromptMining: 3,
+    seoGenerateFix: 1,
     brainstorm: 3,                 // ↓ from 4 (1 text call — lower cost)
     brainstormRefine: 1,           // ↓ from 2 (lightweight)
     brainstormChat: 1,             // ↓ from 2 (single short response)
@@ -255,6 +257,61 @@ export const requireCredits = (actionOrCost = 1) => {
             return res.status(500).json({ success: false, error: 'Credit system error. Please try again.' });
         }
     };
+};
+
+/**
+ * Deduct credits manually — for use inside handlers where credit deduction 
+ * depends on logic (e.g. only deduct if AI call succeeds)
+ */
+export const deductCredits = async (userId, actionOrCost, amount = 1, brandId = null) => {
+    if (!userId) return;
+    try {
+        const user = await User.findById(userId);
+        if (!user) return;
+
+        // Bypass for superadmin
+        if (user.role === 'superadmin' || user.plan === 'enterprise') {
+            console.log(`🛡️ Superadmin bypass: Deducting 0 credits for ${actionOrCost}`);
+            return user;
+        }
+
+        let cost = typeof actionOrCost === 'number' ? actionOrCost : amount;
+        if (typeof actionOrCost === 'string') {
+            const costs = await getCreditCosts();
+            cost = costs[actionOrCost] || amount;
+        }
+
+        const updateOps = [
+            User.findByIdAndUpdate(userId, { $inc: { 'credits.used': cost } }, { returnDocument: 'after' })
+        ];
+
+        // If user has an active subscription, sync deduction there too
+        if (user.activeSubscription) {
+            const Subscription = (await import('../models/Subscription.js')).default;
+            updateOps.push(Subscription.findByIdAndUpdate(user.activeSubscription, { $inc: { 'credits.used': cost } }));
+        }
+
+        const [updated] = await Promise.all(updateOps);
+
+        // Log usage
+        const updTopUp = (updated.credits?.topUp > 0 && updated.credits?.topUpExpiry && new Date(updated.credits.topUpExpiry) > new Date()) ? updated.credits.topUp : 0;
+        const balanceAfter = (updated.credits?.total || 0) + (updated.credits?.bonus || 0) + updTopUp - (updated.credits?.used || 0);
+
+        CreditUsage.create({
+            user: userId,
+            action: typeof actionOrCost === 'string' ? actionOrCost : 'manual_deduction',
+            cost,
+            balanceAfter: Math.max(0, balanceAfter),
+            description: ACTION_LABELS[actionOrCost] || actionOrCost || 'AI Operation',
+            studio: (typeof actionOrCost === 'string' && actionOrCost.startsWith('seo')) ? 'seo' : 'unknown',
+            metadata: { brandId },
+        }).catch(err => console.warn('Manual credit usage log failed:', err.message));
+
+        console.log(`💰 Manually deducted ${cost} credits from user ${userId} for ${actionOrCost}`);
+        return updated;
+    } catch (e) {
+        console.error('Manual credit deduction failed:', e.message);
+    }
 };
 
 /**
