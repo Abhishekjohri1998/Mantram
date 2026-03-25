@@ -45,6 +45,10 @@ import skillsRoutes from './routes/skills.js';
 
 const app = express();
 
+// Immediate health check (bypasses all middleware)
+app.get('/api/health', (req, res) => res.json({ status: 'ok', port: config.port }));
+app.get('/', (req, res) => res.json({ status: 'ok', message: 'Mantram AI API' }));
+
 // Connect Database
 connectDB();
 
@@ -172,22 +176,7 @@ app.use('/api/social', socialRoutes);
 app.use('/api/waitlist', waitlistRoutes);
 app.use('/api/skills', skillsRoutes);
 
-// Health check
-app.get('/api/health', (req, res) => {
-    res.json({
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        cors: {
-            hardcodedOrigins: HARDCODED_ORIGINS,
-            envOrigins: config.frontendUrl,
-        },
-        ai: {
-            textProvider: config.ai.defaultTextProvider,
-            imageProvider: config.ai.defaultImageProvider,
-            textModel: config.ai.defaultTextModel,
-        },
-    });
-});
+// Health check moved to top
 
 // Error handler
 app.use((err, req, res, next) => {

@@ -14,7 +14,7 @@ module.exports = {
       out_file: '/home/ec2-user/Mantram/backend/logs/out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
       kill_timeout: 30000,
-      wait_ready: true,
+      wait_ready: false,
       listen_timeout: 30000,
     },
   ],

@@ -183,7 +183,8 @@ jobs:
             update_env_var "AWS_SECRET_ACCESS_KEY" "$AWS_SECRET_ACCESS_KEY"
             update_env_var "AWS_S3_BUCKET" "$AWS_S3_BUCKET"
             update_env_var "AWS_REGION" "$AWS_REGION"
-            echo "✅ AWS S3 configuration updated"
+            update_env_var "PORT" "3001"
+            echo "✅ AWS S3 and PORT configuration updated"
 
             # 2.3 Inject Razorpay Secrets
             if [ ! -z "$RAZORPAY_KEY_ID" ]; then
