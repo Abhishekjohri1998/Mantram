@@ -77,7 +77,7 @@ const TAB_TO_AUDIT_TYPE = {
     'backlinks': 'backlinks',
 };
 
-export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, website, competitors, brandPayload, gaConnected, gaReport, gscReport, gaLoading, gaAuthError, reconnectGA, hideNav }) {
+export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, website, competitors, setCompetitors, brandPayload, gaConnected, gaReport, gscReport, gaLoading, gaAuthError, reconnectGA, hideNav }) {
     // Per-tab data cache (for saved reports)
     const [tabData, setTabData] = useState({});
     const [pageUrl, setPageUrl] = useState('');
@@ -87,6 +87,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
     // Content fix state (per-item AI generated content)
     const [contentFixes, setContentFixes] = useState({});
     const [fixLoading, setFixLoading] = useState({});
+    const [isDiscovering, setIsDiscovering] = useState(false);
 
     const brandId = brand?._id;
 
@@ -125,9 +126,22 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
         }
     }, [ctx]);
 
-    const buildPayload = (extra = {}) => ({
-        url: website, brand: brandPayload, brandId, country: brand?.dna?.country || 'India', industry: brand?.dna?.industry, ...extra,
-    });
+    const runDiscovery = async () => {
+        if (!brandId) return;
+        setIsDiscovering(true);
+        try {
+            const d = await seoAPI.discoverCompetitors({ brandId });
+            if (d.competitors && setCompetitors) {
+                setCompetitors(d.competitors);
+            }
+        } catch (e) {
+            setTabData(prev => ({ ...prev, [advPage]: { error: e.message } }));
+        } finally {
+            setIsDiscovering(false);
+        }
+    };
+
+    const buildPayload = (extra = {}) => ({ ...brandPayload, ...extra });
 
     // ── Content Fix: one-click AI content generation from SEO suggestions ──
     const generateContentFix = useCallback(async (fixKey, { issueTitle, issueDescription, pageUrl: pUrl, fixType, currentContent, targetKeyword }) => {
@@ -1089,7 +1103,15 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
             case 'competitor-detail': {
                 if (!hasData) return (
                     <EmptyState icon="groups" title="Competitor Analysis" desc="Compare your SEO performance against competitors. See keyword gaps, scoring matrix, and battle plans.">
-                        <RunButton onClick={() => runAnalysis('competitor-detail', seoAPI.competitors, buildPayload({ competitorUrls: competitors.map(c => c.url).filter(Boolean) }), 'Analyzing competitors...')} label="Run Competitor Analysis" icon="swords" />
+                        <div className="flex flex-wrap gap-3 justify-center">
+                            <RunButton onClick={() => runAnalysis('competitor-detail', seoAPI.competitors, buildPayload({ competitorUrls: competitors.map(c => c.url).filter(Boolean) }), 'Analyzing competitors...')} label="Run Competitor Analysis" icon="swords" disabled={!competitors?.length} />
+                            <button onClick={runDiscovery} disabled={isDiscovering}
+                                className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 transition-all disabled:opacity-50 cursor-pointer">
+                                <span className={`material-symbols-outlined text-lg ${isDiscovering ? 'animate-spin' : ''}`}>{isDiscovering ? 'sync' : 'auto_awesome'}</span>
+                                {isDiscovering ? 'Discovering...' : 'Auto-Discover Competitors'}
+                            </button>
+                        </div>
+                        {!competitors?.length && <p className="text-[10px] text-slate-500 mt-4 text-center">Add competitors in the sidebar setup or use Auto-Discover to get started.</p>}
                     </EmptyState>
                 );
                 return (
@@ -1100,10 +1122,19 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                         {data.competitors?.length > 0 && (
                             <SectionCard title="Competitor Scorecard" icon="leaderboard">
                                 <DataTable columns={[
-                                    { key: 'name', label: 'Competitor' }, { key: 'overallScore', label: 'Score' },
-                                    { key: 'strengths', label: 'Strengths' }, { key: 'weaknesses', label: 'Weaknesses' },
+                                    { key: 'name', label: 'Competitor' },
+                                    { key: 'overallScore', label: 'Overall' },
+                                    { key: 'technical', label: 'Technical' },
+                                    { key: 'content', label: 'Content' },
+                                    { key: 'authority', label: 'Authority' },
+                                    { key: 'aiReadiness', label: 'AI Ready' },
                                 ]} rows={data.competitors.map(c => ({
-                                    ...c, strengths: (c.strengths || []).slice(0, 2).join(', '), weaknesses: (c.weaknesses || []).slice(0, 2).join(', '),
+                                    ...c,
+                                    overallScore: c.scores?.overall || c.overallScore || '—',
+                                    technical: c.scores?.technical || '—',
+                                    content: c.scores?.content || '—',
+                                    authority: c.scores?.authority || '—',
+                                    aiReadiness: c.scores?.aiReadiness || '—',
                                 }))} />
                             </SectionCard>
                         )}

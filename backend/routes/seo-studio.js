@@ -1506,9 +1506,23 @@ Respond in JSON:
       "estimatedAuthority": "high|medium|low",
       "contentVelocity": "Estimated posting frequency",
       "schemaAdvantage": "What schema/structured data they have that the brand doesn't",
+      "scores": {
+        "technical": 0-100,
+        "content": 0-100,
+        "authority": 0-100,
+        "aiReadiness": 0-100,
+        "overall": 0-100
+      },
       "howToBeat": "Specific actionable plan to outperform this competitor"
     }
   ],
+  "brandScore": {
+    "technical": 0-100,
+    "content": 0-100,
+    "authority": 0-100,
+    "aiReadiness": 0-100,
+    "overall": 0-100
+  },
   "whyTheyWin": [
     { "reason": "Strategic reason from crawl data", "evidence": "Specific observation", "whyItMatters": "How this translates to higher rankings/traffic", "fix": "Specific counterstrategy", "priority": "high|medium", "timeline": "1 week|2 weeks|1 month|3 months" }
   ],
@@ -2363,6 +2377,10 @@ Respond in STRICT JSON:
   "scoringMatrix": [
     { "category": "Technical SEO|Content|Authority|AI Visibility|Speed", "yourScore": 0-100, "avgCompetitorScore": 0-100, "verdict": "ahead|tied|behind", "actions": ["Action to maintain/improve"] }
   ],
+  "competitorScores": [
+    { "name": "Name", "scores": { "technical": 0-100, "content": 0-100, "authority": 0-100, "aiReadiness": 0-100, "overall": 0-100 } }
+  ],
+  "brandScore": { "technical": 0-100, "content": 0-100, "authority": 0-100, "aiReadiness": 0-100, "overall": 0-100 },
   "keywordBattles": [
     { "keyword": "keyword", "yourStatus": "ranking|attempting|absent", "competitorStatus": "dominant|present|absent", "battlePlan": "How to win this keyword", "difficulty": "easy|medium|hard", "priority": "critical|high|medium" }
   ],

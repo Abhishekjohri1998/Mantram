@@ -88,6 +88,8 @@ export const auth = {
     getProfile: () => apiFetch('/auth/me'),
     updateProfile: (data) => apiFetch('/auth/profile', { method: 'PUT', body: JSON.stringify(data) }),
     google: () => apiFetch('/auth/google'),
+    claimUserId: (userId) => apiFetch('/auth/claim-userid', { method: 'PUT', body: JSON.stringify({ userId }) }),
+    changePassword: (currentPassword, newPassword) => apiFetch('/auth/change-password', { method: 'PUT', body: JSON.stringify({ currentPassword, newPassword }) }),
 };
 
 // ============ Brands API ============
