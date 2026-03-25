@@ -58,7 +58,7 @@ const HARDCODED_ORIGINS = [
     'http://localhost:3000',
 ];
 
-app.use(cors({
+const corsOptions = {
     origin: (origin, callback) => {
         // Allow requests with no origin (mobile apps, curl, server-to-server)
         if (!origin) return callback(null, true);
@@ -78,17 +78,19 @@ app.use(cors({
         }
 
         console.error(`❌ CORS Rejected: "${origin}" not in allowed list.`, { allowedOrigins });
-        // Return proper CORS error (not just false which gives confusing browser message)
         return callback(new Error(`CORS policy: Origin "${origin}" not allowed`));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-    optionsSuccessStatus: 200, // For legacy browser compatibility (IE11)
-}));
+    optionsSuccessStatus: 200,
+};
 
-// Explicitly handle OPTIONS preflight for all routes
-app.options('*', cors());
+app.use(cors(corsOptions));
+
+// Handle OPTIONS preflight for all routes
+// Note: '/(.*) 'used instead of '*' for path-to-regexp v8+ compatibility (Express 5)
+app.options('/(.*)', cors(corsOptions));
 
 // Special middleware for Shopify Webhooks to ensure raw body capture for HMAC verification
 app.use('/api/shopify/webhooks', express.raw({ type: '*/*', limit: '50mb' }), (req, res, next) => {
@@ -218,13 +220,13 @@ const server = app.listen(config.port, () => {
         console.log('🕵️ Agent Intelligence active — Missions scheduler running every 6 hours (Compliance Optimized)');
     }).catch(() => { });
 
-    // Start scheduled post publisher (every 60 seconds)
+    // Start scheduled post publisher
     import('./services/scheduledPostPublisher.js').then(({ startScheduledPostPublisher }) => {
         startScheduledPostPublisher();
     }).catch((err) => { console.warn('📅 Scheduled Post Publisher failed to start:', err.message); });
 });
 
-// Configure Keep-Alive timeout to be larger than AWS ALB / CloudFront idle timeout (60s)
+// Configure Keep-Alive timeout larger than AWS ALB / CloudFront idle timeout (60s)
 server.keepAliveTimeout = 65000;
 server.headersTimeout = 66000;
 
@@ -232,14 +234,13 @@ server.headersTimeout = 66000;
 server.timeout = 60000000;
 
 // ══════════════════════════════════════════════════════════════
-// SCALING: GRACEFUL SHUTDOWN
+// GRACEFUL SHUTDOWN
 // ══════════════════════════════════════════════════════════════
 const gracefulShutdown = (signal) => {
     console.log(`\n🛑 ${signal} received. Starting graceful shutdown...`);
 
     server.close(async () => {
         console.log('HTTP server closed.');
-
         try {
             if (mongoose.connection) {
                 mongoose.connection.isShuttingDown = true;
@@ -263,7 +264,7 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // ══════════════════════════════════════════════════════════════
-// SCALING: ERROR GUARDS
+// ERROR GUARDS
 // ══════════════════════════════════════════════════════════════
 process.on('unhandledRejection', (reason, promise) => {
     console.error('🚨 Unhandled Rejection at:', promise, 'reason:', reason);
