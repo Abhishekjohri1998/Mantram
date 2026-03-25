@@ -49,7 +49,7 @@ let lastTokenUsage = null;
 export function getLastTokenUsage() { return lastTokenUsage; }
 
 async function aiCall(systemPrompt, userPrompt, options = {}) {
-  const { temperature = 0.7, maxTokens = 8192, json = false, timeout = 35000 } = options;
+  const { temperature = 0.7, maxTokens = 8192, json = false, timeout = 120000 } = options;
   lastTokenUsage = null;
 
   const overallController = new AbortController();
@@ -1257,8 +1257,9 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
       + 'Generate 5-8 keyword clusters. Use VERIFIED volumes where available. Add confidenceStars (1-5) based on how many data layers support each cluster.';
 
     const userPrompt = 'Find traffic opportunities for: ' + website;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192 
- });
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoTraffic', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
@@ -1494,8 +1495,7 @@ Respond in JSON:
 Be STRATEGIC and SPECIFIC. Every insight must have a WHY and an actionable HOW. Think like a competitive intelligence firm, not a scraping tool.`;
 
     const userPrompt = `Competitive analysis for: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192 
- });
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192, timeout: remainingBudget });
     const parsed = parseJSON(result);
     parsed.researchSources = [
       ...(siteResearch.pages?.map(p => p.url) || [website]),
@@ -2700,7 +2700,7 @@ Generate 15-20 mined prompts. Be specific to this brand's industry. Think about 
     // STEP 3: AI call enriched with real autocomplete data
     const elapsed = Date.now() - (req.startTime || Date.now());
     const remainingBudget = Math.max(300000, 600000 - elapsed);
-    const aiResult = await aiCall(systemPrompt, userPrompt + autocompleteContext, { json: true, temperature: 0.6, maxTokens: 8192 });
+    const aiResult = await aiCall(systemPrompt, userPrompt + autocompleteContext, { json: true, temperature: 0.6, maxTokens: 8192, timeout: remainingBudget });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoPromptMining', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(aiResult);
     parsed.researchSources = [website];
@@ -3286,10 +3286,13 @@ QUALITY STANDARDS:
     if (targetKeyword) userPrompt += `\nTarget Keyword: ${targetKeyword}`;
     userPrompt += `\n\nGenerate the fix now.`;
 
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
     const result = await aiCall(systemPrompt, userPrompt, {
       temperature: 0.6,
       maxTokens: 2048,
       json: false,
+      timeout: remainingBudget
     });
 
     // Log token usage

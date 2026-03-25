@@ -16,48 +16,63 @@ const router = Router();
 // ============================================================================
 
 async function aiCall(systemPrompt, userPrompt, options = {}) {
-    const { temperature = 0.7, maxTokens = 4096, json = false } = options;
+    const { temperature = 0.7, maxTokens = 4096, json = false, timeout = 600000 } = options;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
 
-    if (process.env.OPENAI_API_KEY) {
-        try {
-            const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-                body: JSON.stringify({
-                    model: 'gpt-4o-mini',
-                    messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-                    temperature, max_tokens: maxTokens,
-                    ...(json ? { response_format: { type: 'json_object' } } : {}),
-                }),
-            });
-            const data = await resp.json();
-            if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
-            if (data.error) console.warn('GPT-4o-mini failed:', data.error.message);
-        } catch (e) { console.warn('GPT-4o-mini error:', e.message); }
-    }
-
-    const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
-    if (geminiKey) {
-        for (const model of ['gemini-2.5-flash', 'gemini-2.5-flash-preview-05-20']) {
+    try {
+        if (process.env.OPENAI_API_KEY) {
             try {
-                const resp = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
-                    {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            systemInstruction: { parts: [{ text: systemPrompt }] },
-                            contents: [{ parts: [{ text: userPrompt }] }],
-                            generationConfig: { temperature, maxOutputTokens: maxTokens, ...(json ? { responseMimeType: 'application/json' } : {}) },
-                        }),
-                    }
-                );
+                const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    signal: controller.signal,
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+                    body: JSON.stringify({
+                        model: 'gpt-4o-mini',
+                        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+                        temperature, max_tokens: maxTokens,
+                        ...(json ? { response_format: { type: 'json_object' } } : {}),
+                    }),
+                });
                 const data = await resp.json();
-                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (text) return text;
-            } catch (e) { console.warn(`Gemini ${model} error:`, e.message); }
+                if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
+                if (data.error) console.warn('GPT-4o-mini failed:', data.error.message);
+            } catch (e) {
+                if (e.name === 'AbortError') throw e;
+                console.warn('GPT-4o-mini error:', e.message);
+            }
         }
+
+        const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
+        if (geminiKey) {
+            for (const model of ['gemini-2.0-flash', 'gemini-1.5-flash']) {
+                try {
+                    const resp = await fetch(
+                        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+                        {
+                            method: 'POST', 
+                            signal: controller.signal,
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                systemInstruction: { parts: [{ text: systemPrompt }] },
+                                contents: [{ parts: [{ text: userPrompt }] }],
+                                generationConfig: { temperature, maxOutputTokens: maxTokens, ...(json ? { responseMimeType: 'application/json' } : {}) },
+                            }),
+                        }
+                    );
+                    const data = await resp.json();
+                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (text) return text;
+                } catch (e) {
+                    if (e.name === 'AbortError') throw e;
+                    console.warn(`Gemini ${model} error:`, e.message);
+                }
+            }
+        }
+        throw new Error('All AI models failed');
+    } finally {
+        clearTimeout(timer);
     }
-    throw new Error('All AI models failed');
 }
 
 function parseJSON(text) {

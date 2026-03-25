@@ -16,7 +16,7 @@ const router = Router();
 // ============================================================================
 
 async function aiCall(systemPrompt, userPrompt, options = {}) {
-    const { temperature = 0.7, maxTokens = 4096, json = false, timeoutMs = 120000 } = options;
+    const { temperature = 0.7, maxTokens = 4096, json = false, timeoutMs = 600000 } = options;
 
     const controller = new AbortController();
     try { setMaxListeners(30, controller.signal); } catch (e) {}
