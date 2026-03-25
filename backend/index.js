@@ -56,12 +56,32 @@ app.use(cors({
 
         // Standardize origin for matching (lowercase, no trailing slash)
         const cleanOrigin = origin.toLowerCase().replace(/\/$/, '');
-        const allowedOrigins = config.frontendUrl.map(url => url.toLowerCase().replace(/\/$/, ''));
+        
+        // Define hardcoded safe domains as fallback
+        const safeDomains = [
+            'https://mantram.ai',
+            'https://www.mantram.ai',
+            'https://djty1w4l0681b.cloudfront.net'
+        ];
+        
+        const allowedOrigins = [
+            ...(config.frontendUrl || []),
+            ...safeDomains
+        ].map(url => url.toLowerCase().replace(/\/$/, ''));
 
-        if (allowedOrigins.includes(cleanOrigin)) {
+        // Check against allowed list or allow any mantram.ai subdomain in production
+        const isAllowed = allowedOrigins.includes(cleanOrigin) || 
+                         (cleanOrigin.endsWith('.mantram.ai') && !cleanOrigin.includes('..'));
+
+        if (isAllowed) {
             callback(null, true);
         } else {
-            console.warn(`⚠️ CORS Blocked: Origin "${origin}" (cleaned: "${cleanOrigin}") not in allowed list:`, allowedOrigins);
+            console.error(`❌ CORS Rejected: Origin "${origin}" (cleaned: "${cleanOrigin}") is not in the allowed list.`, {
+                configured: config.frontendUrl,
+                allowedProcessed: allowedOrigins
+            });
+            // Still call callback with false to trigger standard CORS failure
+            // but we might want to allow it anyway if we suspect config issues
             callback(null, false);
         }
     },
