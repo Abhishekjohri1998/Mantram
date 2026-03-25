@@ -631,6 +631,7 @@ export const seoStudio = {
     getSavedReport: (brandId, type) => apiFetch(`/seo-studio/reports/${type}?brandId=${brandId}`),
     llmProbe: (data) => apiFetch('/seo-studio/llm-probe', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
     autoFix: (data) => apiFetch('/seo-studio/auto-fix', { method: 'POST', body: JSON.stringify(data), timeout: 150000 }),
+    contentFix: (data) => apiFetch('/seo-studio/content-fix', { method: 'POST', body: JSON.stringify(data), timeout: 60000 }),
     promptMining: (data) => apiFetch('/seo-studio/prompt-mining', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
     history: (params = {}) => {
         const query = new URLSearchParams(params).toString();

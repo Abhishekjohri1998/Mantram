@@ -2226,4 +2226,111 @@ Respond in JSON:
   }
 });
 
+// ============================================================================
+// CONTENT FIX — AI-powered inline content fixes for SEO audit issues
+// ============================================================================
+
+router.post('/content-fix', protect, requireStudio('seoStudio'), async (req, res) => {
+  try {
+    const { brandId, issueTitle, issueDescription, pageUrl, fixType, currentContent, targetKeyword } = req.body;
+
+    if (!issueTitle) {
+      return res.status(400).json({ success: false, error: 'Issue title is required.' });
+    }
+
+    const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
+    const brandContext = buildBrandContext(brand);
+    const website = pageUrl || brand?.website || '';
+
+    // Build fix-type-specific instructions
+    const fixInstructions = {
+      'meta-title': {
+        task: 'Write an optimized SEO meta title tag',
+        constraints: 'Must be 50-60 characters. Include the primary keyword naturally. Make it compelling for click-through. Do NOT use pipes (|) excessively.',
+        format: 'Return ONLY the meta title text, nothing else. No quotes, no HTML tags, no explanation.',
+      },
+      'meta-description': {
+        task: 'Write an optimized SEO meta description',
+        constraints: 'Must be 150-160 characters. Include the primary keyword. Include a clear call-to-action. Make it compelling to increase CTR from search results.',
+        format: 'Return ONLY the meta description text, nothing else. No quotes, no HTML tags, no explanation.',
+      },
+      'h1': {
+        task: 'Write an optimized H1 heading tag for this page',
+        constraints: 'Must be clear, descriptive, and include the primary keyword naturally. Should accurately describe the page content. Keep it under 70 characters.',
+        format: 'Return ONLY the H1 text, nothing else. No HTML tags, no quotes, no explanation.',
+      },
+      'content-expand': {
+        task: 'Expand the thin content on this page to make it comprehensive and SEO-friendly',
+        constraints: 'Write 300-500 words of high-quality, original content. Include relevant keywords naturally. Use proper heading structure (H2, H3). Add value with specific details, examples, or actionable advice. Write in the brand\'s voice.',
+        format: 'Return the expanded content in clean markdown format with headings. No meta commentary.',
+      },
+      'content-rewrite': {
+        task: 'Rewrite and improve this content for better SEO performance',
+        constraints: 'Improve readability, keyword coverage, and user engagement. Maintain the original intent but make it more comprehensive and authoritative. Use proper heading structure.',
+        format: 'Return the rewritten content in clean markdown format. No meta commentary.',
+      },
+      'alt-text': {
+        task: 'Generate descriptive, SEO-friendly alt text for images on this page',
+        constraints: 'Each alt text should be 10-15 words, descriptive of the image content, and include relevant keywords where natural. Generate 5 alt text suggestions for common image types on this page.',
+        format: 'Return each alt text suggestion on a new line, numbered 1-5. Each should be a standalone description.',
+      },
+    };
+
+    const fix = fixInstructions[fixType] || fixInstructions['content-rewrite'];
+
+    const systemPrompt = `You are a SENIOR SEO CONTENT SPECIALIST. Your job is to generate production-ready content fixes for specific SEO issues.
+
+${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
+${website ? `Page URL: ${website}` : ''}
+${targetKeyword ? `Target Keyword: ${targetKeyword}` : ''}
+
+TASK: ${fix.task}
+CONSTRAINTS: ${fix.constraints}
+
+OUTPUT FORMAT: ${fix.format}
+
+QUALITY STANDARDS:
+- Write naturally — no keyword stuffing
+- Match the brand's industry and tone
+- Every word must add value
+- Optimize for both users AND search engines
+- Follow 2026 SEO best practices (E-E-A-T, helpful content signals)`;
+
+    let userPrompt = `Fix this SEO issue:\n\nIssue: ${issueTitle}`;
+    if (issueDescription) userPrompt += `\nDetails: ${issueDescription}`;
+    if (currentContent) userPrompt += `\nCurrent Content: ${currentContent}`;
+    if (targetKeyword) userPrompt += `\nTarget Keyword: ${targetKeyword}`;
+    userPrompt += `\n\nGenerate the fix now.`;
+
+    const result = await aiCall(systemPrompt, userPrompt, {
+      temperature: 0.6,
+      maxTokens: 2048,
+      json: false,
+    });
+
+    // Log token usage
+    if (req.user && lastTokenUsage) {
+      logTokenUsage(req.user._id, lastTokenUsage, {
+        action: 'seoContentFix',
+        studio: 'seo',
+        route: req.originalUrl,
+        brandId: brand?._id,
+      });
+    }
+
+    const content = result?.trim();
+    if (!content) {
+      return res.status(500).json({ success: false, error: 'AI did not generate content. Please try again.' });
+    }
+
+    res.json({ success: true, content, fixType });
+  } catch (error) {
+    console.error('SEO Content Fix error:', error);
+    if (error.name === 'AbortError' || error.message?.includes('aborted')) {
+      return res.status(504).json({ success: false, error: 'Content generation timed out. Please try again.' });
+    }
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
 export default router;
