@@ -188,6 +188,18 @@ export default function SeoStudio() {
         'prompt-mining': ['Analyzing your industry...', 'Mining AI prompt patterns...', 'Scoring visibility per prompt...', 'Building content calendar...'],
     }
 
+    // Estimated duration in seconds per workflow — drives the progress bar & ETA
+    const ESTIMATED_DURATIONS = {
+        'health-check': 120,
+        'traffic': 60,
+        'competitors': 90,
+        'ai-visibility': 75,
+        'competitor-warroom': 120,
+        'llm-probe': 90,
+        'auto-fix': 45,
+        'prompt-mining': 60,
+    }
+
     const cancelWorkflow = () => {
         if (abortRef.current) abortRef.current.abort()
         clearInterval(elapsedTimerRef.current)
@@ -1068,6 +1080,7 @@ small{color:#94a3b8;font-size:10px}
                                     currentStage={loadingStage}
                                     stages={STAGE_MESSAGES[activeSection] || []}
                                     elapsed={loadingElapsed}
+                                    estimatedDuration={ESTIMATED_DURATIONS[activeSection] || 60}
                                     icon="troubleshoot"
                                 />
                                 <div className="absolute bottom-6 left-0 right-0 flex justify-center">
