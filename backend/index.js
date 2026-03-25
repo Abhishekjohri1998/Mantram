@@ -43,17 +43,6 @@ import paymentRoutes from './routes/payments.js';
 import waitlistRoutes from './routes/waitlist.js';
 import skillsRoutes from './routes/skills.js';
 
-const app = express();
-
-// ── DIAGNOSTIC LOGGER (ABSOLUTE TOP) ──────────────────────────
-app.use((req, res, next) => {
-    if (req.path !== '/api/health') {
-        console.log(`[REQUEST] ${req.method} ${req.path} (Origin: ${req.headers.origin || 'none'})`);
-    }
-    next();
-});
-
-// ── FAST START: LISTEN IMMEDIATELY ────────────────────────────
 const HARDCODED_ORIGINS = [
     'https://mantram.ai',
     'https://www.mantram.ai',
@@ -62,27 +51,34 @@ const HARDCODED_ORIGINS = [
     'http://localhost:3000',
 ];
 
-// Immediate health check (bypasses all middleware)
-app.get('/api/health', (req, res) => res.json({ status: 'ok', port: config.port }));
-app.get('/', (req, res) => res.json({ status: 'ok', message: 'Mantram AI API' }));
+const app = express();
 
-// ── UNCONDITIONAL CORS (BRUTE FORCE) ──────────────────────────
+// ── ABSOLUTE TOP-LEVEL DIAGNOSTICS ────────────────────────────
 app.use((req, res, next) => {
-    const origin = req.headers.origin;
-    // Allow all mantram.ai origins unconditionally
+    const origin = req.headers.origin || 'none';
+    if (req.path !== '/api/health' && req.path !== '/health') {
+        console.log(`[INCOMING] ${req.method} ${req.path} | Origin: ${origin} | User-Agent: ${req.headers['user-agent']}`);
+    }
+    
+    // Immediate CORS Force for mantram.ai
     if (origin && (origin.toLowerCase().endsWith('mantram.ai') || origin.toLowerCase().includes('mantram.ai'))) {
         res.setHeader('Access-Control-Allow-Origin', origin);
         res.setHeader('Access-Control-Allow-Credentials', 'true');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, Pragma');
     }
     
-    // Handle Preflight immediately
+    // Immediate OPTIONS Intercept
     if (req.method === 'OPTIONS') {
+        console.log(`[PREFLIGHT-OK] Intercepted OPTIONS for ${req.path}`);
         return res.status(200).end();
     }
     next();
 });
+
+// Alias for health checks
+app.get(['/health', '/api/health'], (req, res) => res.json({ status: 'ok', port: config.port }));
+app.get('/', (req, res) => res.json({ status: 'ok', message: 'Mantram AI API' }));
 
 const server = app.listen(config.port, '0.0.0.0', () => {
     console.log(`\n🚀 Mantram AI Server FAST-START on port ${config.port}`);
