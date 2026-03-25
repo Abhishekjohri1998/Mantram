@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { protect, optionalAuth } from '../middleware/auth.js';
 import { requireStudio } from '../middleware/studioAccess.js';
-import { requireCredits, logTokenUsage } from '../middleware/credits.js';
+import { requireCredits, logTokenUsage, deductCredits } from '../middleware/credits.js';
 import Brand from '../models/Brand.js';
 import SeoAudit from '../models/SeoAudit.js';
 import GeoProbeHistory from '../models/GeoProbeHistory.js';
@@ -209,11 +209,52 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
 
 
 function parseJSON(text) {
-  let clean = text.trim();
-  if (clean.startsWith('```')) {
-    clean = clean.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+  try {
+    let clean = text.trim();
+    // 1. Extract JSON from markdown code blocks
+    if (clean.includes('```')) {
+      const match = clean.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+      if (match) {
+        clean = match[1].trim();
+      } else {
+        // Truncated markdown: remove only the start indicator
+        clean = clean.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+      }
+    }
+
+    // 2. Simple truncation repair (heuristic)
+    if (clean.startsWith('{') && !clean.endsWith('}')) {
+      // If a string is open, close it
+      if ((clean.match(/"/g) || []).length % 2 !== 0) {
+        // Basic check for escaped trailing quote: if ends with \" don't add "
+        if (!clean.endsWith('\\"')) clean += '"';
+      }
+      // Re-balance braces and brackets
+      const stack = [];
+      for (let i = 0; i < clean.length; i++) {
+        const char = clean[i];
+        if (char === '{') stack.push('}');
+        else if (char === '[') stack.push(']');
+        else if (char === '}' || char === ']') stack.pop();
+      }
+      while (stack.length) clean += stack.pop();
+    }
+
+    return JSON.parse(clean);
+  } catch (e) {
+    // 3. Last-ditch: extract the first valid-looking object structure
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      try {
+        return JSON.parse(text.substring(firstBrace, lastBrace + 1));
+      } catch (innerE) {
+        console.error('CRITICAL: AI JSON Parse Failed. Length:', text.length, 'Error:', e.message);
+        throw e;
+      }
+    }
+    throw e;
   }
-  return JSON.parse(clean);
 }
 
 // Build brand context
@@ -2568,7 +2609,9 @@ Respond in STRICT JSON:
   ]
 }
 
-Generate production-ready code. Every fix must be copy-paste ready. Use the brand's actual information in the code.`;
+Generate production-ready code. Every fix must be copy-paste ready. Use the brand's actual information in the code.
+
+CRITICAL: If the list of issues is long (>15), prioritize and solve ONLY the most critical ones to avoid response truncation. Keep your explanations concise. Every fix must be ready-to-use.`;
 
     const userPrompt = `Generate auto-fix code for: ${website}`;
     const elapsed = Date.now() - (req.startTime || Date.now());
