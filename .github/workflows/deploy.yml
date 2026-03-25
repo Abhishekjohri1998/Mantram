@@ -111,7 +111,7 @@ jobs:
           done
 
       - name: 🚀 Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.5
+        uses: appleboy/ssh-action@v1
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.MEDIA_AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.MEDIA_AWS_SECRET_ACCESS_KEY }}
