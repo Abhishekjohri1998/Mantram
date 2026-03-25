@@ -2294,9 +2294,9 @@ router.post('/competitor-warroom', protect, requireStudio('seoStudio'), requireC
     });
 
     // Timing Safeguard: AI gets generous budget since data gathering is now fast
-    const elapsed = Date.now() - (req.startTime || Date.now());
-    const budget = 3600000; 
-    const remainingBudget = Math.max(1800000, budget - elapsed);
+    const requestStart = Date.now();
+    const elapsed = Date.now() - (req.startTime || requestStart);
+    const remainingBudget = Math.max(300000, 600000 - elapsed);
     console.log(`⏱️ War Room research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     const systemPrompt = `You are a COMPETITIVE WAR ROOM STRATEGIST — create a 90-day battle plan to systematically outrank competitors. You have REAL DATA from DataForSEO and site analysis.
@@ -2340,10 +2340,9 @@ Respond in STRICT JSON:
   "researchSources": ["URLs crawled"]
 }`;
 
-    const userPrompt = `Build 90-day war room plan for: ${website}`;
-    const elapsed = Date.now() - (req.startTime || Date.now());
-    const remainingBudget = Math.max(300000, 600000 - elapsed);
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192, timeout: remainingBudget });
+    const currentElapsed = Date.now() - (req.startTime || requestStart);
+    const finalBudget = Math.max(300000, 600000 - currentElapsed);
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192, timeout: finalBudget });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoWarRoom', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
@@ -2463,10 +2462,9 @@ Respond in STRICT JSON:
 
 CRITICAL: Use the REAL mention rate (${probeData.aggregate.mentionRate}%) as the overall visibility score. Reference ACTUAL probe results. Every recommendation must tie back to specific prompts where the brand was NOT mentioned.`;
 
-    const userPrompt = `Analyze real LLM probe results for: ${brandName} (${website})`;
-    const elapsed = Date.now() - (req.startTime || Date.now());
-    const remainingBudget = Math.max(300000, 600000 - elapsed);
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6144, timeout: remainingBudget });
+    const currentElapsed = Date.now() - (req.startTime || Date.now());
+    const finalBudget = Math.max(300000, 600000 - currentElapsed);
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6144, timeout: finalBudget });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoLlmProbe', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
 
