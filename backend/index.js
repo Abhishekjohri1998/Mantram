@@ -53,6 +53,9 @@ const HARDCODED_ORIGINS = [
 
 const app = express();
 
+// Trust proxy for rate limiting behind Nginx
+app.set('trust proxy', 1);
+
 // ── ABSOLUTE TOP-LEVEL DIAGNOSTICS ────────────────────────────
 app.use((req, res, next) => {
     const origin = req.headers.origin || 'none';
