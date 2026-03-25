@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'mantram-server',
-      script: '/home/ec2-user/Mantram/backend/index.js',
+      script: '../index.js',
       instances: 2,
       exec_mode: 'cluster',
       max_memory_restart: '2G',

@@ -187,7 +187,7 @@ app.use((err, req, res, next) => {
     });
 });
 
-const server = app.listen(config.port, () => {
+const server = app.listen(config.port, '0.0.0.0', () => {
     console.log(`\n🚀 Mantram AI Server running on port ${config.port}`);
     console.log(`📡 AI Provider: ${config.ai.defaultTextProvider} (${config.ai.defaultTextModel})`);
     console.log(`🌐 Frontend: ${config.frontendUrl}\n`);
