@@ -953,6 +953,61 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 ))}</div>
                             </SectionCard>
                         )}
+                        {/* Prompt Mining Categories */}
+                        {data.promptCategories?.length > 0 && (
+                            <SectionCard title="AI Citation by Category" icon="category">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                    {data.promptCategories.map((cat, i) => (
+                                        <div key={`cat-${i}`} className="rounded-xl p-4 bg-white/[0.02] border border-white/[0.04]">
+                                            <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">{cat.category}</p>
+                                            <p className="text-xl font-bold text-white mb-1">{cat.currentCitationRate}</p>
+                                            <p className="text-xs text-slate-400">{cat.totalPrompts} prompts analyzed</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </SectionCard>
+                        )}
+
+                        {/* Mined Prompts */}
+                        {data.minedPrompts?.length > 0 && (
+                            <SectionCard title="Mined Prompt Opportunities" icon="troubleshoot">
+                                <div className="space-y-3">{data.minedPrompts.map((mp, i) => (
+                                    <div key={`mp-${i}`} className="rounded-xl p-4 bg-white/[0.02] border border-white/[0.04]">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            {mp.priority && <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${mp.priority === 'critical' ? 'bg-rose-500/15 text-rose-400' : mp.priority === 'high' ? 'bg-amber-500/15 text-amber-400' : 'bg-blue-500/15 text-blue-400'}`}>{mp.priority}</span>}
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-white/10 text-slate-300">{mp.category}</span>
+                                            {mp.currentlyCited && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-emerald-500/15 text-emerald-400">Cited</span>}
+                                        </div>
+                                        <p className="text-sm font-bold text-white mb-2">"{mp.prompt}"</p>
+                                        
+                                        {!mp.currentlyCited && mp.competitorsCited?.length > 0 && (
+                                            <div className="mb-3">
+                                                <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Competitors Cited Instead:</p>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {mp.competitorsCited.map((comp, cIdx) => (
+                                                        <span key={`comp-${cIdx}`} className="text-xs px-2 py-1 rounded bg-rose-500/10 text-rose-300">{comp}</span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        
+                                        <div className="grid grid-cols-2 gap-2 mb-3">
+                                            <div className="rounded-lg p-2 bg-white/[0.02]">
+                                                <p className="text-[10px] text-slate-500 uppercase font-bold">Why not cited</p>
+                                                <p className="text-xs text-slate-300">{mp.whyNotCited || 'N/A'}</p>
+                                            </div>
+                                            <div className="rounded-lg p-2 bg-emerald-500/5 border border-emerald-500/10">
+                                                <p className="text-[10px] text-emerald-500/70 uppercase font-bold">Content Needed</p>
+                                                <p className="text-xs text-emerald-400">{mp.contentNeeded}</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <FixWithAI fixKey={`prompt-mining-${i}`} issueTitle={`Missing Citation for: "${mp.prompt}"`} issueDescription={mp.whyNotCited || ''}
+                                            fixType={mp.contentFormat || 'new-content'} targetKeyword={mp.prompt} label="Generate Content to Rank" />
+                                    </div>
+                                ))}</div>
+                            </SectionCard>
+                        )}
 
                         {/* Optimization tips */}
                         {(data.optimizations || data.recommendations)?.length > 0 && (
@@ -975,7 +1030,9 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                             {opt.timeline && <span className="text-slate-500">⏱ {opt.timeline}</span>}
                                             {opt.proofMethod && <span className="text-slate-500">✓ {opt.proofMethod}</span>}
                                         </div>
-                                        {opt.expectedROI && <p className="text-xs text-emerald-400/80 mt-2 font-medium">📈 {opt.expectedROI}</p>}
+                                        {opt.expectedROI && <p className="text-xs text-emerald-400/80 mt-2 font-medium mb-3">📈 {opt.expectedROI}</p>}
+                                        <FixWithAI fixKey={`geo-opt-${i}`} issueTitle={opt.title || opt.action || opt} issueDescription={opt.description || ''}
+                                            fixType="geo-optimization" label="Generate SEO Fix" />
                                     </div>
                                 ))}</div>
                             </SectionCard>
