@@ -1735,7 +1735,7 @@ STRATEGIC RULES (MANDATORY):
 
     const userPrompt = `AI Visibility audit for: ${website}`;
     // Run AI on-page analysis AND real LLM probing in parallel
-    const brandName = brand?.name || brandPayload?.name || new URL(website).hostname.replace(/^www\./, '').split('.')[0];
+    const brandName = brand?.name || brandPayload?.name || brand?.dna?.brandName || new URL(website).hostname.replace(/^www\./, '').replace(/\.[^.]+$/, '');
     const industry = brand?.industry || brand?.businessCategory || brandPayload?.industry || '';
     const location = brand?.location || brandPayload?.location || '';
     const competitors = brand?.competitors?.map(c => c.name || c) || [];
@@ -1786,7 +1786,7 @@ STRATEGIC RULES (MANDATORY):
         probeDetails: geoProbeResult.probeDetails,
       };
       // Blend: 40% on-page analysis + 60% real probe data
-      const onPageScore = parsed.aiVisibilityScore || 50;
+      const onPageScore = parsed.aiVisibilityScore ?? 50;
       parsed.aiVisibilityScore = Math.round(onPageScore * 0.4 + geoProbeResult.score * 0.6);
       parsed.scoreBreakdown = {
         onPageAnalysis: onPageScore,

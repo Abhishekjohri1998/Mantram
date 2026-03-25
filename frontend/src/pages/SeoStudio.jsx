@@ -1854,9 +1854,9 @@ function AIVisibilityResults({ results }) {
         <div className="glass-panel rounded-2xl p-6 mb-6">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 items-center border-b border-white/[0.04] pb-6 mb-6">
                 <ScoreRing score={results.aiVisibilityScore || 0} size={100} label="AI Visibility" color="violet" />
-                <ScoreRing score={results.schemaScore || 50} size={100} label="Schema & Data" color="emerald" />
-                <ScoreRing score={results.contentScore || 50} size={100} label="Content" color="amber" />
-                <ScoreRing score={results.authorityScore || 50} size={100} label="Authority" color="blue" />
+                <ScoreRing score={results.schemaScore ?? bd.schemaReadiness?.score ?? 0} size={100} label="Schema & Data" color="emerald" />
+                <ScoreRing score={results.contentScore ?? bd.qnaPresence?.score ?? bd.snippetStructure?.score ?? 0} size={100} label="Content" color="amber" />
+                <ScoreRing score={results.authorityScore ?? bd.entityCoverage?.score ?? bd.trustSignals?.score ?? 0} size={100} label="Authority" color="blue" />
             </div>
             <div className="flex-1">
                 <p className="text-sm text-slate-300 leading-relaxed">{results.summary}</p>
