@@ -45,6 +45,14 @@ import skillsRoutes from './routes/skills.js';
 
 const app = express();
 
+// ── DIAGNOSTIC LOGGER (ABSOLUTE TOP) ──────────────────────────
+app.use((req, res, next) => {
+    if (req.path !== '/api/health') {
+        console.log(`[REQUEST] ${req.method} ${req.path} (Origin: ${req.headers.origin || 'none'})`);
+    }
+    next();
+});
+
 // ── FAST START: LISTEN IMMEDIATELY ────────────────────────────
 const HARDCODED_ORIGINS = [
     'https://mantram.ai',
@@ -266,6 +274,12 @@ process.on('unhandledRejection', (reason, promise) => {
 
 process.on('uncaughtException', (err) => {
     console.error('🚨 Uncaught Exception:', err);
+});
+
+// Catch-all 404 logger
+app.use((req, res) => {
+    console.warn(`[404] Not Found: ${req.method} ${req.originalUrl}`);
+    res.status(404).json({ success: false, error: `Route ${req.originalUrl} not found` });
 });
 
 export default app;
