@@ -56,7 +56,10 @@ const app = express();
 // ── ABSOLUTE TOP-LEVEL DIAGNOSTICS ────────────────────────────
 app.use((req, res, next) => {
     const origin = req.headers.origin || 'none';
-    if (req.path !== '/api/health' && req.path !== '/health') {
+    const path = req.path.toLowerCase();
+    const isBotScan = ['.php', '.xml', 'wp-admin', 'vendor', 'phpunit', '.env', '.git'].some(p => path.includes(p));
+
+    if (!isBotScan && path !== '/api/health' && path !== '/health') {
         console.log(`[INCOMING] ${req.method} ${req.path} | Origin: ${origin} | User-Agent: ${req.headers['user-agent']}`);
     }
     
