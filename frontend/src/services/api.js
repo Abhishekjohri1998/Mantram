@@ -674,22 +674,6 @@ export const skills = {
     enhanceInstructions: (data) => apiFetch('/skills/enhance-instructions', { method: 'POST', body: JSON.stringify(data) }),
 };
 
-// ============ Skills System API ============
-export const skills = {
-    list: (params = {}) => {
-        const query = new URLSearchParams(params).toString();
-        return apiFetch(`/skills?${query}`);
-    },
-    get: (id) => apiFetch(`/skills/${id}`),
-    create: (data) => apiFetch('/skills', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id, data) => apiFetch(`/skills/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    delete: (id) => apiFetch(`/skills/${id}`, { method: 'DELETE' }),
-    clone: (id) => apiFetch(`/skills/${id}/clone`, { method: 'POST' }),
-    rate: (id, data) => apiFetch(`/skills/${id}/rate`, { method: 'POST', body: JSON.stringify(data) }),
-    execute: (id, data) => apiFetch(`/skills/${id}/execute`, { method: 'POST', body: JSON.stringify(data) }),
-    generate: (data) => apiFetch('/skills/generate', { method: 'POST', body: JSON.stringify(data) }),
-};
-
 // ============ Google Analytics + Search Console API (brand-aware) ============
 export const googleAnalytics = {
     connect: (brandId) => apiFetch(`/google-analytics/connect${brandId ? `?brandId=${brandId}` : ''}`),

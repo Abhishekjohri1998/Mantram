@@ -1,11 +1,42 @@
 import { Router } from 'express';
 import { protect, optionalAuth } from '../middleware/auth.js';
-import { requireCredits } from '../middleware/credits.js';
+import { requireStudio } from '../middleware/studioAccess.js';
+import { requireCredits, logTokenUsage } from '../middleware/credits.js';
 import Brand from '../models/Brand.js';
+import SeoAudit from '../models/SeoAudit.js';
+import GeoProbeHistory from '../models/GeoProbeHistory.js';
+import GscSnapshot from '../models/GscSnapshot.js';
+import SeoSnapshot from '../models/SeoSnapshot.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 import {
-  researchDomain, researchCompetitors,
+  researchDomain, researchDomainLight, researchCompetitors,
   formatSiteResearch, formatCompetitorResearch,
+  discoverBacklinks, analyzeCompetitorLinkProfile,
 } from '../utils/web-research.js';
+import { runRealLLMProbe, generateProbePrompts } from '../utils/llm-probe.js';
+import { probeAIVisibility } from '../services/geoProbe.js';
+import { getPageSpeed, formatPageSpeedForPrompt } from '../utils/pagespeed.js';
+import { mineAutocomplete, formatAutocompleteForPrompt } from '../utils/autocomplete.js';
+import { runKeywordIntelligence } from '../utils/keyword-intelligence.js';
+import { batchPAA, formatPAAForPrompt } from '../utils/paa-scraper.js';
+import {
+  getKeywordIntelligence, getDomainBacklinks,
+  formatKeywordDataForPrompt, formatBacklinkDataForPrompt,
+  isDataForSEOConfigured,
+  getEnrichedBacklinks, formatEnrichedBacklinkData,
+} from '../utils/dataforseo.js';
+import { getMozDomainAuthority, getMozBatchDA, formatMozDataForPrompt, isMozConfigured } from '../utils/moz.js';
+import {
+  getInstantSiteIntelligence, getDomainRankings, getCompetitiveOverlap,
+  discoverSerpCompetitors, getBrandMentions,
+  formatRankedKeywordsForPrompt, formatInstantPageForPrompt,
+  formatSerpCompetitorsForPrompt, formatDomainIntersectionForPrompt,
+  isOnPageConfigured,
+} from '../utils/onpage-api.js';
+import { jsRenderCrawl, formatJSCrawlForPrompt } from '../utils/js-crawler.js';
+import { scoreSiteContent, formatContentScoresForPrompt } from '../utils/content-scorer.js';
+import { crawlCompetitor, compareSnapshots, analyzeKeywordOverlap, formatCompetitorMonitorForPrompt } from '../utils/competitor-monitor.js';
+import CompetitorSnapshot from '../models/CompetitorSnapshot.js';
 
 const router = Router();
 
@@ -13,79 +44,169 @@ const router = Router();
 // AI CALL HELPER
 // ============================================================================
 
+// Track last AI call's token usage for downstream logging
+let lastTokenUsage = null;
+export function getLastTokenUsage() { return lastTokenUsage; }
+
 async function aiCall(systemPrompt, userPrompt, options = {}) {
-  const { temperature = 0.7, maxTokens = 8192, json = false } = options;
+  const { temperature = 0.7, maxTokens = 8192, json = false, timeout = 35000 } = options;
+  lastTokenUsage = null;
 
-  // Try OpenAI first
-  if (process.env.OPENAI_API_KEY) {
-    try {
-      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-          temperature, max_tokens: maxTokens,
-          ...(json ? { response_format: { type: 'json_object' } } : {}),
-        }),
-      });
-      const data = await resp.json();
-      if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
-      if (data.error) console.warn('GPT-4o-mini failed:', data.error.message);
-    } catch (e) { console.warn('GPT-4o-mini error:', e.message); }
-  }
+  const overallController = new AbortController();
+  const overallTimer = setTimeout(() => overallController.abort(), timeout);
 
-  // Try Grok (xAI) — excellent for real-time trend/keyword data
-  const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
-  if (grokKey) {
-    try {
-      const resp = await fetch('https://api.x.ai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${grokKey}` },
-        body: JSON.stringify({
-          model: 'grok-3-mini-fast',
-          messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-          temperature, max_tokens: maxTokens,
-          ...(json ? { response_format: { type: 'json_object' } } : {}),
-        }),
-      });
-      const data = await resp.json();
-      if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
-      if (data.error) console.warn('Grok failed:', data.error.message);
-    } catch (e) { console.warn('Grok error:', e.message); }
-  }
+  const defaultProvider = process.env.DEFAULT_TEXT_PROVIDER || 'anthropic';
+  const defaultModel = process.env.DEFAULT_TEXT_MODEL;
+  
+  const providers = [
+    { name: 'anthropic', key: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY },
+    { name: 'openai', key: process.env.OPENAI_API_KEY },
+    { name: 'xai', key: process.env.GROK_API_KEY || process.env.XAI_API_KEY },
+    { name: 'gemini', key: process.env.GEMINI_API_KEY || process.env.GEMINI_IMAGE_API_KEY },
+  ];
 
-  // Fallback to Gemini
-  const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
-  if (geminiKey) {
-    const models = ['gemini-2.0-flash', 'gemini-2.5-flash-preview-05-20'];
-    for (const model of models) {
+  const sortedProviders = [
+    ...providers.filter(p => p.name === defaultProvider),
+    ...providers.filter(p => p.name !== defaultProvider)
+  ];
+
+  const isQuotaError = (status, data) => {
+    if (status === 429) return true;
+    const errText = JSON.stringify(data || {}).toLowerCase();
+    return errText.includes('quota') || errText.includes('rate limit') || errText.includes('limit exceeded') || errText.includes('throttled') || errText.includes('credit balance') || errText.includes('resource_exhausted');
+  };
+
+  try {
+    for (const provider of sortedProviders) {
+      if (!provider.key || overallController.signal.aborted) continue;
+
+      console.log(`🤖 aiCall: Trying ${provider.name}...`);
+
       try {
-        const resp = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              systemInstruction: { parts: [{ text: systemPrompt }] },
-              contents: [{ parts: [{ text: userPrompt }] }],
-              generationConfig: {
-                temperature, maxOutputTokens: maxTokens,
-                ...(json ? { responseMimeType: 'application/json' } : {}),
-              },
-            }),
-          }
-        );
-        const data = await resp.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return text;
-        if (data.error) console.warn(`Gemini ${model}:`, data.error.message);
-      } catch (e) { console.warn(`Gemini ${model} error:`, e.message); }
-    }
-  }
+        // We rely entirely on the overallController to enforce strict global budgets.
 
-  throw new Error('All AI models failed');
+        if (provider.name === 'anthropic') {
+          const modelId = (defaultProvider === 'anthropic' && defaultModel) ? defaultModel : 'claude-3-5-sonnet-20240620';
+          const resp = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': provider.key,
+              'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify({
+              model: modelId,
+              max_tokens: maxTokens,
+              system: systemPrompt,
+              messages: [{ role: 'user', content: userPrompt }],
+              temperature,
+            }),
+            signal: overallController.signal,
+          });
+          const data = await resp.json();
+          if (resp.ok && data.content?.[0]?.text) {
+            lastTokenUsage = { inputTokens: data.usage?.input_tokens || 0, outputTokens: data.usage?.output_tokens || 0, model: modelId, provider: 'anthropic' };
+            return data.content[0].text;
+          } else {
+            const err = data.error?.message || JSON.stringify(data);
+            console.warn(`Claude ${modelId} error (${resp.status}): ${err}`);
+            if (isQuotaError(resp.status, data)) continue;
+          }
+        }
+
+        if (provider.name === 'openai') {
+          const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${provider.key}` },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+              temperature, max_tokens: maxTokens,
+              ...(json ? { response_format: { type: 'json_object' } } : {}),
+            }),
+            signal: overallController.signal,
+          });
+          const data = await resp.json();
+          if (resp.ok && data.choices?.[0]?.message?.content) {
+            lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'gpt-4o-mini', provider: 'openai' };
+            return data.choices[0].message.content;
+          } else {
+            const err = data.error?.message || JSON.stringify(data);
+            console.warn(`OpenAI error (${resp.status}): ${err}`);
+            if (isQuotaError(resp.status, data)) continue;
+          }
+        }
+
+        if (provider.name === 'xai') {
+          const resp = await fetch('https://api.x.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${provider.key}` },
+            body: JSON.stringify({
+              model: 'grok-3-mini-fast',
+              messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+              temperature, max_tokens: maxTokens,
+              ...(json ? { response_format: { type: 'json_object' } } : {}),
+            }),
+            signal: overallController.signal,
+          });
+          const data = await resp.json();
+          if (resp.ok && data.choices?.[0]?.message?.content) {
+            lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'grok-3-mini-fast', provider: 'xai' };
+            return data.choices[0].message.content;
+          } else {
+            console.warn(`Grok error (${resp.status}):`, JSON.stringify(data));
+          }
+        }
+
+        if (provider.name === 'gemini') {
+          const models = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-2.5-flash'];
+          for (const modelId of models) {
+            if (overallController.signal.aborted) break;
+            try {
+              const resp = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${provider.key}`,
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+                    generationConfig: {
+                      temperature, 
+                      maxOutputTokens: maxTokens,
+                      ...(json ? { responseMimeType: 'application/json' } : {}),
+                    },
+                  }),
+                  signal: overallController.signal,
+                }
+              );
+              const data = await resp.json();
+              if (resp.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                const text = data.candidates[0].content.parts[0].text;
+                lastTokenUsage = { inputTokens: data.usageMetadata?.promptTokenCount || 0, outputTokens: data.usageMetadata?.candidatesTokenCount || 0, model: modelId, provider: 'gemini' };
+                return text;
+              } else {
+                console.warn(`Gemini ${modelId} error (${resp.status}):`, JSON.stringify(data.error || data));
+                // If limit is 0 or quota exceeded, try next Gemini model
+                if (isQuotaError(resp.status, data)) continue;
+              }
+            } catch (e) {
+              console.warn(`Gemini ${modelId} request fail: ${e.message}`);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn(`${provider.name} provider error: ${e.message}`);
+        if (overallController.signal.aborted) throw e;
+      }
+    }
+
+    throw new Error('All AI models failed, quotas exceeded, or total timeout reached');
+  } finally {
+    clearTimeout(overallTimer);
+  }
 }
+
+
 
 function parseJSON(text) {
   let clean = text.trim();
@@ -127,7 +248,8 @@ async function loadBrand(brandId, userId) {
 // HEALTH CHECK — Real crawl + AI analysis
 // ============================================================================
 
-router.post('/health-check', protect, requireCredits('seoHealthCheck'), async (req, res) => {
+router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits('seoHealthCheck'), async (req, res, next) => {
+  req._routeStartTime = Date.now();
   try {
     const { url, brand: brandPayload, brandId } = req.body;
 
@@ -138,26 +260,189 @@ router.post('/health-check', protect, requireCredits('seoHealthCheck'), async (r
 
     const brandContext = buildBrandContext(brand || brandPayload);
 
-    // STEP 1: Real website research
-    console.log(`🔍 SEO Health Check: crawling ${website}...`);
-    const siteResearch = await researchDomain(website);
+    // STEP 1: FAST parallel data gathering — replaces 800-page crawl with APIs
+    // researchDomainLight: homepage-only crawl (3-5s) for basic site structure
+    // getInstantSiteIntelligence: DataForSEO APIs in parallel (5-10s) for ranked keywords, SERP competitors, instant page analysis
+    console.log(`🔍 SEO Health Check: fast parallel intelligence for ${website}...`);
+    let brandDomain;
+    try { brandDomain = new URL(website.startsWith('http') ? website : `https://${website}`).hostname.replace(/^www\./, ''); } catch { brandDomain = website; }
+    
+    const brandObj = brand || brandPayload || {};
+    const dna = brandObj.dna || {};
+    const country = dna.targetMarket || dna.country || 'India';
+    
+    let [siteResearch, siteIntel, pageSpeedData, backlinkData, mozData] = await Promise.all([
+      researchDomain(website, { maxPages: 200, timeout: 60000 }).catch(e => {
+        console.error(`❌ Crawl failed: ${e.message}`);
+        return { url: website, pages: [], homepage: {}, siteIntelligence: { totalPages: 0 }, error: e.message };
+      }),
+      isOnPageConfigured() ? getInstantSiteIntelligence(brandDomain, { country }).catch(e => {
+        console.warn(`⚠️ Instant intelligence failed: ${e.message}`);
+        return { available: false };
+      }) : Promise.resolve({ available: false }),
+      getPageSpeed(website, 'mobile').catch(e => ({ success: false, error: e.message })),
+      isDataForSEOConfigured() ? getDomainBacklinks(brandDomain).catch(e => ({ available: false, error: e.message })) : Promise.resolve({ available: false }),
+      isMozConfigured() ? getMozDomainAuthority(brandDomain).catch(e => ({ available: false, error: e.message })) : Promise.resolve({ available: false }),
+    ]);
+
+    // ── 429 FALLBACK: If crawl failed, use previous successful audit data ──
+    let crawlFailed = false;
+    if (siteResearch.error || !siteResearch.pages?.length) {
+      console.log('⚠️  Crawl returned 0 pages — checking for previous successful audit...');
+      try {
+        // Try a broad query first — look for any completed audit with real data
+        let prevAudit = await SeoAudit.findOne({
+          user: req.user?._id,
+          type: 'health-check',
+          'results.siteStats.pagesCrawled': { $gt: 0 }
+        }).sort({ createdAt: -1 }).lean();
+
+        // If no match with pagesCrawled > 0, try looking for totalPages > 0 or any siteStats
+        if (!prevAudit) {
+          prevAudit = await SeoAudit.findOne({
+            user: req.user?._id,
+            type: 'health-check',
+            'results.siteStats': { $exists: true }
+          }).sort({ createdAt: -1 }).lean();
+          console.log(`🔍 Fallback broad search: found=${!!prevAudit}, pagesCrawled=${prevAudit?.results?.siteStats?.pagesCrawled || 'N/A'}`);
+        }
+
+        if (prevAudit?.results?.siteStats) {
+          console.log(`✅ Found previous audit with ${prevAudit.results.siteStats.pagesCrawled} pages — using as fallback`);
+          crawlFailed = true;
+          // Reconstruct siteResearch from stored data
+          const ps = prevAudit.results.siteStats;
+          siteResearch = {
+            url: website,
+            pages: prevAudit.results.researchSources?.map(u => ({ url: u, title: '', h1: [] })) || [],
+            homepage: { title: ps.title || '', metaDescription: ps.metaDescription || '', h1: [], h2: [] },
+            siteIntelligence: {
+              totalPages: ps.totalPages || 0,
+              totalWordCount: ps.totalWordCount || 0,
+              avgWordCount: ps.avgWordCount || 0,
+              totalImages: ps.totalImages || 0,
+              imagesWithoutAlt: ps.imagesWithoutAlt || 0,
+              schemaTypes: ps.schemaTypes || [],
+              hasSchemaOrg: ps.hasSchemaOrg || false,
+              techStack: ps.techStack || [],
+              hasCanonical: ps.hasCanonical || false,
+              hasViewport: ps.hasViewport || false,
+              hasSitemap: ps.hasSitemap || false,
+              hasRobotsTxt: ps.hasRobotsTxt || false,
+              thinPageCount: ps.thinPageCount || 0,
+              duplicateContentCount: ps.duplicateContentCount || 0,
+              titleDuplicateCount: ps.titleDuplicateCount || 0,
+              metaDuplicateCount: ps.metaDuplicateCount || 0,
+              redirectChainCount: ps.redirectChainCount || 0,
+              missingH1Count: ps.missingH1Count || 0,
+              multipleH1Count: ps.multipleH1Count || 0,
+              missingH1Tags: ps.missingH1Tags || [],
+              multipleH1Pages: ps.multipleH1Pages || [],
+              missingMetaDescriptions: ps.missingMetaDescriptions || [],
+              brokenInternalCount: ps.brokenInternalCount || 0,
+              brokenInternalLinks: ps.brokenInternalLinks || [],
+              brokenExternalCount: ps.brokenExternalCount || 0,
+              permanentRedirectCount: ps.permanentRedirectCount || 0,
+              blockedByRobotsTxt: ps.blockedByRobotsTxt || { internalCount: 0 },
+              resourceScanning: ps.resourceScanning || { blockedResourceCount: 0, uncachedResourceCount: 0, unminifiedResourceCount: 0 },
+              emptyAnchorCount: ps.emptyAnchorCount || 0,
+              nofollowInternalCount: ps.nofollowInternalCount || 0,
+              headingIssues: { skippedCount: ps.skippedHeadingCount || 0, multipleH1Count: ps.multipleH1Count || 0 },
+              singleIncomingCount: ps.singleIncomingCount || 0,
+              orphanPages: ps.orphanPages || [],
+              lowTextRatioCount: ps.lowTextRatioCount || 0,
+              avgTextToHtmlRatio: ps.avgTextToHtmlRatio || 0,
+              metaRobotsIssues: { noindexCount: ps.noindexCount || 0 },
+            },
+            _fallbackFromPrevious: true,
+          };
+        }
+      } catch (fallbackErr) {
+        console.error('⚠️  Fallback lookup failed:', fallbackErr.message);
+      }
+    }
+
     const siteData = formatSiteResearch(siteResearch);
+    const pageSpeedText = formatPageSpeedForPrompt(pageSpeedData);
+    const backlinkText = formatBacklinkDataForPrompt(backlinkData);
+    const mozText = formatMozDataForPrompt(mozData);
+    
+    // ── NEW: Format DataForSEO enriched intelligence ──
+    const rankedKeywordsText = siteIntel?.available ? formatRankedKeywordsForPrompt(siteIntel.rankedKeywords || {}) : '';
+    const serpCompetitorsText = siteIntel?.available ? formatSerpCompetitorsForPrompt(siteIntel.serpCompetitors || {}) : '';
+    const instantPageText = siteIntel?.available ? formatInstantPageForPrompt(siteIntel.homepage) : '';
+    
+    // ── Build deterministic metrics summary for AI prompt (prevents hallucination) ──
+    const siMetrics = siteResearch?.siteIntelligence || {};
+    const deterministicMetricsText = `
+=== DETERMINISTIC CRAWL METRICS (EXACT — DO NOT CONTRADICT) ===
+Pages crawled: ${siMetrics.totalPages || 0}
+Missing H1 tags: ${siMetrics.missingH1Count || (siMetrics.missingH1Tags?.length || 0)} pages
+Multiple H1 tags: ${siMetrics.multipleH1Count || 0} pages
+Broken internal links: ${siMetrics.brokenInternalCount || 0}
+Broken external links: ${siMetrics.brokenExternalCount || 0}
+Permanent redirects (301/308): ${siMetrics.permanentRedirectCount || 0}
+Redirect chains: ${siMetrics.redirectChainCount || 0}
+Thin pages (<300 words): ${siMetrics.thinPageCount || 0}
+Duplicate titles: ${siMetrics.titleDuplicateCount || 0}
+Duplicate meta descriptions: ${siMetrics.metaDuplicateCount || 0}
+Missing meta descriptions: ${siMetrics.missingMetaDescriptions?.length || 0}
+Missing alt text: ${siMetrics.imagesWithoutAlt || 0} images
+Blocked by robots.txt: ${siMetrics.blockedByRobotsTxt?.internalCount || 0} internal pages
+Blocked JS/CSS resources: ${siMetrics.resourceScanning?.blockedResourceCount || 0}
+Uncached JS/CSS: ${siMetrics.resourceScanning?.uncachedResourceCount || 0}
+Unminified JS/CSS: ${siMetrics.resourceScanning?.unminifiedResourceCount || 0}
+Noindex pages: ${siMetrics.metaRobotsIssues?.noindexCount || 0}
+Nofollow internal links: ${siMetrics.nofollowInternalCount || 0}
+Empty anchor text links: ${siMetrics.emptyAnchorCount || 0}
+Pages with skipped heading levels: ${siMetrics.headingIssues?.skippedCount || 0}
+Single incoming internal link: ${siMetrics.singleIncomingCount || 0}
+Orphan pages: ${siMetrics.orphanPages?.length || 0}
+Schema types found: ${(siMetrics.schemaTypes || []).join(', ') || 'NONE'}
+Sitemap found: ${siMetrics.hasSitemap ? 'Yes' : 'No'}
+Robots.txt found: ${siMetrics.hasRobotsTxt ? 'Yes' : 'No'}
+Low text-to-HTML ratio pages: ${siMetrics.lowTextRatioCount || 0}
+Average text-to-HTML ratio: ${siMetrics.avgTextToHtmlRatio || 0}%
+`;
+
+    // AI timeout: Phase 1 now completes in 5-10s (APIs), so AI gets max budget
+    const routeStartTime = req._routeStartTime || (Date.now() - 5000);
+    const elapsed = Date.now() - routeStartTime;
+    const AI_MIN_BUDGET = 120000; // Always give AI at least 120s
+    const remainingBudget = Math.max(AI_MIN_BUDGET, 180000 - elapsed);
+    
+    console.log(`⏱️ Data gathering complete (${siteIntel?.available ? 'with DataForSEO' : 'light crawl only'}). Elapsed: ${elapsed}ms. AI Budget: ${remainingBudget}ms`);
 
     const systemPrompt = `You are a SENIOR SEO STRATEGIST (not just an auditor). You think like a CMO + technical SEO expert combined. You have REAL CRAWL DATA — use it as ground truth. Never guess or contradict the crawl.
 
-IMPORTANT: For every finding, explain WHY it matters — connect it to a specific Google algorithm signal, ranking factor, or business outcome. Don't just list problems — explain the strategic impact and provide the business reasoning.
+CRITICAL RULE: The "DETERMINISTIC CRAWL METRICS" section below contains EXACT counts from the real crawl. You MUST use these exact numbers in your issues. DO NOT make up your own H1, broken link, redirect, or other counts — use ONLY the numbers given. For example, if the data says "Missing H1 tags: N pages", you must report exactly N, not "homepage + 2 pages".
 
-ALGORITHM CONTEXT (2026):
-- Google's Helpful Content System penalizes thin/unhelpful pages; rewards genuine expertise
-- E-E-A-T (Experience, Expertise, Authoritativeness, Trust) is a core ranking signal
-- AI Overviews (SGE) now appear in 40%+ of searches — sites need structured, authoritative content to be cited
-- Core Web Vitals remain a ranking factor (LCP < 2.5s, CLS < 0.1, INP < 200ms)
-- Google rewards topical authority — sites that deeply cover a topic cluster outrank those with scattered content
-- Schema markup and structured data directly influence rich results and AI citation rates
+IMPORTANT: Do NOT generate issues for ANY of these deterministic metrics — they are ALREADY displayed as separate checks in the report:
+- Missing H1 tags, multiple H1 tags
+- Missing alt text / images without alt
+- Broken internal or external links
+- Duplicate titles or meta descriptions
+- Thin pages, redirect chains, missing meta descriptions
+- Blocked resources, uncached resources
+Do NOT mention these in your summary, crawlSummary, or issues array. Focus ONLY on strategic insights, algorithm risks, content gaps, AI readiness, and opportunities that the deterministic checks do NOT cover.
 
 ${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
 
 ${siteData}
+
+${pageSpeedText}
+
+${backlinkText}
+
+${mozText}
+
+${rankedKeywordsText}
+
+${serpCompetitorsText}
+
+${instantPageText}
+
+${deterministicMetricsText}
 
 Respond in STRICT JSON:
 {
@@ -206,17 +491,454 @@ Respond in STRICT JSON:
   "crawlSummary": "What the live crawl revealed"
 }
 
-Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' that connects to business outcomes. Think like a consultant, not a checklist tool.`;
+Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must have a 'whyItMatters' that connects to business outcomes. Think like a consultant, not a checklist tool.`;
 
     const userPrompt = `Analyze site: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192 });
-    const parsed = parseJSON(result);
+    let parsed;
+    try {
+        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget });
+        // Log token usage from this AI call
+        if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: req.creditAction || 'seoHealthCheck', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+        parsed = parseJSON(result);
+    } catch (aiErr) {
+        console.warn(`⚠️ AI analysis failed (${aiErr.message}) — returning deterministic data only`);
+        // Return a minimal AI result so the deterministic crawl data is still available
+        parsed = {
+            seoHealthScore: 50,
+            aiVisibilityScore: 50,
+            technicalScore: 50,
+            contentScore: 50,
+            authorityScore: 50,
+            summary: `SEO audit crawled ${siMetrics.totalPages || 0} pages. AI analysis timed out — the deterministic issue checks below are from real crawl data.`,
+            strategicBrief: 'AI analysis was unable to complete within the timeout window. All issue checks shown are based on real crawl data and are accurate.',
+            algorithmRisks: [],
+            issues: [],
+            fixNow: [],
+            createNext: [],
+            monitor: [],
+            aiSeoInsights: { schemaReadiness: { score: 0, issues: [], recommendations: [] }, qnaPresence: { score: 0, suggestions: [] }, entityCoverage: { score: 0, missingEntities: [], recommendations: [] }, snippetStructure: { score: 0, recommendations: [] }, trustSignals: { score: 0, recommendations: [] } },
+            topOpportunity: 'AI analysis timed out — review the deterministic checks for issue details.',
+            competitorHints: [],
+            industryBenchmark: '',
+            crawlSummary: `Crawled ${siMetrics.totalPages || 0} pages. AI could not complete analysis.`,
+            _aiTimedOut: true,
+        };
+    }
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
+
+    // ── Inject REAL crawl data into AI results (AI only generates scores/strategy) ──
+    const si = siteResearch?.siteIntelligence || {};
+    const pages = siteResearch?.pages || [];
+    parsed.siteStats = {
+      pagesCrawled: si.totalPages || 0,
+      totalWordCount: si.totalWordCount || 0,
+      avgWordCount: si.avgWordCount || 0,
+      totalImages: si.totalImages || 0,
+      imagesWithoutAlt: si.imagesWithoutAlt || 0,
+      thinPageCount: si.thinPageCount || 0,
+      schemaTypes: si.schemaTypes || [],
+      hasSitemap: si.hasSitemap || false,
+      hasRobotsTxt: si.hasRobotsTxt || false,
+      hasCanonical: si.hasCanonical || false,
+      duplicateContentCount: si.duplicateContentCount || 0,
+      redirectChainCount: si.redirectChainCount || 0,
+      techStack: si.techStack || [],
+      // Enhanced stats
+      pageStatusDistribution: si.pageStatusDistribution || {},
+      orphanPageCount: si.orphanPages?.length || 0,
+      mixedContentCount: si.mixedContentCount || 0,
+      responseTimeAvg: si.responseTime?.avg || 0,
+      responseTimeSlowest: si.responseTime?.slowest || 0,
+      slowPageCount: si.responseTime?.slowPageCount || 0,
+      pageSizeAvg: si.pageSize?.avg || 0,
+      pageSizeLargest: si.pageSize?.largest || 0,
+      heavyPageCount: si.pageSize?.heavyPageCount || 0,
+      headingSkippedCount: si.headingIssues?.skippedCount || 0,
+      multipleH1Count: si.headingIssues?.multipleH1Count || 0,
+      titleDuplicateCount: si.titleQuality?.duplicates?.length || 0,
+      metaDescDuplicateCount: si.metaDescQuality?.duplicates?.length || 0,
+      securityHeaderScore: `${si.securityScore?.score || 0}/${si.securityScore?.total || 7}`,
+      securityHeaders: si.securityScore?.details || [],
+      hasLangAttribute: si.hasLangAttribute || false,
+      langAttribute: si.langAttribute || '',
+      hreflangPresent: si.hreflangPresent || false,
+      noindexPageCount: si.metaRobotsIssues?.noindexCount || 0,
+      nofollowPageCount: si.metaRobotsIssues?.nofollowCount || 0,
+      urlTooLongCount: si.urlIssues?.tooLongCount || 0,
+      avgCssResources: si.resourceBloat?.avgCss || 0,
+      avgJsResources: si.resourceBloat?.avgJs || 0,
+      // Round 2 additions
+      brokenExternalCount: si.brokenExternalCount || 0,
+      brokenExternalLinks: si.brokenExternalLinks || [],
+      brokenInternalCount: si.brokenInternalCount || 0,
+      brokenInternalLinks: si.brokenInternalLinks || [],
+      emptyAnchorCount: si.emptyAnchorCount || 0,
+      nofollowInternalCount: si.nofollowInternalCount || 0,
+      conflictingCanonicalCount: si.conflictingCanonicals?.length || 0,
+      cacheControlPresent: si.cacheControlPresent || false,
+      llmsTxtFound: si.llmsTxt?.found || false,
+      llmsTxtSections: si.llmsTxt?.sections?.length || 0,
+      sitemapCoverage: si.sitemapCoverage || {},
+      // New Semrush-parity metrics
+      titleDuplicateCount: si.titleDuplicateCount || 0,
+      metaDuplicateCount: si.metaDuplicateCount || 0,
+      multipleH1Count: si.multipleH1Count || 0,
+      missingH1Count: si.missingH1Count || 0,
+      lowTextRatioCount: si.lowTextRatioCount || 0,
+      avgTextToHtmlRatio: si.avgTextToHtmlRatio || 0,
+      oversizedPageCount: si.oversizedPageCount || 0,
+      singleIncomingCount: si.singleIncomingCount || 0,
+      // Resource scanning (Semrush parity: blocked/uncached/unminified JS/CSS)
+      blockedResourceCount: si.resourceScanning?.blockedResourceCount || 0,
+      uncachedResourceCount: si.resourceScanning?.uncachedResourceCount || 0,
+      unminifiedResourceCount: si.resourceScanning?.unminifiedResourceCount || 0,
+      // Permanent redirects (Semrush: 636 for ACwO)
+      permanentRedirectCount: si.permanentRedirectCount || 0,
+      // Blocked by robots.txt (Semrush: 209 internal + 838 external)
+      blockedByRobotsTxtCount: si.blockedByRobotsTxt?.internalCount || 0,
+      // Alt text (Semrush: 8 missing)
+      missingAltCount: si.imagesWithoutAlt || 0,
+      totalImages: si.totalImages || 0,
+      // Detail arrays for issue cards
+      missingH1Tags: (si.missingH1Tags || []).slice(0, 15),
+      multipleH1Pages: (si.multipleH1Pages || []).slice(0, 15),
+      // Real backlink data (DataForSEO — beats AI estimation)
+      backlinkDataAvailable: backlinkData?.available || false,
+      totalBacklinks: backlinkData?.summary?.totalBacklinks || 0,
+      referringDomains: backlinkData?.summary?.referringDomains || 0,
+      domainRank: backlinkData?.summary?.domainRank || 0,
+      backlinkDofollow: backlinkData?.summary?.backlinksDofollow || 0,
+      backlinkNofollow: backlinkData?.summary?.backlinksNofollow || 0,
+      brokenBacklinks: backlinkData?.summary?.brokenBacklinks || 0,
+      topReferringDomains: (backlinkData?.topReferringDomains || []).slice(0, 10),
+      // Moz Domain Authority (real)
+      mozAvailable: mozData?.available || false,
+      domainAuthority: mozData?.domainAuthority || 0,
+      pageAuthority: mozData?.pageAuthority || 0,
+      spamScore: mozData?.spamScore || 0,
+      mozLinkingDomains: mozData?.rootDomainsToRootDomain || 0,
+      // Missing meta descriptions
+      missingMetaDescCount: si.missingMetaDescriptions?.length || 0,
+    };
+    parsed.pageReports = pages.slice(0, 50).map(p => ({
+      url: p.url,
+      title: p.title || 'Untitled',
+      statusCode: p.statusCode || 200,
+      responseTimeMs: p.responseTimeMs || 0,
+      pageSizeKB: p.pageSizeKB || 0,
+      wordCount: p.wordCount || 0,
+      titleLength: p.titleLength || 0,
+      metaDescLength: p.metaDescLength || 0,
+      hasH1: !!(p.h1?.length),
+      h1Count: p.h1?.length || 0,
+      imagesWithoutAlt: p.images?.withoutAlt || 0,
+      headingHierarchyValid: p.headingHierarchy?.valid ?? true,
+      hasSchema: p.hasSchemaOrg || false,
+      hasCanonical: !!p.canonical,
+      urlTooLong: p.urlTooLong || false,
+      textToHtmlRatio: p.textToHtmlRatio || 0,
+      metaRobots: p.metaRobots || {},
+    }));
+
+    // ── BUILD DETERMINISTIC GROUPED ISSUES FROM CRAWL DATA (Semrush parity) ──
+    // Each issue has: check, value, issueType, aboutThisIssue, howToFix, affectedUrls
+    const st = parsed.siteStats;
+    console.log(`🔍 DEBUG siteStats: missingH1=${st.missingH1Count}, multipleH1=${st.multipleH1Count}, brokenInt=${st.brokenInternalCount}, permRedirects=${st.permanentRedirectCount}, blockedRobots=${st.blockedByRobotsTxtCount}, blockedRes=${st.blockedResourceCount}, uncached=${st.uncachedResourceCount}, missingAlt=${st.missingAltCount}, totalPages=${st.pagesCrawled}`);
+    const deterministicChecks = [];
+
+    if (st.missingH1Count > 0) deterministicChecks.push({
+      check: `${st.missingH1Count} pages without H1 tag`, value: st.missingH1Count,
+      issueType: st.missingH1Count > 5 ? 'error' : 'warning', // 1-5 = warning, >5 = error
+      aboutThisIssue: 'The H1 tag is the most important heading on a page. It tells search engines what the page is about and is a critical on-page SEO signal. Pages without H1 tags are harder for Google to understand and rank.',
+      howToFix: 'Add a unique, descriptive H1 tag to each page that includes the primary keyword. There should be exactly one H1 per page. Learn more: https://developers.google.com/search/docs/fundamentals/seo-starter-guide#use-heading-tags',
+      affectedUrls: (st.missingH1Tags || []).slice(0, 10),
+    });
+    if (st.multipleH1Count > 0) deterministicChecks.push({
+      check: `${st.multipleH1Count} pages with multiple H1 tags`, value: st.multipleH1Count, issueType: 'warning',
+      aboutThisIssue: 'Having multiple H1 tags on a page dilutes the primary topic signal. While Google can handle multiple H1s, it creates ambiguity about which heading represents the main topic.',
+      howToFix: 'Keep only one H1 tag per page. Convert other H1s to H2 or H3 as appropriate for the content hierarchy.',
+      affectedUrls: (st.multipleH1Pages || []).slice(0, 10).map(p => p.url || p),
+    });
+    if (st.brokenInternalCount > 0) deterministicChecks.push({
+      check: `${st.brokenInternalCount} broken internal links`, value: st.brokenInternalCount, issueType: 'error',
+      aboutThisIssue: 'Broken internal links (404s) waste crawl budget, prevent PageRank flow, and create a poor user experience. Google may reduce the perceived quality of a site with many broken links.',
+      howToFix: 'Fix or remove broken internal links. Update the href to the correct page, or set up 301 redirects. Use Search Console to identify crawl errors. Learn more: https://developers.google.com/search/docs/crawling-indexing/http-network-errors',
+      affectedUrls: (st.brokenInternalLinks || []).slice(0, 10).map(l => l.url || l),
+    });
+    if (st.permanentRedirectCount > 0) deterministicChecks.push({
+      check: `${st.permanentRedirectCount} pages with permanent redirects`, value: st.permanentRedirectCount, issueType: 'warning',
+      aboutThisIssue: 'Pages returning 301/308 redirects add latency and waste crawl budget. While redirects pass link equity, excessive redirects indicate URL structure issues and slow down page load.',
+      howToFix: 'Update internal links to point directly to the final destination URL instead of the redirect source. Remove redirect chains where possible. Learn more: https://developers.google.com/search/docs/crawling-indexing/301-redirects',
+      affectedUrls: [],
+    });
+    if (st.blockedByRobotsTxtCount > 0) deterministicChecks.push({
+      check: `${st.blockedByRobotsTxtCount} internal pages blocked by robots.txt`, value: st.blockedByRobotsTxtCount, issueType: 'warning',
+      aboutThisIssue: 'Pages blocked by robots.txt cannot be crawled by search engines. If these pages should be indexed, they need to be unblocked. Blocking important pages wastes potential organic traffic.',
+      howToFix: 'Review your robots.txt file and remove Disallow rules for pages that should be indexed. Use "noindex" meta tag instead if you want pages crawlable but not indexed. Learn more: https://developers.google.com/search/docs/crawling-indexing/robots/intro',
+      affectedUrls: [],
+    });
+    if (st.blockedResourceCount > 0) deterministicChecks.push({
+      check: `${st.blockedResourceCount} JS/CSS resources blocked`, value: st.blockedResourceCount, issueType: 'warning',
+      aboutThisIssue: 'Blocked resources prevent Googlebot from rendering pages correctly. If CSS or JavaScript files are blocked, Google cannot see the page as users do, potentially missing important content.',
+      howToFix: 'Allow Googlebot to access all CSS and JS resources. Update robots.txt to remove blocks on /css/, /js/, and similar paths. Test with Google\'s Mobile-Friendly Test tool.',
+      affectedUrls: [],
+    });
+    if (st.uncachedResourceCount > 0) deterministicChecks.push({
+      check: `${st.uncachedResourceCount} JS/CSS resources without cache headers`, value: st.uncachedResourceCount, issueType: 'warning',
+      aboutThisIssue: 'Resources without cache-control headers are re-downloaded on every page load, increasing page load time and TTI (Time to Interactive). This directly impacts Core Web Vitals.',
+      howToFix: 'Add Cache-Control headers to all static resources (JS, CSS, images). Set max-age to at least 1 year for versioned files. Learn more: https://web.dev/articles/http-cache',
+      affectedUrls: [],
+    });
+    if (st.unminifiedResourceCount > 0) deterministicChecks.push({
+      check: `${st.unminifiedResourceCount} unminified JS/CSS resources`, value: st.unminifiedResourceCount, issueType: 'notice',
+      aboutThisIssue: 'Unminified resources contain unnecessary whitespace, comments, and long variable names. Minification typically reduces file size by 20-40%, improving page load speed.',
+      howToFix: 'Use build tools like webpack, Vite, or esbuild to minify JS and CSS files. Enable minification in your bundler config. Learn more: https://web.dev/articles/reduce-network-payloads-using-text-compression',
+      affectedUrls: [],
+    });
+    if (st.missingAltCount > 0) deterministicChecks.push({
+      check: `${st.missingAltCount} images without alt text`, value: st.missingAltCount, issueType: 'warning',
+      aboutThisIssue: 'Images without alt text cannot be understood by search engines or screen readers. Alt text is a ranking factor for image search and contributes to overall page relevance. It also improves accessibility.',
+      howToFix: 'Add descriptive alt text to all meaningful images. Alt text should describe the image content and include relevant keywords naturally. Learn more: https://developers.google.com/search/docs/appearance/google-images#descriptive-alt-text',
+      affectedUrls: [],
+    });
+    if (st.titleDuplicateCount > 0) deterministicChecks.push({
+      check: `${st.titleDuplicateCount} pages with duplicate titles`, value: st.titleDuplicateCount, issueType: 'warning',
+      aboutThisIssue: 'Duplicate title tags confuse search engines about which page to rank for a query. Each page should have a unique, descriptive title that reflects its specific content.',
+      howToFix: 'Write unique title tags for each page. Include the primary keyword and keep titles under 60 characters. Learn more: https://developers.google.com/search/docs/appearance/title-link',
+      affectedUrls: [],
+    });
+    if (st.thinPageCount > 0) deterministicChecks.push({
+      check: `${st.thinPageCount} thin pages (under 300 words)`, value: st.thinPageCount, issueType: 'warning',
+      aboutThisIssue: 'Thin content pages provide little value to users and are a signal of low quality. Google\'s Helpful Content system can demote entire sites that have too many thin pages.',
+      howToFix: 'Expand thin pages with genuinely useful content, or consolidate them with similar pages using 301 redirects. Aim for at least 500 words of unique, valuable content per page.',
+      affectedUrls: [],
+    });
+    if (st.brokenExternalCount > 0) deterministicChecks.push({
+      check: `${st.brokenExternalCount} broken external links`, value: st.brokenExternalCount, issueType: 'notice',
+      aboutThisIssue: 'Broken external links lead users to dead pages, creating a poor experience. While external link quality is a minor signal, maintaining working links shows content freshness and reliability.',
+      howToFix: 'Remove or update broken external links. Replace with links to working, authoritative sources.',
+      affectedUrls: (st.brokenExternalLinks || []).slice(0, 10).map(l => l.url || l),
+    });
+    if (st.redirectChainCount > 0) deterministicChecks.push({
+      check: `${st.redirectChainCount} pages with redirect chains`, value: st.redirectChainCount, issueType: 'notice',
+      aboutThisIssue: 'Redirect chains (A→B→C) add multiple round-trips, increasing page load time. Each redirect loses a small amount of link equity. Google may stop following chains after 5+ hops.',
+      howToFix: 'Eliminate redirect chains by pointing directly to the final destination URL. Update both internal links and server redirect rules.',
+      affectedUrls: [],
+    });
+    // ── 15 NEW checks (total: 28) ──
+    if (st.headingSkippedCount > 0) deterministicChecks.push({
+      check: `${st.headingSkippedCount} pages with skipped heading levels`, value: st.headingSkippedCount, issueType: 'warning',
+      aboutThisIssue: 'Skipping heading levels (e.g., H1→H3 without H2) breaks the semantic document outline. Screen readers and search engines use heading hierarchy to understand content structure.',
+      howToFix: 'Ensure headings follow a logical sequence: H1→H2→H3. Never skip H2 when going from H1 to H3. Learn more: https://web.dev/articles/headings-and-landmarks',
+      affectedUrls: [],
+    });
+    if (st.noindexPageCount > 0) deterministicChecks.push({
+      check: `${st.noindexPageCount} pages with noindex tag`, value: st.noindexPageCount, issueType: 'warning',
+      aboutThisIssue: 'Pages with a noindex meta tag are excluded from search results entirely. Verify these pages are intentionally hidden — accidental noindex on important pages causes total traffic loss.',
+      howToFix: 'Review each noindex page. If the page should appear in search, remove the noindex meta tag. If intentional, ensure no important content is behind noindex.',
+      affectedUrls: [],
+    });
+    if (st.nofollowInternalCount > 0) deterministicChecks.push({
+      check: `${st.nofollowInternalCount} internal links with nofollow`, value: st.nofollowInternalCount, issueType: 'warning',
+      aboutThisIssue: 'Nofollow on internal links wastes PageRank by preventing link equity from flowing to important pages. Internal links should almost always be followed.',
+      howToFix: 'Remove rel="nofollow" from internal links. Reserve nofollow for untrusted external links or user-generated content.',
+      affectedUrls: [],
+    });
+    if (st.emptyAnchorCount > 0) deterministicChecks.push({
+      check: `${st.emptyAnchorCount} links with empty anchor text`, value: st.emptyAnchorCount, issueType: 'warning',
+      aboutThisIssue: 'Links without visible anchor text provide no context to search engines about the linked page. This includes image links without alt text and icon-only links.',
+      howToFix: 'Add descriptive anchor text to all links. For image links, add alt text to the image. For icon links, add aria-label or visible text.',
+      affectedUrls: [],
+    });
+    if (st.conflictingCanonicalCount > 0) deterministicChecks.push({
+      check: `${st.conflictingCanonicalCount} pages with conflicting canonical tags`, value: st.conflictingCanonicalCount, issueType: 'error',
+      aboutThisIssue: 'A canonical tag pointing to a different URL tells Google this page is a copy. If incorrect, the wrong page gets indexed and the original loses all ranking signals.',
+      howToFix: 'Ensure each page\'s canonical tag points to itself (self-referencing) or to the correct preferred version. Learn more: https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls',
+      affectedUrls: [],
+    });
+    if (st.orphanPageCount > 0) deterministicChecks.push({
+      check: `${st.orphanPageCount} orphan pages (no incoming internal links)`, value: st.orphanPageCount, issueType: 'warning',
+      aboutThisIssue: 'Orphan pages have no internal links pointing to them. Google discovers pages through links — orphan pages may not be crawled or indexed effectively.',
+      howToFix: 'Add internal links from relevant pages to orphan pages. Include them in navigation, related content sections, or sitemaps.',
+      affectedUrls: [],
+    });
+    if (st.mixedContentCount > 0) deterministicChecks.push({
+      check: `${st.mixedContentCount} pages with mixed content (HTTP on HTTPS)`, value: st.mixedContentCount, issueType: 'error',
+      aboutThisIssue: 'Loading HTTP resources on HTTPS pages creates security warnings and can cause browsers to block content. This degrades user trust and can trigger ranking penalties.',
+      howToFix: 'Update all resource URLs from http:// to https://. Check images, scripts, stylesheets, and iframes. Learn more: https://web.dev/articles/fixing-mixed-content',
+      affectedUrls: [],
+    });
+    if (st.slowPageCount > 0) deterministicChecks.push({
+      check: `${st.slowPageCount} pages with slow response (>3s)`, value: st.slowPageCount, issueType: 'warning',
+      aboutThisIssue: 'Pages taking more than 3 seconds to respond impact Core Web Vitals and user experience. Google explicitly uses page speed as a ranking factor.',
+      howToFix: 'Optimize server response time with caching, CDN, and efficient database queries. Target under 200ms server response. Learn more: https://web.dev/articles/ttfb',
+      affectedUrls: [],
+    });
+    if ((st.oversizedPageCount || 0) > 0) deterministicChecks.push({
+      check: `${st.oversizedPageCount} oversized pages (>3MB)`, value: st.oversizedPageCount, issueType: 'warning',
+      aboutThisIssue: 'Pages over 3MB take significantly longer to load, especially on mobile networks. Large pages are penalized by Core Web Vitals metrics and increase bounce rate.',
+      howToFix: 'Compress images, minify CSS/JS, lazy-load below-fold resources, remove unused code. Target total page size under 1.5MB.',
+      affectedUrls: [],
+    });
+    if (st.urlTooLongCount > 0) deterministicChecks.push({
+      check: `${st.urlTooLongCount} pages with URLs longer than 75 characters`, value: st.urlTooLongCount, issueType: 'notice',
+      aboutThisIssue: 'Long URLs are harder to share, look spammy in search results, and may be truncated. Google recommends keeping URLs concise and descriptive.',
+      howToFix: 'Use short, descriptive URLs with the primary keyword. Avoid unnecessary parameters, session IDs, and deeply nested paths.',
+      affectedUrls: [],
+    });
+    if (st.missingMetaDescCount > 0) deterministicChecks.push({
+      check: `${st.missingMetaDescCount} pages without meta descriptions`, value: st.missingMetaDescCount, issueType: 'warning',
+      aboutThisIssue: 'Pages without meta descriptions leave the search snippet to Google\'s discretion. A well-crafted meta description improves click-through rate by 5-10%.',
+      howToFix: 'Write unique, compelling meta descriptions for each page. Keep between 120-160 characters. Include the primary keyword and a call to action.',
+      affectedUrls: [],
+    });
+    if (st.lowTextRatioCount > 0) deterministicChecks.push({
+      check: `${st.lowTextRatioCount} pages with low text-to-HTML ratio`, value: st.lowTextRatioCount, issueType: 'notice',
+      aboutThisIssue: 'Low text-to-HTML ratio (<10%) indicates pages are mostly code with little visible content. Search engines may consider these pages as low value.',
+      howToFix: 'Increase visible text content. Remove unnecessary HTML, inline styles, and JavaScript. Consider if the page provides enough value for search intent.',
+      affectedUrls: [],
+    });
+    if (st.singleIncomingCount > 0) deterministicChecks.push({
+      check: `${st.singleIncomingCount} pages with only 1 incoming internal link`, value: st.singleIncomingCount, issueType: 'notice',
+      aboutThisIssue: 'Pages with only one internal link pointing to them receive minimal PageRank. Important pages should have multiple internal links from authoritative pages.',
+      howToFix: 'Build contextual internal links from related content pages. Add the page to relevant category and navigation menus. Create a hub-and-spoke linking structure.',
+      affectedUrls: [],
+    });
+    if ((st.schemaTypes || []).length === 0) deterministicChecks.push({
+      check: 'No structured data (schema markup) found', value: 0, issueType: 'warning',
+      aboutThisIssue: 'Without schema markup, search engines cannot generate rich results (star ratings, prices, FAQs, breadcrumbs). Schema also helps AI models understand and cite your content.',
+      howToFix: 'Add JSON-LD schema markup for your content type: Organization, Product, FAQ, BreadcrumbList, Article, etc. Test with https://search.google.com/test/rich-results',
+      affectedUrls: [],
+    });
+    if (!st.hasSitemap) deterministicChecks.push({
+      check: 'No sitemap.xml found', value: 0, issueType: 'notice',
+      aboutThisIssue: 'A sitemap.xml helps search engines discover all important pages on your site. Without it, pages may be missed during crawling, especially on large sites.',
+      howToFix: 'Create and submit a sitemap.xml file. Include all important pages. Submit via Google Search Console. Learn more: https://developers.google.com/search/docs/crawling-indexing/sitemaps/overview',
+      affectedUrls: [],
+    });
+
+    // Merge deterministic checks with any AI-generated issues
+    // DEDUP: remove AI issues that overlap with deterministic checks
+    const deterministicKeywords = deterministicChecks.map(d => d.check.toLowerCase());
+    const overlapPatterns = [
+      /\bh1\b/i, /\bmissing.*h1\b/i, /\bh1.*missing\b/i, /\bh1.*tag\b/i,
+      /\balt.?text\b/i, /\balt.?attribute\b/i, /\bimage.*alt\b/i, /\bmissing.*alt\b/i,
+      /\bduplicate.*title\b/i, /\btitle.*duplicate\b/i,
+      /\bbroken.*link\b/i, /\b(4[0-9]{2}).*link\b/i, /\blink.*broken\b/i,
+      /\bredirect.*chain\b/i, /\bmeta.*description\b/i, /\bthin.*page\b/i, /\bthin.*content\b/i,
+    ];
+    const aiIssues = (parsed.issues || []).map(i => ({
+      check: i.title, value: i.description || '', issueType: i.severity === 'critical' ? 'error' : i.severity === 'high' ? 'error' : i.severity === 'medium' ? 'warning' : 'notice',
+      aboutThisIssue: i.whyItMatters || i.description || '', howToFix: i.fix || '', affectedUrls: [],
+    })).filter(aiIssue => {
+      // If a deterministic check already covers this topic, skip the AI duplicate
+      const aiTitle = (aiIssue.check || '').toLowerCase();
+      for (const pattern of overlapPatterns) {
+        if (pattern.test(aiTitle) && deterministicKeywords.some(dk => pattern.test(dk))) {
+          return false; // Deterministic already covers this
+        }
+      }
+      return true;
+    });
+    const allGroupedIssues = [...deterministicChecks, ...aiIssues];
+    parsed.groupedIssues = {
+      errors: allGroupedIssues.filter(d => d.issueType === 'error'),
+      warnings: allGroupedIssues.filter(d => d.issueType === 'warning'),
+      notices: allGroupedIssues.filter(d => d.issueType === 'notice'),
+      errorCount: allGroupedIssues.filter(d => d.issueType === 'error').length,
+      warningCount: allGroupedIssues.filter(d => d.issueType === 'warning').length,
+      noticeCount: allGroupedIssues.filter(d => d.issueType === 'notice').length,
+    };
+    console.log(`🔍 DEBUG groupedIssues: ${parsed.groupedIssues.errorCount} errors, ${parsed.groupedIssues.warningCount} warnings, ${parsed.groupedIssues.noticeCount} notices, deterministicChecks=${deterministicChecks.length}, aiIssues=${aiIssues.length}`);
+
+    // Attach real PageSpeed data to response
+    if (pageSpeedData?.success) {
+      parsed.realPageSpeed = {
+        scores: pageSpeedData.scores,
+        coreWebVitals: pageSpeedData.coreWebVitals,
+        overallFieldAssessment: pageSpeedData.overallFieldAssessment,
+        failedAudits: pageSpeedData.failedAudits,
+        dataSource: pageSpeedData.dataSource,
+      };
+    }
+
+    // ── Trend Delta: Compare with previous audit (like Semrush's "since last audit") ──
+    let trendDelta = null;
+    if (req.user && (brand?._id || brandPayload?._id)) {
+      try {
+        const prevAudit = await SeoAudit.findOne({
+          user: req.user._id,
+          brand: brand?._id || brandPayload?._id,
+          type: { $in: ['health-check', 'onboarding-baseline'] },
+          status: 'completed',
+        }).sort({ createdAt: -1 }).lean();
+
+        if (prevAudit?.scores && prevAudit?.results) {
+          const prev = prevAudit.scores;
+          const prevStats = prevAudit.results?.siteStats || {};
+          const currStats = parsed.siteStats || {};
+          trendDelta = {
+            previousDate: prevAudit.createdAt,
+            scoreChange: (parsed.seoHealthScore || 0) - (prev.seoHealth || 0),
+            technicalChange: (parsed.technicalScore || 0) - (prev.technicalScore || 0),
+            contentChange: (parsed.contentScore || 0) - (prev.contentScore || 0),
+            authorityChange: (parsed.authorityScore || 0) - (prev.authorityScore || 0),
+            pagesCrawledChange: (currStats.pagesCrawled || 0) - (prevStats.pagesCrawled || 0),
+            brokenInternalChange: (currStats.brokenInternalCount || 0) - (prevStats.brokenInternalCount || 0),
+            thinPageChange: (currStats.thinPageCount || 0) - (prevStats.thinPageCount || 0),
+            duplicateTitleChange: (currStats.titleDuplicateCount || 0) - (prevStats.titleDuplicateCount || 0),
+            multipleH1Change: (currStats.multipleH1Count || 0) - (prevStats.multipleH1Count || 0),
+            // Count new vs resolved AI issues
+            newIssueCount: (parsed.issues || []).filter(i => {
+              const prevIssues = prevAudit.results?.issues || [];
+              return !prevIssues.some(pi => pi.title === i.title);
+            }).length,
+            resolvedIssueCount: (prevAudit.results?.issues || []).filter(pi => {
+              const currIssues = parsed.issues || [];
+              return !currIssues.some(i => i.title === pi.title);
+            }).length,
+          };
+
+          // ── Per-issue deltas (compare grouped deterministic issues) ──
+          const prevSnapshot = prevAudit.results?.issueCountSnapshot || {};
+          const currGrouped = parsed.groupedIssues || {};
+          const allCurrentIssues = [...(currGrouped.errors || []), ...(currGrouped.warnings || []), ...(currGrouped.notices || [])];
+          const issueDeltas = [];
+          for (const issue of allCurrentIssues) {
+            const prevValue = prevSnapshot[issue.check];
+            if (prevValue === undefined) {
+              issueDeltas.push({ check: issue.check, issueType: issue.issueType, status: 'new', currentValue: issue.value });
+            } else if (prevValue !== issue.value) {
+              issueDeltas.push({ check: issue.check, issueType: issue.issueType, status: 'changed', currentValue: issue.value, previousValue: prevValue });
+            }
+          }
+          // Check for resolved issues
+          for (const [checkName, prevValue] of Object.entries(prevSnapshot)) {
+            if (!allCurrentIssues.some(i => i.check === checkName)) {
+              issueDeltas.push({ check: checkName, status: 'resolved', previousValue: prevValue });
+            }
+          }
+          trendDelta.issueDeltas = issueDeltas;
+          trendDelta.newDetectedCount = issueDeltas.filter(d => d.status === 'new').length;
+          trendDelta.resolvedDetectedCount = issueDeltas.filter(d => d.status === 'resolved').length;
+
+          console.log(`📊 Trend: score ${trendDelta.scoreChange >= 0 ? '+' : ''}${trendDelta.scoreChange}, ${trendDelta.newDetectedCount} new checks, ${trendDelta.resolvedDetectedCount} resolved checks`);
+        }
+      } catch (e) { console.warn('Trend delta computation failed:', e.message); }
+    }
+    if (trendDelta) parsed.trendDelta = trendDelta;
+
+    // Build issueCountSnapshot for future trend comparisons
+    const currGroupedIssues = parsed.groupedIssues || {};
+    const allDetectedIssues = [...(currGroupedIssues.errors || []), ...(currGroupedIssues.warnings || []), ...(currGroupedIssues.notices || [])];
+    parsed.issueCountSnapshot = {};
+    for (const issue of allDetectedIssues) {
+      parsed.issueCountSnapshot[issue.check] = issue.value;
+    }
 
     // Save audit
     if (req.user) {
       try {
-        const SeoAudit = (await import('../models/SeoAudit.js')).default;
         await SeoAudit.create({
           user: req.user._id,
           brand: brand?._id || brandPayload?._id,
@@ -233,12 +955,94 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
           status: 'completed',
         });
       } catch (dbErr) { console.warn('Could not save audit:', dbErr.message); }
+
+      // ── Save historical snapshot + compute rich deltas ──
+      try {
+        const brandIdForSnapshot = brand?._id || brandPayload?._id;
+        if (brandIdForSnapshot) {
+          const si = siteResearch?.siteIntelligence || {};
+          const sv = si.schemaValidation || {};
+          const snapshotData = {
+            brand: brandIdForSnapshot,
+            user: req.user._id,
+            url: website,
+            pagesCrawled: si.totalPages || 0,
+            pagesWithErrors: (si.pageStatusDistribution?.status404 || 0) + (si.pageStatusDistribution?.status5xx || 0),
+            missingH1: si.missingH1Count || 0,
+            multipleH1: si.multipleH1Count || 0,
+            missingTitle: si.titleQuality?.missing?.length || 0,
+            missingMetaDesc: si.missingMetaDescriptions?.length || 0,
+            duplicateTitles: si.titleDuplicateCount || 0,
+            duplicateContent: si.duplicateContentCount || 0,
+            thinPages: si.thinPageCount || 0,
+            brokenInternalLinks: si.brokenInternalCount || 0,
+            brokenExternalLinks: si.brokenExternalCount || 0,
+            imagesWithoutAlt: si.imagesWithoutAlt || 0,
+            orphanPages: si.orphanPages?.length || 0,
+            redirectChains: si.redirectAnalysis?.totalRedirects || si.redirectChainCount || 0,
+            avgWordCount: si.avgWordCount || 0,
+            avgResponseTimeMs: si.responseTime?.avg || 0,
+            pagesWithSchema: sv.pagesWithSchema || 0,
+            pagesWithoutSchema: sv.pagesWithoutSchema || 0,
+            schemaValidationIssues: sv.validationIssueCount || 0,
+            performanceScore: pageSpeedData?.scores?.performance || 0,
+            seoScore: pageSpeedData?.scores?.seo || 0,
+            accessibilityScore: pageSpeedData?.scores?.accessibility || 0,
+            lcpMs: pageSpeedData?.coreWebVitals?.lcp?.value || 0,
+            clsScore: pageSpeedData?.coreWebVitals?.cls?.value || 0,
+            tbtMs: pageSpeedData?.coreWebVitals?.tbt?.value || 0,
+            overallScore: parsed.seoHealthScore || 0,
+            mixedContentPages: si.mixedContentCount || 0,
+            blockedResources: si.resourceScanning?.blockedResourceCount || 0,
+          };
+
+          // Get previous snapshot for rich delta
+          const prevSnapshot = await SeoSnapshot.getPreviousSnapshot(brandIdForSnapshot, website);
+          const richDeltas = SeoSnapshot.computeDeltas(snapshotData, prevSnapshot);
+          if (richDeltas) {
+            parsed.historicalTrends = {
+              previousDate: prevSnapshot.createdAt,
+              daysSinceLastAudit: Math.round((Date.now() - new Date(prevSnapshot.createdAt).getTime()) / 86400000),
+              deltas: richDeltas,
+            };
+            console.log(`📊 Historical: ${Object.values(richDeltas).filter(d => d.trend === '▲').length} improved, ${Object.values(richDeltas).filter(d => d.trend === '▼').length} worsened since ${new Date(prevSnapshot.createdAt).toLocaleDateString()}`);
+          }
+
+          // Save new snapshot
+          await SeoSnapshot.create(snapshotData);
+          console.log(`💾 SeoSnapshot saved (${snapshotData.pagesCrawled} pages)`);
+        }
+      } catch (snapErr) { console.warn('Snapshot save/delta failed:', snapErr.message); }
+    }
+
+    // ── Multi-page CWV sampling: test top 3 sub-pages ──
+    if (siteResearch?.pages?.length > 1) {
+      try {
+        const subPages = siteResearch.pages
+          .filter(p => p.url !== website && p.url !== siteResearch.url && p.success !== false)
+          .slice(0, 3);
+        if (subPages.length > 0) {
+          console.log(`⚡ CWV sampling: testing ${subPages.length} sub-pages...`);
+          const subPageCWV = await Promise.all(
+            subPages.map(p => getPageSpeed(p.url, 'mobile').catch(() => ({ success: false, url: p.url })))
+          );
+          parsed.subPageCWV = subPageCWV.filter(r => r.success).map(r => ({
+            url: r.url,
+            performance: r.scores?.performance || 0,
+            lcp: r.coreWebVitals?.lcp?.value || 0,
+            cls: r.coreWebVitals?.cls?.value || 0,
+            tbt: r.coreWebVitals?.tbt?.value || 0,
+            fcp: r.coreWebVitals?.fcp?.value || 0,
+            fieldAssessment: r.overallFieldAssessment || 'NONE',
+          }));
+          console.log(`⚡ CWV sampling done: ${parsed.subPageCWV?.length || 0} sub-pages measured`);
+        }
+      } catch (cwvErr) { console.warn('Sub-page CWV sampling failed:', cwvErr.message); }
     }
 
     res.json({ success: true, ...parsed });
   } catch (error) {
-    console.error('SEO Health Check error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    next(error);
   }
 });
 
@@ -247,7 +1051,7 @@ Generate 8-15 issues. Be STRATEGIC — every issue must have a 'whyItMatters' th
 // GET ME TRAFFIC — Real crawl + keyword research
 // ============================================================================
 
-router.post('/traffic', protect, requireCredits('seoTraffic'), async (req, res) => {
+router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seoTraffic'), async (req, res, next) => {
   try {
     const { url, brand: brandPayload, brandId, industry, country } = req.body;
 
@@ -256,87 +1060,287 @@ router.post('/traffic', protect, requireCredits('seoTraffic'), async (req, res) 
     if (!website) return res.status(400).json({ success: false, error: 'No website URL available.' });
 
     const brandContext = buildBrandContext(brand || brandPayload);
+    const brandObj = brand || brandPayload || {};
+    const dna = brandObj.dna || {};
 
-    // Real crawl to understand existing content
-    console.log(`🔍 SEO Traffic: crawling ${website}...`);
-    const siteResearch = await researchDomain(website);
+    // Derive PAA seed queries from brand context
+    const brandName = brand?.name || brandPayload?.name || '';
+    const industryFocus = industry || dna.industry || 'General';
+    const paaSeeds = [
+        brandName && industryFocus !== 'General' ? `${brandName} ${industryFocus}` : '',
+        industryFocus !== 'General' ? `best ${industryFocus}` : '',
+        industryFocus !== 'General' ? `${industryFocus} tips` : '',
+    ].filter(Boolean).slice(0, 3);
+
+    // Map country to Google gl parameter
+    const countryGlMap = { 'India': 'in', 'United States': 'us', 'UAE': 'ae', 'Dubai': 'ae', 'UK': 'gb', 'Singapore': 'sg', 'Australia': 'au', 'Saudi Arabia': 'sa' };
+    const countryFocus = country || dna.country || 'India';
+    const gl = countryGlMap[countryFocus] || 'in';
+
+    // Run light crawl + DataForSEO ranked keywords + Keyword Intelligence + PAA in parallel
+    console.log(`\n🧠 SEO Traffic: Fast parallel intelligence for ${website}...`);
+    let trafficDomain;
+    try { trafficDomain = new URL(website.startsWith('http') ? website : `https://${website}`).hostname.replace(/^www\./, ''); } catch { trafficDomain = website; }
+    
+    const [siteResearch, domainRankings, keywordIntel, paaData] = await Promise.all([
+      researchDomain(website, { maxPages: 50, timeout: 30000, skipCfSolve: true }).catch(e => {
+        console.error(`❌ Light crawl failed: ${e.message}`);
+        return { url: website, pages: [], homepage: {}, siteIntelligence: { totalPages: 0 }, error: e.message };
+      }),
+      isOnPageConfigured() ? getDomainRankings(trafficDomain, { country: countryFocus, limit: 100 }).catch(e => {
+        console.warn('Ranked Keywords error:', e.message);
+        return { available: false };
+      }) : Promise.resolve({ available: false }),
+      runKeywordIntelligence(brandObj, { seedKeywords: [] }).catch(e => {
+        console.warn('Keyword Intelligence Engine error:', e.message);
+        return { success: false, error: e.message };
+      }),
+      paaSeeds.length > 0 ? batchPAA(paaSeeds, gl).catch(e => {
+        console.warn('PAA scraper error:', e.message);
+        return { allQuestions: [], allRelated: [] };
+      }) : Promise.resolve({ allQuestions: [], allRelated: [] }),
+    ]);
     const siteData = formatSiteResearch(siteResearch);
+    const rankedKwsText = formatRankedKeywordsForPrompt(domainRankings || {});
+    const paaText = formatPAAForPrompt(paaData);
+    console.log(`🔍 PAA: ${paaData.allQuestions?.length || 0} questions, ${paaData.allRelated?.length || 0} related searches`);
 
-    const systemPrompt = `You are a STRATEGIC SEO GROWTH ADVISOR — not just a keyword tool. You combine keyword research with business strategy to create a growth playbook. You have REAL CRAWL DATA showing actual content on the site.
+    // ── Wave 2: Enrich discovered keywords with DataForSEO (if configured) ──
+    let realKeywordData = null;
+    let backlinkData = null;
+    if (isDataForSEOConfigured()) {
+      // Collect discovered keywords from keyword intelligence
+      const discoveredKws = [];
+      if (keywordIntel?.strategist?.mustTarget) {
+        for (const kw of keywordIntel.strategist.mustTarget) discoveredKws.push(kw.keyword);
+      }
+      if (keywordIntel?.strategist?.hiddenGems) {
+        for (const kw of keywordIntel.strategist.hiddenGems) discoveredKws.push(kw.keyword);
+      }
+      if (keywordIntel?.signals?.allDiscoveredKeywords) {
+        for (const kw of keywordIntel.signals.allDiscoveredKeywords.slice(0, 30)) {
+          discoveredKws.push(typeof kw === 'string' ? kw : kw.keyword || kw.term);
+        }
+      }
+      const uniqueKws = [...new Set(discoveredKws.filter(Boolean))].slice(0, 50);
 
-CRITICAL: For every recommendation, explain WHY — connect keywords to business outcomes, search intent to buyer journey stages, and content gaps to revenue opportunities.
-
-STRATEGIC FRAMEWORK (2026):
-- Google rewards "topical authority" — sites must build depth in topic clusters, not just target isolated keywords
-- "Information Gain Score" — Google now measures whether content adds unique value beyond what already exists
-- AI Overviews pull from authoritative, well-structured content — FAQ schemas, how-to markup, and entity establishment increase citation rates 3x
-- E-E-A-T: First-hand experience signals (case studies, original data, reviews) outperform generic content
-- Zero-click searches are 60%+ — content must be optimized for both clicks AND brand visibility in search results
-
-${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
-
-Country focus: ${country || brand?.dna?.country || brandPayload?.dna?.country || 'India'}
-Industry: ${industry || brand?.dna?.industry || brandPayload?.dna?.industry || 'General'}
-
-${siteData}
-
-Respond in JSON:
-{
-  "summary": "Strategic 3-4 sentence analysis of the brand's content position, biggest growth lever, and what competitors likely dominate",
-  "strategicInsight": "A 2-3 paragraph strategic brief for the brand owner. Explain their content market position, where the biggest untapped audience is, and what content strategy will move the needle most. Be specific to their industry.",
-  "keywordClusters": [
-    {
-      "clusterName": "Topic cluster theme",
-      "whyThisCluster": "Strategic reason — why this cluster matters for THIS brand. Connect to business goals, audience needs, or competitive gaps.",
-      "funnelStage": "awareness|consideration|decision|retention",
-      "intent": "buy|learn|compare|local|navigate",
-      "opportunityScore": 0-100,
-      "difficulty": "easy|medium|hard",
-      "estimatedMonthlySearches": "total estimated monthly search volume across all keywords in this cluster",
-      "keywords": [
-        { "keyword": "keyword phrase", "volume": "high|medium|low", "intent": "buy|learn|compare", "difficulty": "easy|medium|hard", "whyItMatters": "Why this keyword connects to business outcomes" }
-      ],
-      "recommendedPageType": "blog|landing|category|faq|guide|tool|comparison|case-study",
-      "suggestedTitle": "SEO-optimized page title",
-      "suggestedOutline": ["H2 point 1", "H2 point 2", "H2 point 3"],
-      "contentAngle": "What unique angle should this content take to outperform existing results (original data, case studies, expert interviews, etc.)"
+      if (uniqueKws.length > 0) {
+        const domain = new URL(website.startsWith('http') ? website : `https://${website}`).hostname;
+        console.log(`📊 DataForSEO: Enriching ${uniqueKws.length} keywords + backlinks for ${domain}...`);
+        [realKeywordData, backlinkData] = await Promise.all([
+          getKeywordIntelligence(uniqueKws, { country: countryFocus }).catch(e => {
+            console.warn('DataForSEO keyword error:', e.message);
+            return null;
+          }),
+          getDomainBacklinks(domain).catch(e => {
+            console.warn('DataForSEO backlinks error:', e.message);
+            return null;
+          }),
+        ]);
+      }
     }
-  ],
-  "existingContentStrengths": [
-    { "page": "Page found in crawl", "strength": "What it does well", "improvement": "How to rank higher", "whyImprove": "Why improving this specific page has the highest ROI" }
-  ],
-  "risingKeywords": [
-    { "keyword": "trending keyword", "trend": "rising|breakout|seasonal", "reason": "Why trending in this industry", "actionDeadline": "When to publish by" }
-  ],
-  "seasonalPeaks": [
-    { "keyword": "keyword", "peakMonth": "Month", "prepareBy": "Date", "reason": "Festival/event", "contentSuggestion": "What content to prepare" }
-  ],
-  "contentGaps": [
-    { "topic": "Missing content topic", "competitorsCovering": 3, "priority": "high|medium", "suggestedFormat": "blog|video|guide", "whyMissing": "What this gap costs the brand in terms of lost visibility or leads", "revenueImpact": "How filling this gap can drive conversions" }
-  ],
-  "quickWins": [
-    { "action": "What to do", "keyword": "Target keyword", "expectedImpact": "Expected traffic gain", "effort": "quick-fix|moderate", "whyQuick": "Why this will show results fastest" }
-  ],
-  "thirtyDayPlan": [
-    { "week": 1, "theme": "Focus area", "actions": ["Action 1", "Action 2"], "expectedOutcome": "What to expect" },
-    { "week": 2, "theme": "Focus area", "actions": ["Action 1", "Action 2"], "expectedOutcome": "What to expect" },
-    { "week": 3, "theme": "Focus area", "actions": ["Action 1", "Action 2"], "expectedOutcome": "What to expect" },
-    { "week": 4, "theme": "Focus area", "actions": ["Action 1", "Action 2"], "expectedOutcome": "What to expect" }
-  ],
-  "competitorContentAnalysis": "Brief analysis of what competitors likely rank for and where the brand can differentiate"
-}
 
-Generate 5-8 keyword clusters. For each, explain WHY it matters strategically. Think like a growth consultant, not a keyword database.`;
+    // Timing Safeguard: Check if we have enough time left for AI
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const budget = 55000; // Increased to 55s to allow for all fallbacks (ALB/CloudFront limit usually 60s)
+    const remainingBudget = Math.max(10000, budget - elapsed);
+    console.log(`⏱️ Traffic research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
-    const userPrompt = `Find traffic opportunities for: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192 });
+    // Build enriched signal data for AI prompt
+    let intelligenceData = '';
+    if (keywordIntel && keywordIntel.success) {
+      intelligenceData = keywordIntel.signalPrompt || '';
+      const strat = keywordIntel.strategist;
+      if (strat) {
+        if (strat.strategicVerdict) {
+          intelligenceData += '\n=== CMO STRATEGIC ANALYSIS ===\n' + strat.strategicVerdict + '\n';
+        }
+        if (strat.mustTarget && strat.mustTarget.length) {
+          intelligenceData += '\nMust-Target Keywords:\n';
+          for (const kw of strat.mustTarget.slice(0, 10)) {
+            intelligenceData += '  - "' + kw.keyword + '" (est. ' + kw.volume + '/mo) — ' + kw.why + '\n';
+          }
+        }
+        if (strat.hiddenGems && strat.hiddenGems.length) {
+          intelligenceData += '\nHidden Gems (low volume, high value):\n';
+          for (const kw of strat.hiddenGems.slice(0, 5)) {
+            intelligenceData += '  - "' + kw.keyword + '" (est. ' + kw.volume + '/mo) — ' + kw.why + '\n';
+          }
+        }
+        if (strat.vernacularOpportunities && strat.vernacularOpportunities.length) {
+          intelligenceData += '\nVernacular Language Opportunities:\n';
+          for (const kw of strat.vernacularOpportunities.slice(0, 5)) {
+            intelligenceData += '  - "' + kw.keyword + '" [' + kw.language + '] (est. ' + kw.volume + '/mo, competition: ' + kw.competition + ')\n';
+          }
+        }
+        if (strat.avoid && strat.avoid.length) {
+          intelligenceData += '\nKeywords to AVOID:\n';
+          for (const kw of strat.avoid.slice(0, 5)) {
+            intelligenceData += '  - "' + kw.keyword + '" (' + kw.volume + '/mo) — ' + kw.why + '\n';
+          }
+        }
+      }
+    }
+
+    // Append PAA data to intelligence
+    if (paaText) {
+      intelligenceData += paaText;
+    }
+
+    // Append DataForSEO real data (when available)
+    const realKwText = formatKeywordDataForPrompt(realKeywordData);
+    const backlinkText = formatBacklinkDataForPrompt(backlinkData);
+    if (realKwText) intelligenceData += realKwText;
+    if (backlinkText) intelligenceData += backlinkText;
+    if (rankedKwsText) intelligenceData += rankedKwsText;
+
+    const hasRealData = !!(realKeywordData?.available || domainRankings?.available);
+    const systemPrompt = 'You are a STRATEGIC SEO GROWTH ADVISOR. You have REAL DATA from multiple intelligence sources.\n\n'
+      + 'You have:\n'
+      + '1. REAL CRAWL DATA from the brand\'s website (deep crawl — 20+ pages with sitemap/robots.txt analysis)\n'
+      + '2. REAL Google Trends data with verified interest scores\n'
+      + '3. REAL Google SERP sampling with difficulty scores\n'
+      + '4. REAL suggestions from Google, YouTube, Amazon, and Bing\n'
+      + '5. REAL People Also Ask (PAA) questions from Google\n'
+      + '6. Multi-agent AI analysis (Scout, Analyst, Strategist)\n'
+      + (hasRealData ? '7. VERIFIED keyword volumes, CPC, and difficulty from DataForSEO\n8. VERIFIED backlink data from DataForSEO\n' : '')
+      + '\nCRITICAL: Use the VERIFIED signals. Do NOT override real data with guesses. When volume estimates come from Google Trends or multi-agent consensus, use those numbers.'
+      + (hasRealData ? ' The DataForSEO data is the MOST ACCURATE — always prefer it over AI estimates.' : '')
+      + '\n\n'
+      + (brandContext ? 'BRAND CONTEXT:\n' + brandContext + '\n\n' : '')
+      + 'Country: ' + countryFocus + '\nIndustry: ' + industryFocus + '\n\n'
+      + siteData + '\n\n'
+      + intelligenceData + '\n\n'
+      + 'Respond in JSON:\n'
+      + '{\n'
+      + '  "summary": "3-4 sentence strategic analysis grounded in REAL data",\n'
+      + '  "strategicInsight": "2-3 paragraph brief referencing verified data",\n'
+      + '  "dataConfidence": "How much is based on verified data vs AI estimation",\n'
+      + '  "keywordClusters": [\n'
+      + '    {\n'
+      + '      "clusterName": "Topic cluster",\n'
+      + '      "whyThisCluster": "Strategic reason with data backing",\n'
+      + '      "funnelStage": "awareness|consideration|decision|retention",\n'
+      + '      "intent": "buy|learn|compare|local|navigate",\n'
+      + '      "opportunityScore": "0-100",\n'
+      + '      "difficulty": "easy|medium|hard",\n'
+      + '      "difficultyScore": "0-100",\n'
+      + '      "estimatedMonthlySearches": "Use verified numbers",\n'
+      + '      "confidenceStars": "1-5",\n'
+      + '      "keywords": [\n'
+      + '        { "keyword": "kw", "volume": 5000, "intent": "type", "difficulty": "level", "difficultyScore": 50, "source": "trends|autocomplete|serp|agent", "whyItMatters": "reason" }\n'
+      + '      ],\n'
+      + '      "recommendedPageType": "blog|landing|faq|guide|case-study",\n'
+      + '      "suggestedTitle": "SEO-optimized title",\n'
+      + '      "suggestedOutline": ["H2 1", "H2 2", "H2 3"],\n'
+      + '      "contentAngle": "Unique angle"\n'
+      + '    }\n'
+      + '  ],\n'
+      + '  "existingContentStrengths": [\n'
+      + '    { "page": "Page from crawl", "strength": "What it does well", "improvement": "How to rank higher", "whyImprove": "ROI reason" }\n'
+      + '  ],\n'
+      + '  "risingKeywords": [\n'
+      + '    { "keyword": "kw", "volume": 1000, "trend": "rising|breakout|seasonal", "reason": "Why", "source": "trends|scout", "actionDeadline": "When" }\n'
+      + '  ],\n'
+      + '  "contentGaps": [\n'
+      + '    { "topic": "Missing topic", "competitorsCovering": 3, "priority": "high|medium", "suggestedFormat": "format", "revenueImpact": "Impact" }\n'
+      + '  ],\n'
+      + '  "quickWins": [\n'
+      + '    { "action": "What to do", "keyword": "kw", "expectedImpact": "Impact", "effort": "quick-fix|moderate", "whyQuick": "Reason" }\n'
+      + '  ],\n'
+      + '  "thirtyDayPlan": [\n'
+      + '    { "week": 1, "theme": "Focus", "actions": ["Action 1"], "expectedOutcome": "Outcome" },\n'
+      + '    { "week": 2, "theme": "Focus", "actions": ["Action 1"], "expectedOutcome": "Outcome" },\n'
+      + '    { "week": 3, "theme": "Focus", "actions": ["Action 1"], "expectedOutcome": "Outcome" },\n'
+      + '    { "week": 4, "theme": "Focus", "actions": ["Action 1"], "expectedOutcome": "Outcome" }\n'
+      + '  ]\n'
+      + '}\n\n'
+      + 'Generate 5-8 keyword clusters. Use VERIFIED volumes where available. Add confidenceStars (1-5) based on how many data layers support each cluster.';
+
+    const userPrompt = 'Find traffic opportunities for: ' + website;
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget });
+    if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoTraffic', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
 
+    // Attach real intelligence metadata
+    if (keywordIntel && keywordIntel.success) {
+      parsed.intelligenceEngine = {
+        dataLayers: keywordIntel.meta.dataLayers,
+        totalKeywordsDiscovered: keywordIntel.meta.totalKeywordsDiscovered,
+        elapsedSeconds: keywordIntel.meta.elapsedSeconds,
+        tokensUsed: keywordIntel.meta.tokensUsed,
+        strategistModel: keywordIntel.meta.dataLayers.strategistModel,
+      };
+      parsed.realSignals = {
+        trendsData: keywordIntel.signals.trendsData,
+        serpData: keywordIntel.signals.serpData,
+        scoutInsights: keywordIntel.signals.scoutInsights,
+        discoveredKeywords: (keywordIntel.signals.allDiscoveredKeywords || []).slice(0, 50),
+      };
+      parsed.agentAnalysis = {
+        analyst: keywordIntel.analyst,
+        strategist: keywordIntel.strategist,
+      };
+      parsed.dataSource = realKeywordData?.available ? 'dataforseo+intelligence' : 'keyword-intelligence-engine';
+    } else {
+      parsed.dataSource = 'ai-only';
+    }
+
+    // Attach DataForSEO real keyword data (when available)
+    if (realKeywordData?.available && realKeywordData.keywords?.length > 0) {
+      parsed.verifiedKeywords = realKeywordData.keywords.map(kw => ({
+        keyword: kw.keyword,
+        searchVolume: kw.searchVolume,
+        cpc: kw.cpc,
+        difficulty: kw.difficulty,
+        competition: kw.competitionLevel,
+      }));
+      parsed.dataForSEOEnabled = true;
+    }
+
+    // Attach backlink data (when available)
+    if (backlinkData?.available && backlinkData.summary) {
+      parsed.backlinkProfile = {
+        ...backlinkData.summary,
+        topReferringDomains: (backlinkData.topReferringDomains || []).slice(0, 10),
+      };
+    }
+
+    // Attach PAA data
+    if (paaData?.allQuestions?.length > 0) {
+      parsed.peopleAlsoAsk = paaData.allQuestions;
+      parsed.relatedSearches = paaData.allRelated;
+    }
+
+    // Attach deep crawl intelligence
+    if (siteResearch.siteIntelligence) {
+      parsed.crawlIntelligence = {
+        totalPages: siteResearch.siteIntelligence.totalPages,
+        hasRobotsTxt: siteResearch.siteIntelligence.hasRobotsTxt,
+        thinPageCount: siteResearch.siteIntelligence.thinPageCount,
+        duplicateContentCount: siteResearch.siteIntelligence.duplicateContentCount,
+        redirectChainCount: siteResearch.siteIntelligence.redirectChainCount,
+        missingMetaCount: siteResearch.siteIntelligence.missingMetaDescriptions?.length || 0,
+        missingH1Count: siteResearch.siteIntelligence.missingH1Tags?.length || 0,
+      };
+    }
+
+    // Save to SeoAudit for persistence
+    if (req.user && brand?._id) {
+      try {
+        await SeoAudit.findOneAndUpdate(
+          { user: req.user._id, brand: brand._id, type: 'traffic' },
+          { results: parsed, url: website, status: 'completed' },
+          { upsert: true, returnDocument: 'after' }
+        );
+        console.log(`✅ SEO Traffic Analysis Successful: ${website}`);
+      } catch (dbErr) { console.warn('Could not save traffic audit:', dbErr.message); }
+    }
+
     res.json({ success: true, ...parsed });
   } catch (error) {
-    console.error('SEO Traffic error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    next(error);
   }
 });
 
@@ -345,7 +1349,7 @@ Generate 5-8 keyword clusters. For each, explain WHY it matters strategically. T
 // BEAT COMPETITORS — Real competitor research
 // ============================================================================
 
-router.post('/competitors', protect, requireCredits('seoCompetitors'), async (req, res) => {
+router.post('/competitors', protect, requireStudio('seoStudio'), requireCredits('seoCompetitors'), async (req, res, next) => {
   try {
     const { url, brand: brandPayload, brandId, competitorUrls } = req.body;
 
@@ -355,28 +1359,66 @@ router.post('/competitors', protect, requireCredits('seoCompetitors'), async (re
 
     const brandContext = buildBrandContext(brand || brandPayload);
 
-    // STEP 1: Crawl brand's own site
-    console.log(`🔍 SEO Competitors: crawling ${website}...`);
-    const siteResearch = await researchDomain(website);
-    const siteData = formatSiteResearch(siteResearch);
-
-    // STEP 2: Gather competitor URLs (stored + user-provided)
+    // Gather competitor URLs (stored + user-provided)
     const storedCompetitors = (brand?.competitors || []).map(c => c.url).filter(Boolean);
     const providedCompetitors = (competitorUrls || []).filter(u => u.trim());
     const allCompetitorUrls = [...new Set([...storedCompetitors, ...providedCompetitors])].slice(0, 5);
 
-    let competitorData = '';
-    let competitorResearch = [];
+    // STEP 1 & 2: Light crawl + DataForSEO competitive intelligence in PARALLEL
+    console.log(`🔍 SEO Competitors: fast parallel intelligence for ${website} and ${allCompetitorUrls.length} competitors...`);
+    let compBrandDomain;
+    try { compBrandDomain = new URL(website.startsWith('http') ? website : `https://${website}`).hostname.replace(/^www\./, ''); } catch { compBrandDomain = website; }
+    const competitorDomains = allCompetitorUrls.map(u => { try { return new URL(u.startsWith('http') ? u : `https://${u}`).hostname.replace(/^www\./, ''); } catch { return u; } });
 
-    if (allCompetitorUrls.length > 0) {
-      // STEP 3a: Crawl known competitors
-      console.log(`🔍 Crawling ${allCompetitorUrls.length} competitors...`);
-      competitorResearch = await researchCompetitors(allCompetitorUrls);
-      competitorData = formatCompetitorResearch(competitorResearch);
-    } else {
-      // STEP 3b: Ask AI to identify competitors first, then we'll note them
-      competitorData = 'No competitor URLs provided. Identify the top 3-5 most likely competitors based on brand industry and location, and provide their real URLs. Be sure to provide REAL existing company websites, not made-up ones.';
+    const brandObj2 = brand || brandPayload || {};
+    const dna2 = brandObj2.dna || {};
+    const compCountry = dna2.targetMarket || dna2.country || 'India';
+
+    const [siteResearch, competitorResults, brandBacklinks, mozBatchData, brandRankings, serpCompData, ...compBacklinks] = await Promise.all([
+      researchDomain(website, { maxPages: 50, timeout: 30000, skipCfSolve: true }).catch(e => {
+        console.error(`❌ Light crawl failed: ${e.message}`);
+        return { url: website, pages: [], homepage: {}, siteIntelligence: { totalPages: 0 }, error: e.message };
+      }),
+      allCompetitorUrls.length > 0 ? researchCompetitors(allCompetitorUrls) : Promise.resolve([]),
+      isDataForSEOConfigured() ? getDomainBacklinks(compBrandDomain).catch(() => ({ available: false })) : Promise.resolve({ available: false }),
+      isMozConfigured() ? getMozBatchDA(compBrandDomain, competitorDomains).catch(() => ({ available: false })) : Promise.resolve({ available: false }),
+      isOnPageConfigured() ? getDomainRankings(compBrandDomain, { country: compCountry, limit: 50 }).catch(() => ({ available: false })) : Promise.resolve({ available: false }),
+      isOnPageConfigured() ? discoverSerpCompetitors(compBrandDomain, { country: compCountry, limit: 15 }).catch(() => ({ available: false })) : Promise.resolve({ available: false }),
+      ...(isDataForSEOConfigured() ? competitorDomains.map(d => getDomainBacklinks(d).catch(() => ({ available: false }))) : []),
+    ]);
+
+    const siteData = formatSiteResearch(siteResearch);
+    let competitorData = '';
+    // Format backlink comparison data
+    let backlinkComparisonText = '';
+    if (brandBacklinks?.available) {
+      const bs = brandBacklinks.summary || {};
+      backlinkComparisonText = `\n=== REAL BACKLINK COMPARISON (DataForSEO — verified) ===\n`;
+      backlinkComparisonText += `YOUR SITE (${compBrandDomain}): ${(bs.totalBacklinks || 0).toLocaleString()} backlinks, ${(bs.referringDomains || 0).toLocaleString()} referring domains, rank ${bs.domainRank || 0}\n`;
+      competitorDomains.forEach((d, i) => {
+        const cb = compBacklinks[i]?.summary || {};
+        if (compBacklinks[i]?.available) {
+          backlinkComparisonText += `${d}: ${(cb.totalBacklinks || 0).toLocaleString()} backlinks, ${(cb.referringDomains || 0).toLocaleString()} referring domains, rank ${cb.domainRank || 0}\n`;
+        }
+      });
     }
+    // Format Moz DA comparison
+    const mozComparisonText = formatMozDataForPrompt(mozBatchData);
+    // NEW: Format ranked keywords + SERP competitors
+    const brandRankingsText = formatRankedKeywordsForPrompt(brandRankings || {});
+    const serpCompText = formatSerpCompetitorsForPrompt(serpCompData || {});
+    
+    if (competitorResults.length > 0) {
+      competitorData = formatCompetitorResearch(competitorResults);
+    } else {
+      competitorData = 'No competitor URLs provided. Identify the top 3-5 most likely competitors based on brand industry and location, and provide their real URLs.';
+    }
+
+    // Timing Safeguard: Check if we have enough time left for AI
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const budget = 55000; // 55s budget
+    const remainingBudget = Math.max(10000, budget - elapsed);
+    console.log(`⏱️ Competitor research took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     const systemPrompt = `You are a COMPETITIVE INTELLIGENCE STRATEGIST — you think like a war-room strategist, not a data reporter. You have REAL CRAWL DATA from both the brand and competitor websites. Your job is to explain WHY competitors win, WHAT their strategy is, and HOW to beat them.
 
@@ -395,6 +1437,14 @@ ${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
 ${siteData}
 
 ${competitorData}
+
+${backlinkComparisonText}
+
+${mozComparisonText}
+
+${brandRankingsText}
+
+${serpCompText}
 
 Respond in JSON:
 {
@@ -444,12 +1494,24 @@ Respond in JSON:
 Be STRATEGIC and SPECIFIC. Every insight must have a WHY and an actionable HOW. Think like a competitive intelligence firm, not a scraping tool.`;
 
     const userPrompt = `Competitive analysis for: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192 });
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192, timeout: remainingBudget });
     const parsed = parseJSON(result);
     parsed.researchSources = [
       ...(siteResearch.pages?.map(p => p.url) || [website]),
       ...allCompetitorUrls,
     ];
+
+    // Save to SeoAudit for persistence
+    if (req.user && brand?._id) {
+      try {
+        await SeoAudit.findOneAndUpdate(
+          { user: req.user._id, brand: brand._id, type: 'competitors' },
+          { results: parsed, url: website, status: 'completed' },
+          { upsert: true, returnDocument: 'after' }
+        );
+        console.log(`✅ Competitor Analysis Successful: ${website}`);
+      } catch (dbErr) { console.warn('Could not save competitors audit:', dbErr.message); }
+    }
 
     // Auto-save discovered competitors to brand if authenticated
     if (brand && parsed.discoveredCompetitors?.length && !storedCompetitors.length) {
@@ -477,7 +1539,7 @@ Be STRATEGIC and SPECIFIC. Every insight must have a WHY and an actionable HOW. 
     res.json({ success: true, ...parsed });
   } catch (error) {
     console.error('SEO Competitors error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 
@@ -486,9 +1548,9 @@ Be STRATEGIC and SPECIFIC. Every insight must have a WHY and an actionable HOW. 
 // AI VISIBILITY — Real structured data audit
 // ============================================================================
 
-router.post('/ai-visibility', protect, requireCredits('seoAiVisibility'), async (req, res) => {
+router.post('/ai-visibility', protect, requireStudio('seoStudio'), requireCredits('seoAiVisibility'), async (req, res, next) => {
   try {
-    const { url, brand: brandPayload, brandId } = req.body;
+    const { url, brand: brandPayload, brandId, customPrompts } = req.body;
 
     const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
     const website = brand?.website || url || brandPayload?.website;
@@ -496,14 +1558,32 @@ router.post('/ai-visibility', protect, requireCredits('seoAiVisibility'), async 
 
     const brandContext = buildBrandContext(brand || brandPayload);
 
-    // Real crawl
-    console.log(`🔍 AI Visibility: crawling ${website}...`);
-    const siteResearch = await researchDomain(website);
+    // Fast parallel: light crawl + DataForSEO ranked keywords (includes AI Overview references)
+    console.log(`🔍 AI Visibility: fast parallel intelligence for ${website}...`);
+    let aiVisDomain;
+    try { aiVisDomain = new URL(website.startsWith('http') ? website : `https://${website}`).hostname.replace(/^www\./, ''); } catch { aiVisDomain = website; }
+    const aiBrandObj = brand || brandPayload || {};
+    const aiDna = aiBrandObj.dna || {};
+    const aiCountry = aiDna.targetMarket || aiDna.country || 'India';
+    
+    const [siteResearch, aiRankings] = await Promise.all([
+      researchDomain(website, { maxPages: 50, timeout: 30000, skipCfSolve: true }).catch(e => {
+        console.error(`❌ Light crawl failed: ${e.message}`);
+        return { url: website, pages: [], homepage: {}, siteIntelligence: { totalPages: 0 }, error: e.message };
+      }),
+      isOnPageConfigured() ? getDomainRankings(aiVisDomain, { country: aiCountry, limit: 100 }).catch(() => ({ available: false })) : Promise.resolve({ available: false }),
+    ]);
     const siteData = formatSiteResearch(siteResearch);
+    const aiRankingsText = formatRankedKeywordsForPrompt(aiRankings || {});
+
+    // Timing: data gathering is fast now, AI gets generous budget
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(60000, 120000 - elapsed);
+    console.log(`⏱️ AI Visibility intelligence took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
 
     const systemPrompt = `You are an AI SEARCH STRATEGIST — the world's foremost expert on making brands visible in AI-powered search (Google AI Overviews, ChatGPT + Bing, Perplexity, Gemini, Claude, etc.) in 2026.
 
-You have REAL CRAWL DATA. Use it as ground truth. Don't guess — analyze what's actually there.
+You have REAL CRAWL DATA and REAL KEYWORD RANKING DATA from DataForSEO. Use it as ground truth. Don't guess — analyze what's actually there. Pay special attention to keywords appearing in AI Overviews.
 
 CRITICAL: Explain WHY each recommendation matters for AI visibility. Connect every finding to how LLMs discover, evaluate, and cite content. Don't just list what's missing — explain the strategic consequence of each gap.
 
@@ -518,6 +1598,8 @@ AI SEARCH LANDSCAPE (2026):
 ${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
 
 ${siteData}
+
+${aiRankingsText}
 
 Respond in JSON:
 {
@@ -579,6 +1661,19 @@ Respond in JSON:
   "priorityActions": [
     { "priority": 1, "action": "What to do", "impact": "high|medium", "effort": "quick-fix|moderate|major", "details": "Step by step", "whyThisOrder": "Why this should be done first", "expectedOutcome": "What will change in AI visibility" }
   ],
+  "optimizations": [
+    {
+      "title": "Specific, actionable optimization — NOT generic advice like 'Improve content'",
+      "description": "Exact steps to implement this optimization with tool/code references",
+      "priority": "critical|high|medium",
+      "kpi": "The exact metric to measure (e.g., 'FAQ schema count', 'AI Overview citation rate', 'Schema validation score')",
+      "baseline": "Current measured value from crawl data (e.g., '0 FAQ schemas found', '2 of 10 pages have JSON-LD')",
+      "target": "Specific measurable target (e.g., 'FAQ schema on top 5 landing pages', '100% pages with Organization schema')",
+      "timeline": "Realistic timeline to implement (e.g., '3 days', '1 week', '2 weeks')",
+      "proofMethod": "How to verify this worked (e.g., 'Re-run AI Visibility scan — schemaReadiness score should increase by 15-25 points', 'Check Google Rich Results Test for FAQ snippets')",
+      "expectedROI": "Business outcome (e.g., '10-20% increase in AI Overview citations within 30 days', 'Rich snippet appearance for 5 target queries')"
+    }
+  ],
   "contentPatterns": [
     { "pattern": "Content pattern name", "description": "How to implement", "example": "Brief example", "aiAdvantage": "Why AI models prefer content formatted this way" }
   ],
@@ -590,17 +1685,156 @@ Respond in JSON:
   "crawlFindings": "Summary of what the crawl revealed about AI readiness"
 }
 
-Be STRATEGIC. Every recommendation must explain WHY it matters for AI visibility specifically, not just general SEO.`;
+STRATEGIC RULES (MANDATORY):
+1. NEVER give generic advice like 'Enhance User Engagement' or 'Leverage Influencer Marketing' — these are worthless
+2. Every optimization MUST reference specific crawl data findings
+3. Every optimization MUST have a measurable KPI with a baseline (from crawl) and a target
+4. Every optimization MUST explain HOW TO PROVE it worked after implementation
+5. Think like a consultant billing $500/hour — every recommendation must justify its existence with data`;
 
     const userPrompt = `AI Visibility audit for: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192 });
+
+    // Run AI on-page analysis AND real LLM probing in parallel
+    const brandName = brand?.name || brandPayload?.name || new URL(website).hostname.replace(/^www\./, '').split('.')[0];
+    const industry = brand?.industry || brand?.businessCategory || brandPayload?.industry || '';
+    const location = brand?.location || brandPayload?.location || '';
+    const competitors = brand?.competitors?.map(c => c.name || c) || [];
+
+    console.log(`🔮 Starting parallel: AI analysis + GEO probe v3 for "${brandName}" in "${industry}"`);
+
+    // Fetch previous probe for citation drift detection
+    let previousProbe = null;
+    if (req.user && brand?._id) {
+      try {
+        const prevHistory = await GeoProbeHistory.findOne({ brand: brand._id, user: req.user._id })
+          .sort({ createdAt: -1 }).lean();
+        if (prevHistory) previousProbe = { citations: prevHistory.citations || [] };
+      } catch (_) { /* ignore */ }
+    }
+
+    const [result, geoProbeResult] = await Promise.all([
+      aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget }),
+      probeAIVisibility(brandName, industry, location, website, competitors, customPrompts || [], previousProbe).catch(err => {
+        console.warn('GEO Probe failed (non-blocking):', err.message);
+        return null;
+      }),
+    ]);
+
     const parsed = parseJSON(result);
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
 
+    // Merge real GEO probe data into response
+    if (geoProbeResult) {
+      parsed.geoProbe = {
+        realScore: geoProbeResult.score,
+        scoreCI: geoProbeResult.scoreCI,
+        mentionRate: geoProbeResult.mentionRate,
+        weightedMentionRate: geoProbeResult.weightedMentionRate,
+        totalProbes: geoProbeResult.totalProbes,
+        totalMentions: geoProbeResult.totalMentions,
+        samplesPerPrompt: geoProbeResult.samplesPerPrompt,
+        sentimentDistribution: geoProbeResult.sentimentDistribution,
+        sentimentMethod: geoProbeResult.sentimentMethod,
+        shareOfVoice: geoProbeResult.shareOfVoice,
+        competitivePosition: geoProbeResult.competitivePosition,
+        modelBreakdown: geoProbeResult.modelBreakdown,
+        topSnippets: geoProbeResult.topSnippets,
+        contentGaps: geoProbeResult.contentGaps,
+        entityConfidence: geoProbeResult.entityConfidence,
+        citations: geoProbeResult.citations,
+        citationDrift: geoProbeResult.citationDrift,
+        promptsUsed: geoProbeResult.promptsUsed,
+        probeDetails: geoProbeResult.probeDetails,
+      };
+      // Blend: 40% on-page analysis + 60% real probe data
+      const onPageScore = parsed.aiVisibilityScore || 50;
+      parsed.aiVisibilityScore = Math.round(onPageScore * 0.4 + geoProbeResult.score * 0.6);
+      parsed.scoreBreakdown = {
+        onPageAnalysis: onPageScore,
+        realProbeScore: geoProbeResult.score,
+        blendedScore: parsed.aiVisibilityScore,
+        confidence: geoProbeResult.scoreCI?.confidence || 'unknown',
+        margin: geoProbeResult.scoreCI?.margin || 0,
+        formula: '40% on-page + 60% real LLM probe (3x multi-sample)',
+      };
+      console.log(`🔮 GEO Score: on-page=${onPageScore}, probe=${geoProbeResult.score}±${geoProbeResult.scoreCI?.margin || 0}, blended=${parsed.aiVisibilityScore}`);
+    }
+
+    // Save to SeoAudit for persistence
+    if (req.user && brand?._id) {
+      try {
+        await SeoAudit.findOneAndUpdate(
+          { user: req.user._id, brand: brand._id, type: 'ai-visibility' },
+          { results: parsed, url: website, status: 'completed' },
+          { upsert: true, returnDocument: 'after' }
+        );
+        console.log(`✅ AI Visibility Successful: ${website}`);
+      } catch (dbErr) { console.warn('Could not save AI visibility audit:', dbErr.message); }
+
+      // Save GEO probe history for trend tracking
+      if (geoProbeResult) {
+        try {
+          await GeoProbeHistory.create({
+            user: req.user._id,
+            brand: brand._id,
+            website,
+            score: geoProbeResult.score,
+            mentionRate: geoProbeResult.mentionRate,
+            totalProbes: geoProbeResult.totalProbes,
+            totalMentions: geoProbeResult.totalMentions,
+            competitivePosition: geoProbeResult.competitivePosition,
+            modelBreakdown: geoProbeResult.modelBreakdown,
+            sentimentDistribution: geoProbeResult.sentimentDistribution,
+            shareOfVoice: geoProbeResult.shareOfVoice,
+            entityConfidence: geoProbeResult.entityConfidence,
+            modelsUsed: geoProbeResult.modelsUsed,
+            modelCoverage: geoProbeResult.modelCoverage,
+            contentGapsCount: geoProbeResult.contentGaps?.length || 0,
+            citationsCount: geoProbeResult.citations?.length || 0,
+            citations: geoProbeResult.citations || [],
+            samplesPerPrompt: geoProbeResult.samplesPerPrompt || 1,
+            onPageScore: parsed.scoreBreakdown?.onPageAnalysis || 0,
+            blendedScore: parsed.aiVisibilityScore || 0,
+          });
+          console.log('📊 GEO Probe history saved for trend tracking');
+        } catch (histErr) { console.warn('Could not save GEO history:', histErr.message); }
+      }
+    }
+
     res.json({ success: true, ...parsed });
   } catch (error) {
-    console.error('AI Visibility error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    next(error);
+  }
+});
+
+// ── GEO History / Trends ──
+router.get('/geo-history', protect, async (req, res, next) => {
+  try {
+    const { brandId, limit } = req.query;
+    if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
+
+    const history = await GeoProbeHistory.find({ brand: brandId, user: req.user._id })
+      .sort({ createdAt: -1 })
+      .limit(Math.min(parseInt(limit) || 30, 100))
+      .lean();
+
+    // Compute trend deltas
+    const latest = history[0];
+    const previous = history[1];
+    let trend = null;
+    if (latest && previous) {
+      trend = {
+        scoreDelta: latest.score - previous.score,
+        mentionRateDelta: latest.mentionRate - previous.mentionRate,
+        positionChange: latest.competitivePosition !== previous.competitivePosition
+          ? `${previous.competitivePosition} → ${latest.competitivePosition}` : null,
+        daysBetween: Math.round((new Date(latest.createdAt) - new Date(previous.createdAt)) / 86400000),
+      };
+    }
+
+    res.json({ success: true, history, trend, total: history.length });
+  } catch (error) {
+    next(error);
   }
 });
 
@@ -609,7 +1843,7 @@ Be STRATEGIC. Every recommendation must explain WHY it matters for AI visibility
 // ON-PAGE AUDIT
 // ============================================================================
 
-router.post('/audit-page', protect, requireCredits('seoAuditPage'), async (req, res) => {
+router.post('/audit-page', protect, requireStudio('seoStudio'), requireCredits('seoAuditPage'), async (req, res, next) => {
   try {
     const { pageUrl, brand: brandPayload, brandId, keyword } = req.body;
     if (!pageUrl) return res.status(400).json({ success: false, error: 'Page URL is required' });
@@ -664,8 +1898,7 @@ Respond in JSON:
 
     res.json({ success: true, ...parsed });
   } catch (error) {
-    console.error('Page audit error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    next(error);
   }
 });
 
@@ -675,7 +1908,7 @@ Respond in JSON:
 // ============================================================================
 
 // POST /api/seo-studio/competitors/manage — Add/remove competitors
-router.post('/competitors/manage', protect, async (req, res) => {
+router.post('/competitors/manage', protect, async (req, res, next) => {
   try {
     const { brandId, action, competitor } = req.body;
     if (!brandId) return res.status(400).json({ success: false, error: 'Brand ID required' });
@@ -707,12 +1940,12 @@ router.post('/competitors/manage', protect, async (req, res) => {
 
     res.json({ success: true, competitors: brand.competitors });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
 
 // POST /api/seo-studio/competitors/discover — AI auto-discover competitors
-router.post('/competitors/discover', protect, requireCredits('seoCompetitorDiscover'), async (req, res) => {
+router.post('/competitors/discover', protect, requireCredits('seoCompetitorDiscover'), async (req, res, next) => {
   try {
     const { brandId } = req.body;
     if (!brandId) return res.status(400).json({ success: false, error: 'Brand ID required' });
@@ -753,7 +1986,1185 @@ CRITICAL: Only include REAL existing companies. Do not make up fictional compani
 
     res.json({ success: true, competitors: brand.competitors });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+
+// ============================================================================
+// BACKLINK INTELLIGENCE — Agentic multi-phase backlink crawler
+// ============================================================================
+
+router.post('/backlinks', protect, requireStudio('seoStudio'), requireCredits('seoBacklinks'), async (req, res, next) => {
+  let brandDomain;
+  const requestStart = Date.now();
+  try {
+    const { url, brand: brandPayload, brandId } = req.body;
+
+    const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
+    const website = brand?.website || url || brandPayload?.website;
+    if (!website) return res.status(400).json({ success: false, error: 'No website URL available. Please add a website to your brand.' });
+
+    const brandContext = buildBrandContext(brand || brandPayload);
+    let normalizedUrl = website.trim();
+    if (!/^https?:\/\//i.test(normalizedUrl)) normalizedUrl = `https://${normalizedUrl}`;
+    brandDomain = website;
+    try { brandDomain = new URL(normalizedUrl).hostname.replace(/^www\./, ''); } catch (e) { /* ignore */ }
+
+    console.log(`\n🔗 === BACKLINK INTELLIGENCE (OPTIMIZED): ${brandDomain} ===`);
+
+    // Extract competitor domains for DataForSEO link gap analysis
+    const storedCompetitors = (brand?.competitors || []).map(c => c.url).filter(Boolean);
+    const competitorDomains = storedCompetitors.map(u => {
+      try { return new URL(u.startsWith('http') ? u : `https://${u}`).hostname.replace(/^www\./, ''); } catch { return u; }
+    }).filter(Boolean);
+
+    // ── PHASE 1: ALL PARALLEL API CALLS (3-5s total instead of 120s+) ──
+    console.log(`🔗 Phase 1: Parallel data fetch — light crawl + DataForSEO enriched + Moz DA...`);
+    const [siteResearch, enrichedBacklinks, mozData] = await Promise.all([
+      researchDomainLight(normalizedUrl),
+      isDataForSEOConfigured()
+        ? getEnrichedBacklinks(brandDomain, competitorDomains).catch(e => ({ available: false, error: e.message }))
+        : Promise.resolve({ available: false }),
+      isMozConfigured()
+        ? getMozBatchDA(brandDomain, competitorDomains).catch(() => ({ available: false }))
+        : Promise.resolve({ available: false }),
+    ]);
+
+    const phase1Elapsed = Date.now() - requestStart;
+    console.log(`⏱️ Phase 1 complete in ${phase1Elapsed}ms (light crawl + DataForSEO + Moz)`);
+
+    const siteData = formatSiteResearch(siteResearch);
+    const si = siteResearch.siteIntelligence || {};
+    const enrichedText = formatEnrichedBacklinkData(enrichedBacklinks);
+    const mozText = formatMozDataForPrompt(mozData);
+
+    // ── PHASE 2: AI Strategic Analysis (gets 90s+ budget now) ──
+    const aiBudget = Math.max(30000, 120000 - phase1Elapsed);
+    console.log(`🔗 Phase 2: AI strategic analysis (budget: ${Math.round(aiBudget / 1000)}s, DataForSEO: ${enrichedBacklinks?.available ? 'ENRICHED' : 'unavailable'})...`);
+
+    const systemPrompt = `You are an expert backlink analyst and link-building strategist. You have VERIFIED backlink data from DataForSEO (4.5 trillion link index) and Moz. Use this real data to create an actionable backlink strategy.
+
+CRITICAL: The backlink data below is REAL and VERIFIED — do NOT estimate or fabricate numbers. Use the actual data.
+
+${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
+
+=== BRAND SITE ===
+${siteData}
+
+Brand outbound links to: ${(si.externalDomains || []).slice(0, 20).join(', ') || 'None found'}
+Internal links: ${si.internalLinkCount || 0}
+
+${enrichedText || 'DataForSEO not available — provide estimates based on site analysis.'}
+
+${mozText || ''}
+
+Respond in STRICT JSON:
+{
+  "backlinkHealthScore": 0-100,
+  "estimatedReferringDomains": "Use real DataForSEO count if available, otherwise estimate",
+  "estimatedTotalBacklinks": "Use real count if available",
+  "dofollowRatio": "Calculate from real data or estimate",
+  "anchorTextHealth": "natural|over-optimized|under-optimized",
+  "summary": "3-4 sentence strategic analysis using REAL data. Cite actual numbers.",
+  "strategicBrief": "2-3 paragraph analysis for the brand owner using real backlink metrics.",
+
+  "discoveredBacklinks": [
+    {
+      "sourceUrl": "Real URL from DataForSEO referring domains",
+      "sourceDomain": "domain.com",
+      "anchorText": "Known anchor text",
+      "linkType": "dofollow|nofollow",
+      "estimatedAuthority": "high|medium|low",
+      "context": "How this page links to the brand",
+      "status": "verified-live",
+      "category": "directory|editorial|resource|social|press|citation"
+    }
+  ],
+
+  "competitorLinkGap": [
+    {
+      "domain": "Domain from link gap data",
+      "competitorLinkedFrom": "Which competitor benefits",
+      "pageType": "blog|resource|directory|press",
+      "estimatedAuthority": "high|medium|low",
+      "howToGetLink": "Step-by-step action plan",
+      "difficulty": "easy|medium|hard",
+      "impactScore": 1-10
+    }
+  ],
+
+  "linkOpportunities": [
+    {
+      "targetUrl": "Real domain to target",
+      "type": "guest-post|resource-page|broken-link|digital-pr|haro|directory|partnership",
+      "title": "Opportunity name",
+      "description": "Why and how to approach",
+      "estimatedAuthority": "high|medium|low",
+      "difficulty": "easy|medium|hard",
+      "impactScore": 1-10,
+      "strategy": "Step-by-step approach",
+      "estimatedTimeline": "1 week|2 weeks|1 month",
+      "suggestedAnchors": ["Anchor 1", "Anchor 2"]
+    }
+  ],
+
+  "toxicRisks": [{ "concern": "Risk", "severity": "high|medium|low", "action": "Fix" }],
+
+  "outreachTemplates": [
+    {
+      "type": "guest-post|broken-link|resource-page|partnership",
+      "subject": "Email subject",
+      "body": "Email template with [BRAND], [SITE], [NAME] placeholders",
+      "whenToUse": "Which opportunities this targets",
+      "successRate": "Expected response rate"
+    }
+  ],
+
+  "internalLinkingIssues": [{ "issue": "Problem", "fix": "Solution", "impact": "Why it matters" }],
+
+  "anchorTextStrategy": {
+    "currentState": "Assessment from real anchor data",
+    "recommendations": ["Recommendations"],
+    "idealDistribution": { "branded": "40-50%", "topical": "20-30%", "naked-url": "10-15%", "generic": "10-15%", "exact-match": "5-10%" }
+  },
+
+  "thirtyDayPlan": [
+    { "week": 1, "focus": "Theme", "actions": ["Action"], "expectedLinks": "Target" },
+    { "week": 2, "focus": "Theme", "actions": ["Action"], "expectedLinks": "Target" },
+    { "week": 3, "focus": "Theme", "actions": ["Action"], "expectedLinks": "Target" },
+    { "week": 4, "focus": "Theme", "actions": ["Action"], "expectedLinks": "Target" }
+  ],
+
+  "quickWins": [{ "action": "Quick win", "estimatedTime": "Time", "expectedImpact": "high|medium", "whyQuick": "Reason" }]
+}
+
+Generate 5-10 discovered backlinks (from real DataForSEO data), 5-8 link gap items, 8-12 link opportunities, and 2-3 outreach templates. Be SPECIFIC and cite real data.`;
+
+    const userPrompt = `Complete backlink intelligence analysis for: ${brandDomain} (${normalizedUrl})`;
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6144, timeout: aiBudget });
+    if (!result) throw new Error('AI analysis returned empty result');
+    let parsed;
+    try {
+      parsed = parseJSON(result);
+    } catch (e) {
+      console.error('Failed to parse AI response for backlinks:', e.message, result.substring(0, 200));
+      throw new Error('AI analysis returned invalid data format');
+    }
+    
+    if (!parsed || typeof parsed !== 'object') {
+      throw new Error('AI analysis returned malformed object');
+    }
+
+    // Add metadata
+    parsed.crawlMetadata = {
+      brandDomain,
+      pagesCrawled: 1,
+      competitorsAnalyzed: competitorDomains.length,
+      dataForSEOEnriched: enrichedBacklinks?.available || false,
+      mozAvailable: mozData?.available || false,
+      timestamp: new Date().toISOString(),
+      totalTimeMs: Date.now() - requestStart,
+    };
+    parsed.researchSources = [normalizedUrl];
+    // Attach real DataForSEO backlink data
+    if (enrichedBacklinks?.available) {
+      parsed.realBacklinkData = {
+        provider: 'dataforseo',
+        summary: enrichedBacklinks.summary || {},
+        topReferringDomains: (enrichedBacklinks.topReferringDomains || []).slice(0, 15),
+        anchorDistribution: (enrichedBacklinks.anchorDistribution || []).slice(0, 15),
+        backlinkCompetitors: (enrichedBacklinks.backlinkCompetitors || []).slice(0, 10),
+        linkGap: (enrichedBacklinks.linkGap || []).slice(0, 15),
+      };
+      parsed.dataSource = 'dataforseo-enriched';
+    } else {
+      parsed.dataSource = 'crawl+ai';
+      if (enrichedBacklinks?.subscriptionNeeded) {
+        parsed.backlinkApiStatus = {
+          subscriptionNeeded: true,
+          activateUrl: enrichedBacklinks.activateUrl || 'https://app.dataforseo.com/backlinks-subscription',
+          message: 'DataForSEO Backlinks API subscription is not activated. Activate it to get real backlink data (referring domains, anchor text, link gap analysis).',
+        };
+      }
+    }
+    if (mozData?.available) {
+      parsed.mozData = { brand: mozData.brand, competitors: mozData.competitors };
+    }
+    // Log token usage
+    if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: req.creditAction || 'seoBacklinks', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+
+    // Save to SeoAudit for persistence
+    if (req.user && brand?._id) {
+      try {
+        await SeoAudit.findOneAndUpdate(
+          { user: req.user._id, brand: brand._id, type: 'backlinks' },
+          { url: website, scores: { authorityScore: parsed.backlinkHealthScore || 0 }, results: parsed, status: 'completed', creditsUsed: req.creditsDeducted || 4 },
+          { upsert: true, returnDocument: 'after' }
+        );
+        const totalTime = ((Date.now() - requestStart) / 1000).toFixed(1);
+        console.log(`✅ Backlink Audit Successful: ${website} (${totalTime}s total)`);
+      } catch (dbErr) { console.warn('Could not save backlink audit:', dbErr.message); }
+    }
+
+    const totalTime = ((Date.now() - requestStart) / 1000).toFixed(1);
+    console.log(`🔗 === BACKLINK INTELLIGENCE COMPLETE: ${brandDomain} (${totalTime}s) ===\n`);
+    res.json({ success: true, ...parsed });
+  } catch (error) {
+    console.error(`Backlink Intelligence error [${brandDomain || 'unknown'}]:`, error.stack || error);
+    
+    const isTimeout = error.name === 'AbortError' || 
+                      error.message.toLowerCase().includes('timeout') || 
+                      error.message.toLowerCase().includes('aborted') ||
+                      error.message.toLowerCase().includes('budget exceeded');
+
+    if (isTimeout) {
+      return res.status(504).json({
+        success: false,
+        error: 'Analysis timed out. The website might be too complex or the AI provider is slow. Please try again in 1 minute.',
+        code: 'TIMEOUT_ERROR'
+      });
+    }
+
+    res.status(500).json({ 
+      success: false, 
+      error: safeErrorMessage(error),
+      debug: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    });
+  }
+});
+
+
+// ============================================================================
+// COMPETITOR WAR ROOM — 90-day battle plan
+// ============================================================================
+
+router.post('/competitor-warroom', protect, requireStudio('seoStudio'), requireCredits('seoWarRoom'), async (req, res, next) => {
+  try {
+    const { url, brand: brandPayload, brandId, competitorUrls } = req.body;
+
+    const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
+    const website = brand?.website || url || brandPayload?.website;
+    if (!website) return res.status(400).json({ success: false, error: 'No website URL available.' });
+
+    const brandContext = buildBrandContext(brand || brandPayload);
+
+    // Gather competitors
+    const storedCompetitors = (brand?.competitors || []).map(c => c.url).filter(Boolean);
+    const providedCompetitors = (competitorUrls || []).filter(u => u.trim());
+    const allCompetitorUrls = [...new Set([...storedCompetitors, ...providedCompetitors])].slice(0, 5);
+
+    // STEP 1 & 2: Light crawl + DataForSEO competitive intelligence in PARALLEL
+    console.log(`⚔️ War Room: fast parallel intelligence for ${website} and ${allCompetitorUrls.length} competitors...`);
+    let wrBrandDomain;
+    try { wrBrandDomain = new URL(website.startsWith('http') ? website : `https://${website}`).hostname.replace(/^www\./, ''); } catch { wrBrandDomain = website; }
+    const wrCompDomains = allCompetitorUrls.map(u => { try { return new URL(u.startsWith('http') ? u : `https://${u}`).hostname.replace(/^www\./, ''); } catch { return u; } });
+    
+    const wrBrandObj = brand || brandPayload || {};
+    const wrDna = wrBrandObj.dna || {};
+    const wrCountry = wrDna.targetMarket || wrDna.country || 'India';
+
+    const [siteResearch, competitorResults, brandRankingsWR, serpCompWR, ...competitorOverlaps] = await Promise.all([
+      researchDomain(website, { maxPages: 50, timeout: 30000, skipCfSolve: true }).catch(e => {
+        console.error(`❌ Light crawl failed: ${e.message}`);
+        return { url: website, pages: [], homepage: {}, siteIntelligence: { totalPages: 0 }, error: e.message };
+      }),
+      allCompetitorUrls.length > 0 ? researchCompetitors(allCompetitorUrls) : Promise.resolve([]),
+      isOnPageConfigured() ? getDomainRankings(wrBrandDomain, { country: wrCountry, limit: 50 }).catch(() => ({ available: false })) : Promise.resolve({ available: false }),
+      isOnPageConfigured() ? discoverSerpCompetitors(wrBrandDomain, { country: wrCountry, limit: 15 }).catch(() => ({ available: false })) : Promise.resolve({ available: false }),
+      ...(isOnPageConfigured() ? wrCompDomains.map(cd => getCompetitiveOverlap(wrBrandDomain, cd, { country: wrCountry, limit: 30 }).catch(() => ({ available: false }))) : []),
+    ]);
+
+    const siteData = formatSiteResearch(siteResearch);
+    let competitorData = '';
+    if (competitorResults.length > 0) {
+      competitorData = formatCompetitorResearch(competitorResults);
+    }
+    
+    // Format ranked keywords + SERP competitors + keyword overlap data
+    const wrRankingsText = formatRankedKeywordsForPrompt(brandRankingsWR || {});
+    const wrSerpCompText = formatSerpCompetitorsForPrompt(serpCompWR || {});
+    let wrOverlapText = '';
+    wrCompDomains.forEach((cd, i) => {
+      if (competitorOverlaps[i]?.available) {
+        wrOverlapText += formatDomainIntersectionForPrompt(competitorOverlaps[i], wrBrandDomain, cd);
+      }
+    });
+
+    // Timing Safeguard: AI gets generous budget since data gathering is now fast
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(60000, 120000 - elapsed);
+    console.log(`⏱️ War Room intelligence took ${elapsed}ms. Remaining budget for AI: ${remainingBudget}ms`);
+
+    const systemPrompt = `You are a COMPETITIVE WAR ROOM STRATEGIST — create a 90-day battle plan to systematically outrank competitors. You have REAL DATA from DataForSEO and site analysis.
+
+${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
+
+=== BRAND SITE ===
+${siteData}
+
+${competitorData || 'No competitors provided — identify top 3 competitors.'}
+
+${wrRankingsText}
+
+${wrSerpCompText}
+
+${wrOverlapText}
+
+Respond in STRICT JSON:
+{
+  "summary": "3-4 sentence strategic war room brief",
+  "competitivePosition": "winning|competitive|behind|far-behind",
+  "threatAssessment": "Top strategic threat to the brand's SEO position",
+  "scoringMatrix": [
+    { "category": "Technical SEO|Content|Authority|AI Visibility|Speed", "yourScore": 0-100, "avgCompetitorScore": 0-100, "verdict": "ahead|tied|behind", "actions": ["Action to maintain/improve"] }
+  ],
+  "keywordBattles": [
+    { "keyword": "keyword", "yourStatus": "ranking|attempting|absent", "competitorStatus": "dominant|present|absent", "battlePlan": "How to win this keyword", "difficulty": "easy|medium|hard", "priority": "critical|high|medium" }
+  ],
+  "ninetyDayPlan": [
+    { "month": 1, "theme": "Foundation", "goals": ["Goal 1"], "weeklyActions": [
+      { "week": 1, "actions": ["Action"], "deliverables": ["Deliverable"] },
+      { "week": 2, "actions": ["Action"], "deliverables": ["Deliverable"] },
+      { "week": 3, "actions": ["Action"], "deliverables": ["Deliverable"] },
+      { "week": 4, "actions": ["Action"], "deliverables": ["Deliverable"] }
+    ], "expectedOutcome": "What to measure" },
+    { "month": 2, "theme": "Expansion", "goals": ["Goal"], "weeklyActions": [{ "week": 5, "actions": ["Action"], "deliverables": ["Deliverable"] }, { "week": 6, "actions": ["Action"], "deliverables": ["Deliverable"] }, { "week": 7, "actions": ["Action"], "deliverables": ["Deliverable"] }, { "week": 8, "actions": ["Action"], "deliverables": ["Deliverable"] }], "expectedOutcome": "What to measure" },
+    { "month": 3, "theme": "Domination", "goals": ["Goal"], "weeklyActions": [{ "week": 9, "actions": ["Action"], "deliverables": ["Deliverable"] }, { "week": 10, "actions": ["Action"], "deliverables": ["Deliverable"] }, { "week": 11, "actions": ["Action"], "deliverables": ["Deliverable"] }, { "week": 12, "actions": ["Action"], "deliverables": ["Deliverable"] }], "expectedOutcome": "What to measure" }
+  ],
+  "quickWins": [{ "action": "Immediate action", "impact": "high|medium", "timeline": "This week" }],
+  "competitors": [{ "name": "Name", "url": "URL", "threatLevel": "high|medium|low", "strengths": ["Strength"], "weaknesses": ["Weakness"], "howToBeat": "Strategy" }],
+  "researchSources": ["URLs crawled"]
+}`;
+
+    const userPrompt = `Build 90-day war room plan for: ${website}`;
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192, timeout: remainingBudget });
+    if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoWarRoom', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+    const parsed = parseJSON(result);
+    parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
+
+    if (req.user && brand?._id) {
+      try {
+        await SeoAudit.findOneAndUpdate(
+          { user: req.user._id, brand: brand._id, type: 'competitor-warroom' },
+          { url: website, results: parsed, status: 'completed' },
+          { upsert: true, returnDocument: 'after' }
+        );
+        console.log(`✅ SEO War Room Plan Successful: ${website}`);
+      } catch (dbErr) { console.warn('Could not save war room audit:', dbErr.message); }
+    }
+
+    res.json({ success: true, ...parsed });
+  } catch (error) {
+    console.error('War Room error:', error);
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+
+// ============================================================================
+// LLM PROBE — Multi-model brand mention check
+// ============================================================================
+
+router.post('/llm-probe', protect, requireStudio('seoStudio'), requireCredits('seoLlmProbe'), async (req, res, next) => {
+  try {
+    const { url, brand: brandPayload, brandId } = req.body;
+
+    const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
+    const website = brand?.website || url || brandPayload?.website;
+    if (!website) return res.status(400).json({ success: false, error: 'No website URL available.' });
+
+    const brandContext = buildBrandContext(brand || brandPayload);
+    const brandName = brand?.name || brandPayload?.name || website;
+    const dna = brand?.dna || brandPayload?.dna || {};
+    const competitors = brand?.competitors || [];
+
+    // STEP 1: Generate probe prompts
+    const probePrompts = generateProbePrompts(
+      brandName,
+      dna.industry || '',
+      dna.targetAudience || '',
+      website
+    );
+
+    // Timing Safeguard: LLM Probe involves real external calls, so we must budget strictly
+    const startElapsed = Date.now() - (req.startTime || Date.now());
+    const probeBudget = 28000 - startElapsed;
+    
+    // STEP 2: Run REAL probe — actually query ChatGPT, Gemini, Grok
+    console.log(`\n🔬 === REAL LLM PROBE: ${brandName} (${probePrompts.length} prompts × 3 models). Budget: ${probeBudget}ms ===`);
+    const probeData = await runRealLLMProbe(probePrompts, brandName, website, competitors);
+
+    // Final Timing Check for Analysis AI
+    const finalElapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(5000, 28000 - finalElapsed);
+    console.log(`⏱️ LLM Probe real queries took ${finalElapsed}ms. Remaining budget for AI analysis: ${remainingBudget}ms`);
+
+    // STEP 3: Feed real probe results to AI for strategic analysis
+    let probeResultsText = `\n=== REAL LLM PROBE RESULTS (verified by actually querying each model) ===\n`;
+    probeResultsText += `Total probes: ${probeData.aggregate.totalProbes}\n`;
+    probeResultsText += `Brand mentioned: ${probeData.aggregate.mentionCount}/${probeData.aggregate.totalProbes} (${probeData.aggregate.mentionRate}%)\n\n`;
+
+    for (const [model, data] of Object.entries(probeData.byModel)) {
+      probeResultsText += `${model}: ${data.mentioned}/${data.total} mentions (${data.score}%) — ${data.status}\n`;
+    }
+
+    probeResultsText += `\nDetailed Results:\n`;
+    for (const r of probeData.results) {
+      if (!r.success) { probeResultsText += `- [${r.model}] "${r.prompt}" → ERROR: ${r.error}\n`; continue; }
+      probeResultsText += `- [${r.model}] "${r.prompt}" → ${r.mentioned ? `MENTIONED (${r.mentionType})` : 'NOT MENTIONED'}`;
+      if (r.competitorsMentioned.length > 0) probeResultsText += ` | Competitors: ${r.competitorsMentioned.join(', ')}`;
+      probeResultsText += `\n  Snippet: ${r.responseSnippet.substring(0, 150)}\n`;
+    }
+
+    const systemPrompt = `You are an AI VISIBILITY STRATEGIST. You have REAL probe data — we ACTUALLY queried ChatGPT, Gemini, and Grok with real prompts and checked if they mention this brand. This is NOT simulated — this is ground truth.
+
+${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
+
+${probeResultsText}
+
+Analyze the REAL probe results above and provide strategic recommendations.
+
+Respond in STRICT JSON:
+{
+  "summary": "3-4 sentence strategic summary based on REAL probe data — mention actual mention rate and which models mention/don't mention the brand",
+  "overallVisibilityScore": ${probeData.aggregate.mentionRate},
+  "visibilityByModel": {
+    "ChatGPT": { "score": 0-100, "status": "visible|partially-visible|invisible", "topIssue": "Based on actual probe responses" },
+    "Gemini": { "score": 0-100, "status": "visible|partially-visible|invisible", "topIssue": "Based on actual probe responses" },
+    "Grok": { "score": 0-100, "status": "visible|partially-visible|invisible", "topIssue": "Based on actual probe responses" }
+  },
+  "brandPerception": {
+    "sentiment": "positive|neutral|negative|unknown",
+    "authorityLevel": "high|medium|low|unknown",
+    "primaryAssociations": ["What models associate with this brand — from REAL responses"],
+    "missingAssociations": ["What SHOULD be associated but isn't"]
+  },
+  "optimizations": [
+    {
+      "title": "Specific action tied to REAL probe results",
+      "description": "Reference specific prompts where brand was NOT mentioned",
+      "priority": "critical|high|medium",
+      "kpi": "Brand mention rate in re-probe",
+      "baseline": "Current state from real data (e.g., 'Mentioned in X of Y probes')",
+      "target": "Specific target",
+      "timeline": "Implementation timeline",
+      "proofMethod": "Re-run LLM Probe",
+      "expectedROI": "Business impact"
+    }
+  ],
+  "contentToCreate": [
+    { "title": "Content piece", "purpose": "Why this helps", "format": "blog|faq|guide|case-study", "targetPrompts": ["Which prompts this content targets"], "measurableGoal": "Expected re-probe result" }
+  ]
+}
+
+CRITICAL: Use the REAL mention rate (${probeData.aggregate.mentionRate}%) as the overall visibility score. Reference ACTUAL probe results. Every recommendation must tie back to specific prompts where the brand was NOT mentioned.`;
+
+    const userPrompt = `Analyze real LLM probe results for: ${brandName} (${website})`;
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6144, timeout: remainingBudget });
+    if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoLlmProbe', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+    const parsed = parseJSON(result);
+
+    // Merge real probe data into response
+    parsed.realProbeData = {
+      probeResults: probeData.results.map(r => ({
+        prompt: r.prompt,
+        model: r.model,
+        mentioned: r.mentioned,
+        mentionType: r.mentionType,
+        confidence: r.confidence,
+        responseSnippet: r.responseSnippet,
+        competitorsMentioned: r.competitorsMentioned,
+        success: r.success,
+      })),
+      aggregate: probeData.aggregate,
+      byModel: probeData.byModel,
+    };
+    parsed.overallVisibilityScore = probeData.aggregate.mentionRate;
+    parsed.dataSource = 'real-queries';
+    parsed.researchSources = [website];
+
+    if (req.user && brand?._id) {
+      try {
+        await SeoAudit.findOneAndUpdate(
+          { user: req.user._id, brand: brand._id, type: 'llm-probe' },
+          { url: website, results: parsed, status: 'completed' },
+          { upsert: true, returnDocument: 'after' }
+        );
+      } catch (dbErr) { console.warn('Could not save LLM probe:', dbErr.message); }
+    }
+
+    res.json({ success: true, ...parsed });
+  } catch (error) {
+    console.error('LLM Probe error:', error);
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+
+// ============================================================================
+// AUTO-FIX — Generate copy-paste code fixes
+// ============================================================================
+
+router.post('/auto-fix', protect, requireStudio('seoStudio'), requireCredits('seoAutoFix'), async (req, res, next) => {
+  try {
+    const { url, brand: brandPayload, brandId, issues } = req.body;
+
+    const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
+    const website = brand?.website || url || brandPayload?.website;
+    if (!website) return res.status(400).json({ success: false, error: 'No website URL available.' });
+
+    if (!issues || issues.length === 0) {
+      return res.status(400).json({ success: false, error: 'Run a Health Check first to find issues, then use Auto-Fix.' });
+    }
+
+    const brandContext = buildBrandContext(brand || brandPayload);
+    const issueList = issues.map((iss, i) => `${i + 1}. [${iss.severity || 'medium'}] ${iss.title || iss.issue}: ${iss.description || iss.fix || ''}`).join('\n');
+
+    const systemPrompt = `You are a TECHNICAL SEO CODE FIXER. Given a list of SEO issues found from a real crawl, generate READY-TO-USE code fixes that developers can copy-paste.
+
+${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
+
+ISSUES FOUND:
+${issueList}
+
+Respond in STRICT JSON:
+{
+  "summary": "Brief summary of fixes generated",
+  "totalIssuesAddressed": ${issues.length},
+  "fixes": [
+    {
+      "issueTitle": "Which issue this fixes",
+      "severity": "critical|high|medium|low",
+      "description": "What this fix does",
+      "code": "Complete ready-to-use code snippet (HTML, JSON-LD, meta tags, .htaccess rules, etc.)",
+      "language": "html|json|javascript|htaccess|nginx|robots",
+      "whereToAdd": "Exact location where to add this code (e.g., '<head> section of every page')",
+      "instructions": "Step-by-step implementation instructions"
+    }
+  ],
+  "schemaFixes": [
+    {
+      "type": "Organization|LocalBusiness|Product|FAQ|BreadcrumbList|WebSite|Article",
+      "description": "What this schema does",
+      "code": "Complete JSON-LD code ready to paste into <head>",
+      "impact": "How this improves SEO/AI visibility"
+    }
+  ],
+  "metaTagFixes": {
+    "title": "Optimized title tag",
+    "description": "Optimized meta description",
+    "ogTags": "Complete Open Graph meta tags",
+    "twitterTags": "Complete Twitter Card meta tags"
+  },
+  "robotsTxt": "Suggested robots.txt content (if issues found)",
+  "quickWins": [
+    { "fix": "Quick fix description", "code": "Code snippet", "effort": "5 min|15 min|30 min|1 hour" }
+  ]
+}
+
+Generate production-ready code. Every fix must be copy-paste ready. Use the brand's actual information in the code.`;
+
+    const userPrompt = `Generate auto-fix code for: ${website}`;
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(5000, 28000 - elapsed);
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.4, maxTokens: 8192, timeout: remainingBudget });
+    if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoAutoFix', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+    const parsed = parseJSON(result);
+
+    if (req.user && brand?._id) {
+      try {
+        await SeoAudit.findOneAndUpdate(
+          { user: req.user._id, brand: brand._id, type: 'auto-fix' },
+          { url: website, results: parsed, status: 'completed' },
+          { upsert: true, returnDocument: 'after' }
+        );
+      } catch (dbErr) { console.warn('Could not save auto-fix audit:', dbErr.message); }
+    }
+
+    res.json({ success: true, ...parsed });
+  } catch (error) {
+    console.error('Auto-Fix error:', error);
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+
+// ============================================================================
+// PROMPT MINING — Discover AI prompts for citation
+// ============================================================================
+
+router.post('/prompt-mining', protect, requireStudio('seoStudio'), requireCredits('seoPromptMining'), async (req, res, next) => {
+  try {
+    const { url, brand: brandPayload, brandId } = req.body;
+
+    const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
+    const website = brand?.website || url || brandPayload?.website;
+    if (!website) return res.status(400).json({ success: false, error: 'No website URL available.' });
+
+    const brandContext = buildBrandContext(brand || brandPayload);
+    const brandName = brand?.name || brandPayload?.name || website;
+
+    const systemPrompt = `You are a PROMPT MINING SPECIALIST — you find the exact AI prompts and queries where a brand SHOULD be cited but currently ISN'T. Your goal: create a content calendar that systematically captures AI citation traffic.
+
+${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
+
+Respond in STRICT JSON:
+{
+  "summary": "3-4 sentence analysis of the brand's AI citation landscape — where they're missing and what to do",
+  "totalPromptsAnalyzed": 30,
+  "citationScore": 0-100,
+  "promptCategories": [
+    {
+      "category": "Product Recommendations|How-To Guides|Industry Best Practices|Comparison Queries|Problem-Solving|Educational|Local Queries",
+      "totalPrompts": 5,
+      "currentCitationRate": "0%|10%|25%|50%|75%",
+      "opportunity": "high|medium|low"
+    }
+  ],
+  "minedPrompts": [
+    {
+      "prompt": "The exact question users ask AI that should cite this brand",
+      "category": "recommendation|how-to|comparison|best-of|problem-solving",
+      "searchVolume": "high|medium|low",
+      "currentlyCited": false,
+      "competitorsCited": ["Competitors who ARE cited for this prompt"],
+      "whyNotCited": "Why the brand isn't currently cited",
+      "contentNeeded": "What content to create to get cited",
+      "contentFormat": "blog|faq|guide|comparison|case-study|data-report|tool",
+      "priority": "critical|high|medium",
+      "estimatedImpact": "How many AI-generated responses this could appear in"
+    }
+  ],
+  "contentCalendar": [
+    {
+      "week": 1,
+      "theme": "Week theme",
+      "contentPieces": [
+        { "title": "Content title", "format": "blog|faq|guide", "targetPrompts": ["Prompts this content targets"], "publishBy": "Date" }
+      ]
+    },
+    { "week": 2, "theme": "Theme", "contentPieces": [{ "title": "Title", "format": "format", "targetPrompts": ["prompt"], "publishBy": "Date" }] },
+    { "week": 3, "theme": "Theme", "contentPieces": [{ "title": "Title", "format": "format", "targetPrompts": ["prompt"], "publishBy": "Date" }] },
+    { "week": 4, "theme": "Theme", "contentPieces": [{ "title": "Title", "format": "format", "targetPrompts": ["prompt"], "publishBy": "Date" }] }
+  ],
+  "quickWins": [
+    { "action": "Quick win to get cited faster", "targetPrompt": "Which prompt this addresses", "effort": "1 hour|1 day|1 week", "expectedImpact": "high|medium", "proofMethod": "How to verify it worked (e.g., 'Re-probe this prompt in 14 days')" }
+  ],
+  "optimizations": [
+    {
+      "title": "Specific optimization tied to mined prompts above — NOT generic",
+      "description": "Exact steps referencing specific mined prompts and content calendar items",
+      "priority": "critical|high|medium",
+      "kpi": "Measurable metric (e.g., 'Citation rate for product-recommendation prompts', 'Number of prompts where brand appears')",
+      "baseline": "Current state from mined data (e.g., 'Brand cited in 0 of 15 mined prompts', 'No FAQ content covering problem-solving queries')",
+      "target": "Specific target (e.g., 'Cited in 8 of 15 prompts within 90 days', 'FAQ page ranking for 5 problem-solving queries')",
+      "timeline": "Realistic timeline (e.g., 'Week 1-2: content creation, Week 3-6: indexing, Week 6-12: re-probe and measure')",
+      "proofMethod": "How to verify (e.g., 'Re-run Prompt Mining after 60 days — citation score should increase from 15 to 55+')",
+      "expectedROI": "Business outcome (e.g., 'Capture 200-400 monthly AI-referred visits from how-to prompts')"
+    }
+  ]
+}
+
+STRATEGIC RULES (MANDATORY):
+1. NEVER give generic advice like 'Create quality content' or 'Build brand awareness' — be SPECIFIC to mined prompts
+2. Every optimization MUST reference specific mined prompts and categories from above
+3. Every optimization MUST have measurable KPI with baseline and target values
+4. Every optimization MUST explain how to PROVE it worked after implementation
+5. Think like a consultant billing $500/hour — if a recommendation could apply to ANY brand, it's too generic. DELETE IT.
+
+Generate 15-20 mined prompts. Be specific to this brand's industry. Think about what real users ask ChatGPT/Gemini/Perplexity about topics this brand should own.`;
+
+    const userPrompt = `Mine AI prompts for: ${brandName} (${website})`;
+
+    // STEP 2: Get real Google Autocomplete data first, then enrich AI call
+    const dna = brand?.dna || brandPayload?.dna || {};
+    console.log(`🔎 Prompt Mining: fetching real autocomplete data for ${brandName}...`);
+    let autocompleteData = null;
+    let autocompleteContext = '';
+    try {
+      autocompleteData = await mineAutocomplete(
+        brandName,
+        dna.industry || '',
+        dna.targetAudience || '',
+        dna.country || '',
+        dna.defaultLanguage ? dna.defaultLanguage.substring(0, 2) : 'en'
+      );
+      if (autocompleteData?.totalSuggestions > 0) {
+        const autocompleteText = formatAutocompleteForPrompt(autocompleteData);
+        autocompleteContext = `\n\nIMPORTANT — use the following REAL Google Autocomplete data to inform your prompt mining. These are verified queries people actually search for:\n${autocompleteText}`;
+      }
+    } catch (e) {
+      console.warn('Autocomplete mining failed:', e.message);
+    }
+
+    // STEP 3: AI call enriched with real autocomplete data
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const remainingBudget = Math.max(5000, 28000 - elapsed);
+    const aiResult = await aiCall(systemPrompt, userPrompt + autocompleteContext, { json: true, temperature: 0.6, maxTokens: 8192, timeout: remainingBudget });
+    if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoPromptMining', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+    const parsed = parseJSON(aiResult);
+    parsed.researchSources = [website];
+
+    // Attach real autocomplete data to response
+    if (autocompleteData?.totalSuggestions > 0) {
+      parsed.realAutocompleteData = {
+        totalSeeds: autocompleteData.totalSeeds,
+        totalSuggestions: autocompleteData.totalSuggestions,
+        categorized: autocompleteData.categorized,
+        allSuggestions: autocompleteData.allSuggestions?.slice(0, 50),
+      };
+      parsed.dataSource = 'ai+autocomplete';
+    } else {
+      parsed.dataSource = 'ai-only';
+    }
+
+    if (req.user && brand?._id) {
+      try {
+        await SeoAudit.findOneAndUpdate(
+          { user: req.user._id, brand: brand._id, type: 'prompt-mining' },
+          { url: website, results: parsed, status: 'completed' },
+          { upsert: true, returnDocument: 'after' }
+        );
+      } catch (dbErr) { console.warn('Could not save prompt mining:', dbErr.message); }
+    }
+
+    res.json({ success: true, ...parsed });
+  } catch (error) {
+    console.error('Prompt Mining error:', error);
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+
+// ============================================================================
+// HISTORY — List past audits & get individual audit
+// ============================================================================
+
+router.get('/history', protect, async (req, res, next) => {
+  try {
+    const { brandId, type, limit = 20 } = req.query;
+    const filter = { user: req.user._id };
+    if (brandId) filter.brand = brandId;
+    if (type) filter.type = type;
+
+    const audits = await SeoAudit.find(filter)
+      .sort('-updatedAt')
+      .limit(Number(limit))
+      .select('type url scores status createdAt updatedAt')
+      .lean();
+
+    res.json({ success: true, audits });
+  } catch (error) {
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+router.get('/history/:id', protect, async (req, res, next) => {
+  try {
+    const audit = await SeoAudit.findOne({ _id: req.params.id, user: req.user._id }).lean();
+    if (!audit) return res.status(404).json({ success: false, error: 'Audit not found' });
+    res.json({ success: true, audit });
+  } catch (error) {
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+
+// ============================================================================
+// SAVED REPORTS — Fetch last generated report per type
+// ============================================================================
+
+router.get('/reports/:type', protect, async (req, res, next) => {
+  try {
+    const { type } = req.params;
+    const { brandId } = req.query;
+    if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
+
+    let audit = await SeoAudit.findOne(
+      { user: req.user._id, brand: brandId, type, status: 'completed' }
+    ).sort('-updatedAt').lean();
+
+    // ── Fallback: if no health-check exists, use onboarding-baseline ──
+    if (!audit && type === 'health-check') {
+      audit = await SeoAudit.findOne(
+        { user: req.user._id, brand: brandId, type: 'onboarding-baseline', status: 'completed' }
+      ).sort('-updatedAt').lean();
+
+      if (audit) {
+        // Map baseline field names → health-check field names so HealthCheckResults renders correctly
+        const r = audit.results || {};
+        const mappedReport = {
+          ...r,
+          // HealthCheckResults reads these top-level field names
+          seoHealthScore: r.overallScore || r.scores?.seoHealth || 0,
+          aiVisibilityScore: 0, // Not computed at onboarding
+          technicalScore: r.scores?.technicalScore || 0,
+          contentScore: r.scores?.contentScore || 0,
+          authorityScore: r.scores?.authorityScore || 0,
+          onPageScore: r.scores?.onPageScore || 0,
+          // Issues — already in the right format
+          issues: r.issues || [],
+          // Summary
+          summary: `SEO Baseline Audit (generated automatically during brand onboarding). Overall score: ${r.overallScore || 0}/100 (${r.grading?.overall || 'N/A'}). Run a full Health Check for AI-powered strategic analysis.`,
+          topOpportunity: r.issues?.[0] ? `Top priority: ${r.issues[0].title} — ${r.issues[0].fix}` : 'Run a full Health Check for detailed recommendations.',
+          // Action buckets from issues
+          fixNow: (r.issues || []).filter(i => i.severity === 'critical').slice(0, 5).map(i => i.title + (i.fix ? ': ' + i.fix : '')),
+          createNext: (r.issues || []).filter(i => i.severity === 'high').slice(0, 5).map(i => i.title + (i.fix ? ': ' + i.fix : '')),
+          monitor: (r.issues || []).filter(i => i.severity === 'medium').slice(0, 5).map(i => i.title),
+          // Per-page report cards (NEW)
+          pageReports: r.pageReports || [],
+          // Crawl intelligence + enhanced siteStats (NEW)
+          siteStats: r.siteStats || {},
+          crawlIntelligence: r.siteStats || {},
+          researchSources: r.siteStats ? [{ url: audit.url, pages: r.siteStats.pagesCrawled }] : [],
+          // Metadata
+          _isBaseline: true,
+          _baselineNote: 'This data was generated automatically during brand onboarding using deterministic scoring. Run a full Health Check for AI-powered strategic recommendations.',
+        };
+        return res.json({
+          success: true,
+          found: true,
+          report: mappedReport,
+          generatedAt: audit.updatedAt || audit.createdAt,
+          scores: audit.scores,
+          isBaseline: true,
+        });
+      }
+    }
+
+    if (!audit) return res.json({ success: true, found: false });
+
+    res.json({
+      success: true,
+      found: true,
+      report: audit.results,
+      generatedAt: audit.updatedAt || audit.createdAt,
+      scores: audit.scores,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+// ============================================================================
+// HISTORY COMPARISON — Score trends over time
+// ============================================================================
+
+router.get('/history/compare', protect, async (req, res, next) => {
+  try {
+    const { brandId, type } = req.query;
+    if (!brandId || !type) return res.status(400).json({ success: false, error: 'brandId and type required' });
+
+    const audits = await SeoAudit.find({
+      user: req.user._id,
+      brand: brandId,
+      type,
+      status: 'completed',
+    })
+      .sort('-createdAt')
+      .limit(10)
+      .select('scores results.seoHealthScore results.aiVisibilityScore results.technicalScore results.contentScore results.authorityScore createdAt')
+      .lean();
+
+    if (audits.length < 1) return res.json({ success: true, hasHistory: false, trend: [] });
+
+    const trend = audits.map(a => ({
+      date: a.createdAt,
+      scores: {
+        seoHealth: a.scores?.seoHealth || a.results?.seoHealthScore || 0,
+        aiVisibility: a.scores?.aiVisibility || a.results?.aiVisibilityScore || 0,
+        technical: a.scores?.technicalScore || a.results?.technicalScore || 0,
+        content: a.scores?.contentScore || a.results?.contentScore || 0,
+        authority: a.scores?.authorityScore || a.results?.authorityScore || 0,
+      },
+    })).reverse();
+
+    const latest = trend[trend.length - 1]?.scores || {};
+    const previous = trend.length >= 2 ? trend[trend.length - 2]?.scores : null;
+    const changes = previous ? {
+      seoHealth: latest.seoHealth - previous.seoHealth,
+      aiVisibility: latest.aiVisibility - previous.aiVisibility,
+      technical: latest.technical - previous.technical,
+      content: latest.content - previous.content,
+      authority: latest.authority - previous.authority,
+    } : null;
+
+    res.json({
+      success: true,
+      hasHistory: audits.length > 1,
+      totalAudits: audits.length,
+      trend,
+      changes,
+      latestDate: audits[0]?.createdAt,
+      previousDate: audits[1]?.createdAt,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+// ============================================================================
+// JS RENDERING CRAWL — Puppeteer-based SPA crawling
+// ============================================================================
+
+router.post('/js-crawl', protect, requireCredits('seoHealthCheck'), async (req, res, next) => {
+  try {
+    const { brand, url, maxPages = 20, mobile = false } = req.body;
+    const website = url || brand?.website;
+    if (!website) return res.status(400).json({ success: false, error: 'Website URL required' });
+
+    console.log(`🖥️ JS Render Crawl requested for ${website} (max ${maxPages} pages)`);
+    const crawlData = await jsRenderCrawl(website, { maxPages: Math.min(maxPages, 30), mobile });
+
+    res.json({ success: true, ...crawlData });
+  } catch (error) {
+    console.error('JS Crawl error:', error);
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+
+// ============================================================================
+// CONTENT SCORING — Grade existing pages for SEO quality
+// ============================================================================
+
+router.post('/content-score', protect, requireCredits('seoHealthCheck'), async (req, res, next) => {
+  try {
+    const { brand, url, targetKeywords = [] } = req.body;
+    const website = url || brand?.website;
+    if (!website) return res.status(400).json({ success: false, error: 'Website URL required' });
+
+    console.log(`📊 Content Scoring: Crawling ${website} (max 30 pages)...`);
+    const crawlResult = await researchDomain(website, { maxPages: 30, timeout: 25000, skipCfSolve: true });
+    if (!crawlResult?.pages?.length) {
+      return res.status(400).json({ success: false, error: 'Could not crawl website' });
+    }
+
+    const pagesForScoring = crawlResult.pages.map(p => ({
+      url: p.url || '', title: p.title || '', metaDesc: p.meta?.description || '',
+      h1s: p.h1 ? [p.h1] : [], h2s: p.h2s || [],
+      bodyText: p.bodyText || p.content || '', wordCount: p.wordCount || 0,
+      internalLinks: p.internalLinks || [], externalLinks: p.externalLinks || [],
+      images: p.images || [], schemas: p.schemas || [],
+    }));
+
+    const siteScores = scoreSiteContent(pagesForScoring, targetKeywords);
+    res.json({ success: true, ...siteScores });
+  } catch (error) {
+    console.error('Content scoring error:', error);
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+
+// ============================================================================
+// COMPETITOR MONITORING — Track competitor content changes
+// ============================================================================
+
+router.post('/competitor-monitor', protect, requireCredits('seoCompetitors'), async (req, res, next) => {
+  try {
+    const { brand, competitors = [], brandKeywords = [] } = req.body;
+    if (!brand?._id) return res.status(400).json({ success: false, error: 'Brand required' });
+    if (!competitors.length) return res.status(400).json({ success: false, error: 'At least one competitor URL required' });
+
+    const brandId = brand._id;
+    const results = [];
+
+    for (const comp of competitors.slice(0, 5)) {
+      const compUrl = typeof comp === 'string' ? comp : comp.url || comp.website;
+      const compName = typeof comp === 'string' ? compUrl : comp.name || compUrl;
+      if (!compUrl) continue;
+
+      console.log(`🕵️ Competitor Monitor: Analyzing ${compName}...`);
+      const crawlData = await crawlCompetitor(compUrl);
+
+      const prevSnapshot = await CompetitorSnapshot.findOne({
+        user: req.user._id, brand: brandId, competitorUrl: compUrl,
+      }).sort('-createdAt').lean();
+
+      const changes = compareSnapshots(crawlData, prevSnapshot);
+      const overlap = brandKeywords.length > 0
+        ? analyzeKeywordOverlap(brandKeywords, crawlData.titleKeywords || [])
+        : null;
+
+      await CompetitorSnapshot.create({
+        user: req.user._id, brand: brandId,
+        competitorUrl: compUrl, competitorName: compName,
+        pages: crawlData.pages, totalPages: crawlData.totalPages,
+        avgWordCount: crawlData.avgWordCount,
+        titleKeywords: crawlData.titleKeywords, metaKeywords: crawlData.metaKeywords,
+        schemaTypes: crawlData.schemaTypes,
+        newPages: changes.newPages, changedPages: changes.changedPages, removedPages: changes.removedPages,
+      });
+
+      results.push({
+        url: compUrl, name: compName, totalPages: crawlData.totalPages,
+        avgWordCount: crawlData.avgWordCount, schemaTypes: crawlData.schemaTypes,
+        changes, overlap, hasSitemap: crawlData.hasSitemap, hasRobotsTxt: crawlData.hasRobotsTxt,
+      });
+    }
+
+    res.json({
+      success: true,
+      competitors: results,
+      summary: `Monitored ${results.length} competitors. ` +
+        results.map(r => `${r.name}: ${r.changes?.summary || 'analyzed'}`).join('. '),
+    });
+  } catch (error) {
+    console.error('Competitor monitor error:', error);
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+
+// ============================================================================
+// GSC POSITION TRACKING — Snapshot & Trend Endpoints
+// ============================================================================
+
+// POST /api/seo-studio/gsc/snapshot — Take a position snapshot from GSC
+router.post('/gsc/snapshot', protect, async (req, res, next) => {
+  try {
+    const { brandId, siteUrl } = req.body;
+    if (!brandId || !siteUrl) return res.status(400).json({ success: false, error: 'brandId and siteUrl required' });
+
+    // Get valid GSC token
+    const Integration = (await import('../models/Integration.js')).default;
+    const integration = await Integration.findOne({
+      user: req.user._id, platform: 'google-analytics', status: 'connected',
+      ...(brandId ? { brand: brandId } : {}),
+    });
+    if (!integration?.accessToken) {
+      return res.status(401).json({ success: false, error: 'Google Search Console not connected' });
+    }
+
+    const accessToken = integration.accessToken;
+    const endDate = new Date(Date.now() - 2 * 86400000).toISOString().split('T')[0];
+    const startDate = new Date(Date.now() - 28 * 86400000).toISOString().split('T')[0];
+
+    // Fetch queries and pages from GSC
+    const fetchGSC = async (dimensions, rowLimit = 100) => {
+      const resp = await fetch(
+        `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
+        {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ startDate, endDate, dimensions, rowLimit }),
+        }
+      );
+      return resp.json();
+    };
+
+    const [queriesData, pagesData] = await Promise.all([
+      fetchGSC(['query'], 100),
+      fetchGSC(['page'], 50),
+    ]);
+
+    const queries = (queriesData.rows || []).map(r => ({
+      query: r.keys[0], clicks: r.clicks, impressions: r.impressions, ctr: r.ctr, position: r.position,
+    }));
+    const pages = (pagesData.rows || []).map(r => ({
+      page: r.keys[0], clicks: r.clicks, impressions: r.impressions, ctr: r.ctr, position: r.position,
+    }));
+
+    const totalClicks = queries.reduce((s, q) => s + q.clicks, 0);
+    const totalImpressions = queries.reduce((s, q) => s + q.impressions, 0);
+    const averagePosition = queries.length ? queries.reduce((s, q) => s + q.position, 0) / queries.length : 0;
+    const averageCtr = queries.length ? queries.reduce((s, q) => s + q.ctr, 0) / queries.length : 0;
+
+    const snapshot = await GscSnapshot.create({
+      user: req.user._id, brand: brandId, siteUrl,
+      queries, pages,
+      totalClicks, totalImpressions, averagePosition, averageCtr,
+      dateFrom: new Date(startDate), dateTo: new Date(endDate),
+    });
+
+    res.json({ success: true, snapshot: { _id: snapshot._id, totalClicks, totalImpressions, averagePosition, averageCtr, queriesCount: queries.length } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+// GET /api/seo-studio/gsc/snapshots — Get snapshot history
+router.get('/gsc/snapshots', protect, async (req, res, next) => {
+  try {
+    const { brandId, siteUrl } = req.query;
+    if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
+
+    const query = { user: req.user._id, brand: brandId };
+    if (siteUrl) query.siteUrl = siteUrl;
+
+    const snapshots = await GscSnapshot.find(query)
+      .sort('-createdAt')
+      .limit(20)
+      .select('totalClicks totalImpressions averagePosition averageCtr siteUrl dateFrom dateTo createdAt')
+      .lean();
+
+    res.json({ success: true, snapshots });
+  } catch (error) {
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
+// GET /api/seo-studio/gsc/rank-changes — Compare latest vs previous snapshot
+router.get('/gsc/rank-changes', protect, async (req, res, next) => {
+  try {
+    const { brandId, siteUrl } = req.query;
+    if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
+
+    const query = { user: req.user._id, brand: brandId };
+    if (siteUrl) query.siteUrl = siteUrl;
+
+    const [latest, previous] = await GscSnapshot.find(query)
+      .sort('-createdAt')
+      .limit(2)
+      .lean();
+
+    if (!latest) return res.json({ success: true, hasData: false });
+
+    // Build query position map from previous snapshot
+    const prevMap = {};
+    if (previous) {
+      for (const q of previous.queries || []) prevMap[q.query] = q;
+    }
+
+    // Compare
+    const changes = (latest.queries || []).map(q => {
+      const prev = prevMap[q.query];
+      return {
+        query: q.query,
+        clicks: q.clicks,
+        impressions: q.impressions,
+        position: Math.round(q.position * 10) / 10,
+        prevPosition: prev ? Math.round(prev.position * 10) / 10 : null,
+        positionChange: prev ? Math.round((prev.position - q.position) * 10) / 10 : null, // Positive = improved
+        clicksChange: prev ? q.clicks - prev.clicks : null,
+        isNew: !prev,
+      };
+    }).sort((a, b) => (b.positionChange || 0) - (a.positionChange || 0));
+
+    // Summary
+    const improved = changes.filter(c => c.positionChange > 0).length;
+    const declined = changes.filter(c => c.positionChange < 0).length;
+    const unchanged = changes.filter(c => c.positionChange === 0).length;
+    const newKeywords = changes.filter(c => c.isNew).length;
+
+    res.json({
+      success: true,
+      hasData: true,
+      hasPrevious: !!previous,
+      latestDate: latest.createdAt,
+      previousDate: previous?.createdAt,
+      summary: { improved, declined, unchanged, newKeywords, total: changes.length },
+      overallChange: {
+        clicks: previous ? latest.totalClicks - previous.totalClicks : null,
+        impressions: previous ? latest.totalImpressions - previous.totalImpressions : null,
+        position: previous ? Math.round((previous.averagePosition - latest.averagePosition) * 10) / 10 : null,
+      },
+      changes: changes.slice(0, 50),
+    });
+  } catch (error) {
+    next(error);
   }
 });
 
@@ -762,7 +3173,7 @@ CRITICAL: Only include REAL existing companies. Do not make up fictional compani
 // ASK BAR — Universal intent router
 // ============================================================================
 
-router.post('/ask', protect, requireCredits('seoAsk'), async (req, res) => {
+router.post('/ask', protect, requireCredits('seoAsk'), async (req, res, next) => {
   try {
     const { question, brand, url } = req.body;
     if (!question) return res.status(400).json({ success: false, error: 'Question is required' });
@@ -790,459 +3201,13 @@ Respond in JSON:
   "followUpQuestions": ["Follow-up 1", "Follow-up 2", "Follow-up 3"]
 }`;
 
-    const result = await aiCall(systemPrompt, question, { json: true, temperature: 0.7, maxTokens: 4096 });
+    const result = await aiCall(systemPrompt, question, { json: true, temperature: 0.7, maxTokens: 4096, timeout: 15000 });
     const parsed = parseJSON(result);
 
     res.json({ success: true, ...parsed });
   } catch (error) {
-    console.error('SEO Ask error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    next(error);
   }
 });
-
-
-// ============================================================================
-// COMPETITOR WAR ROOM — Side-by-side competitive scoring matrix
-// ============================================================================
-
-router.post('/competitor-warroom', protect, requireCredits('seoCompetitors'), async (req, res) => {
-  try {
-    const { brandId, competitorUrls } = req.body;
-
-    const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
-    const website = brand?.website;
-    if (!website) return res.status(400).json({ success: false, error: 'No website URL available.' });
-
-    const brandContext = buildBrandContext(brand);
-
-    // Gather all competitor URLs
-    const storedCompetitors = (brand?.competitors || []).map(c => c.url).filter(Boolean);
-    const providedCompetitors = (competitorUrls || []).filter(u => u.trim());
-    const allCompetitorUrls = [...new Set([...storedCompetitors, ...providedCompetitors])].slice(0, 5);
-
-    if (allCompetitorUrls.length === 0) {
-      return res.status(400).json({ success: false, error: 'Add at least one competitor first. Use Auto-Discover or add manually.' });
-    }
-
-    // Parallel crawl: brand + all competitors
-    console.log(`🏟️ War Room: crawling ${website} + ${allCompetitorUrls.length} competitors...`);
-    const [siteResearch, ...competitorResearches] = await Promise.all([
-      researchDomain(website),
-      ...allCompetitorUrls.map(url => researchDomain(url).catch(() => ({ pages: [], error: true })))
-    ]);
-    const siteData = formatSiteResearch(siteResearch);
-
-    let competitorCrawlData = '';
-    allCompetitorUrls.forEach((url, i) => {
-      const research = competitorResearches[i];
-      if (research && !research.error) {
-        competitorCrawlData += `\n\n=== COMPETITOR ${i + 1}: ${url} ===\n${formatSiteResearch(research)}`;
-      } else {
-        competitorCrawlData += `\n\n=== COMPETITOR ${i + 1}: ${url} ===\n[Crawl failed — analyze based on URL/domain pattern]`;
-      }
-    });
-
-    const systemPrompt = `You are a COMPETITIVE INTELLIGENCE WAR ROOM STRATEGIST. You have REAL CRAWL DATA for the brand AND each competitor. Your job is to produce a side-by-side battle analysis with actionable intelligence.
-
-${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
-
-=== BRAND SITE DATA ===
-${siteData}
-${competitorCrawlData}
-
-Respond in STRICT JSON:
-{
-  "overallVerdict": "winning|competitive|behind|far-behind",
-  "executiveSummary": "4-5 sentence strategic briefing for the CEO. Who is winning, why, and what to do NOW.",
-  "brandScore": {
-    "technical": 0-100,
-    "content": 0-100,
-    "schema": 0-100,
-    "aiReadiness": 0-100,
-    "authority": 0-100,
-    "overall": 0-100
-  },
-  "competitorScores": [
-    {
-      "name": "Competitor name",
-      "url": "URL",
-      "scores": { "technical": 0-100, "content": 0-100, "schema": 0-100, "aiReadiness": 0-100, "authority": 0-100, "overall": 0-100 },
-      "topStrength": "Their #1 advantage over you",
-      "exploitableWeakness": "Their #1 weakness you can exploit",
-      "contentVelocity": "high|medium|low",
-      "estimatedMonthlyTraffic": "estimated range",
-      "topContentTopics": ["Topic 1", "Topic 2", "Topic 3"],
-      "schemaTypes": ["Schema types found"],
-      "threatLevel": "critical|high|medium|low"
-    }
-  ],
-  "keywordBattles": [
-    {
-      "keyword": "High-value keyword",
-      "searchIntent": "buy|learn|compare|local",
-      "estimatedVolume": "high|medium|low",
-      "brandPosition": "dominant|strong|moderate|weak|absent",
-      "competitors": [{ "name": "Comp name", "position": "dominant|strong|moderate|weak|absent", "whyTheyRank": "Brief reason" }],
-      "winStrategy": "How to win this keyword",
-      "difficulty": "easy|medium|hard",
-      "priority": "critical|high|medium"
-    }
-  ],
-  "contentBattles": [
-    {
-      "topic": "Content topic area",
-      "brandCoverage": "deep|moderate|shallow|none",
-      "bestCompetitor": "Who covers it best",
-      "competitorApproach": "What makes their content win",
-      "yourBetterVersion": "How to create 10x content",
-      "contentType": "guide|comparison|tool|case-study|video"
-    }
-  ],
-  "offensivePlaybook": [
-    { "priority": 1, "action": "Specific action", "target": "Which competitor/keyword", "timeline": "This week|2 weeks|1 month|3 months", "expectedImpact": "What changes", "effort": "quick|moderate|major" }
-  ],
-  "defensivePlaybook": [
-    { "risk": "What competitors might do", "defense": "How to protect", "urgency": "immediate|soon|monitor" }
-  ],
-  "quickWins": [
-    { "action": "Do this today", "impact": "Why it matters", "target": "Who it beats" }
-  ],
-  "ninety_day_battleplan": "A 3-paragraph strategic plan for the next 90 days to overtake the top competitor"
-}
-
-Generate 10-15 keyword battles. Be RUTHLESSLY strategic. Every insight must answer 'so what?' and 'now what?'.`;
-
-    const userPrompt = `War Room analysis for: ${website} vs ${allCompetitorUrls.join(', ')}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192 });
-    const parsed = parseJSON(result);
-    parsed.researchSources = [
-      ...(siteResearch.pages?.map(p => p.url) || [website]),
-      ...allCompetitorUrls,
-    ];
-
-    // Save audit
-    if (req.user) {
-      try {
-        const SeoAudit = (await import('../models/SeoAudit.js')).default;
-        await SeoAudit.create({
-          user: req.user._id, brand: brand?._id, type: 'competitor-warroom',
-          url: website, results: parsed, status: 'completed',
-        });
-      } catch (dbErr) { console.warn('Could not save war room audit:', dbErr.message); }
-    }
-
-    res.json({ success: true, ...parsed });
-  } catch (error) {
-    console.error('Competitor War Room error:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-
-// ============================================================================
-// LLM BRAND PROBE — Actually ask LLMs about the brand
-// ============================================================================
-
-router.post('/llm-probe', protect, requireCredits('seoAiVisibility'), async (req, res) => {
-  try {
-    const { brandId } = req.body;
-
-    const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
-    if (!brand) return res.status(400).json({ success: false, error: 'Brand required for LLM probe.' });
-
-    const industry = brand.dna?.industry || 'general';
-    const location = brand.dna?.country || brand.dna?.region || 'India';
-    const productCategory = brand.dna?.productCategory || brand.dna?.brandDescription?.split(' ').slice(0, 5).join(' ') || industry;
-
-    // Generate probe prompts
-    const probePrompts = [
-      `What is the best ${industry} company in ${location}?`,
-      `Recommend a ${productCategory} provider for small businesses`,
-      `Compare top ${industry} brands in ${location}`,
-      `What are the most trusted ${industry} companies?`,
-      `Who should I choose for ${productCategory}? Give me options.`,
-      `What is ${brand.name}? Tell me about this company.`,
-      `Is ${brand.name} a good choice for ${productCategory}?`,
-      `List alternatives to popular ${industry} companies in ${location}`,
-    ];
-
-    console.log(`🧠 LLM Brand Probe: testing ${brand.name} across AI models...`);
-
-    // Run probes across available AI models in parallel
-    const probeResults = [];
-    for (const prompt of probePrompts) {
-      try {
-        const response = await aiCall(
-          `You are a helpful AI assistant. Answer the user's question naturally and thoroughly. If you know specific brands, name them. Be honest and factual.`,
-          prompt,
-          { temperature: 0.7, maxTokens: 1024 }
-        );
-
-        const mentioned = response.toLowerCase().includes(brand.name.toLowerCase());
-        const sentiment = mentioned
-          ? (response.toLowerCase().includes('recommend') || response.toLowerCase().includes('excellent') || response.toLowerCase().includes('top') || response.toLowerCase().includes('leading'))
-            ? 'positive'
-            : response.toLowerCase().includes('limited') || response.toLowerCase().includes('concern') || response.toLowerCase().includes('drawback')
-              ? 'mixed'
-              : 'neutral'
-          : 'not_mentioned';
-
-        // Extract competitor mentions
-        const competitorMentions = (brand.competitors || [])
-          .filter(c => response.toLowerCase().includes(c.name?.toLowerCase()))
-          .map(c => c.name);
-
-        probeResults.push({
-          prompt,
-          mentioned,
-          sentiment,
-          competitorsMentioned: competitorMentions,
-          responseSnippet: response.substring(0, 300) + (response.length > 300 ? '...' : ''),
-          position: mentioned ? (response.toLowerCase().indexOf(brand.name.toLowerCase()) < 200 ? 'early' : 'late') : 'absent',
-        });
-      } catch (e) {
-        probeResults.push({ prompt, mentioned: false, sentiment: 'error', error: e.message });
-      }
-    }
-
-    // Compute scores
-    const mentionCount = probeResults.filter(p => p.mentioned).length;
-    const visibilityScore = Math.round((mentionCount / probeResults.length) * 100);
-    const positiveCount = probeResults.filter(p => p.sentiment === 'positive').length;
-    const sentimentScore = mentionCount > 0 ? Math.round((positiveCount / mentionCount) * 100) : 0;
-
-    // Generate strategic analysis
-    const analysisPrompt = `You are an AI Search Strategist. Analyze these LLM probe results for ${brand.name} (${industry} in ${location}).
-
-PROBE RESULTS:
-${probeResults.map(p => `Prompt: "${p.prompt}" → Mentioned: ${p.mentioned}, Sentiment: ${p.sentiment}, Position: ${p.position}`).join('\n')}
-
-Brand visibility score: ${visibilityScore}%
-Sentiment score: ${sentimentScore}%
-
-Respond in JSON:
-{
-  "strategicAnalysis": "3-4 paragraph analysis of the brand's AI visibility. What's working, what's concerning, and what to do about it.",
-  "criticalGaps": ["Prompts where brand SHOULD appear but doesn't"],
-  "improvementActions": [
-    { "priority": 1, "action": "What to do", "why": "Why this will help", "expectedOutcome": "What will change" }
-  ],
-  "competitorAdvantage": "Which competitors appear more often and why",
-  "contentToCreate": ["Content pieces that would increase LLM citation"]
-}`;
-
-    const analysis = await aiCall('You are an AI Search Strategist.', analysisPrompt, { json: true, temperature: 0.5 });
-    const parsedAnalysis = parseJSON(analysis);
-
-    const finalResult = {
-      brandName: brand.name,
-      industry,
-      location,
-      visibilityScore,
-      sentimentScore,
-      probeResults,
-      totalProbes: probeResults.length,
-      mentionCount,
-      ...parsedAnalysis,
-    };
-
-    // Save audit
-    if (req.user) {
-      try {
-        const SeoAudit = (await import('../models/SeoAudit.js')).default;
-        await SeoAudit.create({
-          user: req.user._id, brand: brand._id, type: 'llm-probe',
-          url: brand.website || '', scores: { aiVisibility: visibilityScore },
-          results: finalResult, status: 'completed',
-        });
-      } catch (dbErr) { console.warn('Could not save LLM probe:', dbErr.message); }
-    }
-
-    res.json({ success: true, ...finalResult });
-  } catch (error) {
-    console.error('LLM Brand Probe error:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-
-// ============================================================================
-// AGENTIC AUTO-FIX — Generate ready-to-implement code fixes
-// ============================================================================
-
-router.post('/auto-fix', protect, requireCredits('seoAuditPage'), async (req, res) => {
-  try {
-    const { issues, brandId, pageUrl } = req.body;
-    if (!issues?.length) return res.status(400).json({ success: false, error: 'No issues provided. Run a Health Check first.' });
-
-    const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
-    const brandContext = buildBrandContext(brand);
-
-    const issueList = issues.slice(0, 15).map((issue, i) =>
-      `${i + 1}. [${issue.severity || 'medium'}] ${issue.title}: ${issue.description || issue.fix || ''}`
-    ).join('\n');
-
-    const systemPrompt = `You are an EXPERT SEO DEVELOPER. Given a list of SEO issues, generate READY-TO-IMPLEMENT code fixes. Every fix must be copy-paste ready.
-
-${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
-${pageUrl ? `Target page: ${pageUrl}\n` : ''}
-
-ISSUES:
-${issueList}
-
-Respond in STRICT JSON:
-{
-  "fixes": [
-    {
-      "issueTitle": "Original issue title",
-      "severity": "critical|high|medium|low",
-      "fixType": "meta-tags|schema-jsonld|html-structure|heading-hierarchy|faq-block|robots|sitemap|content|canonical|og-tags",
-      "description": "What this fix does and why",
-      "codeLanguage": "html|json|xml|txt",
-      "code": "Complete, ready-to-paste code. For schema, provide full JSON-LD. For meta tags, provide full <meta> tags. For FAQ, provide full FAQ schema + HTML.",
-      "implementationGuide": "Where exactly to add this code (e.g., 'Add to <head> section of every page')",
-      "expectedImpact": "What SEO improvement to expect",
-      "effort": "copy-paste|5-minutes|30-minutes|1-hour"
-    }
-  ],
-  "priorityOrder": "Brief explanation of which fixes to implement first and why",
-  "combinedSchemaBlock": "If multiple schema fixes exist, provide ONE combined JSON-LD script tag with all schemas merged for easy copy-paste"
-}
-
-CRITICAL: Code must be PRODUCTION READY. Use the brand's actual name, website, and details. No placeholders unless absolutely necessary.`;
-
-    const userPrompt = `Generate auto-fixes for these ${issues.length} SEO issues`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.3, maxTokens: 8192 });
-    const parsed = parseJSON(result);
-
-    res.json({ success: true, ...parsed });
-  } catch (error) {
-    console.error('Auto-fix error:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-
-// ============================================================================
-// AI PROMPT MINING — Discover prompts where brand should appear
-// ============================================================================
-
-router.post('/prompt-mining', protect, requireCredits('seoAiVisibility'), async (req, res) => {
-  try {
-    const { brandId } = req.body;
-
-    const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
-    if (!brand) return res.status(400).json({ success: false, error: 'Brand required for prompt mining.' });
-
-    const brandContext = buildBrandContext(brand);
-
-    const systemPrompt = `You are an AI SEARCH OPTIMIZATION expert specializing in "Prompt Mining" — discovering the exact prompts and questions people ask AI assistants that SHOULD result in a brand being recommended.
-
-${brandContext}
-
-Your job: Generate 25-30 realistic prompts/questions that potential customers would ask AI assistants (ChatGPT, Gemini, Perplexity, Siri, Alexa) where this brand SHOULD be mentioned or recommended.
-
-For each prompt, analyze:
-1. Would the brand likely be mentioned in AI responses today?
-2. What determines whether the brand gets cited?
-3. What content would need to exist for the brand to be recommended?
-
-Respond in STRICT JSON:
-{
-  "industry": "${brand.dna?.industry || 'general'}",
-  "totalPrompts": 25,
-  "promptCategories": [
-    {
-      "category": "Category name (e.g., 'Product Recommendations', 'Brand Comparisons', 'How-To Questions', 'Best-Of Lists')",
-      "prompts": [
-        {
-          "prompt": "The exact question/prompt a user would type",
-          "intent": "buy|compare|learn|recommend|troubleshoot",
-          "estimatedFrequency": "high|medium|low",
-          "currentVisibility": "likely-cited|possibly-cited|unlikely-cited|definitely-not-cited",
-          "whyOrWhyNot": "Why the brand would or wouldn't be cited currently",
-          "contentNeeded": "What content/page the brand needs to be cited for this prompt",
-          "competitorsLikelyCited": ["Competitor names likely to appear"],
-          "actionableStrategy": "Specific steps to become the recommended answer"
-        }
-      ]
-    }
-  ],
-  "visibilitySummary": {
-    "likelyCitedCount": 0,
-    "possiblyCitedCount": 0,
-    "unlikelyCitedCount": 0,
-    "overallReadiness": "ready|partially-ready|not-ready"
-  },
-  "topPriorityActions": [
-    { "priority": 1, "action": "What to do", "promptsCovered": 5, "effort": "quick|moderate|major", "expectedOutcome": "How many more prompts will cite the brand" }
-  ],
-  "contentCalendar": [
-    { "week": 1, "content": "Content to create", "targetPrompts": ["Which prompts this helps with"], "format": "blog|faq|guide|video|landing-page" }
-  ]
-}
-
-Be STRATEGIC. Focus on HIGH-VALUE prompts where the brand has the best chance of appearing with the right content strategy.`;
-
-    const userPrompt = `Mine AI prompts for: ${brand.name} (${brand.dna?.industry || 'general'})`;
-    console.log(`💬 Prompt Mining: analyzing for ${brand.name}...`);
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192 });
-    const parsed = parseJSON(result);
-
-    // Save audit
-    if (req.user) {
-      try {
-        const SeoAudit = (await import('../models/SeoAudit.js')).default;
-        await SeoAudit.create({
-          user: req.user._id, brand: brand._id, type: 'prompt-mining',
-          url: brand.website || '', results: parsed, status: 'completed',
-        });
-      } catch (dbErr) { console.warn('Could not save prompt mining:', dbErr.message); }
-    }
-
-    res.json({ success: true, ...parsed });
-  } catch (error) {
-    console.error('Prompt Mining error:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-
-// ============================================================================
-// HISTORY
-// ============================================================================
-
-router.get('/history', optionalAuth, async (req, res) => {
-  try {
-    if (!req.user) return res.json({ success: true, audits: [] });
-
-    const SeoAudit = (await import('../models/SeoAudit.js')).default;
-    const brandId = req.query.brandId;
-    const query = { user: req.user._id };
-    if (brandId) query.brand = brandId;
-
-    const audits = await SeoAudit.find(query)
-      .sort({ createdAt: -1 })
-      .limit(20)
-      .select('-results')
-      .lean();
-
-    res.json({ success: true, audits });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-router.get('/history/:id', protect, async (req, res) => {
-  try {
-    const SeoAudit = (await import('../models/SeoAudit.js')).default;
-    const audit = await SeoAudit.findOne({ _id: req.params.id, user: req.user._id }).lean();
-    if (!audit) return res.status(404).json({ success: false, error: 'Audit not found' });
-    res.json({ success: true, audit });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
 
 export default router;
