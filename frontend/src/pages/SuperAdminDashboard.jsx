@@ -153,7 +153,7 @@ export default function SuperAdminDashboard() {
         if (tab === 'waitlist') loadWaitlist()
         if (tab === 'coupons') loadCoupons()
         if (tab === 'content') { loadBrands(); loadContent() }
-        if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts(); loadApiKeys(); loadStudioVisibility() }
+        if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts(); loadApiKeys() }
         if (tab === 'studios') { loadStudioVisibility() }
         if (tab === 'integrations') loadIntegrations()
         if (tab === 'packages') loadPackages()
@@ -471,8 +471,7 @@ export default function SuperAdminDashboard() {
                             {navGroups.map(group => (
                                 <div key={group.label} className="mb-4">
                                     {!sidebarCollapsed && (
-                                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 px-3 mb-1.5 flex items-center gap-1.5">
-                                            <span className="material-symbols-outlined text-[11px]">{group.icon}</span>
+                                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 px-3 mb-1.5">
                                             {group.label}
                                         </p>
                                     )}
@@ -1964,55 +1963,6 @@ export default function SuperAdminDashboard() {
                                     </div>
                                 </div>
 
-                                {/* Studio Launch Control - 3-tier visibility */}
-                                {studioVisibility && (
-                                    <div className="pt-4 border-t border-white/[0.06]">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <div className="flex items-center gap-2">
-                                                <span className="material-symbols-outlined text-violet-400">rocket_launch</span>
-                                                <p className="text-base font-bold text-white">Studio Launch Control</p>
-                                            </div>
-                                            <div className="flex gap-3 text-xs">
-                                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" />Public</span>
-                                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" />Private</span>
-                                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500" />Hidden</span>
-                                            </div>
-                                        </div>
-                                        <p className="text-sm text-slate-500 mb-4">Control which studios are available portal-wide. <b className="text-slate-400">Public</b> = everyone (per plan), <b className="text-amber-400">Private</b> = whitelisted users only, <b className="text-rose-400">Hidden</b> = off for all.</p>
-                                        <div className="space-y-2">
-                                            {studioKeys.map(key => {
-                                                const status = studioVisibility[key] || 'public';
-                                                const rowBorder = { public: 'border-emerald-500/20', private: 'border-amber-500/20', hidden: 'border-rose-500/20' };
-                                                const dotColor = { public: 'bg-emerald-500', private: 'bg-amber-500', hidden: 'bg-rose-500' };
-                                                const activeClasses = {
-                                                    public: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40',
-                                                    private: 'bg-amber-500/20 text-amber-400 border border-amber-500/40',
-                                                    hidden: 'bg-rose-500/20 text-rose-400 border border-rose-500/40',
-                                                };
-                                                return (
-                                                    <div key={key} className={`flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.02] border ${rowBorder[status]} transition-all`}>
-                                                        <div className="flex items-center gap-3">
-                                                            <span className={`w-2.5 h-2.5 rounded-full ${dotColor[status]}`} />
-                                                            <span className="text-sm font-bold text-white">{studioLabels[key] || key}</span>
-                                                        </div>
-                                                        <div className="flex gap-1">
-                                                            {['public', 'private', 'hidden'].map(state => (
-                                                                <button key={state} onClick={() => handleStudioVisibilityChange(key, state)}
-                                                                    className={`px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${status === state
-                                                                        ? activeClasses[state]
-                                                                        : 'text-slate-600 hover:text-slate-400 border border-transparent'
-                                                                    }`}
-                                                                >
-                                                                    {state.charAt(0).toUpperCase() + state.slice(1)}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
                                 <div className="flex items-center justify-between">
                                     <div><p className="text-base font-bold text-white">Default AI Provider</p><p className="text-sm text-slate-500">Primary model for content generation</p></div>
                                     <select value={systemSettings.defaultProvider || 'gemini'} onChange={e => handleToggleSetting('defaultProvider', e.target.value)}
