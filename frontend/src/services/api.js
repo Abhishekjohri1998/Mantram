@@ -630,17 +630,10 @@ export const seoStudio = {
     competitorWarRoom: (data) => apiFetch('/seo-studio/competitor-warroom', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
     backlinkIntelligence: (data) => apiFetch('/seo-studio/backlinks', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
     getSavedReport: (brandId, type) => apiFetch(`/seo-studio/reports/${type}?brandId=${brandId}`),
-<<<<<<< HEAD
     llmProbe: (data) => apiFetch('/seo-studio/llm-probe', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
     autoFix: (data) => apiFetch('/seo-studio/auto-fix', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
-    contentFix: (data) => apiFetch('/seo-studio/content-fix', { method: 'POST', body: JSON.stringify(data), timeout: 60000 }),
+    contentFix: (data) => apiFetch('/seo-studio/content-fix', { method: 'POST', body: JSON.stringify(data), timeout: 600000 }),
     promptMining: (data) => apiFetch('/seo-studio/prompt-mining', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
-=======
-    llmProbe: (data) => apiFetch('/seo-studio/llm-probe', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
-    autoFix: (data) => apiFetch('/seo-studio/auto-fix', { method: 'POST', body: JSON.stringify(data), timeout: 150000 }),
-    contentFix: (data) => apiFetch('/seo-studio/content-fix', { method: 'POST', body: JSON.stringify(data), timeout: 150000 }),
-    promptMining: (data) => apiFetch('/seo-studio/prompt-mining', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
->>>>>>> origin/sachin
     history: (params = {}) => {
         const query = new URLSearchParams(params).toString();
         return apiFetch(`/seo-studio/history?${query}`);
