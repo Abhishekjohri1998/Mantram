@@ -389,6 +389,7 @@ export default function Landing() {
                         <h2 className="text-white text-xl font-bold tracking-tight">Mantram <span className="text-primary">AI</span></h2>
                     </div>
                     <div className="hidden md:flex items-center gap-8">
+                        <Link to="/about" className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">About Us</Link>
                         <button onClick={() => scrollTo('studios')} className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">Studios</button>
                         <button onClick={() => scrollTo('usps')} className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">Why Mantram</button>
                         <button onClick={() => scrollTo('how-it-works')} className="text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer">How It Works</button>
@@ -1145,6 +1146,7 @@ export default function Landing() {
                         <div>
                             <h4 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Resources</h4>
                             <ul className="space-y-3">
+                                <li><Link to="/about" className="text-slate-500 hover:text-primary text-sm transition-colors cursor-pointer">About Us</Link></li>
                                 <li><button onClick={() => scrollTo('how-it-works')} className="text-slate-500 hover:text-primary text-sm transition-colors cursor-pointer">How It Works</button></li>
                                 <li><button onClick={() => scrollTo('usps')} className="text-slate-500 hover:text-primary text-sm transition-colors cursor-pointer">Why Mantram</button></li>
                                 <li><button onClick={() => scrollTo('early-access')} className="text-slate-500 hover:text-primary text-sm transition-colors cursor-pointer">Early Access</button></li>
