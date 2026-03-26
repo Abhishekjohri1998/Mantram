@@ -49,7 +49,7 @@ function buildVisualContext(brand) {
     if (vdna.textureStyle) parts.push(`Texture/surface: ${vdna.textureStyle}`);
     if (vdna.typographyStyle) parts.push(`Typography rendering: ${vdna.typographyStyle}`);
     if (vdna.decorativeElements) parts.push(`Decorative elements: ${vdna.decorativeElements}`);
-    if (vdna.imageAnalysis) parts.push(`Brand visual patterns: ${vdna.imageAnalysis}`);
+    // NOTE: vdna.imageAnalysis removed — it often contains raw color descriptions\n    // and hex codes that Gemini renders as visible swatches on generated images
     
     // ── Design rules from visual DNA ──
     const designRules = vdna.designRules || [];
@@ -487,7 +487,10 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
 
         const styleWord = options?.style || 'modern';
         const textOverlayPart = options?.textOverlay ? ` Include the text "${options.textOverlay}" in a clean, readable font.` : '';
-        const colorPart = colorPhrase ? ` ${colorPhrase}.` : '';
+        // CRITICAL: Do NOT inject color directives into Gemini image prompts.
+        // Even descriptive color phrases ("use purple tones") cause Gemini to render
+        // visible color swatches/palettes with hex codes on the generated image.
+        // Colors are handled by the prompt enhancer (text-to-text step) instead.
         const refPart = referenceInstructions.length > 0 ? '\n' + referenceInstructions.join('\n') : '';
         const visualCtx = buildVisualContext(brand);
         const visualPart = visualCtx ? `\nBRAND VISUAL GUIDELINES: ${visualCtx}` : '';
@@ -518,16 +521,14 @@ ${bodyInstruction}
 Keep the exact same layout, composition, text placement, and design style. Replace only the elements described. Output must fill the entire canvas edge-to-edge.
 CRITICAL: Do NOT render any text labels, dimensions, hex codes, color palettes, color swatches, metadata, borders, frames, or mockup presentations on the image.`;
         } else if (characterRefs.length > 0) {
-            // Character reference mode — use official "this person" pattern
-            // Per Gemini docs: "A studio portrait of this man..." / "these people making funny faces"
             fullPrompt = `Using the provided reference photo of this person: ${cleanedPrompt}
-${styleWord} image for ${brand.name}.${colorPart}${textOverlayPart}${visualPart}
+${styleWord} image for ${brand.name}.${textOverlayPart}${visualPart}
 ${refPart}
-The output must fill the entire canvas edge-to-edge. Do NOT include any frames, borders, mockups, dimension labels, hex codes, color swatches, or metadata text anywhere on the image.`;
+The output must fill the entire canvas edge-to-edge. Do NOT render any color palettes, color swatches, hex codes, dimension labels, brand guidelines, metadata text, frames, borders, or mockup presentations anywhere on the image. The entire image must be pure visual content only.`;
         } else {
             fullPrompt = `${cleanedPrompt}${textOverlayPart}
-${styleWord} image for ${brand.name}.${colorPart}${visualPart}${refPart}
-The output must fill the entire canvas edge-to-edge. Do NOT include any frames, borders, mockups, dimension labels, hex codes, color swatches, or metadata text anywhere on the image.`;
+${styleWord} image for ${brand.name}.${visualPart}${refPart}
+The output must fill the entire canvas edge-to-edge. Do NOT render any color palettes, color swatches, hex codes, dimension labels, brand guidelines, metadata text, frames, borders, or mockup presentations anywhere on the image. The entire image must be pure visual content only.`;
         }
 
         console.log('📸 Full prompt (first 300 chars):', fullPrompt.substring(0, 300) + '...');
