@@ -33,13 +33,9 @@ function buildVisualContext(brand) {
     const dna = brand.dna || {};
     if (dna.voice?.personality) parts.push(`Brand personality: ${dna.voice.personality}`);
     
-    // ── Typography — inject actual font preferences ──
-    const fonts = dna.fonts || {};
-    const fontParts = [];
-    if (fonts.heading?.family) fontParts.push(`Headlines: "${fonts.heading.family}" ${fonts.heading.weight || 'Bold'} ${fonts.heading.style || ''}`);
-    if (fonts.body?.family) fontParts.push(`Body text: "${fonts.body.family}" ${fonts.body.weight || 'Regular'}`);
-    if (fonts.accent?.family) fontParts.push(`Accent/CTA: "${fonts.accent.family}" ${fonts.accent.weight || 'SemiBold'}`);
-    if (fontParts.length > 0) parts.push(`TYPOGRAPHY — use these exact fonts: ${fontParts.join('; ')}`);
+    // NOTE: Typography metadata removed from prompts — Gemini renders font names,
+    // weights, and style labels (e.g. "Work Sans 700 normal") as visible text cards
+    // on the image. Typography is handled by the canvas editor, not image generation.
     
     // ── Photography & Image Style ──
     if (dna.photographyStyle) parts.push(`Photography direction: ${dna.photographyStyle}`);
@@ -72,16 +68,21 @@ function buildVisualContext(brand) {
 }
 
 // Convert brand colors to a direct, enforceable color directive for the AI
-// Weak hints like "green tones" are ignored by Gemini — use hex codes + mandatory language
+// CRITICAL: Describe colors by appearance only — hex codes, labels, and names
+// get rendered as visible text/swatches on the image by Gemini
 function getColorPhrase(brand) {
     const colors = brand.dna?.colors || [];
     if (!colors.length) return '';
-    // Include hex codes so the AI has exact targets, plus descriptive names
+    // Describe colors by visual appearance — NEVER include hex codes, color names as labels,
+    // or any technical metadata that the model might render as text on the image
     const colorDescs = colors.slice(0, 4).map(c => {
-        const name = c.name || 'brand color';
-        return `${name} (${c.hex})`;
-    });
-    return `MANDATORY COLOR PALETTE — use these exact brand colors throughout the design: ${colorDescs.join(', ')}. The primary color ${colors[0]?.hex || ''} must be the dominant color`;
+        const name = c.name || '';
+        // Use descriptive color names only, never hex codes
+        if (name && !/^#|rgb|color/i.test(name)) return name.toLowerCase();
+        // Fallback: skip hex codes entirely — just say 'brand accent'
+        return 'brand accent';
+    }).filter((v, i, a) => a.indexOf(v) === i); // deduplicate
+    return `Use these brand colors throughout the design: ${colorDescs.join(', ')}`;
 }
 
 // ── Helper: extract base64 from data URI ────────────────────────────────
@@ -514,18 +515,19 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
             fullPrompt = `Edit this template image for ${brand.name}. ${cleanedPrompt}
 ${refPart}${visualPart}
 ${bodyInstruction}
-Keep the exact same layout, composition, text placement, and design style. Replace only the elements described. Output must fill the entire canvas edge-to-edge.`;
+Keep the exact same layout, composition, text placement, and design style. Replace only the elements described. Output must fill the entire canvas edge-to-edge.
+CRITICAL: Do NOT render any text labels, dimensions, hex codes, color palettes, color swatches, metadata, borders, frames, or mockup presentations on the image.`;
         } else if (characterRefs.length > 0) {
             // Character reference mode — use official "this person" pattern
             // Per Gemini docs: "A studio portrait of this man..." / "these people making funny faces"
             fullPrompt = `Using the provided reference photo of this person: ${cleanedPrompt}
-${platformSize} ${styleWord} image for ${brand.name}.${colorPart}${textOverlayPart}${visualPart}
+${styleWord} image for ${brand.name}.${colorPart}${textOverlayPart}${visualPart}
 ${refPart}
-The output must fill the entire canvas edge-to-edge. No frames, borders, or mockups.`;
+The output must fill the entire canvas edge-to-edge. Do NOT include any frames, borders, mockups, dimension labels, hex codes, color swatches, or metadata text anywhere on the image.`;
         } else {
             fullPrompt = `${cleanedPrompt}${textOverlayPart}
-${platformSize} ${styleWord} image for ${brand.name}.${colorPart}${visualPart}${refPart}
-The output must fill the entire canvas edge-to-edge. No frames, borders, or mockups.`;
+${styleWord} image for ${brand.name}.${colorPart}${visualPart}${refPart}
+The output must fill the entire canvas edge-to-edge. Do NOT include any frames, borders, mockups, dimension labels, hex codes, color swatches, or metadata text anywhere on the image.`;
         }
 
         console.log('📸 Full prompt (first 300 chars):', fullPrompt.substring(0, 300) + '...');

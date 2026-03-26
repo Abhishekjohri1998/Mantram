@@ -320,6 +320,83 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                                 </div>
                             )}
 
+                            {/* ── Quick Share (works without accounts) ── */}
+                            <div>
+                                <h4 className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-widest flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-sm text-primary">share</span>
+                                    Quick Share
+                                </h4>
+                                <div className="grid grid-cols-3 gap-2.5">
+                                    {/* Native Share (mobile share sheet) */}
+                                    {typeof navigator !== 'undefined' && navigator.share && (
+                                        <button
+                                            onClick={async () => {
+                                                try {
+                                                    const shareData = { title: 'Mantram Creative', text: caption || 'Check out this creative!' }
+                                                    if (imageUrl) {
+                                                        try {
+                                                            const res = await fetch(imageUrl)
+                                                            const blob = await res.blob()
+                                                            const file = new File([blob], 'creative.png', { type: blob.type })
+                                                            shareData.files = [file]
+                                                        } catch { shareData.url = imageUrl }
+                                                    }
+                                                    await navigator.share(shareData)
+                                                } catch (e) { if (e.name !== 'AbortError') console.warn('Share failed:', e) }
+                                            }}
+                                            className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 hover:border-purple-500/40 text-purple-300 hover:text-white transition-all cursor-pointer group"
+                                        >
+                                            <span className="material-symbols-outlined text-2xl group-hover:scale-110 transition-transform">smartphone</span>
+                                            <span className="text-[11px] font-bold">Share via...</span>
+                                            <span className="text-[9px] text-slate-500">WhatsApp, Telegram etc.</span>
+                                        </button>
+                                    )}
+
+                                    {/* Copy Link */}
+                                    <button
+                                        onClick={() => {
+                                            const textToCopy = imageUrl || caption || ''
+                                            navigator.clipboard.writeText(textToCopy).then(() => {
+                                                alert('Copied to clipboard!')
+                                            })
+                                        }}
+                                        className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] hover:border-primary/30 text-slate-400 hover:text-white transition-all cursor-pointer group"
+                                    >
+                                        <span className="material-symbols-outlined text-2xl group-hover:scale-110 transition-transform">content_copy</span>
+                                        <span className="text-[11px] font-bold">Copy Link</span>
+                                        <span className="text-[9px] text-slate-500">Paste anywhere</span>
+                                    </button>
+
+                                    {/* Download */}
+                                    <button
+                                        onClick={async () => {
+                                            if (!imageUrl) return
+                                            try {
+                                                const res = await fetch(imageUrl)
+                                                const blob = await res.blob()
+                                                const blobUrl = window.URL.createObjectURL(blob)
+                                                const a = document.createElement('a')
+                                                a.href = blobUrl; a.download = 'mantram-creative.png'
+                                                document.body.appendChild(a); a.click(); document.body.removeChild(a)
+                                                window.URL.revokeObjectURL(blobUrl)
+                                            } catch { window.open(imageUrl, '_blank') }
+                                        }}
+                                        className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] hover:border-emerald-500/30 text-slate-400 hover:text-white transition-all cursor-pointer group"
+                                    >
+                                        <span className="material-symbols-outlined text-2xl group-hover:scale-110 transition-transform">download</span>
+                                        <span className="text-[11px] font-bold">Download</span>
+                                        <span className="text-[9px] text-slate-500">Save image</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* ── Divider ── */}
+                            <div className="flex items-center gap-3">
+                                <div className="flex-1 h-px bg-white/[0.06]" />
+                                <span className="text-[10px] text-slate-600 uppercase tracking-wider font-medium">or publish to socials</span>
+                                <div className="flex-1 h-px bg-white/[0.06]" />
+                            </div>
+
                             {/* ── Account Selection ── */}
                             <div>
                                 <h4 className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-widest flex items-center gap-2">
@@ -332,6 +409,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                                     <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] text-center">
                                         <span className="material-symbols-outlined text-3xl text-slate-600 mb-2">link_off</span>
                                         <p className="text-slate-400 text-sm mb-2">No social accounts connected.</p>
+                                        <p className="text-[11px] text-slate-600 mb-3">Use Quick Share above, or connect accounts to publish directly.</p>
                                         <a href="/integrations" className="text-primary text-sm hover:underline font-medium">Connect accounts →</a>
                                     </div>
                                 ) : (
@@ -394,17 +472,17 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                                             <p className="text-xs text-amber-300">{adaptError}</p>
                                         </div>
                                     )}
-                                    {/* AI Caption generate */}
-                                    {imageUrl && caption.trim().length < 20 && selectedAccounts.length > 0 && (
+                                    {/* AI Caption generate — works even without accounts */}
+                                    {imageUrl && caption.trim().length < 20 && (
                                         <button
                                             onClick={async () => {
                                                 const platforms = getSelectedPlatforms()
-                                                if (platforms.length === 0) return
+                                                const targetPlatform = platforms.length > 0 ? platforms[0] : 'instagram'
                                                 setGeneratingCaption(true)
                                                 try {
                                                     const data = await social.generateCaption({
                                                         imageUrl,
-                                                        platforms: [platforms[0]],
+                                                        platforms: [targetPlatform],
                                                         brandId: brandId || undefined,
                                                     })
                                                     if (data.success && data.captions) {

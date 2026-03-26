@@ -2668,6 +2668,17 @@ export default function ContentStudio() {
                 window.sessionStorage.removeItem('photoshootImage')
             }
             setSearchParams({}, { replace: true })
+        } else if (searchParams.get('fromCreative')) {
+            // Coming from Creative Studio — generate caption for generated image
+            const creativeImageUrl = searchParams.get('imageUrl')
+            if (creativeImageUrl) {
+                setGoal('promote')
+                setSubType('social')
+                setPhotoshootImage(creativeImageUrl)
+                setContext({ details: 'Write a compelling social media caption for this creative. Include relevant hashtags and a strong CTA.' })
+                setStep(2) // Jump to channel selection
+            }
+            setSearchParams({}, { replace: true })
         } else if (searchParams.get('goal') === 'hijack' || searchParams.get('trend')) {
             // Coming from Dashboard Trending Now widget
             const trendTopic = searchParams.get('trend') || ''

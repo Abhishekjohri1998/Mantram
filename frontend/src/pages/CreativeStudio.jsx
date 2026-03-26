@@ -367,7 +367,16 @@ export default function CreativeStudio() {
 
     // ── Animate: AI Prompt Suggestion ──
     const handleAnimateClick = async () => {
-        if (!result?.imageUrl) return
+        if (!result?.imageUrl) {
+            setError('No image to animate. Generate an image first.')
+            setTimeout(() => setError(''), 4000)
+            return
+        }
+        if (!result.imageUrl.startsWith('http')) {
+            setError('Cannot animate — image needs to be uploaded first. Try regenerating.')
+            setTimeout(() => setError(''), 4000)
+            return
+        }
         setAnimateModalOpen(true)
         setAnimateError('')
         setAnimateVideoUrl(null)
@@ -2249,6 +2258,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <button onClick={handleAnimateClick}
                                         className="p-1.5 rounded-lg text-slate-500 hover:text-purple-400 hover:bg-purple-400/10 cursor-pointer transition-all" title="Animate">
                                         <span className="material-symbols-outlined text-sm">animation</span>
+                                    </button>
+                                    <button onClick={() => {
+                                        if (!result?.imageUrl) return
+                                        const params = new URLSearchParams({ fromCreative: 'true', imageUrl: result.imageUrl })
+                                        navigate(`/content-studio?${params.toString()}`)
+                                    }}
+                                        className="p-1.5 rounded-lg text-slate-500 hover:text-cyan-400 hover:bg-cyan-400/10 cursor-pointer transition-all" title="Get Caption in Content Studio">
+                                        <span className="material-symbols-outlined text-sm">edit_note</span>
                                     </button>
                                     <button onClick={handleGenerate}
                                         className="ml-auto p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] cursor-pointer transition-all" title="Regenerate">
@@ -5881,27 +5898,6 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                         )
                     })()}
 
-                    {/* ═══ ZOOM LIGHTBOX (for generated result) ═══ */}
-                    {zoomImage && (
-                        <div className="fixed inset-0 z-[110] flex items-center justify-center animate-fade-in"
-                            onClick={() => setZoomImage(null)}>
-                            <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" />
-                            <div className="relative max-w-[90vw] max-h-[90vh]" onClick={e => e.stopPropagation()}>
-                                <img src={zoomImage} alt="Zoomed" className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain" />
-                                <div className="absolute top-3 right-3 flex gap-2">
-                                    <a href={zoomImage} download="creative.png"
-                                        className="p-2 rounded-full bg-black/60 text-white hover:bg-white/20 backdrop-blur-sm transition-colors">
-                                        <span className="material-symbols-outlined text-lg">download</span>
-                                    </a>
-                                    <button onClick={() => setZoomImage(null)}
-                                        className="p-2 rounded-full bg-black/60 text-white hover:bg-white/20 backdrop-blur-sm cursor-pointer transition-colors">
-                                        <span className="material-symbols-outlined text-lg">close</span>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
                     {/* ═══ LIGHTBOX / ZOOM OVERLAY ═══ */}
                     {lightboxIdx !== null && bankImages[lightboxIdx] && (() => {
                         const img = bankImages[lightboxIdx]
@@ -6018,6 +6014,194 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                     })()}
                 </div>
             )}
+
+            {/* ═══ ZOOM LIGHTBOX (for generated result — global, all tabs) ═══ */}
+            {zoomImage && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center animate-fade-in"
+                    onClick={() => setZoomImage(null)}>
+                    <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" />
+                    <div className="relative max-w-[90vw] max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                        <img src={zoomImage} alt="Zoomed" className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain" />
+                        <div className="absolute top-3 right-3 flex gap-2">
+                            <button onClick={(e) => { e.stopPropagation(); handleDownloadImage(zoomImage, 'mantram-creative.png') }}
+                                className="p-2 rounded-full bg-black/60 text-white hover:bg-white/20 backdrop-blur-sm cursor-pointer transition-colors">
+                                <span className="material-symbols-outlined text-lg">download</span>
+                            </button>
+                            <button onClick={(e) => {
+                                e.stopPropagation()
+                                if (navigator.share) {
+                                    fetch(zoomImage).then(r => r.blob()).then(blob => {
+                                        const file = new File([blob], 'creative.png', { type: blob.type })
+                                        navigator.share({ title: 'Mantram Creative', files: [file] }).catch(() => {})
+                                    }).catch(() => { window.open(zoomImage, '_blank') })
+                                } else {
+                                    navigator.clipboard.writeText(zoomImage).then(() => {
+                                        setFeedbackToast('Link copied!')
+                                        setTimeout(() => setFeedbackToast(''), 2000)
+                                    })
+                                }
+                            }}
+                                className="p-2 rounded-full bg-black/60 text-white hover:bg-white/20 backdrop-blur-sm cursor-pointer transition-colors">
+                                <span className="material-symbols-outlined text-lg">share</span>
+                            </button>
+                            <button onClick={() => setZoomImage(null)}
+                                className="p-2 rounded-full bg-black/60 text-white hover:bg-white/20 backdrop-blur-sm cursor-pointer transition-colors">
+                                <span className="material-symbols-outlined text-lg">close</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ═══ ANIMATE MODAL ═══ */}
+            {animateModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center animate-fade-in"
+                    onClick={() => { if (!animateGenerating) setAnimateModalOpen(false) }}>
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-xl" />
+                    <div className="relative w-full max-w-lg mx-4 bg-[#12121f] rounded-2xl border border-white/[0.08] shadow-2xl overflow-hidden animate-scale-in"
+                        onClick={e => e.stopPropagation()}>
+
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-purple-500/15 flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-purple-400">animation</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-bold text-white">Animate Image</h3>
+                                    <p className="text-[11px] text-slate-500">Turn your still image into video</p>
+                                </div>
+                            </div>
+                            <button onClick={() => { if (!animateGenerating) setAnimateModalOpen(false) }}
+                                className="p-2 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] cursor-pointer transition-all">
+                                <span className="material-symbols-outlined text-lg">close</span>
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-5 space-y-4 max-h-[65vh] overflow-y-auto">
+
+                            {/* Preview */}
+                            {result?.imageUrl && (
+                                <div className="rounded-xl overflow-hidden border border-white/[0.06] mb-3">
+                                    <img src={result.imageUrl} alt="Source" className="w-full h-32 object-cover" />
+                                </div>
+                            )}
+
+                            {/* Prompt */}
+                            <div>
+                                <label className="text-xs font-bold text-slate-400 mb-1.5 block">Animation Prompt</label>
+                                {animateAnalyzing ? (
+                                    <div className="flex items-center gap-2 p-3 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                                        <div className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full" style={{ animation: 'spin 0.8s linear infinite' }} />
+                                        <span className="text-xs text-purple-400">AI analyzing image for motion...</span>
+                                    </div>
+                                ) : (
+                                    <textarea value={animatePrompt} onChange={e => setAnimatePrompt(e.target.value)}
+                                        placeholder="Describe the motion you want..."
+                                        className="input-glass w-full py-2.5 text-sm resize-none" rows={3} />
+                                )}
+                            </div>
+
+                            {/* Model Selector */}
+                            <div>
+                                <label className="text-xs font-bold text-slate-400 mb-1.5 block">Model</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {Object.entries(ANIMATE_MODELS).map(([id, m]) => (
+                                        <button key={id} onClick={() => setAnimateModel(id)}
+                                            className={`p-2.5 rounded-xl text-left text-xs transition-all cursor-pointer border ${
+                                                animateModel === id
+                                                    ? 'bg-purple-500/15 border-purple-500/30 text-white'
+                                                    : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:border-white/[0.12]'
+                                            }`}>
+                                            <span className="text-sm mr-1">{m.icon}</span>
+                                            <span className="font-bold">{m.name}</span>
+                                            <p className="text-[10px] text-slate-500 mt-0.5">{m.desc}</p>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Duration + Aspect Ratio */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-400 mb-1.5 block">Duration (sec)</label>
+                                    <input type="number" value={animateDuration}
+                                        onChange={e => setAnimateDuration(Math.max(ANIMATE_MODELS[animateModel]?.dur?.[0] || 1, Math.min(ANIMATE_MODELS[animateModel]?.dur?.[1] || 15, Number(e.target.value))))}
+                                        className="input-glass w-full py-2 text-sm text-center"
+                                        min={ANIMATE_MODELS[animateModel]?.dur?.[0] || 1}
+                                        max={ANIMATE_MODELS[animateModel]?.dur?.[1] || 15} />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-400 mb-1.5 block">Aspect Ratio</label>
+                                    <select value={animateAspectRatio} onChange={e => setAnimateAspectRatio(e.target.value)}
+                                        className="input-glass w-full py-2 text-sm">
+                                        {(ANIMATE_MODELS[animateModel]?.ratios || ['1:1', '16:9', '9:16']).map(r => (
+                                            <option key={r} value={r}>{r}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Error */}
+                            {animateError && (
+                                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-sm">error</span>
+                                    {animateError}
+                                </div>
+                            )}
+
+                            {/* Progress */}
+                            {animateGenerating && (
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-purple-400 font-bold">Generating animation...</span>
+                                        <span className="text-slate-500">{animateProgress}%</span>
+                                    </div>
+                                    <div className="progress-bar">
+                                        <div className="progress-bar-fill" style={{ width: `${animateProgress}%`, background: 'linear-gradient(90deg, #8b5cf6, #a78bfa)' }} />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Result Video */}
+                            {animateVideoUrl && (
+                                <div className="rounded-xl overflow-hidden border border-emerald-500/20 bg-emerald-500/5">
+                                    <video src={animateVideoUrl} controls autoPlay loop muted playsInline
+                                        className="w-full rounded-xl" />
+                                    <div className="p-3 flex gap-2">
+                                        <a href={animateVideoUrl} download="animated-creative.mp4"
+                                            className="flex-1 py-2 rounded-lg bg-emerald-500/15 text-emerald-400 text-xs font-bold text-center hover:bg-emerald-500/25 transition-colors">
+                                            <span className="material-symbols-outlined text-sm mr-1" style={{ verticalAlign: 'middle' }}>download</span>
+                                            Download Video
+                                        </a>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        {!animateVideoUrl && (
+                            <div className="p-5 border-t border-white/[0.06]">
+                                <button onClick={handleAnimateGenerate}
+                                    disabled={animateGenerating || animateAnalyzing || !animatePrompt.trim()}
+                                    className={`w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                                        animateGenerating || animateAnalyzing || !animatePrompt.trim()
+                                            ? 'bg-white/[0.06] text-slate-600 cursor-not-allowed'
+                                            : 'bg-gradient-to-r from-purple-500 to-violet-500 text-white hover:from-purple-400 hover:to-violet-400 shadow-lg shadow-purple-500/20'
+                                    }`}>
+                                    {animateGenerating ? (
+                                        <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full" style={{ animation: 'spin 0.8s linear infinite' }} /> Generating...</>
+                                    ) : (
+                                        <><span className="material-symbols-outlined text-lg">play_arrow</span> Generate Animation</>
+                                    )}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
 
             {/* ── Media Picker Modal ── */}
             {refPickerSlot && (
