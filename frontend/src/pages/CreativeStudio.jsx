@@ -368,13 +368,19 @@ export default function CreativeStudio() {
     // ── Animate: AI Prompt Suggestion ──
     const handleAnimateClick = async () => {
         if (!result?.imageUrl) {
-            setError('No image to animate. Generate an image first.')
-            setTimeout(() => setError(''), 4000)
+            setError({
+                message: 'No image to animate. Generate an image first.',
+                isProviderError: false
+            })
+            setTimeout(() => setError(null), 4000)
             return
         }
         if (!result.imageUrl.startsWith('http')) {
-            setError('Cannot animate — image needs to be uploaded first. Try regenerating.')
-            setTimeout(() => setError(''), 4000)
+            setError({
+                message: 'Cannot animate — image needs to be uploaded first. Try regenerating.',
+                isProviderError: false
+            })
+            setTimeout(() => setError(null), 4000)
             return
         }
         setAnimateModalOpen(true)
@@ -472,7 +478,11 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                         setAnimateProgress(100)
                     } else if (gen.status === 'FAILED') {
                         clearInterval(animatePollRef.current)
-                        setAnimateError(gen.error || 'Animation generation failed')
+                        setAnimateError({
+                            message: gen.error || 'Animation generation failed',
+                            isProviderError: gen.isProviderError,
+                            provider: gen.provider
+                        });
                         setAnimateGenerating(false)
                     }
                 } catch { /* continue polling */ }
@@ -3298,9 +3308,12 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 )}
                                             </button>
                                             {psEditError && (
-                                                <div className={`mt-3 p-3 rounded-xl border flex items-center gap-2 ${psEditError.includes('external API issue') ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
-                                                    <span className="material-symbols-outlined text-sm">{psEditError.includes('external API issue') ? 'warning' : 'error'}</span>
-                                                    <span className="flex-1 text-xs">{psEditError}</span>
+                                                <div className={`mt-3 p-3 rounded-xl border flex items-center gap-2 ${psEditError.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
+                                                    <span className="material-symbols-outlined text-sm">{psEditError.isProviderError ? 'warning' : 'error'}</span>
+                                                    <div className="flex-1 text-xs">
+                                                        <span className="font-bold mr-1">{psEditError.isProviderError ? `${psEditError.provider || 'AI Provider'} Notice:` : 'Error:'}</span>
+                                                        {psEditError.message}
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -3439,7 +3452,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     }
                                     const url=res.creative?.imageUrl||res.imageUrl;
                                     if(url)setClgResults(prev=>[...prev,url]);
-                                    else setClgError('No image returned — try again');
+                                    else setClgError({
+                                        message: 'No image returned — try again',
+                                        isProviderError: false
+                                    });
                                 }catch(err){
                                     console.error('❌ Logo generation error:', err);
                                     setClgError({
@@ -4187,7 +4203,11 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                                         else{
                                                             console.error(`❌ Creative #${i+1} failed after 2 attempts:`,retryErr.message);
                                                             if (retryErr.name === 'AbortError' || retryErr.message?.toLowerCase().includes('timeout') || retryErr.message?.toLowerCase().includes('failed to fetch') || retryErr.status === 504) {
-                                                                setCampError('Generation is taking longer than usual. Your images are likely still processing — please check the Image Bank in a minute.');
+                                                                setCampError({
+                                                                    message: 'Generation is taking longer than usual. Your images are likely still processing — please check the Image Bank in a minute.',
+                                                                    isProviderError: true,
+                                                                    provider: 'Mantram AI'
+                                                                });
                                                             }
                                                             res=null;
                                                         }
@@ -4204,9 +4224,16 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                     }catch(err){
                                         console.error('❌ Campaign generation error:', err);
                                         if (err.name === 'AbortError' || err.message?.toLowerCase().includes('timeout') || err.message?.toLowerCase().includes('failed to fetch') || err.status === 504) {
-                                            setCampError('Generation is taking longer than usual. Your images are likely still processing — please check the Image Bank in a minute.');
+                                            setCampError({
+                                                message: 'Generation is taking longer than usual. Your images are likely still processing — please check the Image Bank in a minute.',
+                                                isProviderError: false
+                                            });
                                         } else {
-                                            setCampError(err.message);
+                                            setCampError({
+                                                message: err.message,
+                                                isProviderError: err.isProviderError,
+                                                provider: err.provider
+                                            });
                                         }
                                     }
                                     finally{setCampGenerating(false)}
@@ -5525,8 +5552,12 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                 </CreditTooltipWrapper>
 
                                 {templateError && (
-                                    <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
-                                        ⚠️ {templateError}
+                                    <div className={`p-3 rounded-xl border flex items-center gap-2 mb-4 ${templateError.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
+                                        <span className="material-symbols-outlined text-sm">{templateError.isProviderError ? 'warning' : 'error'}</span>
+                                        <div className="text-xs">
+                                            <span className="font-bold mr-1">{templateError.isProviderError ? `${templateError.provider || 'AI Provider'} Notice:` : 'Error:'}</span>
+                                            {templateError.message}
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -6672,7 +6703,10 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                                     if (res.success && res.imageUrl) {
                                                         setVtoPersonImage(res.imageUrl)
                                                     } else {
-                                                        setVtoError('Failed to generate model photo')
+                                                        setVtoError({
+                                                            message: 'Failed to generate model photo',
+                                                            isProviderError: false
+                                                        });
                                                     }
                                                 } catch (err) { 
                                                     setVtoError({
@@ -6710,8 +6744,18 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                                 mode: 'preview'
                                             })
                                             if (res.success && res.imageUrl) setVtoPreviewResult(res.imageUrl)
-                                            else setVtoError(res.error || 'Preview generation failed')
-                                        } catch (err) { setVtoError(err.message) }
+                                            else setVtoError({
+                                                message: res.error || 'Preview generation failed',
+                                                isProviderError: res.isProviderError,
+                                                provider: res.provider
+                                            });
+                                        } catch (err) {
+                                            setVtoError({
+                                                message: err.message,
+                                                isProviderError: err.isProviderError,
+                                                provider: err.provider
+                                            });
+                                        }
                                         finally { setVtoLoading(false) }
                                     }}
                                     className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2

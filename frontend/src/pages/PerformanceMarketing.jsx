@@ -2232,7 +2232,7 @@ export default function PerformanceMarketing() {
                                             body: JSON.stringify({ brandId: activeBrand?._id }),
                                         })
                                         loadReports()
-                                    } catch (e) { setError(e.message) }
+                                    } catch (e) { setError({ message: e.message, isProviderError: e.isProviderError, provider: e.provider }) }
                                     finally { setLoading(false) }
                                 }}
                                 disabled={loading}

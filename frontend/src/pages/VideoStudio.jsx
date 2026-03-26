@@ -256,7 +256,13 @@ export default function VideoStudio() {
     // STEP 1: Start — Submit brief + images → get concepts
     // ══════════════════════════════════════════════════════════════════════════
     async function handleStart() {
-        if (!brief.trim() && images.length === 0) { setError('Enter a brief or add at least one image'); return }
+        if (!brief.trim() && images.length === 0) { 
+            setError({
+                message: 'Enter a brief or add at least one image',
+                isProviderError: false
+            }); 
+            return; 
+        }
         setLoading(true); setError('')
         try {
             const signal = getSignal()
@@ -420,7 +426,11 @@ export default function VideoStudio() {
                 } else if (data.project.generation?.status === 'FAILED') {
                     clearInterval(pollRef.current)
                     const errMsg = data.project.generation?.error || 'Video generation failed. Try editing the prompt and regenerating.'
-                    setError(errMsg)
+                    setError({
+                        message: errMsg,
+                        isProviderError: data.project.generation?.isProviderError,
+                        provider: data.project.generation?.provider
+                    });
                     setStep(6)
                 }
             } catch { /* keep polling */ }
@@ -973,7 +983,13 @@ export default function VideoStudio() {
                                         <div className="flex gap-2 mt-2">
                                             <button onClick={async () => {
                                                 if (!aiPromptValue.trim()) return
-                                                if (!activeBrand?._id) { setError('Select a brand first to generate images'); return }
+                                                if (!activeBrand?._id) { 
+                                                    setError({
+                                                        message: 'Select a brand first to generate images',
+                                                        isProviderError: false
+                                                    }); 
+                                                    return; 
+                                                }
                                                 setLoading(true)
                                                 try {
                                                     const d = await api('/creatives/generate', {
@@ -989,9 +1005,18 @@ export default function VideoStudio() {
                                                         setImages(prev => [...prev, { url, source: 'ai-generate', label: aiPromptValue.trim().substring(0, 30) }])
                                                         setAiPromptValue(''); setShowAiPrompt(false)
                                                     } else {
-                                                        setError('AI image generation returned no image')
+                                                        setError({
+                                                            message: 'AI image generation returned no image',
+                                                            isProviderError: false
+                                                        });
                                                     }
-                                                } catch (e) { setError(e.message) }
+                                                } catch (e) { 
+                                                    setError({
+                                                        message: e.message,
+                                                        isProviderError: e.isProviderError,
+                                                        provider: e.provider
+                                                    }); 
+                                                }
                                                 setLoading(false)
                                             }} disabled={loading} className="px-4 py-2 rounded-lg bg-cyan-500/20 text-cyan-300 font-medium text-sm hover:bg-cyan-500/30 transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50">
                                                 <span className="material-symbols-outlined text-sm">{loading ? 'progress_activity' : 'auto_awesome'}</span>

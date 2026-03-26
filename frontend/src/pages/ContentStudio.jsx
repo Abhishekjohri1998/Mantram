@@ -2836,7 +2836,7 @@ export default function ContentStudio() {
 
     const handleGenerate = async (settings) => {
         setToneSettings(settings)
-        if (!activeBrand) { setError('Please select a brand first.'); return }
+        if (!activeBrand) { setError({ message: 'Please select a brand first.', isProviderError: false }); return }
         setGenerating(true)
         setError('')
 
@@ -2913,7 +2913,7 @@ export default function ContentStudio() {
 
     // Press Release generation handler
     const handleGeneratePR = async (prData) => {
-        if (!activeBrand) { setError('Please select a brand first.'); return }
+        if (!activeBrand) { setError({ message: 'Please select a brand first.', isProviderError: false }); return }
         setGenerating(true)
         setError('')
 
@@ -3024,7 +3024,7 @@ SPOKESPERSON QUOTES:`
 
     // YouTube content generation handler (Script & Ideation)
     const handleGenerateYouTube = async (ytSettings) => {
-        if (!activeBrand) { setError('Please select a brand first.'); return }
+        if (!activeBrand) { setError({ message: 'Please select a brand first.', isProviderError: false }); return }
         setGenerating(true)
         setError('')
 
@@ -3055,7 +3055,7 @@ SPOKESPERSON QUOTES:`
 
     // YouTube SEO / Publish Optimizer handler (metadata only)
     const handleGenerateYouTubeSeo = async (seoSettings) => {
-        if (!activeBrand) { setError('Please select a brand first.'); return }
+        if (!activeBrand) { setError({ message: 'Please select a brand first.', isProviderError: false }); return }
         setGenerating(true)
         setError('')
 

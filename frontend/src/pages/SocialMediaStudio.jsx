@@ -910,7 +910,7 @@ export default function SocialMediaStudio() {
                                             </div>
                                             {accts.length > 0 && <div className="mt-3 space-y-1">{accts.map((a,i) => (
                                                 <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-white/[0.03]"><span className="text-xs text-white">{a.accountName || a.username || 'Account'}</span>
-                                                    <button onClick={async () => { try { await social.disconnect(a._id); setConnectedAccounts(prev => prev.filter(x => x._id !== a._id)) } catch (e) { setError(e.message) } }}
+                                                    <button onClick={async () => { try { await social.disconnect(a._id); setConnectedAccounts(prev => prev.filter(x => x._id !== a._id)) } catch (e) { setError({ message: e.message, isProviderError: e.isProviderError, provider: e.provider }) } }}
                                                         className="text-[10px] text-rose-400 hover:text-rose-300 cursor-pointer">Disconnect</button>
                                                 </div>
                                             ))}</div>}

@@ -199,7 +199,7 @@ export default function SkillsHub() {
         try {
             const data = await skillsAPI.list()
             if (data.success) setSkillsList(data.skills || [])
-        } catch (e) { setError(e.message) }
+        } catch (e) { setError({ message: e.message, isProviderError: e.isProviderError, provider: e.provider }) }
         finally { setLoading(false) }
     }
 
@@ -216,7 +216,7 @@ export default function SkillsHub() {
                 setRating(0)
                 setView('run')
             }
-        } catch (e) { setError(e.message) }
+        } catch (e) { setError({ message: e.message, isProviderError: e.isProviderError, provider: e.provider }) }
     }
 
     // ── Execute skill ──
@@ -234,7 +234,7 @@ export default function SkillsHub() {
             })
             if (data.success) setResult(data)
             else setError(data.error || 'Execution failed')
-        } catch (e) { setError(e.message) }
+        } catch (e) { setError({ message: e.message, isProviderError: e.isProviderError, provider: e.provider }) }
         finally { clearInterval(interval); setExecuting(false) }
     }
 
@@ -249,7 +249,7 @@ export default function SkillsHub() {
         try {
             const data = await skillsAPI.clone(skillId)
             if (data.success) { loadSkills(); setError('') }
-        } catch (e) { setError(e.message) }
+        } catch (e) { setError({ message: e.message, isProviderError: e.isProviderError, provider: e.provider }) }
     }
 
     // ── Delete skill ──
@@ -257,13 +257,13 @@ export default function SkillsHub() {
         try {
             await skillsAPI.delete(skillId)
             loadSkills()
-        } catch (e) { setError(e.message) }
+        } catch (e) { setError({ message: e.message, isProviderError: e.isProviderError, provider: e.provider }) }
     }
 
     // ── Create skill ──
     const createSkill = async () => {
         const { name, description, instructions, category, tags, icon, color, temperature, outputFormat, inputFields } = buildForm
-        if (!name.trim() || !description.trim() || !instructions.trim()) { setError('Name, description, and instructions are required'); return }
+        if (!name.trim() || !description.trim() || !instructions.trim()) { setError({ message: 'Name, description, and instructions are required', isProviderError: false }); return }
         setLoading(true); setError('')
         try {
             const data = await skillsAPI.create({
@@ -273,7 +273,7 @@ export default function SkillsHub() {
                 outputFormat, inputFields,
             })
             if (data.success) { loadSkills(); setView('browse'); setBuildForm({ name: '', description: '', instructions: '', category: 'general', tags: '', icon: 'auto_awesome', color: 'violet', temperature: 0.7, outputFormat: 'structured', inputFields: [] }) }
-        } catch (e) { setError(e.message) }
+        } catch (e) { setError({ message: e.message, isProviderError: e.isProviderError, provider: e.provider }) }
         finally { setLoading(false) }
     }
 
@@ -294,7 +294,7 @@ export default function SkillsHub() {
                 })
                 setAiPrompt('')
             }
-        } catch (e) { setError(e.message) }
+        } catch (e) { setError({ message: e.message, isProviderError: e.isProviderError, provider: e.provider }) }
         finally { setGenerating(false) }
     }
 
@@ -302,7 +302,7 @@ export default function SkillsHub() {
 
     // ── Enhance instructions with AI ──
     const enhanceInstructions = async () => {
-        if (!buildForm.instructions.trim()) { setError('Write some rough instructions first, then enhance'); return }
+        if (!buildForm.instructions.trim()) { setError({ message: 'Write some rough instructions first, then enhance', isProviderError: false }); return }
         setEnhancingInstructions(true); setError('')
         try {
             const data = await skillsAPI.enhanceInstructions({
@@ -312,8 +312,8 @@ export default function SkillsHub() {
             })
             if (data.success && data.enhanced) {
                 setBuildForm({ ...buildForm, instructions: data.enhanced })
-            } else { setError(data.error || 'Enhancement failed') }
-        } catch (e) { setError(e.message) }
+            } else { setError({ message: data.error || 'Enhancement failed', isProviderError: false }) }
+        } catch (e) { setError({ message: e.message, isProviderError: e.isProviderError, provider: e.provider }) }
         finally { setEnhancingInstructions(false) }
     }
 
@@ -325,9 +325,17 @@ export default function SkillsHub() {
 
                 {/* Error */}
                 {error && (
-                    <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 mb-4 flex items-center justify-between">
-                        <p className="text-rose-400 text-xs">{error}</p>
-                        <button onClick={() => setError('')} className="text-rose-400 hover:text-white text-xs cursor-pointer">✕</button>
+                    <div className={`p-4 rounded-2xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'} text-sm mb-4 flex items-center gap-2`}>
+                        <span className="material-symbols-outlined text-base">
+                            {error.isProviderError ? 'warning' : 'error'}
+                        </span>
+                        <div className="flex-1">
+                            {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                            {error.message}
+                        </div>
+                        <button onClick={() => setError('')} className="ml-auto opacity-50 hover:opacity-100 cursor-pointer">
+                            <span className="material-symbols-outlined text-sm">close</span>
+                        </button>
                     </div>
                 )}
 
