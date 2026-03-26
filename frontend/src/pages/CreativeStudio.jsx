@@ -660,6 +660,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [logoPosition, setLogoPosition] = useState('bottom-right')
     const [logoSize, setLogoSize] = useState('medium')
     const [galleryFilter, setGalleryFilter] = useState('All')
+    const [viewMode, setViewMode] = useState('list')
     const [showAdvanced, setShowAdvanced] = useState(false)
     const [activeQuickTemplate, setActiveQuickTemplate] = useState(null)
     const [showQuickStart, setShowQuickStart] = useState(true)
@@ -1684,102 +1685,86 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )}
 
-                        {/* ── Guided References Bar (ABOVE prompt for guided flow) ── */}
-                        <div className="mb-4 p-3 rounded-2xl bg-gradient-to-r from-violet-500/[0.04] to-cyan-500/[0.04] border border-white/[0.06]">
-                            <div className="flex items-center justify-between mb-2.5">
-                                <p className="text-xs font-extrabold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined text-sm text-violet-400">collections</span>
-                                    References
-                                </p>
-                                <span className="text-[9px] text-slate-600">Add images before writing your prompt</span>
-                            </div>
-                            <div className="flex gap-2 items-start">
-                                {/* Style Ref */}
-                                {referenceImages.style ? (
-                                    <div className="relative flex-shrink-0">
-                                        <div className="w-14 h-14 rounded-xl overflow-hidden border-2 border-amber-500/40">
-                                            <img src={referenceImages.style} alt="Style" className="w-full h-full object-cover" />
-                                        </div>
-                                        <button onClick={() => setReferenceImages(prev => ({ ...prev, style: null }))}
-                                            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center cursor-pointer">×</button>
-                                        <span className="block text-[8px] text-amber-400 text-center mt-0.5 font-bold">Style</span>
-                                    </div>
-                                ) : (
-                                    <button onClick={() => { setRefPickerSlot('style'); setRefPickerTab('upload') }}
-                                        className="flex-shrink-0 w-14 h-14 rounded-xl border-2 border-dashed border-amber-500/20 hover:border-amber-500/40 flex flex-col items-center justify-center cursor-pointer transition-colors bg-amber-500/[0.03] group">
-                                        <span className="material-symbols-outlined text-base text-slate-600 group-hover:text-amber-400">brush</span>
-                                        <span className="text-[8px] text-slate-600 group-hover:text-amber-400 font-bold">Style</span>
-                                    </button>
-                                )}
+                        {/* ── Compact References Row ── */}
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Refs</span>
 
-                                {/* Characters — dynamic */}
-                                <div className="flex gap-1.5 items-start flex-wrap flex-1 min-w-0">
-                                    {characters.map((char, idx) => (
-                                        <div key={idx} className="relative flex-shrink-0 group">
-                                            <div className="w-14 h-14 rounded-xl overflow-hidden border-2 border-violet-500/40">
-                                                <img src={char.image} alt={char.name} className="w-full h-full object-cover" />
-                                            </div>
-                                            <button onClick={() => setCharacters(prev => prev.filter((_, i) => i !== idx))}
-                                                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">×</button>
-                                            <input
-                                                value={char.name}
-                                                onChange={e => setCharacters(prev => prev.map((c, i) => i === idx ? { ...c, name: e.target.value } : c))}
-                                                className="w-14 mt-0.5 text-[8px] text-center bg-transparent text-violet-300 outline-none font-bold truncate"
-                                                placeholder="Name"
-                                            />
-                                        </div>
-                                    ))}
-                                    {characters.length < 5 && (
-                                        <button onClick={() => { setRefPickerSlot(`character-${characters.length}`); setRefPickerTab('upload') }}
-                                            className="flex-shrink-0 w-14 h-14 rounded-xl border-2 border-dashed border-violet-500/20 hover:border-violet-500/40 flex flex-col items-center justify-center cursor-pointer transition-colors bg-violet-500/[0.03] group">
-                                            <span className="material-symbols-outlined text-base text-slate-600 group-hover:text-violet-400">person_add</span>
-                                            <span className="text-[8px] text-slate-600 group-hover:text-violet-400 font-bold">Character</span>
-                                        </button>
-                                    )}
+                            {/* Style Ref */}
+                            {referenceImages.style ? (
+                                <div className="relative flex-shrink-0 group">
+                                    <div className="w-10 h-10 rounded-lg overflow-hidden border border-amber-500/40">
+                                        <img src={referenceImages.style} alt="Style" className="w-full h-full object-cover" />
+                                    </div>
+                                    <button onClick={() => setReferenceImages(prev => ({ ...prev, style: null }))}
+                                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">×</button>
                                 </div>
+                            ) : (
+                                <button onClick={() => { setRefPickerSlot('style'); setRefPickerTab('upload') }}
+                                    className="flex-shrink-0 w-10 h-10 rounded-lg border border-dashed border-white/10 hover:border-amber-500/40 flex flex-col items-center justify-center cursor-pointer transition-all bg-white/[0.02] group" title="Add style reference">
+                                    <span className="material-symbols-outlined text-sm text-slate-600 group-hover:text-amber-400">brush</span>
+                                    <span className="text-[7px] text-slate-600 group-hover:text-amber-400 font-bold leading-none">Style</span>
+                                </button>
+                            )}
 
-                                {/* Upload Ref */}
-                                {referenceImages.upload ? (
-                                    <div className="relative flex-shrink-0 group">
-                                        <div className="w-14 h-14 rounded-xl overflow-hidden border-2 border-cyan-500/40">
-                                            <img src={referenceImages.upload} alt="Ref" className="w-full h-full object-cover" />
-                                        </div>
-                                        <button onClick={() => setReferenceImages(prev => ({ ...prev, upload: null }))}
-                                            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center cursor-pointer z-10">×</button>
-                                        <button onClick={() => { setCharacters(prev => [...prev, { name: `Character ${prev.length + 1}`, image: referenceImages.upload }]); setReferenceImages(prev => ({ ...prev, upload: null })) }}
-                                            className="absolute -bottom-1 -left-1 w-5 h-5 rounded-full bg-violet-500 text-white text-[10px] flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-10" title="Use as Character">
-                                            <span className="material-symbols-outlined text-[10px]">person_add</span>
-                                        </button>
-                                        <span className="block text-[8px] text-cyan-400 text-center mt-0.5 font-bold">Upload</span>
+                            {/* Characters */}
+                            {characters.map((char, idx) => (
+                                <div key={idx} className="relative flex-shrink-0 group">
+                                    <div className="w-10 h-10 rounded-lg overflow-hidden border border-violet-500/40">
+                                        <img src={char.image} alt={char.name} className="w-full h-full object-cover" />
                                     </div>
-                                ) : (
-                                    <button onClick={() => { setRefPickerSlot('upload'); setRefPickerTab('upload') }}
-                                        className="flex-shrink-0 w-14 h-14 rounded-xl border-2 border-dashed border-cyan-500/20 hover:border-cyan-500/40 flex flex-col items-center justify-center cursor-pointer transition-colors bg-cyan-500/[0.03] group">
-                                        <span className="material-symbols-outlined text-base text-slate-600 group-hover:text-cyan-400">add_photo_alternate</span>
-                                        <span className="text-[8px] text-slate-600 group-hover:text-cyan-400 font-bold">Upload</span>
+                                    <button onClick={() => setCharacters(prev => prev.filter((_, i) => i !== idx))}
+                                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">×</button>
+                                    <input
+                                        value={char.name}
+                                        onChange={e => setCharacters(prev => prev.map((c, i) => i === idx ? { ...c, name: e.target.value } : c))}
+                                        className="w-10 mt-0.5 text-[7px] text-center bg-transparent text-violet-300 outline-none font-bold truncate"
+                                        placeholder="Name"
+                                    />
+                                </div>
+                            ))}
+                            {characters.length < 5 && (
+                                <button onClick={() => { setRefPickerSlot(`character-${characters.length}`); setRefPickerTab('upload') }}
+                                    className="flex-shrink-0 w-10 h-10 rounded-lg border border-dashed border-white/10 hover:border-violet-500/40 flex flex-col items-center justify-center cursor-pointer transition-all bg-white/[0.02] group" title="Add character">
+                                    <span className="material-symbols-outlined text-sm text-slate-600 group-hover:text-violet-400">person_add</span>
+                                    <span className="text-[7px] text-slate-600 group-hover:text-violet-400 font-bold leading-none">Person</span>
+                                </button>
+                            )}
+
+                            {/* Upload Ref */}
+                            {referenceImages.upload ? (
+                                <div className="relative flex-shrink-0 group">
+                                    <div className="w-10 h-10 rounded-lg overflow-hidden border border-cyan-500/40">
+                                        <img src={referenceImages.upload} alt="Ref" className="w-full h-full object-cover" />
+                                    </div>
+                                    <button onClick={() => setReferenceImages(prev => ({ ...prev, upload: null }))}
+                                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center cursor-pointer z-10 opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                                    <button onClick={() => { setCharacters(prev => [...prev, { name: `Character ${prev.length + 1}`, image: referenceImages.upload }]); setReferenceImages(prev => ({ ...prev, upload: null })) }}
+                                        className="absolute -bottom-1 -left-1 w-4 h-4 rounded-full bg-violet-500 text-white text-[8px] flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-10" title="Use as Character">
+                                        <span className="material-symbols-outlined text-[8px]">person_add</span>
                                     </button>
-                                )}
-                            </div>
-                            {characters.length > 0 && (
-                                <p className="text-[9px] text-violet-400/60 mt-1.5 flex items-center gap-1">
-                                    <span className="material-symbols-outlined text-[10px]">info</span>
-                                    Type <span className="font-bold text-violet-400">@name</span> in prompt to tag characters
-                                </p>
+                                </div>
+                            ) : (
+                                <button onClick={() => { setRefPickerSlot('upload'); setRefPickerTab('upload') }}
+                                    className="flex-shrink-0 w-10 h-10 rounded-lg border border-dashed border-white/10 hover:border-cyan-500/40 flex flex-col items-center justify-center cursor-pointer transition-all bg-white/[0.02] group" title="Upload reference image">
+                                    <span className="material-symbols-outlined text-sm text-slate-600 group-hover:text-cyan-400">add_photo_alternate</span>
+                                    <span className="text-[7px] text-slate-600 group-hover:text-cyan-400 font-bold leading-none">Upload</span>
+                                </button>
                             )}
                         </div>
+                        {characters.length > 0 && (
+                            <p className="text-[9px] text-violet-400/50 mb-2 -mt-1 flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[10px]">info</span>
+                                Type <span className="font-bold text-violet-400">@name</span> in prompt to tag characters
+                            </p>
+                        )}
 
-                        <div className="flex items-center gap-2.5 mb-4 relative">
-                            <span className="material-symbols-outlined text-3xl text-gradient">auto_awesome</span>
-                            <h3 className="text-xl font-extrabold text-gradient">Describe your vision</h3>
-                        </div>
-
+                        {/* ── Prompt Area ── */}
                         <div className="relative mb-3">
                             <textarea
                                 value={prompt}
                                 onChange={e => {
                                     const val = e.target.value
                                     setPrompt(val)
-                                    // Detect if user just typed @
                                     const cursor = e.target.selectionStart
                                     const textBefore = val.substring(0, cursor)
                                     const atMatch = textBefore.match(/@(\w*)$/)
@@ -1795,10 +1780,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     if (e.key === 'Escape') setShowCharTags(false)
                                 }}
                                 placeholder={activeBrand
-                                    ? `Describe your visual... e.g. "Instagram post with @Character1 in a summer scene" 🎤`
+                                    ? `Describe your visual for ${activeBrand.name}...`
                                     : "Create a brand first to start generating visuals"}
                                 disabled={!activeBrand || generating}
-                                className="input-glass w-full resize-none py-4 pr-14 disabled:opacity-30 text-white text-base"
+                                className="input-glass w-full resize-none py-3.5 px-4 pr-14 pb-12 disabled:opacity-30 text-white text-sm leading-relaxed rounded-2xl"
                                 rows={3}
                                 autoFocus
                                 ref={promptTextareaRef}
@@ -1812,7 +1797,6 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         .filter(c => !charTagFilter || c.name.toLowerCase().includes(charTagFilter))
                                         .map((char, idx) => (
                                             <button key={idx} onClick={() => {
-                                                // Replace the @partial with @CharacterName
                                                 const textarea = promptTextareaRef.current
                                                 if (!textarea) return
                                                 const cursor = textarea.selectionStart
@@ -1835,7 +1819,6 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 </div>
                                             </button>
                                         ))}
-                                    {/* Upload reference in autocomplete */}
                                     {referenceImages.upload && (!charTagFilter || 'upload'.includes(charTagFilter) || 'reference'.includes(charTagFilter)) && (
                                         <button onClick={() => {
                                             const textarea = promptTextareaRef.current
@@ -1858,34 +1841,29 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     )}
                                 </div>
                             )}
+
+                            {/* Voice input — top right */}
                             <div className="absolute right-3 top-3">
                                 <VoiceInput
                                     onResult={(text) => setPrompt(prev => prev ? prev + ' ' + text : text)}
                                     size="small"
                                 />
                             </div>
-                        </div>
 
-                        {/* Enhance Prompt Button */}
-                        {prompt.trim() && (
-                            <div className="flex items-center gap-2.5 mb-3 -mt-1">
-                                <button onClick={handleEnhancePrompt} disabled={enhancing || !activeBrand}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${enhancing
-                                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                                        : 'bg-gradient-to-r from-amber-500/15 to-orange-500/10 text-amber-400 hover:from-amber-500/25 hover:to-orange-500/20 border border-amber-500/20 hover:border-amber-500/40 hover:shadow-lg hover:shadow-amber-500/10'}`}>
-                                    <span className={`material-symbols-outlined text-base ${enhancing ? 'animate-spin' : ''}`}>
-                                        {enhancing ? 'progress_activity' : 'auto_awesome'}
-                                    </span>
-                                    {enhancing ? 'Enhancing...' : '✨ Enhance with AI'}
-                                </button>
-                                <span className="text-xs text-slate-500">Makes your prompt detailed & brand-aware</span>
-                            </div>
-                        )}
-
-                        {/* Quick-insert character tags */}
-                        {characters.length > 0 && (
-                            <div className="flex items-center gap-1.5 mb-3 -mt-1 flex-wrap">
-                                <span className="text-[10px] text-slate-600 mr-0.5">Tag:</span>
+                            {/* Bottom bar inside textarea: Enhance + Character tags */}
+                            <div className="absolute left-2 right-2 bottom-2 flex items-center gap-1.5 pointer-events-none">
+                                {prompt.trim() && (
+                                    <button onClick={handleEnhancePrompt} disabled={enhancing || !activeBrand}
+                                        className={`pointer-events-auto flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${enhancing
+                                            ? 'bg-amber-500/20 text-amber-400'
+                                            : 'bg-white/[0.06] text-slate-400 hover:text-amber-400 hover:bg-amber-500/10'}`}>
+                                        <span className={`material-symbols-outlined text-xs ${enhancing ? 'animate-spin' : ''}`}>
+                                            {enhancing ? 'progress_activity' : 'auto_awesome'}
+                                        </span>
+                                        {enhancing ? 'Enhancing...' : 'Enhance'}
+                                    </button>
+                                )}
+                                {/* Quick tag chips */}
                                 {characters.map((char, idx) => {
                                     const tagName = char.name.replace(/\s/g, '')
                                     return (
@@ -1897,72 +1875,72 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             setPrompt(before + `@${tagName} ` + after)
                                             setTimeout(() => textarea?.focus(), 50)
                                         }}
-                                            className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 text-[10px] font-bold hover:bg-violet-500/20 border border-violet-500/15 cursor-pointer transition-all">
-                                            <img src={char.image} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
+                                            className="pointer-events-auto flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-violet-500/10 text-violet-400 text-[9px] font-bold hover:bg-violet-500/20 cursor-pointer transition-all">
+                                            <img src={char.image} alt="" className="w-3 h-3 rounded-full object-cover" />
                                             @{tagName}
                                         </button>
                                     )
                                 })}
+                                {referenceImages.upload && (
+                                    <button onClick={() => {
+                                        const textarea = promptTextareaRef.current
+                                        const cursor = textarea?.selectionStart ?? prompt.length
+                                        const before = prompt.substring(0, cursor)
+                                        const after = prompt.substring(cursor)
+                                        setPrompt(before + '@Upload ' + after)
+                                        setTimeout(() => textarea?.focus(), 50)
+                                    }}
+                                        className="pointer-events-auto flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 text-[9px] font-bold hover:bg-cyan-500/20 cursor-pointer transition-all">
+                                        <img src={referenceImages.upload} alt="" className="w-3 h-3 rounded-full object-cover" />
+                                        @Upload
+                                    </button>
+                                )}
                             </div>
-                        )}
-                        {/* Quick-insert upload reference tag */}
-                        {referenceImages.upload && (
-                            <div className="flex items-center gap-1.5 mb-3 -mt-1">
-                                <span className="text-[10px] text-slate-600 mr-0.5">Ref:</span>
+                        </div>
+
+                        {/* ── Action Row: Format + Generate + Options ── */}
+                        <div className="space-y-2">
+                            {/* Format selector row */}
+                            {selectedTypeInfo && (
+                                <button onClick={() => setShowAdvanced(!showAdvanced)}
+                                    className="flex items-center gap-1.5 w-full px-3 py-2 rounded-xl text-[11px] font-bold bg-white/[0.04] text-slate-400 hover:text-white border border-white/[0.06] hover:border-white/10 transition-all cursor-pointer">
+                                    <span className="material-symbols-outlined text-xs text-primary">{selectedTypeInfo.icon}</span>
+                                    {selectedTypeInfo.label}
+                                    <span className="text-[9px] text-slate-500">{selectedTypeInfo.size}</span>
+                                    <span className="material-symbols-outlined text-[10px] text-slate-600 ml-auto">expand_more</span>
+                                </button>
+                            )}
+
+                            {/* Generate + action icons row */}
+                            <div className="flex items-center gap-2">
+                                <CreditTooltipWrapper action="creative">
+                                    <button onClick={handleGenerate} disabled={!prompt.trim() || !activeBrand || generating}
+                                        className="btn-primary flex-1 py-3 px-5 rounded-xl disabled:opacity-30 justify-center text-sm font-bold cursor-pointer">
+                                        {generating ? (
+                                            <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Generating...</>
+                                        ) : (
+                                            <><span className="material-symbols-outlined text-sm">auto_awesome</span> Generate <CreditBadge action="creative" /></>
+                                        )}
+                                    </button>
+                                </CreditTooltipWrapper>
+
+                                <button onClick={() => setShowAdvanced(!showAdvanced)}
+                                    className={`px-3 py-3 rounded-xl text-sm transition-all cursor-pointer flex-shrink-0 ${showAdvanced ? 'bg-white/10 text-white border border-white/20' : 'bg-white/[0.04] text-slate-400 hover:text-white border border-white/[0.06]'}`} title="Advanced options">
+                                    <span className="material-symbols-outlined text-sm">tune</span>
+                                </button>
+
                                 <button onClick={() => {
-                                    const textarea = promptTextareaRef.current
-                                    const cursor = textarea?.selectionStart ?? prompt.length
-                                    const before = prompt.substring(0, cursor)
-                                    const after = prompt.substring(cursor)
-                                    setPrompt(before + '@Upload ' + after)
-                                    setTimeout(() => textarea?.focus(), 50)
+                                    if (activeBrand?._id) {
+                                        productsAPI.list({ brandId: activeBrand._id, limit: 50 })
+                                            .then(res => setProductsList(res.products || []))
+                                            .catch(() => { })
+                                    }
+                                    setShowProductPicker(true)
                                 }}
-                                    className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 text-[10px] font-bold hover:bg-cyan-500/20 border border-cyan-500/15 cursor-pointer transition-all">
-                                    <img src={referenceImages.upload} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
-                                    @Upload
+                                    className="px-3 py-3 rounded-xl text-sm bg-white/[0.04] text-slate-400 hover:text-cyan-400 border border-white/[0.06] transition-all cursor-pointer flex-shrink-0" title="Select product">
+                                    <span className="material-symbols-outlined text-sm">inventory_2</span>
                                 </button>
                             </div>
-                        )}
-
-                        {/* Auto-detected format badge */}
-                        {prompt.trim() && selectedTypeInfo && (
-                            <div className="flex items-center gap-2 mb-3 animate-fade-in">
-                                <span className="text-xs text-slate-500">Format:</span>
-                                <span className="text-xs font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                                    <span className="material-symbols-outlined text-xs align-middle mr-0.5">{selectedTypeInfo.icon}</span>
-                                    {selectedTypeInfo.label} ({selectedTypeInfo.size})
-                                </span>
-                                <button onClick={() => setShowAdvanced(true)} className="text-xs text-slate-600 hover:text-white cursor-pointer underline underline-offset-2">change</button>
-                            </div>
-                        )}
-
-                        <div className="flex gap-2">
-                            <CreditTooltipWrapper action="creative">
-                                <button onClick={handleGenerate} disabled={!prompt.trim() || !activeBrand || generating}
-                                    className="btn-primary flex-1 py-3.5 px-6 rounded-xl disabled:opacity-30 justify-center text-base font-bold cursor-pointer">
-                                    {generating ? (
-                                        <><span className="material-symbols-outlined animate-spin">progress_activity</span> Generating...</>
-                                    ) : (
-                                        <><span className="material-symbols-outlined">auto_awesome</span> Generate <CreditBadge action="creative" /></>
-                                    )}
-                                </button>
-                            </CreditTooltipWrapper>
-                            <button onClick={() => setShowAdvanced(!showAdvanced)}
-                                className={`px-4 py-3.5 rounded-xl text-sm font-bold transition-all cursor-pointer flex items-center gap-1.5 ${showAdvanced ? 'bg-white/10 text-white border border-white/20' : 'glass-panel text-slate-400 hover:text-white'}`}>
-                                <span className="material-symbols-outlined text-sm">tune</span>
-                                {showAdvanced ? 'Hide' : 'Options'}
-                            </button>
-                            <button onClick={() => {
-                                if (activeBrand?._id) {
-                                    productsAPI.list({ brandId: activeBrand._id, limit: 50 })
-                                        .then(res => setProductsList(res.products || []))
-                                        .catch(() => { })
-                                }
-                                setShowProductPicker(true)
-                            }}
-                                className="px-4 py-3.5 rounded-xl text-sm font-bold glass-panel text-slate-400 hover:text-cyan-400 transition-all cursor-pointer flex items-center gap-1.5">
-                                <span className="material-symbols-outlined text-sm">inventory_2</span>
-                            </button>
                         </div>
 
                     {/* ── Collapsible Advanced Options Drawer ── */}
@@ -2167,10 +2145,12 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                             <div className="flex items-center gap-1.5">
                                 <div className="flex rounded-lg border border-white/[0.08] overflow-hidden">
-                                    <button className="p-1.5 bg-white/[0.08] text-white cursor-pointer" title="List view">
+                                    <button onClick={() => setViewMode('list')}
+                                        className={`p-1.5 cursor-pointer transition-all ${viewMode === 'list' ? 'bg-white/[0.08] text-white' : 'text-slate-600 hover:text-slate-400'}`} title="List view">
                                         <span className="material-symbols-outlined text-sm">view_list</span>
                                     </button>
-                                    <button className="p-1.5 text-slate-600 hover:text-slate-400 cursor-pointer" title="Grid view">
+                                    <button onClick={() => setViewMode('grid')}
+                                        className={`p-1.5 cursor-pointer transition-all ${viewMode === 'grid' ? 'bg-white/[0.08] text-white' : 'text-slate-600 hover:text-slate-400'}`} title="Grid view">
                                         <span className="material-symbols-outlined text-sm">grid_view</span>
                                     </button>
                                 </div>
@@ -2304,6 +2284,44 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 );
                             }
                             if (filtered.length === 0) return null;
+
+                            {/* ── Grid View ── */}
+                            if (viewMode === 'grid') {
+                                return (
+                                    <div className="grid grid-cols-2 gap-2.5">
+                                        {filtered.map(img => (
+                                            <div key={img._id} className="group relative rounded-xl overflow-hidden border border-white/[0.06] bg-black/20 cursor-pointer transition-all hover:border-white/[0.12]"
+                                                onClick={() => setZoomImage(img.imageUrl || img.thumbnailUrl)}>
+                                                <img src={img.imageUrl || img.thumbnailUrl} alt={img.title || 'Creative'}
+                                                    loading="lazy" decoding="async"
+                                                    className="w-full aspect-square object-cover" />
+                                                {/* Hover overlay with actions */}
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
+                                                    <p className="text-[9px] text-white/80 line-clamp-2 mb-1.5 leading-tight">{img.prompt || img.title || 'AI Generated'}</p>
+                                                    <div className="flex gap-1">
+                                                        <button onClick={(e) => { e.stopPropagation(); handleDownloadImage(img.imageUrl || img.thumbnailUrl, `${img.title || 'creative'}.png`) }}
+                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-white/20 transition-all" title="Download">
+                                                            <span className="material-symbols-outlined text-xs">download</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setDesignBaseImage(img.imageUrl || img.thumbnailUrl); setPrompt(img.prompt || ''); }}
+                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-primary/40 transition-all" title="Edit">
+                                                            <span className="material-symbols-outlined text-xs">edit</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setPublishData({ image: img.imageUrl || img.thumbnailUrl, text: img.title || '' }) }}
+                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-[#1877F2]/40 transition-all" title="Publish">
+                                                            <span className="material-symbols-outlined text-xs">share</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                {/* Time ago badge */}
+                                                <span className="absolute top-1.5 right-1.5 text-[8px] text-white/60 bg-black/50 px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-all">{getTimeAgo(img.createdAt)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            }
+
+                            {/* ── List View (default) ── */}
                             return (
                                 <div className="space-y-4">
                                     {filtered.map(img => (
