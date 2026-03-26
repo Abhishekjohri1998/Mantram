@@ -2,7 +2,7 @@ import config from '../config/env.js';
 import { GeminiProvider } from './providers/gemini.js';
 import { OpenAIProvider } from './providers/openai.js';
 import { AnthropicProvider } from './providers/anthropic.js';
-import { AIProviderBusyError, AIProviderQuotaError } from './errors.js';
+import { AIProviderBusyError, AIProviderQuotaError, AIProviderModelError } from './errors.js';
 
 /**
  * Model Router — Routes AI requests to the configured provider.
@@ -21,7 +21,7 @@ class ModelRouter {
         // Register all providers — they self-check if API key exists
         this.providers.gemini = new GeminiProvider({
             apiKey: providerConfigs.gemini?.apiKey,
-            defaultModel: 'gemini-2.0-flash', // Current stable flash model
+            defaultModel: 'gemini-2.5-flash', // Upgraded from 2.0-flash
         });
         this.providers.openai = new OpenAIProvider({
             apiKey: providerConfigs.openai?.apiKey,
@@ -178,10 +178,18 @@ class ModelRouter {
         const isQuota = msg.includes('quota') || 
                         msg.includes('credit') || 
                         msg.includes('balance') ||
-                        msg.includes('billing');
+                        msg.includes('billing') ||
+                        msg.includes('402');
+
+        const isModelError = msg.includes('404') ||
+                             msg.includes('no longer available') ||
+                             msg.includes('not found') ||
+                             msg.includes('deprecated') ||
+                             msg.includes('text output');
 
         if (isBusy) return new AIProviderBusyError(providerName, error.message);
         if (isQuota) return new AIProviderQuotaError(providerName, error.message);
+        if (isModelError) return new AIProviderModelError(providerName, error.message);
 
         // Fallback to generic AI error if not specifically recognized as busy/quota
         return error;

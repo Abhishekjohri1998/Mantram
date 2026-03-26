@@ -328,7 +328,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
     const [imagePreview, setImagePreview] = useState(initialImage || null)
     const [imageAnalysis, setImageAnalysis] = useState('')
     const [analyzing, setAnalyzing] = useState(false)
-    const [analysisError, setAnalysisError] = useState('')
+    const [analysisError, setAnalysisError] = useState(null)
     const [libraryImages, setLibraryImages] = useState([])
     const [libraryLoading, setLibraryLoading] = useState(false)
     const [libraryCategory, setLibraryCategory] = useState('all')
@@ -350,11 +350,16 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                         setImageAnalysis(data.analysis)
                         setDetails(data.analysis)
                     } else {
-                        setAnalysisError(data.error || 'Analysis failed')
-                    }
-                } catch (err) {
-                    setAnalysisError(err.message || 'Analysis failed')
-                } finally {
+                const errMsg = data.error || 'Analysis failed'
+                setAnalysisError({ message: errMsg, isProviderError: data.isProviderError, provider: data.provider })
+            }
+        } catch (err) {
+            setAnalysisError({ 
+                message: err.message || 'Analysis failed', 
+                isProviderError: err.isProviderError, 
+                provider: err.provider 
+            })
+        } finally {
                     setAnalyzing(false)
                 }
             }
@@ -578,8 +583,12 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
 
                             {/* Analysis Error */}
                             {analysisError && (
-                                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm mb-4">
-                                    <span className="material-symbols-outlined align-middle mr-1 text-sm">error</span> {analysisError}
+                                <div className={`p-3 rounded-xl border ${analysisError.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm mb-4`}>
+                                    <span className="material-symbols-outlined align-middle mr-1 text-sm">
+                                        {analysisError.isProviderError ? 'warning' : 'error'}
+                                    </span> 
+                                    {analysisError.isProviderError && <span className="font-bold mr-1">[{analysisError.provider || 'AI Provider'}]</span>}
+                                    {analysisError.message}
                                 </div>
                             )}
 
@@ -2621,7 +2630,7 @@ export default function ContentStudio() {
     const [toneSettings, setToneSettings] = useState(null)
     const [result, setResult] = useState(null)
     const [generating, setGenerating] = useState(false)
-    const [error, setError] = useState('')
+    const [error, setError] = useState(null)
     const [prefilledOccasion, setPrefilledOccasion] = useState(null)
     const [accepted, setAccepted] = useState(false)
     const [showHistory, setShowHistory] = useState(false)
@@ -2847,7 +2856,11 @@ export default function ContentStudio() {
             setResult(data.content)
             setStep(5)
         } catch (err) {
-            setError(err.message || 'Generation failed.')
+            setError({ 
+                message: err.message || 'Generation failed.', 
+                isProviderError: err.isProviderError, 
+                provider: err.provider 
+            })
         } finally {
             setGenerating(false)
         }
@@ -2967,7 +2980,11 @@ SPOKESPERSON QUOTES:`
             setResult(data.content)
             setStep(5)
         } catch (err) {
-            setError(err.message || 'Press release generation failed.')
+            setError({ 
+                message: err.message || 'Press release generation failed.', 
+                isProviderError: err.isProviderError, 
+                provider: err.provider 
+            })
         } finally {
             setGenerating(false)
         }
@@ -3026,7 +3043,11 @@ SPOKESPERSON QUOTES:`
             setYoutubeData(data.content?.youtubeData || {})
             setStep(9)  // YouTube result view
         } catch (err) {
-            setError(err.message || 'YouTube content generation failed.')
+            setError({ 
+                message: err.message || 'YouTube content generation failed.', 
+                isProviderError: err.isProviderError, 
+                provider: err.provider 
+            })
         } finally {
             setGenerating(false)
         }
@@ -3051,7 +3072,11 @@ SPOKESPERSON QUOTES:`
             setYoutubeSeoData(data.content?.youtubeSeoData || {})
             setStep(11)  // YouTube SEO result view
         } catch (err) {
-            setError(err.message || 'YouTube SEO generation failed.')
+            setError({ 
+                message: err.message || 'YouTube SEO generation failed.', 
+                isProviderError: err.isProviderError, 
+                provider: err.provider 
+            })
         } finally {
             setGenerating(false)
         }
@@ -3171,8 +3196,12 @@ SPOKESPERSON QUOTES:`
                         estimatedDuration={45}
                     />
                     {error && (
-                        <div className="max-w-2xl mx-auto mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm text-center">
-                            <span className="material-symbols-outlined align-middle mr-1">error</span> {error}
+                        <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm text-center`}>
+                            <span className="material-symbols-outlined align-middle mr-1">
+                                {error.isProviderError ? 'warning' : 'error'}
+                            </span>
+                            {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                            {error.message}
                         </div>
                     )}
                 </>
@@ -3197,8 +3226,12 @@ SPOKESPERSON QUOTES:`
                         estimatedDuration={45}
                     />
                     {error && (
-                        <div className="max-w-2xl mx-auto mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm text-center">
-                            <span className="material-symbols-outlined align-middle mr-1">error</span> {error}
+                        <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm text-center`}>
+                            <span className="material-symbols-outlined align-middle mr-1">
+                                {error.isProviderError ? 'warning' : 'error'}
+                            </span>
+                            {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                            {error.message}
                         </div>
                     )}
                 </>
@@ -3252,8 +3285,12 @@ SPOKESPERSON QUOTES:`
                         estimatedDuration={60}
                     />
                     {error && (
-                        <div className="max-w-2xl mx-auto mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm text-center">
-                            <span className="material-symbols-outlined align-middle mr-1">error</span> {error}
+                        <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm text-center`}>
+                            <span className="material-symbols-outlined align-middle mr-1">
+                                {error.isProviderError ? 'warning' : 'error'}
+                            </span>
+                            {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                            {error.message}
                         </div>
                     )}
                 </>
@@ -3289,8 +3326,12 @@ SPOKESPERSON QUOTES:`
                         estimatedDuration={60}
                     />
                     {error && (
-                        <div className="max-w-2xl mx-auto mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm text-center">
-                            <span className="material-symbols-outlined align-middle mr-1">error</span> {error}
+                        <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm text-center`}>
+                            <span className="material-symbols-outlined align-middle mr-1">
+                                {error.isProviderError ? 'warning' : 'error'}
+                            </span>
+                            {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                            {error.message}
                         </div>
                     )}
                 </>

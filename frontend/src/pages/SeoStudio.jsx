@@ -114,7 +114,7 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
     const [savedResults, setSavedResults] = useState(null)
     const results = currentTask?.results || savedResults
     const [askResult, setAskResult] = useState(null)
-    const [error, setError] = useState('')
+    const [error, setError] = useState(null)
     const [askLoading, setAskLoading] = useState(false)
 
     // Sync error from context task
@@ -197,7 +197,13 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
         try {
             const d = await seoAPI.manageCompetitors({ brandId: activeBrand._id, action: 'add', competitor: { url: newCompUrl.trim() } })
             if (d.competitors) { setCompetitors(d.competitors); setNewCompUrl('') }
-        } catch (e) { setError(e.message) }
+        } catch (e) { 
+            setError({ 
+                message: e.message, 
+                isProviderError: e.isProviderError, 
+                provider: e.provider 
+            }) 
+        }
         finally { setCompLoading(false) }
     }
     const removeCompetitor = async (url) => {
@@ -217,7 +223,13 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
                 setCompetitors(d.competitors)
                 setShowComparePrompt(true)
             }
-        } catch (e) { setError(e.message) }
+        } catch (e) { 
+            setError({ 
+                message: e.message, 
+                isProviderError: e.isProviderError, 
+                provider: e.provider 
+            }) 
+        }
         finally { setCompLoading(false) }
     }
 
@@ -272,9 +284,12 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
     }, [activeSection, activeBrand?._id, currentTask?.status])
 
     const runWorkflow = async (workflowId) => {
-        if (!website) { setError('No website URL found. Please add a website to your brand.'); return }
+        if (!website) { 
+            setError({ message: 'No website URL found. Please add a website to your brand.' }); 
+            return 
+        }
 
-        setError(''); setSavedResults(null); setSavedAt(null)
+        setError(null); setSavedResults(null); setSavedAt(null)
 
         const stages = STAGE_MESSAGES[workflowId] || ['Processing...']
         const payload = { url: website, brand: brandPayload, brandId: activeBrand?._id, country: activeBrand?.dna?.country || 'India', industry: activeBrand?.dna?.industry }
@@ -290,7 +305,7 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
                 } catch { }
             }
             if (lastIssues.length === 0) {
-                setError('Run a Health Check first to find issues, then use Auto-Fix.')
+                setError({ message: 'Run a Health Check first to find issues, then use Auto-Fix.' })
                 return
             }
             payload.issues = lastIssues
@@ -314,8 +329,18 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
         try {
             const data = await seoAPI.ask({ question: askQuery.trim(), brand: brandPayload, url: website })
             if (data.success !== false) setAskResult(data)
-            else setError(data.error)
-        } catch (e) { setError(e.message) }
+            else setError({ 
+                message: data.error, 
+                isProviderError: data.isProviderError, 
+                provider: data.provider 
+            })
+        } catch (e) { 
+            setError({ 
+                message: e.message, 
+                isProviderError: e.isProviderError, 
+                provider: e.provider 
+            }) 
+        }
         finally { setAskLoading(false) }
     }
 
@@ -941,7 +966,7 @@ small{color:#94a3b8;font-size:10px}
                                         const isDone = itemTask?.status === 'done'
                                         return (
                                             <button key={item.id}
-                                                onClick={() => { setActiveSection(item.id); setError(''); if (item.type === 'workflow') { setSavedResults(null) } }}
+                                                onClick={() => { setActiveSection(item.id); setError(null); if (item.type === 'workflow') { setSavedResults(null) } }}
                                                 title={sidebarCollapsed ? item.label : undefined}
                                                 className={`w-full flex items-center gap-2.5 px-3 py-2 text-left cursor-pointer transition-all duration-200 group relative ${isActive ? 'text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'}`}
                                                 style={isActive ? { background: `linear-gradient(90deg, ${item.color}12, transparent)` } : {}}>
@@ -1089,7 +1114,20 @@ small{color:#94a3b8;font-size:10px}
                             </div>
                         )}
 
-                        {error && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 mb-4"><p className="text-rose-400 text-xs">{error}</p></div>}
+                        {error && (
+                            <div className={`p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} mb-4 flex items-center gap-2`}>
+                                <span className="material-symbols-outlined text-sm">
+                                    {error.isProviderError ? 'warning' : 'error'}
+                                </span>
+                                <div className="flex-1">
+                                    {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                                    {error.message}
+                                </div>
+                                <button onClick={() => setError(null)} className="ml-auto opacity-50 hover:opacity-100 transition-opacity cursor-pointer">
+                                    <span className="material-symbols-outlined text-xs">close</span>
+                                </button>
+                            </div>
+                        )}
 
                         {/* ─── Loading State ─── */}
                         {loading && isWorkflow && (

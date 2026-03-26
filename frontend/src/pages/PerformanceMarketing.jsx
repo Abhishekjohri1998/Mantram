@@ -43,7 +43,7 @@ export default function PerformanceMarketing() {
 
     const [tab, setTab] = useState('dashboard')
     const [loading, setLoading] = useState(false)
-    const [error, setError] = useState('')
+    const [error, setError] = useState(null)
 
     // Dashboard state
     const [dashboard, setDashboard] = useState(null)
@@ -238,7 +238,11 @@ export default function PerformanceMarketing() {
             loadReports()
             loadLearnings()
         } catch (e) {
-            setError(e.message)
+            setError({
+                message: e.message,
+                isProviderError: e.isProviderError,
+                provider: e.provider
+            })
         } finally {
             setLoading(false)
         }
@@ -267,7 +271,11 @@ export default function PerformanceMarketing() {
             setStrategyResult(data.report)
             loadReports()
         } catch (e) {
-            setError(e.message)
+            setError({
+                message: e.message,
+                isProviderError: e.isProviderError,
+                provider: e.provider
+            })
         } finally {
             setLoading(false)
         }
@@ -291,7 +299,11 @@ export default function PerformanceMarketing() {
             setStrategyResult(prev => ({ ...prev, ...data.report }))
             loadReports()
         } catch (e) {
-            setError(e.message)
+            setError({
+                message: e.message,
+                isProviderError: e.isProviderError,
+                provider: e.provider
+            })
         } finally {
             setLoading(false)
         }
@@ -315,7 +327,11 @@ export default function PerformanceMarketing() {
                 setTab('campaigns')
             }
         } catch (e) {
-            setError(e.message)
+            setError({
+                message: e.message,
+                isProviderError: e.isProviderError,
+                provider: e.provider
+            })
         } finally {
             setLoading(false)
         }
@@ -336,7 +352,11 @@ export default function PerformanceMarketing() {
             })
             setAdImageUrl(data.imageUrl || '')
         } catch (e) {
-            setError(e.message)
+            setError({
+                message: e.message,
+                isProviderError: e.isProviderError,
+                provider: e.provider
+            })
         } finally {
             setGeneratingImage(false)
         }
@@ -375,9 +395,15 @@ export default function PerformanceMarketing() {
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* ── Error display ── */}
                 {error && (
-                    <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm flex items-center justify-between">
-                        <span>{error}</span>
-                        <button onClick={() => setError('')} className="text-rose-400 hover:text-rose-300 cursor-pointer">
+                    <div className={`p-4 rounded-2xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'} text-sm flex items-center gap-2`}>
+                        <span className="material-symbols-outlined text-base">
+                            {error.isProviderError ? 'warning' : 'error'}
+                        </span>
+                        <div className="flex-1">
+                            {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                            {error.message}
+                        </div>
+                        <button onClick={() => setError(null)} className="ml-auto opacity-50 hover:opacity-100 cursor-pointer">
                             <span className="material-symbols-outlined text-sm">close</span>
                         </button>
                     </div>

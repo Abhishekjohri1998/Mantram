@@ -68,7 +68,7 @@ function WebsiteScan({ onComplete, onBack, initialUrl = '' }) {
     const [progress, setProgress] = useState(0)
     const [currentStep, setCurrentStep] = useState('')
     const [stepIndex, setStepIndex] = useState(0)
-    const [error, setError] = useState('')
+    const [error, setError] = useState(null)
 
     const steps = [
         { label: 'Connecting to website', icon: 'language', duration: 800 },
@@ -86,7 +86,7 @@ function WebsiteScan({ onComplete, onBack, initialUrl = '' }) {
     const handleScan = async () => {
         if (!url.trim()) return
         setScanning(true)
-        setError('')
+        setError(null)
         setStepIndex(0)
 
         // Animate progress steps while the real API call runs
@@ -111,7 +111,11 @@ function WebsiteScan({ onComplete, onBack, initialUrl = '' }) {
         } catch (err) {
             clearInterval(interval)
             setScanning(false)
-            setError(err.message || 'Failed to scan website. Please check the URL and try again.')
+            setError({
+                message: err.message || 'Failed to scan website. Please check the URL and try again.',
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
         }
     }
 
@@ -153,8 +157,14 @@ function WebsiteScan({ onComplete, onBack, initialUrl = '' }) {
                     </div>
 
                     {error && (
-                        <div className="mt-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm flex items-center gap-2 max-w-lg mx-auto">
-                            <span className="material-symbols-outlined text-lg">error</span> {error}
+                        <div className={`mt-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2 max-w-lg mx-auto`}>
+                            <span className="material-symbols-outlined text-lg">
+                                {error.isProviderError ? 'warning' : 'error'}
+                            </span>
+                            <div className="flex-1 text-left">
+                                {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                                {error.message}
+                            </div>
                         </div>
                     )}
                 </div>
@@ -224,7 +234,7 @@ function FileUpload({ onComplete, onBack }) {
     const [industry, setIndustry] = useState('')
     const [country, setCountry] = useState('India')
     const [uploading, setUploading] = useState(false)
-    const [error, setError] = useState('')
+    const [error, setError] = useState(null)
 
     const handleDrop = (e) => {
         e.preventDefault()
@@ -235,7 +245,7 @@ function FileUpload({ onComplete, onBack }) {
     const handleCreate = async () => {
         if (!brandName.trim()) return
         setUploading(true)
-        setError('')
+        setError(null)
         try {
             const data = await brandsAPI.create({
                 name: brandName,
@@ -249,7 +259,11 @@ function FileUpload({ onComplete, onBack }) {
             onComplete(data.brand)
         } catch (err) {
             setUploading(false)
-            setError(err.message)
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
         }
     }
 
@@ -307,8 +321,14 @@ function FileUpload({ onComplete, onBack }) {
                 )}
 
                 {error && (
-                    <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm flex items-center gap-2">
-                        <span className="material-symbols-outlined text-lg">error</span> {error}
+                    <div className={`p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                        <span className="material-symbols-outlined text-lg">
+                            {error.isProviderError ? 'warning' : 'error'}
+                        </span>
+                        <div className="flex-1">
+                            {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                            {error.message}
+                        </div>
                     </div>
                 )}
 
@@ -338,7 +358,7 @@ function Brainstorm({ onComplete, onBack }) {
     const [generatedLogo, setGeneratedLogo] = useState(null)
     const [generating, setGenerating] = useState(false)
     const [suggestion, setSuggestion] = useState(null)
-    const [error, setError] = useState('')
+    const [error, setError] = useState(null)
 
     const industries = ['Technology', 'Fashion & Apparel', 'Food & Beverage', 'Health & Wellness', 'Finance', 'Education', 'Real Estate', 'E-commerce', 'SaaS', 'Entertainment', 'Travel', 'Automotive', 'Beauty', 'Sports & Fitness', 'Home & Living', 'Pet Care', 'Kids & Baby', 'Agriculture', 'Other']
 
@@ -385,7 +405,11 @@ function Brainstorm({ onComplete, onBack }) {
                 const { creatives: creativesAPI } = await import('../services/api')
                 alert('Logo generation is being processed...')
             } catch { }
-            setError(err.message || 'Logo generation failed')
+            setError({
+                message: err.message || 'Logo generation failed',
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
         } finally {
             setGeneratingLogo(false)
         }
@@ -406,7 +430,11 @@ function Brainstorm({ onComplete, onBack }) {
             setSuggestion({ ...data.brandSuggestion, name: brandName })
             setStep(3)
         } catch (err) {
-            setError(err.message || 'AI brainstorming failed.')
+            setError({
+                message: err.message || 'AI brainstorming failed.',
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
         } finally {
             setGenerating(false)
         }
@@ -427,7 +455,11 @@ function Brainstorm({ onComplete, onBack }) {
             const data = await agents.saveBrainstorm(brandData)
             onComplete(data.brand)
         } catch (err) {
-            setError(err.message)
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
             setGenerating(false)
         }
     }
@@ -621,8 +653,14 @@ function Brainstorm({ onComplete, onBack }) {
                     </div>
 
                     {error && (
-                        <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
-                            <span className="material-symbols-outlined text-sm align-middle mr-1">error</span> {error}
+                        <div className={`p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                            <span className="material-symbols-outlined text-lg">
+                                {error.isProviderError ? 'warning' : 'error'}
+                            </span>
+                            <div className="flex-1">
+                                {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                                {error.message}
+                            </div>
                         </div>
                     )}
 

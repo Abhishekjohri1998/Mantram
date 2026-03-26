@@ -287,10 +287,20 @@ app.use('/api/retention-studio', retentionStudioRoutes);
 // Error handler
 app.use((err, req, res, next) => {
     console.error('Server Error:', err.stack);
-    res.status(err.statusCode || 500).json({
+    
+    const response = {
         success: false,
         error: config.nodeEnv === 'development' ? err.message : 'Server Error',
-    });
+    };
+
+    // If it's a categorized AI provider error, pass metadata to frontend
+    if (err.provider) {
+        response.isProviderError = true;
+        response.provider = err.provider;
+        response.error = err.message; // Use the specific user-friendly message
+    }
+
+    res.status(err.statusCode || 500).json(response);
 });
 
 // Keep-Alive timeouts

@@ -1283,7 +1283,7 @@ router.get('/provider-usage', async (req, res) => {
         const providerModels = {
             openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
             anthropic: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet', 'claude-3-haiku'],
-            gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-image'],
+            gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-flash-image'],
             grok: ['grok-3', 'grok-3-mini', 'grok-beta'],
             piapi: ['seedance-2.0', 'kling-v2'],
             fal: ['kling-fal', 'fast-sdxl'],

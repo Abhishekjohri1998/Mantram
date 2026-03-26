@@ -21,6 +21,6 @@ async function run() {
   await checkModel('gemini-1.5-flash-latest');
   await checkModel('gemini-1.5-pro-latest');
   await checkModel('gemini-2.5-flash');
-  await checkModel('gemini-2.0-flash');
+  await checkModel('gemini-2.5-flash');
 }
 run();

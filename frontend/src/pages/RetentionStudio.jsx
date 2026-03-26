@@ -63,7 +63,7 @@ export default function RetentionStudio() {
     const [activeCampaign, setActiveCampaign] = useState(null);
     const [loading, setLoading] = useState(false);
     const [nodeLoading, setNodeLoading] = useState('');
-    const [error, setError] = useState('');
+    const [error, setError] = useState(null);
 
     // Pipeline state
     const [csvText, setCsvText] = useState('');
@@ -107,7 +107,11 @@ export default function RetentionStudio() {
                 } catch {}
             }
         } catch (err) {
-            setError(err.message);
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            });
         } finally {
             setLoading(false);
         }
@@ -115,7 +119,7 @@ export default function RetentionStudio() {
 
     // ── Create new campaign ──
     const createCampaign = async () => {
-        if (!brandId) return setError('Select a brand first');
+        if (!brandId) return setError({ message: 'Select a brand first' });
         try {
             setLoading(true);
             const res = await retentionStudio.create({ brandId });
@@ -125,7 +129,11 @@ export default function RetentionStudio() {
                 loadCampaigns();
             }
         } catch (err) {
-            setError(err.message);
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            });
         } finally {
             setLoading(false);
         }
@@ -133,18 +141,26 @@ export default function RetentionStudio() {
 
     // ── Pipeline Node Runners ──
     const runIngest = async () => {
-        if (!csvText.trim()) return setError('Paste your Amazon customer CSV data');
+        if (!csvText.trim()) return setError({ message: 'Paste your Amazon customer CSV data' });
         try {
             setNodeLoading('ingest');
-            setError('');
+            setError(null);
             const res = await retentionStudio.ingest(activeCampaign._id, { rawData: csvText, source: 'csv' });
             if (res.success) {
                 loadCampaign(activeCampaign._id);
             } else {
-                setError(res.error || 'Ingest failed');
+                setError({
+                    message: res.error || 'Ingest failed',
+                    isProviderError: res.isProviderError,
+                    provider: res.provider
+                });
             }
         } catch (err) {
-            setError(err.message);
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            });
         } finally {
             setNodeLoading('');
         }
@@ -153,15 +169,23 @@ export default function RetentionStudio() {
     const runMatch = async () => {
         try {
             setNodeLoading('match');
-            setError('');
+            setError(null);
             const res = await retentionStudio.match(activeCampaign._id);
             if (res.success) {
                 loadCampaign(activeCampaign._id);
             } else {
-                setError(res.error || 'Match failed');
+                setError({
+                    message: res.error || 'Match failed',
+                    isProviderError: res.isProviderError,
+                    provider: res.provider
+                });
             }
         } catch (err) {
-            setError(err.message);
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            });
         } finally {
             setNodeLoading('');
         }
@@ -170,15 +194,23 @@ export default function RetentionStudio() {
     const runCreative = async () => {
         try {
             setNodeLoading('creative');
-            setError('');
+            setError(null);
             const res = await retentionStudio.creative(activeCampaign._id, { creativeTemplate });
             if (res.success) {
                 loadCampaign(activeCampaign._id);
             } else {
-                setError(res.error || 'Creative generation failed');
+                setError({
+                    message: res.error || 'Creative generation failed',
+                    isProviderError: res.isProviderError,
+                    provider: res.provider
+                });
             }
         } catch (err) {
-            setError(err.message);
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            });
         } finally {
             setNodeLoading('');
         }
@@ -187,15 +219,23 @@ export default function RetentionStudio() {
     const runCompose = async () => {
         try {
             setNodeLoading('compose');
-            setError('');
+            setError(null);
             const res = await retentionStudio.compose(activeCampaign._id, { mailerTemplate });
             if (res.success) {
                 loadCampaign(activeCampaign._id);
             } else {
-                setError(res.error || 'Mailer composition failed');
+                setError({
+                    message: res.error || 'Mailer composition failed',
+                    isProviderError: res.isProviderError,
+                    provider: res.provider
+                });
             }
         } catch (err) {
-            setError(err.message);
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            });
         } finally {
             setNodeLoading('');
         }
@@ -217,15 +257,23 @@ export default function RetentionStudio() {
         if (!confirm(`This will send REAL emails to ${activeCampaign.contacts?.filter(c => c.matched).length || 0} customers. Continue?`)) return;
         try {
             setNodeLoading('send');
-            setError('');
+            setError(null);
             const res = await retentionStudio.send(activeCampaign._id);
             if (res.success) {
                 loadCampaign(activeCampaign._id);
             } else {
-                setError(res.error || 'Send failed');
+                setError({
+                    message: res.error || 'Send failed',
+                    isProviderError: res.isProviderError,
+                    provider: res.provider
+                });
             }
         } catch (err) {
-            setError(err.message);
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            });
         } finally {
             setNodeLoading('');
         }
@@ -242,7 +290,7 @@ export default function RetentionStudio() {
     };
 
     const sendTestEmail = async () => {
-        if (!testEmail.trim()) return setError('Enter a test email address');
+        if (!testEmail.trim()) return setError({ message: 'Enter a test email address' });
         try {
             setNodeLoading('test');
             setTestEmailSent('');
@@ -250,10 +298,18 @@ export default function RetentionStudio() {
             if (res.success) {
                 setTestEmailSent(`✅ Test email sent to ${testEmail}`);
             } else {
-                setError(res.error || 'Test email failed');
+                setError({
+                    message: res.error || 'Test email failed',
+                    isProviderError: res.isProviderError,
+                    provider: res.provider
+                });
             }
         } catch (err) {
-            setError(err.message);
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            });
         } finally {
             setNodeLoading('');
         }
@@ -263,16 +319,24 @@ export default function RetentionStudio() {
         if (!activeCampaign?._id) return;
         try {
             setImageLoading(true);
-            setError('');
+            setError(null);
             const res = await retentionStudio.generateImage(activeCampaign._id);
             if (res.success) {
                 setGeneratedImageUrl(res.imageUrl);
                 loadCampaign(activeCampaign._id);
             } else {
-                setError(res.error || 'Image generation failed');
+                setError({
+                    message: res.error || 'Image generation failed',
+                    isProviderError: res.isProviderError,
+                    provider: res.provider
+                });
             }
         } catch (err) {
-            setError(err.message);
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            });
         } finally {
             setImageLoading(false);
         }
@@ -346,10 +410,15 @@ export default function RetentionStudio() {
 
                 {/* Error */}
                 {error && (
-                    <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 12, padding: '12px 16px', marginBottom: 20, color: '#f87171', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>error</span>
-                        {error}
-                        <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#f87171', cursor: 'pointer' }}>✕</button>
+                    <div className={`p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} mb-5 flex items-center gap-2 text-sm`}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                            {error.isProviderError ? 'warning' : 'error'}
+                        </span>
+                        <div className="flex-1">
+                            {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                            {error.message}
+                        </div>
+                        <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', opacity: 0.5 }}>✕</button>
                     </div>
                 )}
 

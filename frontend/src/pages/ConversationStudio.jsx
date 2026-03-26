@@ -44,6 +44,7 @@ export default function ConversationStudio() {
     const [replyText, setReplyText] = useState('')
     const [sending, setSending] = useState(false)
     const [stats, setStats] = useState(null)
+    const [error, setError] = useState(null)
 
     const messagesEndRef = useRef(null)
 
@@ -108,7 +109,13 @@ export default function ConversationStudio() {
             const data = await conversationsAPI.get(selected)
             setConversation(data.conversation)
             setReplyText('')
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
         finally { setSending(false) }
     }
 
@@ -167,6 +174,21 @@ export default function ConversationStudio() {
                     <span className="material-symbols-outlined text-sm">insights</span> Insights
                 </button>
             </div>
+
+            {error && (
+                <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                    <span className="material-symbols-outlined text-base">
+                        {error.isProviderError ? 'warning' : 'error'}
+                    </span>
+                    <div className="flex-1">
+                        {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                        {error.message}
+                    </div>
+                    <button onClick={() => setError(null)} className="ml-auto opacity-50 hover:opacity-100 cursor-pointer">
+                        <span className="material-symbols-outlined text-base">close</span>
+                    </button>
+                </div>
+            )}
 
             {/* Top Stats Bar */}
             <div className="flex items-center gap-3 mb-6">

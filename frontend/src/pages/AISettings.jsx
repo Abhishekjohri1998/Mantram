@@ -44,6 +44,7 @@ export default function AISettings() {
     const navigate = useNavigate();
     const [rules, setRules] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
     const [editingRule, setEditingRule] = useState(null);
     const [showAddRule, setShowAddRule] = useState(false);
 
@@ -126,7 +127,11 @@ export default function AISettings() {
             const data = await routingRulesAPI.test({ message: testMessage, brandId: currentBrand?._id });
             if (data.success) setTestResult(data);
         } catch (err) {
-            setTestResult({ error: err.message });
+            setTestResult({
+                error: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            });
         } finally {
             setTesting(false);
         }
@@ -166,6 +171,21 @@ export default function AISettings() {
                     <span className="material-symbols-outlined text-sm">insights</span> Insights
                 </button>
             </div>
+
+            {error && (
+                <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                    <span className="material-symbols-outlined text-base">
+                        {error.isProviderError ? 'warning' : 'error'}
+                    </span>
+                    <div className="flex-1">
+                        {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                        {error.message}
+                    </div>
+                    <button onClick={() => setError(null)} className="ml-auto opacity-50 hover:opacity-100 cursor-pointer">
+                        <span className="material-symbols-outlined text-base">close</span>
+                    </button>
+                </div>
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                 {/* ── Left Column: Routing Rules ── */}
@@ -329,8 +349,14 @@ export default function AISettings() {
                             )}
 
                             {testResult?.error && (
-                                <div style={{ background: '#fef2f2', borderRadius: '8px', padding: '0.75rem', color: '#ef4444', fontSize: '0.85rem' }}>
-                                    ❌ {testResult.error}
+                                <div className={`p-4 rounded-xl border ${testResult.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                                    <span className="material-symbols-outlined text-base">
+                                        {testResult.isProviderError ? 'warning' : 'error'}
+                                    </span>
+                                    <div className="flex-1">
+                                        {testResult.isProviderError && <span className="font-bold mr-1">[{testResult.provider || 'AI Provider'}]</span>}
+                                        {testResult.error}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -444,7 +470,13 @@ export default function AISettings() {
                             setSavingAutonomy(true);
                             try {
                                 await brandsAPI.updateAutonomy(currentBrand._id, autonomy);
-                            } catch (err) { alert(err.message); }
+                            } catch (err) {
+                                setError({
+                                    message: err.message,
+                                    isProviderError: err.isProviderError,
+                                    provider: err.provider
+                                });
+                            }
                             setSavingAutonomy(false);
                         }}
                         disabled={savingAutonomy}

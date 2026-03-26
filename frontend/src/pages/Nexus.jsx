@@ -11,11 +11,32 @@ export default function Nexus() {
     const [aiHealth, setAiHealth] = useState(null)
     const [contentCount, setContentCount] = useState(0)
     const [creativeCount, setCreativeCount] = useState(0)
+    const [error, setError] = useState(null)
 
     useEffect(() => {
-        agents.health().then(setAiHealth).catch(() => { })
-        contentAPI.list({ limit: 1 }).then(d => setContentCount(d.total || 0)).catch(() => { })
-        creativesAPI.list({ limit: 1 }).then(d => setCreativeCount(d.total || 0)).catch(() => { })
+        agents.health()
+            .then(setAiHealth)
+            .catch(err => setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            }))
+
+        contentAPI.list({ limit: 1 })
+            .then(d => setContentCount(d.total || 0))
+            .catch(err => setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            }))
+
+        creativesAPI.list({ limit: 1 })
+            .then(d => setCreativeCount(d.total || 0))
+            .catch(err => setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            }))
     }, [])
 
     const brand = activeBrand
@@ -25,7 +46,21 @@ export default function Nexus() {
     return (
         <DashboardLayout title="Nexus" subtitle="Cross-studio intelligence hub">
             <SEOHead title="Nexus — Mantram AI" noIndex={true} />
-            {/* Brand Header */}
+
+            {error && (
+                <div className={`mb-6 p-4 rounded-2xl border flex items-center gap-3 animate-fade-in ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
+                    <span className="material-symbols-outlined">
+                        {error.isProviderError ? 'warning' : 'error'}
+                    </span>
+                    <div className="flex-1">
+                        {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                        {error.message}
+                    </div>
+                    <button onClick={() => setError(null)} className="text-slate-500 hover:text-white">
+                        <span className="material-symbols-outlined text-sm">close</span>
+                    </button>
+                </div>
+            )}
 
             {!brand ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-4">

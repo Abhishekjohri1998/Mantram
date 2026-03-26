@@ -199,6 +199,7 @@ export default function UserDashboard() {
     const [activeTab, setActiveTab] = useState('trends')
     const [radarHover, setRadarHover] = useState(null)
     const [d2cSnapshot, setD2cSnapshot] = useState(null)
+    const [error, setError] = useState(null)
 
     // ── Analytics state (Funnel + Performance + ROAS) ──
     const [funnelData, setFunnelData] = useState(null)
@@ -224,7 +225,10 @@ export default function UserDashboard() {
     const loadSummary = useCallback(async () => {
         setLoadingSummary(true)
         try { setSummary(await dashboardSummary.get(activeBrand?._id)) }
-        catch (e) { console.warn('Dashboard summary error:', e.message) }
+        catch (err) {
+            console.warn('Dashboard summary error:', err.message)
+            setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider })
+        }
         finally { setLoadingSummary(false) }
     }, [activeBrand?._id])
 
@@ -233,7 +237,10 @@ export default function UserDashboard() {
         try {
             const data = activeBrand?._id ? await trendsAPI.brandMatch(activeBrand._id) : await trendsAPI.now()
             setTrendingTopics(data.trends || [])
-        } catch (e) { console.warn('Trends error:', e.message) }
+        } catch (err) {
+            console.warn('Trends error:', err.message)
+            setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider })
+        }
         finally { setTrendsLoading(false) }
     }, [activeBrand?._id])
 
@@ -260,7 +267,19 @@ export default function UserDashboard() {
             if (perfRes.status === 'fulfilled') setPerfData(perfRes.value?.dashboard || null)
             if (anomalyRes.status === 'fulfilled') setAnomalies(anomalyRes.value?.anomalies || [])
             if (roasRes.status === 'fulfilled') setBlendedRoas(roasRes.value || null)
-        } catch { /* silent */ }
+
+            // Check for rejected promises that might be provider errors
+            const rejected = [funnelRes, perfRes, anomalyRes, roasRes].find(r => r.status === 'rejected')
+            if (rejected && rejected.reason?.isProviderError) {
+                setError({
+                    message: rejected.reason.message,
+                    isProviderError: true,
+                    provider: rejected.reason.provider
+                })
+            }
+        } catch (err) {
+            setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider })
+        }
         finally { setLoadingAnalytics(false) }
     }, [activeBrand?._id])
 
@@ -283,7 +302,10 @@ export default function UserDashboard() {
                 ])
                 setRecentContent(c.content || [])
                 setStats({ content: c.total || 0, creatives: cr.total || 0 })
-            } catch (e) { console.warn(e) }
+            } catch (err) {
+                console.warn(err)
+                setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider })
+            }
         }
         fetchBasicData()
     }, [activeBrand?._id])
@@ -291,7 +313,12 @@ export default function UserDashboard() {
     useEffect(() => {
         loadSummary(); loadTrends(); loadAnalytics()
         setLoadingD2C(true)
-        shopifyAnalytics.snapshot().then(d => setD2cSnapshot(d)).catch(() => { }).finally(() => setLoadingD2C(false))
+        shopifyAnalytics.snapshot()
+            .then(d => setD2cSnapshot(d))
+            .catch(err => {
+                setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider })
+            })
+            .finally(() => setLoadingD2C(false))
         const interval = setInterval(() => { loadTrends(); loadSummary(); loadAnalytics() }, 30 * 60 * 1000)
         return () => clearInterval(interval)
     }, [loadSummary, loadTrends, loadAnalytics])
@@ -398,6 +425,24 @@ export default function UserDashboard() {
             `}</style>
 
             {/* ═══════════════════════════════════════════════════════════════ */}
+            {/* ═══════════════════════════════════════════════════════════════ */}
+            {/* 0. ERROR BANNER                                                */}
+            {/* ═══════════════════════════════════════════════════════════════ */}
+            {error && (
+                <div className={`mb-6 p-4 rounded-2xl border flex items-center gap-3 animate-fade-in ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
+                    <span className="material-symbols-outlined">
+                        {error.isProviderError ? 'warning' : 'error'}
+                    </span>
+                    <div className="flex-1">
+                        {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                        {error.message}
+                    </div>
+                    <button onClick={() => setError(null)} className="text-slate-500 hover:text-white transition-colors">
+                        <span className="material-symbols-outlined text-sm">close</span>
+                    </button>
+                </div>
+            )}
+
             {/* 1. HERO GREETING + STREAK                                      */}
             {/* ═══════════════════════════════════════════════════════════════ */}
             {loadingSummary ? (

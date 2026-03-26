@@ -176,7 +176,7 @@ export default function BrainstormStudio() {
     const [ideaFeedback, setIdeaFeedback] = useState({}) // { ideaTitle: 'like'|'dislike' }
     const [screenplay, setScreenplay] = useState(null)
     const [screenplayLoading, setScreenplayLoading] = useState(false)
-    const [error, setError] = useState('')
+    const [error, setError] = useState(null)
 
     // Strategy state
     const [strategyData, setStrategyData] = useState(null)
@@ -216,7 +216,7 @@ export default function BrainstormStudio() {
 
     const selectIntent = async (intentId) => {
         setIntent(intentId)
-        setError('')
+        setError(null)
         setLoading(true)
         setLoadingMsg(activeBrand ? `Analyzing ${activeBrand.name}'s DNA for your brainstorm...` : 'Preparing questions...')
         try {
@@ -234,10 +234,18 @@ export default function BrainstormStudio() {
                 setAnswers({})
                 setStep(1)
             } else {
-                setError(data.error || 'Failed to start')
+                setError({
+                    message: data.error || 'Failed to start',
+                    isProviderError: data.isProviderError,
+                    provider: data.provider
+                })
             }
         } catch (e) {
-            setError(e.message)
+            setError({
+                message: e.message,
+                isProviderError: e.isProviderError,
+                provider: e.provider
+            })
         } finally {
             setLoading(false)
         }
@@ -271,10 +279,18 @@ export default function BrainstormStudio() {
             if (data.success) {
                 setConfirmation(data)
             } else {
-                setError(data.error || 'Confirmation failed')
+                setError({
+                    message: data.error || 'Confirmation failed',
+                    isProviderError: data.isProviderError,
+                    provider: data.provider
+                })
             }
         } catch (e) {
-            setError(e.message)
+            setError({
+                message: e.message,
+                isProviderError: e.isProviderError,
+                provider: e.provider
+            })
         } finally {
             setLoading(false)
         }
@@ -284,7 +300,7 @@ export default function BrainstormStudio() {
         setLoading(true)
         setLoadingMsg(refinementHint ? 'Refining ideas...' : 'Generating multi-layer strategy...')
         setStep(3)
-        setError('')
+        setError(null)
         try {
             const fn = refinementHint ? bsAPI.refine : bsAPI.generate
             const data = await fn({
@@ -296,10 +312,18 @@ export default function BrainstormStudio() {
             if (data.success && data.ideas) {
                 setIdeas(data.ideas)
             } else {
-                setError(data.error || 'Generation failed')
+                setError({
+                    message: data.error || 'Generation failed',
+                    isProviderError: data.isProviderError,
+                    provider: data.provider
+                })
             }
         } catch (e) {
-            setError(e.message)
+            setError({
+                message: e.message,
+                isProviderError: e.isProviderError,
+                provider: e.provider
+            })
         } finally {
             setLoading(false)
         }
@@ -342,8 +366,18 @@ export default function BrainstormStudio() {
                 brand: activeBrand ? { name: activeBrand.name, dna: activeBrand.dna } : null,
             })
             if (data.success) setScreenplay(data.screenplay)
-            else setError(data.error || 'Screenplay generation failed')
-        } catch (e) { setError(e.message) }
+            else setError({
+                message: data.error || 'Screenplay generation failed',
+                isProviderError: data.isProviderError,
+                provider: data.provider
+            })
+        } catch (e) {
+            setError({
+                message: e.message,
+                isProviderError: e.isProviderError,
+                provider: e.provider
+            })
+        }
         finally { setScreenplayLoading(false) }
     }
 
@@ -390,7 +424,7 @@ export default function BrainstormStudio() {
     const resetAll = () => {
         setStep(0); setIntent(null); setQuestions([]); setCurrentQ(0); setAnswers({});
         setCurrentAnswer(''); setConfirmation(null); setIdeas(null); setExpandedIdea(null);
-        setBrandInsight(null); setIdeaFeedback({}); setScreenplay(null); setError(''); setLoading(false);
+        setBrandInsight(null); setIdeaFeedback({}); setScreenplay(null); setError(null); setLoading(false);
         setChatFilm(null); setChatHistory([]); setChatMessage(''); setChatLoading(false)
         setStrategyData(null); setStrategyId(null); setStrategyKpis([]); setStrategyMilestones([]);
         setSlides(null); setSlideIndex(0); setSlidesLoading(false); setTrackerView(null); setKpiEditing(null)
@@ -402,7 +436,7 @@ export default function BrainstormStudio() {
         setLoading(true)
         setLoadingMsg('Building your comprehensive brand strategy...')
         setStep(6)
-        setError('')
+        setError(null)
         try {
             const data = await bsAPI.strategy({
                 answers,
@@ -414,9 +448,19 @@ export default function BrainstormStudio() {
                 setStrategyKpis(data.kpis || [])
                 setStrategyMilestones(data.milestones || [])
             } else {
-                setError(data.error || 'Strategy generation failed')
+                setError({
+                    message: data.error || 'Strategy generation failed',
+                    isProviderError: data.isProviderError,
+                    provider: data.provider
+                })
             }
-        } catch (e) { setError(e.message) }
+        } catch (e) {
+            setError({
+                message: e.message,
+                isProviderError: e.isProviderError,
+                provider: e.provider
+            })
+        }
         finally { setLoading(false) }
     }
 
@@ -433,8 +477,20 @@ export default function BrainstormStudio() {
                 setSlides(data.slides)
                 setSlideIndex(0)
                 setStep(7)
-            } else { setError(data.error || 'Slides generation failed') }
-        } catch (e) { setError(e.message) }
+            } else {
+                setError({
+                    message: data.error || 'Slides generation failed',
+                    isProviderError: data.isProviderError,
+                    provider: data.provider
+                })
+            }
+        } catch (e) {
+            setError({
+                message: e.message,
+                isProviderError: e.isProviderError,
+                provider: e.provider
+            })
+        }
         finally { setSlidesLoading(false) }
     }
 
@@ -474,7 +530,13 @@ export default function BrainstormStudio() {
                 setIntent('brand-strategy')
                 setStep(6)
             }
-        } catch (e) { setError(e.message) }
+        } catch (e) {
+            setError({
+                message: e.message,
+                isProviderError: e.isProviderError,
+                provider: e.provider
+            })
+        }
         finally { setLoading(false) }
     }
 
@@ -509,9 +571,15 @@ export default function BrainstormStudio() {
             )}
 
             {error && (
-                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm mb-4 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm">error</span> {error}
-                    <button onClick={() => setError('')} className="ml-auto text-rose-400/50 hover:text-rose-400 cursor-pointer">
+                <div className={`p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm mb-4 flex items-center gap-2`}>
+                    <span className="material-symbols-outlined text-sm">
+                        {error.isProviderError ? 'warning' : 'error'}
+                    </span>
+                    <div className="flex-1">
+                        {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                        {error.message}
+                    </div>
+                    <button onClick={() => setError(null)} className="ml-auto text-current opacity-50 hover:opacity-100 cursor-pointer">
                         <span className="material-symbols-outlined text-sm">close</span>
                     </button>
                 </div>

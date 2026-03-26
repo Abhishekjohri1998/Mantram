@@ -31,7 +31,7 @@ export default function SocialMediaStudio() {
     const [tab, setTab] = useState('dashboard')
     const [loading, setLoading] = useState(false)
     const [loadingMsg, setLoadingMsg] = useState('')
-    const [error, setError] = useState('')
+    const [error, setError] = useState(null)
     const [connectedAccounts, setConnectedAccounts] = useState([])
     const [accountsLoading, setAccountsLoading] = useState(true)
     const [selectedPlatforms, setSelectedPlatforms] = useState([])
@@ -164,51 +164,101 @@ export default function SocialMediaStudio() {
 
     // === GENERATORS ===
     const generateStrategy = async () => {
-        if (!selectedPlatforms.length) return setError('Select at least one platform')
-        setLoading(true); setError(''); setLoadingMsg('Building your social media strategy...')
+        if (!selectedPlatforms.length) return setError({ message: 'Select at least one platform' })
+        setLoading(true); setError(null); setLoadingMsg('Building your social media strategy...')
         try {
             const d = await api.generateStrategy({ platforms: selectedPlatforms, timeframe, goals, currentMetrics, brand: activeBrand, brandId: activeBrand?._id, industry: activeBrand?.dna?.industry })
-            if (d.success) { setStrategyResult(d.strategy); loadHistory() } else setError(d.error || 'Failed')
-        } catch (e) { setError(e.message) } finally { setLoading(false); setLoadingMsg('') }
+            if (d.success) { setStrategyResult(d.strategy); loadHistory() } else setError({
+                message: d.error || 'Failed',
+                isProviderError: d.isProviderError,
+                provider: d.provider
+            })
+        } catch (e) {
+            setError({
+                message: e.message,
+                isProviderError: e.isProviderError,
+                provider: e.provider
+            })
+        } finally { setLoading(false); setLoadingMsg('') }
     }
     const generateCalendar = async () => {
-        if (!selectedPlatforms.length) return setError('Select at least one platform')
-        setLoading(true); setError(''); setLoadingMsg('Creating your content calendar...')
+        if (!selectedPlatforms.length) return setError({ message: 'Select at least one platform' })
+        setLoading(true); setError(null); setLoadingMsg('Creating your content calendar...')
         try {
             const d = await api.generateCalendar({ platforms: selectedPlatforms, month: currentMonth + 1, year: currentYear, brand: activeBrand, brandId: activeBrand?._id })
-            if (d.success) { setCalendarResult(d.calendar); loadHistory() } else setError(d.error || 'Failed')
-        } catch (e) { setError(e.message) } finally { setLoading(false); setLoadingMsg('') }
+            if (d.success) { setCalendarResult(d.calendar); loadHistory() } else setError({
+                message: d.error || 'Failed',
+                isProviderError: d.isProviderError,
+                provider: d.provider
+            })
+        } catch (e) {
+            setError({
+                message: e.message,
+                isProviderError: e.isProviderError,
+                provider: e.provider
+            })
+        } finally { setLoading(false); setLoadingMsg('') }
     }
     const runAudit = async () => {
-        setLoading(true); setError(''); setLoadingMsg('AI is auditing your account...')
+        setLoading(true); setError(null); setLoadingMsg('AI is auditing your account...')
         try {
             const acct = Array.isArray(connectedAccounts) ? connectedAccounts.find(a => a.platform === auditPlatform) : null
             const metrics = acct ? { followers: acct.followers || '', engagementRate: acct.engagementRate || '', postsPerWeek: '', avgLikes: '', avgComments: '' } : {}
             const d = await api.accountAudit({ platform: auditPlatform, metrics, brand: activeBrand, brandId: activeBrand?._id })
-            if (d.success) { setAuditResult(d.audit); loadHistory() } else setError(d.error || 'Failed')
-        } catch (e) { setError(e.message) } finally { setLoading(false); setLoadingMsg('') }
+            if (d.success) { setAuditResult(d.audit); loadHistory() } else setError({
+                message: d.error || 'Failed',
+                isProviderError: d.isProviderError,
+                provider: d.provider
+            })
+        } catch (e) {
+            setError({
+                message: e.message,
+                isProviderError: e.isProviderError,
+                provider: e.provider
+            })
+        } finally { setLoading(false); setLoadingMsg('') }
     }
     const runProfileScore = async () => {
-        setProfileScoreLoading(true); setError(''); setLoadingMsg('Scoring your ' + auditPlatform + ' profile...')
+        setProfileScoreLoading(true); setError(null); setLoadingMsg('Scoring your ' + auditPlatform + ' profile...')
         try {
             const d = await api.profileScore({ platform: auditPlatform, brand: activeBrand, brandId: activeBrand?._id })
-            if (d.success) { setProfileScore(d.scoreCard); loadHistory() } else setError(d.error || 'Failed')
-        } catch (e) { setError(e.message) } finally { setProfileScoreLoading(false); setLoadingMsg('') }
+            if (d.success) { setProfileScore(d.scoreCard); loadHistory() } else setError({
+                message: d.error || 'Failed',
+                isProviderError: d.isProviderError,
+                provider: d.provider
+            })
+        } catch (e) {
+            setError({
+                message: e.message,
+                isProviderError: e.isProviderError,
+                provider: e.provider
+            })
+        } finally { setProfileScoreLoading(false); setLoadingMsg('') }
     }
     const runCompetitorAnalysis = async () => {
         const valid = competitors.filter(c => c.trim())
-        if (!valid.length) return setError('Add at least one competitor')
-        setLoading(true); setError(''); setLoadingMsg('Analyzing competitors...')
+        if (!valid.length) return setError({ message: 'Add at least one competitor' })
+        setLoading(true); setError(null); setLoadingMsg('Analyzing competitors...')
         try {
             const d = await api.competitorAnalysis({ competitors: valid.map(c => ({ name: c })), platforms: selectedPlatforms.length ? selectedPlatforms : ['instagram','linkedin'], brand: activeBrand, brandId: activeBrand?._id })
-            if (d.success) { setCompResult(d.analysis); loadHistory() } else setError(d.error || 'Failed')
-        } catch (e) { setError(e.message) } finally { setLoading(false); setLoadingMsg('') }
+            if (d.success) { setCompResult(d.analysis); loadHistory() } else setError({
+                message: d.error || 'Failed',
+                isProviderError: d.isProviderError,
+                provider: d.provider
+            })
+        } catch (e) {
+            setError({
+                message: e.message,
+                isProviderError: e.isProviderError,
+                provider: e.provider
+            })
+        } finally { setLoading(false); setLoadingMsg('') }
     }
 
     // AGENTIC: One-click Full Analysis
     const runFullAnalysis = async () => {
         setFullAnalysisRunning(true); setLoading(true); setLoadingMsg('Running Full Analysis — Strategy + Audit + Competitor...')
-        setError('')
+        setError(null)
         try {
             const plats = selectedPlatforms.length ? selectedPlatforms : ['instagram','linkedin']
             const validComps = competitors.filter(c => c.trim())
@@ -221,7 +271,13 @@ export default function SocialMediaStudio() {
             if (aud.status === 'fulfilled' && aud.value?.success) setAuditResult(aud.value.audit)
             if (comp.status === 'fulfilled' && comp.value?.success) setCompResult(comp.value.analysis)
             loadHistory()
-        } catch (e) { setError(e.message) }
+        } catch (e) {
+            setError({
+                message: e.message,
+                isProviderError: e.isProviderError,
+                provider: e.provider
+            })
+        }
         finally { setLoading(false); setLoadingMsg(''); setFullAnalysisRunning(false) }
     }
 
@@ -242,7 +298,11 @@ export default function SocialMediaStudio() {
                 window.open(d.authUrl, `Connect ${platform}`, `width=${width},height=${height},left=${left},top=${top}`)
             }
         } catch (e) {
-            setError(e.message)
+            setError({
+                message: e.message,
+                isProviderError: e.isProviderError,
+                provider: e.provider
+            })
         }
     }
 
@@ -269,7 +329,7 @@ export default function SocialMediaStudio() {
             {/* TAB BAR */}
             <div className="flex gap-1 p-1.5 rounded-2xl bg-white/[0.02] border border-white/[0.06] mb-6 overflow-x-auto">
                 {TABS.map(t => (
-                    <button key={t.id} onClick={() => { setTab(t.id); setError('') }}
+                    <button key={t.id} onClick={() => { setTab(t.id); setError(null) }}
                         className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-sm font-medium transition-all whitespace-nowrap cursor-pointer ${tab === t.id ? 'bg-gradient-to-r from-primary/15 to-violet-500/15 text-white border border-primary/30' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'}`}>
                         <span className="material-symbols-outlined text-base">{t.icon}</span>
                         <span className="hidden md:inline">{t.label}</span>
@@ -278,7 +338,20 @@ export default function SocialMediaStudio() {
                 ))}
             </div>
 
-            {error && <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm flex items-center gap-2"><span className="material-symbols-outlined text-base">error</span>{error}<button onClick={() => setError('')} className="ml-auto cursor-pointer">✕</button></div>}
+            {error && (
+                <div className={`mb-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                    <span className="material-symbols-outlined text-base">
+                        {error.isProviderError ? 'warning' : 'error'}
+                    </span>
+                    <div className="flex-1">
+                        {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                        {error.message}
+                    </div>
+                    <button onClick={() => setError(null)} className="ml-auto opacity-50 hover:opacity-100 cursor-pointer">
+                        <span className="material-symbols-outlined text-base">close</span>
+                    </button>
+                </div>
+            )}
 
             {loading && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center"><div className="max-w-md w-full mx-4"><GlobalLoader isActive={true} title={loadingMsg || 'AI is thinking...'} icon="psychology" estimatedDuration={fullAnalysisRunning ? 90 : 45} stages={fullAnalysisRunning ? ['Strategy', 'Account Audit', 'Competitor Intel'] : ['Analyzing Data', 'Building Report']} currentStage={fullAnalysisRunning ? 'Strategy' : 'Analyzing Data'} /></div></div>}
 

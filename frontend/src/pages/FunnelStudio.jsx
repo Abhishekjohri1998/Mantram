@@ -56,6 +56,7 @@ export default function FunnelStudio() {
     const [scoringLoading, setScoringLoading] = useState(false)
     const [landingPages, setLandingPages] = useState([])
     const [pagesLoading, setPagesLoading] = useState(false)
+    const [error, setError] = useState(null)
 
     // Automation engine state
     const [automationRules, setAutomationRules] = useState([])
@@ -110,7 +111,13 @@ export default function FunnelStudio() {
             setSelectedFunnel(fData.funnel)
             setAnalytics(aData.analytics)
             setView('analytics')
-        } catch { }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
 
     const createFromTemplate = async (templateId) => {
@@ -122,7 +129,13 @@ export default function FunnelStudio() {
                 await fetchFunnels()
                 openFunnel(data.funnel)
             }
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
         finally { setCreatingTemplate(null) }
     }
 
@@ -133,7 +146,13 @@ export default function FunnelStudio() {
             await api.delete(id)
             if (selectedFunnel?._id === id) { setSelectedFunnel(null); setView('dashboard') }
             await fetchFunnels()
-        } catch { }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
 
     const toggleFunnelStatus = async (id, currentStatus, e) => {
@@ -142,7 +161,13 @@ export default function FunnelStudio() {
         try {
             await api.update(id, { status: newStatus })
             await fetchFunnels()
-        } catch { }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
 
     const duplicateFunnel = async (id, e) => {
@@ -151,7 +176,13 @@ export default function FunnelStudio() {
         try {
             const data = await api.duplicate(id)
             if (data.funnel) { await fetchFunnels(); openFunnel(data.funnel) }
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
         finally { setDuplicating(null) }
     }
 
@@ -164,7 +195,13 @@ export default function FunnelStudio() {
             setSelectedFunnel(refreshed.funnel)
             setEntriesByStage(refreshed.entriesByStage || {})
             setShowImportModal(false)
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
 
     const fetchSuggestions = async () => {
@@ -173,7 +210,13 @@ export default function FunnelStudio() {
         try {
             const data = await api.aiSuggestions(selectedFunnel._id)
             setSuggestions(data.suggestions || [])
-        } catch { }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
         finally { setLoadingSuggestions(false) }
     }
 
@@ -182,7 +225,13 @@ export default function FunnelStudio() {
         try {
             const data = await api.update(selectedFunnel._id, { stages: newStages })
             setSelectedFunnel(data.funnel)
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
 
     // ── Nurture Sequences ──
@@ -192,7 +241,13 @@ export default function FunnelStudio() {
         try {
             const data = await nurtureApi.list(funnelId)
             setNurtureSequencesData(data.sequences || [])
-        } catch { }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
         finally { setNurtureLoading(false) }
     }
 
@@ -203,7 +258,13 @@ export default function FunnelStudio() {
                 setNurtureSequencesData(prev => [...prev, result.sequence])
             }
             return result
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
 
     const aiGenerateNurture = async (data) => {
@@ -213,7 +274,13 @@ export default function FunnelStudio() {
                 setNurtureSequencesData(prev => [...prev, result.sequence])
             }
             return result
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
 
     const updateNurtureSequence = async (id, data) => {
@@ -223,7 +290,13 @@ export default function FunnelStudio() {
                 setNurtureSequencesData(prev => prev.map(s => s._id === id ? result.sequence : s))
             }
             return result
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
 
     const deleteNurtureSequence = async (id) => {
@@ -231,7 +304,13 @@ export default function FunnelStudio() {
         try {
             await nurtureApi.delete(id)
             setNurtureSequencesData(prev => prev.filter(s => s._id !== id))
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
 
     const toggleNurtureSequence = async (id) => {
@@ -240,7 +319,13 @@ export default function FunnelStudio() {
             if (result.sequence) {
                 setNurtureSequencesData(prev => prev.map(s => s._id === id ? result.sequence : s))
             }
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
 
     // ── Phase 4: Intelligence ──
@@ -249,7 +334,13 @@ export default function FunnelStudio() {
         try {
             const data = await intelApi.health(funnelId)
             setHealthData(data.health)
-        } catch { }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
         finally { setHealthLoading(false) }
     }
 
@@ -263,7 +354,13 @@ export default function FunnelStudio() {
             const refreshed = await api.get(selectedFunnel._id)
             setSelectedFunnel(refreshed.funnel)
             setEntriesByStage(refreshed.entriesByStage || {})
-        } catch { }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
         finally { setScoringLoading(false) }
     }
 
@@ -272,7 +369,13 @@ export default function FunnelStudio() {
         try {
             const data = await intelApi.listPages(funnelId)
             setLandingPages(data.pages || [])
-        } catch { }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
         finally { setPagesLoading(false) }
     }
 
@@ -281,7 +384,13 @@ export default function FunnelStudio() {
             const result = await intelApi.createPage(data)
             if (result.page) setLandingPages(prev => [...prev, result.page])
             return result
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
 
     const aiGeneratePage = async (data) => {
@@ -289,7 +398,13 @@ export default function FunnelStudio() {
             const result = await intelApi.aiGeneratePage(data)
             if (result.page) setLandingPages(prev => [...prev, result.page])
             return result
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
 
     const deleteLandingPage = async (id) => {
@@ -297,7 +412,13 @@ export default function FunnelStudio() {
         try {
             await intelApi.deletePage(id)
             setLandingPages(prev => prev.filter(p => p._id !== id))
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
 
     // ── Automation Engine ──
@@ -306,7 +427,13 @@ export default function FunnelStudio() {
         try {
             const data = await autoApi.list(funnelId)
             setAutomationRules(data.rules || [])
-        } catch { }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
         finally { setAutoLoading(false) }
     }
 
@@ -315,7 +442,13 @@ export default function FunnelStudio() {
             const result = await autoApi.create(data)
             if (result.rule) setAutomationRules(prev => [...prev, result.rule])
             return result
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
 
     const deleteAutomationRule = async (id) => {
@@ -323,14 +456,26 @@ export default function FunnelStudio() {
         try {
             await autoApi.delete(id)
             setAutomationRules(prev => prev.filter(r => r._id !== id))
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
 
     const toggleAutomationRule = async (id) => {
         try {
             const result = await autoApi.toggle(id)
             if (result.rule) setAutomationRules(prev => prev.map(r => r._id === id ? result.rule : r))
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
 
     const aiGenerateRules = async (prompt) => {
@@ -340,7 +485,13 @@ export default function FunnelStudio() {
             const result = await autoApi.aiGenerate({ funnelId: selectedFunnel._id, prompt })
             if (result.rules) setAutomationRules(prev => [...prev, ...result.rules])
             return result
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
         finally { setAutoGenerating(false) }
     }
 
@@ -354,7 +505,13 @@ export default function FunnelStudio() {
             const refreshed = await api.get(selectedFunnel._id)
             setSelectedFunnel(refreshed.funnel)
             setEntriesByStage(refreshed.entriesByStage || {})
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
         finally { setAutoRunning(false) }
     }
 
@@ -366,7 +523,13 @@ export default function FunnelStudio() {
             setSelectedFunnel(data.funnel)
             setEntriesByStage(data.entriesByStage || {})
             setShowAddEntry(false)
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
 
     const moveEntry = async (entryId, toStage) => {
@@ -376,7 +539,13 @@ export default function FunnelStudio() {
             const data = await api.get(selectedFunnel._id)
             setSelectedFunnel(data.funnel)
             setEntriesByStage(data.entriesByStage || {})
-        } catch { }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
 
     const updateEntryStatus = async (entryId, status) => {
@@ -386,7 +555,13 @@ export default function FunnelStudio() {
             const data = await api.get(selectedFunnel._id)
             setSelectedFunnel(data.funnel)
             setEntriesByStage(data.entriesByStage || {})
-        } catch { }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
 
     const deleteEntry = async (entryId) => {
@@ -396,7 +571,13 @@ export default function FunnelStudio() {
             const data = await api.get(selectedFunnel._id)
             setSelectedFunnel(data.funnel)
             setEntriesByStage(data.entriesByStage || {})
-        } catch { }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -426,6 +607,20 @@ export default function FunnelStudio() {
         return (
             <DashboardLayout title="Nurture Sequences" subtitle={selectedFunnel.name}>
                 <SEOHead title={`Nurture — ${selectedFunnel.name}`} noIndex={true} />
+                {error && (
+                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                        <span className="material-symbols-outlined text-base">
+                            {error.isProviderError ? 'warning' : 'error'}
+                        </span>
+                        <div className="flex-1">
+                            {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                            {error.message}
+                        </div>
+                        <button onClick={() => setError(null)} className="ml-auto opacity-50 hover:opacity-100 cursor-pointer">
+                            <span className="material-symbols-outlined text-base">close</span>
+                        </button>
+                    </div>
+                )}
                 <NurtureView
                     funnel={selectedFunnel}
                     sequences={nurtureSequencesData}
@@ -449,6 +644,20 @@ export default function FunnelStudio() {
         return (
             <DashboardLayout title="Funnel Health" subtitle={selectedFunnel.name}>
                 <SEOHead title={`Health — ${selectedFunnel.name}`} noIndex={true} />
+                {error && (
+                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                        <span className="material-symbols-outlined text-base">
+                            {error.isProviderError ? 'warning' : 'error'}
+                        </span>
+                        <div className="flex-1">
+                            {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                            {error.message}
+                        </div>
+                        <button onClick={() => setError(null)} className="ml-auto opacity-50 hover:opacity-100 cursor-pointer">
+                            <span className="material-symbols-outlined text-base">close</span>
+                        </button>
+                    </div>
+                )}
                 <HealthDashboardView
                     funnel={selectedFunnel}
                     health={healthData}
@@ -470,6 +679,20 @@ export default function FunnelStudio() {
         return (
             <DashboardLayout title="Landing Pages" subtitle={selectedFunnel.name}>
                 <SEOHead title={`Pages — ${selectedFunnel.name}`} noIndex={true} />
+                {error && (
+                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                        <span className="material-symbols-outlined text-base">
+                            {error.isProviderError ? 'warning' : 'error'}
+                        </span>
+                        <div className="flex-1">
+                            {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                            {error.message}
+                        </div>
+                        <button onClick={() => setError(null)} className="ml-auto opacity-50 hover:opacity-100 cursor-pointer">
+                            <span className="material-symbols-outlined text-base">close</span>
+                        </button>
+                    </div>
+                )}
                 <LandingPagesView
                     funnel={selectedFunnel}
                     pages={landingPages}
@@ -494,6 +717,20 @@ export default function FunnelStudio() {
         return (
             <DashboardLayout title="Revenue Forecast" subtitle={selectedFunnel.name}>
                 <SEOHead title={`Forecast — ${selectedFunnel.name}`} noIndex={true} />
+                {error && (
+                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                        <span className="material-symbols-outlined text-base">
+                            {error.isProviderError ? 'warning' : 'error'}
+                        </span>
+                        <div className="flex-1">
+                            {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                            {error.message}
+                        </div>
+                        <button onClick={() => setError(null)} className="ml-auto opacity-50 hover:opacity-100 cursor-pointer">
+                            <span className="material-symbols-outlined text-base">close</span>
+                        </button>
+                    </div>
+                )}
                 <RevenueForecastView forecast={revenueForecast} funnel={selectedFunnel} onBack={() => setView('pipeline')} />
             </DashboardLayout>
         )
@@ -506,8 +743,22 @@ export default function FunnelStudio() {
         return (
             <DashboardLayout title="Activity Feed" subtitle={selectedFunnel.name}>
                 <SEOHead title={`Activity — ${selectedFunnel.name}`} noIndex={true} />
+                {error && (
+                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                        <span className="material-symbols-outlined text-base">
+                            {error.isProviderError ? 'warning' : 'error'}
+                        </span>
+                        <div className="flex-1">
+                            {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                            {error.message}
+                        </div>
+                        <button onClick={() => setError(null)} className="ml-auto opacity-50 hover:opacity-100 cursor-pointer">
+                            <span className="material-symbols-outlined text-base">close</span>
+                        </button>
+                    </div>
+                )}
                 <ActivityFeedView feed={activityFeed} funnel={selectedFunnel} onBack={() => setView('pipeline')}
-                    onRefresh={async () => { try { const r = await autoApi.activityFeed(selectedFunnel._id); setActivityFeed(r.feed || []) } catch {} }} />
+                    onRefresh={async () => { try { const r = await autoApi.activityFeed(selectedFunnel._id); setActivityFeed(r.feed || []) } catch (err) { setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider }) } }} />
             </DashboardLayout>
         )
     }
@@ -519,6 +770,20 @@ export default function FunnelStudio() {
         return (
             <DashboardLayout title="Webhook Integrations" subtitle={selectedFunnel.name}>
                 <SEOHead title={`Webhooks — ${selectedFunnel.name}`} noIndex={true} />
+                {error && (
+                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                        <span className="material-symbols-outlined text-base">
+                            {error.isProviderError ? 'warning' : 'error'}
+                        </span>
+                        <div className="flex-1">
+                            {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                            {error.message}
+                        </div>
+                        <button onClick={() => setError(null)} className="ml-auto opacity-50 hover:opacity-100 cursor-pointer">
+                            <span className="material-symbols-outlined text-base">close</span>
+                        </button>
+                    </div>
+                )}
                 <WebhooksView webhookData={webhookData} funnel={selectedFunnel} onBack={() => setView('pipeline')} />
             </DashboardLayout>
         )
@@ -534,9 +799,9 @@ export default function FunnelStudio() {
                 <SharedTemplatesView
                     templates={sharedTemplates} funnels={funnels} brandId={currentBrand?._id}
                     onBack={() => setView('dashboard')}
-                    onRefresh={async () => { try { const r = await shareApi.browse(); setSharedTemplates(r.templates || []) } catch {} }}
-                    onClone={async (id) => { try { await shareApi.clone(id, { brandId: currentBrand?._id }); fetchFunnels() } catch {} }}
-                    onShare={async (id) => { try { await shareApi.share(id, {}); } catch {} }}
+                    onRefresh={async () => { try { const r = await shareApi.browse(); setSharedTemplates(r.templates || []) } catch (err) { setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider }) } }}
+                    onClone={async (id) => { try { await shareApi.clone(id, { brandId: currentBrand?._id }); fetchFunnels() } catch (err) { setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider }) } }}
+                    onShare={async (id) => { try { await shareApi.share(id, {}); } catch (err) { setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider }) } }}
                 />
             </DashboardLayout>
         )
@@ -546,6 +811,20 @@ export default function FunnelStudio() {
         return (
             <DashboardLayout title="Automations" subtitle={selectedFunnel.name}>
                 <SEOHead title={`Automations — ${selectedFunnel.name}`} noIndex={true} />
+                {error && (
+                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                        <span className="material-symbols-outlined text-base">
+                            {error.isProviderError ? 'warning' : 'error'}
+                        </span>
+                        <div className="flex-1">
+                            {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                            {error.message}
+                        </div>
+                        <button onClick={() => setError(null)} className="ml-auto opacity-50 hover:opacity-100 cursor-pointer">
+                            <span className="material-symbols-outlined text-base">close</span>
+                        </button>
+                    </div>
+                )}
                 <AutomationView
                     funnel={selectedFunnel}
                     rules={automationRules}
@@ -559,6 +838,7 @@ export default function FunnelStudio() {
                     onToggle={toggleAutomationRule}
                     onAIGenerate={aiGenerateRules}
                     onRunAll={runAllAutomations}
+                    setError={setError} // Pass setError to AutomationView
                 />
             </DashboardLayout>
         )
@@ -747,11 +1027,11 @@ export default function FunnelStudio() {
                                 className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'analytics' ? 'bg-cyan-500/15 text-cyan-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>analytics</span> Analytics
                             </button>
-                            <button onClick={async () => { try { const r = await autoApi.revenueForecast(selectedFunnel._id); setRevenueForecast(r.forecast); setView('forecast') } catch {} }}
+                            <button onClick={async () => { try { const r = await autoApi.revenueForecast(selectedFunnel._id); setRevenueForecast(r.forecast); setView('forecast') } catch (err) { setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider }) } }}
                                 className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'forecast' ? 'bg-cyan-500/15 text-cyan-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>trending_up</span> Forecast
                             </button>
-                            <button onClick={async () => { try { await runScoring(); setView('health') } catch {} }}
+                            <button onClick={async () => { try { await runScoring(); setView('health') } catch (err) { setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider }) } }}
                                 className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold text-amber-400 hover:bg-amber-500/10 transition-all cursor-pointer whitespace-nowrap">
                                 <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>score</span> Score Leads
                             </button>
@@ -771,7 +1051,7 @@ export default function FunnelStudio() {
                                 className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'pages' ? 'bg-emerald-500/15 text-emerald-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>web</span> Pages
                             </button>
-                            <button onClick={async () => { try { const r = await autoApi.activityFeed(selectedFunnel._id); setActivityFeed(r.feed || []); setView('activity') } catch {} }}
+                            <button onClick={async () => { try { const r = await autoApi.activityFeed(selectedFunnel._id); setActivityFeed(r.feed || []); setView('activity') } catch (err) { setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider }) } }}
                                 className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'activity' ? 'bg-emerald-500/15 text-emerald-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>dynamic_feed</span> Feed
                             </button>
@@ -783,7 +1063,7 @@ export default function FunnelStudio() {
                                 className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'builder' ? 'bg-amber-500/15 text-amber-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>build</span> Stage Builder
                             </button>
-                            <button onClick={async () => { try { const r = await shareApi.webhookToken(selectedFunnel._id); setWebhookData(r); setView('webhooks') } catch {} }}
+                            <button onClick={async () => { try { const r = await shareApi.webhookToken(selectedFunnel._id); setWebhookData(r); setView('webhooks') } catch (err) { setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider }) } }}
                                 className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${view === 'webhooks' ? 'bg-amber-500/15 text-amber-300' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>webhook</span> Webhooks
                             </button>
@@ -800,7 +1080,7 @@ export default function FunnelStudio() {
                                 {/* Column Header */}
                                 <div className="flex items-center justify-between mb-3 px-1">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: stage.color }} />
+                                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: stage.color }} />
                                         <h3 className="text-sm font-bold text-white">{stage.name}</h3>
                                         <span className="text-xs px-1.5 py-0.5 rounded-md bg-white/[0.06] text-slate-400 font-bold">{stageEntries.length}</span>
                                     </div>
@@ -941,9 +1221,9 @@ export default function FunnelStudio() {
                 {/* #8 Fidato AI Sidebar */}
                 {fidatoOpen && (
                     <FidatoFunnelSidebar funnel={selectedFunnel} onClose={() => setFidatoOpen(false)}
-                        onScoreDecay={async () => { try { await autoApi.scoreDecay({ funnelId: selectedFunnel._id }); const r = await api.get(selectedFunnel._id); setSelectedFunnel(r.funnel); setEntriesByStage(r.entriesByStage || {}) } catch {} }}
-                        onPredictiveScore={async () => { try { await autoApi.predictiveScore({ funnelId: selectedFunnel._id }); const r = await api.get(selectedFunnel._id); setSelectedFunnel(r.funnel); setEntriesByStage(r.entriesByStage || {}) } catch {} }}
-                        onRunAutomations={async () => { try { await autoApi.run({ funnelId: selectedFunnel._id }); const r = await api.get(selectedFunnel._id); setSelectedFunnel(r.funnel); setEntriesByStage(r.entriesByStage || {}) } catch {} }}
+                        onScoreDecay={async () => { try { await autoApi.scoreDecay({ funnelId: selectedFunnel._id }); const r = await api.get(selectedFunnel._id); setSelectedFunnel(r.funnel); setEntriesByStage(r.entriesByStage || {}) } catch (err) { setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider }) } }}
+                        onPredictiveScore={async () => { try { await autoApi.predictiveScore({ funnelId: selectedFunnel._id }); const r = await api.get(selectedFunnel._id); setSelectedFunnel(r.funnel); setEntriesByStage(r.entriesByStage || {}) } catch (err) { setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider }) } }}
+                        onRunAutomations={async () => { try { await autoApi.run({ funnelId: selectedFunnel._id }); const r = await api.get(selectedFunnel._id); setSelectedFunnel(r.funnel); setEntriesByStage(r.entriesByStage || {}) } catch (err) { setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider }) } }}
                     />
                 )}
             </DashboardLayout>
@@ -974,7 +1254,20 @@ export default function FunnelStudio() {
     return (
         <DashboardLayout title="Funnel Studio" subtitle="Build and manage your sales funnels">
             <SEOHead title="Funnel Studio — Mantram AI" noIndex={true} />
-
+            {error && (
+                <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                    <span className="material-symbols-outlined text-base">
+                        {error.isProviderError ? 'warning' : 'error'}
+                    </span>
+                    <div className="flex-1">
+                        {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                        {error.message}
+                    </div>
+                    <button onClick={() => setError(null)} className="ml-auto opacity-50 hover:opacity-100 cursor-pointer">
+                        <span className="material-symbols-outlined text-base">close</span>
+                    </button>
+                </div>
+            )}
             {/* ═══ Report Button ═══ */}
             <div className="flex justify-end mb-4">
                 <StudioReportButton studio="funnel" brandId={currentBrand?._id} />
@@ -1023,7 +1316,7 @@ export default function FunnelStudio() {
             <div className="flex items-center gap-3 mb-6 overflow-x-auto pb-1">
                 {[
                     { label: 'AI Generate', icon: 'auto_awesome', color: '#8b5cf6', onClick: () => setShowAIModal(true) },
-                    { label: 'Marketplace', icon: 'storefront', color: '#6366f1', onClick: async () => { try { const r = await shareApi.browse(); setSharedTemplates(r.templates || []) } catch {}; setView('sharing') } },
+                    { label: 'Marketplace', icon: 'storefront', color: '#6366f1', onClick: async () => { try { const r = await shareApi.browse(); setSharedTemplates(r.templates || []) } catch (err) { setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider }) } ; setView('sharing') } },
                     { label: 'How It Works', icon: 'menu_book', color: '#06b6d4', onClick: () => setView('help') },
                 ].map(a => (
                     <button key={a.label} onClick={a.onClick}
@@ -1223,6 +1516,7 @@ export default function FunnelStudio() {
 
             {/* AI Generate Modal */}
             {showAIModal && <AIGenerateModal brandId={currentBrand?._id} onCreated={(f) => { fetchFunnels(); openFunnel(f); setShowAIModal(false) }} onClose={() => setShowAIModal(false)} />}
+            {error && <ErrorModal error={error} onClose={() => setError(null)} />}
         </DashboardLayout>
     )
 }

@@ -57,7 +57,7 @@ export default function VideoStudio() {
     const [step, setStep] = useState(0) // 0=input, 1=concepts, 2=script, 3=voiceover, 4=cost, 5=generate, 6=review
     const [loading, setLoading] = useState(false)
     const [studioMode, setStudioMode] = useState('storyboard') // 'advanced' | 'storyboard' | 'ugc'
-    const [error, setError] = useState('')
+    const [error, setError] = useState(null)
     const [autoStart, setAutoStart] = useState(false)
     const [searchParams, setSearchParams] = useSearchParams()
 
@@ -274,7 +274,13 @@ export default function VideoStudio() {
             setConcepts(data.project.concepts || [])
             setPipeline(data.project.pipeline)
             setStep(1)
-        } catch (err) { setError(err.message) }
+        } catch (err) { 
+            setError({ 
+                message: err.message, 
+                isProviderError: err.isProviderError, 
+                provider: err.provider 
+            }) 
+        }
         setLoading(false)
     }
 
@@ -293,7 +299,13 @@ export default function VideoStudio() {
             setBackendPrompt(data.project.backendPrompt || '')
             setPipeline(data.project.pipeline)
             setStep(2)
-        } catch (err) { setError(err.message) }
+        } catch (err) { 
+            setError({ 
+                message: err.message, 
+                isProviderError: err.isProviderError, 
+                provider: err.provider 
+            }) 
+        }
         setLoading(false)
     }
 
@@ -323,7 +335,13 @@ export default function VideoStudio() {
                 api('/video-studio/ugc/sarvam-voices').then(d => setSarvamVoiceList(d.voices || [])).catch(() => {})
             }
             setStep(3) // voice over preview step
-        } catch (err) { setError(err.message) }
+        } catch (err) { 
+            setError({ 
+                message: err.message, 
+                isProviderError: err.isProviderError, 
+                provider: err.provider 
+            }) 
+        }
         setLoading(false)
     }
 
@@ -348,7 +366,13 @@ export default function VideoStudio() {
                 body: JSON.stringify(body),
             })
             setVoiceoverAudioUrl(data.audioUrl)
-        } catch (err) { setError(err.message) }
+        } catch (err) { 
+            setError({ 
+                message: err.message, 
+                isProviderError: err.isProviderError, 
+                provider: err.provider 
+            }) 
+        }
         setVoiceoverLoading(false)
     }
 
@@ -371,7 +395,13 @@ export default function VideoStudio() {
             setPipeline(data.project.pipeline)
             setStep(5)
             startPolling()
-        } catch (err) { setError(err.message) }
+        } catch (err) { 
+            setError({ 
+                message: err.message, 
+                isProviderError: err.isProviderError, 
+                provider: err.provider 
+            }) 
+        }
         setLoading(false)
     }
 
@@ -412,7 +442,13 @@ export default function VideoStudio() {
             setGeneration(data.project.generation)
             setStep(5)
             startPolling()
-        } catch (err) { setError(err.message) }
+        } catch (err) { 
+            setError({ 
+                message: err.message, 
+                isProviderError: err.isProviderError, 
+                provider: err.provider 
+            }) 
+        }
         setLoading(false)
     }
 
@@ -426,7 +462,13 @@ export default function VideoStudio() {
             setBrief(''); setImages([]); setConcepts([]); setScript(null); setBackendPrompt('')
             setRouting(null); setGeneration(null); setCritique(null)
             api('/video-studio?limit=10').then(d => setProjects(d.projects || [])).catch(() => { })
-        } catch (err) { setError(err.message) }
+        } catch (err) { 
+            setError({ 
+                message: err.message, 
+                isProviderError: err.isProviderError, 
+                provider: err.provider 
+            }) 
+        }
         setLoading(false)
     }
 
@@ -465,7 +507,13 @@ export default function VideoStudio() {
             setStep(statusMap[p.status] || 0)
             setShowHistory(false)
             if (p.status === 'generating') startPolling()
-        } catch (err) { setError(err.message) }
+        } catch (err) { 
+            setError({ 
+                message: err.message, 
+                isProviderError: err.isProviderError, 
+                provider: err.provider 
+            }) 
+        }
         setLoading(false)
     }
 
@@ -788,10 +836,15 @@ export default function VideoStudio() {
 
                     {/* ── Error ── */}
                     {error && (
-                        <div className="mb-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm flex items-center gap-2">
-                            <span className="material-symbols-outlined text-lg">error</span>
-                            {error}
-                            <button onClick={() => setError('')} className="ml-auto text-rose-300 hover:text-white cursor-pointer">
+                        <div className={`mb-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                            <span className="material-symbols-outlined text-sm">
+                                {error.isProviderError ? 'warning' : 'error'}
+                            </span>
+                            <div className="flex-1">
+                                {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                                {error.message}
+                            </div>
+                            <button onClick={() => setError(null)} className={`ml-auto ${error.isProviderError ? 'text-amber-300' : 'text-rose-300'} hover:text-white cursor-pointer`}>
                                 <span className="material-symbols-outlined text-sm">close</span>
                             </button>
                         </div>

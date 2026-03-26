@@ -333,7 +333,7 @@ export default function CreativeStudio() {
     const [autoGenerate, setAutoGenerate] = useState(false)
     const [enhancing, setEnhancing] = useState(false)
     const [result, setResult] = useState(null)
-    const [error, setError] = useState('')
+    const [error, setError] = useState(null)
     const [feedbackState, setFeedbackState] = useState(null)  // 'liked' | 'disliked' | 'accepted'
     const [feedbackToast, setFeedbackToast] = useState('')
     const [style, setStyle] = useState('modern')
@@ -353,7 +353,7 @@ export default function CreativeStudio() {
     const [animateProjectId, setAnimateProjectId] = useState(null)
     const [animateProgress, setAnimateProgress] = useState(0)
     const [animateVideoUrl, setAnimateVideoUrl] = useState(null)
-    const [animateError, setAnimateError] = useState('')
+    const [animateError, setAnimateError] = useState(null)
     const animatePollRef = useRef(null)
 
     // Synced with backend MODEL_CAPABILITIES (falClient.js) + xAI/fal.ai/PiAPI API docs
@@ -478,7 +478,11 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 } catch { /* continue polling */ }
             }, 5000)
         } catch (e) {
-            setAnimateError(e.message)
+            setAnimateError({
+                message: e.message,
+                isProviderError: e.isProviderError,
+                provider: e.provider
+            })
             setAnimateGenerating(false)
         }
     }
@@ -503,14 +507,14 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [vtoHdResult, setVtoHdResult] = useState(null)
     const [vtoLoading, setVtoLoading] = useState(false)
     const [vtoHdLoading, setVtoHdLoading] = useState(false)
-    const [vtoError, setVtoError] = useState('')
+    const [vtoError, setVtoError] = useState(null)
 
     // ── Lifestyle Mockups State ──
     const [mockupProductImage, setMockupProductImage] = useState(null)
     const [mockupScenePrompt, setMockupScenePrompt] = useState('')
     const [mockupResult, setMockupResult] = useState(null)
     const [mockupLoading, setMockupLoading] = useState(false)
-    const [mockupError, setMockupError] = useState('')
+    const [mockupError, setMockupError] = useState(null)
     const [mockupAspectRatio, setMockupAspectRatio] = useState('1:1')
     const [mockupSceneCategory, setMockupSceneCategory] = useState('all')
     const [mockupSubMode, setMockupSubMode] = useState('lifestyle') // lifestyle | logo
@@ -526,7 +530,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [logoKeywords, setLogoKeywords] = useState('')
     const [logoResult, setLogoResult] = useState(null)
     const [logoLoading, setLogoLoading] = useState(false)
-    const [logoError, setLogoError] = useState('')
+    const [logoError, setLogoError] = useState(null)
     const [logoAspectRatio, setLogoAspectRatio] = useState('1:1')
 
     // ── Campaign Logo Generator State ──
@@ -541,7 +545,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [clgEnhance, setClgEnhance] = useState('')
     const [clgResults, setClgResults] = useState([])
     const [clgLoading, setClgLoading] = useState(false)
-    const [clgError, setClgError] = useState('')
+    const [clgError, setClgError] = useState(null)
 
     // ── Campaign Creatives Wizard State ──
     const [campStep, setCampStep] = useState(1)
@@ -577,7 +581,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [campResults, setCampResults] = useState([])
     const [campGenerating, setCampGenerating] = useState(false)
     const [campProgress, setCampProgress] = useState(0)
-    const [campError, setCampError] = useState('')
+    const [campError, setCampError] = useState(null)
 
     // ── Best Performing Library State ──
     const [bplOpen, setBplOpen] = useState(false)
@@ -595,7 +599,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [photoshootBrief, setPhotoshootBrief] = useState('')
     const [photoshootGenerating, setPhotoshootGenerating] = useState(false)
     const [photoshootResult, setPhotoshootResult] = useState(null)
-    const [photoshootError, setPhotoshootError] = useState('')
+    const [photoshootError, setPhotoshootError] = useState(null)
     const [photoshootSaved, setPhotoshootSaved] = useState(false)
     const [fidelity, setFidelity] = useState(80)
     const [cameraAngle, setCameraAngle] = useState('eye-level')
@@ -1047,13 +1051,13 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             }
 
             setResult(creative)
-        } catch (err) {
-            console.error('❌ Generation error:', err)
-            if (err.name === 'AbortError' || err.message?.toLowerCase().includes('timeout') || err.message?.toLowerCase().includes('failed to fetch') || err.status === 504) {
-                setError('Generation is taking longer than usual. The image might still be processing — please check the Image Bank in a minute.')
-            } else {
-                setError(err.message || 'Failed to generate creative.')
-            }
+        } catch (e) {
+            console.error('❌ Generation error:', e)
+            setError({
+                message: e.message,
+                isProviderError: e.isProviderError,
+                provider: e.provider
+            })
         } finally {
             setGenerating(false)
         }
@@ -1182,7 +1186,13 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 teardownPsMaskCanvas()
                 setPsMaskMode(false)
             }
-        } catch (err) { setPsEditError(err.message) }
+        } catch (err) { 
+            setPsEditError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
         setPsEditLoading(false)
     }
 
@@ -1296,11 +1306,11 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             }
         } catch (err) {
             console.error('❌ Template generation error:', err)
-            if (err.name === 'AbortError' || err.message?.toLowerCase().includes('timeout') || err.message?.toLowerCase().includes('failed to fetch') || err.status === 504) {
-                setTemplateError('Generation is taking longer than usual. The image might still be processing — please check the Image Bank in a minute.')
-            } else {
-                setTemplateError(err.message || 'Template generation failed')
-            }
+            setTemplateError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
         }
         setTemplateGenerating(false)
     }
@@ -2191,9 +2201,12 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                         {/* ── Error ── */}
                         {error && (
-                            <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm flex items-center gap-2">
-                                <span className="material-symbols-outlined text-sm">error</span>
-                                <span>{error}</span>
+                            <div className={`mb-4 p-3 rounded-xl border flex items-center gap-2 ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
+                                <span className="material-symbols-outlined text-sm">{error.isProviderError ? 'warning' : 'error'}</span>
+                                <div className="flex-1">
+                                    <span className="font-bold mr-1">{error.isProviderError ? `${error.provider || 'AI Provider'} Notice:` : 'Error:'}</span>
+                                    {error.message}
+                                </div>
                             </div>
                         )}
 
@@ -3048,10 +3061,18 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             // Auto-save to image bank
                                             saveToImageBank(data)
                                         } else {
-                                            setPhotoshootError(data.error || 'Generation failed')
+                                            setPhotoshootError({
+                                                message: data.error || 'Generation failed',
+                                                isProviderError: data.isProviderError,
+                                                provider: data.provider
+                                            })
                                         }
                                     } catch (err) {
-                                        setPhotoshootError(err.message || 'Photoshoot generation failed')
+                                        setPhotoshootError({
+                                            message: err.message,
+                                            isProviderError: err.isProviderError,
+                                            provider: err.provider
+                                        })
                                     } finally {
                                         setPhotoshootGenerating(false)
                                     }
@@ -3068,8 +3089,12 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         </CreditTooltipWrapper>
 
                         {photoshootError && (
-                            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
-                                <span className="material-symbols-outlined text-sm align-middle mr-1">error</span> {photoshootError}
+                            <div className={`p-3 rounded-xl border flex items-center gap-2 ${photoshootError.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
+                                <span className="material-symbols-outlined text-sm">{photoshootError.isProviderError ? 'warning' : 'error'}</span>
+                                <div className="flex-1 text-sm">
+                                    <span className="font-bold mr-1">{photoshootError.isProviderError ? `${photoshootError.provider || 'AI Provider'} Notice:` : 'Error:'}</span>
+                                    {photoshootError.message}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -3255,8 +3280,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 )}
                                             </button>
                                             {psEditError && (
-                                                <div className="mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
-                                                    ⚠️ {psEditError}
+                                                <div className={`mt-3 p-3 rounded-xl border flex items-center gap-2 ${psEditError.includes('external API issue') ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
+                                                    <span className="material-symbols-outlined text-sm">{psEditError.includes('external API issue') ? 'warning' : 'error'}</span>
+                                                    <span className="flex-1 text-xs">{psEditError}</span>
                                                 </div>
                                             )}
                                         </div>
@@ -3398,11 +3424,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     else setClgError('No image returned — try again');
                                 }catch(err){
                                     console.error('❌ Logo generation error:', err);
-                                    if (err.name === 'AbortError' || err.message?.toLowerCase().includes('timeout') || err.message?.toLowerCase().includes('failed to fetch') || err.status === 504) {
-                                        setClgError('Generation is taking longer than usual. Your logo is likely still processing — please check the Image Bank in a minute.');
-                                    } else {
-                                        setClgError(err.message||'Generation failed — please try again');
-                                    }
+                                    setClgError({
+                                        message: err.message,
+                                        isProviderError: err.isProviderError,
+                                        provider: err.provider
+                                    });
                                 } finally {
                                     setClgLoading(false);
                                 }
@@ -3429,7 +3455,15 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
                             )}
 
-                            {clgError&&<div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-center gap-2"><span className="material-symbols-outlined text-lg">warning</span>{clgError}</div>}
+                            {clgError && (
+                                <div className={`p-3 rounded-xl border flex items-center gap-2 ${clgError.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-red-500/10 border-red-500/20 text-red-300'}`}>
+                                    <span className="material-symbols-outlined text-lg">{clgError.isProviderError ? 'warning' : 'error'}</span>
+                                    <div className="flex-1 text-sm">
+                                        <span className="font-bold mr-1">{clgError.isProviderError ? `${clgError.provider || 'AI Provider'} Notice:` : 'Error:'}</span>
+                                        {clgError.message}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Right — Results */}
@@ -4175,7 +4209,15 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                 </div>
                             )}
 
-                            {campError&&<div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-center gap-2"><span className="material-symbols-outlined text-lg">warning</span>{campError}</div>}
+                            {campError && (
+                                <div className={`mt-4 p-3 rounded-xl border flex items-center gap-2 ${campError.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
+                                    <span className="material-symbols-outlined text-sm">{campError.isProviderError ? 'warning' : 'error'}</span>
+                                    <div className="flex-1 text-xs">
+                                        <span className="font-bold mr-1">{campError.isProviderError ? `${campError.provider || 'AI Provider'} Notice:` : 'Error:'}</span>
+                                        {campError.message}
+                                    </div>
+                                </div>
+                            )}
                             {/* Results Grid */}
                             {campResults.length>0&&(
                                 <div>
@@ -6145,9 +6187,12 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
 
                             {/* Error */}
                             {animateError && (
-                                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-sm">error</span>
-                                    {animateError}
+                                <div className={`p-3 rounded-xl border flex items-center gap-2 ${animateError.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
+                                    <span className="material-symbols-outlined text-sm">{animateError.isProviderError ? 'warning' : 'error'}</span>
+                                    <div className="flex-1 text-xs">
+                                        <span className="font-bold mr-1">{animateError.isProviderError ? `${animateError.provider || 'AI Provider'} Notice:` : 'Error:'}</span>
+                                        {animateError.message}
+                                    </div>
                                 </div>
                             )}
 
@@ -6611,7 +6656,13 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                                     } else {
                                                         setVtoError('Failed to generate model photo')
                                                     }
-                                                } catch (err) { setVtoError(err.message) }
+                                                } catch (err) { 
+                                                    setVtoError({
+                                                        message: err.message,
+                                                        isProviderError: err.isProviderError,
+                                                        provider: err.provider
+                                                    })
+                                                }
                                                 finally { setVtoLoading(false) }
                                             }}
                                             className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-2
@@ -6688,7 +6739,14 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                                     setVtoError(res.error || 'HD queuing failed')
                                                     setVtoHdLoading(false)
                                                 }
-                                            } catch (err) { setVtoError(err.message); setVtoHdLoading(false) }
+                                            } catch (err) { 
+                                                setVtoError({
+                                                    message: err.message,
+                                                    isProviderError: err.isProviderError,
+                                                    provider: err.provider
+                                                })
+                                                setVtoHdLoading(false) 
+                                            }
                                         }}
                                         className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2
                                             bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white
@@ -6703,8 +6761,12 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                             </div>
 
                             {vtoError && (
-                                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-lg">warning</span>{vtoError}
+                                <div className={`p-3 rounded-xl border flex items-center gap-2 ${vtoError.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-red-500/10 border-red-500/20 text-red-300'}`}>
+                                    <span className="material-symbols-outlined text-lg">{vtoError.isProviderError ? 'warning' : 'error'}</span>
+                                    <div className="flex-1 text-sm">
+                                        <span className="font-bold mr-1">{vtoError.isProviderError ? `${vtoError.provider || 'AI Provider'} Notice:` : 'Error:'}</span>
+                                        {vtoError.message}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -7174,8 +7236,18 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                             harmonizeWithBrand: mockupHarmonize || undefined
                                         })
                                         if (res.success && res.imageUrl) setMockupResult(res.imageUrl)
-                                        else setMockupError(res.error || 'Mockup generation failed')
-                                    } catch (err) { setMockupError(err.message) }
+                                        else setMockupError({
+                                            message: res.error || 'Mockup generation failed',
+                                            isProviderError: res.isProviderError,
+                                            provider: res.provider
+                                        })
+                                    } catch (err) { 
+                                        setMockupError({
+                                            message: err.message,
+                                            isProviderError: err.isProviderError,
+                                            provider: err.provider
+                                        })
+                                    }
                                     finally { setMockupLoading(false) }
                                 }}
                                 className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2
@@ -7189,8 +7261,12 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                             </button>
 
                             {mockupError && (
-                                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-lg">warning</span>{mockupError}
+                                <div className={`p-3 rounded-xl border flex items-center gap-2 ${mockupError.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-red-500/10 border-red-500/20 text-red-300'}`}>
+                                    <span className="material-symbols-outlined text-lg">{mockupError.isProviderError ? 'warning' : 'error'}</span>
+                                    <div className="flex-1 text-sm">
+                                        <span className="font-bold mr-1">{mockupError.isProviderError ? `${mockupError.provider || 'AI Provider'} Notice:` : 'Error:'}</span>
+                                        {mockupError.message}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -7484,8 +7560,18 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                             ...(logoStyleRef ? { styleRef: logoStyleRef } : {})
                                         })
                                         if (res.success && res.imageUrl) setLogoResult(res.imageUrl)
-                                        else setLogoError(res.error || 'Logo mockup generation failed')
-                                    } catch (err) { setLogoError(err.message) }
+                                        else setLogoError({
+                                            message: res.error || 'Logo mockup generation failed',
+                                            isProviderError: res.isProviderError,
+                                            provider: res.provider
+                                        })
+                                    } catch (err) { 
+                                        setLogoError({
+                                            message: err.message,
+                                            isProviderError: err.isProviderError,
+                                            provider: err.provider
+                                        })
+                                    }
                                     finally { setLogoLoading(false) }
                                 }}
                                 className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2
@@ -7499,8 +7585,12 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                             </button>
 
                             {logoError && (
-                                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-lg">warning</span>{logoError}
+                                <div className={`p-3 rounded-xl border flex items-center gap-2 ${logoError.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-red-500/10 border-red-500/20 text-red-300'}`}>
+                                    <span className="material-symbols-outlined text-lg">{logoError.isProviderError ? 'warning' : 'error'}</span>
+                                    <div className="flex-1 text-sm">
+                                        <span className="font-bold mr-1">{logoError.isProviderError ? `${logoError.provider || 'AI Provider'} Notice:` : 'Error:'}</span>
+                                        {logoError.message}
+                                    </div>
                                 </div>
                             )}
                         </div>

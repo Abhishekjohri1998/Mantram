@@ -86,7 +86,13 @@ function AddProductModal({ brandId, onClose, onSaved, editProduct }) {
             }
             onSaved()
             onClose()
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
     return (
         <EditModal title={editProduct ? 'Edit Product' : 'Add Product'} icon="inventory_2" onClose={onClose} onSave={handleSave}>
@@ -124,7 +130,13 @@ function ProductCard({ product, onEdit, onDelete, onEnrich }) {
     }
     const handleDelete = async () => {
         if (!confirm(`Delete "${product.title}"?`)) return
-        try { await onDelete(product._id) } catch { }
+        try { await onDelete(product._id) } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
     const mainImage = product.images?.[0]?.url
     const price = product.variants?.[0]?.price
@@ -155,7 +167,7 @@ function ProductCard({ product, onEdit, onDelete, onEnrich }) {
     )
 }
 
-function ProductCatalog({ brandId, brandWebsite }) {
+function ProductCatalog({ brandId, brandWebsite, setError }) {
     const [products, setProducts] = useState([])
     const [total, setTotal] = useState(0)
     const [loading, setLoading] = useState(false)
@@ -171,7 +183,13 @@ function ProductCatalog({ brandId, brandWebsite }) {
             const data = await productsAPI.list({ brandId, search, limit: 50 })
             setProducts(data.products || [])
             setTotal(data.total || 0)
-        } catch { } finally { setLoading(false) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        } finally { setLoading(false) }
     }, [brandId, search])
 
     useEffect(() => { fetchProducts() }, [fetchProducts])
@@ -182,7 +200,13 @@ function ProductCatalog({ brandId, brandWebsite }) {
         try { await productsAPI.aiEnrich(id); fetchProducts() } catch { }
     }
     const handleDelete = async (id) => {
-        try { await productsAPI.delete(id); fetchProducts() } catch { }
+        try { await productsAPI.delete(id); fetchProducts() } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
     const handleScanWebsite = async () => {
         if (!brandWebsite) return alert('No website URL configured for this brand')
@@ -191,7 +215,13 @@ function ProductCatalog({ brandId, brandWebsite }) {
             const res = await productsAPI.scanFromWebsite(brandId, brandWebsite)
             alert(`Scan complete! Found ${res.imported || 0} new products.`)
             fetchProducts()
-        } catch (err) { alert(`Scan failed: ${err.message}`) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
         finally { setScanning(false) }
     }
 
@@ -298,7 +328,7 @@ function DeleteBrandModal({ brand, onClose, onConfirm }) {
 // ============================================================================
 // BRAND IMAGE GALLERY — Categorized with Lightbox Viewer
 // ============================================================================
-function BrandImageGallery({ dna, brandId, updateBrandDNA }) {
+function BrandImageGallery({ dna, brandId, updateBrandDNA, setError }) {
     const navigate = useNavigate()
     const [lightbox, setLightbox] = useState(null) // { images, index }
     const [collapsedCats, setCollapsedCats] = useState({})
@@ -339,8 +369,16 @@ function BrandImageGallery({ dna, brandId, updateBrandDNA }) {
         const updatedBannerImages = (dna.bannerImages || []).map(img =>
             img.url === editingImage.url ? { ...img, ...updatedData } : img
         )
-        await updateBrandDNA(brandId, { brandImages: updatedBrandImages, bannerImages: updatedBannerImages })
-        setEditingImage(null)
+        try {
+            await updateBrandDNA(brandId, { brandImages: updatedBrandImages, bannerImages: updatedBannerImages })
+            setEditingImage(null)
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
     }
 
     // Navigate to Creative Studio AI Photoshoot with image
@@ -432,7 +470,11 @@ function BrandImageGallery({ dna, brandId, updateBrandDNA }) {
             const updatedBannerImages = (dna.bannerImages || []).filter(i => i.url !== imgUrl)
             await updateBrandDNA(brandId, { brandImages: updatedBrandImages, bannerImages: updatedBannerImages })
         } catch (err) {
-            console.error('Failed to delete image:', err)
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
         } finally {
             setDeletingUrl(null)
         }
@@ -448,7 +490,7 @@ function BrandImageGallery({ dna, brandId, updateBrandDNA }) {
         }
         window.addEventListener('keydown', handleKey)
         return () => window.removeEventListener('keydown', handleKey)
-    }, [lightbox])
+    }, [lightbox, prevImage, nextImage, closeLightbox])
 
     const currentImg = lightbox ? lightbox.images[lightbox.index] : null
     const currentConf = currentImg ? (categoryConfig[currentImg._category] || categoryConfig.other) : null
@@ -646,7 +688,7 @@ function BrandImageGallery({ dna, brandId, updateBrandDNA }) {
 // ============================================================================
 // KNOWLEDGE BANK — Add knowledge via text, files, or URLs
 // ============================================================================
-function KnowledgeBank({ brandId }) {
+function KnowledgeBank({ brandId, setError }) {
     const [activeTab, setActiveTab] = useState('text') // 'text', 'file', 'url'
     const [entries, setEntries] = useState([])
     const [loading, setLoading] = useState(true)
@@ -669,8 +711,14 @@ function KnowledgeBank({ brandId }) {
         setLoading(true)
         brandsAPI.getKnowledgeEntries(brandId).then(r => {
             if (r.success) setEntries(r.entries || [])
-        }).catch(() => { }).finally(() => setLoading(false))
-    }, [brandId])
+        }).catch(err => {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }).finally(() => setLoading(false))
+    }, [brandId, setError])
 
     const showFeedback = (msg, ok = true) => {
         setFeedback({ msg, ok })
@@ -732,7 +780,11 @@ function KnowledgeBank({ brandId }) {
                 showFeedback(result.error || 'Failed to add knowledge', false)
             }
         } catch (err) {
-            showFeedback(err.message || 'Failed to add knowledge', false)
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
         } finally {
             setSubmitting(false)
         }
@@ -764,7 +816,11 @@ function KnowledgeBank({ brandId }) {
                 showFeedback(result.error || 'Failed to add knowledge', false)
             }
         } catch (err) {
-            showFeedback(err.message || 'Failed', false)
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
         } finally {
             setSubmitting(false)
             setDupWarnings(null)
@@ -780,7 +836,13 @@ function KnowledgeBank({ brandId }) {
                 setEntries(prev => prev.filter(e => e.id !== entryId))
                 showFeedback('Entry removed')
             }
-        } catch { showFeedback('Failed to delete', false) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
         finally { setDeletingId(null) }
     }
 
@@ -1054,6 +1116,7 @@ function KnowledgeBank({ brandId }) {
 export default function BrandDNA() {
     const navigate = useNavigate()
     const { activeBrand, updateBrandDNA, deleteBrand } = useBrand()
+    const [error, setError] = useState(null)
 
     const brand = activeBrand
     const dna = brand?.dna || {}
@@ -1072,9 +1135,15 @@ export default function BrandDNA() {
         setAuditLoading(true)
         brandsAPI.getAuditLog(brand._id)
             .then(data => setAuditLogs(data.logs || []))
-            .catch(() => { })
+            .catch(err => {
+                setError({
+                    message: err.message,
+                    isProviderError: err.isProviderError,
+                    provider: err.provider
+                })
+            })
             .finally(() => setAuditLoading(false))
-    }, [brand?._id])
+    }, [brand?._id, setError])
 
     // Start editing a section
     const startEdit = (section) => {
@@ -1156,9 +1225,19 @@ export default function BrandDNA() {
             }
             setEditSection(null)
             // Refresh audit log
-            brandsAPI.getAuditLog(brand._id).then(data => setAuditLogs(data.logs || [])).catch(() => { })
+            brandsAPI.getAuditLog(brand._id).then(data => setAuditLogs(data.logs || [])).catch(err => {
+                setError({
+                    message: err.message,
+                    isProviderError: err.isProviderError,
+                    provider: err.provider
+                })
+            })
         } catch (err) {
-            alert(`Failed to save: ${err.message}`)
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
         }
     }
 
@@ -1435,13 +1514,13 @@ export default function BrandDNA() {
                 </div>
 
                 {/* ═══════════ BRAND IMAGES — Categorized Gallery ═══════════ */}
-                <BrandImageGallery dna={dna} brandId={brand._id} updateBrandDNA={updateBrandDNA} />
+                <BrandImageGallery dna={dna} brandId={brand._id} updateBrandDNA={updateBrandDNA} setError={setError} />
 
                 {/* ═══════════ PRODUCTS ═══════════ */}
-                <ProductCatalog brandId={brand._id} brandWebsite={brand.website || ''} />
+                <ProductCatalog brandId={brand._id} brandWebsite={brand.website || ''} setError={setError} />
 
                 {/* ═══════════ KNOWLEDGE BANK ═══════════ */}
-                <KnowledgeBank brandId={brand._id} />
+                <KnowledgeBank brandId={brand._id} setError={setError} />
 
                 {/* ═══════════ KNOWLEDGE CHANGE LOG ═══════════ */}
                 <div className="col-span-12 glass-panel rounded-2xl p-6 animate-fade-in" style={{ animationDelay: '600ms' }}>
@@ -1648,6 +1727,20 @@ export default function BrandDNA() {
                 </EditModal>
             )}
 
+            {error && (
+                <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                    <span className="material-symbols-outlined text-base">
+                        {error.isProviderError ? 'warning' : 'error'}
+                    </span>
+                    <div className="flex-1">
+                        {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                        {error.message}
+                    </div>
+                    <button onClick={() => setError(null)} className="ml-auto opacity-50 hover:opacity-100 cursor-pointer">
+                        <span className="material-symbols-outlined text-base">close</span>
+                    </button>
+                </div>
+            )}
             {/* Delete Confirmation */}
             {showDelete && <DeleteBrandModal brand={brand} onClose={() => setShowDelete(false)} onConfirm={handleDeleteBrand} />}
         </DashboardLayout>

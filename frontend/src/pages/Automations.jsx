@@ -35,6 +35,7 @@ export default function Automations() {
     const [automationsList, setAutomationsList] = useState([])
     const [selectedAutomation, setSelectedAutomation] = useState(null)
     const [loading, setLoading] = useState(false)
+    const [error, setError] = useState(null)
     const [creating, setCreating] = useState(null)
     const [view, setView] = useState('list') // 'list' | 'flow'
     const [editingNode, setEditingNode] = useState(null)
@@ -88,7 +89,13 @@ export default function Automations() {
                 setSelectedAutomation(data.automation)
                 setView('flow')
             }
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
         finally { setCreating(null) }
     }
 
@@ -221,7 +228,13 @@ export default function Automations() {
                 setView('flow')
                 setShowCreateModal(false)
             }
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            setError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
         finally { setCreating(null) }
     }
 
@@ -276,6 +289,20 @@ export default function Automations() {
         const nodes = selectedAutomation.nodes || []
         return (
             <DashboardLayout title="Flow Builder" subtitle={selectedAutomation.name}>
+                {error && (
+                    <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                        <span className="material-symbols-outlined text-base">
+                            {error.isProviderError ? 'warning' : 'error'}
+                        </span>
+                        <div className="flex-1">
+                            {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                            {error.message}
+                        </div>
+                        <button onClick={() => setError(null)} className="ml-auto opacity-50 hover:opacity-100 cursor-pointer">
+                            <span className="material-symbols-outlined text-base">close</span>
+                        </button>
+                    </div>
+                )}
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
@@ -558,6 +585,20 @@ export default function Automations() {
     return (
         <DashboardLayout title="Conversation Studio" subtitle="Build and manage conversation flows">
             <SEOHead title="Automations — Mantram AI" noIndex={true} />
+            {error && (
+                <div className={`mb-6 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm flex items-center gap-2`}>
+                    <span className="material-symbols-outlined text-base">
+                        {error.isProviderError ? 'warning' : 'error'}
+                    </span>
+                    <div className="flex-1">
+                        {error.isProviderError && <span className="font-bold mr-1">[{error.provider || 'AI Provider'}]</span>}
+                        {error.message}
+                    </div>
+                    <button onClick={() => setError(null)} className="ml-auto opacity-50 hover:opacity-100 cursor-pointer">
+                        <span className="material-symbols-outlined text-base">close</span>
+                    </button>
+                </div>
+            )}
             {/* Sub-Navigation */}
             <div className="flex items-center gap-1 mb-6 p-1 glass-panel rounded-xl w-fit">
                 <button onClick={() => navigate('/conversations')}

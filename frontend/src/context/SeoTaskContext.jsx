@@ -129,7 +129,16 @@ export function SeoTaskProvider({ children, onNavigate }) {
                 } else {
                     setTasks(prev => ({
                         ...prev,
-                        [taskKey]: { ...prev[taskKey], status: 'error', error: data.error || 'Analysis failed', stage: '' }
+                        [taskKey]: { 
+                            ...prev[taskKey], 
+                            status: 'error', 
+                            error: { 
+                                message: data.error || 'Analysis failed', 
+                                isProviderError: data.isProviderError, 
+                                provider: data.provider 
+                            }, 
+                            stage: '' 
+                        }
                     }))
                     pushToast('error', `${label} failed`, taskKey)
                 }
@@ -148,7 +157,16 @@ export function SeoTaskProvider({ children, onNavigate }) {
                 } else {
                     setTasks(prev => ({
                         ...prev,
-                        [taskKey]: { ...prev[taskKey], status: 'error', error: e.message, stage: '' }
+                        [taskKey]: { 
+                            ...prev[taskKey], 
+                            status: 'error', 
+                            error: { 
+                                message: e.message, 
+                                isProviderError: e.isProviderError, 
+                                provider: e.provider 
+                            }, 
+                            stage: '' 
+                        }
                     }))
                     pushToast('error', `${label} failed`, taskKey)
                 }

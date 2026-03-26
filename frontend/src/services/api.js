@@ -79,7 +79,12 @@ export async function apiFetch(endpoint, options = {}) {
     const data = await response.json();
 
     if (!response.ok) {
-        throw new Error(data.error || 'API request failed');
+        const err = new Error(data.error || 'API request failed');
+        if (data.isProviderError) {
+            err.isProviderError = true;
+            err.provider = data.provider;
+        }
+        throw err;
     }
 
     return data;
