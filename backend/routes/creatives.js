@@ -262,17 +262,58 @@ RESPOND WITH ONLY THE ENHANCED PROMPT TEXT. Nothing else.`;
             referenceDescriptions ? `REFERENCE IMAGES: ${referenceDescriptions}` : '',
         ].filter(Boolean).join('\n');
 
-        const { getRouter } = await import('../ai/router.js');
-        const router = getRouter();
-        const result = await router.generateText({
-            systemPrompt,
-            userPrompt,
-            temperature: 0.7,
-            maxTokens: 300,
-        }); // Router auto-selects cheapest provider
+        // Prompt enhancement is a lightweight text task — use ONLY cheap models.
+        // Gemini Flash (~free) or GPT-4o-mini ($0.015/1K). Never waste Claude on this.
+        const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
+        const openaiKey = process.env.OPENAI_API_KEY;
+        let enhanced = '';
+
+        // Try Gemini first (cheapest)
+        if (geminiKey) {
+            try {
+                const resp = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            systemInstruction: { parts: [{ text: systemPrompt }] },
+                            contents: [{ parts: [{ text: userPrompt }] }],
+                            generationConfig: { temperature: 0.7, maxOutputTokens: 300 },
+                        }),
+                    }
+                );
+                const data = await resp.json();
+                enhanced = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            } catch (e) {
+                console.warn('Prompt enhance: Gemini failed:', e.message);
+            }
+        }
+
+        // Fallback to GPT-4o-mini (still cheap)
+        if (!enhanced && openaiKey) {
+            try {
+                const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
+                    body: JSON.stringify({
+                        model: 'gpt-4o-mini',
+                        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+                        temperature: 0.7, max_tokens: 300,
+                    }),
+                });
+                const data = await resp.json();
+                enhanced = data.choices?.[0]?.message?.content || '';
+            } catch (e) {
+                console.warn('Prompt enhance: GPT-4o-mini failed:', e.message);
+            }
+        }
+
+        // Last resort: return original prompt (never call Claude for this)
+        if (!enhanced) enhanced = prompt;
 
         // Clean up the response — remove quotes, "Generate:" prefixes, etc.
-        let enhanced = (result.text || '').trim();
+        enhanced = enhanced.trim();
         enhanced = enhanced.replace(/^["']|["']$/g, '').trim();
         enhanced = enhanced.replace(/^(Generate|Create|Design|Prompt|Enhanced):?\s*/i, '').trim();
 
