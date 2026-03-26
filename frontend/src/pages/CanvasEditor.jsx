@@ -222,6 +222,7 @@ function CanvasEditorInner() {
     // ── Canvas Theme (dark/light workspace background) ──
     const [canvasTheme, setCanvasTheme] = useState('dark') // 'dark' or 'light'
     const [canvasView, setCanvasView] = useState('design') // 'board' | 'design' | 'timeline'
+    const [mobilePanel, setMobilePanel] = useState(null) // null | 'text' | 'ai' | 'elements' | 'photos' | 'properties'
     const [boardScenes, setBoardScenes] = useState([])
     const [storyBrief, setStoryBrief] = useState(null)
 
@@ -6667,6 +6668,38 @@ function CanvasEditorInner() {
                     )}
                 </div>
             )}
+
+            {/* ── MOBILE BOTTOM ACTION BAR ── */}
+            <div className="ce-mobile-action-bar">
+                <button className={`ce-mobile-action-btn ${mobilePanel === 'text' ? 'active' : ''}`}
+                    onClick={() => { setMobilePanel(mobilePanel === 'text' ? null : 'text'); setShowTextModal(true) }}>
+                    <span className="material-symbols-outlined">text_fields</span>
+                    <span className="ce-mobile-action-label">Text</span>
+                </button>
+                <button className={`ce-mobile-action-btn ${mobilePanel === 'ai' ? 'active' : ''}`}
+                    onClick={() => { setMobilePanel(mobilePanel === 'ai' ? null : 'ai'); setActiveLeftTab('ai'); setSidebarCollapsed(false) }}>
+                    <span className="material-symbols-outlined" style={{ color: mobilePanel === 'ai' ? '#7c3aed' : undefined }}>auto_awesome</span>
+                    <span className="ce-mobile-action-label">Fidato</span>
+                </button>
+                <button className={`ce-mobile-action-btn ${mobilePanel === 'elements' ? 'active' : ''}`}
+                    onClick={() => { setMobilePanel(mobilePanel === 'elements' ? null : 'elements'); setActiveLeftTab('elements'); setSidebarCollapsed(false) }}>
+                    <span className="material-symbols-outlined">category</span>
+                    <span className="ce-mobile-action-label">Elements</span>
+                </button>
+                <button className={`ce-mobile-action-btn ${mobilePanel === 'photos' ? 'active' : ''}`}
+                    onClick={() => { setMobilePanel(mobilePanel === 'photos' ? null : 'photos'); setActiveLeftTab('photos'); setSidebarCollapsed(false) }}>
+                    <span className="material-symbols-outlined">image</span>
+                    <span className="ce-mobile-action-label">Photos</span>
+                </button>
+                <button className="ce-mobile-action-btn" onClick={uploadImage}>
+                    <span className="material-symbols-outlined">upload</span>
+                    <span className="ce-mobile-action-label">Upload</span>
+                </button>
+                <button className="ce-mobile-action-btn" onClick={handleUndo} disabled={!canUndo}>
+                    <span className="material-symbols-outlined">undo</span>
+                    <span className="ce-mobile-action-label">Undo</span>
+                </button>
+            </div>
 
             {/* ── TOAST ── */}
             {toast && <div className="ce-toast">{toast}</div>}

@@ -429,6 +429,212 @@
       max-height: none;
     }
   }
+
+  /* ═══════════════════════════════════════════════════════
+     MOBILE RESPONSIVENESS — Comprehensive Media Queries
+     Covers all studios, modals, grids, tables, forms
+  ═══════════════════════════════════════════════════════ */
+
+  /* ── iPad Pro / Narrow Desktop (≤1280px) ── */
+  @media (max-width: 1280px) {
+    .stat-card { padding: 1.125rem; }
+  }
+
+  /* ── iPad / Tablet (≤1024px) ── */
+  @media (max-width: 1024px) {
+    /* Stat/metric grids: max 2 cols on tablet */
+    .studio-stat-grid,
+    [class*="grid-cols-4"],
+    [class*="grid-cols-3"] {
+      grid-template-columns: repeat(2, 1fr) !important;
+    }
+
+    /* Side-by-side layouts stack */
+    .studio-split-layout {
+      flex-direction: column !important;
+    }
+    .studio-split-layout > * {
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+
+    /* Force 12-col grid children to full width on tablet */
+    [class*="grid-cols-12"] {
+      grid-template-columns: 1fr !important;
+    }
+    [class*="col-span-8"],
+    [class*="col-span-4"] {
+      grid-column: 1 / -1 !important;
+    }
+
+    /* Sticky panels become static */
+    .studio-sticky-panel {
+      position: static !important;
+      max-height: none !important;
+    }
+  }
+
+  /* ── Mobile / Large Phone (≤768px) ── */
+  @media (max-width: 768px) {
+    /* All grids collapse to single column */
+    .studio-stat-grid,
+    [class*="grid-cols-4"],
+    [class*="grid-cols-3"],
+    [class*="grid-cols-2"]:not(.keep-2-col) {
+      grid-template-columns: 1fr !important;
+    }
+
+    /* Force 12-col grid children to full width on mobile */
+    [class*="grid-cols-12"],
+    [class*="grid-cols-1 "] {
+      grid-template-columns: 1fr !important;
+    }
+    [class*="col-span-8"],
+    [class*="col-span-4"],
+    [class*="col-span-6"],
+    [class*="col-span-12"] {
+      grid-column: 1 / -1 !important;
+    }
+
+    /* Navigation tab pills: horizontal scroll */
+    .studio-tabs,
+    .studio-nav-pills {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      flex-wrap: nowrap !important;
+      gap: 0.25rem;
+      padding-bottom: 2px;
+    }
+    .studio-tabs::-webkit-scrollbar,
+    .studio-nav-pills::-webkit-scrollbar {
+      display: none;
+    }
+    .studio-tabs > *,
+    .studio-nav-pills > * {
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    /* Glass panels: reduce padding */
+    .glass-panel { padding: 0.75rem; }
+    .studio-card { padding: 0.75rem; border-radius: 1rem; }
+    .stat-card { padding: 0.875rem; border-radius: 0.875rem; }
+
+    /* Modals: full-width on mobile */
+    .studio-modal,
+    [class*="max-w-lg"],
+    [class*="max-w-md"],
+    [class*="max-w-xl"],
+    [class*="max-w-2xl"] {
+      max-width: calc(100vw - 1.5rem) !important;
+      margin: 0.75rem !important;
+    }
+    .studio-modal-body {
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+
+    /* Tables: horizontal scroll */
+    .studio-table-wrapper {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .studio-table-wrapper table {
+      min-width: 600px;
+    }
+
+    /* Button groups: wrap */
+    .studio-btn-group {
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    /* Form rows: stack */
+    .studio-form-row {
+      flex-direction: column !important;
+      gap: 0.75rem;
+    }
+    .studio-form-row > * {
+      width: 100% !important;
+    }
+
+    /* Section headers: stack title + actions */
+    .studio-section-header {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: 0.75rem;
+    }
+
+    /* Reduce spacing */
+    .studio-section + .studio-section { margin-top: 1.25rem; }
+
+    /* Text sizes */
+    h1, .text-3xl, .text-4xl { font-size: 1.5rem !important; }
+    h2, .text-2xl { font-size: 1.25rem !important; }
+  }
+
+  /* ── Small Phone (≤480px) ── */
+  @media (max-width: 480px) {
+    /* Even tighter spacing */
+    .glass-panel { padding: 0.625rem; }
+    .stat-card { padding: 0.75rem; }
+    .btn-primary { padding: 0.5rem 1rem; font-size: 0.8125rem; }
+    .input-glass { padding: 0.625rem 0.75rem; }
+
+    /* Badge smaller */
+    .badge { font-size: 0.6875rem; padding: 0.125rem 0.5rem; }
+
+    /* Hide decorative blobs on small screens */
+    .studio-decorative-blob { display: none !important; }
+  }
+
+  /* ── Fidato floating chat — mobile treatment ── */
+  .fidato-panel-container {
+    position: fixed;
+    z-index: 9999;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @media (max-width: 768px) {
+    .fidato-panel-container {
+      inset: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      max-width: 100% !important;
+      max-height: 100% !important;
+      border-radius: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+    }
+  }
+
+  @media (min-width: 769px) and (max-width: 1024px) {
+    .fidato-panel-container {
+      width: 400px !important;
+      max-width: 50vw !important;
+    }
+  }
+
+  /* ── Safe area for iOS notch ── */
+  @supports (padding: env(safe-area-inset-bottom)) {
+    .fidato-panel-container,
+    .mobile-bottom-bar {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+  }
+
+  /* ── NexusBar mobile ── */
+  @media (max-width: 768px) {
+    .nexus-bar-container {
+      bottom: 0;
+      left: 0;
+      right: 0;
+      top: auto !important;
+      position: fixed;
+      z-index: 100;
+    }
+  }
 }
 
 @layer utilities {

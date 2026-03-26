@@ -374,21 +374,21 @@ export default function UserDashboard() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-20 sm:pb-0">
                 {/* ═══════════════════════════════════════════════════════════ */}
                 {/* MAIN COLUMN                                                 */}
                 {/* ═══════════════════════════════════════════════════════════ */}
                 <div className="col-span-1 lg:col-span-8 space-y-6">
 
                     {/* ── 4. BRAND HEALTH RINGS ── */}
-                    <div className="glass-panel rounded-2xl p-5 lg:p-6 border border-white/[0.06] anim-slide-up" style={{ animationDelay: '250ms' }}>
+                    <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 border border-white/[0.06] anim-slide-up" style={{ animationDelay: '250ms' }}>
                         <div className="flex items-center gap-2 mb-4">
                             <span className="material-symbols-outlined text-emerald-400">monitoring</span>
                             <span className="text-lg font-bold text-white">Brand Health</span>
                             <span className="text-2xl font-extrabold text-white ml-auto">{health.overallScore || 0}<span className="text-sm text-slate-500 font-medium">/100</span></span>
                         </div>
-                        <div className="flex flex-col sm:flex-row items-center gap-6">
-                            <div className="shrink-0 w-full max-w-[180px] aspect-square mx-auto">
+                        <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
+                            <div className="shrink-0 w-full max-w-[140px] sm:max-w-[160px] md:max-w-[180px] aspect-square mx-auto">
                                 <svg viewBox="0 0 180 180" className="w-full h-full">
                                     <HealthRing score={health.contentVelocity || 0} radius={78} strokeWidth={8} color="#8b5cf6" label="Content" delay={0} />
                                     <HealthRing score={health.creativeOutput || 0} radius={66} strokeWidth={8} color="#06b6d4" label="Creative" delay={100} />
@@ -396,18 +396,18 @@ export default function UserDashboard() {
                                     <HealthRing score={health.trendReadiness || 0} radius={42} strokeWidth={8} color="#34d399" label="Trends" delay={300} />
                                 </svg>
                             </div>
-                            <div className="grid grid-cols-2 gap-3 flex-1 w-full">
+                            <div className="grid grid-cols-2 gap-2 sm:gap-3 flex-1 w-full">
                                 {[
                                     { label: 'Content Velocity', score: health.contentVelocity, color: '#8b5cf6', icon: 'article' },
                                     { label: 'Creative Output', score: health.creativeOutput, color: '#06b6d4', icon: 'image' },
                                     { label: 'Brand DNA', score: health.brandCompleteness, color: '#f59e0b', icon: 'fingerprint' },
                                     { label: 'Trend Readiness', score: health.trendReadiness, color: '#34d399', icon: 'trending_up' },
                                 ].map((m, i) => (
-                                    <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                                    <div key={i} className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
                                         <div className="size-3 rounded-full shrink-0" style={{ background: m.color, boxShadow: `0 0 8px ${m.color}60` }} />
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-sm text-slate-400 truncate">{m.label}</p>
-                                            <p className="text-lg font-extrabold text-white">{Math.round(m.score || 0)}</p>
+                                            <p className="text-xs sm:text-sm text-slate-400 truncate">{m.label}</p>
+                                            <p className="text-base sm:text-lg font-extrabold text-white">{Math.round(m.score || 0)}</p>
                                         </div>
                                     </div>
                                 ))}
@@ -417,19 +417,19 @@ export default function UserDashboard() {
 
                     {/* ── 4a. FUNNEL VELOCITY — SIDE-BY-SIDE LAYOUT ── */}
                     {funnelData && (
-                        <div className="glass-panel rounded-2xl p-5 lg:p-6 border border-indigo-500/15 anim-slide-up cursor-pointer group"
+                        <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 border border-indigo-500/15 anim-slide-up cursor-pointer group"
                             style={{ animationDelay: '275ms' }}
                             onClick={() => navigate('/funnel-studio')}>
-                            <div className="flex items-center justify-between mb-5">
-                                <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-indigo-400">filter_alt</span>
-                                    <span className="text-lg font-bold text-white">Funnel Velocity</span>
-                                    <span className="ml-2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                            <div className="flex flex-wrap items-center justify-between gap-2 mb-4 sm:mb-5">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <span className="material-symbols-outlined text-indigo-400 shrink-0">filter_alt</span>
+                                    <span className="text-base sm:text-lg font-bold text-white truncate">Funnel Velocity</span>
+                                    <span className="hidden sm:inline ml-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 truncate max-w-[120px]">
                                         {funnelData.funnel?.name || 'Active'}
                                     </span>
                                 </div>
-                                <div className="flex items-center gap-1 text-sm text-slate-500 group-hover:text-indigo-400 transition-colors">
-                                    <span>Open Studio</span>
+                                <div className="flex items-center gap-1 text-sm text-slate-500 group-hover:text-indigo-400 transition-colors shrink-0">
+                                    <span className="hidden sm:inline">Open Studio</span>
                                     <span className="material-symbols-outlined text-sm group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
                                 </div>
                             </div>
@@ -631,7 +631,7 @@ export default function UserDashboard() {
 
                     {/* ── 4b. PERFORMANCE COCKPIT ── */}
                     {perfData && (
-                        <div className="glass-panel rounded-2xl p-5 lg:p-6 border border-rose-500/15 anim-slide-up cursor-pointer group"
+                        <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 border border-rose-500/15 anim-slide-up cursor-pointer group"
                             style={{ animationDelay: '290ms' }}
                             onClick={() => navigate('/performance-marketing')}>
                             <div className="flex items-center justify-between mb-5">
@@ -653,7 +653,7 @@ export default function UserDashboard() {
                             {(perfData.stats?.totalCampaigns || 0) > 0 ? (
                                 <>
                                     {/* Stats Grid */}
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                                    <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-4 mb-5">
                                         {[
                                             { label: 'Total Spend', value: `₹${(perfData.stats?.totalSpend || 0).toLocaleString()}`, icon: 'account_balance', color: '#f59e0b' },
                                             { label: 'ROAS', value: `${perfData.stats?.avgRoas || '0'}x`, icon: 'show_chart', color: parseFloat(perfData.stats?.avgRoas) >= 2 ? '#34d399' : '#f43f5e' },
@@ -755,7 +755,7 @@ export default function UserDashboard() {
 
                     {/* ── 4c. STRIKES RADAR ── */}
                     {radar && (
-                        <div className="glass-panel rounded-2xl p-5 lg:p-6 border border-white/[0.06] anim-slide-up cursor-pointer group"
+                        <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 border border-white/[0.06] anim-slide-up cursor-pointer group"
                             style={{ animationDelay: '300ms' }}
                             onClick={() => navigate('/d2c-analytics')}>
                             <div className="flex items-center justify-between mb-5">
@@ -771,7 +771,7 @@ export default function UserDashboard() {
                             </div>
 
                             {/* Key Metrics Bar */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                            <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-4 mb-5">
                                 {[
                                     { label: 'Total Visitors', value: radar.totalVisitors?.toLocaleString(), icon: 'group', color: '#8b5cf6' },
                                     { label: 'Weekly Growth', value: `${radar.weeklyGrowth > 0 ? '+' : ''}${radar.weeklyGrowth}%`, icon: 'trending_up', color: '#34d399' },

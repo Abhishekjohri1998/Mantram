@@ -557,7 +557,7 @@ export default function NexusBar() {
             )}
 
             {/* ═══════════ FLOATING FIDATO BUBBLE ═══════════ */}
-            <div className="fixed bottom-6 right-6 z-[9999]" ref={dropdownRef}>
+            <div className="fixed bottom-6 right-4 sm:right-6 z-[9999]" ref={dropdownRef}>
                 {/* Chat Panel (opens upward from bubble) */}
                 {open && (
                     <div className={`absolute bottom-16 right-0 rounded-2xl overflow-hidden animate-fade-in

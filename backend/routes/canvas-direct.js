@@ -8,6 +8,7 @@ import os from 'os';
 import path from 'path';
 import { execSync } from 'child_process';
 import { searchWeb, searchBrandImages } from '../utils/searchManager.js';
+import Product from '../models/Product.js';
 
 const router = express.Router();
 
@@ -374,7 +375,7 @@ ${brandContext}
 ${canvasContext}
 
 ## YOUR ROLE
-You are a creative director who receives a brief + pre-researched product data, then executes the full creative pipeline using your tools. Research data (web search results + reference images) is ALREADY PROVIDED in this prompt — you do NOT need to search. Use what's given.
+You are a creative director who receives a brief + brand data from the database (Brand DNA + Product catalog), then executes the full creative pipeline using your tools. Brand DNA data (description, USPs, product info, images) is ALREADY PROVIDED in this prompt — you do NOT need to search. Use what's given.
 
 ## PIPELINE — EXECUTE IN THIS EXACT ORDER
 
@@ -454,14 +455,13 @@ Then call the tools for Phase 1 in order. After Phase 1 completes, STOP and ask 
 
 
 
-        // ── PRE-FLIGHT RESEARCH: Do web search & image download BEFORE Claude ──
+        // ── PRE-FLIGHT: Pull data from Brand DNA + Product catalog (NO web search) ──
         const aiRouter = getAIRouter();
         let result;
         let preFlightResearch = '';
         let referenceImages = [];
 
-        // Detect if the message mentions a brand/product that needs research
-        const lowerMsg = message.toLowerCase();
+        // Detect if the message mentions a brand/product that needs creative generation
         const needsResearch = /\b(ad|creative|campaign|video|film|promo|poster|post|storyboard|script)\b/i.test(message)
             && !/\b(change|move|resize|delete|color|font|undo|redo)\b/i.test(message);
 
@@ -470,118 +470,133 @@ Then call the tools for Phase 1 in order. After Phase 1 completes, STOP and ask 
             console.log(`🔍 [Pre-Flight] Using CONFIRMED research data from user`);
             preFlightResearch = preflightResearchData.research || '';
             referenceImages = preflightResearchData.referenceImages || [];
-        } else if (needsResearch) {
-            console.log(`🔍 [Pre-Flight] Detected campaign intent — running research BEFORE Claude`);
-            
-            // Extract the PRODUCT/BRAND NAME from the message (strip all non-product words)
-            const productName = message
+        } else if (needsResearch && brand?._id) {
+            console.log(`📦 [Pre-Flight] Pulling data from Brand DNA + Product catalog (no web search)`);
+
+            // Extract product keywords from the message
+            const productKeywords = message
                 .replace(/\b(create|make|design|build|generate|an?|the|of|for|about|with|using|on|my|our|sec|secs|second|seconds|minute|minutes|min|\d+|ad|ads|film|video|clip|reel|story|stories|post|posts|creative|creatives|campaign|promo|promotional|poster|banner|carousel|storyboard|script)\b/gi, '')
                 .replace(/\s+/g, ' ')
                 .trim();
-            
-            // Get brand market context from Brand DNA
-            const brandCountry = brand.dna?.country || brand.country || 'India';
+            console.log(`   📌 Product keywords: "${productKeywords}"`);
+
+            // ── Step 1: Brand DNA context ──
+            const dna = brand.dna || {};
+            const brandCountry = dna.country || brand.country || 'India';
             const currencyMap = { 'India': 'INR ₹', 'US': 'USD $', 'USA': 'USD $', 'UK': 'GBP £', 'UAE': 'AED', 'Canada': 'CAD' };
             const localCurrency = currencyMap[brandCountry] || brandCountry;
-            const marketContext = `${brandCountry} ${localCurrency}`;
-            
-            console.log(`   📌 Extracted product name: "${productName}" | Market: ${brandCountry}`);
 
-            // Step 1: Web search for product/brand info
-            try {
-                const searchQuery = `${productName} ${brandCountry}`;
-                const searchBrandCtx = brand.name ? `Brand platform: ${brand.name}. Industry: ${brand.dna?.industry || 'consumer electronics'}` : '';
-                console.log(`🌐 [Pre-Flight] Searching web for: "${searchQuery}"`);
-                const searchResult = await searchWeb(searchQuery, searchBrandCtx);
-                preFlightResearch += `\n\n## WEB RESEARCH RESULTS (LIVE DATA — USE THIS, DO NOT HALLUCINATE)\nMarket: ${brandCountry} | Currency: ${localCurrency}\n${searchResult}\n`;
-                console.log(`   ✅ Web search returned ${searchResult.length} chars`);
-            } catch (err) {
-                console.warn(`   ⚠️ Web search failed: ${err.message}`);
+            preFlightResearch += `\n## BRAND DNA (FROM DATABASE — VERIFIED DATA)\n`;
+            preFlightResearch += `Brand: ${brand.name || 'Unknown'}\n`;
+            preFlightResearch += `Market: ${brandCountry} | Currency: ${localCurrency}\n`;
+            if (dna.tagline) preFlightResearch += `Tagline: "${dna.tagline}"\n`;
+            if (dna.industry) preFlightResearch += `Industry: ${dna.industry}\n`;
+            if (dna.brandDescription) preFlightResearch += `Description: ${dna.brandDescription}\n`;
+            if (dna.companyOverview) preFlightResearch += `Overview: ${dna.companyOverview}\n`;
+            if (dna.targetAudience) preFlightResearch += `Target Audience: ${dna.targetAudience}\n`;
+            if (dna.missionStatement) preFlightResearch += `Mission: ${dna.missionStatement}\n`;
+            if (dna.servicesOffered?.length) preFlightResearch += `Products/Services: ${dna.servicesOffered.join(', ')}\n`;
+            if (dna.uniqueSellingPoints?.length) preFlightResearch += `USPs: ${dna.uniqueSellingPoints.join(' | ')}\n`;
+            if (dna.brandValues?.length) preFlightResearch += `Values: ${dna.brandValues.join(', ')}\n`;
+            if (dna.colors?.length) preFlightResearch += `Brand Colors: ${dna.colors.map(c => `${c.name || c.usage}:${c.hex}`).join(', ')}\n`;
+            if (dna.voice?.personality) preFlightResearch += `Voice: ${dna.voice.personality}${dna.voice.description ? ' — ' + dna.voice.description : ''}\n`;
+            if (dna.photographyStyle) preFlightResearch += `Photography Style: ${dna.photographyStyle}\n`;
+
+            // Visual DNA for design intelligence
+            if (dna.visualDNA) {
+                const vd = dna.visualDNA;
+                const vdParts = [
+                    vd.designStyle && `Design: ${vd.designStyle}`,
+                    vd.imageMood && `Mood: ${vd.imageMood}`,
+                    vd.layoutPreference && `Layout: ${vd.layoutPreference}`,
+                    vd.typographyStyle && `Typography: ${vd.typographyStyle}`,
+                    vd.textureStyle && `Texture: ${vd.textureStyle}`,
+                ].filter(Boolean);
+                if (vdParts.length) preFlightResearch += `Visual DNA: ${vdParts.join(' | ')}\n`;
+                if (vd.designRules?.length) preFlightResearch += `Design Rules: ${vd.designRules.join('; ')}\n`;
+                if (vd.designAvoid?.length) preFlightResearch += `Avoid: ${vd.designAvoid.join('; ')}\n`;
             }
 
-            // Step 2: Download brand/product images → S3
+            // ── Step 2: Search Product catalog for matching products ──
             try {
-                const imageQuery = `${productName} product ${brandCountry}`;
-                console.log(`🖼️ [Pre-Flight] Downloading brand images for: "${imageQuery}"`);
-                const imgResult = await searchBrandImages(imageQuery, 4);
-                
-                if (imgResult.images.length > 0) {
-                    // Upload each to S3
-                    const uploadPromises = imgResult.images.map(async (img, idx) => {
-                        try {
-                            // Generate URL variants for retry (Shopify CDN URLs are fragile)
-                            const urlVariants = [img.url];
-                            const u = img.url;
-                            // Try without @2x suffix
-                            if (u.includes('@2x')) urlVariants.push(u.replace(/@2x/, ''));
-                            // Try without size constraint
-                            if (u.includes('_1024x1024')) urlVariants.push(u.replace(/_1024x1024/, ''));
-                            // Try without both
-                            if (u.includes('_1024x1024') && u.includes('@2x')) urlVariants.push(u.replace(/_1024x1024@2x/, ''));
-                            // Try .jpg instead of .webp
-                            if (u.endsWith('.webp')) urlVariants.push(u.replace(/\.webp$/, '.jpg'), u.replace(/\.webp$/, '.png'));
+                let matchedProducts = [];
+                if (productKeywords.length > 2) {
+                    // Text search on product title, description, tags, keywords
+                    matchedProducts = await Product.find({
+                        brand: brand._id,
+                        status: 'active',
+                        $text: { $search: productKeywords },
+                    }, { score: { $meta: 'textScore' } })
+                    .sort({ score: { $meta: 'textScore' } })
+                    .limit(3)
+                    .lean();
+                }
+                // Fallback: get all active products if text search returns nothing
+                if (!matchedProducts.length) {
+                    matchedProducts = await Product.find({
+                        brand: brand._id,
+                        status: 'active',
+                    }).limit(5).lean();
+                }
 
-                            let imgResp = null;
-                            let usedUrl = '';
-                            for (const variant of urlVariants) {
-                                try {
-                                    console.log(`   📥 Fetching image ${idx}: ${variant.substring(0, 90)}...`);
-                                    imgResp = await fetch(variant, {
-                                        headers: {
-                                            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
-                                            'Referer': new URL(variant).origin,
-                                        },
-                                        redirect: 'follow',
-                                    });
-                                    if (imgResp.ok) { usedUrl = variant; break; }
-                                    console.warn(`   ⚠️ Image ${idx} variant 404: ${variant.substring(0, 60)}`);
-                                    imgResp = null;
-                                } catch { imgResp = null; }
+                if (matchedProducts.length > 0) {
+                    preFlightResearch += `\n## PRODUCT CATALOG MATCHES\n`;
+                    for (const prod of matchedProducts) {
+                        preFlightResearch += `\n### ${prod.title}\n`;
+                        if (prod.description) preFlightResearch += `Description: ${prod.description.substring(0, 300)}\n`;
+                        if (prod.features?.length) preFlightResearch += `Features: ${prod.features.join(' | ')}\n`;
+                        if (prod.price?.amount) preFlightResearch += `Price: ${prod.price.currency || 'INR'} ${prod.price.amount}${prod.price.mrp ? ` (MRP: ${prod.price.mrp})` : ''}\n`;
+                        if (prod.category) preFlightResearch += `Category: ${prod.category}${prod.subCategory ? ' > ' + prod.subCategory : ''}\n`;
+                        if (prod.tags?.length) preFlightResearch += `Tags: ${prod.tags.join(', ')}\n`;
+
+                        // Collect product images (already on S3!)
+                        if (prod.images?.length) {
+                            for (const img of prod.images) {
+                                if (img.url) {
+                                    referenceImages.push({ url: img.url, alt: img.alt || prod.title, source: `product-catalog` });
+                                }
                             }
-                            if (!imgResp) {
-                                console.warn(`   ❌ Image ${idx} all variants failed (${urlVariants.length} tried)`);
-                                return null;
-                            }
-                            const buffer = await imgResp.arrayBuffer();
-                            console.log(`   📦 Image ${idx} fetched: ${buffer.byteLength} bytes`);
-                            if (buffer.byteLength < 1000) {
-                                console.warn(`   ❌ Image ${idx} too small (${buffer.byteLength}b), skipping`);
-                                return null;
-                            }
-                            const contentType = imgResp.headers.get('content-type') || 'image/jpeg';
-                            const base64 = `data:${contentType};base64,${Buffer.from(buffer).toString('base64')}`;
-                            const s3Key = `canvas-refs/${req.user._id}/${Date.now()}_ref${idx}.jpg`;
-                            const s3Url = await uploadToS3(base64, s3Key, contentType);
-                            console.log(`   ☁️ Image ${idx} uploaded to S3: ${s3Url.substring(0, 60)}...`);
-                            return { url: s3Url, alt: img.alt || `reference ${idx}`, source: img.source };
-                        } catch (e) {
-                            console.warn(`   ❌ Image ${idx} upload failed:`, e.message);
-                            return null;
                         }
-                    });
-                    referenceImages = (await Promise.all(uploadPromises)).filter(Boolean);
-                    
-                    if (referenceImages.length > 0) {
-                        preFlightResearch += `\n## DOWNLOADED REFERENCE IMAGES (uploaded to S3 — use these URLs as references)\n`;
-                        referenceImages.forEach((img, i) => {
-                            preFlightResearch += `- Image ${i + 1}: ${img.url} (${img.alt})\n`;
-                        });
-                        preFlightResearch += `\nWhen creating storyboard frames, describe the ACTUAL product appearance you see in these reference images. The system will automatically use these images as visual references for AI image generation.\n`;
                     }
-                    console.log(`   ✅ Uploaded ${referenceImages.length} reference images to S3`);
+                    console.log(`   📦 Found ${matchedProducts.length} products, ${referenceImages.length} product images`);
+                } else {
+                    console.log(`   ⚠️ No products found in catalog — will use brand images`);
                 }
             } catch (err) {
-                console.warn(`   ⚠️ Image search/upload failed: ${err.message}`);
+                console.warn(`   ⚠️ Product search failed: ${err.message}`);
             }
 
-            // ── PHASE 1: Return pre-flight results for user confirmation ──
+            // ── Step 3: Add brand images (logo + scraped website images) as fallback/supplement ──
+            if (dna.logo?.url) {
+                referenceImages.push({ url: dna.logo.url, alt: `${brand.name} logo`, source: 'brand-logo' });
+            }
+            if (dna.brandImages?.length) {
+                for (const img of dna.brandImages.slice(0, 6)) {
+                    if (img.url && !referenceImages.some(r => r.url === img.url)) {
+                        referenceImages.push({ url: img.url, alt: img.alt || `${brand.name} brand image`, source: img.source || 'brand-onboarding' });
+                    }
+                }
+            }
+
+            // Add reference images to research text
+            if (referenceImages.length > 0) {
+                preFlightResearch += `\n## REFERENCE IMAGES (FROM YOUR BRAND — ALREADY ON S3)\n`;
+                referenceImages.forEach((img, i) => {
+                    preFlightResearch += `- Image ${i + 1}: ${img.url} (${img.alt}) [source: ${img.source}]\n`;
+                });
+                preFlightResearch += `\nUse these REAL product/brand images as visual references. These are pre-uploaded to S3 and ready to use.\n`;
+            }
+
+            console.log(`   ✅ Brand DNA research: ${preFlightResearch.length} chars, ${referenceImages.length} images`);
+
+            // ── Return pre-flight results for user confirmation ──
             return res.json({
                 success: true,
                 preflightConfirmation: true,
                 reply: '',
-                research: preFlightResearch || '(No research results found)',
+                research: preFlightResearch || '(No brand data found)',
                 referenceImages: referenceImages,
-                productName: message.replace(/\b(create|make|design|build|generate|an?|the|of|for|about|with|using|on|my|our|sec|secs|second|seconds|minute|minutes|min|\d+|ad|ads|film|video|clip|reel|story|stories|post|posts|creative|creatives|campaign|promo|promotional|poster|banner|carousel|storyboard|script)\b/gi, '').replace(/\s+/g, ' ').trim(),
+                productName: productKeywords,
                 toolCalls: [],
                 tokensUsed: 0,
                 generationTime: Date.now() - startTime,
