@@ -8,6 +8,7 @@ const navItems = [
     { icon: 'psychology', label: 'Brainstorm Studio', to: '/brainstorm', studioKey: 'brainstormStudio' },
     { icon: 'edit_note', label: 'Content Studio', to: '/content-studio', studioKey: 'contentStudio' },
     { icon: 'auto_fix_high', label: 'Creative Studio', to: '/creative-studio', studioKey: 'creativeStudio' },
+    { icon: 'draw', label: 'AI Canvas', to: '/ai-canvas', studioKey: 'creativeStudio' },
     { icon: 'movie', label: 'Video Studio', to: '/video-studio', studioKey: 'videoStudio' },
     { icon: 'share', label: 'Social Media Studio', to: '/social-media-studio', studioKey: 'socialMediaStudio' },
     { icon: 'forum', label: 'Conversation Studio', to: '/conversations', studioKey: 'conversationStudio' },

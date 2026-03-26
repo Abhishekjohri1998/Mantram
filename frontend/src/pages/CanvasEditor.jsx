@@ -8,6 +8,7 @@ import { media as mediaAPI, creatives as creativesAPI, nexus as nexusAPI, voice 
 import { TEMPLATE_LIBRARY, TEMPLATE_CATEGORIES } from './canvasTemplates'
 import { SVG_ELEMENT_CATEGORIES } from './canvasElements'
 import './CanvasEditor.css'
+import StoryboardBoard from './StoryboardBoard'
 
 
 // ── Platform Size Presets ──
@@ -185,7 +186,7 @@ function CanvasEditorInner() {
     const [aiLoading, setAiLoading] = useState(false)
     const [aiResult, setAiResult] = useState(null) // { imageUrl, type:'image' } or { copy, type:'copy' }
     const [aiError, setAiError] = useState('')
-    const [panelOpen, setPanelOpen] = useState(true) // content panel visibility
+    const [panelOpen, setPanelOpen] = useState(false) // content panel visibility
     // Mask painting state
     const [isMaskMode, setIsMaskMode] = useState(false)
     const [maskBrushSize, setMaskBrushSize] = useState(30)
@@ -216,10 +217,13 @@ function CanvasEditorInner() {
     const clipboardRef = useRef(null) // stores cloned fabric objects for copy/paste
 
     // ── Sidebar Collapse State ──
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
 
     // ── Canvas Theme (dark/light workspace background) ──
     const [canvasTheme, setCanvasTheme] = useState('dark') // 'dark' or 'light'
+    const [canvasView, setCanvasView] = useState('design') // 'board' | 'design' | 'timeline'
+    const [boardScenes, setBoardScenes] = useState([])
+    const [storyBrief, setStoryBrief] = useState(null)
 
     // ── Fidato Canvas Chat State ──
     const [fidatoOpen, setFidatoOpen] = useState(false)
@@ -229,6 +233,7 @@ function CanvasEditorInner() {
     const [fidatoInput, setFidatoInput] = useState('')
     const [fidatoLoading, setFidatoLoading] = useState(false)
     const fidatoMsgEndRef = useRef(null)
+    const fidatoAbortRef = useRef(null)
 
     // ── Fidato Voice Input State ──
     const [fidatoRecording, setFidatoRecording] = useState(false)
@@ -3064,11 +3069,21 @@ function CanvasEditorInner() {
         try {
             const fc = fabricRef.current; if (!fc) return
             const img = await fabric.FabricImage.fromURL(url, { crossOrigin: 'anonymous' })
-            const scale = Math.min(fc.width / img.width, fc.height / img.height) * 0.6
-            img.set({ left: 100 + Math.random() * 100, top: 100 + Math.random() * 100, scaleX: scale, scaleY: scale })
+            // Constrain image to max 400px and ensure it fits on canvas
+            const maxDim = 400
+            const scale = Math.min(maxDim / img.width, maxDim / img.height, 1)
+            // Smart grid placement: find next available slot
+            const existingObjs = fc.getObjects().filter(o => o.id !== 'artboard' && o.type === 'image')
+            const colSize = maxDim * scale + 20
+            const cols = Math.max(1, Math.floor((fc.width - 40) / colSize))
+            const idx = existingObjs.length
+            const col = idx % cols
+            const row = Math.floor(idx / cols)
+            const posX = 40 + col * colSize
+            const posY = 40 + row * (maxDim * scale + 20)
+            img.set({ left: posX, top: posY, scaleX: scale, scaleY: scale })
             img._customName = label || 'AI Image'
             fc.add(img); fc.setActiveObject(img); fc.renderAll(); saveHistory()
-            // Track in generated images gallery
             setGeneratedImages(prev => [{ url, label: label || `AI Image ${prev.length + 1}`, timestamp: Date.now() }, ...prev])
             showToast('🎨 Image added to canvas')
         } catch (err) { showToast('Failed to add image') }
@@ -3081,6 +3096,9 @@ function CanvasEditorInner() {
         setFidatoMessages(prev => [...prev, { role: 'user', content: msg }])
         setFidatoInput('')
         setFidatoLoading(true)
+        // Create AbortController for this request
+        const abortController = new AbortController()
+        fidatoAbortRef.current = abortController
         setTimeout(() => fidatoMsgEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
 
         // Helper: position element based on named position
@@ -3118,7 +3136,7 @@ function CanvasEditorInner() {
         }
 
         // ── Tool Call Executors ──
-        const executeToolCall = async (toolCall, fc) => {
+        const executeToolCall = async (toolCall, fc, ctx = {}) => {
             const { name, args } = toolCall
             const brandFont = activeBrand?.dna?.fonts?.[0] || 'Inter'
             const brandColor = activeBrand?.dna?.colors?.[0]?.hex || '#ffffff'
@@ -3264,10 +3282,606 @@ function CanvasEditorInner() {
                                 if (lastObj) positionElement(lastObj, args.position, fc)
                                 fc.renderAll()
                             }
-                            return `Image generated and added`
+                            return { text: `Image generated and added`, thumbnail: data.imageUrl }
                         }
                     } catch (e) { return `Image generation failed: ${e.message}` }
                     return 'Image generation failed'
+                }
+
+                // ═══════════════════════════════════════════════════
+                // ── AGENTIC CANVAS TOOLS ──────────────────────────
+                // ═══════════════════════════════════════════════════
+
+                case 'create_script_block': {
+                    const { title, scenes } = args
+                    const cardW = 320
+                    const gap = 12
+                    const startX = 60
+                    let curY = 80
+
+                    // Title card
+                    const titleText = new fabric.Textbox(`📝 ${title || 'Script'}`, {
+                        left: startX, top: curY, width: cardW,
+                        fontSize: 22, fontWeight: '800', fontFamily: 'Inter',
+                        fill: '#a78bfa',
+                        customName: `Script: ${title}`, id: `script-title-${Date.now()}`,
+                        _nodeType: 'script',
+                    })
+                    fc.add(titleText)
+                    curY += 44
+
+                    // Scene cards
+                    for (const scene of (scenes || [])) {
+                        const cardH = 100
+                        const bg = new fabric.Rect({
+                            left: startX, top: curY, width: cardW, height: cardH,
+                            rx: 12, ry: 12,
+                            fill: 'rgba(99,102,241,0.08)',
+                            stroke: 'rgba(99,102,241,0.2)', strokeWidth: 1,
+                            selectable: false, evented: false,
+                            id: `scene-bg-${scene.sceneNumber}-${Date.now()}`,
+                            _nodeType: 'script',
+                        })
+                        const sceneHead = new fabric.Textbox(
+                            `Scene ${scene.sceneNumber}${scene.duration ? ` • ${scene.duration}` : ''}${scene.mood ? ` • ${scene.mood}` : ''}`, {
+                            left: startX + 14, top: curY + 10, width: cardW - 28,
+                            fontSize: 12, fontWeight: '700', fontFamily: 'Inter',
+                            fill: '#818cf8',
+                            selectable: false, evented: false,
+                            id: `scene-head-${scene.sceneNumber}-${Date.now()}`,
+                            _nodeType: 'script',
+                        })
+                        const visual = new fabric.Textbox(`🎬 ${scene.visualDescription}`, {
+                            left: startX + 14, top: curY + 28, width: cardW - 28,
+                            fontSize: 11, fontFamily: 'Inter', fill: '#94a3b8',
+                            selectable: false, evented: false,
+                            id: `scene-vis-${scene.sceneNumber}-${Date.now()}`,
+                            _nodeType: 'script',
+                        })
+                        const vo = new fabric.Textbox(`🎙️ "${scene.voiceover}"`, {
+                            left: startX + 14, top: curY + 58, width: cardW - 28,
+                            fontSize: 11, fontFamily: 'Inter', fontStyle: 'italic', fill: '#64748b',
+                            selectable: false, evented: false,
+                            id: `scene-vo-${scene.sceneNumber}-${Date.now()}`,
+                            _nodeType: 'script',
+                        })
+
+                        fc.add(bg, sceneHead, visual, vo)
+                        curY += cardH + gap
+                    }
+
+                    fc.renderAll()
+                    return `Script "${title}" created with ${(scenes || []).length} scenes`
+                }
+
+                case 'create_storyboard_frames': {
+                    const { title, frames, generateImages } = args
+                    const numFrames = (frames || []).length
+                    const shouldGenerate = generateImages !== false
+
+                    const newScenes = (frames || []).map((frame, i) => ({
+                        id: `scene-${Date.now()}-${i}`,
+                        imageUrl: '',
+                        caption: frame.caption || `Scene ${frame.frameNumber || i + 1}`,
+                        shotType: '',
+                        shotDescription: frame.imagePrompt,
+                        duration: 5,
+                        _generating: shouldGenerate
+                    }))
+
+                    setBoardScenes(prev => [...prev, ...newScenes])
+                    setStoryBrief({ title: title || 'Storyboard', frames: numFrames })
+                    setCanvasView('board') // Switch to board view
+
+                    if (shouldGenerate) {
+                        const generatedThumbs = new Array(numFrames).fill(null);
+                        ctx.scenes = new Array(numFrames).fill({}); // Initialize ctx for scenes
+                        // Generate images synchronously so they can be returned to chat UI
+                        await Promise.all(newScenes.map(async (scene, i) => {
+                            try {
+                                // Pass S3 reference image URLs directly — backend aiGenerate handles fetch
+                                const refUrls = (ctx.referenceImages || []).slice(0, 3).map(r => r.url).filter(Boolean);
+                                if (refUrls.length > 0) {
+                                    console.log(`🖼️ Passing ${refUrls.length} S3 reference images for frame ${i + 1}`);
+                                }
+                                const data = await canvasAssets.aiGenerate({ 
+                                    prompt: frames[i].imagePrompt, 
+                                    size: '512x512',
+                                    referenceImages: refUrls
+                                })
+                                if (data.imageUrl) {
+                                    setBoardScenes(prev => prev.map(s =>
+                                        s.id === scene.id ? { ...s, imageUrl: data.imageUrl, _generating: false } : s
+                                    ))
+                                    generatedThumbs[i] = data.imageUrl;
+                                    if (ctx.scenes) ctx.scenes[i] = { imageUrl: data.imageUrl };
+                                }
+                            } catch (e) {
+                                console.warn(`Frame ${i + 1} gen failed:`, e.message)
+                                setBoardScenes(prev => prev.map(s =>
+                                    s.id === scene.id ? { ...s, _generating: false } : s
+                                ))
+                            }
+                        }))
+                        return { text: `Storyboard "${title}" created with ${numFrames} scenes.`, thumbnails: generatedThumbs.filter(Boolean) }
+                    }
+
+                    return `Storyboard "${title}" created on the Board View with ${numFrames} scenes.`
+                }
+
+                case 'create_character_profile': {
+                    const { characterName, physicalDescription, wardrobe, styleKeywords, referenceImagePrompt } = args
+                    const cardW = 300
+                    const cardH = 200
+                    const x = 60
+                    const y = 80
+
+                    // Card background
+                    const bg = new fabric.Rect({
+                        left: x, top: y, width: cardW, height: cardH,
+                        rx: 14, ry: 14,
+                        fill: 'rgba(236,72,153,0.06)',
+                        stroke: 'rgba(236,72,153,0.25)', strokeWidth: 1,
+                        shadow: new fabric.Shadow({ color: 'rgba(236,72,153,0.15)', blur: 16, offsetY: 4 }),
+                        selectable: false, evented: false,
+                        id: `char-bg-${Date.now()}`,
+                        _nodeType: 'character',
+                    })
+                    fc.add(bg)
+
+                    // Header
+                    const header = new fabric.Textbox(`👤 ${characterName}`, {
+                        left: x + 14, top: y + 12, width: cardW - 28,
+                        fontSize: 16, fontWeight: '800', fontFamily: 'Inter',
+                        fill: '#f472b6',
+                        selectable: false, evented: false,
+                        id: `char-name-${Date.now()}`,
+                        _nodeType: 'character',
+                    })
+                    fc.add(header)
+
+                    // Description
+                    const desc = new fabric.Textbox(physicalDescription, {
+                        left: x + 14, top: y + 36, width: cardW - 28,
+                        fontSize: 11, fontFamily: 'Inter', fill: '#94a3b8',
+                        selectable: false, evented: false,
+                        id: `char-desc-${Date.now()}`,
+                        _nodeType: 'character',
+                    })
+                    fc.add(desc)
+
+                    if (wardrobe) {
+                        const wText = new fabric.Textbox(`👗 ${wardrobe}`, {
+                            left: x + 14, top: y + 90, width: cardW - 28,
+                            fontSize: 10, fontFamily: 'Inter', fontStyle: 'italic', fill: '#64748b',
+                            selectable: false, evented: false,
+                            id: `char-ward-${Date.now()}`,
+                            _nodeType: 'character',
+                        })
+                        fc.add(wText)
+                    }
+
+                    if (styleKeywords?.length) {
+                        const tags = new fabric.Textbox(`🏷️ ${styleKeywords.join(' • ')}`, {
+                            left: x + 14, top: y + cardH - 30, width: cardW - 28,
+                            fontSize: 9, fontFamily: 'Inter', fill: '#475569',
+                            selectable: false, evented: false,
+                            id: `char-tags-${Date.now()}`,
+                            _nodeType: 'character',
+                        })
+                        fc.add(tags)
+                    }
+
+                    let generatedThumbUrl = null;
+                    // Generate reference image if prompt provided
+                    if (referenceImagePrompt) {
+                        setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🖼️ Generating reference portrait for ${characterName}...` }])
+                        try {
+                            const data = await canvasAssets.aiGenerate({ prompt: referenceImagePrompt, size: '512x512' })
+                            if (data.imageUrl) {
+                                generatedThumbUrl = data.imageUrl;
+                                const img = await fabric.FabricImage.fromURL(data.imageUrl, { crossOrigin: 'anonymous' })
+                                const imgSize = 120
+                                const imgScale = imgSize / Math.max(img.width, img.height)
+                                img.set({
+                                    left: x + cardW + 20, top: y,
+                                    scaleX: imgScale, scaleY: imgScale,
+                                    customName: `${characterName} - Reference`,
+                                    id: `char-ref-img-${Date.now()}`,
+                                    _nodeType: 'character',
+                                })
+                                fc.add(img)
+                            }
+                        } catch (e) { console.warn('Character ref image failed:', e) }
+                    }
+
+                    fc.renderAll()
+                    return { text: `Character profile "${characterName}" created`, thumbnail: generatedThumbUrl || undefined }
+                }
+
+                case 'auto_layout_grid': {
+                    const { columns, gap: gridGap, cardWidth, cardHeight, includeTypes, startX: gStartX, startY: gStartY } = args
+                    
+                    // Remove previous auto-frames to prevent stacking
+                    const existingFrames = fc.getObjects().filter(o => o.id?.startsWith('auto-frame-'))
+                    existingFrames.forEach(f => fc.remove(f))
+
+                    const allObjects = fc.getObjects().filter(o => o.id !== 'artboard' && !o.id?.startsWith('auto-frame-'))
+                    
+                    // Filter by node types if specified
+                    let targets = allObjects
+                    if (includeTypes?.length && !includeTypes.includes('all')) {
+                        targets = allObjects.filter(o => includeTypes.includes(o._nodeType))
+                    }
+
+                    if (targets.length === 0) return 'No elements to arrange'
+
+                    const cols = columns || Math.min(4, Math.ceil(Math.sqrt(targets.length)))
+                    const gapPx = gridGap || 20
+                    const cW = cardWidth || 240
+                    const cH = cardHeight || 240
+                    const sX = gStartX || 60
+                    const sY = gStartY || 80
+                    
+                    let maxX = sX;
+                    let maxY = sY;
+
+                    targets.forEach((obj, i) => {
+                        const col = i % cols
+                        const row = Math.floor(i / cols)
+                        const targetX = sX + col * (cW + gapPx)
+                        const targetY = sY + row * (cH + gapPx)
+
+                        // Scale to fit within card dimensions
+                        const objW = (obj.width || 100) * (obj.scaleX || 1)
+                        const objH = (obj.height || 100) * (obj.scaleY || 1)
+                        if (objW > cW || objH > cH) {
+                            const fitScale = Math.min(cW / objW, cH / objH) * 0.9
+                            obj.set({ scaleX: (obj.scaleX || 1) * fitScale, scaleY: (obj.scaleY || 1) * fitScale })
+                        }
+
+                        obj.set({ left: targetX, top: targetY })
+                        obj.setCoords()
+                        
+                        // Calculate bounds for the frame
+                        const curW = (obj.width || 100) * (obj.scaleX || 1);
+                        const curH = (obj.height || 100) * (obj.scaleY || 1);
+                        if (targetX + curW > maxX) maxX = targetX + curW;
+                        if (targetY + curH > maxY) maxY = targetY + curH;
+                    })
+                    
+                    // Draw Container Frame
+                    const framePadding = 48;
+                    const frameBg = new fabric.Rect({
+                        left: sX - framePadding, 
+                        top: sY - framePadding,
+                        width: (maxX - sX) + (framePadding * 2), 
+                        height: (maxY - sY) + (framePadding * 2),
+                        fill: 'rgba(255,255,255,0.02)',
+                        stroke: 'rgba(255,255,255,0.15)',
+                        strokeWidth: 1,
+                        rx: 24, ry: 24,
+                        strokeDashArray: [8, 8],
+                        selectable: false, evented: false,
+                        id: `auto-frame-bg-${Date.now()}`
+                    });
+                    
+                    const frameLabel = new fabric.Textbox('✦ Generated Content /', {
+                        left: sX - framePadding + 16, 
+                        top: sY - framePadding - 28,
+                        fontSize: 12, fontWeight: '700', fontFamily: 'Inter',
+                        fill: '#a1a1aa', // slate-400
+                        selectable: false, evented: false,
+                        id: `auto-frame-label-${Date.now()}`
+                    });
+
+                    fc.add(frameBg, frameLabel);
+                    fc.sendObjectToBack(frameLabel);
+                    fc.sendObjectToBack(frameBg);
+                    
+                    // Keep artboard at very back
+                    const ab = fc.getObjects().find(o => o.id === 'artboard')
+                    if (ab) fc.sendObjectToBack(ab)
+
+                    fc.renderAll()
+                    return `Auto-arranged ${targets.length} elements into a ${cols}-column grouped frame`
+                }
+
+                case 'generate_video_clip': {
+                    let { prompt, duration, aspectRatio, sourceImageUrl, sceneRef } = args
+                    
+                    if (!sourceImageUrl && sceneRef && ctx.scenes && ctx.scenes[sceneRef - 1]?.imageUrl) {
+                        sourceImageUrl = ctx.scenes[sceneRef - 1].imageUrl;
+                        console.log(`🎬 Dynamically resolved sceneRef=${sceneRef} to image URL`);
+                    }
+
+                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎬 Generating video: "${prompt?.substring(0, 50)}..."` }])
+                    try {
+                        const data = await canvasAssets.generateVideo({
+                            prompt, duration: duration || 5,
+                            aspectRatio: aspectRatio || '16:9',
+                            sourceImageUrl: sourceImageUrl || '',
+                        })
+                        if (data.success && data.taskId) {
+                            if (!ctx.videos) ctx.videos = {};
+                            Object.assign(ctx.videos, { [data.taskId]: { status: 'pending', url: null } });
+
+                            // Create a video placeholder card on canvas
+                            const cardW = 320
+                            const cardH = 200
+                            const x = 60, y = 80
+                            const bg = new fabric.Rect({
+                                left: x, top: y, width: cardW, height: cardH,
+                                rx: 12, ry: 12,
+                                fill: 'rgba(6,182,212,0.08)',
+                                stroke: 'rgba(6,182,212,0.3)', strokeWidth: 1,
+                                shadow: new fabric.Shadow({ color: 'rgba(6,182,212,0.15)', blur: 16, offsetY: 4 }),
+                                selectable: true, evented: true,
+                                id: `video-bg-${Date.now()}`,
+                                _nodeType: 'video',
+                                _taskId: data.taskId,
+                                _provider: data.provider,
+                            })
+                            fc.add(bg)
+                            const icon = new fabric.Textbox('🎬', {
+                                left: x + cardW / 2 - 20, top: y + cardH / 2 - 30,
+                                width: 40, fontSize: 36, textAlign: 'center',
+                                selectable: false, evented: false,
+                                id: `video-icon-${Date.now()}`, _nodeType: 'video',
+                            })
+                            fc.add(icon)
+                            const label = new fabric.Textbox(`Video generating...\nScene ${sceneRef || '?'} • ${duration || 5}s`, {
+                                left: x + 10, top: y + cardH - 40, width: cardW - 20,
+                                fontSize: 10, fontWeight: '600', fontFamily: 'Inter',
+                                fill: '#22d3ee', textAlign: 'center',
+                                selectable: false, evented: false,
+                                id: `video-label-${Date.now()}`, _nodeType: 'video',
+                            })
+                            fc.add(label)
+                            fc.renderAll()
+                            return { text: `Video generation started (ID: ${data.taskId}).`, thumbnail: sourceImageUrl || null }
+                        }
+                        return `Video generation started. ${data.message || ''}`
+                    } catch (e) { return `Video generation failed: ${e.message}` }
+                }
+
+                case 'generate_voiceover': {
+                    const { text, language, speaker, speed, sceneRef } = args
+                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎙️ Generating voiceover (${speaker || 'anushka'})...` }])
+                    try {
+                        const data = await canvasAssets.generateVoiceover({
+                            text, language: language || 'en-IN',
+                            speaker: speaker || 'anushka', speed: speed || 1.0,
+                        })
+                        if (data.success && data.audioUrl) {
+                            if (!ctx.voiceovers) ctx.voiceovers = [];
+                            ctx.voiceovers.push(data.audioUrl)
+                            
+                            // Create audio node on canvas
+                            const cardW = 280
+                            const cardH = 80
+                            const x = 60, y = 80
+                            const bg = new fabric.Rect({
+                                left: x, top: y, width: cardW, height: cardH,
+                                rx: 10, ry: 10,
+                                fill: 'rgba(168,85,247,0.08)',
+                                stroke: 'rgba(168,85,247,0.25)', strokeWidth: 1,
+                                selectable: true, evented: true,
+                                id: `vo-bg-${Date.now()}`, _nodeType: 'voiceover',
+                                _audioUrl: data.audioUrl,
+                            })
+                            fc.add(bg)
+                            const voLabel = new fabric.Textbox(`🎙️ Voiceover${sceneRef ? ` • Scene ${sceneRef}` : ''}\n${text.substring(0, 60)}...`, {
+                                left: x + 10, top: y + 10, width: cardW - 20,
+                                fontSize: 11, fontFamily: 'Inter', fill: '#a78bfa',
+                                selectable: false, evented: false,
+                                id: `vo-label-${Date.now()}`, _nodeType: 'voiceover',
+                            })
+                            fc.add(voLabel)
+                            const durLabel = new fabric.Textbox(`~${data.duration}s • ${data.provider}`, {
+                                left: x + 10, top: y + cardH - 20, width: cardW - 20,
+                                fontSize: 9, fontFamily: 'Inter', fill: '#7c3aed',
+                                selectable: false, evented: false,
+                                id: `vo-dur-${Date.Now()}`, _nodeType: 'voiceover',
+                            })
+                            fc.add(durLabel)
+                            fc.renderAll()
+                            return `Voiceover generated (${data.duration}s) — ${data.audioUrl}`
+                        }
+                        return 'Voiceover generation failed'
+                    } catch (e) { return `Voiceover failed: ${e.message}` }
+                }
+
+                case 'generate_music': {
+                    const { prompt, duration, mood } = args
+                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎵 Generating music (${mood || 'auto'})...` }])
+                    try {
+                        const data = await canvasAssets.generateMusic({
+                            prompt, duration: duration || 15, mood: mood || 'auto',
+                        })
+                        if (data.success && data.audioUrl) {
+                            if (!ctx.music) ctx.music = [];
+                            ctx.music.push(data.audioUrl)
+                            
+                            const cardW = 280
+                            const cardH = 80
+                            const x = 60, y = 80
+                            const bg = new fabric.Rect({
+                                left: x, top: y, width: cardW, height: cardH,
+                                rx: 10, ry: 10,
+                                fill: 'rgba(34,197,94,0.08)',
+                                stroke: 'rgba(34,197,94,0.25)', strokeWidth: 1,
+                                selectable: true, evented: true,
+                                id: `music-bg-${Date.now()}`, _nodeType: 'music',
+                                _audioUrl: data.audioUrl,
+                            })
+                            fc.add(bg)
+                            const mLabel = new fabric.Textbox(`🎵 Music • ${mood || 'auto'}\n${prompt.substring(0, 60)}...`, {
+                                left: x + 10, top: y + 10, width: cardW - 20,
+                                fontSize: 11, fontFamily: 'Inter', fill: '#22c55e',
+                                selectable: false, evented: false,
+                                id: `music-label-${Date.now()}`, _nodeType: 'music',
+                            })
+                            fc.add(mLabel)
+                            const mDur = new fabric.Textbox(`${data.duration}s • ${data.provider}`, {
+                                left: x + 10, top: y + cardH - 20, width: cardW - 20,
+                                fontSize: 9, fontFamily: 'Inter', fill: '#15803d',
+                                selectable: false, evented: false,
+                                id: `music-dur-${Date.now()}`, _nodeType: 'music',
+                            })
+                            fc.add(mDur)
+                            fc.renderAll()
+                            return `Music generated (${data.duration}s, ${mood || 'auto'} mood) — ${data.audioUrl}`
+                        }
+                        return `Music generation failed: ${data.error || 'Unknown error'}`
+                    } catch (e) { return `Music failed: ${e.message}` }
+                }
+
+                case 'generate_sound_effect': {
+                    const { prompt, duration } = args
+                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🔊 Generating SFX: "${prompt?.substring(0, 40)}..."` }])
+                    try {
+                        const data = await canvasAssets.generateSoundEffect({
+                            prompt, duration: duration || 3,
+                        })
+                        if (data.success && data.audioUrl) {
+                            const cardW = 220
+                            const cardH = 60
+                            const x = 60, y = 80
+                            const bg = new fabric.Rect({
+                                left: x, top: y, width: cardW, height: cardH,
+                                rx: 8, ry: 8,
+                                fill: 'rgba(251,191,36,0.08)',
+                                stroke: 'rgba(251,191,36,0.25)', strokeWidth: 1,
+                                selectable: true, evented: true,
+                                id: `sfx-bg-${Date.now()}`, _nodeType: 'sfx',
+                                _audioUrl: data.audioUrl,
+                            })
+                            fc.add(bg)
+                            const sLabel = new fabric.Textbox(`🔊 SFX: ${prompt.substring(0, 40)}`, {
+                                left: x + 8, top: y + 8, width: cardW - 16,
+                                fontSize: 10, fontFamily: 'Inter', fill: '#fbbf24',
+                                selectable: false, evented: false,
+                                id: `sfx-label-${Date.now()}`, _nodeType: 'sfx',
+                            })
+                            fc.add(sLabel)
+                            const sDur = new fabric.Textbox(`${data.duration}s`, {
+                                left: x + 8, top: y + cardH - 18, width: cardW - 16,
+                                fontSize: 9, fontFamily: 'Inter', fill: '#92400e',
+                                selectable: false, evented: false,
+                                id: `sfx-dur-${Date.now()}`, _nodeType: 'sfx',
+                            })
+                            fc.add(sDur)
+                            fc.renderAll()
+                            return `Sound effect generated (${data.duration}s) — ${data.audioUrl}`
+                        }
+                        return `SFX generation failed: ${data.error || 'Unknown error'}`
+                        return `SFX generation failed: ${data.error || 'Unknown error'}`
+                    } catch (e) { return `SFX failed: ${e.message}` }
+                }
+
+                case 'compile_workspace_assets': {
+                    const { title, campaignType } = args
+                    if (campaignType === 'image') {
+                        // For image campaigns, we just arrange them nicely
+                        return await executeToolCall({ name: 'auto_layout_grid', args: { columns: 3, includeTypes: ['image', 'character'] } }, fc, ctx)
+                    }
+
+                    // --- VIDEO CAMPAIGN COMPILATION ---
+                    // 1. Poll for any pending videos in ctx.videos
+                    if (!ctx.videos || Object.keys(ctx.videos).length === 0) return 'No videos found to compile.'
+                    
+                    const taskIds = Object.keys(ctx.videos)
+                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: `⏳ QA Check: Waiting for ${taskIds.length} video generation(s) to finish rendering...` }])
+                    
+                    let allDone = false;
+                    let maxRetries = 60; // 5 mins total polling
+                    const { API_BASE } = await import('../services/api')
+                    const token = localStorage.getItem('mantram_token') || ''
+                    
+                    while (!allDone && maxRetries > 0) {
+                        let completedCount = 0;
+                        for (const tid of taskIds) {
+                            if (ctx.videos[tid].status === 'COMPLETED' || ctx.videos[tid].status === 'FAILED') {
+                                completedCount++;
+                                continue;
+                            }
+                            try {
+                                const resp = await fetch(`${API_BASE}/video-studio/${tid}/status`, { headers: { Authorization: `Bearer ${token}` } })
+                                const statusData = await resp.json()
+                                if (statusData.status === 'COMPLETED') {
+                                    ctx.videos[tid].status = 'COMPLETED';
+                                    ctx.videos[tid].url = statusData.generation?.videoUrl || statusData.videoUrl;
+                                    console.log('Video completed:', tid, ctx.videos[tid].url);
+                                } else if (statusData.status === 'FAILED') {
+                                    ctx.videos[tid].status = 'FAILED';
+                                    console.log('Video failed:', tid);
+                                }
+                            } catch (e) { console.warn('Poll err', e) }
+                        }
+                        if (completedCount === taskIds.length) {
+                            allDone = true;
+                        } else {
+                            await new Promise(r => setTimeout(r, 5000));
+                            maxRetries--;
+                        }
+                    }
+
+                    // 2. Gather URLs
+                    // We must wait for React state updates to guarantee videos are fully compiled
+                    const finalClips = taskIds.filter(t => ctx.videos[t].url).map(t => ctx.videos[t].url)
+                    const voUrl = ctx.voiceovers && ctx.voiceovers.length > 0 ? ctx.voiceovers[0] : null
+                    const bgmUrl = ctx.music && ctx.music.length > 0 ? ctx.music[0] : null
+
+                    if (finalClips.length === 0) return 'Compilation aborted: All video generations failed.'
+
+                    setFidatoMessages(prev => [...prev, { role: 'assistant', content: `🎬 Compiling Final Ad Film "${title}" with FFmpeg...` }])
+
+                    // 3. POST to FFmpeg Compilation Route
+                    try {
+                        const compileData = await canvasAssets.compileVideo({
+                            title,
+                            clips: finalClips,
+                            voiceoverUrl: voUrl,
+                            musicUrl: bgmUrl
+                        })
+
+                        if (compileData.success && compileData.videoUrl) {
+                            // Render massive 16:9 vertical video on canvas
+                            await executeToolCall({ name: 'auto_layout_grid', args: { columns: 4 } }, fc, ctx)
+                            
+                            const cardW = 400
+                            const cardH = 711 // 16:9 vertical
+                            const bg = new fabric.Rect({
+                                left: 60, top: 400, width: cardW, height: cardH,
+                                rx: 16, ry: 16, fill: '#000',
+                                stroke: 'rgba(255,255,255,0.2)', strokeWidth: 2,
+                                shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.5)', blur: 24, offsetY: 12 }),
+                                selectable: true, evented: true,
+                                id: `final-ad-${Date.now()}`, _nodeType: 'video',
+                                customName: `Final Ad: ${title}`,
+                                _videoUrl: compileData.videoUrl
+                            })
+                            fc.add(bg)
+                            const icon = new fabric.Textbox('🎥', {
+                                left: 60 + cardW / 2 - 30, top: 400 + cardH / 2 - 40,
+                                width: 60, fontSize: 48, textAlign: 'center', selectable: false
+                            })
+                            fc.add(icon)
+                            const label = new fabric.Textbox(`FINAL CAMPAIGN\n${title}`, {
+                                left: 60 + 20, top: 400 + cardH - 60, width: cardW - 40,
+                                fontSize: 16, fontWeight: '800', fontFamily: 'Inter',
+                                fill: '#fff', textAlign: 'center', selectable: false
+                            })
+                            fc.add(label)
+                            fc.renderAll()
+
+                            return { text: `Successfully compiled the final ad film "${title}"!`, thumbnail: compileData.videoUrl }
+                        }
+                        return `Compilation completed, but no video URL returned: ${compileData.error || ''}`
+                    } catch (e) {
+                        return `FFmpeg compilation failed: ${e.message}`
+                    }
                 }
 
                 default:
@@ -3291,13 +3905,31 @@ function CanvasEditorInner() {
                     height: Math.round((obj.height || 0) * (obj.scaleY || 1)),
                     fill: obj.fill,
                     text: obj.text?.substring(0, 50),
+                    _nodeType: obj._nodeType || null,
+                    _audioUrl: obj._audioUrl || null,
+                    src: obj.type === 'image' ? (obj._element?.src || obj.getSrc?.() || '').substring(0, 200) : null,
                 })) : []
+
+            // Capture which objects are currently selected by the user
+            const activeObjects = fc?.getActiveObjects?.() || []
+            const selectedElements = activeObjects.map(obj => ({
+                type: obj.type,
+                name: obj.customName || obj._customName || obj.type,
+                text: obj.text?.substring(0, 100),
+                src: obj.type === 'image' ? (obj._element?.src || obj.getSrc?.() || '').substring(0, 200) : null,
+                fill: obj.fill,
+                _nodeType: obj._nodeType || null,
+                width: Math.round((obj.width || 0) * (obj.scaleX || 1)),
+                height: Math.round((obj.height || 0) * (obj.scaleY || 1)),
+            }))
 
             const artboard = fc?.getObjects().find(o => o.id === 'artboard')
             const canvasState = {
                 width: artboard ? Math.round(artboard.width) : fc?._logicalWidth || 1080,
                 height: artboard ? Math.round(artboard.height) : fc?._logicalHeight || 1080,
                 elements: canvasElements,
+                selectedElements: selectedElements.length > 0 ? selectedElements : undefined,
+                selectedCount: selectedElements.length,
             }
 
             // Build conversation history (last few messages)
@@ -3306,24 +3938,237 @@ function CanvasEditorInner() {
                 content: typeof m.content === 'string' ? m.content : 'image',
             }))
 
-            // Show thinking indicator
-            setFidatoMessages(prev => [...prev, { role: 'assistant', content: '🎨 **Creative Director** thinking...' }])
+            // Show progressive thinking indicator with steps
+            const thinkingSteps = [
+                { icon: 'psychology', text: 'Analyzing your request...', status: 'active' },
+                { icon: 'photo_library', text: selectedElements.length > 0 ? `Reviewing ${selectedElements.length} selected element(s)...` : 'Scanning canvas state...', status: 'pending' },
+                { icon: 'architecture', text: 'Planning creative actions...', status: 'pending' },
+            ]
+            setFidatoMessages(prev => [...prev, { role: 'assistant', content: '', thinking: true, thinkingSteps }])
+            setTimeout(() => fidatoMsgEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+
+            // Update step 1 → 2
+            setTimeout(() => {
+                setFidatoMessages(prev => {
+                    const updated = [...prev]
+                    const last = { ...updated[updated.length - 1] }
+                    if (last?.thinking) {
+                        last.thinkingSteps = last.thinkingSteps.map((s, i) =>
+                            i === 0 ? { ...s, status: 'done' } : i === 1 ? { ...s, status: 'active' } : s
+                        )
+                        updated[updated.length - 1] = last
+                    }
+                    return updated
+                })
+            }, 1500)
+
+            // Update step 2 → 3
+            setTimeout(() => {
+                setFidatoMessages(prev => {
+                    const updated = [...prev]
+                    const last = { ...updated[updated.length - 1] }
+                    if (last?.thinking) {
+                        last.thinkingSteps = last.thinkingSteps.map((s, i) =>
+                            i <= 1 ? { ...s, status: 'done' } : { ...s, status: 'active' }
+                        )
+                        updated[updated.length - 1] = last
+                    }
+                    return updated
+                })
+            }, 3000)
 
             // Call Claude tool-use endpoint
             const result = await fidatoAPI.canvasDirect({
-                message: msg,
+                message: selectedElements.length > 0
+                    ? `${msg}\n\n[USER HAS ${selectedElements.length} ELEMENT(S) SELECTED ON CANVAS: ${selectedElements.map(e => e.type === 'image' ? `Image(${e.src?.substring(0, 80) || 'uploaded'})` : `${e.type}("${e.text || e.name}")`).join(', ')}. WORK WITH THESE SELECTED ELEMENTS WHEN RELEVANT.]`
+                    : msg,
                 canvasState,
                 conversationHistory,
+                signal: abortController.signal,
             })
 
-            // Execute tool calls against the canvas
+            // ── PHASE 1: Pre-flight confirmation — show research results before proceeding ──
+            if (result.preflightConfirmation) {
+                const imgCount = (result.referenceImages || []).length;
+                const researchPreview = (result.research || '').substring(0, 300).replace(/##/g, '').trim();
+                
+                // Show research results as a confirmation message
+                setFidatoMessages(prev => {
+                    const updated = [...prev];
+                    const last = { ...updated[updated.length - 1] };
+                    last.thinking = false;
+                    last.content = `🔍 **Research Complete** for "${result.productName || 'product'}"\n\n${imgCount > 0 ? `✅ Found ${imgCount} product image(s)` : '⚠️ No product images found'}\n\n📄 ${researchPreview}${researchPreview.length >= 300 ? '...' : ''}`;
+                    last.referenceImages = result.referenceImages || [];
+                    updated[updated.length - 1] = last;
+                    return updated;
+                });
+
+                // Auto-proceed to Phase 2 with the confirmed research data
+                setFidatoMessages(prev => [...prev, { role: 'assistant', content: '⏳ Proceeding to creative pipeline with found research...', thinking: true }]);
+
+                const phase2Result = await fidatoAPI.canvasDirect({
+                    message: msg,
+                    canvasState,
+                    conversationHistory,
+                    preflightResearchData: {
+                        research: result.research,
+                        referenceImages: result.referenceImages,
+                    },
+                    signal: abortController.signal,
+                });
+
+                // Replace the "proceeding" message with the actual Claude response
+                setFidatoMessages(prev => {
+                    const updated = [...prev];
+                    updated[updated.length - 1] = {
+                        role: 'assistant',
+                        content: phase2Result.text || phase2Result.reply || '',
+                        thinking: false,
+                    };
+                    return updated;
+                });
+
+                // Use phase2Result for tool execution below
+                Object.assign(result, phase2Result);
+                result.preflightConfirmation = false; // Reset so we proceed to tool execution
+            }
+
+            // Execute tool calls against the canvas with progress updates
             const toolResults = []
             if (result.toolCalls?.length > 0 && fc) {
-                for (const tc of result.toolCalls) {
-                    console.log(`🎨 Executing tool: ${tc.name}`, tc.args)
-                    const result = await executeToolCall(tc, fc)
-                    toolResults.push(`✅ ${result}`)
+                const totalTools = result.toolCalls.length;
+                
+                // 1. Setup the initial visual plan block
+                const initTime = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                setFidatoMessages(prev => {
+                    const updated = [...prev];
+                    const last = updated[updated.length - 1];
+                    if (last) {
+                        last.thinking = false; // Turn off the main spinner
+                        last.plan = {
+                            title: `Created plan 0/${totalTools}`,
+                            items: result.toolCalls.map(tc => ({
+                                id: tc.name + Math.random(),
+                                text: `${tc.name.replace(/_/g, ' ')}`,
+                                status: 'pending' // 'pending' | 'active' | 'done' | 'error'
+                            }))
+                        };
+                        last.processLogs = [{ time: initTime, text: `[System] Parsed ${totalTools} task sequence(s) from agent strategy.` }];
+                    }
+                    return updated;
+                });
+                
+                const addLog = (text) => {
+                    const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                    setFidatoMessages(prev => {
+                        const updated = [...prev];
+                        const last = { ...updated[updated.length - 1] };
+                        if (last) {
+                            last.processLogs = [...(last.processLogs || []), { time, text }];
+                            updated[updated.length - 1] = last;
+                        }
+                        return updated;
+                    });
+                };
+
+                // 2. Execute sequentially and update plan dynamically
+                let executionContext = { scenes: [], videos: [], voiceovers: [], music: [], referenceImages: result.referenceImages || [] };
+                
+                // Log if reference images were found by the agent
+                if (executionContext.referenceImages.length > 0) {
+                    addLog(`[Agent] Downloaded ${executionContext.referenceImages.length} reference images from the web`);
+                    console.log('🖼️ Reference images from agent:', executionContext.referenceImages.map(i => i.url));
                 }
+                
+                for (let ti = 0; ti < totalTools; ti++) {
+                    const tc = result.toolCalls[ti]
+                    console.log(`🎨 Executing tool: ${tc.name}`, tc.args)
+                    const startTime = Date.now();
+                    
+                    addLog(`[TaskRunner] Executing ${tc.name}...`);
+                    addLog(`[Payload] ${JSON.stringify(tc.args)}`);
+
+                    // Mark task as active
+                    setFidatoMessages(prev => {
+                        const updated = [...prev];
+                        const last = { ...updated[updated.length - 1] };
+                        if (last && last.plan) {
+                            const newPlan = { ...last.plan };
+                            const newItems = [...newPlan.items];
+                            newItems[ti] = { ...newItems[ti], status: 'active' };
+                            newPlan.title = `Updated plan ${ti + 1}/${totalTools}`;
+                            newPlan.items = newItems;
+                            last.plan = newPlan;
+                            updated[updated.length - 1] = last;
+                        }
+                        return updated;
+                    });
+
+                    try {
+                        let result2 = await executeToolCall(tc, fc, executionContext)
+                        let text = result2;
+                        let mediaUrls = [];
+                        
+                        if (typeof result2 === 'object' && result2 !== null) {
+                            text = result2.text;
+                            if (result2.thumbnail) mediaUrls = [result2.thumbnail];
+                            if (result2.thumbnails) mediaUrls = result2.thumbnails;
+                        }
+                        
+                        // Mark task as done
+                        setFidatoMessages(prev => {
+                            const updated = [...prev];
+                            const last = { ...updated[updated.length - 1] };
+                            if (last && last.plan) {
+                                const newPlan = { ...last.plan };
+                                const newItems = [...newPlan.items];
+                                const newItem = { ...newItems[ti], status: 'done', resultText: text };
+                                if (mediaUrls.length > 0) {
+                                    newItem.thumbnails = [...(newItem.thumbnails || []), ...mediaUrls];
+                                }
+                                newItems[ti] = newItem;
+                                newPlan.items = newItems;
+                                last.plan = newPlan;
+                                updated[updated.length - 1] = last;
+                            }
+                            return updated;
+                        });
+                        
+                        toolResults.push(`✅ ${text}`)
+                        addLog(`[Success] Call returned ok in ${Date.now() - startTime}ms.`);
+                    } catch (err) {
+                        console.error('Tool execution error:', err);
+                        addLog(`[Error] Execution failed in ${Date.now() - startTime}ms: ${err.message}`);
+                        
+                        // Mark task as error
+                        setFidatoMessages(prev => {
+                            const updated = [...prev];
+                            const last = { ...updated[updated.length - 1] };
+                            if (last && last.plan) {
+                                const newPlan = { ...last.plan };
+                                const newItems = [...newPlan.items];
+                                newItems[ti] = { ...newItems[ti], status: 'error' };
+                                newPlan.items = newItems;
+                                last.plan = newPlan;
+                                updated[updated.length - 1] = last;
+                            }
+                            return updated;
+                        });
+                        
+                        toolResults.push(`❌ Failed ${tc.name}`);
+                    }
+                }
+                
+                // Finalize plan title
+                setFidatoMessages(prev => {
+                    const updated = [...prev];
+                    const last = updated[updated.length - 1];
+                    if (last && last.plan) {
+                        last.plan.title = `Completed plan ${totalTools}/${totalTools}`;
+                    }
+                    return updated;
+                });
+                
                 saveHistory()
                 updateLayers()
             }
@@ -3335,15 +4180,33 @@ function CanvasEditorInner() {
                 : ''
             const providerNote = result.fallback ? ` *(via ${result.provider})* ` : ''
 
-            // Update the "thinking..." message with the real response
+            // Extract searches from reasoning
+            let searches = []
+            let cleanReasoning = result.thinking || ''
+            const searchRegex = /<search query="([^"]+)">([\s\S]*?)<\/search>/gi
+            let match;
+            while ((match = searchRegex.exec(cleanReasoning)) !== null) {
+                searches.push({ query: match[1], result: match[2].trim() })
+            }
+            cleanReasoning = cleanReasoning.replace(searchRegex, '').trim()
+
+            // Update the "thinking..." message with real response + reasoning
             setFidatoMessages(prev => {
                 const updated = [...prev]
-                // Replace the last assistant "thinking" message
                 const lastIdx = updated.length - 1
+                const newMsgData = {
+                    role: 'assistant',
+                    content: `${reply}${actionSummary}${providerNote}`,
+                    reasoning: cleanReasoning || undefined,
+                    searches: searches.length > 0 ? searches : undefined,
+                    research: result.research || undefined,
+                    referenceImages: result.referenceImages || undefined,
+                }
+                
                 if (lastIdx >= 0 && updated[lastIdx].role === 'assistant') {
-                    updated[lastIdx] = { role: 'assistant', content: `${reply}${actionSummary}${providerNote}` }
+                    updated[lastIdx] = newMsgData
                 } else {
-                    updated.push({ role: 'assistant', content: `${reply}${actionSummary}${providerNote}` })
+                    updated.push(newMsgData)
                 }
                 return updated
             })
@@ -3354,7 +4217,7 @@ function CanvasEditorInner() {
             setFidatoMessages(prev => {
                 const updated = [...prev]
                 const lastIdx = updated.length - 1
-                if (lastIdx >= 0 && updated[lastIdx].content?.includes('thinking')) {
+                if (lastIdx >= 0 && (updated[lastIdx].thinking || updated[lastIdx].content?.includes('thinking'))) {
                     updated[lastIdx] = { role: 'assistant', content: `❌ Error: ${err.message}` }
                 } else {
                     updated.push({ role: 'assistant', content: `❌ Error: ${err.message}` })
@@ -3521,7 +4384,21 @@ function CanvasEditorInner() {
                         Back
                     </button>
                     <div className="ce-divider" />
-
+                    {/* View switcher */}
+                    <div className="ce-view-tabs">
+                        <button className={`ce-view-tab ${canvasView === 'board' ? 'active' : ''}`} onClick={() => setCanvasView('board')}>
+                            <span className="material-symbols-outlined">dashboard</span>
+                            Board
+                        </button>
+                        <button className={`ce-view-tab ${canvasView === 'design' ? 'active' : ''}`} onClick={() => setCanvasView('design')}>
+                            <span className="material-symbols-outlined">brush</span>
+                            Design
+                        </button>
+                        <button className={`ce-view-tab ${canvasView === 'timeline' ? 'active' : ''}`} onClick={() => setCanvasView('timeline')}>
+                            <span className="material-symbols-outlined">view_timeline</span>
+                            Timeline
+                        </button>
+                    </div>
 
                 </div>
 
@@ -4713,6 +5590,114 @@ function CanvasEditorInner() {
                 </div>
 
 
+                {/* ── MAIN CONTENT AREA — Board or Canvas ── */}
+                {canvasView === 'board' ? (
+                    <StoryboardBoard
+                        scenes={boardScenes}
+                        onScenesChange={setBoardScenes}
+                        storyBrief={storyBrief}
+                        brandContext={activeBrand ? {
+                            brandName: activeBrand.brandName,
+                            brandColors: activeBrand.brandColors || {},
+                        } : null}
+                        onSendToCanvas={async () => {
+                            setCanvasView('design')
+                            if (!fc || boardScenes.length === 0) return
+                            const cols = Math.min(3, boardScenes.length)
+                            const cardW = 260
+                            const imgAreaH = 180
+                            const captionH = 80
+                            const cardH = 8 + imgAreaH + captionH + 8
+                            const gap = 16
+                            const startX = 60
+                            const startY = 80
+                            const groupTag = `sb-${Date.now()}`
+
+                            if (storyBrief?.title) {
+                                fc.add(new fabric.Textbox(`🎬 ${storyBrief.title}`, {
+                                    left: startX, top: startY - 36, width: cols * (cardW + gap) - gap,
+                                    fontSize: 18, fontWeight: '800', fontFamily: 'Inter',
+                                    fill: '#c4b5fd', selectable: true, evented: true,
+                                    customName: `Storyboard Title`, id: `${groupTag}-title`
+                                }))
+                            }
+
+                            for (let i = 0; i < boardScenes.length; i++) {
+                                const scene = boardScenes[i]
+                                const col = i % cols
+                                const row = Math.floor(i / cols)
+                                const x = startX + col * (cardW + gap)
+                                const y = startY + row * (cardH + gap)
+                                const imgAreaW = cardW - 16
+
+                                // Card BG
+                                fc.add(new fabric.Rect({
+                                    left: x, top: y, width: cardW, height: cardH, rx: 12, ry: 12,
+                                    fill: 'rgba(15,17,30,0.92)', stroke: 'rgba(99,102,241,0.18)', strokeWidth: 1,
+                                    shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.2)', blur: 10, offsetY: 3 }),
+                                    selectable: false, evented: false
+                                }))
+
+                                // Image
+                                if (scene.imageUrl) {
+                                    try {
+                                        const img = await fabric.FabricImage.fromURL(scene.imageUrl, { crossOrigin: 'anonymous' })
+                                        const scale = Math.min(imgAreaW / img.width, imgAreaH / img.height)
+                                        const sw = img.width * scale
+                                        const sh = img.height * scale
+                                        img.set({
+                                            left: x + 8 + (imgAreaW - sw) / 2, top: y + 8 + (imgAreaH - sh) / 2,
+                                            scaleX: scale, scaleY: scale, selectable: true, evented: true,
+                                            customName: `Scene Image ${i + 1}`
+                                        })
+                                        fc.add(img)
+                                    } catch (e) {
+                                        console.warn('Failed to load scene image', e)
+                                    }
+                                } else {
+                                    fc.add(new fabric.Rect({
+                                        left: x + 8, top: y + 8, width: imgAreaW, height: imgAreaH,
+                                        rx: 8, ry: 8, fill: 'rgba(99,102,241,0.03)', stroke: 'rgba(99,102,241,0.08)', strokeWidth: 1, strokeDashArray: [5, 4],
+                                        selectable: false, evented: false
+                                    }))
+                                }
+
+                                // Caption
+                                fc.add(new fabric.Textbox(scene.caption || `Scene ${i + 1}`, {
+                                    left: x + 10, top: y + 8 + imgAreaH + 8, width: cardW - 20,
+                                    fontSize: 11, fontWeight: '600', fontFamily: 'Inter',
+                                    fill: '#e2e8f0', textAlign: 'left', lineHeight: 1.35, selectable: true, evented: true,
+                                    customName: `Scene Caption ${i + 1}`
+                                }))
+                            }
+                            fc.renderAll()
+                        }}
+                        onAddScene={() => {
+                            const newScene = {
+                                id: `scene-${Date.now()}`,
+                                imageUrl: '',
+                                caption: `Scene ${boardScenes.length + 1}`,
+                                shotType: '',
+                                shotDescription: '',
+                                duration: 5,
+                            }
+                            setBoardScenes(prev => [...prev, newScene])
+                        }}
+                        onSceneEdit={(scene) => {
+                            // Future: open scene detail editor
+                        }}
+                        onSceneImageClick={(scene) => {
+                            // Future: expand image or open editor
+                        }}
+                    />
+                ) : canvasView === 'timeline' ? (
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', flexDirection: 'column', gap: 8 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 48, opacity: 0.3 }}>view_timeline</span>
+                        <h3 style={{ color: '#e2e8f0', fontSize: 16 }}>Timeline View</h3>
+                        <p style={{ fontSize: 13 }}>Coming soon — sequence scenes with transitions</p>
+                    </div>
+                ) : (
+                <>
                 {/* ── CANVAS AREA ── */}
                 <div className="ce-canvas-area" ref={containerRef} onContextMenu={handleCanvasContextMenu}>
                     <div className="ce-canvas-wrapper">
@@ -4871,7 +5856,82 @@ function CanvasEditorInner() {
                                     <div key={i} className={`ce-fidato-msg ${msg.role}`}>
                                         <div className="ce-fidato-msg-avatar">{msg.role === 'assistant' ? 'F' : '\u2726'}</div>
                                         <div className="ce-fidato-msg-bubble">
-                                            <FormattedText text={msg.content || ''} />
+                                            {/* Thinking steps UI */}
+                                            {/* Pre-flight Research (Luma-style "Read" section) */}
+                                            {msg.research && msg.research.length > 50 && (
+                                                <details className="ce-fidato-search-block" style={{ marginBottom: 10, background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.12)', borderRadius: 8, overflow: 'hidden' }} open>
+                                                    <summary style={{ padding: '8px 12px', fontSize: 12, color: '#a1a1aa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, userSelect: 'none', fontWeight: 600 }}>
+                                                        <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#818cf8' }}>menu_book</span>
+                                                        Read
+                                                        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#52525b' }}>{Math.round(msg.research.length / 4)} words</span>
+                                                    </summary>
+                                                    <div style={{ padding: '0 12px 12px 32px', fontSize: 11, color: '#d4d4d8', whiteSpace: 'pre-wrap', lineHeight: 1.6, maxHeight: 160, overflowY: 'auto' }}>
+                                                        {msg.research.replace(/## WEB RESEARCH RESULTS.*\n/g, '').replace(/## REFERENCE IMAGES.*\n[\s\S]*$/g, '').trim()}
+                                                    </div>
+                                                </details>
+                                            )}
+
+                                            {/* Reference Images (Luma-style product strip) */}
+                                            {msg.referenceImages && msg.referenceImages.length > 0 && (
+                                                <div style={{ marginBottom: 10 }}>
+                                                    <div style={{ fontSize: 11, color: '#a1a1aa', fontWeight: 600, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                        <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#818cf8' }}>photo_library</span>
+                                                        Product References ({msg.referenceImages.length})
+                                                    </div>
+                                                    <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
+                                                        {msg.referenceImages.map((img, idx) => (
+                                                            <img key={idx} src={img.s3Url || img.url || img} alt={img.alt || `Reference ${idx + 1}`}
+                                                                style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.08)', flexShrink: 0, cursor: 'pointer' }}
+                                                                onClick={() => addImageUrlToCanvas(img.s3Url || img.url || img)}
+                                                                title="Click to add to canvas"
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Thinking/reasoning (Luma-style "Thought" section) */}
+                                            {msg.searches && msg.searches.length > 0 && (
+                                                <div className="ce-fidato-searches" style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                    {msg.searches.map((search, idx) => (
+                                                        <details key={idx} className="ce-fidato-search-block" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, overflow: 'hidden' }}>
+                                                            <summary style={{ padding: '8px 12px', fontSize: 12, color: '#a1a1aa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, userSelect: 'none' }}>
+                                                                <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#6366f1' }}>public</span>
+                                                                Searched web: "{search.query}"
+                                                            </summary>
+                                                            <div style={{ padding: '0 12px 12px 32px', fontSize: 12, color: '#d4d4d8', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                                                                {search.result}
+                                                            </div>
+                                                        </details>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            
+                                            {msg.thinking && msg.thinkingSteps ? (
+                                                <div className="ce-fidato-reasoning">
+                                                    {msg.thinkingSteps.map((step, si) => (
+                                                        <div key={si} className={`ce-fidato-thinking-step ${step.status}`}>
+                                                            <span className="material-symbols-outlined">
+                                                                {step.status === 'done' ? 'check_circle' : step.status === 'active' ? 'pending' : 'radio_button_unchecked'}
+                                                            </span>
+                                                            {step.text}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <FormattedText text={msg.content || ''} />
+                                                    {msg.reasoning && (
+                                                        <details className="ce-fidato-reasoning" style={{ marginTop: 8 }}>
+                                                            <summary className="ce-fidato-reasoning-toggle">
+                                                                <span className="material-symbols-outlined" style={{ fontSize: 12 }}>psychology</span>
+                                                                View reasoning
+                                                            </summary>
+                                                            <div style={{ marginTop: 6, whiteSpace: 'pre-wrap' }}>{msg.reasoning}</div>
+                                                        </details>
+                                                    )}
+                                                </>
+                                            )}
                                             {msg.images && msg.images.length > 0 && (
                                                 <div className="ce-fidato-images">
                                                     {msg.images.map((img, j) => (
@@ -4886,16 +5946,44 @@ function CanvasEditorInner() {
                                                     <div className="ce-fidato-plan-title">{msg.plan.title}</div>
                                                     {msg.plan.items.map((item, k) => (
                                                         <div key={k} className={`ce-fidato-plan-item ${item.status || ''}`}>
-                                                            <span className="material-symbols-outlined">{item.status === 'done' ? 'check_circle' : item.status === 'active' ? 'pending' : 'radio_button_unchecked'}</span>
-                                                            {item.text}
+                                                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                                <span className="material-symbols-outlined">{item.status === 'done' ? 'check_circle' : item.status === 'active' ? 'pending' : 'radio_button_unchecked'}</span>
+                                                                {item.text}
+                                                            </div>
+                                                            {item.thumbnails && item.thumbnails.length > 0 && (
+                                                                <div style={{ display: 'flex', gap: 6, marginTop: 8, paddingLeft: 24, flexWrap: 'wrap' }}>
+                                                                    {item.thumbnails.map((t, idx) => (
+                                                                        <img key={idx} src={t} alt="Result" style={{ width: 44, height: 44, borderRadius: 6, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
+                                                                    ))}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     ))}
                                                 </div>
                                             )}
+                                            
+                                            {/* Process Logs (Terminal View) */}
+                                            {msg.processLogs && msg.processLogs.length > 0 && (
+                                                <details className="ce-fidato-process-logs" style={{ marginTop: 12, background: '#0a0a0a', borderRadius: 6, border: '1px solid #27272a', overflow: 'hidden' }}>
+                                                    <summary style={{ padding: '8px 12px', fontSize: 11, fontWeight: 600, color: '#a1a1aa', cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center' }}>
+                                                        <span className="material-symbols-outlined" style={{ fontSize: 14, marginRight: 6 }}>terminal</span>
+                                                        Show process
+                                                    </summary>
+                                                    <div style={{ padding: '8px 12px 12px', fontSize: 10, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace', color: '#10b981', whiteSpace: 'pre-wrap', maxHeight: 240, overflowY: 'auto' }}>
+                                                        {msg.processLogs.map((log, i) => (
+                                                            <div key={i} style={{ marginBottom: 4 }}>
+                                                                <span style={{ color: '#52525b', marginRight: 8}}>[{log.time}]</span>
+                                                                <span style={{ color: log.text.includes('[Error]') ? '#ef4444' : log.text.includes('[Payload]') ? '#d4d4d8' : '#10b981' }}>{log.text}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </details>
+                                            )}
+                                            
                                         </div>
                                     </div>
                                 ))}
-                                {fidatoLoading && (
+                                {fidatoLoading && !fidatoMessages[fidatoMessages.length - 1]?.thinking && (
                                     <div className="ce-fidato-thinking">
                                         <span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span> Thinking
                                         <div className="ce-fidato-thinking-dots"><span /><span /><span /></div>
@@ -5026,9 +6114,30 @@ function CanvasEditorInner() {
                                             {fidatoRecording ? 'stop_circle' : fidatoTranscribing ? 'hourglass_top' : 'mic'}
                                         </span>
                                     </button>
-                                    <button className="ce-fidato-send-btn" onClick={() => handleFidatoSend()} disabled={fidatoLoading || !fidatoInput.trim()}>
-                                        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{fidatoLoading ? 'progress_activity' : 'arrow_upward'}</span>
-                                    </button>
+                                    {fidatoLoading ? (
+                                        <button className="ce-fidato-send-btn" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', borderColor: '#ef4444' }} onClick={() => {
+                                            if (fidatoAbortRef.current) {
+                                                fidatoAbortRef.current.abort()
+                                                fidatoAbortRef.current = null
+                                            }
+                                            setFidatoLoading(false)
+                                            setFidatoMessages(prev => {
+                                                const updated = [...prev]
+                                                const last = updated[updated.length - 1]
+                                                if (last && last.role === 'assistant' && last.thinking) {
+                                                    last.thinking = false
+                                                    last.content = (last.content || '') + '\n\n⏹️ Stopped by user.'
+                                                }
+                                                return updated
+                                            })
+                                        }} title="Stop generation">
+                                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>stop_circle</span>
+                                        </button>
+                                    ) : (
+                                        <button className="ce-fidato-send-btn" onClick={() => handleFidatoSend()} disabled={!fidatoInput.trim()}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_upward</span>
+                                        </button>
+                                    )}
                                 </div>
                                 <div className="ce-fidato-shortcuts">
                                     <button className="ce-fidato-shortcut" onClick={() => setFidatoInput('Generate a campaign image for ')}>
@@ -5398,8 +6507,9 @@ function CanvasEditorInner() {
                         </div>
                     </div>
                 </div >
+            </>
+            )}
             </div >
-
 
 
             {/* ── BOTTOM BAR (Resize + Platform Presets) ── */}

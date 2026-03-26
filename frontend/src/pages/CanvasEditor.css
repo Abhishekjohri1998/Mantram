@@ -2432,9 +2432,60 @@
     border-left: 1px solid rgba(255, 255, 255, 0.06);
     display: flex;
     flex-direction: column;
+    overflow: hidden;
     z-index: 90;
     animation: ceFidatoSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* Thinking / Reasoning display */
+.ce-fidato-reasoning {
+    background: rgba(139, 92, 246, 0.06);
+    border: 1px solid rgba(139, 92, 246, 0.15);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin: 4px 0;
+    font-size: 11px;
+    color: #a78bfa;
+    line-height: 1.5;
+    max-height: 120px;
+    overflow-y: auto;
+    transition: max-height 0.3s ease;
+}
+.ce-fidato-reasoning.collapsed {
+    max-height: 32px;
+    overflow: hidden;
+    cursor: pointer;
+}
+.ce-fidato-reasoning-toggle {
+    font-size: 10px;
+    color: #7c3aed;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    opacity: 0.7;
+}
+.ce-fidato-reasoning-toggle:hover { opacity: 1; }
+
+.ce-fidato-reasoning::-webkit-scrollbar { width: 2px; }
+.ce-fidato-reasoning::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.3); border-radius: 2px; }
+
+/* Thinking status steps */
+.ce-fidato-thinking-step {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+    font-size: 11px;
+    color: #94a3b8;
+}
+.ce-fidato-thinking-step .material-symbols-outlined {
+    font-size: 14px;
+    color: #8b5cf6;
+}
+.ce-fidato-thinking-step.active { color: #c4b5fd; font-weight: 600; }
+.ce-fidato-thinking-step.done { color: #22c55e; }
 
 @keyframes ceFidatoSlideIn {
     from { transform: translateX(100%); }
@@ -3197,4 +3248,124 @@
 .canvas-editor:not(.theme-light) .ce-sidebar-collapse-btn:hover {
     background: rgba(99, 102, 241, 0.2);
     border-color: rgba(99, 102, 241, 0.5);
+}
+
+/* ══════════════════════════════════════════════════════════════════════ */
+/* ══  LIGHT THEME FIXES — Force Light UI on Hardcoded Dark Components ══ */
+/* ══════════════════════════════════════════════════════════════════════ */
+
+/* Fidato Chat Panel */
+.canvas-editor.theme-light .ce-fidato-panel {
+    background: rgba(255, 255, 255, 0.97);
+    border-left: 1px solid rgba(0, 0, 0, 0.08);
+}
+.canvas-editor.theme-light .ce-fidato-header {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+.canvas-editor.theme-light .ce-fidato-name,
+.canvas-editor.theme-light .ce-fidato-msg-bubble,
+.canvas-editor.theme-light .ce-fidato-input {
+    color: #1d1d1f;
+}
+.canvas-editor.theme-light .ce-fidato-collapse {
+    background: rgba(0, 0, 0, 0.04);
+    color: #6e6e73;
+}
+.canvas-editor.theme-light .ce-fidato-collapse:hover {
+    background: rgba(0, 0, 0, 0.08);
+    color: #1d1d1f;
+}
+.canvas-editor.theme-light .ce-fidato-msg.assistant .ce-fidato-msg-bubble {
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+.canvas-editor.theme-light .ce-fidato-msg.user .ce-fidato-msg-bubble {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.05));
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    color: #1d1d1f;
+}
+.canvas-editor.theme-light .ce-fidato-input-bar {
+    background: #ffffff;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+.canvas-editor.theme-light .ce-fidato-input-row {
+    background: rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+.canvas-editor.theme-light .ce-fidato-input::placeholder {
+    color: #86868b;
+}
+.canvas-editor.theme-light .ce-fidato-plan {
+    background: rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+}
+.canvas-editor.theme-light .ce-fidato-plan-title,
+.canvas-editor.theme-light .ce-fidato-plan-item {
+    color: #4a5568;
+}
+.canvas-editor.theme-light .ce-fidato-shortcut {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: #ffffff;
+    color: #4a5568;
+}
+.canvas-editor.theme-light .ce-palette-chip {
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+.canvas-editor.theme-light .ce-palette-hex {
+    color: #4a5568;
+}
+
+/* AI Generating Floating Panel */
+.canvas-editor.theme-light .ce-genimg-panel {
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+.canvas-editor.theme-light .ce-genimg-textarea {
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    color: #1d1d1f;
+}
+.canvas-editor.theme-light .ce-genimg-textarea::placeholder {
+    color: #86868b;
+}
+
+/* Modal UI Overrides */
+.canvas-editor.theme-light .ce-modal-overlay {
+    background: rgba(255, 255, 255, 0.2);
+}
+.canvas-editor.theme-light .ce-modal {
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+.canvas-editor.theme-light .ce-modal h3 {
+    color: #1d1d1f;
+}
+.canvas-editor.theme-light .ce-text-modal-textarea {
+    background: rgba(0, 0, 0, 0.03);
+    color: #1d1d1f;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+.canvas-editor.theme-light .ce-text-modal-textarea::focus {
+    border-color: #6366f1;
+}
+
+/* Left Sidebar Drawers (Elements, Images, Masks) */
+.canvas-editor.theme-light .ce-elements-grid,
+.canvas-editor.theme-light .ce-library-grid {
+    background: transparent;
+}
+.canvas-editor.theme-light .ce-element-btn {
+    background: rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    color: #4a5568;
+}
+.canvas-editor.theme-light .ce-element-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #1d1d1f;
+}
+.canvas-editor.theme-light h4 {
+    color: #1d1d1f;
 }

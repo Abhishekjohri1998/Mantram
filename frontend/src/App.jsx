@@ -104,7 +104,7 @@ function App() {
                   <Route path="/team" element={<ProtectedRoute><TeamDashboard /></ProtectedRoute>} />
                   <Route path="/content-studio" element={<ProtectedRoute><ContentStudio /></ProtectedRoute>} />
                   <Route path="/creative-studio" element={<ProtectedRoute><CreativeStudio /></ProtectedRoute>} />
-                  <Route path="/creative-studio/editor" element={<ProtectedRoute><CanvasEditor /></ProtectedRoute>} />
+                  <Route path="/ai-canvas" element={<ProtectedRoute><CanvasEditor /></ProtectedRoute>} />
                   <Route path="/video-studio" element={<ProtectedRoute><VideoStudio /></ProtectedRoute>} />
                   <Route path="/performance-marketing" element={<ProtectedRoute><PerformanceMarketing /></ProtectedRoute>} />
                   <Route path="/d2c-analytics" element={<ProtectedRoute><D2CAnalytics /></ProtectedRoute>} />

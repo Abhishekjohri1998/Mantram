@@ -1610,7 +1610,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                 ].map(tab => (
                     <button key={tab.id}
                         onClick={() => {
-                            if (tab.isNav) { navigate('/creative-studio/editor'); return }
+                            if (tab.isNav) { navigate('/ai-canvas'); return }
                             setStudioMode(tab.id)
                             if (tab.id === 'imagebank') loadImageBank()
                         }}
@@ -5519,7 +5519,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                             </button>
                                             <button onClick={() => {
                                                 sessionStorage.setItem('canvasEditorImage', templateResult.imageUrl)
-                                                navigate('/creative-studio/editor')
+                                                navigate('/ai-canvas')
                                             }}
                                                 className="py-2.5 px-5 rounded-xl text-xs font-bold bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 cursor-pointer">
                                                 <span className="material-symbols-outlined text-sm">edit</span>
@@ -5782,7 +5782,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                                 <button onClick={(e) => {
                                                     e.stopPropagation();
                                                     sessionStorage.setItem('canvasEditorImage', img.imageUrl);
-                                                    navigate('/creative-studio/editor')
+                                                    navigate('/ai-canvas')
                                                 }}
                                                     className="p-1.5 rounded-lg text-slate-500 hover:text-violet-400 hover:bg-violet-500/10 transition-all cursor-pointer"
                                                     title="Edit in Canvas">
@@ -5848,7 +5848,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                                         className="p-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-all cursor-pointer" title="Download">
                                                         <span className="material-symbols-outlined text-xs">download</span>
                                                     </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); sessionStorage.setItem('canvasEditorImage', img.imageUrl); navigate('/creative-studio/editor') }}
+                                                    <button onClick={(e) => { e.stopPropagation(); sessionStorage.setItem('canvasEditorImage', img.imageUrl); navigate('/ai-canvas') }}
                                                         className="p-1.5 rounded-lg bg-violet-500/20 text-violet-400 hover:bg-violet-500/30 transition-all cursor-pointer" title="Edit">
                                                         <span className="material-symbols-outlined text-xs">edit</span>
                                                     </button>
@@ -5976,7 +5976,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                             <button onClick={() => {
                                                 sessionStorage.setItem('canvasEditorImage', img.imageUrl)
                                                 setLightboxIdx(null)
-                                                navigate('/creative-studio/editor')
+                                                navigate('/ai-canvas')
                                             }}
                                                 className="py-2.5 px-4 rounded-xl text-xs font-bold bg-violet-500/15 text-violet-400 hover:bg-violet-500/25 flex items-center gap-2 cursor-pointer transition-colors">
                                                 <span className="material-symbols-outlined text-sm">edit</span>

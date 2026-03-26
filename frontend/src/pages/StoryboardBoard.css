@@ -1,0 +1,421 @@
+/* ═══════════════════════════════════════════════════════════════════════ */
+/*  STORYBOARD BOARD — Luma-Style Grid Layout                            */
+/* ═══════════════════════════════════════════════════════════════════════ */
+
+.sb-board {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 24px 32px;
+    background: #0c0d14;
+    min-height: 0;
+}
+
+/* ── Story Brief ── */
+.sb-brief {
+    background: rgba(99, 102, 241, 0.06);
+    border: 1px solid rgba(99, 102, 241, 0.15);
+    border-radius: 14px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+}
+
+.sb-brief-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.sb-brief-header .material-symbols-outlined {
+    font-size: 18px;
+    color: #818cf8;
+}
+
+.sb-brief-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #e2e8f0;
+}
+
+.sb-brief-brand {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 600;
+    color: #818cf8;
+    background: rgba(99, 102, 241, 0.12);
+    padding: 2px 10px;
+    border-radius: 10px;
+}
+
+.sb-brief-arc {
+    font-size: 12px;
+    color: #cbd5e1;
+    margin-bottom: 6px;
+    line-height: 1.5;
+}
+
+.sb-brief-synopsis {
+    font-size: 12px;
+    color: #94a3b8;
+    line-height: 1.5;
+}
+
+.sb-brief-meta {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 8px;
+}
+
+/* ── Scene Grid ── */
+.sb-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+    align-content: start;
+}
+
+/* ── Scene Card ── */
+.sb-card {
+    background: rgba(15, 17, 30, 0.95);
+    border: 1px solid rgba(99, 102, 241, 0.12);
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: grab;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    position: relative;
+}
+
+.sb-card:hover {
+    border-color: rgba(99, 102, 241, 0.35);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(99, 102, 241, 0.1);
+    transform: translateY(-2px);
+}
+
+.sb-card.dragging {
+    opacity: 0.4;
+    cursor: grabbing;
+}
+
+.sb-card.dragging-overlay {
+    box-shadow: 0 12px 40px rgba(99, 102, 241, 0.25);
+    border-color: rgba(99, 102, 241, 0.5);
+    transform: rotate(2deg) scale(1.03);
+}
+
+/* ── Card Image Area ── */
+.sb-card-image {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    background: rgba(99, 102, 241, 0.03);
+    cursor: pointer;
+}
+
+.sb-card-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.sb-card-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #475569;
+    gap: 6px;
+}
+
+.sb-card-placeholder .material-symbols-outlined {
+    font-size: 28px;
+    opacity: 0.4;
+}
+
+.sb-card-placeholder-text {
+    font-size: 10px;
+    opacity: 0.6;
+}
+
+/* ── Card Badge (Scene Number) ── */
+.sb-card-badge {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    background: rgba(99, 102, 241, 0.75);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 10px;
+    backdrop-filter: blur(8px);
+    font-family: 'Inter', sans-serif;
+}
+
+.sb-card-shot-type {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.6);
+    color: #a5b4fc;
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 8px;
+    backdrop-filter: blur(8px);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ── Card Metadata ── */
+.sb-card-meta {
+    padding: 10px 12px;
+}
+
+.sb-card-caption {
+    font-size: 12px;
+    font-weight: 600;
+    color: #e2e8f0;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-family: 'Inter', sans-serif;
+}
+
+.sb-card-description {
+    font-size: 11px;
+    color: #94a3b8;
+    line-height: 1.4;
+    margin-top: 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.sb-card-duration {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    font-size: 10px;
+    color: #64748b;
+}
+
+/* ── Card Actions (hover) ── */
+.sb-card-actions {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.sb-card:hover .sb-card-actions {
+    opacity: 1;
+}
+
+.sb-card-actions button {
+    background: rgba(0, 0, 0, 0.7);
+    border: none;
+    color: #e2e8f0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+}
+
+.sb-card-actions button:hover {
+    background: rgba(99, 102, 241, 0.7);
+}
+
+.sb-card-actions button .material-symbols-outlined {
+    font-size: 14px;
+}
+
+/* ── Add Scene Card ── */
+.sb-add-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 160px;
+    background: transparent;
+    border: 2px dashed rgba(99, 102, 241, 0.15);
+    border-radius: 12px;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.sb-add-card:hover {
+    border-color: rgba(99, 102, 241, 0.4);
+    color: #818cf8;
+    background: rgba(99, 102, 241, 0.04);
+}
+
+.sb-add-card .material-symbols-outlined {
+    font-size: 28px;
+}
+
+/* ── Footer ── */
+.sb-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0 0;
+    margin-top: 20px;
+    border-top: 1px solid rgba(99, 102, 241, 0.08);
+}
+
+.sb-footer-info {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.sb-footer-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.sb-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(99, 102, 241, 0.12);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    color: #a5b4fc;
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.2s ease;
+}
+
+.sb-action-btn:hover {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: rgba(99, 102, 241, 0.4);
+    color: #c4b5fd;
+}
+
+.sb-action-btn .material-symbols-outlined {
+    font-size: 16px;
+}
+
+/* ── Empty State ── */
+.sb-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+    text-align: center;
+    gap: 8px;
+}
+
+.sb-empty h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #e2e8f0;
+    margin: 8px 0 0;
+}
+
+.sb-empty p {
+    font-size: 13px;
+    color: #64748b;
+    margin: 0;
+}
+
+/* ── View Tabs ── */
+.ce-view-tabs {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: rgba(15, 17, 30, 0.6);
+    border-radius: 8px;
+    padding: 2px;
+    border: 1px solid rgba(99, 102, 241, 0.1);
+}
+
+.ce-view-tab {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: transparent;
+    border: none;
+    color: #64748b;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.ce-view-tab:hover {
+    color: #a5b4fc;
+}
+
+.ce-view-tab.active {
+    background: rgba(99, 102, 241, 0.15);
+    color: #c4b5fd;
+}
+
+.ce-view-tab .material-symbols-outlined {
+    font-size: 16px;
+}
+
+/* ── Reasoning Block ── */
+.ce-fidato-reasoning {
+    background: rgba(139, 92, 246, 0.06);
+    border: 1px solid rgba(139, 92, 246, 0.12);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 11px;
+    color: #a78bfa;
+}
+
+.ce-fidato-reasoning-toggle {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #a78bfa;
+    list-style: none;
+    user-select: none;
+}
+
+.ce-fidato-reasoning-toggle::-webkit-details-marker {
+    display: none;
+}
+
+.ce-fidato-reasoning-toggle::before {
+    content: '▸';
+    transition: transform 0.15s ease;
+}
+
+details[open] .ce-fidato-reasoning-toggle::before {
+    transform: rotate(90deg);
+}

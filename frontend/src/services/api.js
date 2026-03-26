@@ -43,9 +43,13 @@ export async function apiFetch(endpoint, options = {}) {
     };
 
     // Configurable timeout — default 1 hour (3,600,000ms), heavy operations can pass longer
-    const { timeout: timeoutMs = 3600000, ...fetchOptions } = options;
+    const { timeout: timeoutMs = 3600000, signal: externalSignal, ...fetchOptions } = options;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    // If caller provides an external signal (for stop buttons), wire it up
+    if (externalSignal) {
+        externalSignal.addEventListener('abort', () => controller.abort());
+    }
 
     let response;
     try {
@@ -281,7 +285,7 @@ export const team = {
 // ============ Fidato AI Assistant ============
 export const fidato = {
     chat: (message, brandId) => apiFetch('/fidato/chat', { method: 'POST', body: JSON.stringify({ message, brandId }) }),
-    canvasDirect: (data) => apiFetch('/fidato/canvas-direct', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
+    canvasDirect: (data) => { const { signal, ...body } = data; return apiFetch('/fidato/canvas-direct', { method: 'POST', body: JSON.stringify(body), timeout: 3600000, signal }); },
     briefing: (brandId) => apiFetch('/fidato/briefing', { method: 'POST', body: JSON.stringify({ brandId }) }),
     notifications: (brandId) => apiFetch(`/fidato/notifications${brandId ? `?brandId=${brandId}` : ''}`),
     updatePreferences: (prefs) => apiFetch('/fidato/preferences', { method: 'POST', body: JSON.stringify(prefs) }),
@@ -354,12 +358,19 @@ export const rewards = {
 
 // ============ Canvas Assets API (Creative Studio) ============
 export const canvasAssets = {
+    aiGenerate: (data) => apiFetch('/canvas-assets/ai-generate', { method: 'POST', body: JSON.stringify(data) }),
     aiEdit: (data) => apiFetch('/canvas-assets/ai-edit', { method: 'POST', body: JSON.stringify(data) }),
     aiEditVisual: (data) => apiFetch('/canvas-assets/ai-edit-visual', { method: 'POST', body: JSON.stringify(data) }),
     aiRetouch: (data) => apiFetch('/canvas-assets/ai-retouch', { method: 'POST', body: JSON.stringify(data) }),
     aiBackground: (data) => apiFetch('/canvas-assets/ai-background', { method: 'POST', body: JSON.stringify(data) }),
     aiAnalyze: (data) => apiFetch('/canvas-assets/ai-analyze', { method: 'POST', body: JSON.stringify(data) }),
     aiAnalyzeTemplate: (data) => apiFetch('/canvas-assets/ai-analyze-template', { method: 'POST', body: JSON.stringify(data) }),
+    // Agentic Canvas tools
+    generateVideo: (data) => apiFetch('/fidato/canvas-video', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
+    generateVoiceover: (data) => apiFetch('/fidato/canvas-voiceover', { method: 'POST', body: JSON.stringify(data) }),
+    generateMusic: (data) => apiFetch('/fidato/canvas-music', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
+    generateSoundEffect: (data) => apiFetch('/fidato/canvas-sfx', { method: 'POST', body: JSON.stringify(data) }),
+    compileVideo: (data) => apiFetch('/fidato/canvas-compile', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
 };
 
 // ============ Video Studio API ============

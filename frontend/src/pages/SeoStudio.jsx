@@ -155,10 +155,26 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
     }, [activeBrand])
 
     const loadGAProperties = async () => {
-        try { const d = await gaAPI.properties(activeBrand?._id); setGaProperties(d.properties || []) } catch { }
+        try { 
+            const d = await gaAPI.properties(activeBrand?._id); 
+            const props = d.properties || [];
+            setGaProperties(props);
+            if (props.length > 0) {
+                setGaSelectedProp(props[0].id);
+                loadGAReport(props[0].id);
+            }
+        } catch { }
     }
     const loadGSCSites = async () => {
-        try { const d = await gaAPI.searchConsoleSites(activeBrand?._id); setGaSites(d.sites || []) } catch { }
+        try { 
+            const d = await gaAPI.searchConsoleSites(activeBrand?._id); 
+            const sites = d.sites || [];
+            setGaSites(sites);
+            if (sites.length > 0) {
+                setGaSelectedSite(sites[0].siteUrl);
+                loadGSCReport(sites[0].siteUrl);
+            }
+        } catch { }
     }
     const loadGAReport = async (propId) => {
         if (!propId) return; setGaLoading(true)
@@ -958,11 +974,11 @@ small{color:#94a3b8;font-size:10px}
                                     <button onClick={() => setShowSetup(!showSetup)}
                                         className="w-full flex items-center gap-2 px-3 py-2 text-left cursor-pointer transition-all hover:bg-white/[0.03]">
                                         <span className="material-symbols-outlined text-slate-600 text-lg">settings</span>
-                                        <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest flex-1">Setup</span>
+                                        <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest flex-1">Track Competitors</span>
                                         <span className="material-symbols-outlined text-slate-700 text-xs">{showSetup ? 'expand_less' : 'expand_more'}</span>
                                     </button>
                                 ) : (
-                                    <button onClick={() => { setSidebarCollapsed(false); setShowSetup(true) }} title="Setup"
+                                    <button onClick={() => { setSidebarCollapsed(false); setShowSetup(true) }} title="Track Competitors"
                                         className="w-full flex items-center justify-center py-2 cursor-pointer hover:bg-white/[0.03] transition-all">
                                         <span className="material-symbols-outlined text-slate-600 text-lg">settings</span>
                                     </button>
@@ -982,7 +998,7 @@ small{color:#94a3b8;font-size:10px}
                                             </div>
                                             <div className="flex gap-1">
                                                 <input type="text" value={newCompUrl} onChange={e => setNewCompUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCompetitor()}
-                                                    placeholder="competitor.com" className="flex-1 px-2 py-1 rounded text-[10px] text-white bg-white/[0.04] border border-white/[0.06] outline-none" />
+                                                    placeholder="Add competitor URL..." className="flex-1 px-2 py-1 rounded text-[10px] text-white bg-white/[0.04] border border-white/[0.06] outline-none" />
                                                 <button onClick={addCompetitor} disabled={!newCompUrl.trim()} className="px-1.5 py-1 rounded text-[9px] font-bold bg-white/[0.04] text-slate-500 cursor-pointer disabled:opacity-30">+</button>
                                             </div>
                                             <button onClick={discoverCompetitors} disabled={compLoading}
@@ -1246,6 +1262,14 @@ small{color:#94a3b8;font-size:10px}
                                 gaConnected={gaConnected}
                                 gaReport={gaReport}
                                 gscReport={gscReport}
+                                gaProperties={gaProperties}
+                                gaSelectedProp={gaSelectedProp}
+                                setGaSelectedProp={setGaSelectedProp}
+                                loadGAReport={loadGAReport}
+                                gaSites={gaSites}
+                                gaSelectedSite={gaSelectedSite}
+                                setGaSelectedSite={setGaSelectedSite}
+                                loadGSCReport={loadGSCReport}
                                 setCompetitors={setCompetitors}
                                 hideNav
                             />

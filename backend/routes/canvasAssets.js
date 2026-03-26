@@ -218,10 +218,26 @@ router.post('/ai-generate', protect, requireCredits('canvasGenerate'), async (re
 
         // Build multimodal parts — reference images first, then text prompt
         const parts = []
-        for (const refBase64 of referenceImages.slice(0, 4)) {
-            const base64Data = refBase64.includes('base64,') ? refBase64.split('base64,')[1] : refBase64
-            const mimeType = refBase64.startsWith('data:') ? refBase64.split(';')[0].split(':')[1] : 'image/png'
-            parts.push({ inlineData: { mimeType, data: base64Data } })
+        for (const ref of referenceImages.slice(0, 4)) {
+            try {
+                if (ref.startsWith('http://') || ref.startsWith('https://')) {
+                    // S3 URL or external URL — fetch server-side and convert to base64
+                    const imgResp = await fetch(ref)
+                    if (imgResp.ok) {
+                        const buffer = await imgResp.arrayBuffer()
+                        const base64Data = Buffer.from(buffer).toString('base64')
+                        const contentType = imgResp.headers.get('content-type') || 'image/jpeg'
+                        parts.push({ inlineData: { mimeType: contentType, data: base64Data } })
+                    }
+                } else {
+                    // base64 data URI
+                    const base64Data = ref.includes('base64,') ? ref.split('base64,')[1] : ref
+                    const mimeType = ref.startsWith('data:') ? ref.split(';')[0].split(':')[1] : 'image/png'
+                    parts.push({ inlineData: { mimeType, data: base64Data } })
+                }
+            } catch (e) {
+                console.warn('Failed to process reference image:', e.message)
+            }
         }
         const refCount = parts.length
         const textPrompt = refCount > 0

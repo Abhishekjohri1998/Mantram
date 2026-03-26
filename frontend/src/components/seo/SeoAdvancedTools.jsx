@@ -40,14 +40,14 @@ const ESTIMATED_DURATIONS = {
     'overview': 90,
     'keywords': 60,
     'content-ops': 60,
-    'geo': 90,
-    'geo-llm': 90,
+    'geo-visibility': 90,
+    'geo-probe': 90,
     'geo-mining': 90,
     'competitor-detail': 75,
     'competitor-warroom': 75,
     'on-page': 45,
     'on-page-fix': 45,
-    'backlinks': 60,
+    'backlinks-run': 60,
 };
 
 // Loading stage descriptions per workflow
@@ -56,14 +56,14 @@ const LOADING_STAGES = {
     'overview': ['Running Health Check', 'Analyzing Scores', 'Building Report'],
     'keywords': ['Researching Keywords', 'Analyzing Volume & Difficulty', 'Clustering Topics'],
     'content-ops': ['Analyzing Content Gaps', 'Finding Opportunities', 'Building Report'],
-    'geo': ['Checking AI Visibility', 'Probing LLMs', 'Mining Prompts'],
-    'geo-llm': ['Testing LLM Responses', 'Analyzing AI Coverage'],
+    'geo-visibility': ['Checking AI Visibility', 'Probing LLMs', 'Mining Prompts'],
+    'geo-probe': ['Testing LLM Responses', 'Analyzing AI Coverage'],
     'geo-mining': ['Mining AI Prompts', 'Analyzing Opportunities'],
     'competitor-detail': ['Analyzing Competitors', 'Comparing Metrics', 'Building War Room'],
     'competitor-warroom': ['Deep Competitor Intel', 'Building Strategy'],
     'on-page': ['Auditing Page', 'Checking On-Page SEO', 'Generating Fixes'],
     'on-page-fix': ['Applying AI Fixes', 'Optimizing Content'],
-    'backlinks': ['Analyzing Backlink Profile', 'Checking Authority', 'Building Report'],
+    'backlinks-run': ['Analyzing Backlink Profile', 'Checking Authority', 'Building Report'],
 };
 
 // Map tab IDs to SeoAudit type values for persistence
@@ -77,7 +77,7 @@ const TAB_TO_AUDIT_TYPE = {
     'backlinks': 'backlinks',
 };
 
-export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, website, competitors, setCompetitors, brandPayload, gaConnected, gaReport, gscReport, gaLoading, gaAuthError, reconnectGA, hideNav }) {
+export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, website, competitors, setCompetitors, brandPayload, gaConnected, gaReport, gscReport, gaLoading, gaAuthError, reconnectGA, hideNav, gaProperties, gaSelectedProp, setGaSelectedProp, loadGAReport, gaSites, gaSelectedSite, setGaSelectedSite, loadGSCReport }) {
     // Per-tab data cache (for saved reports)
     const [tabData, setTabData] = useState({});
     const [pageUrl, setPageUrl] = useState('');
@@ -93,8 +93,11 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
 
     // ── Context-driven background tasks ──
     const ctx = useSeoTasks();
-    const contextTask = ctx?.tasks?.[advPage];
-    const loadingAction = contextTask?.status === 'running' ? advPage : '';
+    const runningTaskId = Object.keys(ctx?.tasks || {}).find(key => 
+        (key === advPage || key.startsWith(`${advPage}-`)) && ctx.tasks[key].status === 'running'
+    );
+    const contextTask = ctx?.tasks?.[runningTaskId || advPage];
+    const loadingAction = runningTaskId || '';
     const loadingMsg = contextTask?.stage || '';
 
     // Auto-load saved report when switching tabs (if no context result)
@@ -145,6 +148,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
         }
     };
 
+    // ── Helper to build standardized API payload ──
     const buildPayload = (extra = {}) => ({
         url: brandPayload?.website,
         brand: brandPayload,
@@ -158,10 +162,10 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
     const generateContentFix = useCallback(async (fixKey, { issueTitle, issueDescription, pageUrl: pUrl, fixType, currentContent, targetKeyword }) => {
         setFixLoading(prev => ({ ...prev, [fixKey]: true }));
         try {
-            const res = await seoAPI.contentFix({ brandId, issueTitle, issueDescription, pageUrl: pUrl || website, fixType, currentContent, targetKeyword });
-            if (res.success && res.content) {
-                setContentFixes(prev => ({ ...prev, [fixKey]: res.content }));
-            }
+            await runAnalysis(fixKey, seoAPI.autoFixPage, buildPayload({ // Updated to use runAnalysis from context
+                issueTitle, issueDescription, pageUrl: pUrl || website, fixType, currentContent, targetKeyword
+            }), `Generating fix for ${issueTitle}...`, `auto-fix-${fixKey}`);
+            // The result will be in currentTask.results, so no need to set contentFixes here directly
         } catch (err) {
             setContentFixes(prev => ({ ...prev, [fixKey]: `Error: ${err.message}` }));
         } finally {
@@ -328,10 +332,16 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
 
                         {/* ═══ LIVE ANALYTICS DASHBOARD (Primary Content) ═══ */}
                         {isLoading && (
-                            <div className="rounded-2xl p-6 text-center" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.04))', border: '1px solid rgba(99,102,241,0.15)' }}>
-                                <span className="material-symbols-outlined text-3xl text-primary animate-spin block mb-3">sync</span>
-                                <p className="text-sm text-white font-bold">Loading your analytics dashboard...</p>
-                                <p className="text-xs text-slate-400 mt-1">Fetching data from Google Analytics & Search Console</p>
+                            <div className="glass-panel rounded-2xl p-10 text-center border border-white/[0.08] relative overflow-hidden">
+                                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-violet-500/5 pointer-events-none" />
+                                <div className="relative z-10 flex flex-col items-center">
+                                    <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.05] flex items-center justify-center mb-5 relative group">
+                                        <div className="absolute inset-0 bg-primary/20 rounded-2xl blur-xl group-hover:bg-primary/30 transition-all" />
+                                        <span className="material-symbols-outlined text-3xl text-primary animate-spin">progress_activity</span>
+                                    </div>
+                                    <h3 className="text-lg text-white font-bold tracking-wide mb-1">Loading Analytics Dashboard...</h3>
+                                    <p className="text-sm text-slate-400">Fetching live data from Google Analytics & Search Console</p>
+                                </div>
                             </div>
                         )}
 
@@ -340,6 +350,45 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                                 <span className="material-symbols-outlined text-3xl text-amber-400 block mb-3">warning</span>
                                 <p className="text-sm text-white font-bold">Google Analytics Connected — No Data Yet</p>
                                 <p className="text-xs text-slate-400 mt-1">Make sure a GA4 property and Search Console site are linked to your Google account. The data will load automatically.</p>
+                            </div>
+                        )}
+
+                        {gaConnected && (gaProperties?.length > 0 || gaSites?.length > 0) && (
+                            <div className="flex flex-col sm:flex-row gap-4 bg-white/[0.02] p-4 rounded-xl border border-white/[0.05]">
+                                {gaProperties?.length > 0 && (
+                                    <div className="flex-1">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                                            <span className="material-symbols-outlined text-[14px]">analytics</span> GA4 Property
+                                        </label>
+                                        <select 
+                                            value={gaSelectedProp} 
+                                            onChange={e => { setGaSelectedProp(e.target.value); loadGAReport(e.target.value); }}
+                                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer"
+                                        >
+                                            <option value="">Select Property...</option>
+                                            {gaProperties.map(p => (
+                                                <option key={p.id} value={p.id}>{p.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+                                {gaSites?.length > 0 && (
+                                    <div className="flex-1">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                                            <span className="material-symbols-outlined text-[14px]">travel_explore</span> Search Console Site
+                                        </label>
+                                        <select 
+                                            value={gaSelectedSite} 
+                                            onChange={e => { setGaSelectedSite(e.target.value); loadGSCReport(e.target.value); }}
+                                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer"
+                                        >
+                                            <option value="">Select Site...</option>
+                                            {gaSites.map(s => (
+                                                <option key={s.siteUrl} value={s.siteUrl}>{s.siteUrl}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -1760,7 +1809,7 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                 )}
 
                 {/* ── Content area ── */}
-                <div className="flex-1 min-w-0">
+                <div className="relative flex-1 min-w-0">
                     {/* Hero-style page header */}
                     <div className="relative rounded-2xl p-6 mb-6 overflow-hidden"
                         style={{ background: 'linear-gradient(135deg, rgba(15,17,30,0.95) 0%, rgba(20,22,40,0.9) 100%)', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -1795,9 +1844,9 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
                             {data.error}
                         </div>
                     )}
-                    {/* ── GlobalLoader Overlay ── */}
+                    {/* ── GlobalLoader Overlay (Scoped to Tab) ── */}
                     {loading && (
-                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
+                        <div className="absolute inset-x-0 top-0 bottom-0 bg-black/60 backdrop-blur-sm z-20 flex flex-col items-center justify-center rounded-2xl" style={{ minHeight: '500px' }}>
                             <div className="max-w-md w-full mx-4">
                                 <GlobalLoader
                                     isActive={true}

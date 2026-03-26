@@ -67,7 +67,7 @@ export class AnthropicProvider extends BaseProvider {
      * Claude decides which tools to call based on the user's request.
      * Returns both the text response and the array of tool calls made.
      */
-    async generateWithTools({ systemPrompt, userPrompt, tools, temperature = 0.5, maxTokens = 4096, model }) {
+    async generateWithTools({ systemPrompt, userPrompt, tools, toolHandlers = {}, temperature = 0.5, maxTokens = 4096, model }) {
         const modelId = model || this.config.defaultModel || 'claude-sonnet-4-20250514';
         const startTime = Date.now();
 
@@ -77,7 +77,11 @@ export class AnthropicProvider extends BaseProvider {
         let totalTokens = 0;
 
         // Tool-use loop: Claude may call multiple tools across turns
-        for (let turn = 0; turn < 10; turn++) {
+        for (let turn = 0; turn < 6; turn++) {
+            // Trim messages to prevent token explosion: keep first (user prompt) + last 4
+            if (messages.length > 5) {
+                messages = [messages[0], ...messages.slice(-4)];
+            }
             const response = await fetch(`${this.baseUrl}/messages`, {
                 method: 'POST',
                 headers: {
@@ -112,11 +116,6 @@ export class AnthropicProvider extends BaseProvider {
                     finalText += block.text;
                 } else if (block.type === 'tool_use') {
                     toolUseBlocks.push(block);
-                    allToolCalls.push({
-                        id: block.id,
-                        name: block.name,
-                        args: block.input,
-                    });
                 }
             }
 
@@ -125,18 +124,76 @@ export class AnthropicProvider extends BaseProvider {
                 break;
             }
 
-            // Build tool results for next turn
-            // We return the tool calls to the frontend — the frontend executes them
-            // and we just acknowledge them as successful here
-            messages.push({ role: 'assistant', content: data.content });
-            messages.push({
-                role: 'user',
-                content: toolUseBlocks.map(tb => ({
+            // Separate server-side vs frontend tools
+            const serverToolBlocks = toolUseBlocks.filter(tb => toolHandlers[tb.name]);
+            const frontendToolBlocks = toolUseBlocks.filter(tb => !toolHandlers[tb.name]);
+
+            // CRITICAL: If there are server-side tools (search_web, download_brand_assets),
+            // execute ONLY those and send results back to Claude so it SEES the results
+            // BEFORE deciding on creative tools like create_storyboard_frames.
+            if (serverToolBlocks.length > 0) {
+                console.log(`[AnthropicProvider] Turn ${turn}: ${serverToolBlocks.length} server-side tools, ${frontendToolBlocks.length} frontend tools (deferred)`);
+                
+                const toolResults = [];
+                for (const tb of serverToolBlocks) {
+                    console.log(`[AnthropicProvider] ⚡ Executing server tool: ${tb.name}`);
+                    try {
+                        const result = await toolHandlers[tb.name](tb.input);
+                        toolResults.push({
+                            type: 'tool_result',
+                            tool_use_id: tb.id,
+                            content: JSON.stringify({ success: true, result }),
+                        });
+                        console.log(`[AnthropicProvider] ↳ ${tb.name} succeeded`);
+                    } catch (err) {
+                        toolResults.push({
+                            type: 'tool_result',
+                            tool_use_id: tb.id,
+                            content: JSON.stringify({ success: false, error: err.message }),
+                        });
+                        console.error(`[AnthropicProvider] ↳ ${tb.name} failed: ${err.message}`);
+                    }
+                }
+
+                // For frontend tools in the SAME turn: send back a result telling Claude
+                // to RE-EMIT these tools AFTER it has seen the search/download results
+                for (const tb of frontendToolBlocks) {
+                    toolResults.push({
+                        type: 'tool_result',
+                        tool_use_id: tb.id,
+                        content: JSON.stringify({ 
+                            success: true, 
+                            message: `IMPORTANT: ${tb.name} acknowledged. Now that you have the web research and brand asset results, please call ${tb.name} again with content informed by the research data you just received. Use the actual product details and reference images.` 
+                        }),
+                    });
+                }
+
+                messages.push({ role: 'assistant', content: data.content });
+                messages.push({ role: 'user', content: toolResults });
+                // Continue loop — Claude will re-emit frontend tools WITH research knowledge
+                continue;
+            }
+
+            // No server-side tools — these are all frontend tools
+            // Collect them and send simple acknowledgments so Claude continues to the next step
+            console.log(`[AnthropicProvider] Turn ${turn}: ${frontendToolBlocks.length} frontend tool(s) → collecting`);
+            const toolResults = [];
+            for (const tb of frontendToolBlocks) {
+                allToolCalls.push({
+                    id: tb.id,
+                    name: tb.name,
+                    args: tb.input,
+                });
+                toolResults.push({
                     type: 'tool_result',
                     tool_use_id: tb.id,
-                    content: JSON.stringify({ success: true, message: `${tb.name} executed successfully` }),
-                })),
-            });
+                    content: JSON.stringify({ success: true, message: `${tb.name} executed successfully. Proceed to the next step in the pipeline.` }),
+                });
+            }
+
+            // Send acknowledgments back so Claude continues to the next tool
+            messages.push({ role: 'assistant', content: data.content });
+            messages.push({ role: 'user', content: toolResults });
         }
 
         return {
