@@ -131,7 +131,7 @@ const CANVAS_TOOLS = [
                 preset: {
                     type: 'string',
                     enum: ['ig-post', 'ig-story', 'ig-reel', 'fb-post', 'linkedin', 'yt-thumb', 'twitter', 'carousel', 'banner'],
-                    description: 'Platform preset (e.g. ig-post = 1080x1080, ig-story = 1080x1920)'
+                    description: 'Platform preset (e.g. ig-post = 1080x1350, ig-story = 1080x1920, fb-post = 1080x1350, linkedin = 1200x1200)'
                 },
             },
             required: ['preset'],

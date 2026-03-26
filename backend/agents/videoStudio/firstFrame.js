@@ -6,7 +6,7 @@
  * get an HTTP URL that video generation APIs can use.
  */
 
-const GEMINI_MODELS = ['gemini-3.1-flash-image-preview', 'gemini-1.5-flash-latest', 'gemini-1.5-pro-latest'];
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro'];
 
 /**
  * Generate an image using Gemini's native image generation

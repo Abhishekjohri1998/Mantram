@@ -45,7 +45,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
 
         const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
         if (geminiKey) {
-            for (const model of ['gemini-2.0-flash', 'gemini-1.5-flash']) {
+            for (const model of ['gemini-2.5-flash', 'gemini-2.5-pro']) {
                 try {
                     const resp = await fetch(
                         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,

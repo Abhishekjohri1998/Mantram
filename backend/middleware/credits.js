@@ -364,11 +364,14 @@ const MODEL_COSTS = {
     'grok-3-mini': { input: 0.03, output: 0.10 },
     'gemini-1.5-flash-latest': { input: 0.01, output: 0.04 },
     'gemini-1.5-pro-latest': { input: 0.125, output: 0.50 },
+    'gemini-2.5-flash': { input: 0.015, output: 0.06 },
+    'gemini-2.5-pro': { input: 0.125, output: 0.50 },
     'claude-sonnet-4-20250514': { input: 0.3, output: 1.5 },
     'sarvam-m': { input: 0.02, output: 0.08 },
     // ── Image models (flat cost per image in USD cents) ──
     'gemini-3.1-flash-image-preview': { flatCost: 4.0, type: 'image' },
     'gemini-1.5-flash-latest': { flatCost: 4.0, type: 'image' },
+    'gemini-2.5-flash-image': { flatCost: 4.0, type: 'image' },
     'imagen-3.0-generate-001': { flatCost: 4.0, type: 'image' },
     // ── Video models (flat cost per generation in USD cents) ──
     'seedance-1.0': { flatCost: 10.0, type: 'video' },

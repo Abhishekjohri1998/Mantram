@@ -322,15 +322,15 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
         const colorPhrase = getColorPhrase(brand);
 
         const sizeMap = {
-            'instagram-post': '1080x1080 square',
-            'instagram-story': '1080x1920 vertical story',
-            'facebook-ad': '1200x628 landscape',
-            'linkedin-post': '1200x627 landscape',
-            'youtube-thumb': '1280x720 landscape thumbnail',
+            'instagram-post': '1080x1350 portrait (4:5 ratio)',
+            'instagram-story': '1080x1920 vertical story (9:16 ratio)',
+            'facebook-ad': '1080x1350 portrait (4:5 ratio)',
+            'linkedin-post': '1200x1200 square (1:1 ratio)',
+            'youtube-thumb': '1280x720 landscape thumbnail (16:9 ratio)',
             'banner': '1920x480 wide banner',
             'twitter-post': '1200x675 landscape',
         };
-        let platformSize = sizeMap[type] || '1080x1080 square';
+        let platformSize = sizeMap[type] || '1080x1350 portrait';
 
         // Aspect ratio override — user-selected ratio takes priority
         const ratioMap = {

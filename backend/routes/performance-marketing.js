@@ -746,14 +746,14 @@ router.post('/generate-ad-image', protect, requireCredits('adCreative'), async (
         // Build a performance-marketing-optimized image prompt
         const brandDesc = brand ? `${brand.dna?.industry || ''} brand called ${brand.name}` : 'a modern brand';
         const sizeMap = {
-            'meta-feed': '1080x1080 square',
-            'meta-story': '1080x1920 vertical story',
+            'meta-feed': '1080x1350 portrait (4:5 ratio)',
+            'meta-story': '1080x1920 vertical story (9:16 ratio)',
             'google-display': '1200x628 landscape banner',
             'google-search': '1200x628 landscape',
-            'meta-reel': '1080x1920 vertical',
-            'youtube': '1280x720 landscape thumbnail',
+            'meta-reel': '1080x1920 vertical (9:16 ratio)',
+            'youtube': '1280x720 landscape thumbnail (16:9 ratio)',
         };
-        const size = sizeMap[platform] || '1080x1080 square';
+        const size = sizeMap[platform] || '1080x1350 portrait';
 
         const fullPrompt = `Generate a high-converting ad creative for a ${brandDesc}. ${prompt}. The design must be ${size}, visually striking, scroll-stopping, and ready to use as a paid ad on ${platform || 'social media'}. Do NOT add any text labels, hex codes, color swatches, or metadata. Fill the entire image edge to edge.`;
 
@@ -761,7 +761,7 @@ router.post('/generate-ad-image', protect, requireCredits('adCreative'), async (
         const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
         if (!imageKey) return res.status(400).json({ success: false, error: 'Gemini API key not configured' });
 
-        const models = ['gemini-3.1-flash-image-preview', 'gemini-1.5-flash-latest', 'gemini-1.5-pro-latest'];
+        const models = ['gemini-2.5-flash', 'gemini-2.5-pro'];
 
         let imageUrl = null;
         let usedModel = null;

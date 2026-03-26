@@ -612,7 +612,7 @@ Return ONLY valid JSON:
 }`;
 
         // Use current, working Gemini models for text+image analysis
-        const models = ['gemini-1.5-flash-latest', 'gemini-1.5-pro-latest'];
+        const models = ['gemini-2.5-flash', 'gemini-2.5-pro'];
         let visionResult = null;
 
         for (const modelId of models) {

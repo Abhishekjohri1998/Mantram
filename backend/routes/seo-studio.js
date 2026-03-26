@@ -159,7 +159,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
         }
 
         if (provider.name === 'gemini') {
-          const models = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-2.5-flash'];
+          const models = ['gemini-2.5-flash', 'gemini-2.5-pro'];
           for (const modelId of models) {
             if (overallController.signal.aborted) break;
             try {

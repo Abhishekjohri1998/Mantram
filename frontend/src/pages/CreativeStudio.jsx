@@ -51,10 +51,10 @@ const ASPECT_RATIOS = [
 
 // ── Creative Formats ──
 const creativeTypes = [
-    { id: 'instagram-post', icon: 'photo_camera', label: 'Instagram Post', size: '1080×1080', aspectRatio: '1:1' },
-    { id: 'instagram-story', icon: 'smartphone', label: 'Story', size: '1080×1920', aspectRatio: '9:16' },
-    { id: 'facebook-ad', icon: 'ads_click', label: 'Facebook Ad', size: '1200×628', aspectRatio: '16:9' },
-    { id: 'linkedin-post', icon: 'work', label: 'LinkedIn Post', size: '1200×627', aspectRatio: '16:9' },
+    { id: 'instagram-post', icon: 'photo_camera', label: 'Instagram Post', size: '1080×1350', aspectRatio: '4:5' },
+    { id: 'instagram-story', icon: 'smartphone', label: 'Story / Reel', size: '1080×1920', aspectRatio: '9:16' },
+    { id: 'facebook-ad', icon: 'ads_click', label: 'Facebook Ad', size: '1080×1350', aspectRatio: '4:5' },
+    { id: 'linkedin-post', icon: 'work', label: 'LinkedIn Post', size: '1200×1200', aspectRatio: '1:1' },
     { id: 'youtube-thumb', icon: 'smart_display', label: 'YouTube Thumb', size: '1280×720', aspectRatio: '16:9' },
     { id: 'banner', icon: 'web', label: 'Banner', size: '1920×600', aspectRatio: '16:9' },
 ]
