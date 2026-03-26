@@ -118,6 +118,10 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
 
     // Generic workflow runner — delegates to context
     const runAnalysis = useCallback(async (tabId, apiFn, payload, msg = 'Analyzing...', actionId = '') => {
+        if (!payload?.url && !payload?.brand?.website) {
+            ctx?.pushToast?.('warning', 'Please add a website to your brand first.');
+            return;
+        }
         const aid = actionId || tabId;
         const stages = LOADING_STAGES[aid] || ['Processing', 'Analyzing', 'Building Report'];
         const duration = ESTIMATED_DURATIONS[aid] || 60;
@@ -141,7 +145,14 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
         }
     };
 
-    const buildPayload = (extra = {}) => ({ ...brandPayload, ...extra });
+    const buildPayload = (extra = {}) => ({
+        url: brandPayload?.website,
+        brand: brandPayload,
+        brandId: brandPayload?._id,
+        country: brandPayload?.dna?.country || 'India',
+        industry: brandPayload?.dna?.industry,
+        ...extra
+    });
 
     // ── Content Fix: one-click AI content generation from SEO suggestions ──
     const generateContentFix = useCallback(async (fixKey, { issueTitle, issueDescription, pageUrl: pUrl, fixType, currentContent, targetKeyword }) => {

@@ -199,6 +199,7 @@ export function SeoTaskProvider({ children, onNavigate }) {
         getTask,
         clearTask,
         dismissToast,
+        pushToast,
         runningTasks,
         MAX_CONCURRENT,
         onNavigate,
