@@ -231,6 +231,7 @@ export default function BrandManagement() {
                         const brandIndex = activeBrandsSorted.findIndex(b => b._id === brand._id)
                         const maxBrands = Infinity
                         const isLocked = false
+                        const isOwner = String(brand.user?._id || brand.user) === String(user._id || user.id);
 
                         const primaryColor = brand.dna?.colors?.[0]?.hex || '#8b5cf6'
                         const secondaryColor = brand.dna?.colors?.[1]?.hex || '#6366f1'
@@ -264,8 +265,8 @@ export default function BrandManagement() {
                                             {brand.website && (
                                                 <p className="text-xs text-primary truncate">{brand.website.replace(/^https?:\/\//, '')}</p>
                                             )}
-                                            {brand.dna?.industry && (
-                                                <p className="text-xs text-slate-500 mt-0.5">{brand.dna.industry}</p>
+                                            {!isOwner && (
+                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 uppercase tracking-wider">Shared with you</span>
                                             )}
                                         </div>
                                     </div>
@@ -323,18 +324,24 @@ export default function BrandManagement() {
                                                 </button>
                                             </>
                                         )}
-                                        <button onClick={() => handleToggleStatus(brand)} disabled={togglingId === brand._id}
-                                            className={`flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border disabled:opacity-40 ${isArchived
-                                                ? 'text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 border-emerald-500/10'
-                                                : 'text-amber-400 bg-amber-500/5 hover:bg-amber-500/10 border-amber-500/10'
-                                                }`} title={isArchived ? 'Restore Brand' : 'Archive Brand'}>
-                                            <span className="material-symbols-outlined text-sm">{togglingId === brand._id ? 'progress_activity' : (isArchived ? 'unarchive' : 'archive')}</span>
-                                        </button>
-                                        <button onClick={() => setDeleteTarget(brand)}
-                                            className="flex items-center justify-center px-3 py-2 rounded-xl text-xs text-rose-400/60 hover:text-rose-400 bg-white/[0.02] hover:bg-rose-500/5 border border-white/[0.04] hover:border-rose-500/10 transition-all cursor-pointer"
-                                            title="Delete Brand">
-                                            <span className="material-symbols-outlined text-sm">delete</span>
-                                        </button>
+                                        
+                                        {isOwner && (
+                                            <button onClick={() => handleToggleStatus(brand)} disabled={togglingId === brand._id}
+                                                className={`flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border disabled:opacity-40 ${isArchived
+                                                    ? 'text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 border-emerald-500/10'
+                                                    : 'text-amber-400 bg-amber-500/5 hover:bg-amber-500/10 border-amber-500/10'
+                                                    }`} title={isArchived ? 'Restore Brand' : 'Archive Brand'}>
+                                                <span className="material-symbols-outlined text-sm">{togglingId === brand._id ? 'progress_activity' : (isArchived ? 'unarchive' : 'archive')}</span>
+                                            </button>
+                                        )}
+
+                                        {isOwner && (
+                                            <button onClick={() => setDeleteTarget(brand)}
+                                                className="flex items-center justify-center px-3 py-2 rounded-xl text-xs text-rose-400/60 hover:text-rose-400 bg-white/[0.02] hover:bg-rose-500/5 border border-white/[0.04] hover:border-rose-500/10 transition-all cursor-pointer"
+                                                title="Delete Brand">
+                                                <span className="material-symbols-outlined text-sm">delete</span>
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             </div>

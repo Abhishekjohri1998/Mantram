@@ -37,6 +37,7 @@ export default function TeamDashboard() {
     const [members, setMembers] = useState([])
     const [invites, setInvites] = useState([])
     const [isAdmin, setIsAdmin] = useState(false)
+    const [isOrgOwner, setIsOrgOwner] = useState(false)
     const [planLimits, setPlanLimits] = useState(null)
     const [loading, setLoading] = useState(true)
 
@@ -78,10 +79,11 @@ export default function TeamDashboard() {
             setMembers(membersData.members || [])
             setInvites(membersData.invites || [])
             setIsAdmin(membersData.isAdmin)
+            setIsOrgOwner(!user.organization || user.teamRole === 'owner')
             setPlanLimits(limits)
         } catch { /* silent */ }
         finally { setLoading(false) }
-    }, [])
+    }, [user])
 
     useEffect(() => { loadMembers() }, [loadMembers])
 
@@ -208,7 +210,7 @@ export default function TeamDashboard() {
                          Manage your team, chat, and approvals.
                     </p>
                 </div>
-                {isAdmin && (
+                {isOrgOwner && (
                     <button onClick={() => setShowInvite(true)} className="btn-primary py-2.5 px-5 rounded-xl text-sm cursor-pointer flex items-center gap-2">
                         <span className="material-symbols-outlined text-sm">person_add</span>Invite Member
                     </button>
@@ -275,7 +277,7 @@ export default function TeamDashboard() {
                                                     <p className="text-sm text-slate-400">{m.usage?.contentGenerated || 0} content</p>
                                                     <p className="text-xs text-slate-600">{m.lastActive ? new Date(m.lastActive).toLocaleDateString() : '—'}</p>
                                                 </div>
-                                                {isAdmin && !isOwner && (
+                                                {isOrgOwner && !isOwner && (
                                                     <div className="flex gap-1 shrink-0">
                                                         <button onClick={() => { setEditingMember(m); setEditAccess({ studioAccess: m.studioAccess || {}, brandAccess: m.brandAccess || [], teamRole: m.teamRole }) }}
                                                             className="size-8 rounded-lg bg-white/[0.04] flex items-center justify-center text-slate-400 hover:text-primary hover:bg-primary/10 cursor-pointer transition-all" title="Edit Access">

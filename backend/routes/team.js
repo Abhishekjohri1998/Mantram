@@ -8,6 +8,7 @@ import nodemailer from 'nodemailer';
 import { protect } from '../middleware/auth.js';
 import User from '../models/User.js';
 import Brand from '../models/Brand.js';
+import { requireBrandOwner } from '../middleware/requireBrandOwner.js';
 import TeamInvite from '../models/TeamInvite.js';
 import TeamChat from '../models/TeamChat.js';
 import ApprovalRequest from '../models/ApprovalRequest.js';
@@ -119,6 +120,14 @@ router.post('/invite', protect, async (req, res) => {
         const pendingInvite = await TeamInvite.findOne({ email: email.toLowerCase(), organization: orgId, status: 'pending' });
         if (pendingInvite) {
             return res.status(400).json({ error: 'An invite is already pending for this email' });
+        }
+
+        // If providing brand access, ensure the requester owns all those brands (unless superadmin)
+        if (brandAccess && brandAccess.length > 0 && req.user.role !== 'superadmin') {
+            const ownedBrands = await Brand.find({ user: req.user._id, _id: { $in: brandAccess } });
+            if (ownedBrands.length !== brandAccess.length) {
+                return res.status(403).json({ error: 'Permission Denied: You can only invite members to access brands you own.' });
+            }
         }
 
         const invite = await TeamInvite.create({
@@ -321,7 +330,18 @@ router.put('/members/:id/access', protect, async (req, res) => {
         }
 
         if (studioAccess) member.studioAccess = { ...member.studioAccess?.toObject?.() || {}, ...studioAccess };
-        if (brandAccess) member.brandAccess = brandAccess;
+        
+        // If updating brandAccess, ensure the requester owns all those brands (unless superadmin)
+        if (brandAccess && req.user.role !== 'superadmin') {
+            const ownedBrands = await Brand.find({ user: req.user._id, _id: { $in: brandAccess } });
+            if (ownedBrands.length !== brandAccess.length) {
+                return res.status(403).json({ error: 'Permission Denied: You can only grant access to brands you own.' });
+            }
+            member.brandAccess = brandAccess;
+        } else if (brandAccess) {
+            member.brandAccess = brandAccess;
+        }
+
         if (teamRole && member.teamRole !== 'owner') member.teamRole = teamRole;
 
         await member.save();
@@ -363,6 +383,14 @@ router.put('/members/:id/brands', protect, async (req, res) => {
         }
 
         // Update member's brand access
+        // Ensure requester owns all these brands (unless superadmin)
+        if (req.user.role !== 'superadmin') {
+            const ownedBrands = await Brand.find({ user: req.user._id, _id: { $in: brandIds } });
+            if (ownedBrands.length !== brandIds.length) {
+                return res.status(403).json({ error: 'Permission Denied: You can only assign brands you own.' });
+            }
+        }
+
         member.brandAccess = brandIds;
         await member.save();
 

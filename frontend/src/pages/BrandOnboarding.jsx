@@ -224,6 +224,7 @@ function FileUpload({ onComplete, onBack }) {
     const [industry, setIndustry] = useState('')
     const [country, setCountry] = useState('India')
     const [uploading, setUploading] = useState(false)
+    const [error, setError] = useState('')
 
     const handleDrop = (e) => {
         e.preventDefault()
@@ -234,6 +235,7 @@ function FileUpload({ onComplete, onBack }) {
     const handleCreate = async () => {
         if (!brandName.trim()) return
         setUploading(true)
+        setError('')
         try {
             const data = await brandsAPI.create({
                 name: brandName,
@@ -247,7 +249,7 @@ function FileUpload({ onComplete, onBack }) {
             onComplete(data.brand)
         } catch (err) {
             setUploading(false)
-            alert(err.message)
+            setError(err.message)
         }
     }
 
@@ -301,6 +303,12 @@ function FileUpload({ onComplete, onBack }) {
                                 </button>
                             </div>
                         ))}
+                    </div>
+                )}
+
+                {error && (
+                    <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm flex items-center gap-2">
+                        <span className="material-symbols-outlined text-lg">error</span> {error}
                     </div>
                 )}
 
@@ -407,6 +415,7 @@ function Brainstorm({ onComplete, onBack }) {
     const handleAccept = async () => {
         if (!suggestion) return
         setGenerating(true)
+        setError('')
         try {
             const brandData = {
                 ...suggestion,
@@ -418,7 +427,7 @@ function Brainstorm({ onComplete, onBack }) {
             const data = await agents.saveBrainstorm(brandData)
             onComplete(data.brand)
         } catch (err) {
-            alert(err.message)
+            setError(err.message)
             setGenerating(false)
         }
     }
@@ -1177,17 +1186,20 @@ export default function BrandOnboarding() {
     const [loadingCount, setLoadingCount] = useState(true)
     const scanUrlParam = searchParams.get('scanUrl') || ''
 
-    // Fetch current ACTIVE brand count to check against limits
+    // Safety Guard: If user already has brands, redirect to dashboard
+    // This ensures invited members or existing owners don't stay on onboarding.
     useEffect(() => {
-        if (isAuthenticated) {
-            brandsAPI.list({ include: 'active' }).then(data => {
-                setBrandCount(data.brands?.length || 0)
-                setLoadingCount(false)
-            }).catch(() => setLoadingCount(false))
-        } else {
-            setLoadingCount(false)
+        if (!authLoading && user) {
+            const hasBrands = (user.brandCount ?? 0) > 0;
+            if (hasBrands) {
+                navigate('/dashboard', { replace: true });
+            } else {
+                setLoadingCount(false);
+            }
+        } else if (!authLoading && !isAuthenticated) {
+            setLoadingCount(false);
         }
-    }, [isAuthenticated])
+    }, [user, authLoading, isAuthenticated, navigate]);
 
     // Brand limits are removed for all users
     const maxBrands = Infinity

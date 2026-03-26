@@ -5,6 +5,7 @@ import Product from '../models/Product.js';
 import Integration from '../models/Integration.js';
 import User from '../models/User.js';
 import { protect } from '../middleware/auth.js';
+import { requireBrandOwner } from '../middleware/requireBrandOwner.js';
 import multer from 'multer';
 import crypto from 'crypto';
 import { getOrchestrator } from '../agents/orchestrator.js';
@@ -89,7 +90,42 @@ router.get('/:id', protect, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 router.post('/', protect, async (req, res) => {
     try {
-        const brand = await Brand.create({ ...req.body, user: req.user._id });
+        const { name, website } = req.body;
+        const userId = req.user._id;
+
+        // Normalization helper for website comparison
+        const normalizeUrl = (url) => {
+            if (!url) return '';
+            return url.toLowerCase()
+                .replace(/^https?:\/\//, '')
+                .replace(/^www\./, '')
+                .replace(/\/$/, '');
+        };
+
+        const normalizedInputUrl = normalizeUrl(website);
+
+        // Check for existing brands (active/draft) for this user
+        // We allow duplicates for archived brands, but prevent them for active ones.
+        const existingBrands = await Brand.find({ 
+            user: userId, 
+            status: { $ne: 'archived' } 
+        });
+
+        const isDuplicate = existingBrands.some(b => {
+            const nameMatch = name && b.name?.toLowerCase() === name.toLowerCase();
+            const urlMatch = normalizedInputUrl && normalizeUrl(b.website) === normalizedInputUrl;
+            return nameMatch || urlMatch;
+        });
+
+        if (isDuplicate) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Duplicate Brand Detected', 
+                message: 'This brand already exists in your profile. Please add a different brand name or website.' 
+            });
+        }
+
+        const brand = await Brand.create({ ...req.body, user: userId });
         await req.user.updateOne({ $inc: { 'usage.brandsCreated': 1 } });
         await logAudit(brand, req.user, 'brand_created', {
             summary: `Brand "${brand.name}" created via ${brand.onboardingMethod || 'website'} onboarding`,
@@ -331,7 +367,7 @@ router.put('/:id/autonomy', protect, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 // DELETE /api/brands/:id — cascade delete brand and all related data
 // ═══════════════════════════════════════════════════════════════
-router.delete('/:id', protect, async (req, res) => {
+router.delete('/:id', protect, requireBrandOwner, async (req, res) => {
     try {
         const brand = await Brand.findOne({ _id: req.params.id, user: req.user._id });
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found or access denied' });
@@ -373,7 +409,7 @@ router.delete('/:id', protect, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 // PUT /api/brands/:id/status — toggle active/archived
 // ═══════════════════════════════════════════════════════════════
-router.put('/:id/status', protect, async (req, res) => {
+router.put('/:id/status', protect, requireBrandOwner, async (req, res) => {
     try {
         const { status } = req.body;
         if (!['active', 'archived'].includes(status)) {

@@ -23,14 +23,21 @@ export function AuthProvider({ children }) {
     const login = async (email, password) => {
         const data = await authAPI.login({ email, password });
         setToken(data.token);
-        setUser(data.user);
-        return data;
+        // Force refresh to get accurate brandCount (owned + shared)
+        const profileData = await authAPI.getProfile();
+        setUser(profileData.user);
+        return { ...data, user: profileData.user };
     };
 
     const register = async (name, email, password, company) => {
         const data = await authAPI.register({ name, email, password, company });
-        setToken(data.token);
-        setUser(data.user);
+        // If registration leads to immediate login (auto-approve)
+        if (data.token) {
+            setToken(data.token);
+            const profileData = await authAPI.getProfile();
+            setUser(profileData.user);
+            return { ...data, user: profileData.user };
+        }
         return data;
     };
 

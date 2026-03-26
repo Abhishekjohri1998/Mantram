@@ -163,7 +163,11 @@ router.post('/login', async (req, res) => {
 
         const token = generateToken(user._id);
         const planDetails = await SubscriptionPackage.findOne({ slug: user.plan || 'starter' }).lean();
-        const brandCount = await Brand.countDocuments({ user: user._id });
+        
+        // Accurate brand count (Owned + Shared) - used for redirection logic
+        const ownedCount = await Brand.countDocuments({ user: user._id, status: { $ne: 'archived' } });
+        const sharedCount = await Brand.countDocuments({ sharedWith: user._id, status: { $ne: 'archived' } });
+        const brandCount = ownedCount + sharedCount;
         
         res.json({
             success: true,
@@ -175,6 +179,9 @@ router.post('/login', async (req, res) => {
                 role: user.role, 
                 plan: user.plan, 
                 company: user.company, 
+                teamRole: user.teamRole || '',
+                organization: user.organization || null,
+                isTeamMember: ownedCount === 0 && sharedCount > 0,
                 planDetails,
                 brandCount
             },
@@ -391,8 +398,22 @@ router.get('/me', protect, async (req, res) => {
     }
 
     const planDetails = await SubscriptionPackage.findOne({ slug: user.plan || 'starter' }).lean();
-    const brandCount = await Brand.countDocuments({ user: user._id });
-    res.json({ success: true, user: { ...user, planDetails, brandCount } });
+    
+    // Accurate brand count (Owned + Shared)
+    const userId = user._id || user.id;
+    const ownedCount = await Brand.countDocuments({ user: userId, status: { $ne: 'archived' } });
+    const sharedCount = await Brand.countDocuments({ sharedWith: userId, status: { $ne: 'archived' } });
+    const brandCount = ownedCount + sharedCount;
+
+    res.json({ 
+        success: true, 
+        user: { 
+            ...user, 
+            planDetails, 
+            brandCount,
+            isTeamMember: ownedCount === 0 && sharedCount > 0 
+        } 
+    });
 
 });
 
@@ -598,7 +619,11 @@ router.get('/google/callback', async (req, res) => {
 
         const stringId = userId.toString();
         const token = generateToken(stringId);
-        const brandCount = await Brand.countDocuments({ user: userId });
+
+        // Accurate brand count (Owned + Shared)
+        const ownedCount = await Brand.countDocuments({ user: userId, status: { $ne: 'archived' } });
+        const sharedCount = await Brand.countDocuments({ sharedWith: userId, status: { $ne: 'archived' } });
+        const brandCount = ownedCount + sharedCount;
 
         const userData = {
             id: stringId,
@@ -607,6 +632,9 @@ router.get('/google/callback', async (req, res) => {
             role: user.role || 'user',
             plan: user.plan || 'starter',
             company: user.company || '',
+            teamRole: user.teamRole || '',
+            organization: user.organization || null,
+            isTeamMember: ownedCount === 0 && sharedCount > 0,
             planDetails: await SubscriptionPackage.findOne({ slug: user.plan || 'starter' }).lean(),
             brandCount
         };

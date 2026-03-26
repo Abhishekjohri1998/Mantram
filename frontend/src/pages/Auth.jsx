@@ -49,8 +49,11 @@ export default function Auth() {
             if (pollingRef.current) clearInterval(pollingRef.current)
             let dest = redirect
             
-            if (dest === '/dashboard' && (!user?.brandCount || user.brandCount === 0)) {
-                dest = '/onboarding';
+            if (dest === '/dashboard') {
+                const hasBrand = (user?.brandCount ?? 0) > 0;
+                if (!hasBrand) {
+                    dest = '/onboarding';
+                }
             }
 
             if (scanUrl) {
@@ -82,8 +85,8 @@ export default function Auth() {
             // Logic for "New user vs Older user" redirection
             // If the destination is the default dashboard...
             if (dest === '/dashboard') {
-                // If they have no brands, they MUST go to onboarding
-                if (!res?.user?.brandCount || res.user.brandCount === 0) {
+                const hasBrand = (res?.user?.brandCount ?? 0) > 0;
+                if (!hasBrand) {
                     dest = '/onboarding';
                 }
             }
