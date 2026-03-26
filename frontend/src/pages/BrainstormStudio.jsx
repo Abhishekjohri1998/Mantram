@@ -205,11 +205,11 @@ export default function BrainstormStudio() {
     }, [currentQ, step])
 
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
     }, [currentQ, step, loading])
 
     useEffect(() => {
-        chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+        chatBottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
     }, [chatHistory, chatLoading])
 
     // ========== HANDLERS ==========

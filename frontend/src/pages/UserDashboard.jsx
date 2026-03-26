@@ -62,10 +62,10 @@ function HealthRing({ score, radius, strokeWidth, color, label, delay = 0 }) {
 // ── Ticker Item ──
 function TickerItem({ icon, value, label, color }) {
     return (
-        <div className="flex items-center gap-2.5 px-5 py-2.5 shrink-0">
-            <span className="material-symbols-outlined text-lg" style={{ color }}>{icon}</span>
-            <span className="text-lg font-extrabold text-white">{value}</span>
-            <span className="text-sm text-slate-500 whitespace-nowrap">{label}</span>
+        <div className="flex items-center gap-1.5 sm:gap-2.5 px-3 sm:px-5 py-2 sm:py-2.5 shrink-0">
+            <span className="material-symbols-outlined text-base sm:text-lg" style={{ color }}>{icon}</span>
+            <span className="text-base sm:text-lg font-extrabold text-white">{value}</span>
+            <span className="text-[10px] sm:text-xs md:text-sm text-slate-500 whitespace-nowrap uppercase tracking-tight">{label}</span>
         </div>
     )
 }
@@ -449,7 +449,7 @@ export default function UserDashboard() {
                                         const glowColors = ['#818cf860', '#6366f160', '#a78bfa60', '#8b5cf660', '#7c3aed60', '#6d28d960']
 
                                         return (
-                                            <svg width={svgW} viewBox={`0 0 ${svgW} ${svgH}`}>
+                                            <svg className="w-full max-w-[280px] h-auto" viewBox={`0 0 ${svgW} ${svgH}`}>
                                                 <defs>
                                                     {stages.map((_, i) => (
                                                         <linearGradient key={`fg${i}`} id={`funnelGrad${i}`} x1="0" y1="0" x2="0" y2="1">
@@ -558,7 +558,7 @@ export default function UserDashboard() {
                                     {/* Conversion Ring + Key Metrics */}
                                     <div className="flex items-center gap-4 mb-1">
                                         <div className="shrink-0">
-                                            <svg width="72" height="72" viewBox="0 0 72 72">
+                                            <svg className="w-12 h-12 sm:w-[72px] sm:h-[72px]" viewBox="0 0 72 72">
                                                 <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
                                                 <circle cx="36" cy="36" r="30" fill="none" stroke="#6366f1" strokeWidth="5" strokeLinecap="round"
                                                     strokeDasharray={`${(funnelData.analytics?.overview?.conversionRate || 0) / 100 * 188} 188`}
@@ -794,8 +794,8 @@ export default function UserDashboard() {
                                 <div className="md:col-span-5">
                                     <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Traffic Sources</p>
                                     <div className="flex items-center gap-4">
-                                        <div className="relative shrink-0" style={{ width: 150, height: 150 }}>
-                                            <svg width="150" height="150" viewBox="0 0 150 150" className="absolute inset-0">
+                                        <div className="relative shrink-0 w-24 h-24 sm:w-[150px] sm:h-[150px]">
+                                            <svg viewBox="0 0 150 150" className="absolute inset-0 w-full h-full">
                                                 {/* Background rings */}
                                                 <circle cx="75" cy="75" r="68" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
                                                 <circle cx="75" cy="75" r="52" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
@@ -808,7 +808,7 @@ export default function UserDashboard() {
                                                 <circle cx="75" cy="75" r="68" fill="none" stroke="rgba(52,211,153,0.15)" strokeWidth="1.5" />
                                             </svg>
                                             {/* Sweep arm */}
-                                            <svg width="150" height="150" viewBox="0 0 150 150" className="absolute inset-0 radar-sweep-arm">
+                                            <svg viewBox="0 0 150 150" className="absolute inset-0 w-full h-full radar-sweep-arm">
                                                 <defs>
                                                     <linearGradient id="sweepGrad" gradientTransform="rotate(90)">
                                                         <stop offset="0%" stopColor="rgba(52,211,153,0.35)" />
@@ -819,7 +819,7 @@ export default function UserDashboard() {
                                                 <line x1="75" y1="75" x2="75" y2="7" stroke="rgba(52,211,153,0.8)" strokeWidth="1.5" />
                                             </svg>
                                             {/* Blips for traffic sources */}
-                                            <svg width="150" height="150" viewBox="0 0 150 150" className="absolute inset-0">
+                                            <svg viewBox="0 0 150 150" className="absolute inset-0 w-full h-full">
                                                 {radar.sources?.map((src, i) => {
                                                     const angle = (i / (radar.sources.length)) * 2 * Math.PI - Math.PI / 2
                                                     const dist = 20 + (src.value / 100) * 48
@@ -922,7 +922,7 @@ export default function UserDashboard() {
                         <div className="flex border-b border-white/[0.06] bg-white/[0.01]">
                             {intelTabs.map(tab => (
                                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                                    className={`intel-tab flex-1 px-4 py-3.5 text-sm font-bold cursor-pointer flex items-center justify-center gap-2 border-b-2 ${activeTab === tab.id ? 'active border-violet-500' : 'text-slate-500 border-transparent hover:text-white hover:bg-white/[0.02]'}`}>
+                                    className={`intel-tab flex-1 px-2 sm:px-4 py-3 sm:py-3.5 text-[10px] sm:text-xs md:text-sm font-bold cursor-pointer flex items-center justify-center gap-1.5 sm:gap-2 border-b-2 ${activeTab === tab.id ? 'active border-violet-500' : 'text-slate-500 border-transparent hover:text-white hover:bg-white/[0.02]'}`}>
                                     {tab.label}
                                     {tab.count > 0 && <span className="px-1.5 py-0.5 rounded-full bg-white/[0.06] text-xs">{tab.count}</span>}
                                 </button>
@@ -1383,7 +1383,7 @@ export default function UserDashboard() {
             {/* ═══════════════════════════════════════════════════════════════ */}
             {/* QUICK ACTION FLOATING BAR                                       */}
             {/* ═══════════════════════════════════════════════════════════════ */}
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-3 py-2 rounded-2xl border border-white/[0.08] backdrop-blur-xl"
+            <div className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-2xl border border-white/[0.08] backdrop-blur-xl w-auto max-w-[calc(100%-2rem)] overflow-x-auto no-scrollbar"
                 style={{ background: 'rgba(15,15,25,0.85)', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}>
                 {[
                     { icon: 'edit_note', label: 'New Post', path: '/content-studio', color: '#34d399' },
@@ -1392,10 +1392,10 @@ export default function UserDashboard() {
                     { icon: 'movie', label: 'Create Video', path: '/video-studio', color: '#f59e0b' },
                 ].map((a, i) => (
                     <button key={i} onClick={() => navigate(a.path)}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl hover:bg-white/[0.06] transition-all cursor-pointer group"
+                        className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl hover:bg-white/[0.06] transition-all cursor-pointer group flex-shrink-0"
                         title={a.label}>
-                        <span className="material-symbols-outlined text-lg transition-transform group-hover:scale-110" style={{ color: a.color }}>{a.icon}</span>
-                        <span className="text-sm font-medium text-slate-400 group-hover:text-white transition-colors hidden sm:inline">{a.label}</span>
+                        <span className="material-symbols-outlined text-base sm:text-lg transition-transform group-hover:scale-110" style={{ color: a.color }}>{a.icon}</span>
+                        <span className="text-[10px] sm:text-sm font-medium text-slate-400 group-hover:text-white transition-colors hidden sm:inline">{a.label}</span>
                     </button>
                 ))}
             </div>

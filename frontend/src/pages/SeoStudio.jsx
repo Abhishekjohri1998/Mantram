@@ -135,7 +135,7 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
     const website = activeBrand?.website || ''
 
     useEffect(() => { if (activeBrand?.competitors) setCompetitors(activeBrand.competitors) }, [activeBrand])
-    useEffect(() => { if (results) resultRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [results])
+    useEffect(() => { if (results) resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [results])
 
     // Sync error from context task
     useEffect(() => { if (currentTask?.error) setError(currentTask.error) }, [currentTask?.error])
