@@ -104,10 +104,10 @@ router.post('/', protect, async (req, res) => {
 
         const normalizedInputUrl = normalizeUrl(website);
 
-        // Check for existing brands (active/draft) for this user
+        // Check for existing brands (active/draft) for this user (OWNED OR SHARED)
         // We allow duplicates for archived brands, but prevent them for active ones.
         const existingBrands = await Brand.find({ 
-            user: userId, 
+            $or: [{ user: userId }, { sharedWith: userId }],
             status: { $ne: 'archived' } 
         });
 

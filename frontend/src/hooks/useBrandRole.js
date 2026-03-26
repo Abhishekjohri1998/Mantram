@@ -14,31 +14,39 @@ export function useBrandRole() {
         return { 
             isOwner: false, 
             isMember: false,
+            hasAccess: false,
             canDelete: false,
             canInvite: false,
             canRemoveMember: false,
-            canEditBrandDNA: false
+            canEditBrandDNA: false,
+            roleLabel: 'Guest'
         };
     }
 
     // Role check: Is current user the brand creator/owner?
-    // activeBrand.user can be an ID or an object with _id
     const brandOwnerId = activeBrand.user?._id || activeBrand.user;
     const currentUserId = user._id || user.id;
-    
     const isOwner = String(brandOwnerId) === String(currentUserId);
+
+    // Check if this specific brand is in user's brandAccess (for non-owners)
+    const hasThisBrandAccess = isOwner || 
+        (user.brandAccess || []).some(id => String(id) === String(activeBrand._id));
 
     return {
         isOwner,
-        isMember: !isOwner,
-        
+        isMember: !isOwner && hasThisBrandAccess,
+        hasAccess: isOwner || hasThisBrandAccess,
+
         // Granular permission flags based on ownership and team role
         canDelete: isOwner,
         canInvite: isOwner || user.teamRole === 'manager',
         canRemoveMember: isOwner || user.teamRole === 'manager',
-        canEditBrandDNA: isOwner || user.teamRole === 'manager' || user.role === 'admin' || user.role === 'superadmin',
+        canEditBrandDNA: isOwner || user.teamRole === 'manager',
         
         // Specific helpers
         roleLabel: isOwner ? 'Owner' : (user.teamRole || 'Member'),
+        
+        // Useful for brand switcher UI
+        accessibleBrandIds: (user.brandAccess || []).map(String),
     };
 }

@@ -112,14 +112,26 @@ router.post('/invite', protect, async (req, res) => {
             return res.status(400).json({ error: `Team limit reached (${maxMembers} members on ${owner?.plan || 'starter'} plan). Upgrade to add more.` });
         }
 
-        // Check if already invited or a member
-        const existing = await User.findOne({ email: email.toLowerCase() });
-        if (existing && String(existing.organization) === String(orgId)) {
-            return res.status(400).json({ error: 'This user is already on your team' });
+        // Check if already invited or a member with access to these specific brands
+        const existingUser = await User.findOne({ email: email.toLowerCase() });
+        if (existingUser && brandAccess?.length > 0) {
+            const alreadyShared = await Brand.find({
+                _id: { $in: brandAccess },
+                sharedWith: existingUser._id
+            });
+            if (alreadyShared.length === brandAccess.length) {
+                return res.status(400).json({ error: 'This user already has access to all the selected brands.' });
+            }
         }
-        const pendingInvite = await TeamInvite.findOne({ email: email.toLowerCase(), organization: orgId, status: 'pending' });
+
+        const pendingInvite = await TeamInvite.findOne({ 
+            email: email.toLowerCase(), 
+            organization: orgId, 
+            status: 'pending',
+            brandAccess: { $in: brandAccess } // block only if overlapping brands
+        });
         if (pendingInvite) {
-            return res.status(400).json({ error: 'An invite is already pending for this email' });
+            return res.status(400).json({ error: 'A pending invite already exists for this user and brand.' });
         }
 
         // If providing brand access, ensure the requester owns all those brands (unless superadmin)
@@ -267,12 +279,36 @@ router.post('/accept-invite/:token', async (req, res) => {
         // Check if user exists
         let user = await User.findOne({ email: invite.email });
         if (user) {
-            // Existing user — join team
-            user.organization = invite.organization;
-            user.teamRole = invite.role;
-            user.role = 'team-member';
-            user.studioAccess = invite.studioAccess;
-            user.brandAccess = invite.brandAccess;
+            // Existing user — join team (MERGE access, don't overwrite)
+            
+            // Set organization only if they don't have one yet
+            if (!user.organization) {
+                user.organization = invite.organization;
+                user.role = 'team-member';
+            }
+
+            // Merge teamRole — escalate if new role is higher
+            const roleRank = { 'member': 1, 'manager': 2, 'owner': 3 };
+            const currentRank = roleRank[user.teamRole] || 0;
+            const newRank = roleRank[invite.role] || 0;
+            if (newRank > currentRank) {
+                user.teamRole = invite.role;
+            }
+
+            // Merge studioAccess — grant new permissions, never revoke existing ones
+            const existingStudio = user.studioAccess?.toObject?.() || {};
+            const mergedStudio = { ...existingStudio };
+            Object.entries(invite.studioAccess || {}).forEach(([key, val]) => {
+                if (val === true) mergedStudio[key] = true;
+            });
+            user.studioAccess = mergedStudio;
+
+            // Merge brandAccess — add new brands without removing existing ones
+            const existingBrandIds = (user.brandAccess || []).map(id => id.toString());
+            const newBrandIds = (invite.brandAccess || []).map(id => id.toString());
+            const mergedBrandIds = [...new Set([...existingBrandIds, ...newBrandIds])];
+            user.brandAccess = mergedBrandIds;
+
             await user.save();
         } else {
             // New user — create account
