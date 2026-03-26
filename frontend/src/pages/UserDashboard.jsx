@@ -538,11 +538,11 @@ export default function UserDashboard() {
                         <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 border border-white/[0.06] anim-slide-up" style={{ animationDelay: '250ms' }}>
                             <div className="flex items-center gap-2 mb-4">
                                 <span className="material-symbols-outlined text-emerald-400">monitoring</span>
-                                <span className="text-lg font-bold text-white">Brand Health</span>
-                                <span className="text-xl sm:text-2xl font-extrabold text-white ml-auto">{health.overallScore || 0}<span className="text-xs sm:text-sm text-slate-500 font-medium ml-1">/100</span></span>
+                                <span className="text-base sm:text-lg font-bold text-white">Brand Health</span>
+                                <span className="text-lg sm:text-xl md:text-2xl font-extrabold text-white ml-auto">{health.overallScore || 0}<span className="text-[10px] sm:text-xs sm:text-sm text-slate-500 font-medium ml-1">/100</span></span>
                             </div>
-                            <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8">
-                                <div className="shrink-0 w-full max-w-[140px] sm:max-w-none sm:w-[150px] md:w-[180px] aspect-square flex items-center justify-center">
+                            <div className="flex flex-col md:flex-row items-center gap-6 md:gap-8">
+                                <div className="shrink-0 w-full max-w-[140px] sm:max-w-[160px] md:max-w-none md:w-[150px] lg:w-[180px] aspect-square flex items-center justify-center">
                                     <svg viewBox="0 0 180 180" className="w-full h-full">
                                         <HealthRing score={health.contentVelocity || 0} radius={78} strokeWidth={8} color="#8b5cf6" label="Content" delay={0} />
                                         <HealthRing score={health.creativeOutput || 0} radius={66} strokeWidth={8} color="#06b6d4" label="Creative" delay={100} />
@@ -550,18 +550,18 @@ export default function UserDashboard() {
                                         <HealthRing score={health.trendReadiness || 0} radius={42} strokeWidth={8} color="#34d399" label="Trends" delay={300} />
                                     </svg>
                                 </div>
-                                <div className="grid grid-cols-2 gap-2 sm:gap-3 flex-1 w-full">
+                                <div className="grid grid-cols-2 lg:grid-cols-2 gap-2 sm:gap-3 flex-1 w-full mt-4 md:mt-0">
                                     {[
                                         { label: 'Content Velocity', score: health.contentVelocity, color: '#8b5cf6', icon: 'article' },
                                         { label: 'Creative Output', score: health.creativeOutput, color: '#06b6d4', icon: 'image' },
                                         { label: 'Brand DNA', score: health.brandCompleteness, color: '#f59e0b', icon: 'fingerprint' },
                                         { label: 'Trend Readiness', score: health.trendReadiness, color: '#34d399', icon: 'trending_up' },
                                     ].map((m, i) => (
-                                        <div key={i} className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] transition-all hover:bg-white/[0.05]">
-                                            <div className="size-2.5 sm:size-3 rounded-full shrink-0" style={{ background: m.color, boxShadow: `0 0 8px ${m.color}60` }} />
+                                        <div key={i} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] transition-all hover:bg-white/[0.05]">
+                                            <div className="size-2 sm:size-3 rounded-full shrink-0" style={{ background: m.color, boxShadow: `0 0 8px ${m.color}60` }} />
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-[10px] sm:text-xs text-slate-400 truncate uppercase mt-0.5">{m.label}</p>
-                                                <p className="text-base sm:text-lg font-extrabold text-white leading-tight">{Math.round(m.score || 0)}</p>
+                                                <p className="text-[9px] sm:text-xs text-slate-400 truncate uppercase mt-0.5">{m.label}</p>
+                                                <p className="text-sm sm:text-lg font-extrabold text-white leading-tight">{Math.round(m.score || 0)}</p>
                                             </div>
                                         </div>
                                     ))}
@@ -808,7 +808,7 @@ export default function UserDashboard() {
                             ) : (perfData.stats?.totalCampaigns || 0) > 0 ? (
                                 <>
                                     {/* Stats Grid */}
-                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-6">
                                         {[
                                             { label: 'Total Spend', value: `₹${(perfData.stats?.totalSpend || 0).toLocaleString()}`, icon: 'account_balance', color: '#f59e0b' },
                                             { label: 'ROAS', value: `${perfData.stats?.avgRoas || '0'}x`, icon: 'show_chart', color: parseFloat(perfData.stats?.avgRoas) >= 2 ? '#34d399' : '#f43f5e' },
@@ -820,7 +820,7 @@ export default function UserDashboard() {
                                                     <span className="material-symbols-outlined text-xs sm:text-sm shrink-0" style={{ color: m.color }}>{m.icon}</span>
                                                     <span className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider truncate">{m.label}</span>
                                                 </div>
-                                                <p className="text-lg sm:text-xl font-black text-white">{m.value}</p>
+                                                <p className="text-base sm:text-xl font-black text-white">{m.value}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -926,7 +926,7 @@ export default function UserDashboard() {
                             </div>
 
                             {/* Key Metrics Bar */}
-                            <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-4 mb-5">
+                            <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 mb-5">
                                 {loadingAnalytics ? (
                                     [1, 2, 3, 4].map(i => (
                                         <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] flex flex-col gap-2">
@@ -943,22 +943,22 @@ export default function UserDashboard() {
                                     ].map((m, i) => (
                                         <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
                                             <div className="flex items-center gap-1.5 mb-1">
-                                                <span className="material-symbols-outlined text-sm" style={{ color: m.color }}>{m.icon}</span>
-                                                <span className="text-xs text-slate-500">{m.label}</span>
+                                                <span className="material-symbols-outlined text-[10px] sm:text-xs" style={{ color: m.color }}>{m.icon}</span>
+                                                <span className="text-[10px] sm:text-xs text-slate-500">{m.label}</span>
                                             </div>
-                                            <p className="text-xl font-extrabold text-white">{m.value}</p>
+                                            <p className="text-base sm:text-xl font-extrabold text-white">{m.value}</p>
                                         </div>
                                     ))
                                 )}
                             </div>
 
                             {/* Charts Row */}
-                            <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-                                {/* Animated ATS Radar - md:col-span-12 on small tablet, md:col-span-12 xl:col-span-5 on desktop */}
-                                <div className="md:col-span-12 xl:col-span-5 flex flex-col gap-5">
+                            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8 items-start">
+                                {/* Animated ATS Radar */}
+                                <div className="xl:col-span-5 flex flex-col gap-4">
                                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l-2 border-rose-500 pl-2">Realtime Traffic</p>
                                     <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8">
-                                        <div className="relative shrink-0 w-full max-w-[180px] sm:max-w-[200px] aspect-square">
+                                        <div className="relative shrink-0 w-full max-w-[160px] sm:max-w-[180px] aspect-square">
                                             <svg viewBox="0 0 150 150" className="absolute inset-0 w-full h-full">
                                                 {/* Background rings */}
                                                 <circle cx="75" cy="75" r="68" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
@@ -1001,30 +1001,30 @@ export default function UserDashboard() {
                                                 <circle cx="75" cy="75" r="3" fill="#f43f94" />
                                             </svg>
                                         </div>
-                                        <div className="flex flex-col gap-2.5 flex-1 min-w-0">
-                                            {radar.sources?.map((s, i) => (
+                                        <div className="flex flex-col gap-2 flex-1 min-w-0">
+                                            {radar.sources?.slice(0, 4).map((s, i) => (
                                                 <div key={i} className="flex items-center gap-2 cursor-default group/src"
                                                     onMouseEnter={() => setRadarHover(`src-${i}`)} onMouseLeave={() => setRadarHover(null)}>
-                                                    <div className="size-2 rounded-full shrink-0 group-hover/src:scale-125 transition-transform" style={{ background: s.color, boxShadow: radarHover === `src-${i}` ? `0 0 8px ${s.color}` : 'none' }} />
-                                                    <span className={`text-[11px] font-bold truncate transition-colors ${radarHover === `src-${i}` ? 'text-white' : 'text-slate-400'}`}>{s.name}</span>
-                                                    <span className="text-[11px] font-black text-white ml-auto">{s.value}%</span>
+                                                    <div className="size-1.5 rounded-full shrink-0 group-hover/src:scale-125 transition-transform" style={{ background: s.color, boxShadow: radarHover === `src-${i}` ? `0 0 8px ${s.color}` : 'none' }} />
+                                                    <span className={`text-[10px] font-bold truncate transition-colors ${radarHover === `src-${i}` ? 'text-white' : 'text-slate-400'}`}>{s.name}</span>
+                                                    <span className="text-[10px] font-black text-white ml-auto">{s.value}%</span>
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Location Bars - md:col-span-12 on small tablet, md:col-span-12 xl:col-span-3 on desktop */}
-                                <div className="md:col-span-12 xl:col-span-3">
-                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l-2 border-indigo-500 pl-2 mb-5">Top Geos</p>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-4">
+                                {/* Location Bars */}
+                                <div className="xl:col-span-3">
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l-2 border-indigo-500 pl-2 mb-4">Top Geos</p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-1 gap-3 sm:gap-4">
                                         {radar.locations?.slice(0, 5).map((loc, i) => (
                                             <div key={i} className="group/loc">
                                                 <div className="flex justify-between mb-1.5">
-                                                    <span className="text-[11px] font-bold text-slate-400 group-hover/loc:text-white transition-colors">{loc.name}</span>
-                                                    <span className="text-[11px] font-black text-white">{loc.value}%</span>
+                                                    <span className="text-[10px] font-bold text-slate-400 group-hover/loc:text-white transition-colors truncate w-20">{loc.name}</span>
+                                                    <span className="text-[10px] font-black text-white">{loc.value}%</span>
                                                 </div>
-                                                <div className="h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
+                                                <div className="h-1 rounded-full bg-white/[0.04] overflow-hidden">
                                                     <div className="h-full rounded-full transition-all duration-700 shadow-[0_0_8px_rgba(99,102,241,0.3)]"
                                                         style={{ width: `${loc.value}%`, background: `linear-gradient(90deg, #8b5cf6, #06b6d4)` }} />
                                                 </div>
@@ -1033,20 +1033,20 @@ export default function UserDashboard() {
                                     </div>
                                 </div>
 
-                                {/* Demographics + Device Split - md:col-span-12 on small tablet, md:col-span-12 xl:col-span-4 on desktop */}
-                                <div className="md:col-span-12 xl:col-span-4 flex flex-col gap-6">
+                                {/* Audience Split */}
+                                <div className="xl:col-span-4 flex flex-col gap-5">
                                     <div>
-                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l-2 border-emerald-500 pl-2 mb-5">Audience Split</p>
-                                        <div className="flex h-3 rounded-full overflow-hidden gap-0.5 bg-white/[0.02]">
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l-2 border-emerald-500 pl-2 mb-4">Audience Split</p>
+                                        <div className="flex h-2.5 rounded-full overflow-hidden gap-0.5 bg-white/[0.02]">
                                             {radar.gender?.map((g, i) => (
                                                 <div key={i} className="h-full transition-all duration-500 hover:brightness-125" title={`${g.name}: ${g.value}%`}
                                                     style={{ width: `${g.value}%`, background: g.color, borderRadius: i === 0 ? '9999px 0 0 9999px' : i === radar.gender.length - 1 ? '0 9999px 9999px 0' : '0' }} />
                                             ))}
                                         </div>
-                                        <div className="flex justify-between mt-3 flex-wrap gap-2">
+                                        <div className="flex justify-between mt-3 flex-wrap gap-x-4 gap-y-1">
                                             {radar.gender?.map((g, i) => (
                                                 <div key={i} className="flex items-center gap-2">
-                                                    <div className="size-2 rounded-full" style={{ background: g.color }} />
+                                                    <div className="size-1.5 rounded-full" style={{ background: g.color }} />
                                                     <span className="text-[10px] font-bold text-slate-500">{g.name}</span>
                                                     <span className="text-[10px] font-black text-white">{g.value}%</span>
                                                 </div>
@@ -1055,12 +1055,12 @@ export default function UserDashboard() {
                                     </div>
                                     <div className="grid grid-cols-3 gap-2">
                                         {radar.devices?.map((d, i) => (
-                                            <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] text-center hover:bg-white/5 transition-all group/dev">
-                                                <span className="material-symbols-outlined text-lg group-hover/dev:scale-110 transition-transform block mb-1" style={{ color: d.color }}>
+                                            <div key={i} className="p-2 sm:p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] text-center hover:bg-white/5 transition-all group/dev">
+                                                <span className="material-symbols-outlined text-base group-hover/dev:scale-110 transition-transform block mb-1" style={{ color: d.color }}>
                                                     {d.name === 'Mobile' ? 'smartphone' : d.name === 'Desktop' ? 'computer' : 'tablet'}
                                                 </span>
-                                                <p className="text-[11px] font-black text-white">{d.value}%</p>
-                                                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">{d.name}</p>
+                                                <p className="text-[10px] font-black text-white">{d.value}%</p>
+                                                <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">{d.name}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -1261,19 +1261,21 @@ export default function UserDashboard() {
                                 <span className="truncate">Content Ideas for You</span>
                                 <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 text-[10px] font-black uppercase tracking-widest shrink-0">AI Powered</span>
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-2 xl:grid-cols-4">
                                 {grokContent.slice(0, 4).map((s, i) => (
-                                    <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] hover:border-cyan-500/20 transition-all cursor-pointer group"
+                                    <div key={i} className="p-3.5 sm:p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] hover:border-cyan-500/20 transition-all cursor-pointer group flex flex-col h-full"
                                         style={{ animation: `slide-up 0.4s ease-out ${i * 60}ms both` }}>
                                         <div className="flex items-center gap-2 mb-2.5">
                                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${s.platform === 'instagram' ? 'bg-pink-500/10 text-pink-400'
                                                 : s.platform === 'twitter' ? 'bg-sky-500/10 text-sky-400' : 'bg-slate-500/10 text-slate-400'}`}>{s.platform}</span>
-                                            <span className="text-[11px] text-slate-500 font-bold">{s.format}</span>
-                                            {s.viralPotential === 'high' && <span className="text-[11px] text-orange-400 font-bold ml-auto flex items-center gap-1">🔥 Viral</span>}
+                                            <span className="text-[10px] text-slate-500 font-bold">{s.format}</span>
+                                            {s.viralPotential === 'high' && <span className="text-[10px] text-orange-400 font-bold ml-auto flex items-center gap-1">🔥 Viral</span>}
                                         </div>
-                                        <h4 className="text-base font-bold text-white mb-1.5 group-hover:text-cyan-400 transition-colors leading-tight">{s.title}</h4>
-                                        <p className="text-sm text-slate-400 mb-2 line-clamp-2 leading-relaxed">{s.hook}</p>
-                                        {s.trendConnection && <p className="text-xs text-emerald-400 font-black tracking-wide">📈 {s.trendConnection.toUpperCase()}</p>}
+                                        <h4 className="text-sm sm:text-base font-bold text-white mb-1.5 group-hover:text-cyan-400 transition-colors leading-tight line-clamp-2">{s.title}</h4>
+                                        <p className="text-xs sm:text-sm text-slate-400 mb-3 line-clamp-3 leading-relaxed">{s.hook}</p>
+                                        <div className="mt-auto">
+                                            {s.trendConnection && <p className="text-[10px] text-emerald-400 font-black tracking-wide uppercase">📈 {s.trendConnection}</p>}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -1295,16 +1297,16 @@ export default function UserDashboard() {
                                     const color = EVENT_COLORS[e.type] || EVENT_COLORS.global
                                     return (
                                         <button key={i} onClick={() => navigate(`/content-studio?occasion=${encodeURIComponent(e.name)}&tone=${e.tone}`)}
-                                            className="shrink-0 w-44 glass-panel rounded-xl p-4 text-left hover:bg-white/[0.05] transition-all cursor-pointer group border"
+                                            className="shrink-0 w-40 sm:w-44 glass-panel rounded-xl p-3.5 sm:p-4 text-left hover:bg-white/[0.05] transition-all cursor-pointer group border flex flex-col min-h-[140px]"
                                             style={{ animation: `slide-up 0.4s ease-out ${i * 60}ms both`, borderColor: color.border + '20' }}>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="text-2xl">{e.emoji}</span>
-                                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${e.daysUntil <= 3 ? 'bg-rose-500/20 text-rose-400' : e.daysUntil <= 7 ? 'bg-amber-500/20 text-amber-400' : 'bg-primary/20 text-primary'}`}>
+                                            <div className="flex items-center justify-between mb-3">
+                                                <span className="text-xl sm:text-2xl">{e.emoji}</span>
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${e.daysUntil <= 3 ? 'bg-rose-500/20 text-rose-400' : e.daysUntil <= 7 ? 'bg-amber-500/20 text-amber-400' : 'bg-primary/20 text-primary'}`}>
                                                     {e.daysUntil === 0 ? 'TODAY' : e.daysUntil === 1 ? 'TOMORROW' : `${e.daysUntil}d`}
                                                 </span>
                                             </div>
-                                            <p className="text-sm font-bold text-white truncate">{e.name}</p>
-                                            <p className="text-xs text-slate-500 truncate mt-0.5">{e.tone}</p>
+                                            <p className="text-xs sm:text-sm font-bold text-white line-clamp-2 mb-1">{e.name}</p>
+                                            <p className="mt-auto text-[10px] text-slate-500 truncate">{e.tone}</p>
                                         </button>
                                     )
                                 })}
@@ -1333,18 +1335,18 @@ export default function UserDashboard() {
                                 <button onClick={() => navigate('/onboarding')} className="btn-primary py-3 px-8 rounded-xl text-sm font-black uppercase tracking-widest">Create Brand</button>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
                                 {brands.map((brand, i) => (
                                     <div key={brand._id} onClick={() => { selectBrand(brand); navigate('/nexus') }}
-                                        className={`flex items-center gap-4 p-4 rounded-xl border transition-all cursor-pointer hover:bg-white/[0.05] hover:scale-[1.02] hover:shadow-2xl shadow-primary/5 ${activeBrand?._id === brand._id ? 'border-primary/40 bg-primary/10' : 'border-white/[0.06] bg-white/[0.02]'}`}
+                                        className={`flex items-center gap-3 sm:gap-4 p-3.5 sm:p-4 rounded-xl border transition-all cursor-pointer hover:bg-white/[0.05] hover:scale-[1.02] hover:shadow-2xl shadow-primary/5 ${activeBrand?._id === brand._id ? 'border-primary/40 bg-primary/10' : 'border-white/[0.06] bg-white/[0.02]'}`}
                                         style={{ animation: `slide-up 0.4s ease-out ${i * 50}ms both` }}>
-                                        <div className="size-12 sm:size-14 rounded-2xl flex items-center justify-center font-black text-white text-xl shrink-0 shadow-lg"
+                                        <div className="size-11 sm:size-14 rounded-2xl flex items-center justify-center font-black text-white text-lg sm:text-xl shrink-0 shadow-lg"
                                             style={{ background: brand.dna?.colors?.[0]?.hex || '#2B4BEE', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>{brand.name?.charAt(0)?.toUpperCase()}</div>
                                         <div className="flex-1 min-w-0" style={{ pointerEvents: 'none' }}>
-                                            <p className="text-base font-black text-white truncate">{brand.name}</p>
-                                            <p className="text-[11px] sm:text-xs text-slate-500 font-bold truncate uppercase tracking-tight mt-0.5">{brand.website || brand.dna?.industry || 'Uncategorized'}</p>
+                                            <p className="text-sm sm:text-base font-black text-white truncate">{brand.name}</p>
+                                            <p className="text-[10px] sm:text-xs text-slate-500 font-bold truncate uppercase tracking-tight mt-0.5">{brand.website || brand.dna?.industry || 'Uncategorized'}</p>
                                         </div>
-                                        <span className="material-symbols-outlined text-slate-600 group-hover:text-primary transition-colors shrink-0">chevron_right</span>
+                                        <span className="material-symbols-outlined text-slate-600 group-hover:text-primary transition-colors shrink-0 text-sm sm:text-base">chevron_right</span>
                                     </div>
                                 ))}
                             </div>
@@ -1362,13 +1364,13 @@ export default function UserDashboard() {
                         <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2 mb-5">
                             <span className="material-symbols-outlined text-primary shrink-0">apps</span>Studios
                         </h3>
-                        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-2.5 sm:gap-3">
                             {studios.map((a, i) => (
                                 <button key={i} onClick={() => navigate(a.path)}
-                                    className={`studio-card flex flex-col xs:flex-row items-center gap-2 sm:gap-3 p-3.5 rounded-xl bg-gradient-to-br ${a.bg} border border-white/[0.04] hover:border-white/[0.15] cursor-pointer text-center xs:text-left active:scale-95 transition-all duration-300`}
+                                    className={`studio-card flex flex-col xs:flex-row items-center gap-1.5 xs:gap-3 p-3 sm:p-3.5 rounded-xl bg-gradient-to-br ${a.bg} border border-white/[0.04] hover:border-white/[0.15] cursor-pointer text-center xs:text-left active:scale-95 transition-all duration-300`}
                                     style={{ animation: `slide-up 0.4s ease-out ${i * 50}ms both` }}>
-                                    <span className="material-symbols-outlined text-xl sm:text-2xl" style={{ color: a.color }}>{a.icon}</span>
-                                    <span className="text-xs sm:text-sm md:text-base text-white font-black uppercase tracking-tight">{a.label}</span>
+                                    <span className="material-symbols-outlined text-lg sm:text-xl lg:text-2xl" style={{ color: a.color }}>{a.icon}</span>
+                                    <span className="text-[10px] sm:text-xs lg:text-sm text-white font-black uppercase tracking-tight">{a.label}</span>
                                 </button>
                             ))}
                         </div>
