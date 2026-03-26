@@ -46,24 +46,6 @@ router.get('/', protect, async (req, res) => {
 });
 
 
-// ══════════════════════════════════════════════════════════════
-// GET /campaigns/:id — Get full campaign details
-// ══════════════════════════════════════════════════════════════
-router.get('/:id', protect, async (req, res) => {
-    try {
-        const campaign = await RetentionCampaign.findOne({
-            _id: req.params.id,
-            user: req.user._id,
-        }).lean();
-
-        if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
-        res.json({ success: true, campaign });
-    } catch (err) {
-        console.error('[Retention] Get error:', err);
-        res.status(500).json({ success: false, error: err.message });
-    }
-});
-
 
 // ══════════════════════════════════════════════════════════════
 // POST /campaigns — Create a new retention campaign
@@ -93,23 +75,6 @@ router.post('/', protect, async (req, res) => {
     }
 });
 
-
-// ══════════════════════════════════════════════════════════════
-// DELETE /campaigns/:id — Delete a campaign
-// ══════════════════════════════════════════════════════════════
-router.delete('/:id', protect, async (req, res) => {
-    try {
-        const result = await RetentionCampaign.deleteOne({
-            _id: req.params.id,
-            user: req.user._id,
-        });
-        if (result.deletedCount === 0) return res.status(404).json({ success: false, error: 'Not found' });
-        res.json({ success: true });
-    } catch (err) {
-        console.error('[Retention] Delete error:', err);
-        res.status(500).json({ success: false, error: err.message });
-    }
-});
 
 
 // ══════════════════════════════════════════════════════════════
@@ -829,6 +794,45 @@ router.get('/contacts/marketable', protect, async (req, res) => {
         res.status(500).json({ success: false, error: err.message });
     }
 });
+
+
+// ══════════════════════════════════════════════════════════════
+// GET /:id — Get full campaign details
+// ══════════════════════════════════════════════════════════════
+router.get('/:id', protect, async (req, res) => {
+    try {
+        const campaign = await RetentionCampaign.findOne({
+            _id: req.params.id,
+            user: req.user._id,
+        }).lean();
+
+        if (!campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
+        res.json({ success: true, campaign });
+    } catch (err) {
+        console.error('[Retention] Get error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+
+// ══════════════════════════════════════════════════════════════
+// DELETE /:id — Delete a campaign
+// ══════════════════════════════════════════════════════════════
+router.delete('/:id', protect, async (req, res) => {
+    try {
+        const result = await RetentionCampaign.deleteOne({
+            _id: req.params.id,
+            user: req.user._id,
+        });
+        if (result.deletedCount === 0) return res.status(404).json({ success: false, error: 'Not found' });
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[Retention] Delete error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+
 
 
 // ═══════════════════════════════════════════════════════════════
