@@ -41,13 +41,23 @@ function useTypewriter(text, speed = 40) {
 }
 
 // ── Apple-Watch Health Ring ──
-function HealthRing({ score, radius, strokeWidth, color, label, delay = 0 }) {
+function HealthRing({ score, radius, strokeWidth, color, label, delay = 0, loading = false }) {
     const circumference = 2 * Math.PI * radius
     const [animated, setAnimated] = useState(0)
     useEffect(() => {
+        if (loading) return
         const t = setTimeout(() => setAnimated(score), 300 + delay)
         return () => clearTimeout(t)
-    }, [score, delay])
+    }, [score, delay, loading])
+
+    if (loading) {
+        return (
+            <g className="animate-pulse">
+                <circle cx="90" cy="90" r={radius} fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth={strokeWidth} />
+            </g>
+        )
+    }
+
     return (
         <g>
             <circle cx="90" cy="90" r={radius} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth={strokeWidth} />
@@ -56,6 +66,108 @@ function HealthRing({ score, radius, strokeWidth, color, label, delay = 0 }) {
                 strokeLinecap="round" transform="rotate(-90 90 90)"
                 style={{ transition: 'stroke-dashoffset 1.5s cubic-bezier(0.4,0,0.2,1)', filter: `drop-shadow(0 0 6px ${color}40)` }} />
         </g>
+    )
+}
+
+// ── Skeleton UI Helper ──
+function Skeleton({ className, circle = false }) {
+    return (
+        <div className={`relative overflow-hidden bg-white/[0.03] ${circle ? 'rounded-full' : 'rounded-lg'} ${className}`}>
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
+        </div>
+    )
+}
+
+function SkeletonHero() {
+    return (
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-6 gap-4">
+            <div className="flex-1 space-y-3">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-10 w-64" />
+            </div>
+            <Skeleton className="h-12 w-32 rounded-xl" />
+        </div>
+    )
+}
+
+function SkeletonStats({ count = 4 }) {
+    return (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {[...Array(count)].map((_, i) => (
+                <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                    <Skeleton className="h-3 w-16 mb-3" />
+                    <Skeleton className="h-7 w-24" />
+                </div>
+            ))}
+        </div>
+    )
+}
+
+function SkeletonRings() {
+    return (
+        <div className="flex flex-col sm:flex-row items-center gap-8 p-6 glass-panel rounded-2xl border border-white/[0.06]">
+            <Skeleton className="size-32 rounded-full shrink-0" />
+            <div className="grid grid-cols-2 gap-3 flex-1 w-full">
+                {[1, 2, 3, 4].map(i => (
+                    <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                        <Skeleton className="size-3 rounded-full" />
+                        <div className="space-y-2 flex-1">
+                            <Skeleton className="h-3 w-16" />
+                            <Skeleton className="h-5 w-10" />
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+function SkeletonHub() {
+    return (
+        <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[1, 2, 3, 4].map(i => (
+                    <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] space-y-3">
+                        <div className="flex justify-between items-start">
+                            <Skeleton className="h-5 w-32" />
+                            <Skeleton className="h-4 w-12 rounded-full" />
+                        </div>
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-3/4" />
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+function SkeletonPulse() {
+    return (
+        <div className="grid grid-cols-3 gap-3 mb-5">
+            {[1, 2, 3].map(i => (
+                <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] flex flex-col items-center gap-2">
+                    <Skeleton className="size-5 rounded-md" />
+                    <Skeleton className="h-6 w-16" />
+                    <Skeleton className="h-3 w-10" />
+                </div>
+            ))}
+        </div>
+    )
+}
+
+function SkeletonBrands() {
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[1, 2, 3, 4].map(i => (
+                <div key={i} className="flex items-center gap-4 p-4 rounded-xl border border-white/[0.06] bg-white/[0.02]">
+                    <Skeleton className="size-12 sm:size-14 rounded-2xl shrink-0" />
+                    <div className="flex-1 space-y-2">
+                        <Skeleton className="h-5 w-32" />
+                        <Skeleton className="h-3 w-24" />
+                    </div>
+                </div>
+            ))}
+        </div>
     )
 }
 
@@ -93,9 +205,12 @@ export default function UserDashboard() {
     const [perfData, setPerfData] = useState(null)
     const [anomalies, setAnomalies] = useState([])
     const [blendedRoas, setBlendedRoas] = useState(null)
+    const [loadingAnalytics, setLoadingAnalytics] = useState(true)
+    const [loadingD2C, setLoadingD2C] = useState(true)
 
     // Intel state
     const [intelMissions, setIntelMissions] = useState([])
+    const [loadingIntel, setLoadingIntel] = useState(true)
     const [intelReport, setIntelReport] = useState(null) // { mission, findings }
     const [showIntelReport, setShowIntelReport] = useState(false)
 
@@ -125,6 +240,7 @@ export default function UserDashboard() {
     // ── Analytics loader (Funnel + Performance + ROAS) ──
     const loadAnalytics = useCallback(async () => {
         if (!activeBrand?._id) return
+        setLoadingAnalytics(true)
         const brandId = activeBrand._id
         try {
             const [funnelRes, perfRes, anomalyRes, roasRes] = await Promise.allSettled([
@@ -145,6 +261,7 @@ export default function UserDashboard() {
             if (anomalyRes.status === 'fulfilled') setAnomalies(anomalyRes.value?.anomalies || [])
             if (roasRes.status === 'fulfilled') setBlendedRoas(roasRes.value || null)
         } catch { /* silent */ }
+        finally { setLoadingAnalytics(false) }
     }, [activeBrand?._id])
 
     // Clear stale data and re-fetch when brand changes
@@ -173,7 +290,8 @@ export default function UserDashboard() {
 
     useEffect(() => {
         loadSummary(); loadTrends(); loadAnalytics()
-        shopifyAnalytics.snapshot().then(d => setD2cSnapshot(d)).catch(() => { })
+        setLoadingD2C(true)
+        shopifyAnalytics.snapshot().then(d => setD2cSnapshot(d)).catch(() => { }).finally(() => setLoadingD2C(false))
         const interval = setInterval(() => { loadTrends(); loadSummary(); loadAnalytics() }, 30 * 60 * 1000)
         return () => clearInterval(interval)
     }, [loadSummary, loadTrends, loadAnalytics])
@@ -189,6 +307,7 @@ export default function UserDashboard() {
     useEffect(() => {
         async function fetchIntelData() {
             if (!activeBrand?._id) return
+            setLoadingIntel(true)
             try {
                 const token = localStorage.getItem('mantram_token')
                 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
@@ -200,6 +319,7 @@ export default function UserDashboard() {
                     setIntelMissions(data.missions || [])
                 }
             } catch { /* silent */ }
+            finally { setLoadingIntel(false) }
         }
         fetchIntelData()
     }, [activeBrand?._id])
@@ -253,6 +373,7 @@ export default function UserDashboard() {
             <SEOHead title="Dashboard — Mantram AI" noIndex={true} />
             {/* ═══════ CSS Animations ═══════ */}
             <style>{`
+                @keyframes shimmer { 100% { transform: translateX(100%) } }
                 @keyframes gradient-shift { 0%,100% { background-position: 0% 50% } 50% { background-position: 100% 50% } }
                 @keyframes glow-pulse { 0%,100% { box-shadow: 0 0 20px rgba(139,92,246,0.15) } 50% { box-shadow: 0 0 40px rgba(139,92,246,0.3), 0 0 60px rgba(6,182,212,0.1) } }
                 @keyframes slide-up { from { opacity:0; transform: translateY(20px) } to { opacity:1; transform: translateY(0) } }
@@ -279,29 +400,36 @@ export default function UserDashboard() {
             {/* ═══════════════════════════════════════════════════════════════ */}
             {/* 1. HERO GREETING + STREAK                                      */}
             {/* ═══════════════════════════════════════════════════════════════ */}
-            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-5 gap-3 anim-slide-up">
-                <div>
-                    <div className="flex items-center gap-3 mt-2">
-                        <p className="text-slate-500 text-base">{getDateString()}</p>
-                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                            <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-                            <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">AI Active</span>
-                        </div>
-                    </div>
-                </div>
-                <div className="flex items-center gap-3">
-                    {streak > 0 && (
-                        <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 anim-float">
-                            <span className="text-xl">🔥</span>
-                            <div>
-                                <p className="text-sm font-extrabold text-amber-400">{streak}-Day Streak</p>
-                                <p className="text-xs text-amber-500/60">Keep creating!</p>
+            {loadingSummary ? (
+                <SkeletonHero />
+            ) : (
+                <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-5 sm:mb-6 gap-3 anim-slide-up">
+                    <div className="min-w-0">
+                        <p className="text-slate-400 text-sm sm:text-base font-medium mb-1">{getDateString()}</p>
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight truncate">
+                                {typedGreeting}
+                                {!greetingDone && <span className="inline-block w-1.5 h-6 sm:h-8 bg-violet-500 ml-1 rounded-full animate-[cursor-blink_1s_step-end_infinite]" />}
+                            </h1>
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 shrink-0">
+                                <span className={`size-2 rounded-full bg-emerald-400 animate-pulse`} />
+                                <span className="text-[10px] sm:text-xs font-bold text-emerald-400 uppercase tracking-wider">AI Active</span>
                             </div>
                         </div>
-                    )}
-
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                        {streak > 0 && (
+                            <div className="flex items-center gap-2 px-3 py-2 sm:px-3.5 sm:py-2 rounded-xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 anim-float">
+                                <span className="text-lg sm:text-xl">🔥</span>
+                                <div className="min-w-0">
+                                    <p className="text-xs sm:text-sm font-extrabold text-amber-400 truncate">{streak}-Day Streak</p>
+                                    <p className="text-[10px] sm:text-xs text-amber-500/60 truncate">Keep creating!</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Smart Command Box */}
             <SmartCommandBox variant="dashboard" className="mb-5" />
@@ -309,42 +437,61 @@ export default function UserDashboard() {
             {/* ═══════════════════════════════════════════════════════════════ */}
             {/* 2. MISSION CONTROL — DAILY AI INSIGHT                          */}
             {/* ═══════════════════════════════════════════════════════════════ */}
-            {insight && (
+            {loadingSummary ? (
                 <div className="mb-6 anim-slide-up" style={{ animationDelay: '100ms' }}>
-                    <div className="relative p-6 rounded-2xl overflow-hidden anim-border-glow anim-glow border-2"
+                    <div className="glass-panel p-6 rounded-2xl border-2 border-white/[0.04] space-y-4">
+                        <Skeleton className="h-4 w-32" />
+                        <div className="flex gap-4">
+                            <div className="flex-1 space-y-2">
+                                <Skeleton className="h-6 w-full" />
+                                <Skeleton className="h-4 w-3/4" />
+                            </div>
+                            <Skeleton className="size-16 rounded-2xl shrink-0" />
+                        </div>
+                        <div className="flex gap-3">
+                            <Skeleton className="h-9 w-28 rounded-xl" />
+                            <Skeleton className="h-9 w-28 rounded-xl" />
+                        </div>
+                    </div>
+                </div>
+            ) : insight ? (
+                <div className="mb-6 anim-slide-up" style={{ animationDelay: '100ms' }}>
+                    <div className="relative p-4 sm:p-5 lg:p-6 rounded-2xl overflow-hidden anim-border-glow anim-glow border-2"
                         style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.08) 0%, rgba(6,182,212,0.08) 50%, rgba(52,211,153,0.06) 100%)' }}>
                         {/* Ambient orbs */}
                         <div className="absolute -top-24 -right-24 size-48 bg-gradient-to-br from-violet-500/15 to-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
                         <div className="absolute -bottom-16 -left-16 size-32 bg-gradient-to-tr from-emerald-500/10 to-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
-                        <div className="relative flex flex-col sm:flex-row sm:items-center gap-5">
-                            <div className="shrink-0">
-                                <div className="size-18 rounded-2xl bg-gradient-to-br from-violet-500/25 to-cyan-500/25 flex items-center justify-center text-4xl border border-violet-500/20 backdrop-blur-sm anim-float"
-                                    style={{ width: '72px', height: '72px' }}>
+                        <div className="relative flex flex-col md:flex-row md:items-center gap-4 sm:gap-5">
+                            <div className="shrink-0 flex items-center md:block">
+                                <div className="size-14 sm:size-16 md:size-18 rounded-2xl bg-gradient-to-br from-violet-500/25 to-cyan-500/25 flex items-center justify-center text-3xl sm:text-4xl border border-violet-500/20 backdrop-blur-sm anim-float">
                                     {insight.emoji || '💡'}
+                                </div>
+                                <div className="ml-3 md:hidden">
+                                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300 font-bold uppercase tracking-widest">🤖 AI Mission</span>
                                 </div>
                             </div>
                             <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                                    <span className="text-xs px-2.5 py-1 rounded-full bg-violet-500/15 text-violet-300 font-bold uppercase tracking-widest">🤖 AI Mission</span>
-                                    <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${insight.category === 'trend' ? 'bg-orange-500/15 text-orange-300'
+                                <div className="hidden md:flex items-center gap-2 mb-1.5 flex-wrap">
+                                    <span className="text-[10px] px-2.5 py-1 rounded-full bg-violet-500/15 text-violet-300 font-bold uppercase tracking-widest">🤖 AI Mission</span>
+                                    <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase ${insight.category === 'trend' ? 'bg-orange-500/15 text-orange-300'
                                         : insight.category === 'growth' ? 'bg-emerald-500/15 text-emerald-300'
                                             : insight.category === 'seasonal' ? 'bg-amber-500/15 text-amber-300'
                                                 : 'bg-cyan-500/15 text-cyan-300'
                                         }`}>{insight.category}</span>
                                 </div>
-                                <h3 className="text-xl font-extrabold text-white mb-1">{insight.title}</h3>
-                                <p className="text-base text-slate-300 leading-relaxed">{insight.tip}</p>
+                                <h3 className="text-lg sm:text-xl font-extrabold text-white mb-1 group-hover:text-primary transition-colors">{insight.title}</h3>
+                                <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-medium">{insight.tip}</p>
                             </div>
                             <button onClick={() => navigate(insight.actionPath || '/content-studio')}
-                                className="shrink-0 px-7 py-3.5 rounded-xl text-white text-base font-bold transition-all cursor-pointer flex items-center gap-2 hover:scale-105 active:scale-95"
+                                className="w-full md:w-auto shrink-0 px-6 py-3 rounded-xl text-white text-sm sm:text-base font-bold transition-all cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.03] active:scale-95 group"
                                 style={{ background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)', boxShadow: '0 4px 20px rgba(139,92,246,0.3)' }}>
-                                <span className="material-symbols-outlined text-lg">rocket_launch</span>
+                                <span className="material-symbols-outlined text-lg group-hover:rotate-12 transition-transform">rocket_launch</span>
                                 {insight.actionLabel || 'Act Now'}
                             </button>
                         </div>
                     </div>
                 </div>
-            )}
+            ) : null}
 
             {/* ═══════════════════════════════════════════════════════════════ */}
             {/* 3. REVENUE COMMAND STRIP                                       */}
@@ -352,7 +499,11 @@ export default function UserDashboard() {
             <div className="mb-6 rounded-xl bg-white/[0.02] border border-white/[0.06] overflow-hidden anim-slide-up" style={{ animationDelay: '200ms' }}>
                 <div className="flex overflow-hidden">
                     <div className="flex ticker-track">
-                        {[0, 1].map(dup => (
+                        {(loadingSummary || loadingD2C) ? (
+                            <div className="flex gap-12 px-6 py-3.5">
+                                {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-6 w-36" />)}
+                            </div>
+                        ) : [0, 1].map(dup => (
                             <div key={dup} className="flex">
                                 <TickerItem icon="payments" value={`₹${(d2cSnapshot?.weeklyRevenue || 0).toLocaleString()}`} label="D2C Revenue" color="#34d399" />
                                 <div className="w-px bg-white/[0.06] my-2" />
@@ -381,63 +532,67 @@ export default function UserDashboard() {
                 <div className="col-span-1 lg:col-span-8 space-y-6">
 
                     {/* ── 4. BRAND HEALTH RINGS ── */}
-                    <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 border border-white/[0.06] anim-slide-up" style={{ animationDelay: '250ms' }}>
-                        <div className="flex items-center gap-2 mb-4">
-                            <span className="material-symbols-outlined text-emerald-400">monitoring</span>
-                            <span className="text-lg font-bold text-white">Brand Health</span>
-                            <span className="text-2xl font-extrabold text-white ml-auto">{health.overallScore || 0}<span className="text-sm text-slate-500 font-medium">/100</span></span>
-                        </div>
-                        <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
-                            <div className="shrink-0 w-full max-w-[140px] sm:max-w-[160px] md:max-w-[180px] aspect-square mx-auto">
-                                <svg viewBox="0 0 180 180" className="w-full h-full">
-                                    <HealthRing score={health.contentVelocity || 0} radius={78} strokeWidth={8} color="#8b5cf6" label="Content" delay={0} />
-                                    <HealthRing score={health.creativeOutput || 0} radius={66} strokeWidth={8} color="#06b6d4" label="Creative" delay={100} />
-                                    <HealthRing score={health.brandCompleteness || 0} radius={54} strokeWidth={8} color="#f59e0b" label="DNA" delay={200} />
-                                    <HealthRing score={health.trendReadiness || 0} radius={42} strokeWidth={8} color="#34d399" label="Trends" delay={300} />
-                                </svg>
+                    {loadingSummary ? (
+                        <SkeletonRings />
+                    ) : (
+                        <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 border border-white/[0.06] anim-slide-up" style={{ animationDelay: '250ms' }}>
+                            <div className="flex items-center gap-2 mb-4">
+                                <span className="material-symbols-outlined text-emerald-400">monitoring</span>
+                                <span className="text-lg font-bold text-white">Brand Health</span>
+                                <span className="text-xl sm:text-2xl font-extrabold text-white ml-auto">{health.overallScore || 0}<span className="text-xs sm:text-sm text-slate-500 font-medium ml-1">/100</span></span>
                             </div>
-                            <div className="grid grid-cols-2 gap-2 sm:gap-3 flex-1 w-full">
-                                {[
-                                    { label: 'Content Velocity', score: health.contentVelocity, color: '#8b5cf6', icon: 'article' },
-                                    { label: 'Creative Output', score: health.creativeOutput, color: '#06b6d4', icon: 'image' },
-                                    { label: 'Brand DNA', score: health.brandCompleteness, color: '#f59e0b', icon: 'fingerprint' },
-                                    { label: 'Trend Readiness', score: health.trendReadiness, color: '#34d399', icon: 'trending_up' },
-                                ].map((m, i) => (
-                                    <div key={i} className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                                        <div className="size-3 rounded-full shrink-0" style={{ background: m.color, boxShadow: `0 0 8px ${m.color}60` }} />
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-xs sm:text-sm text-slate-400 truncate">{m.label}</p>
-                                            <p className="text-base sm:text-lg font-extrabold text-white">{Math.round(m.score || 0)}</p>
+                            <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8">
+                                <div className="shrink-0 w-full max-w-[140px] sm:max-w-none sm:w-[150px] md:w-[180px] aspect-square flex items-center justify-center">
+                                    <svg viewBox="0 0 180 180" className="w-full h-full">
+                                        <HealthRing score={health.contentVelocity || 0} radius={78} strokeWidth={8} color="#8b5cf6" label="Content" delay={0} />
+                                        <HealthRing score={health.creativeOutput || 0} radius={66} strokeWidth={8} color="#06b6d4" label="Creative" delay={100} />
+                                        <HealthRing score={health.brandCompleteness || 0} radius={54} strokeWidth={8} color="#f59e0b" label="DNA" delay={200} />
+                                        <HealthRing score={health.trendReadiness || 0} radius={42} strokeWidth={8} color="#34d399" label="Trends" delay={300} />
+                                    </svg>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 sm:gap-3 flex-1 w-full">
+                                    {[
+                                        { label: 'Content Velocity', score: health.contentVelocity, color: '#8b5cf6', icon: 'article' },
+                                        { label: 'Creative Output', score: health.creativeOutput, color: '#06b6d4', icon: 'image' },
+                                        { label: 'Brand DNA', score: health.brandCompleteness, color: '#f59e0b', icon: 'fingerprint' },
+                                        { label: 'Trend Readiness', score: health.trendReadiness, color: '#34d399', icon: 'trending_up' },
+                                    ].map((m, i) => (
+                                        <div key={i} className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] transition-all hover:bg-white/[0.05]">
+                                            <div className="size-2.5 sm:size-3 rounded-full shrink-0" style={{ background: m.color, boxShadow: `0 0 8px ${m.color}60` }} />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-[10px] sm:text-xs text-slate-400 truncate uppercase mt-0.5">{m.label}</p>
+                                                <p className="text-base sm:text-lg font-extrabold text-white leading-tight">{Math.round(m.score || 0)}</p>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
 
-                    {/* ── 4a. FUNNEL VELOCITY — SIDE-BY-SIDE LAYOUT ── */}
+                    {/* ── 4a. FUNNEL VELOCITY ── */}
                     {funnelData && (
-                        <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 border border-indigo-500/15 anim-slide-up cursor-pointer group"
+                        <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 border border-indigo-500/15 anim-slide-up cursor-pointer group hover:bg-indigo-500/[0.02] transition-colors"
                             style={{ animationDelay: '275ms' }}
                             onClick={() => navigate('/funnel-studio')}>
-                            <div className="flex flex-wrap items-center justify-between gap-2 mb-4 sm:mb-5">
+                            <div className="flex flex-wrap items-center justify-between gap-2 mb-4 sm:mb-6">
                                 <div className="flex items-center gap-2 min-w-0">
                                     <span className="material-symbols-outlined text-indigo-400 shrink-0">filter_alt</span>
                                     <span className="text-base sm:text-lg font-bold text-white truncate">Funnel Velocity</span>
-                                    <span className="hidden sm:inline ml-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 truncate max-w-[120px]">
+                                    <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-widest rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 truncate max-w-[120px]">
                                         {funnelData.funnel?.name || 'Active'}
                                     </span>
                                 </div>
-                                <div className="flex items-center gap-1 text-sm text-slate-500 group-hover:text-indigo-400 transition-colors shrink-0">
-                                    <span className="hidden sm:inline">Open Studio</span>
+                                <div className="flex items-center gap-1 text-xs sm:text-sm text-slate-500 group-hover:text-indigo-400 transition-colors shrink-0">
+                                    <span className="hidden xs:inline">Open Studio</span>
                                     <span className="material-symbols-outlined text-sm group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
                                 </div>
                             </div>
 
                             {/* ── Side-by-side: Funnel left, Stats right ── */}
-                            <div className="flex flex-col lg:flex-row gap-6">
+                            <div className="flex flex-col md:flex-row gap-6 lg:gap-8">
                                 {/* LEFT: Animated SVG Funnel */}
-                                <div className="flex-shrink-0 flex justify-center lg:justify-start">
+                                <div className="shrink-0 flex justify-center md:justify-start">
                                     {(() => {
                                         const stages = funnelData.analytics?.stages || []
                                         if (stages.length === 0) return null
@@ -449,7 +604,7 @@ export default function UserDashboard() {
                                         const glowColors = ['#818cf860', '#6366f160', '#a78bfa60', '#8b5cf660', '#7c3aed60', '#6d28d960']
 
                                         return (
-                                            <svg className="w-full max-w-[280px] h-auto" viewBox={`0 0 ${svgW} ${svgH}`}>
+                                            <svg className="w-full max-w-[240px] sm:max-w-[280px] h-auto" viewBox={`0 0 ${svgW} ${svgH}`}>
                                                 <defs>
                                                     {stages.map((_, i) => (
                                                         <linearGradient key={`fg${i}`} id={`funnelGrad${i}`} x1="0" y1="0" x2="0" y2="1">
@@ -495,22 +650,21 @@ export default function UserDashboard() {
                                                                 style={{ animation: `pulse 3s ease-in-out ${i * 0.4}s infinite` }} />
                                                             <polygon points={`${tl},${y} ${tr},${y} ${br},${y + h} ${bl},${y + h}`}
                                                                 fill={`url(#funnelGrad${i})`} stroke={color} strokeWidth="1" strokeOpacity="0.4"
-                                                                style={{ animation: `slide-up 0.6s ease-out ${i * 0.12}s both`, cursor: 'pointer' }} />
+                                                                style={{ cursor: 'pointer' }} />
                                                             <polygon points={`${tl},${y} ${tr},${y} ${br},${y + h} ${bl},${y + h}`}
                                                                 fill="url(#funnelShimmer)" />
                                                             {/* Stage name inside trapezoid */}
-                                                            <text x={funnelCenter} y={y + h / 2 - 6} textAnchor="middle" fill="white" fontSize="14" fontWeight="800" dominantBaseline="middle"
-                                                                style={{ animation: `slide-up 0.5s ease-out ${i * 0.15 + 0.2}s both` }}>
+                                                            <text x={funnelCenter} y={y + h / 2 - 6} textAnchor="middle" fill="white" fontSize="14" fontStyle="italic" fontWeight="900" dominantBaseline="middle">
                                                                 {count.toLocaleString()}
                                                             </text>
-                                                            <text x={funnelCenter} y={y + h / 2 + 8} textAnchor="middle" fill="rgba(255,255,255,0.6)" fontSize="9" fontWeight="600" dominantBaseline="middle">
+                                                            <text x={funnelCenter} y={y + h / 2 + 8} textAnchor="middle" fill="rgba(255,255,255,0.7)" fontSize="9" fontWeight="800" dominantBaseline="middle" style={{ textTransform: 'uppercase' }}>
                                                                 {stage.stageName}
                                                             </text>
                                                             {/* Drop-off badge */}
                                                             {dropOff > 0 && i < stages.length - 1 && (
-                                                                <g style={{ animation: `slide-up 0.5s ease-out ${i * 0.15 + 0.3}s both` }}>
+                                                                <g>
                                                                     <rect x={tr + 4} y={y + h - 6} width={dropOff > 9 ? 38 : 32} height={16} rx="8" fill="#f43f5e" fillOpacity="0.15" stroke="#f43f5e" strokeWidth="0.5" strokeOpacity="0.3" />
-                                                                    <text x={tr + 4 + (dropOff > 9 ? 19 : 16)} y={y + h + 2} textAnchor="middle" fill="#fb7185" fontSize="8" fontWeight="700" dominantBaseline="middle">
+                                                                    <text x={tr + 4 + (dropOff > 9 ? 19 : 16)} y={y + h + 2} textAnchor="middle" fill="#fb7185" fontSize="8" fontWeight="800" dominantBaseline="middle">
                                                                         −{dropOff}%
                                                                     </text>
                                                                 </g>
@@ -538,7 +692,7 @@ export default function UserDashboard() {
                                                     const lastBotHalf = (maxW * lastWidthPct * 0.5) / 2
                                                     const lastY = stages.length * 52 + 6
                                                     return (
-                                                        <g style={{ animation: 'slide-up 0.8s ease-out 0.6s both' }}>
+                                                        <g>
                                                             <polygon points={`${funnelCenter - lastBotHalf},${lastY - 8} ${funnelCenter + lastBotHalf},${lastY - 8} ${funnelCenter},${lastY + 8}`}
                                                                 fill="#34d399" fillOpacity="0.3" stroke="#34d399" strokeWidth="1" strokeOpacity="0.4" />
                                                             <circle cx={funnelCenter} cy={lastY + 14} r="3" fill="#34d399" opacity="0.8">
@@ -554,52 +708,52 @@ export default function UserDashboard() {
                                 </div>
 
                                 {/* RIGHT: Stats + Sources */}
-                                <div className="flex-1 flex flex-col justify-between gap-4 min-w-0">
+                                <div className="flex-1 flex flex-col justify-between gap-5 min-w-0">
                                     {/* Conversion Ring + Key Metrics */}
-                                    <div className="flex items-center gap-4 mb-1">
+                                    <div className="flex items-center gap-4 sm:gap-6 mb-1">
                                         <div className="shrink-0">
-                                            <svg className="w-12 h-12 sm:w-[72px] sm:h-[72px]" viewBox="0 0 72 72">
-                                                <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
-                                                <circle cx="36" cy="36" r="30" fill="none" stroke="#6366f1" strokeWidth="5" strokeLinecap="round"
+                                            <svg className="w-14 h-14 sm:w-[72px] sm:h-[72px]" viewBox="0 0 72 72">
+                                                <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
+                                                <circle cx="36" cy="36" r="30" fill="none" stroke="#6366f1" strokeWidth="6" strokeLinecap="round"
                                                     strokeDasharray={`${(funnelData.analytics?.overview?.conversionRate || 0) / 100 * 188} 188`}
                                                     transform="rotate(-90 36 36)"
-                                                    style={{ animation: 'slide-up 1s ease-out 0.3s both' }} />
-                                                <text x="36" y="33" textAnchor="middle" fill="white" fontSize="15" fontWeight="800" dominantBaseline="middle">
+                                                    style={{ transition: 'stroke-dasharray 1s ease-out 0.3s' }} />
+                                                <text x="36" y="33" textAnchor="middle" fill="white" fontSize="16" fontWeight="900" dominantBaseline="middle">
                                                     {funnelData.analytics?.overview?.conversionRate || 0}%
                                                 </text>
-                                                <text x="36" y="46" textAnchor="middle" fill="#94a3b8" fontSize="7" fontWeight="600" dominantBaseline="middle">
-                                                    CONVERSION
+                                                <text x="36" y="46" textAnchor="middle" fill="#94a3b8" fontSize="7" fontWeight="800" dominantBaseline="middle">
+                                                    CR RATE
                                                 </text>
                                             </svg>
                                         </div>
-                                        <div className="flex-1 grid grid-cols-2 gap-2">
-                                            <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                                                <p className="text-[10px] text-slate-500 uppercase">Leads</p>
-                                                <p className="text-lg font-extrabold text-white">{funnelData.analytics?.overview?.totalEntries || 0}</p>
+                                        <div className="flex-1 grid grid-cols-2 gap-3">
+                                            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] transition-colors">
+                                                <p className="text-[10px] text-slate-500 font-extrabold uppercase tracking-widest mb-1">Leads</p>
+                                                <p className="text-lg sm:text-xl font-black text-white">{funnelData.analytics?.overview?.totalEntries || 0}</p>
                                             </div>
-                                            <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                                                <p className="text-[10px] text-slate-500 uppercase">Converted</p>
-                                                <p className="text-lg font-extrabold text-emerald-400">{funnelData.analytics?.overview?.convertedEntries || 0}</p>
+                                            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] transition-colors">
+                                                <p className="text-[10px] text-slate-500 font-extrabold uppercase tracking-widest mb-1">Sale</p>
+                                                <p className="text-lg sm:text-xl font-black text-emerald-400">{funnelData.analytics?.overview?.convertedEntries || 0}</p>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Stage breakdown list */}
-                                    <div className="space-y-1.5">
-                                        {(funnelData.analytics?.stages || []).map((stage, i) => {
+                                    <div className="space-y-2">
+                                        {(funnelData.analytics?.stages || []).slice(0, 4).map((stage, i) => {
                                             const maxCount = Math.max(...(funnelData.analytics?.stages || []).map(s => s.everEntered || s.currentCount || 1))
                                             const pct = Math.round(((stage.everEntered || stage.currentCount || 0) / maxCount) * 100)
                                             const stageColors = ['#818cf8', '#6366f1', '#a78bfa', '#8b5cf6', '#7c3aed', '#6d28d9']
                                             return (
-                                                <div key={i} className="flex items-center gap-2">
-                                                    <span className="text-[11px] text-slate-400 w-20 truncate">{stage.stageName}</span>
-                                                    <div className="flex-1 h-2 rounded-full bg-white/[0.04] overflow-hidden">
-                                                        <div className="h-full rounded-full transition-all duration-1000"
-                                                            style={{ width: `${pct}%`, background: stageColors[i % stageColors.length], animation: `slide-up 0.5s ease-out ${i * 0.1}s both` }} />
+                                                <div key={i} className="flex items-center gap-3">
+                                                    <span className="text-[10px] sm:text-xs font-bold text-slate-400 w-20 truncate uppercase tracking-tight">{stage.stageName}</span>
+                                                    <div className="flex-1 h-1.5 sm:h-2 rounded-full bg-white/[0.04] overflow-hidden">
+                                                        <div className="h-full rounded-full transition-all duration-1000 shadow-[0_0_8px_rgba(99,102,241,0.3)]"
+                                                            style={{ width: `${pct}%`, background: stageColors[i % stageColors.length] }} />
                                                     </div>
-                                                    <span className="text-[11px] font-bold text-white w-8 text-right">{stage.everEntered || stage.currentCount || 0}</span>
+                                                    <span className="text-[10px] sm:text-xs font-black text-white w-8 text-right">{stage.everEntered || stage.currentCount || 0}</span>
                                                     {stage.dropOffRate > 0 && (
-                                                        <span className="text-[9px] font-bold text-rose-400 w-8">−{stage.dropOffRate}%</span>
+                                                        <span className="text-[9px] font-black text-rose-500/80 w-8">−{stage.dropOffRate}%</span>
                                                     )}
                                                 </div>
                                             )
@@ -608,18 +762,18 @@ export default function UserDashboard() {
 
                                     {/* Revenue + Source Breakdown */}
                                     <div className="flex items-center gap-3 flex-wrap mt-1">
-                                        <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/5 border border-amber-500/10">
+                                        <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
                                             <span className="material-symbols-outlined text-sm text-amber-400">payments</span>
-                                            <span className="text-xs text-slate-400">Revenue</span>
-                                            <span className="text-sm font-extrabold text-white">₹{(funnelData.analytics?.overview?.totalRevenue || 0).toLocaleString()}</span>
+                                            <span className="text-[10px] text-amber-500/60 font-bold uppercase tracking-tight">Rev</span>
+                                            <span className="text-sm font-black text-white">₹{(funnelData.analytics?.overview?.totalRevenue || 0).toLocaleString()}</span>
                                         </div>
-                                        {(funnelData.analytics?.sourceBreakdown || []).slice(0, 4).map((src, i) => {
+                                        {(funnelData.analytics?.sourceBreakdown || []).slice(0, 3).map((src, i) => {
                                             const srcColors = ['#818cf8', '#34d399', '#f59e0b', '#f43f5e']
                                             return (
-                                                <div key={i} className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                                                <div key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.1] hover:bg-white/[0.04] transition-colors">
                                                     <div className="size-1.5 rounded-full" style={{ background: srcColors[i % srcColors.length] }} />
-                                                    <span className="text-[10px] text-slate-400 capitalize">{src.source}</span>
-                                                    <span className="text-[10px] font-bold text-white">{src.count}</span>
+                                                    <span className="text-[10px] text-slate-400 font-bold capitalize tracking-tight">{src.source}</span>
+                                                    <span className="text-[10px] font-black text-white">{src.count}</span>
                                                 </div>
                                             )
                                         })}
@@ -631,15 +785,14 @@ export default function UserDashboard() {
 
                     {/* ── 4b. PERFORMANCE COCKPIT ── */}
                     {perfData && (
-                        <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 border border-rose-500/15 anim-slide-up cursor-pointer group"
-                            style={{ animationDelay: '290ms' }}
-                            onClick={() => navigate('/performance-marketing')}>
-                            <div className="flex items-center justify-between mb-5">
-                                <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-rose-400">campaign</span>
-                                    <span className="text-lg font-bold text-white">Performance Cockpit</span>
+                        <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 border border-rose-500/15 anim-slide-up group"
+                            style={{ animationDelay: '290ms' }}>
+                            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <span className="material-symbols-outlined text-rose-400 shrink-0">campaign</span>
+                                    <span className="text-base sm:text-lg font-bold text-white truncate">Performance Cockpit</span>
                                     {anomalies.length > 0 && (
-                                        <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/20 animate-pulse">
+                                        <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-widest rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 animate-pulse shrink-0">
                                             {anomalies.length} Alert{anomalies.length > 1 ? 's' : ''}
                                         </span>
                                     )}
@@ -650,22 +803,24 @@ export default function UserDashboard() {
                                 </div>
                             </div>
 
-                            {(perfData.stats?.totalCampaigns || 0) > 0 ? (
+                            {loadingAnalytics ? (
+                                <SkeletonStats />
+                            ) : (perfData.stats?.totalCampaigns || 0) > 0 ? (
                                 <>
                                     {/* Stats Grid */}
-                                    <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-4 mb-5">
+                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
                                         {[
                                             { label: 'Total Spend', value: `₹${(perfData.stats?.totalSpend || 0).toLocaleString()}`, icon: 'account_balance', color: '#f59e0b' },
                                             { label: 'ROAS', value: `${perfData.stats?.avgRoas || '0'}x`, icon: 'show_chart', color: parseFloat(perfData.stats?.avgRoas) >= 2 ? '#34d399' : '#f43f5e' },
                                             { label: 'CTR', value: `${perfData.stats?.avgCtr || '0'}%`, icon: 'ads_click', color: '#06b6d4' },
-                                            { label: 'Conversions', value: perfData.stats?.totalConversions || 0, icon: 'conversion_path', color: '#8b5cf6' },
+                                            { label: 'Sales', value: perfData.stats?.totalConversions || 0, icon: 'shopping_bag', color: '#8b5cf6' },
                                         ].map((m, i) => (
-                                            <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                                                <div className="flex items-center gap-1.5 mb-1">
-                                                    <span className="material-symbols-outlined text-sm" style={{ color: m.color }}>{m.icon}</span>
-                                                    <span className="text-xs text-slate-500">{m.label}</span>
+                                            <div key={i} className="p-3.5 sm:p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] transition-all hover:bg-white/[0.05]">
+                                                <div className="flex items-center gap-2 mb-1.5 min-w-0">
+                                                    <span className="material-symbols-outlined text-xs sm:text-sm shrink-0" style={{ color: m.color }}>{m.icon}</span>
+                                                    <span className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider truncate">{m.label}</span>
                                                 </div>
-                                                <p className="text-xl font-extrabold text-white">{m.value}</p>
+                                                <p className="text-lg sm:text-xl font-black text-white">{m.value}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -724,29 +879,29 @@ export default function UserDashboard() {
                                 </>
                             ) : (
                                 /* Empty state — no campaigns yet */
-                                <div className="text-center py-6">
-                                    <div className="size-16 rounded-2xl bg-rose-500/10 flex items-center justify-center mx-auto mb-4">
-                                        <span className="material-symbols-outlined text-3xl text-rose-400">ads_click</span>
+                                <div className="text-center py-6 sm:py-10 max-w-lg mx-auto">
+                                    <div className="size-16 sm:size-20 rounded-2xl bg-rose-500/10 flex items-center justify-center mx-auto mb-5 group-hover:scale-110 transition-transform duration-500">
+                                        <span className="material-symbols-outlined text-3xl sm:text-4xl text-rose-400">ads_click</span>
                                     </div>
-                                    <p className="text-base font-bold text-white mb-2">Connect Your Ad Platforms</p>
-                                    <p className="text-sm text-slate-400 max-w-sm mx-auto mb-5">
+                                    <p className="text-lg sm:text-xl font-black text-white mb-2 underline decoration-rose-500/30">Connect Your Ad Platforms</p>
+                                    <p className="text-sm sm:text-base text-slate-400 leading-relaxed mb-8">
                                         Link Meta Ads or Google Ads to unlock live ROAS tracking, anomaly detection, and automated campaign insights.
                                     </p>
-                                    <div className="flex justify-center gap-3">
+                                    <div className="flex flex-col xs:flex-row justify-center gap-3 px-4">
                                         {[
                                             { name: 'Meta Ads', icon: 'group', color: '#e879f9' },
                                             { name: 'Google Ads', icon: 'search', color: '#60a5fa' },
                                         ].map((p, i) => (
-                                            <div key={i} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-rose-500/20 transition-all">
-                                                <span className="material-symbols-outlined text-sm" style={{ color: p.color }}>{p.icon}</span>
+                                            <button key={i} className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:bg-rose-500/10 hover:border-rose-500/30 transition-all group/btn">
+                                                <span className="material-symbols-outlined text-lg group-hover/btn:scale-110 transition-transform" style={{ color: p.color }}>{p.icon}</span>
                                                 <span className="text-sm font-bold text-white">{p.name}</span>
-                                            </div>
+                                            </button>
                                         ))}
                                     </div>
-                                    <div className="mt-5 flex items-center justify-center gap-6 text-xs text-slate-500">
-                                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-sm text-emerald-400">bolt</span>Live ROAS</span>
-                                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-sm text-amber-400">warning</span>Anomaly Alerts</span>
-                                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-sm text-indigo-400">auto_fix_high</span>AI Optimization</span>
+                                    <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-[10px] sm:text-xs font-bold text-slate-500">
+                                        <span className="flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity"><span className="material-symbols-outlined text-sm text-emerald-400">bolt</span>LIVE ROAS</span>
+                                        <span className="flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity"><span className="material-symbols-outlined text-sm text-amber-400">warning</span>ANOMALY ALERTS</span>
+                                        <span className="flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity"><span className="material-symbols-outlined text-sm text-indigo-400">auto_fix_high</span>AI OPTIMIZATION</span>
                                     </div>
                                 </div>
                             )}
@@ -755,46 +910,55 @@ export default function UserDashboard() {
 
                     {/* ── 4c. STRIKES RADAR ── */}
                     {radar && (
-                        <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 border border-white/[0.06] anim-slide-up cursor-pointer group"
+                        <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 border border-white/[0.06] anim-slide-up cursor-pointer group hover:bg-white/[0.02] transition-all"
                             style={{ animationDelay: '300ms' }}
                             onClick={() => navigate('/d2c-analytics')}>
-                            <div className="flex items-center justify-between mb-5">
-                                <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-rose-400">radar</span>
-                                    <span className="text-lg font-bold text-white">Strikes Radar</span>
-                                    <span className="ml-2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">Live</span>
+                            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <span className="material-symbols-outlined text-rose-400 shrink-0">radar</span>
+                                    <span className="text-base sm:text-lg font-bold text-white truncate">Strikes Radar</span>
+                                    <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-widest rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 shrink-0">Live</span>
                                 </div>
-                                <div className="flex items-center gap-1 text-sm text-slate-500 group-hover:text-primary transition-colors">
-                                    <span>Deep Dive</span>
+                                <div className="flex items-center gap-1 text-xs sm:text-sm text-slate-500 group-hover:text-primary transition-colors shrink-0">
+                                    <span className="hidden xs:inline">Deep Dive</span>
                                     <span className="material-symbols-outlined text-sm group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
                                 </div>
                             </div>
 
                             {/* Key Metrics Bar */}
                             <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-4 mb-5">
-                                {[
-                                    { label: 'Total Visitors', value: radar.totalVisitors?.toLocaleString(), icon: 'group', color: '#8b5cf6' },
-                                    { label: 'Weekly Growth', value: `${radar.weeklyGrowth > 0 ? '+' : ''}${radar.weeklyGrowth}%`, icon: 'trending_up', color: '#34d399' },
-                                    { label: 'Bounce Rate', value: `${radar.bounceRate}%`, icon: 'exit_to_app', color: '#f59e0b' },
-                                    { label: 'Avg Session', value: radar.avgSession, icon: 'timer', color: '#06b6d4' },
-                                ].map((m, i) => (
-                                    <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                                        <div className="flex items-center gap-1.5 mb-1">
-                                            <span className="material-symbols-outlined text-sm" style={{ color: m.color }}>{m.icon}</span>
-                                            <span className="text-xs text-slate-500">{m.label}</span>
+                                {loadingAnalytics ? (
+                                    [1, 2, 3, 4].map(i => (
+                                        <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] flex flex-col gap-2">
+                                            <Skeleton className="h-3 w-16" />
+                                            <Skeleton className="h-5 w-20" />
                                         </div>
-                                        <p className="text-xl font-extrabold text-white">{m.value}</p>
-                                    </div>
-                                ))}
+                                    ))
+                                ) : (
+                                    [
+                                        { label: 'Total Visitors', value: radar.totalVisitors?.toLocaleString(), icon: 'group', color: '#8b5cf6' },
+                                        { label: 'Weekly Growth', value: `${radar.weeklyGrowth > 0 ? '+' : ''}${radar.weeklyGrowth}%`, icon: 'trending_up', color: '#34d399' },
+                                        { label: 'Bounce Rate', value: `${radar.bounceRate}%`, icon: 'exit_to_app', color: '#f59e0b' },
+                                        { label: 'Avg Session', value: radar.avgSession, icon: 'timer', color: '#06b6d4' },
+                                    ].map((m, i) => (
+                                        <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                                            <div className="flex items-center gap-1.5 mb-1">
+                                                <span className="material-symbols-outlined text-sm" style={{ color: m.color }}>{m.icon}</span>
+                                                <span className="text-xs text-slate-500">{m.label}</span>
+                                            </div>
+                                            <p className="text-xl font-extrabold text-white">{m.value}</p>
+                                        </div>
+                                    ))
+                                )}
                             </div>
 
                             {/* Charts Row */}
-                            <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
-                                {/* Animated ATS Radar */}
-                                <div className="md:col-span-5">
-                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Traffic Sources</p>
-                                    <div className="flex items-center gap-4">
-                                        <div className="relative shrink-0 w-24 h-24 sm:w-[150px] sm:h-[150px]">
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+                                {/* Animated ATS Radar - md:col-span-12 on small tablet, md:col-span-12 xl:col-span-5 on desktop */}
+                                <div className="md:col-span-12 xl:col-span-5 flex flex-col gap-5">
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l-2 border-rose-500 pl-2">Realtime Traffic</p>
+                                    <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8">
+                                        <div className="relative shrink-0 w-full max-w-[180px] sm:max-w-[200px] aspect-square">
                                             <svg viewBox="0 0 150 150" className="absolute inset-0 w-full h-full">
                                                 {/* Background rings */}
                                                 <circle cx="75" cy="75" r="68" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
@@ -805,20 +969,20 @@ export default function UserDashboard() {
                                                 <line x1="75" y1="5" x2="75" y2="145" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
                                                 <line x1="5" y1="75" x2="145" y2="75" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
                                                 {/* Outer glow ring */}
-                                                <circle cx="75" cy="75" r="68" fill="none" stroke="rgba(52,211,153,0.15)" strokeWidth="1.5" />
+                                                <circle cx="75" cy="75" r="68" fill="none" stroke="rgba(244,63,94,0.1)" strokeWidth="1.5" />
                                             </svg>
                                             {/* Sweep arm */}
                                             <svg viewBox="0 0 150 150" className="absolute inset-0 w-full h-full radar-sweep-arm">
                                                 <defs>
                                                     <linearGradient id="sweepGrad" gradientTransform="rotate(90)">
-                                                        <stop offset="0%" stopColor="rgba(52,211,153,0.35)" />
-                                                        <stop offset="100%" stopColor="rgba(52,211,153,0)" />
+                                                        <stop offset="0%" stopColor="rgba(244,63,94,0.2)" />
+                                                        <stop offset="100%" stopColor="rgba(244,63,94,0)" />
                                                     </linearGradient>
                                                 </defs>
                                                 <path d="M75,75 L75,7 A68,68 0 0,1 139,55 Z" fill="url(#sweepGrad)" />
-                                                <line x1="75" y1="75" x2="75" y2="7" stroke="rgba(52,211,153,0.8)" strokeWidth="1.5" />
+                                                <line x1="75" y1="75" x2="75" y2="7" stroke="rgba(244,63,94,0.6)" strokeWidth="1.5" />
                                             </svg>
-                                            {/* Blips for traffic sources */}
+                                            {/* Blips */}
                                             <svg viewBox="0 0 150 150" className="absolute inset-0 w-full h-full">
                                                 {radar.sources?.map((src, i) => {
                                                     const angle = (i / (radar.sources.length)) * 2 * Math.PI - Math.PI / 2
@@ -834,36 +998,34 @@ export default function UserDashboard() {
                                                         </g>
                                                     )
                                                 })}
-                                                {/* Center dot */}
-                                                <circle cx="75" cy="75" r="3" fill="#34d399" />
-                                                <circle cx="75" cy="75" r="6" fill="none" stroke="#34d399" strokeWidth="0.5" opacity="0.5" />
+                                                <circle cx="75" cy="75" r="3" fill="#f43f94" />
                                             </svg>
                                         </div>
-                                        <div className="flex flex-col gap-1.5">
+                                        <div className="flex flex-col gap-2.5 flex-1 min-w-0">
                                             {radar.sources?.map((s, i) => (
-                                                <div key={i} className="flex items-center gap-2 cursor-default"
+                                                <div key={i} className="flex items-center gap-2 cursor-default group/src"
                                                     onMouseEnter={() => setRadarHover(`src-${i}`)} onMouseLeave={() => setRadarHover(null)}>
-                                                    <div className="size-2.5 rounded-full shrink-0" style={{ background: s.color, boxShadow: radarHover === `src-${i}` ? `0 0 8px ${s.color}` : 'none' }} />
-                                                    <span className={`text-xs truncate transition-colors ${radarHover === `src-${i}` ? 'text-white' : 'text-slate-400'}`}>{s.name}</span>
-                                                    <span className="text-xs font-bold text-white ml-auto">{s.value}%</span>
+                                                    <div className="size-2 rounded-full shrink-0 group-hover/src:scale-125 transition-transform" style={{ background: s.color, boxShadow: radarHover === `src-${i}` ? `0 0 8px ${s.color}` : 'none' }} />
+                                                    <span className={`text-[11px] font-bold truncate transition-colors ${radarHover === `src-${i}` ? 'text-white' : 'text-slate-400'}`}>{s.name}</span>
+                                                    <span className="text-[11px] font-black text-white ml-auto">{s.value}%</span>
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Location Bars */}
-                                <div className="md:col-span-3">
-                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Top Locations</p>
-                                    <div className="flex flex-col gap-2">
+                                {/* Location Bars - md:col-span-12 on small tablet, md:col-span-12 xl:col-span-3 on desktop */}
+                                <div className="md:col-span-12 xl:col-span-3">
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l-2 border-indigo-500 pl-2 mb-5">Top Geos</p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-4">
                                         {radar.locations?.slice(0, 5).map((loc, i) => (
-                                            <div key={i}>
-                                                <div className="flex justify-between mb-0.5">
-                                                    <span className="text-xs text-slate-400">{loc.name}</span>
-                                                    <span className="text-xs font-bold text-white">{loc.value}%</span>
+                                            <div key={i} className="group/loc">
+                                                <div className="flex justify-between mb-1.5">
+                                                    <span className="text-[11px] font-bold text-slate-400 group-hover/loc:text-white transition-colors">{loc.name}</span>
+                                                    <span className="text-[11px] font-black text-white">{loc.value}%</span>
                                                 </div>
                                                 <div className="h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
-                                                    <div className="h-full rounded-full transition-all duration-700"
+                                                    <div className="h-full rounded-full transition-all duration-700 shadow-[0_0_8px_rgba(99,102,241,0.3)]"
                                                         style={{ width: `${loc.value}%`, background: `linear-gradient(90deg, #8b5cf6, #06b6d4)` }} />
                                                 </div>
                                             </div>
@@ -871,39 +1033,36 @@ export default function UserDashboard() {
                                     </div>
                                 </div>
 
-                                {/* Gender + Device Split */}
-                                <div className="md:col-span-4 flex flex-col gap-4">
+                                {/* Demographics + Device Split - md:col-span-12 on small tablet, md:col-span-12 xl:col-span-4 on desktop */}
+                                <div className="md:col-span-12 xl:col-span-4 flex flex-col gap-6">
                                     <div>
-                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Gender Split</p>
-                                        <div className="flex h-3 rounded-full overflow-hidden gap-0.5">
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l-2 border-emerald-500 pl-2 mb-5">Audience Split</p>
+                                        <div className="flex h-3 rounded-full overflow-hidden gap-0.5 bg-white/[0.02]">
                                             {radar.gender?.map((g, i) => (
-                                                <div key={i} className="h-full transition-all duration-500" title={`${g.name}: ${g.value}%`}
+                                                <div key={i} className="h-full transition-all duration-500 hover:brightness-125" title={`${g.name}: ${g.value}%`}
                                                     style={{ width: `${g.value}%`, background: g.color, borderRadius: i === 0 ? '9999px 0 0 9999px' : i === radar.gender.length - 1 ? '0 9999px 9999px 0' : '0' }} />
                                             ))}
                                         </div>
-                                        <div className="flex justify-between mt-2">
+                                        <div className="flex justify-between mt-3 flex-wrap gap-2">
                                             {radar.gender?.map((g, i) => (
-                                                <div key={i} className="flex items-center gap-1">
+                                                <div key={i} className="flex items-center gap-2">
                                                     <div className="size-2 rounded-full" style={{ background: g.color }} />
-                                                    <span className="text-[10px] text-slate-500">{g.name}</span>
-                                                    <span className="text-[10px] font-bold text-white">{g.value}%</span>
+                                                    <span className="text-[10px] font-bold text-slate-500">{g.name}</span>
+                                                    <span className="text-[10px] font-black text-white">{g.value}%</span>
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
-                                    <div>
-                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Devices</p>
-                                        <div className="flex gap-2">
-                                            {radar.devices?.map((d, i) => (
-                                                <div key={i} className="flex-1 p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04] text-center">
-                                                    <span className="material-symbols-outlined text-lg" style={{ color: d.color }}>
-                                                        {d.name === 'Mobile' ? 'smartphone' : d.name === 'Desktop' ? 'computer' : 'tablet'}
-                                                    </span>
-                                                    <p className="text-sm font-extrabold text-white mt-1">{d.value}%</p>
-                                                    <p className="text-[10px] text-slate-500">{d.name}</p>
-                                                </div>
-                                            ))}
-                                        </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {radar.devices?.map((d, i) => (
+                                            <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] text-center hover:bg-white/5 transition-all group/dev">
+                                                <span className="material-symbols-outlined text-lg group-hover/dev:scale-110 transition-transform block mb-1" style={{ color: d.color }}>
+                                                    {d.name === 'Mobile' ? 'smartphone' : d.name === 'Desktop' ? 'computer' : 'tablet'}
+                                                </span>
+                                                <p className="text-[11px] font-black text-white">{d.value}%</p>
+                                                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">{d.name}</p>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
@@ -919,16 +1078,16 @@ export default function UserDashboard() {
                     {/* ── 5. INTELLIGENCE HUB (TABBED) ── */}
                     <div className="glass-panel rounded-2xl border border-white/[0.06] overflow-hidden anim-slide-up" style={{ animationDelay: '350ms' }}>
                         {/* Tab bar */}
-                        <div className="flex border-b border-white/[0.06] bg-white/[0.01]">
+                        <div className="flex border-b border-white/[0.06] bg-white/[0.01] overflow-x-auto no-scrollbar scroll-smooth">
                             {intelTabs.map(tab => (
                                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                                    className={`intel-tab flex-1 px-2 sm:px-4 py-3 sm:py-3.5 text-[10px] sm:text-xs md:text-sm font-bold cursor-pointer flex items-center justify-center gap-1.5 sm:gap-2 border-b-2 ${activeTab === tab.id ? 'active border-violet-500' : 'text-slate-500 border-transparent hover:text-white hover:bg-white/[0.02]'}`}>
+                                    className={`intel-tab flex-1 min-w-[100px] sm:min-w-0 px-3 sm:px-4 py-3.5 text-[11px] sm:text-xs md:text-sm font-black cursor-pointer flex items-center justify-center gap-2 border-b-2 transition-all ${activeTab === tab.id ? 'active border-violet-500 text-white bg-violet-500/5' : 'text-slate-500 border-transparent hover:text-white hover:bg-white/[0.02]'}`}>
                                     {tab.label}
-                                    {tab.count > 0 && <span className="px-1.5 py-0.5 rounded-full bg-white/[0.06] text-xs">{tab.count}</span>}
+                                    {tab.count > 0 && <span className="px-1.5 py-0.5 rounded-full bg-white/[0.06] text-[10px] opacity-70 font-bold">{tab.count}</span>}
                                 </button>
                             ))}
                             <button onClick={() => { loadSummary(); loadTrends() }}
-                                className="px-4 text-slate-500 hover:text-white cursor-pointer transition-colors">
+                                className="px-5 text-slate-500 hover:text-white cursor-pointer transition-colors border-l border-white/[0.06] shrink-0">
                                 <span className={`material-symbols-outlined text-lg ${loadingSummary ? 'animate-spin' : ''}`}>refresh</span>
                             </button>
                         </div>
@@ -937,8 +1096,12 @@ export default function UserDashboard() {
                             {/* ── TRENDS TAB ── */}
                             {activeTab === 'trends' && (
                                 <div className="space-y-4">
-                                    {/* Grok AI Topics */}
-                                    {grokTrends.length > 0 && (
+                                    {loadingIntel ? (
+                                        <SkeletonHub />
+                                    ) : (
+                                        <>
+                                            {/* Grok AI Topics */}
+                                            {grokTrends.length > 0 && (
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
                                             {grokTrends.slice(0, 4).map((t, i) => (
                                                 <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-orange-500/20 transition-all"
@@ -988,20 +1151,37 @@ export default function UserDashboard() {
                                                         </div>
                                                     </div>
                                                     <button onClick={() => navigate(`/content-studio?goal=hijack&trend=${encodeURIComponent(trend.title)}&prompt=${encodeURIComponent(trend.contentIdea || `Create trending content about "${trend.title}"`)}`)}
-                                                        className="shrink-0 px-4 py-2 rounded-lg bg-rose-500/10 text-rose-400 text-sm font-bold hover:bg-rose-500/20 transition-all cursor-pointer opacity-50 group-hover:opacity-100 flex items-center gap-1.5 border border-rose-500/15">
-                                                        <span className="material-symbols-outlined text-sm">auto_awesome</span>Create
+                                                        className="shrink-0 px-4 py-2 rounded-lg bg-rose-500/10 text-rose-400 text-sm font-bold hover:bg-rose-500/20 transition-all cursor-pointer opacity-100 md:opacity-50 group-hover:opacity-100 flex items-center gap-1.5 border border-rose-500/15">
+                                                        <span className="material-symbols-outlined text-sm">auto_awesome</span>
+                                                        <span className="hidden xs:inline">Create</span>
                                                     </button>
                                                 </div>
                                             ))}
                                         </div>
-                                    ) : <p className="text-base text-slate-500 text-center py-4">Loading trends...</p>}
-                                </div>
+                                    ) : (
+                                        <p className="text-base text-slate-500 text-center py-4">No trends available yet.</p>
+                                    )}
+                                </>
                             )}
+                        </div>
+                    )}
 
                             {/* ── NEWS TAB ── */}
                             {activeTab === 'news' && (
                                 <div className="space-y-3">
-                                    {businessNews.length > 0 ? businessNews.slice(0, 5).map((n, i) => (
+                                    {loadingIntel ? (
+                                        [1, 2, 3].map(i => (
+                                            <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] space-y-3">
+                                                <div className="flex gap-3">
+                                                    <Skeleton className="size-8 rounded-lg shrink-0" />
+                                                    <div className="flex-1 space-y-2">
+                                                        <Skeleton className="h-5 w-full" />
+                                                        <Skeleton className="h-4 w-3/4" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : businessNews.length > 0 ? businessNews.slice(0, 5).map((n, i) => (
                                         <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-emerald-500/15 transition-all"
                                             style={{ animation: `slide-up 0.4s ease-out ${i * 80}ms both` }}>
                                             <div className="flex items-start gap-3">
@@ -1025,75 +1205,92 @@ export default function UserDashboard() {
                                 </div>
                             )}
 
-                            {/* ── TRIVIA TAB ── */}
-                            {activeTab === 'trivia' && (
-                                <div className="space-y-3">
-                                    {didYouKnow.length > 0 ? didYouKnow.slice(0, 4).map((d, i) => (
-                                        <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-amber-500/15 transition-all"
-                                            style={{ animation: `slide-up 0.4s ease-out ${i * 80}ms both` }}>
-                                            <div className="flex items-start gap-3">
-                                                <span className="text-2xl shrink-0 mt-0.5">{d.emoji || '💡'}</span>
-                                                <div className="flex-1 min-w-0">
-                                                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold mb-2 ${d.category === 'history' ? 'bg-orange-500/10 text-orange-400'
-                                                        : d.category === 'science' ? 'bg-cyan-500/10 text-cyan-400'
-                                                            : d.category === 'psychology' ? 'bg-violet-500/10 text-violet-400'
-                                                                : 'bg-emerald-500/10 text-emerald-400'}`}>{d.category}</span>
-                                                    <p className="text-sm text-slate-300 mb-2 leading-relaxed">{d.fact}</p>
-                                                    <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/10">
-                                                        <span className="material-symbols-outlined text-amber-400 text-sm mt-0.5 shrink-0">campaign</span>
-                                                        <p className="text-sm text-amber-300 font-medium">{d.postIdea}</p>
-                                                    </div>
-                                                    <button onClick={() => navigate(`/content-studio?topic=${encodeURIComponent(d.fact.substring(0, 100))}`)}
-                                                        className="mt-3 text-sm text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer transition-colors">
-                                                        <span className="material-symbols-outlined text-sm">edit_note</span>Create Post from This
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )) : <p className="text-base text-slate-500 text-center py-8">No trivia available yet. Refresh to fetch.</p>}
-                                </div>
-                            )}
+                             {/* ── TRIVIA TAB ── */}
+                             {activeTab === 'trivia' && (
+                                 <div className="space-y-3">
+                                     {loadingIntel ? (
+                                         [1, 2, 3, 4].map(i => (
+                                             <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] space-y-3">
+                                                 <div className="flex items-start gap-3">
+                                                     <Skeleton className="size-8 rounded-full shrink-0" />
+                                                     <div className="flex-1 space-y-2">
+                                                         <Skeleton className="h-4 w-1/4 rounded" />
+                                                         <Skeleton className="h-4 w-full" />
+                                                         <Skeleton className="h-12 w-full rounded-lg" />
+                                                     </div>
+                                                 </div>
+                                             </div>
+                                         ))
+                                     ) : didYouKnow.length > 0 ? (
+                                         didYouKnow.slice(0, 4).map((d, i) => (
+                                             <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-amber-500/15 transition-all"
+                                                 style={{ animation: `slide-up 0.4s ease-out ${i * 80}ms both` }}>
+                                                 <div className="flex items-start gap-3">
+                                                     <span className="text-2xl shrink-0 mt-0.5">{d.emoji || '💡'}</span>
+                                                     <div className="flex-1 min-w-0">
+                                                         <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold mb-2 ${d.category === 'history' ? 'bg-orange-500/10 text-orange-400'
+                                                             : d.category === 'science' ? 'bg-cyan-500/10 text-cyan-400'
+                                                                 : d.category === 'psychology' ? 'bg-violet-500/10 text-violet-400'
+                                                                     : 'bg-emerald-500/10 text-emerald-400'}`}>{d.category}</span>
+                                                         <p className="text-sm text-slate-300 mb-2 leading-relaxed">{d.fact}</p>
+                                                         <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/10">
+                                                             <span className="material-symbols-outlined text-amber-400 text-sm mt-0.5 shrink-0">campaign</span>
+                                                             <p className="text-sm text-amber-300 font-medium">{d.postIdea}</p>
+                                                         </div>
+                                                         <button onClick={() => navigate(`/content-studio?topic=${encodeURIComponent(d.fact.substring(0, 100))}`)}
+                                                             className="mt-3 text-sm text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer transition-colors">
+                                                             <span className="material-symbols-outlined text-sm">edit_note</span>Create Post from This
+                                                         </button>
+                                                     </div>
+                                                 </div>
+                                             </div>
+                                         ))
+                                     ) : (
+                                         <p className="text-base text-slate-500 text-center py-8">No trivia available yet. Refresh to fetch.</p>
+                                     )}
+                                 </div>
+                             )}
                         </div>
                     </div>
 
                     {/* ── 6. GROK CONTENT IDEAS ── */}
                     {grokContent.length > 0 && (
-                        <div className="glass-panel rounded-2xl p-5 lg:p-6 border border-cyan-500/15 anim-slide-up" style={{ animationDelay: '450ms' }}>
-                            <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
-                                <span className="material-symbols-outlined text-cyan-400">tips_and_updates</span>
-                                Content Ideas for You
-                                <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 text-xs font-bold">AI POWERED</span>
+                        <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 border border-cyan-500/15 anim-slide-up" style={{ animationDelay: '450ms' }}>
+                            <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2 mb-5">
+                                <span className="material-symbols-outlined text-cyan-400 shrink-0">tips_and_updates</span>
+                                <span className="truncate">Content Ideas for You</span>
+                                <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 text-[10px] font-black uppercase tracking-widest shrink-0">AI Powered</span>
                             </h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                                 {grokContent.slice(0, 4).map((s, i) => (
-                                    <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-cyan-500/15 transition-all"
+                                    <div key={i} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] hover:border-cyan-500/20 transition-all cursor-pointer group"
                                         style={{ animation: `slide-up 0.4s ease-out ${i * 60}ms both` }}>
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${s.platform === 'instagram' ? 'bg-pink-500/10 text-pink-400'
+                                        <div className="flex items-center gap-2 mb-2.5">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${s.platform === 'instagram' ? 'bg-pink-500/10 text-pink-400'
                                                 : s.platform === 'twitter' ? 'bg-sky-500/10 text-sky-400' : 'bg-slate-500/10 text-slate-400'}`}>{s.platform}</span>
-                                            <span className="text-sm text-slate-500">{s.format}</span>
-                                            {s.viralPotential === 'high' && <span className="text-sm text-orange-400">🔥 viral</span>}
+                                            <span className="text-[11px] text-slate-500 font-bold">{s.format}</span>
+                                            {s.viralPotential === 'high' && <span className="text-[11px] text-orange-400 font-bold ml-auto flex items-center gap-1">🔥 Viral</span>}
                                         </div>
-                                        <h4 className="text-base font-bold text-white mb-1">{s.title}</h4>
-                                        <p className="text-sm text-slate-400 mb-2 line-clamp-2">{s.hook}</p>
-                                        {s.trendConnection && <p className="text-sm text-emerald-400">📈 {s.trendConnection}</p>}
+                                        <h4 className="text-base font-bold text-white mb-1.5 group-hover:text-cyan-400 transition-colors leading-tight">{s.title}</h4>
+                                        <p className="text-sm text-slate-400 mb-2 line-clamp-2 leading-relaxed">{s.hook}</p>
+                                        {s.trendConnection && <p className="text-xs text-emerald-400 font-black tracking-wide">📈 {s.trendConnection.toUpperCase()}</p>}
                                     </div>
                                 ))}
                             </div>
                         </div>
                     )}
 
-                    {/* ── 7. UPCOMING EVENTS CAROUSEL ── */}
+                    {/* ── 7. UPCOMING OPPORTUNITIES CAROUSEL ── */}
                     {upcoming.length > 0 && (
-                        <div className="glass-panel rounded-2xl p-5 lg:p-6 anim-slide-up" style={{ animationDelay: '500ms' }}>
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-amber-400">celebration</span>
-                                    Upcoming Opportunities
+                        <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 anim-slide-up" style={{ animationDelay: '500ms' }}>
+                            <div className="flex items-center justify-between mb-5">
+                                <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-amber-400 shrink-0">celebration</span>
+                                    <span className="truncate">Upcoming Opportunities</span>
                                 </h3>
-                                <button onClick={() => navigate('/smart-calendar')} className="text-sm text-primary hover:text-primary-light transition-colors cursor-pointer font-bold">View Calendar →</button>
+                                <button onClick={() => navigate('/smart-calendar')} className="text-xs sm:text-sm text-primary hover:text-primary-light transition-colors cursor-pointer font-black uppercase tracking-wider shrink-0">View All →</button>
                             </div>
-                            <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin">
+                            <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar scroll-smooth -mx-1 px-1">
                                 {upcoming.slice(0, 8).map((e, i) => {
                                     const color = EVENT_COLORS[e.type] || EVENT_COLORS.global
                                     return (
@@ -1116,36 +1313,38 @@ export default function UserDashboard() {
                     )}
 
                     {/* ── 8. YOUR BRANDS ── */}
-                    <div className="glass-panel rounded-2xl p-5 lg:p-6 anim-slide-up" style={{ animationDelay: '550ms' }}>
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                <span className="material-symbols-outlined text-primary">storefront</span>Your Brands
+                    <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 anim-slide-up" style={{ animationDelay: '550ms' }}>
+                        <div className="flex items-center justify-between mb-5">
+                            <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary shrink-0">storefront</span>Your Brands
                             </h3>
-                            <button onClick={() => navigate('/onboarding')} className="text-sm text-primary hover:text-primary-light transition-colors cursor-pointer font-bold flex items-center gap-1">
+                            <button onClick={() => navigate('/onboarding')} className="px-3 py-1.5 text-xs font-black text-primary hover:bg-primary/10 transition-all cursor-pointer flex items-center gap-1 rounded-lg border border-primary/20 bg-primary/5 uppercase tracking-wider">
                                 <span className="material-symbols-outlined text-sm">add</span>Add
                             </button>
                         </div>
                         {brandsLoading ? (
-                            <div className="flex items-center justify-center py-8 text-slate-500"><span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>Loading...</div>
+                            <SkeletonBrands />
                         ) : brands.length === 0 ? (
-                            <div className="text-center py-8">
-                                <span className="material-symbols-outlined text-4xl text-slate-600 mb-2 block">storefront</span>
-                                <p className="text-base text-slate-400 mb-3">No brands yet. Create your first brand!</p>
-                                <button onClick={() => navigate('/onboarding')} className="btn-primary py-2.5 px-6 rounded-xl text-base">Create Brand</button>
+                            <div className="text-center py-10 border-2 border-dashed border-white/5 rounded-2xl">
+                                <div className="size-16 rounded-full bg-white/[0.02] flex items-center justify-center mx-auto mb-4 border border-white/5">
+                                    <span className="material-symbols-outlined text-3xl text-slate-600">storefront</span>
+                                </div>
+                                <p className="text-base font-bold text-white mb-4">No brands yet.</p>
+                                <button onClick={() => navigate('/onboarding')} className="btn-primary py-3 px-8 rounded-xl text-sm font-black uppercase tracking-widest">Create Brand</button>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                                 {brands.map((brand, i) => (
                                     <div key={brand._id} onClick={() => { selectBrand(brand); navigate('/nexus') }}
-                                        className={`flex items-center gap-3 p-4 rounded-xl border transition-all cursor-pointer hover:bg-white/[0.04] hover:scale-[1.01] ${activeBrand?._id === brand._id ? 'border-primary/30 bg-primary/5' : 'border-white/[0.06] bg-white/[0.02]'}`}
+                                        className={`flex items-center gap-4 p-4 rounded-xl border transition-all cursor-pointer hover:bg-white/[0.05] hover:scale-[1.02] hover:shadow-2xl shadow-primary/5 ${activeBrand?._id === brand._id ? 'border-primary/40 bg-primary/10' : 'border-white/[0.06] bg-white/[0.02]'}`}
                                         style={{ animation: `slide-up 0.4s ease-out ${i * 50}ms both` }}>
-                                        <div className="size-12 rounded-xl flex items-center justify-center font-bold text-white text-lg shrink-0"
-                                            style={{ background: brand.dna?.colors?.[0]?.hex || '#2B4BEE' }}>{brand.name?.charAt(0)?.toUpperCase()}</div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-base font-bold text-white truncate">{brand.name}</p>
-                                            <p className="text-sm text-slate-500 truncate">{brand.website || brand.dna?.industry || 'No details'}</p>
+                                        <div className="size-12 sm:size-14 rounded-2xl flex items-center justify-center font-black text-white text-xl shrink-0 shadow-lg"
+                                            style={{ background: brand.dna?.colors?.[0]?.hex || '#2B4BEE', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>{brand.name?.charAt(0)?.toUpperCase()}</div>
+                                        <div className="flex-1 min-w-0" style={{ pointerEvents: 'none' }}>
+                                            <p className="text-base font-black text-white truncate">{brand.name}</p>
+                                            <p className="text-[11px] sm:text-xs text-slate-500 font-bold truncate uppercase tracking-tight mt-0.5">{brand.website || brand.dna?.industry || 'Uncategorized'}</p>
                                         </div>
-                                        <span className="material-symbols-outlined text-slate-600">chevron_right</span>
+                                        <span className="material-symbols-outlined text-slate-600 group-hover:text-primary transition-colors shrink-0">chevron_right</span>
                                     </div>
                                 ))}
                             </div>
@@ -1159,17 +1358,17 @@ export default function UserDashboard() {
                 <div className="col-span-12 lg:col-span-4 space-y-6">
 
                     {/* ── STUDIOS GRID ── */}
-                    <div className="glass-panel rounded-2xl p-5 lg:p-6 anim-slide-up" style={{ animationDelay: '200ms' }}>
-                        <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
-                            <span className="material-symbols-outlined text-primary">apps</span>Studios
+                    <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 anim-slide-up" style={{ animationDelay: '200ms' }}>
+                        <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2 mb-5">
+                            <span className="material-symbols-outlined text-primary shrink-0">apps</span>Studios
                         </h3>
-                        <div className="grid grid-cols-2 gap-2.5">
+                        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                             {studios.map((a, i) => (
                                 <button key={i} onClick={() => navigate(a.path)}
-                                    className={`studio-card flex items-center gap-3 p-3.5 rounded-xl bg-gradient-to-br ${a.bg} border border-white/[0.04] hover:border-white/[0.15] cursor-pointer text-left`}
+                                    className={`studio-card flex flex-col xs:flex-row items-center gap-2 sm:gap-3 p-3.5 rounded-xl bg-gradient-to-br ${a.bg} border border-white/[0.04] hover:border-white/[0.15] cursor-pointer text-center xs:text-left active:scale-95 transition-all duration-300`}
                                     style={{ animation: `slide-up 0.4s ease-out ${i * 50}ms both` }}>
-                                    <span className="material-symbols-outlined text-xl" style={{ color: a.color }}>{a.icon}</span>
-                                    <span className="text-base text-white font-medium">{a.label}</span>
+                                    <span className="material-symbols-outlined text-xl sm:text-2xl" style={{ color: a.color }}>{a.icon}</span>
+                                    <span className="text-xs sm:text-sm md:text-base text-white font-black uppercase tracking-tight">{a.label}</span>
                                 </button>
                             ))}
                         </div>
@@ -1183,18 +1382,20 @@ export default function UserDashboard() {
                             </h3>
                             {d2cSnapshot?.connected && <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Live</span>}
                         </div>
-                        {d2cSnapshot?.connected ? (
+                        {loadingD2C ? (
+                            <SkeletonPulse />
+                        ) : d2cSnapshot?.connected ? (
                             <>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
+                                <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-5">
                                     {[
                                         { label: 'Revenue', value: `₹${(d2cSnapshot.weeklyRevenue || 0).toLocaleString()}`, icon: 'payments', color: '#34d399' },
                                         { label: 'Orders', value: d2cSnapshot.weeklyOrders || 0, icon: 'shopping_bag', color: '#8b5cf6' },
                                         { label: 'AOV', value: `₹${d2cSnapshot.aov || 0}`, icon: 'trending_up', color: '#06b6d4' },
                                     ].map((m, i) => (
-                                        <div key={i} className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04] text-center">
-                                            <span className="material-symbols-outlined text-sm block mb-1" style={{ color: m.color }}>{m.icon}</span>
-                                            <p className="text-lg font-extrabold text-white">{m.value}</p>
-                                            <p className="text-[10px] text-slate-500 uppercase">{m.label}</p>
+                                        <div key={i} className="p-2 sm:p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] text-center hover:bg-white/[0.04] transition-all">
+                                            <span className="material-symbols-outlined text-xs sm:text-sm block mb-1.5" style={{ color: m.color }}>{m.icon}</span>
+                                            <p className="text-sm sm:text-lg font-black text-white">{m.value}</p>
+                                            <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-widest">{m.label}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -1271,13 +1472,13 @@ export default function UserDashboard() {
                         }
 
                         return alerts.length > 0 ? (
-                            <div className="glass-panel rounded-2xl p-5 lg:p-6 border border-rose-500/15 anim-slide-up" style={{ animationDelay: '275ms' }}>
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
-                                    <span className="material-symbols-outlined text-rose-400">notifications_active</span>
-                                    Red Flags
-                                    <span className="px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 text-xs font-bold">{alerts.length}</span>
+                            <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 border border-rose-500/15 anim-slide-up" style={{ animationDelay: '275ms' }}>
+                                <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2 mb-5">
+                                    <span className="material-symbols-outlined text-rose-400 shrink-0">notifications_active</span>
+                                    <span className="truncate">Red Flags</span>
+                                    <span className="px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 text-[10px] font-black">{alerts.length}</span>
                                 </h3>
-                                <div className="space-y-2.5">
+                                <div className="space-y-3">
                                     {alerts.slice(0, 5).map((a, i) => (
                                         <button key={i} onClick={() => navigate(a.path)}
                                             className="w-full flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-rose-500/20 transition-all text-left cursor-pointer group"
@@ -1309,9 +1510,9 @@ export default function UserDashboard() {
 
                     {/* ── SEO KEYWORD NUGGETS ── */}
                     {grokSeo?.risingKeywords?.length > 0 && (
-                        <div className="glass-panel rounded-2xl p-5 lg:p-6 border border-amber-500/10 anim-slide-up" style={{ animationDelay: '300ms' }}>
-                            <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
-                                <span className="material-symbols-outlined text-amber-400">search</span>Trending Keywords
+                        <div className="glass-panel rounded-2xl p-4 sm:p-5 lg:p-6 border border-amber-500/10 anim-slide-up" style={{ animationDelay: '300ms' }}>
+                            <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2 mb-5">
+                                <span className="material-symbols-outlined text-amber-400 shrink-0">search</span>Trending Keywords
                             </h3>
                             <div className="space-y-2.5">
                                 {grokSeo.risingKeywords.slice(0, 5).map((k, i) => (
@@ -1381,27 +1582,28 @@ export default function UserDashboard() {
             </div>
 
             {/* ═══════════════════════════════════════════════════════════════ */}
-            {/* QUICK ACTION FLOATING BAR                                       */}
-            {/* ═══════════════════════════════════════════════════════════════ */}
-            <div className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-2xl border border-white/[0.08] backdrop-blur-xl w-auto max-w-[calc(100%-2rem)] overflow-x-auto no-scrollbar"
-                style={{ background: 'rgba(15,15,25,0.85)', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}>
+            {/* QUICK ACTION FLOATING BAR */}
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-2xl border border-white/[0.12] backdrop-blur-2xl w-auto max-w-[calc(100%-2.5rem)] overflow-x-auto no-scrollbar shadow-[0_20px_50px_rgba(0,0,0,0.6)] group/bar hover:scale-[1.02] transition-transform duration-500"
+                style={{ background: 'rgba(15,15,30,0.85)' }}>
                 {[
-                    { icon: 'edit_note', label: 'New Post', path: '/content-studio', color: '#34d399' },
-                    { icon: 'auto_fix_high', label: 'Generate Image', path: '/creative-studio', color: '#ec4899' },
-                    { icon: 'psychology', label: 'Brainstorm', path: '/brainstorm', color: '#8b5cf6' },
-                    { icon: 'movie', label: 'Create Video', path: '/video-studio', color: '#f59e0b' },
+                    { icon: 'edit_note', label: 'Draft', path: '/content-studio', color: '#34d399' },
+                    { icon: 'brush', label: 'Design', path: '/creative-studio', color: '#ec4899' },
+                    { icon: 'psychology', label: 'Brain', path: '/brainstorm', color: '#8b5cf6' },
+                    { icon: 'movie', label: 'Clip', path: '/video-studio', color: '#f59e0b' },
                 ].map((a, i) => (
                     <button key={i} onClick={() => navigate(a.path)}
-                        className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl hover:bg-white/[0.06] transition-all cursor-pointer group flex-shrink-0"
+                        className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl hover:bg-white/[0.08] transition-all cursor-pointer group flex-shrink-0 relative overflow-hidden active:scale-95"
                         title={a.label}>
-                        <span className="material-symbols-outlined text-base sm:text-lg transition-transform group-hover:scale-110" style={{ color: a.color }}>{a.icon}</span>
-                        <span className="text-[10px] sm:text-sm font-medium text-slate-400 group-hover:text-white transition-colors hidden sm:inline">{a.label}</span>
+                        <div className="absolute inset-0 bg-white/[0.02] opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <span className="material-symbols-outlined text-xl sm:text-2xl group-hover:scale-110 transition-transform duration-300" style={{ color: a.color }}>{a.icon}</span>
+                        <span className="text-[9px] sm:text-xs font-black uppercase tracking-tighter sm:tracking-widest text-slate-300 group-hover:text-white transition-colors">{a.label}</span>
                     </button>
                 ))}
             </div>
 
             {/* Bottom spacer for floating bar */}
             <div className="h-20" />
+            
             {/* Cinematic Intel Report Overlay */}
             {showIntelReport && intelReport && (
                 <IntelReportViewer
