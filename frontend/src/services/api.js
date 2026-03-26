@@ -410,6 +410,28 @@ export const retentionStudio = {
     testEmail: (id, email) => apiFetch(`/retention-studio/${id}/test-email`, { method: 'POST', body: JSON.stringify({ email }) }),
     generateImage: (id, data) => apiFetch(`/retention-studio/${id}/generate-image`, { method: 'POST', body: JSON.stringify(data) }),
     delete: (id) => apiFetch(`/retention-studio/${id}`, { method: 'DELETE' }),
+
+    // RFM & Segmentation (Phase 1)
+    rfmAnalysis: (brandId) => apiFetch(`/retention-studio/rfm?brandId=${brandId}`),
+    rfmSegment: (key, brandId) => apiFetch(`/retention-studio/rfm/${key}?brandId=${brandId}`),
+    
+    // Templates
+    templates: () => apiFetch('/retention-studio/templates'),
+    templateCategories: () => apiFetch('/retention-studio/templates/categories'),
+
+    // Intelligence
+    winbackCandidates: (brandId) => apiFetch(`/retention-studio/winback?brandId=${brandId}`),
+    priceDrops: (brandId) => apiFetch(`/retention-studio/price-drops?brandId=${brandId}`),
+    recentBuyers: (brandId) => apiFetch(`/retention-studio/recent-buyers?brandId=${brandId}`),
+
+    // Contacts
+    unifiedContacts: (brandId) => apiFetch(`/retention-studio/contacts/unified?brandId=${brandId}`),
+
+    // Channels & Widget
+    smsStatus: () => apiFetch('/retention-studio/sms/status'),
+    pushStatus: () => apiFetch('/retention-studio/push/status'),
+    widgetEmbed: (brandId) => apiFetch(`/retention-studio/widget/embed?brandId=${brandId}`),
+    browseTrackerStats: () => apiFetch('/retention-studio/track/stats'),
 };
 
 // ============ Admin API ============
