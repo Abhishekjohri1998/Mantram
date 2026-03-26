@@ -248,7 +248,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                     />
 
                     {/* ── Side Panel ── */}
-                    <div className="fidato-panel-slide" style={{
+                    <div className="fidato-panel-slide fidato-panel-container" style={{
                         position: 'relative',
                         width: '520px',
                         maxWidth: '92vw',
@@ -722,6 +722,17 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                 .fidato-content::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.2); border-radius: 4px; }
                 .fidato-content::-webkit-scrollbar-thumb:hover { background: rgba(139,92,246,0.4); }
                 .fidato-deploy-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+                
+                /* ── Fidato Mobile Responsive ── */
+                @media (max-width: 768px) {
+                    .fidato-panel-container {
+                        width: 100% !important;
+                        max-width: 100% !important;
+                        border-radius: 0 !important;
+                    }
+                    .fidato-content { padding: 12px 14px !important; }
+                    .fidato-mission-card { padding: 12px !important; }
+                }
             `}</style>
         </>
     )

@@ -1895,25 +1895,105 @@
     bottom: 0;
 }
 
-/* Responsive */
+/* ═══════════════════════════════════════════════════════
+   CANVAS RESPONSIVE — iPad, Tablet, Mobile
+═══════════════════════════════════════════════════════ */
+
+/* ── iPad (≤1024px) ── */
+@media (max-width: 1024px) {
+    .ce-content-panel {
+        width: 240px;
+    }
+    .ce-content-panel-inner {
+        width: 240px;
+    }
+    .ce-sidebar-right {
+        width: 240px;
+    }
+    .ce-icon-rail {
+        width: 48px;
+    }
+    .ce-rail-btn {
+        width: 40px;
+        height: 40px;
+    }
+    .ce-rail-btn .ce-rail-label {
+        font-size: 7px;
+    }
+    .ce-toolbar {
+        padding: 0 10px;
+    }
+    .ce-save-btn {
+        padding: 5px 12px;
+        font-size: 12px;
+    }
+}
+
+/* ── Mobile (≤768px) ── */
 @media (max-width: 768px) {
 
-    .ce-sidebar-left,
+    /* Hide desktop sidebars */
+    .ce-sidebar-left {
+        display: none;
+    }
+
     .ce-sidebar-right {
         display: none;
     }
 
+    /* Toolbar compact */
     .ce-toolbar {
+        height: 44px;
         padding: 0 8px;
+        gap: 4px;
     }
 
     .ce-toolbar-center {
         display: none;
     }
 
+    .ce-mode-toggle {
+        display: none;
+    }
+
+    .ce-back-btn span:not(.material-symbols-outlined) {
+        display: none;
+    }
+
+    .ce-save-btn span:not(.material-symbols-outlined) {
+        display: none;
+    }
+
+    .ce-save-btn {
+        padding: 6px 10px;
+        border-radius: 8px;
+    }
+
+    .ce-tool-btn {
+        width: 36px;
+        height: 36px;
+    }
+
+    .ce-tool-btn-label {
+        padding: 4px 8px;
+        font-size: 11px;
+    }
+
+    .ce-divider {
+        margin: 0 2px;
+        height: 16px;
+    }
+
+    /* Canvas workspace full width */
+    .ce-canvas-area {
+        width: 100% !important;
+    }
+
+    /* Bottom bar compact */
     .ce-bottom-bar {
         gap: 4px;
         padding: 0 8px;
+        height: 36px;
     }
 
     .ce-preset-btn {
@@ -1921,6 +2001,7 @@
         padding: 4px 8px;
     }
 
+    /* Simple mode tools */
     .ce-simple-tools {
         padding: 8px;
         gap: 4px;
@@ -1929,6 +2010,159 @@
     .ce-simple-tool {
         padding: 8px 10px;
         min-width: 56px;
+    }
+
+    /* ── Mobile Panel Drawer ── */
+    .ce-mobile-drawer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 200;
+        background: #ffffff;
+        border-top: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 16px 16px 0 0;
+        box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
+        max-height: 60vh;
+        overflow-y: auto;
+        transform: translateY(100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+
+    .ce-mobile-drawer.open {
+        transform: translateY(0);
+    }
+
+    .ce-mobile-drawer-handle {
+        width: 36px;
+        height: 4px;
+        background: rgba(0, 0, 0, 0.15);
+        border-radius: 2px;
+        margin: 8px auto;
+    }
+
+    .ce-mobile-drawer-content {
+        padding: 0 12px 16px;
+    }
+
+    /* ── Mobile Bottom Action Bar ── */
+    .ce-mobile-action-bar {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 150;
+        background: #ffffff;
+        border-top: 1px solid rgba(0, 0, 0, 0.08);
+        padding: 6px 8px;
+        padding-bottom: calc(6px + env(safe-area-inset-bottom, 0));
+        gap: 2px;
+        justify-content: space-around;
+        align-items: center;
+    }
+
+    .ce-mobile-action-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        padding: 6px 8px;
+        border: none;
+        background: transparent;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.15s;
+        color: #6e6e73;
+        min-width: 48px;
+    }
+
+    .ce-mobile-action-btn:hover,
+    .ce-mobile-action-btn.active {
+        background: rgba(0, 0, 0, 0.05);
+        color: #1d1d1f;
+    }
+
+    .ce-mobile-action-btn .material-symbols-outlined {
+        font-size: 22px;
+    }
+
+    .ce-mobile-action-label {
+        font-size: 9px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    /* Properties panel as bottom sheet */
+    .ce-properties-panel-mobile {
+        position: fixed;
+        bottom: 56px;
+        left: 0;
+        right: 0;
+        z-index: 180;
+        background: #ffffff;
+        border-top: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 12px 12px 0 0;
+        max-height: 45vh;
+        overflow-y: auto;
+        box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.08);
+        padding: 12px;
+    }
+
+    /* Fidato chat in canvas — full screen overlay */
+    .ce-ai-panel {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 300 !important;
+        width: 100% !important;
+        height: 100% !important;
+        border-radius: 0 !important;
+    }
+
+    /* Element grid in mobile drawer */
+    .ce-element-grid {
+        grid-template-columns: repeat(4, 1fr) !important;
+    }
+
+    /* Photo grid compact */
+    .ce-photo-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 4px;
+    }
+}
+
+/* ── Small Phone (≤480px) ── */
+@media (max-width: 480px) {
+    .ce-toolbar {
+        height: 40px;
+    }
+
+    .ce-mobile-action-btn {
+        min-width: 42px;
+        padding: 4px 6px;
+    }
+
+    .ce-mobile-action-btn .material-symbols-outlined {
+        font-size: 20px;
+    }
+
+    .ce-mobile-action-label {
+        font-size: 8px;
+    }
+
+    .ce-element-grid {
+        grid-template-columns: repeat(3, 1fr) !important;
+    }
+}
+
+/* Hide mobile-only elements on desktop */
+@media (min-width: 769px) {
+    .ce-mobile-drawer,
+    .ce-mobile-action-bar,
+    .ce-mobile-action-btn,
+    .ce-properties-panel-mobile {
+        display: none !important;
     }
 }
 
