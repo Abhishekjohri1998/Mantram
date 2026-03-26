@@ -2,7 +2,7 @@
  * Performance Marketing Studio — Agent Nodes
  * 
  * Each node: (state) → updatedState
- * Uses Claude Sonnet for AI analysis and strategy.
+ * Uses router (auto-selects cheapest provider) for AI analysis and strategy.
  */
 
 import Brand from '../../models/Brand.js';
@@ -39,7 +39,7 @@ function buildBrandCtx(brand) {
     ].filter(Boolean).join('\n');
 }
 
-// ── Helper: Call Claude and parse JSON response ──
+// ── Helper: Call AI via router (cheapest provider) and parse JSON response ──
 async function callAgent(systemPrompt, userPrompt, temperature = 0.7) {
     const router = getRouter();
     const result = await router.generateText({

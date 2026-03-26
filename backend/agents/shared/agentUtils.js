@@ -14,7 +14,7 @@ import { getRouter } from '../../ai/router.js';
 import { resolveTargetMarkets, getMarketContext, getRelevantFestivals } from '../../utils/globalCalendar.js';
 
 /**
- * Call Claude Sonnet and parse JSON response
+ * Call AI via router (auto-selects cheapest provider) and parse JSON response
  */
 export async function callAgent(systemPrompt, userPrompt, temperature = 0.7, maxTokens = 4096) {
     const router = getRouter();
@@ -36,7 +36,7 @@ export async function callAgent(systemPrompt, userPrompt, temperature = 0.7, max
 }
 
 /**
- * Call Claude and return raw text (not JSON)
+ * Call AI via router and return raw text (not JSON)
  */
 export async function callAgentText(systemPrompt, userPrompt, temperature = 0.7, maxTokens = 4096) {
     const router = getRouter();

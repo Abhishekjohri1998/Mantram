@@ -55,14 +55,16 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
   const overallController = new AbortController();
   const overallTimer = setTimeout(() => overallController.abort(), timeout);
 
-  const defaultProvider = process.env.DEFAULT_TEXT_PROVIDER || 'anthropic';
+  // Cost optimization: default to Gemini (free/cheapest), Claude only as last resort
+  const defaultProvider = process.env.DEFAULT_TEXT_PROVIDER || 'gemini';
   const defaultModel = process.env.DEFAULT_TEXT_MODEL;
   
+  // Provider priority: cheapest → most expensive
   const providers = [
-    { name: 'anthropic', key: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY },
-    { name: 'openai', key: process.env.OPENAI_API_KEY },
-    { name: 'xai', key: process.env.GROK_API_KEY || process.env.XAI_API_KEY },
     { name: 'gemini', key: process.env.GEMINI_API_KEY || process.env.GEMINI_IMAGE_API_KEY },
+    { name: 'xai', key: process.env.GROK_API_KEY || process.env.XAI_API_KEY },
+    { name: 'openai', key: process.env.OPENAI_API_KEY },
+    { name: 'anthropic', key: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY },
   ];
 
   const sortedProviders = [
