@@ -556,7 +556,7 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
             const pr = data.pageReports || []
             if (pr.length) {
                 body += `<div class="section-break"></div><h2><span class="h2-icon">📄</span> Per-Page Analysis <span class="count-badge">${pr.length} pages</span></h2>
-                <table><thead><tr><th style="width:40%">Page</th><th>Response</th><th>Size</th><th>Words</th><th>Issues</th></tr></thead><tbody>`
+                <table><thead><tr><th style="width:40%">Page</th><th>Status</th><th>Response</th><th>Size</th><th>Words</th><th>Issues</th></tr></thead><tbody>`
                 pr.forEach((p, i) => {
                     const issues = []
                     if (!p.hasH1) issues.push('No H1')
@@ -567,9 +567,27 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
                     if (p.metaDescLength === 0) issues.push('No Meta')
                     if (p.wordCount < 300 && p.wordCount > 0) issues.push('Thin')
                     if (p.responseTimeMs > 3000) issues.push('Slow')
-                    body += `<tr class="${i % 2 ? 'alt-row' : ''}"><td><strong>${(p.title || 'Untitled').substring(0, 45)}</strong><br><small>${(p.url || '').substring(0, 65)}</small></td><td>${p.responseTimeMs}ms</td><td>${p.pageSizeKB}KB</td><td>${p.wordCount}</td><td>${issues.length ? `<span class="issue-pill">${issues.join(', ')}</span>` : '<span class="ok-pill">✅ OK</span>'}</td></tr>`
+                    const statusClass = (p.statusCode || 200) >= 400 ? 'status-4xx' : (p.statusCode || 200) >= 300 ? 'status-3xx' : 'status-2xx'
+                    body += `<tr class="${i % 2 ? 'alt-row' : ''}"><td><strong>${(p.title || 'Untitled').substring(0, 45)}</strong><br><a href="${p.url || '#'}" target="_blank" style="color:#6366f1;text-decoration:none;font-size:10px;word-break:break-all">${(p.url || '').substring(0, 75)}</a></td><td><span class="status-pill ${statusClass}">${p.statusCode || 200}</span></td><td>${p.responseTimeMs}ms</td><td>${p.pageSizeKB}KB</td><td>${p.wordCount}</td><td>${issues.length ? `<span class="issue-pill">${issues.join(', ')}</span>` : '<span class="ok-pill">✅ OK</span>'}</td></tr>`
                 })
                 body += `</tbody></table>`
+            }
+
+            // All Crawled URLs — Full list with clickable links
+            const crawledUrls = data.crawledUrls || data.researchSources || []
+            if (crawledUrls.length > 0) {
+                body += `<div class="section-break"></div><h2><span class="h2-icon">🔗</span> All Crawled URLs <span class="count-badge">${crawledUrls.length} pages</span></h2>
+                <p style="font-size:11px;color:#64748b;margin-bottom:12px">Every URL below was discovered from your sitemap.xml, robots.txt, and internal links — then actually fetched by our crawler. Click any URL to verify it exists.</p>
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;max-height:600px;overflow-y:auto">
+                <ol style="padding-left:28px;margin:0">`
+                crawledUrls.forEach((url, i) => {
+                    // Find matching page report for status
+                    const pageData = pr.find(p => p.url === url)
+                    const status = pageData?.statusCode || 200
+                    const statusIcon = status >= 400 ? '❌' : status >= 300 ? '⚠️' : '✅'
+                    body += `<li style="margin:3px 0;font-size:10px;line-height:1.6"><span style="margin-right:4px">${statusIcon}</span><a href="${url}" target="_blank" style="color:#6366f1;text-decoration:none;word-break:break-all">${url}</a>${status !== 200 ? ` <span class="status-pill ${status >= 400 ? 'status-4xx' : 'status-3xx'}" style="font-size:8px;padding:1px 6px">${status}</span>` : ''}</li>`
+                })
+                body += `</ol></div>`
             }
 
             // Algorithm Risks
