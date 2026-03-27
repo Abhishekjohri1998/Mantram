@@ -8,6 +8,9 @@ import VoiceInput from '../components/VoiceInput'
 import GlobalLoader from '../components/GlobalLoader'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
 import PublishModal from '../components/PublishModal'
+import { useCallback, lazy, Suspense } from 'react'
+
+const BlogEditor = lazy(() => import('../components/BlogEditor'))
 
 // ============================================================================
 // DATA: Goals, sub-types, channels, tones
@@ -63,6 +66,16 @@ const GOALS = [
             { id: 'case_study', icon: 'assignment', label: 'Case Study' },
             { id: 'how_to', icon: 'menu_book', label: 'How-To Guide' },
             { id: 'tips', icon: 'tips_and_updates', label: 'Tips & Listicle' },
+        ],
+    },
+    {
+        id: 'write_blog', icon: 'edit_note', label: 'Write Blog',
+        desc: 'AI-powered blog with rich text editor — publish-ready',
+        color: 'from-amber-500/20 to-orange-500/10', accent: '#D97706',
+        subTypes: [
+            { id: 'seo_blog', icon: 'search', label: 'SEO Blog Article' },
+            { id: 'case_study_blog', icon: 'assignment', label: 'Case Study' },
+            { id: 'how_to_blog', icon: 'menu_book', label: 'How-To Guide' },
         ],
     },
     {
@@ -2643,6 +2656,23 @@ export default function ContentStudio() {
         { id: 'auto', label: 'Auto (Recommended)', icon: 'auto_awesome', desc: 'AI picks the best model' },
     ])
 
+    // Blog Module State
+    const [blogBrief, setBlogBrief] = useState('')
+    const [blogHtml, setBlogHtml] = useState('')
+    const [blogTitle, setBlogTitle] = useState('')
+    const [blogGenerating, setBlogGenerating] = useState(false)
+    const [selectedKeywords, setSelectedKeywords] = useState([])
+    const [trendingData, setTrendingData] = useState(null)
+
+    const abortControllerRef = useRef(null)
+    const activeBrandIdRef = useRef(activeBrand?._id)
+
+    const getSignal = useCallback(() => {
+        if (abortControllerRef.current) abortControllerRef.current.abort()
+        abortControllerRef.current = new AbortController()
+        return abortControllerRef.current.signal
+    }, [])
+
     // Fetch available providers on mount
     useEffect(() => {
         contentAPI.providers()
@@ -2705,6 +2735,7 @@ export default function ContentStudio() {
             else if (/festival|diwali|christmas|celebrat|occasion|milestone|holi|eid|navratri/.test(lower)) detectedGoal = 'celebrate'
             else if (/launch|new|announce|pr |press|collab/.test(lower)) detectedGoal = 'launch'
             else if (/blog|seo|article|guide|how.to|educat|tip/.test(lower)) detectedGoal = 'educate'
+            else if (/blog|seo.?article|how.?to.?guide|listicle|write.?a.?post/.test(lower)) detectedGoal = 'write_blog'
             else if (/brand|story|about|tagline|website|vision/.test(lower)) detectedGoal = 'brand'
             else if (/youtube|yt |video script|shorts script/.test(lower)) detectedGoal = 'youtube_content'
 
@@ -2721,6 +2752,10 @@ export default function ContentStudio() {
             if (detectedGoal === 'youtube_content') {
                 setGoal('youtube_content')
                 setStep(1)  // Show YouTube sub-types (Script vs SEO)
+            } else if (detectedGoal === 'write_blog') {
+                setGoal('write_blog')
+                setBlogBrief(prompt)
+                setStep(12)  // Jump to blog input
             } else if (detectedGoal) {
                 setGoal(detectedGoal)
                 if (detectedChannel) {
@@ -2738,7 +2773,11 @@ export default function ContentStudio() {
 
     // Smart input handler
     const handleSmartParse = (parsed) => {
-        if (parsed.goal) {
+        if (parsed.goal === 'write_blog') {
+            setGoal('write_blog')
+            setBlogBrief(parsed.rawInput)
+            setStep(12)
+        } else if (parsed.goal) {
             setGoal(parsed.goal)
             if (parsed.channel) {
                 setChannel(parsed.channel)
@@ -2909,6 +2948,36 @@ export default function ContentStudio() {
             type: goal || 'social',
         })
         navigate(`/creative-studio?${params.toString()}`)
+    }
+
+    // Blog Generation Handler
+    const handleGenerateBlog = async () => {
+        if (!blogBrief.trim()) { setError({ message: 'Please enter a topic or brief.' }); return }
+        setBlogGenerating(true); setGenerating(true); setError(null)
+        try {
+            const blogType = subType ? `\nBLOG TYPE: ${GOALS.find(g => g.id === 'write_blog')?.subTypes?.find(s => s.id === subType)?.label || subType}` : ''
+            const data = await contentAPI.generate({
+                type: 'blog',
+                brandId: activeBrand?._id,
+                prompt: `INTENT: Write a comprehensive, SEO-optimized blog article${blogType}\n\nTOPIC/BRIEF: ${blogBrief}\n\nSTYLE: Use a professional yet engaging tone. Include a clear H1 title, H2 subheadings, and a conclusion.`,
+                model: modelOverride,
+                signal: getSignal()
+            })
+            
+            if (data.success) {
+                const titleMatch = data.content.match(/^# (.*?)($|\n)/m) || data.content.match(/^TITLE: (.*?)($|\n)/mi)
+                setBlogTitle(titleMatch ? titleMatch[1] : blogBrief.split('|')[0].trim().slice(0, 50))
+                setBlogHtml(data.content)
+                setStep(13)
+            } else {
+                setError({ message: data.error || 'Blog generation failed.', isProviderError: data.isProviderError, provider: data.provider })
+            }
+        } catch (err) {
+            if (err.name === 'AbortError') return
+            setError({ message: err.message || 'Blog generation failed.', isProviderError: err.isProviderError, provider: err.provider })
+        } finally {
+            setBlogGenerating(false); setGenerating(false)
+        }
     }
 
     // Press Release generation handler
@@ -3344,6 +3413,109 @@ SPOKESPERSON QUOTES:`
                     youtubeSeoData={youtubeSeoData}
                     onNewContent={resetAll}
                 />
+            )}
+
+            {/* ========== STEP 12: BLOG INPUT ========== */}
+            {step === 12 && (
+                <div className="animate-fade-in max-w-2xl mx-auto">
+                    <button onClick={() => setStep(0)} className="text-slate-500 text-sm flex items-center gap-1 mb-6 hover:text-white transition-colors cursor-pointer">
+                        <span className="material-symbols-outlined text-sm">arrow_back</span> Back
+                    </button>
+                    <div className="mb-10 text-center">
+                        <span className="material-symbols-outlined text-5xl text-primary mb-3 block">edit_note</span>
+                        <h2 className="text-2xl font-black text-white mb-2">Write a <span className="text-primary">Blog</span></h2>
+                        <p className="text-sm text-slate-400">Enter your topic, keywords, or brief — AI will handle the research and writing.</p>
+                    </div>
+
+                    {/* Blog Type Selection */}
+                    <div className="mb-8">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 block">Choose format</label>
+                        <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+                            {GOALS.find(g => g.id === 'write_blog')?.subTypes?.map(st => (
+                                <button key={st.id} onClick={() => setSubType(st.id)}
+                                    className={`flex-shrink-0 flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer ${subType === st.id ? 'bg-primary text-white' : 'glass-panel text-slate-400 hover:text-white hover:bg-white/5'}`}>
+                                    <span className="material-symbols-outlined text-base">{st.icon}</span>
+                                    {st.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Blog Brief/Topic Input */}
+                    <div className="mb-8">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 block">What is the blog about?</label>
+                        <div className="relative">
+                            <textarea value={blogBrief} onChange={e => setBlogBrief(e.target.value)}
+                                placeholder="e.g. Benefits of AI for small marketing teams, include keywords like 'automation', 'productivity'..."
+                                className="input-glass w-full py-4 resize-none min-h-[140px]" autoFocus />
+                            <div className="absolute right-3 top-3">
+                                <VoiceInput
+                                    onResult={(text) => setBlogBrief(prev => prev ? prev + ' ' + text : text)}
+                                    size="small"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Trending Keywords for Blog */}
+                    <div className="mb-10">
+                         <div className="flex items-center justify-between mb-3">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Search Insights</label>
+                            <button onClick={async () => {
+                                if (!blogBrief.trim()) return;
+                                try {
+                                    const data = await contentAPI.trending({ topic: blogBrief, brandId: activeBrand?._id });
+                                    if (data.success) setTrendingData(data.trends);
+                                } catch (err) { console.error('Trending fetch failed', err) }
+                            }} className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer">
+                                <span className="material-symbols-outlined text-xs">analytics</span> Fetch Trending Keywords
+                            </button>
+                         </div>
+                         {trendingData && (
+                            <div className="flex flex-wrap gap-2 p-4 rounded-xl bg-white/[0.03] border border-white/5">
+                                {trendingData.keywords?.map((kw, i) => (
+                                    <button key={i} onClick={() => {
+                                        if (!blogBrief.includes(kw)) setBlogBrief(prev => prev + `, ${kw}`);
+                                    }} className="px-3 py-1.5 rounded-lg bg-white/5 text-xs text-slate-300 hover:text-white hover:bg-primary/20 transition-all border border-white/5 cursor-pointer">
+                                        + {kw}
+                                    </button>
+                                ))}
+                                {(!trendingData.keywords || trendingData.keywords.length === 0) && <p className="text-xs text-slate-500">No specific keywords found for this topic.</p>}
+                            </div>
+                         )}
+                    </div>
+
+                    <button
+                        onClick={handleGenerateBlog}
+                        disabled={blogGenerating || !blogBrief.trim()}
+                        className={`btn-primary w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all ${blogGenerating || !blogBrief.trim() ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02] shadow-lg shadow-primary/20 active:scale-[0.98]'}`}>
+                        {blogGenerating ? (
+                            <><span className="material-symbols-outlined text-lg animate-spin">progress_activity</span> Generating...</>
+                        ) : (
+                            <><span className="material-symbols-outlined text-lg">auto_awesome</span> Generate Blog Post</>
+                        )}
+                    </button>
+                </div>
+            )}
+
+            {/* ========== STEP 13: BLOG EDITOR ========== */}
+            {step === 13 && (
+                <div className="animate-fade-in">
+                    <Suspense fallback={<div className="flex items-center justify-center h-[600px]"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div></div>}>
+                        <BlogEditor
+                            initialContent={blogHtml}
+                            title={blogTitle}
+                            onBack={() => setStep(12)}
+                            onNew={() => { setStep(0); setBlogHtml(''); setBlogTitle(''); setBlogBrief('') }}
+                            onSave={async (blogData) => {
+                                try {
+                                    // Handle blog save if needed
+                                    console.log('Blog saved:', blogData);
+                                } catch (err) { setError({ message: err.message }) }
+                            }}
+                        />
+                    </Suspense>
+                </div>
             )}
 
             {/* Content History Sidebar */}
