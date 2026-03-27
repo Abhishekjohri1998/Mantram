@@ -333,6 +333,7 @@ export default function CreativeStudio() {
     const [autoGenerate, setAutoGenerate] = useState(false)
     const [enhancing, setEnhancing] = useState(false)
     const [result, setResult] = useState(null)
+    const [generationHistory, setGenerationHistory] = useState([]) // In-session gallery for AI Create
     const [error, setError] = useState(null)
     const [feedbackState, setFeedbackState] = useState(null)  // 'liked' | 'disliked' | 'accepted'
     const [feedbackToast, setFeedbackToast] = useState('')
@@ -621,6 +622,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [photoshootBrief, setPhotoshootBrief] = useState('')
     const [photoshootGenerating, setPhotoshootGenerating] = useState(false)
     const [photoshootResult, setPhotoshootResult] = useState(null)
+    const [psHistory, setPsHistory] = useState([]) // In-session gallery for Photoshoot
     const [photoshootError, setPhotoshootError] = useState(null)
     const [photoshootSaved, setPhotoshootSaved] = useState(false)
     const [fidelity, setFidelity] = useState(80)
@@ -704,7 +706,10 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const psImageRef = useRef(null)
     const psIsPainting = useRef(false)
     const promptTextareaRef = useRef(null)
-    const abortControllerRef = useRef(null)
+    // Per-tab AbortControllers — so generations survive tab switches
+    const aiCreateAbortRef = useRef(null)
+    const psAbortRef = useRef(null)
+    const campAbortRef = useRef(null)
     const activeBrandIdRef = useRef(activeBrand?._id)
 
     // Auto-resize textarea when prompt changes programmatically (e.g. enhance)
@@ -736,15 +741,20 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         }
     }
 
-    function getSignal() {
-        if (abortControllerRef.current) abortControllerRef.current.abort()
-        abortControllerRef.current = new AbortController()
-        return abortControllerRef.current.signal
+    function getSignal(tabRef) {
+        const ref = tabRef || aiCreateAbortRef
+        if (ref.current) ref.current.abort()
+        ref.current = new AbortController()
+        return ref.current.signal
     }
 
     // ── Effects ──
     useEffect(() => {
-        return () => abortControllerRef.current?.abort()
+        return () => {
+            aiCreateAbortRef.current?.abort()
+            psAbortRef.current?.abort()
+            campAbortRef.current?.abort()
+        }
     }, [])
 
     useEffect(() => {
@@ -768,7 +778,9 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     useEffect(() => {
         if (activeBrand?._id !== activeBrandIdRef.current) {
             console.log('Brand changed, aborting creative processing...')
-            abortControllerRef.current?.abort()
+            aiCreateAbortRef.current?.abort()
+            psAbortRef.current?.abort()
+            campAbortRef.current?.abort()
             activeBrandIdRef.current = activeBrand?._id
             if (generating || enhancing || templateGenerating) {
                 setGenerating(false); setEnhancing(false); setTemplateGenerating(false)
@@ -993,7 +1005,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             if (characters.length > 0) refDescs.push(`${characters.length} character reference image(s) are attached: ${characters.map(c => c.name).join(', ')} — include these characters in the design`)
             if (referenceImages.upload) refDescs.push('A general reference image is attached — use it as contextual inspiration')
 
-            const signal = getSignal()
+            const signal = getSignal(aiCreateAbortRef)
             const data = await creativesAPI.enhancePrompt({
                 brandId: activeBrand._id,
                 prompt: prompt.trim(),
@@ -1017,7 +1029,6 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         if (!prompt.trim() || !activeBrand) return
         setGenerating(true)
         setError('')
-        setResult(null)
         setFeedbackState(null)
         setFeedbackToast('')
         setShowQuickStart(false)
@@ -1070,7 +1081,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             })
 
             setAiWarnings([])
-            const signal = getSignal()
+            const signal = getSignal(aiCreateAbortRef)
             const data = await creativesAPI.generate({
                 brandId: activeBrand._id,
                 type: selectedType,
@@ -1091,6 +1102,10 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             }
 
             setResult(creative)
+            // Accumulate into in-session gallery
+            if (creative?.imageUrl) {
+                setGenerationHistory(prev => [{ ...creative, _prompt: prompt, _timestamp: Date.now() }, ...prev])
+            }
         } catch (e) {
             console.error('❌ Generation error:', e)
             setError({
@@ -1328,7 +1343,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             }
 
             setAiWarnings([])
-            const signal = getSignal()
+            const signal = getSignal(aiCreateAbortRef)
             const data = await creativesAPI.generate({
                 brandId: activeBrand._id,
                 type: tmpl.type,
@@ -1684,6 +1699,28 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     </button>
                 ))}
             </div>
+
+            {/* ── Cross-Tab Generation Indicator ── */}
+            {(() => {
+                const bgTasks = [];
+                if (studioMode !== 'create' && generating) bgTasks.push({ label: 'AI Create', mode: 'create', icon: 'auto_awesome' })
+                if (studioMode !== 'photoshoot' && photoshootGenerating) bgTasks.push({ label: 'Photoshoot', mode: 'photoshoot', icon: 'photo_camera' })
+                if (studioMode !== 'campaigns' && campGenerating) bgTasks.push({ label: 'Campaign', mode: 'campaigns', icon: 'campaign' })
+                if (bgTasks.length === 0) return null
+                return (
+                    <div className="mb-3 px-3 py-2 rounded-xl bg-gradient-to-r from-blue-500/10 via-violet-500/10 to-purple-500/10 border border-white/[0.06] flex items-center gap-3 animate-fade-in">
+                        <span className="material-symbols-outlined text-blue-400 text-sm animate-spin">progress_activity</span>
+                        <span className="text-xs text-slate-300 flex-1">{bgTasks.length} generation{bgTasks.length > 1 ? 's' : ''} running in background</span>
+                        {bgTasks.map(t => (
+                            <button key={t.mode} onClick={() => setStudioMode(t.mode)}
+                                className="text-xs px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-white flex items-center gap-1 cursor-pointer transition-all">
+                                <span className="material-symbols-outlined text-xs">{t.icon}</span>
+                                {t.label}
+                            </button>
+                        ))}
+                    </div>
+                )
+            })()}
 
             {/* ====================== UNIFIED CREATE MODE — SPLIT PANEL ====================== */}
             {studioMode === 'create' && (
@@ -2352,6 +2389,49 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             icon="photo_camera"
                             estimatedDuration={30}
                         />
+
+                        {/* ── In-Session Generation Gallery (scrollable grid) ── */}
+                        {generationHistory.length > 1 && (
+                            <div className="mb-5">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-sm text-violet-400">history</span>
+                                        Session Gallery ({generationHistory.length})
+                                    </h4>
+                                    <button onClick={() => setGenerationHistory([])} className="text-[10px] text-slate-600 hover:text-slate-400 cursor-pointer transition-all">Clear</button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2.5 max-h-[600px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+                                    {generationHistory.map((item, idx) => (
+                                        <div key={item._id || idx} className={`group relative rounded-xl overflow-hidden border ${idx === 0 ? 'border-violet-500/30 ring-1 ring-violet-500/20' : 'border-white/[0.06]'} bg-black/20 cursor-pointer transition-all hover:border-white/[0.12]`}
+                                            onClick={() => setZoomImage(item.imageUrl)}>
+                                            <img src={item.imageUrl} alt={item._prompt || 'Creative'} loading="lazy" decoding="async" className="w-full aspect-square object-cover" />
+                                            {idx === 0 && <span className="absolute top-1.5 left-1.5 text-[8px] font-bold text-violet-300 bg-violet-500/30 px-1.5 py-0.5 rounded-md">Latest</span>}
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
+                                                <p className="text-[9px] text-white/80 line-clamp-2 mb-1.5 leading-tight">{item._prompt || 'AI Generated'}</p>
+                                                <div className="flex gap-1">
+                                                    <button onClick={(e) => { e.stopPropagation(); handleDownloadImage(item.imageUrl, `creative-${idx}.png`) }}
+                                                        className="p-1 rounded-md bg-white/10 text-white hover:bg-white/20 transition-all" title="Download">
+                                                        <span className="material-symbols-outlined text-xs">download</span>
+                                                    </button>
+                                                    <button onClick={(e) => { e.stopPropagation(); setDesignBaseImage(item.imageUrl); setPrompt(item._prompt || ''); }}
+                                                        className="p-1 rounded-md bg-white/10 text-white hover:bg-primary/40 transition-all" title="Edit">
+                                                        <span className="material-symbols-outlined text-xs">edit</span>
+                                                    </button>
+                                                    <button onClick={(e) => { e.stopPropagation(); setPublishData({ image: item.imageUrl, text: item._prompt || '' }) }}
+                                                        className="p-1 rounded-md bg-white/10 text-white hover:bg-[#1877F2]/40 transition-all" title="Publish">
+                                                        <span className="material-symbols-outlined text-xs">share</span>
+                                                    </button>
+                                                    <button onClick={(e) => { e.stopPropagation(); setResult(item); }}
+                                                        className="p-1 rounded-md bg-white/10 text-white hover:bg-emerald-500/40 transition-all" title="View full">
+                                                        <span className="material-symbols-outlined text-xs">open_in_full</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* ── Generation History (from Image Bank) ── */}
                         {(() => {
@@ -3158,7 +3238,6 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     if (!productImage || !activeBrand) return
                                     setPhotoshootGenerating(true)
                                     setPhotoshootError('')
-                                    setPhotoshootResult(null)
                                     setPhotoshootSaved(false)
                                     try {
                                         const brandColors = activeBrand?.dna?.colors?.map(c => c.hex).join(', ') || ''
@@ -3186,6 +3265,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                                         if (data.success) {
                                             setPhotoshootResult(data)
+                                            // Accumulate into in-session photoshoot gallery
+                                            setPsHistory(prev => [{ ...data, _brief: photoshootBrief, _timestamp: Date.now() }, ...prev])
                                             // Auto-save to image bank
                                             saveToImageBank(data)
                                         } else if (data.modelBusy) {
@@ -3432,6 +3513,45 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 Saved to Image Bank
                                             </span>
                                         )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ── In-Session Photoshoot Gallery ── */}
+                            {psHistory.length > 1 && (
+                                <div className="mt-6 w-full">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                                            <span className="material-symbols-outlined text-sm text-emerald-400">photo_library</span>
+                                            Session Photoshoots ({psHistory.length})
+                                        </h4>
+                                        <button onClick={() => setPsHistory([])} className="text-[10px] text-slate-600 hover:text-slate-400 cursor-pointer transition-all">Clear</button>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2.5 max-h-[500px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+                                        {psHistory.map((item, idx) => (
+                                            <div key={item._id || idx} className={`group relative rounded-xl overflow-hidden border ${idx === 0 ? 'border-emerald-500/30 ring-1 ring-emerald-500/20' : 'border-white/[0.06]'} bg-black/20 cursor-pointer transition-all hover:border-white/[0.12]`}
+                                                onClick={() => setZoomImage(item.imageUrl)}>
+                                                <img src={item.imageUrl} alt={item._brief || 'Photoshoot'} loading="lazy" decoding="async" className="w-full aspect-square object-cover" />
+                                                {idx === 0 && <span className="absolute top-1.5 left-1.5 text-[8px] font-bold text-emerald-300 bg-emerald-500/30 px-1.5 py-0.5 rounded-md">Latest</span>}
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
+                                                    <p className="text-[9px] text-white/80 line-clamp-2 mb-1.5 leading-tight">{item._brief || item.description || 'AI Photoshoot'}</p>
+                                                    <div className="flex gap-1">
+                                                        <button onClick={(e) => { e.stopPropagation(); handleDownloadImage(item.imageUrl, `photoshoot-${idx}.png`) }}
+                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-white/20 transition-all" title="Download">
+                                                            <span className="material-symbols-outlined text-xs">download</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setPhotoshootResult(item); }}
+                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-emerald-500/40 transition-all" title="View full">
+                                                            <span className="material-symbols-outlined text-xs">open_in_full</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setPublishData({ image: item.imageUrl, text: item._brief || '' }) }}
+                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-[#1877F2]/40 transition-all" title="Publish">
+                                                            <span className="material-symbols-outlined text-xs">share</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             )}
