@@ -23,6 +23,7 @@ import {
     toneMatcherNode,
     platformOptimizerNode,
     qualityCriticNode,
+    contentABTestNode,
     youtubeResearchNode,
     youtubeWriterNode,
     youtubeSeoNode,
@@ -184,6 +185,8 @@ router.post('/start', protect, requireCredits('content'), async (req, res) => {
                             state.intelligence?.contentHistory?.success ? 'Content History' : null,
                             state.intelligence?.trending?.success ? 'Trending' : null,
                             state.intelligence?.competitors?.success ? 'Competitors' : null,
+                            state.intelligence?.performanceLearnings?.success ? 'Playbook' : null,
+                            state.intelligence?.ga4?.success ? 'GA4' : null,
                         ].filter(Boolean),
                         researchDepth: state.researchDepth,
                     },
@@ -315,6 +318,100 @@ router.post('/:id/edit', protect, async (req, res) => {
             },
         });
     } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/content/agentic/:id/ab-variants — Generate A/B test variants
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/:id/ab-variants', protect, requireCredits('content'), async (req, res) => {
+    try {
+        const content = await Content.findOne({ _id: req.params.id, user: req.user._id });
+        if (!content) return res.status(404).json({ success: false, error: 'Content not found' });
+
+        // Build state from existing content
+        let state = {
+            userId: req.user._id.toString(),
+            brandId: content.brand?.toString(),
+            brief: content.prompt,
+            contentType: content.type,
+            platform: content.platform,
+            finalContent: content.content,
+            finalTitle: content.title,
+            strategy: content.aiMeta?.strategy || null,
+        };
+
+        // Gather intelligence for performance data
+        const { gatherIntelligence } = await import('../agents/contentStudio/tools.js');
+        state.intelligence = await gatherIntelligence(state);
+
+        // Generate A/B variants
+        state = await contentABTestNode(state);
+
+        // Generate a unique A/B test group ID
+        const abTestGroup = `ab_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
+        // Save each variant as a separate Content document
+        const savedVariants = [];
+        const variants = state.abTestPlan?.variants || [];
+
+        for (const variant of variants) {
+            if (variant.changeType === 'control') {
+                // Update parent content with A/B test metadata
+                content.abTestGroup = abTestGroup;
+                content.variantLabel = variant.label || 'A — Control';
+                content.abTestChangeType = 'control';
+                content.abTestHypothesis = variant.hypothesis || '';
+                await content.save();
+                savedVariants.push(content.toObject());
+            } else {
+                // Create new content doc for each variant
+                const variantDoc = await Content.create({
+                    user: req.user._id,
+                    brand: content.brand || undefined,
+                    type: content.type,
+                    title: variant.title || content.title,
+                    content: variant.content || content.content,
+                    prompt: content.prompt,
+                    platform: content.platform,
+                    originalContent: variant.content || '',
+                    variantOf: content._id,
+                    variantLabel: variant.label || '',
+                    abTestGroup,
+                    abTestHypothesis: variant.hypothesis || '',
+                    abTestChangeType: variant.changeType || '',
+                    aiMeta: {
+                        provider: 'router',
+                        model: 'auto',
+                        agenticPipeline: true,
+                        pipelineStep: 'ab_variant',
+                    },
+                });
+                savedVariants.push(variantDoc.toObject());
+            }
+        }
+
+        await req.user.updateOne({ $inc: { 'usage.contentGenerated': Math.max(0, savedVariants.length - 1) } });
+
+        res.json({
+            success: true,
+            abTestGroup,
+            testPlan: {
+                primaryMetric: state.abTestPlan?.primaryMetric || 'engagement_rate',
+                testDuration: state.abTestPlan?.testDuration || '7 days',
+                sampleSize: state.abTestPlan?.sampleSizeRecommendation || '',
+            },
+            variants: savedVariants.map(v => ({
+                ...v,
+                isControl: v.abTestChangeType === 'control',
+            })),
+        });
+    } catch (error) {
+        console.error('A/B variant generation error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'contentGenerate', `Refund: AB Variant Generation Failure (${safeErrorMessage(error)})`, 'content');
+        }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });

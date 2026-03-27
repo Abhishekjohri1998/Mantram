@@ -58,6 +58,16 @@ const contentSchema = new mongoose.Schema({
     publishedAt: { type: Date },
     publishedTo: [{ platform: String, postId: String, url: String }],
 
+    // A/B Test Variant Tracking
+    variantOf: { type: mongoose.Schema.Types.ObjectId, ref: 'Content' }, // parent content this is a variant of
+    variantLabel: { type: String, default: '' }, // e.g. "B — Question Hook"
+    abTestGroup: { type: String, default: '' }, // groups variants together (UUID)
+    abTestHypothesis: { type: String, default: '' },
+    abTestChangeType: { type: String, enum: ['control', 'hook', 'cta', 'tone', 'structure', 'length', ''], default: '' },
+
+    // Performance snapshot (GA4 data at time of analysis)
+    performanceSnapshot: { type: mongoose.Schema.Types.Mixed },
+
     // Engagement (after publishing)
     engagement: {
         likes: { type: Number, default: 0 },

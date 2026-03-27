@@ -19,6 +19,7 @@ import {
     QUALITY_CRITIC_PROMPT,
     CONTENT_STRATEGIST_PROMPT,
     PLATFORM_OPTIMIZER_PROMPT,
+    CONTENT_AB_TEST_PROMPT,
     YOUTUBE_RESEARCH_PROMPT,
     YOUTUBE_WRITER_PROMPT,
     YOUTUBE_SEO_PROMPT,
@@ -94,6 +95,22 @@ export async function writerNode(state) {
         ? `\n\nCOMPETITOR ANALYSIS:\n${state.intelligence.competitors.data?.analysis || ''}`
         : '';
 
+    // Performance learnings from past content (what worked/didn't)
+    const performanceContext = state.intelligence?.performanceLearnings?.success
+        ? `\n\nPERFORMANCE PLAYBOOK (what works for this brand):
+Accept Rate: ${state.intelligence.performanceLearnings.data?.feedbackPatterns?.acceptRate || 0}% | Regenerate Rate: ${state.intelligence.performanceLearnings.data?.feedbackPatterns?.regenerateRate || 0}%
+Top Rated Examples: ${(state.intelligence.performanceLearnings.data?.topRated || []).map(t => `"${t.title}" (${t.rating}★ on ${t.platform})`).join(', ') || 'none yet'}
+Avoid Patterns: ${(state.intelligence.performanceLearnings.data?.avoidPatterns || []).map(a => `"${a.title}" (${a.rating}★)`).join(', ') || 'none flagged'}`
+        : '';
+
+    // GA4 content performance (real page analytics)
+    const ga4Context = state.intelligence?.ga4?.success
+        ? `\n\nGA4 CONTENT PERFORMANCE:
+Total Views: ${state.intelligence.ga4.data?.totalViews || 0} | Pages Tracked: ${state.intelligence.ga4.data?.pagesTracked || 0}
+Avg Bounce Rate: ${state.intelligence.ga4.data?.avgBounceRate || 0}%
+Top Pages: ${(state.intelligence.ga4.data?.pages || []).slice(0, 3).map(p => `${p.contentTitle || p.path} (${p.pageViews} views)`).join(', ')}`
+        : '';
+
     const userPrompt = [
         `WRITE CONTENT FOR: ${state.brief}`,
         `TYPE: ${state.contentType || 'social'}`,
@@ -112,6 +129,8 @@ export async function writerNode(state) {
         seoInsights,
         strategyContext,
         competitorInsights,
+        performanceContext,
+        ga4Context,
         rewriteNote,
     ].filter(Boolean).join('\n');
 
@@ -208,6 +227,12 @@ export async function contentStrategistNode(state) {
         competitorContext,
         state.intelligence?.contentHistory?.success
             ? `\nPAST CONTENT PERFORMANCE: ${state.intelligence.contentHistory.data?.totalPieces || 0} pieces previously created`
+            : '',
+        state.intelligence?.performanceLearnings?.success
+            ? `\nPERFORMANCE PLAYBOOK:\nBest Types: ${Object.entries(state.intelligence.performanceLearnings.data?.byType || {}).sort((a, b) => b[1].avgRating - a[1].avgRating).slice(0, 3).map(([t, d]) => `${t}(${d.avgRating}★, ${d.count} pieces)`).join(', ')}\nBest Platforms: ${Object.entries(state.intelligence.performanceLearnings.data?.byPlatform || {}).sort((a, b) => b[1].avgRating - a[1].avgRating).slice(0, 3).map(([p, d]) => `${p}(${d.avgRating}★)`).join(', ')}\nAccept Rate: ${state.intelligence.performanceLearnings.data?.feedbackPatterns?.acceptRate || 0}% | Regenerate Rate: ${state.intelligence.performanceLearnings.data?.feedbackPatterns?.regenerateRate || 0}%`
+            : '',
+        state.intelligence?.ga4?.success
+            ? `\nGA4 TOP CONTENT: ${(state.intelligence.ga4.data?.pages || []).slice(0, 3).map(p => `${p.contentTitle || p.path} (${p.pageViews} views, ${(p.bounceRate * 100).toFixed(0)}% bounce)`).join(', ')}`
             : '',
     ].filter(Boolean).join('\n');
 
@@ -306,6 +331,37 @@ export async function qualityCriticNode(state) {
         platformMeta: state.platformOptimized?.platformMeta || null,
         engagementHooks: state.platformOptimized?.engagementHooks || null,
         status: 'critique',
+    };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// NODE 8: CONTENT A/B TEST — Generate variants for split testing
+// ══════════════════════════════════════════════════════════════════════════════
+export async function contentABTestNode(state) {
+    console.log('🔬 Content Agent: A/B Test — generating variants...');
+
+    const { brandContext } = await loadBrandContext(state.brandId);
+
+    const userPrompt = [
+        `GENERATE A/B TEST VARIANTS FOR THIS CONTENT:`,
+        `Title: ${state.finalTitle || state.draft?.title || ''}`,
+        `Content: ${state.finalContent || state.draft?.content || ''}`,
+        `Platform: ${state.platform || 'instagram'}`,
+        `Content Type: ${state.contentType || 'social'}`,
+        state.strategy?.funnelPosition ? `Funnel Position: ${state.strategy.funnelPosition}` : '',
+        state.strategy?.hookStrategy ? `Hook Strategy Used: ${state.strategy.hookStrategy}` : '',
+        state.strategy?.ctaStrategy ? `CTA Strategy Used: ${state.strategy.ctaStrategy}` : '',
+        state.intelligence?.performanceLearnings?.success
+            ? `\nPERFORMANCE DATA (what worked before):\nAvg Sentiment: ${state.intelligence.performanceLearnings.data?.feedbackPatterns?.avgSentiment || 0}\nTop Rated Types: ${Object.entries(state.intelligence.performanceLearnings.data?.byType || {}).sort((a, b) => b[1].avgRating - a[1].avgRating).slice(0, 3).map(([t, d]) => `${t}(${d.avgRating}★)`).join(', ')}`
+            : '',
+    ].filter(Boolean).join('\n');
+
+    const result = await callAgent(CONTENT_AB_TEST_PROMPT(brandContext), userPrompt, 0.7);
+
+    return {
+        ...state,
+        abTestPlan: result,
+        status: 'ab_test',
     };
 }
 
