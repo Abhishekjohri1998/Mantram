@@ -140,6 +140,9 @@ export const brands = {
 export const content = {
     providers: () => apiFetch('/content/providers'),
     generate: (data) => apiFetch('/content/generate', { method: 'POST', body: JSON.stringify(data) }),
+    // Agentic pipeline (v2 — with real intelligence gathering)
+    agenticStart: (data) => apiFetch('/content/agentic/start', { method: 'POST', body: JSON.stringify(data) }),
+    agenticRefine: (id, data) => apiFetch(`/content/agentic/${id}/refine`, { method: 'POST', body: JSON.stringify(data) }),
     list: (params = {}) => {
         const query = new URLSearchParams(params).toString();
         return apiFetch(`/content?${query}`);

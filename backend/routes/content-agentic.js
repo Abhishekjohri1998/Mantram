@@ -33,10 +33,10 @@ const router = Router();
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/start', protect, requireCredits('content'), async (req, res) => {
     try {
-        const { brandId, brief, contentType, platform, tone, language, targetAudience } = req.body;
+        const { brandId, brief, contentType, platform, tone, language, targetAudience, researchDepth } = req.body;
         if (!brief) return res.status(400).json({ success: false, error: 'Brief is required' });
 
-        // Step 1: Research
+        // Step 1: Research (with real intelligence gathering)
         let state = {
             userId: req.user._id.toString(),
             brandId: brandId || null,
@@ -46,11 +46,12 @@ router.post('/start', protect, requireCredits('content'), async (req, res) => {
             tone: tone || '',
             language: language || '',
             targetAudience: targetAudience || '',
+            researchDepth: researchDepth || 'quick', // 'quick' = Grok (cheap), 'deep' = Perplexity (premium)
         };
 
         state = await researchNode(state);
 
-        // Step 2: Writer (auto-chains from research)
+        // Step 2: Writer (auto-chains from research, enriched with real data)
         state = await writerNode(state);
 
         // Save initial content
@@ -65,12 +66,13 @@ router.post('/start', protect, requireCredits('content'), async (req, res) => {
             platform: platform || 'instagram',
             originalContent: state.draft?.content || '',
             aiMeta: {
-                provider: 'router', // Uses default (gemini) unless user selects Claude
+                provider: 'router',
                 model: 'auto',
                 agenticPipeline: true,
                 pipelineStep: 'draft',
                 research: state.research,
-                brandAlignmentScore: 70, // Pre-optimization
+                researchDepth: researchDepth || 'quick',
+                brandAlignmentScore: 70,
             },
         });
 
@@ -83,11 +85,21 @@ router.post('/start', protect, requireCredits('content'), async (req, res) => {
                 agenticData: {
                     research: state.research,
                     draft: state.draft,
-                    pipelineProgress: 40, // 2/5 steps done
+                    intelligence: {
+                        sourcesUsed: [
+                            state.intelligence?.web?.success ? `Web(${state.intelligence.web.source})` : null,
+                            state.intelligence?.seo?.success ? 'SEO Audit' : null,
+                            state.intelligence?.contentHistory?.success ? 'Content History' : null,
+                            state.intelligence?.trending?.success ? 'Trending' : null,
+                        ].filter(Boolean),
+                        researchDepth: state.researchDepth,
+                    },
+                    pipelineProgress: 40,
                     nextStep: 'refine',
                 },
             },
         });
+
     } catch (error) {
         console.error('Content agentic start error:', error);
         if (req.creditsDeducted > 0) {

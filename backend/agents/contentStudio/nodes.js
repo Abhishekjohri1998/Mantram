@@ -1,12 +1,16 @@
 /**
- * Content Studio — Agentic Pipeline Node Functions
+ * Content Studio — Agentic Pipeline Node Functions (v2)
+ * 
+ * TRULY AGENTIC: Each agent now uses real data via tools (web search, SEO, trends, history)
  * 
  * 5-agent chain: Research → Writer → SEO → ToneMatcher → QualityCritic
+ * Quality Critic auto-loops to Writer if score < 8 (max 2 loops)
  * Each node: (state) → updatedState
  */
 
-import { callAgent } from '../shared/agentUtils.js';
+import { callAgent, callAgentText } from '../shared/agentUtils.js';
 import { loadBrandContext } from '../shared/agentUtils.js';
+import { gatherIntelligence } from './tools.js';
 import {
     RESEARCH_PROMPT,
     WRITER_PROMPT,
@@ -19,12 +23,19 @@ import {
 } from './prompts.js';
 
 // ══════════════════════════════════════════════════════════════════════════════
-// NODE 1: RESEARCH — Analyze topic, find angles, keywords, structure
+// NODE 1: RESEARCH — Gathers REAL intelligence, then analyzes
 // ══════════════════════════════════════════════════════════════════════════════
 export async function researchNode(state) {
-    console.log('🔍 Content Agent: Research — analyzing topic...');
+    console.log('🔍 Content Agent: Research — gathering real intelligence...');
 
     const { brandContext } = await loadBrandContext(state.brandId);
+
+    // ── NEW: Gather real data from tools ──
+    const intelligence = await gatherIntelligence(state);
+    state.intelligence = intelligence;
+
+    // Build enriched research prompt with real data
+    const intelligenceContext = buildIntelligenceContext(intelligence);
 
     const userPrompt = [
         `CONTENT BRIEF: ${state.brief}`,
@@ -33,6 +44,8 @@ export async function researchNode(state) {
         `TARGET AUDIENCE: ${state.targetAudience || 'general'}`,
         state.tone ? `PREFERRED TONE: ${state.tone}` : '',
         state.language ? `LANGUAGE: ${state.language}` : '',
+        '',
+        intelligenceContext,
     ].filter(Boolean).join('\n');
 
     const result = await callAgent(RESEARCH_PROMPT(brandContext), userPrompt, 0.6);
@@ -45,12 +58,29 @@ export async function researchNode(state) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// NODE 2: WRITER — Create the content using research insights
+// NODE 2: WRITER — Create content using research + real intelligence
 // ══════════════════════════════════════════════════════════════════════════════
 export async function writerNode(state) {
-    console.log('✍️ Content Agent: Writer — creating content...');
+    const rewriteNote = state.rewriteCount > 0
+        ? `\n\n⚠️ REWRITE #${state.rewriteCount} — The Quality Critic asked for improvements:\n${state.rewriteInstructions || 'Improve overall quality, make it more engaging and brand-aligned.'}`
+        : '';
+
+    console.log(`✍️ Content Agent: Writer — ${state.rewriteCount > 0 ? `rewriting (attempt ${state.rewriteCount + 1})...` : 'creating content...'}`);
 
     const { brandContext } = await loadBrandContext(state.brandId);
+
+    // Include real web research data if available
+    const webInsights = state.intelligence?.web?.success
+        ? `\n\nREAL WEB RESEARCH DATA:\n${state.intelligence.web.data.substring(0, 2000)}`
+        : '';
+
+    const trendingInsights = state.intelligence?.trending?.success
+        ? `\n\nTRENDING NOW:\n${(state.intelligence.trending.data?.trending || []).map(t => `• ${t.topic}: ${t.description}`).join('\n')}`
+        : '';
+
+    const seoInsights = state.intelligence?.seo?.success
+        ? `\n\nBRAND'S SEO DATA:\nSite Health: ${state.intelligence.seo.data?.siteHealthScore}/100\nTop Keywords: ${(state.intelligence.seo.data?.topKeywords || []).slice(0, 8).join(', ')}\nContent Gaps: ${(state.intelligence.seo.data?.contentGaps || []).slice(0, 3).join(', ')}`
+        : '';
 
     const userPrompt = [
         `WRITE CONTENT FOR: ${state.brief}`,
@@ -65,6 +95,10 @@ export async function writerNode(state) {
         `Structure: ${JSON.stringify(state.research?.suggestedStructure || {})}`,
         `Brand Notes: ${state.research?.brandNotes || ''}`,
         `Competitor Gap: ${state.research?.competitorInsights || ''}`,
+        webInsights,
+        trendingInsights,
+        seoInsights,
+        rewriteNote,
     ].filter(Boolean).join('\n');
 
     const result = await callAgent(WRITER_PROMPT(brandContext), userPrompt, 0.7);
@@ -77,12 +111,17 @@ export async function writerNode(state) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// NODE 3: SEO — Optimize for discoverability
+// NODE 3: SEO — Optimize for discoverability (now with real SEO data)
 // ══════════════════════════════════════════════════════════════════════════════
 export async function seoNode(state) {
     console.log('🔎 Content Agent: SEO — optimizing...');
 
     const { brandContext } = await loadBrandContext(state.brandId);
+
+    // Include real SEO audit data if available
+    const seoAuditContext = state.intelligence?.seo?.success
+        ? `\n\nBRAND'S REAL SEO DATA:\n${JSON.stringify(state.intelligence.seo.data, null, 1)}`
+        : '';
 
     const userPrompt = [
         `OPTIMIZE THIS CONTENT FOR SEO:`,
@@ -90,6 +129,7 @@ export async function seoNode(state) {
         `Content: ${state.draft?.content || ''}`,
         `Platform: ${state.platform || 'instagram'}`,
         `Target Keywords: ${(state.research?.targetKeywords || []).join(', ')}`,
+        seoAuditContext,
     ].join('\n');
 
     const result = await callAgent(SEO_PROMPT(brandContext), userPrompt, 0.3);
@@ -127,10 +167,10 @@ export async function toneMatcherNode(state) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// NODE 5: QUALITY CRITIC — Final assessment
+// NODE 5: QUALITY CRITIC — Final assessment with AUTO-LOOP
 // ══════════════════════════════════════════════════════════════════════════════
 export async function qualityCriticNode(state) {
-    console.log('⭐ Content Agent: Quality Critic — scoring...');
+    console.log(`⭐ Content Agent: Quality Critic — scoring... (attempt ${(state.rewriteCount || 0) + 1})`);
 
     const { brandContext } = await loadBrandContext(state.brandId);
 
@@ -141,13 +181,44 @@ export async function qualityCriticNode(state) {
         `Platform: ${state.platform || 'instagram'}`,
         `Content Type: ${state.contentType || 'social'}`,
         `Brief: ${state.brief}`,
+        state.rewriteCount > 0 ? `\nThis is rewrite attempt #${state.rewriteCount}. Be fair but watch for improvement.` : '',
     ].join('\n');
 
     const result = await callAgent(QUALITY_CRITIC_PROMPT(brandContext), userPrompt, 0.3);
 
+    const overallScore = result?.scores?.overall || result?.overallScore || 10;
+    const rewriteCount = state.rewriteCount || 0;
+
+    // ── AUTO-LOOP: If score < 8 and we haven't rewritten twice, send back to Writer ──
+    if (overallScore < 8 && rewriteCount < 2) {
+        console.log(`   ⚠️ Score ${overallScore}/10 — below threshold. Sending back to Writer (loop ${rewriteCount + 1}/2)...`);
+
+        const fixInstructions = [
+            result?.improvements?.[0] || '',
+            result?.improvements?.[1] || '',
+            result?.mainIssue || '',
+            `The critic scored this ${overallScore}/10. Key issues: ${result?.summary || 'Needs more engagement and brand alignment.'}`,
+        ].filter(Boolean).join('\n');
+
+        const newState = {
+            ...state,
+            rewriteCount: rewriteCount + 1,
+            rewriteInstructions: fixInstructions,
+            critique: result,
+        };
+
+        // Re-run Writer → Quality Critic
+        const rewrittenState = await writerNode(newState);
+        return await qualityCriticNode(rewrittenState);
+    }
+
+    console.log(`   ✅ Quality score: ${overallScore}/10 ${overallScore >= 8 ? '— PASSED' : '— accepted (max loops reached)'}`);
+
     return {
         ...state,
         critique: result,
+        qualityScore: overallScore,
+        rewriteCount,
         finalContent: state.toneMatched?.matchedContent || state.seoOptimized?.optimizedContent || state.draft?.content || '',
         finalTitle: state.seoOptimized?.optimizedTitle || state.draft?.title || '',
         status: 'critique',
@@ -155,12 +226,24 @@ export async function qualityCriticNode(state) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// NODE 6: YOUTUBE RESEARCH — Analyze topic, keywords, structure for YouTube
+// YOUTUBE NODES (kept as-is but with intelligence feeding)
 // ══════════════════════════════════════════════════════════════════════════════
+
 export async function youtubeResearchNode(state) {
     console.log('🎬 YouTube Agent: Research — analyzing topic for YouTube...');
 
     const { brandContext } = await loadBrandContext(state.brandId);
+
+    // Gather intelligence for YouTube too
+    if (!state.intelligence) {
+        const intelligence = await gatherIntelligence({
+            ...state,
+            platform: 'youtube',
+        });
+        state.intelligence = intelligence;
+    }
+
+    const intelligenceContext = buildIntelligenceContext(state.intelligence);
 
     const userPrompt = [
         `VIDEO BRIEF: ${state.brief}`,
@@ -170,6 +253,8 @@ export async function youtubeResearchNode(state) {
         state.style ? `VIDEO STYLE: ${state.style}` : '',
         state.language ? `LANGUAGE: ${state.language}` : '',
         state.subType ? `VIDEO TYPE: ${state.subType}` : '',
+        '',
+        intelligenceContext,
     ].filter(Boolean).join('\n');
 
     const result = await callAgent(YOUTUBE_RESEARCH_PROMPT(brandContext), userPrompt, 0.6);
@@ -181,9 +266,6 @@ export async function youtubeResearchNode(state) {
     };
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// NODE 7: YOUTUBE WRITER — Script, title, description, tags, keywords
-// ══════════════════════════════════════════════════════════════════════════════
 export async function youtubeWriterNode(state) {
     console.log('✍️ YouTube Agent: Writer — creating YouTube content...');
 
@@ -218,9 +300,6 @@ export async function youtubeWriterNode(state) {
     };
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// NODE 8: YOUTUBE SEO — Publish Optimizer (metadata only, no script)
-// ══════════════════════════════════════════════════════════════════════════════
 export async function youtubeSeoNode(state) {
     console.log('🚀 YouTube Agent: SEO Optimizer — generating publish metadata...');
 
@@ -250,4 +329,67 @@ export async function youtubeSeoNode(state) {
         youtubeSeo: result,
         status: 'youtube_seo',
     };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HELPER: Build intelligence context string from gathered tools data
+// ══════════════════════════════════════════════════════════════════════════════
+function buildIntelligenceContext(intelligence) {
+    if (!intelligence) return '';
+
+    const parts = [];
+    parts.push('═══ REAL-TIME INTELLIGENCE (from agent tools) ═══');
+
+    // Web Research
+    if (intelligence.web?.success) {
+        parts.push(`\n📌 WEB RESEARCH [source: ${intelligence.web.source}, mode: ${intelligence.web.mode}]:`);
+        parts.push(intelligence.web.data.substring(0, 2000));
+        if (intelligence.web.citations?.length) {
+            parts.push(`Sources: ${intelligence.web.citations.slice(0, 5).join(', ')}`);
+        }
+    }
+
+    // SEO Audit Data
+    if (intelligence.seo?.success && intelligence.seo.data) {
+        const s = intelligence.seo.data;
+        parts.push(`\n📊 BRAND SEO DATA [from latest site audit]:`);
+        parts.push(`Site Health: ${s.siteHealthScore}/100`);
+        if (s.topKeywords?.length) parts.push(`Top Ranking Keywords: ${s.topKeywords.slice(0, 10).join(', ')}`);
+        if (s.contentGaps?.length) parts.push(`Content Gaps to Fill: ${s.contentGaps.slice(0, 5).join(', ')}`);
+        if (s.topPerformingPages?.length) parts.push(`Top Pages: ${s.topPerformingPages.map(p => `${p.title} (${p.wordCount} words)`).join(', ')}`);
+        if (s.algorithmRisks?.length) parts.push(`SEO Risks: ${s.algorithmRisks.join('; ')}`);
+    }
+
+    // Content History
+    if (intelligence.contentHistory?.success && intelligence.contentHistory.data) {
+        const h = intelligence.contentHistory.data;
+        parts.push(`\n📝 PAST CONTENT PERFORMANCE:`);
+        parts.push(`Total pieces: ${h.totalPieces}, Published: ${h.publishedCount}, Avg brand score: ${h.averageBrandScore}`);
+        if (h.recentTitles?.length) parts.push(`Recent titles: ${h.recentTitles.slice(0, 5).join(' | ')}`);
+        if (h.topRatedContent?.length) parts.push(`Best performing: ${h.topRatedContent.map(t => t.title).join(', ')}`);
+    }
+
+    // Trending
+    if (intelligence.trending?.success && intelligence.trending.data) {
+        const t = intelligence.trending.data;
+        if (t.trending?.length) {
+            parts.push(`\n🔥 TRENDING NOW:`);
+            t.trending.slice(0, 5).forEach(tr => {
+                parts.push(`• [${tr.urgency || 'medium'}] ${tr.topic}: ${tr.description}`);
+            });
+        }
+        if (t.keywords?.length) {
+            parts.push(`Real Keywords: ${t.keywords.slice(0, 8).map(k => k.keyword).join(', ')}`);
+        }
+        if (t.calendarHooks?.length) {
+            parts.push(`Calendar Hooks: ${t.calendarHooks.slice(0, 3).join(', ')}`);
+        }
+        if (t.viralFormats?.length) {
+            parts.push(`Viral Formats: ${t.viralFormats.slice(0, 3).join(', ')}`);
+        }
+    }
+
+    parts.push('\n═══ USE THIS REAL DATA — do NOT invent facts ═══');
+
+    return parts.join('\n');
 }

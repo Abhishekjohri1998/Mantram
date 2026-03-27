@@ -799,6 +799,7 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
     const [sellStyle, setSellStyle] = useState('direct')
     const showSellStyle = ['promote', 'launch'].includes(goal)
     const [showAdvanced, setShowAdvanced] = useState(false)
+    const [researchDepth, setResearchDepth] = useState('quick') // 'quick' (Grok) or 'deep' (Perplexity)
 
     // Language — default from brand profile
     const defaultLang = activeBrand?.dna?.defaultLanguage || 'english'
@@ -986,10 +987,36 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                 )}
             </div>
 
+            {/* ── Research Depth Toggle ── */}
+            <div className="mb-6">
+                <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-3">
+                    <span className="material-symbols-outlined text-xs align-middle mr-1">neurology</span>
+                    Research Depth
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                    <button onClick={() => setResearchDepth('quick')}
+                        className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${researchDepth === 'quick' ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'}`}>
+                        <span className={`material-symbols-outlined text-lg block mb-1 ${researchDepth === 'quick' ? 'text-primary' : 'text-slate-500'}`}>bolt</span>
+                        <p className={`text-xs font-bold ${researchDepth === 'quick' ? 'text-white' : 'text-slate-400'}`}>Quick Research</p>
+                        <p className="text-xs text-slate-600 mt-0.5">Fast + trending data</p>
+                    </button>
+                    <button onClick={() => setResearchDepth('deep')}
+                        className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${researchDepth === 'deep' ? 'bg-indigo-500/15 border-indigo-500/40' : 'hover:bg-white/[0.05]'}`}>
+                        <span className={`material-symbols-outlined text-lg block mb-1 ${researchDepth === 'deep' ? 'text-indigo-400' : 'text-slate-500'}`}>psychology</span>
+                        <p className={`text-xs font-bold ${researchDepth === 'deep' ? 'text-white' : 'text-slate-400'}`}>Deep Research</p>
+                        <p className="text-xs text-slate-600 mt-0.5">Web search + competitor + SEO</p>
+                    </button>
+                </div>
+                <p className="text-xs text-slate-600 mt-2 text-center">
+                    {researchDepth === 'quick' ? '⚡ Uses Grok for fast trending intelligence' : '🔬 Uses Perplexity + full web research for deeper insights'}
+                </p>
+            </div>
+
             <CreditTooltipWrapper action="content">
-                <button onClick={() => onComplete({ tone, length, sellStyle, language, langStyle, scriptType })}
+                <button onClick={() => onComplete({ tone, length, sellStyle, language, langStyle, scriptType, researchDepth })}
                     className="btn-primary w-full py-3.5 rounded-xl text-sm font-bold">
-                    <span className="material-symbols-outlined text-sm">auto_awesome</span> Generate Content <CreditBadge action="content" />
+                    <span className="material-symbols-outlined text-sm">auto_awesome</span>
+                    {researchDepth === 'deep' ? '🔬 Generate with Deep Research' : '⚡ Generate Content'} <CreditBadge action="content" />
                 </button>
             </CreditTooltipWrapper>
         </div>
@@ -2883,23 +2910,52 @@ export default function ContentStudio() {
         const prompt = buildPrompt(settings)
 
         try {
-            const data = await contentAPI.generate({
+            // Use agentic pipeline (v2) — with real intelligence gathering
+            const data = await contentAPI.agenticStart({
                 brandId: activeBrand._id,
-                type: goal,
-                subType,
+                brief: prompt,
+                contentType: goal,
                 platform: Array.isArray(channel) ? channel.join(',') : channel,
-                prompt,
-                toneSettings: settings,
-                options: modelOverride !== 'auto' ? { modelOverride } : {},
+                tone: settings.tone || 'bold',
+                language: settings.language || 'english',
+                targetAudience: activeBrand?.dna?.targetAudience || '',
+                researchDepth: settings.researchDepth || 'quick',
             })
-            setResult(data.content)
+
+            // Map agentic response to our result format
+            const agenticContent = data.content
+            setResult({
+                _id: agenticContent._id,
+                content: agenticContent.agenticData?.draft?.content || agenticContent.content,
+                title: agenticContent.agenticData?.draft?.title || agenticContent.title,
+                hookLine: agenticContent.agenticData?.draft?.hookLine || '',
+                cta: agenticContent.agenticData?.draft?.cta || '',
+                hashtags: agenticContent.agenticData?.draft?.hashtags || [],
+                agenticData: agenticContent.agenticData,
+            })
             setStep(5)
         } catch (err) {
-            setError({ 
-                message: err.message || 'Generation failed.', 
-                isProviderError: err.isProviderError, 
-                provider: err.provider 
-            })
+            // Fallback to single-shot if agentic pipeline fails
+            console.warn('Agentic pipeline failed, falling back to single-shot:', err.message)
+            try {
+                const data = await contentAPI.generate({
+                    brandId: activeBrand._id,
+                    type: goal,
+                    subType,
+                    platform: Array.isArray(channel) ? channel.join(',') : channel,
+                    prompt,
+                    toneSettings: settings,
+                    options: modelOverride !== 'auto' ? { modelOverride } : {},
+                })
+                setResult(data.content)
+                setStep(5)
+            } catch (fallbackErr) {
+                setError({ 
+                    message: fallbackErr.message || 'Generation failed.', 
+                    isProviderError: fallbackErr.isProviderError, 
+                    provider: fallbackErr.provider 
+                })
+            }
         } finally {
             setGenerating(false)
         }
