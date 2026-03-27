@@ -64,6 +64,14 @@ export class OpenAIProvider extends BaseProvider {
     }
 
     async generateImage({ prompt, size = '1024x1024', model }) {
+        // Normalize size — Gemini uses '1K', aspect ratios, etc. but OpenAI only accepts specific dimensions
+        const sizeMap = {
+            '1K': '1024x1024', '1k': '1024x1024', '2K': '1024x1024', '2k': '1024x1024',
+            '1:1': '1024x1024', '4:5': '1024x1536', '5:4': '1536x1024',
+            '9:16': '1024x1536', '16:9': '1536x1024', '3:4': '1024x1536', '4:3': '1536x1024',
+            '2:3': '1024x1536', '3:2': '1536x1024',
+        };
+        const normalizedSize = sizeMap[size] || (['1024x1024', '1024x1536', '1536x1024', 'auto'].includes(size) ? size : 'auto');
         const response = await fetch(`${this.baseUrl}/images/generations`, {
             method: 'POST',
             headers: {
@@ -73,7 +81,7 @@ export class OpenAIProvider extends BaseProvider {
             body: JSON.stringify({
                 model: model || 'dall-e-3',
                 prompt,
-                size,
+                size: normalizedSize,
                 n: 1,
             }),
         });
