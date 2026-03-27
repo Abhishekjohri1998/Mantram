@@ -24,6 +24,7 @@ const USER_FACING_PATTERNS = [
 ];
 
 export function safeErrorMessage(error, fallback = 'Internal server error') {
+<<<<<<< Updated upstream
     // ALWAYS allow provider-categorized errors to pass through (disclaimers)
     if (error?.isProviderError || error?.provider) {
         return error.message;
@@ -37,6 +38,15 @@ export function safeErrorMessage(error, fallback = 'Internal server error') {
     }
 
 
+=======
+    const msg = error?.message || '';
+
+    // Always show real error in development
+    if (nodeEnv === 'development') {
+        return msg || fallback;
+    }
+
+>>>>>>> Stashed changes
     // In production: check if the error is user-facing (API/provider issue)
     const lowerMsg = msg.toLowerCase();
     const isUserFacing = USER_FACING_PATTERNS.some(pattern => lowerMsg.includes(pattern));
