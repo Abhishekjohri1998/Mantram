@@ -520,30 +520,39 @@ router.post('/generate-campaign-copy', protect, requireStudio('creativeStudio'),
         }
         const mergedFeatures = allFeatures.length > 0 ? allFeatures : featArr;
 
-        const systemPrompt = `You are an award-winning Brand Manager and Senior Copywriter who creates brand-specific, scroll-stopping ad copy.
+        const systemPrompt = `You are an award-winning Creative Director at a premium brand agency. You create emotionally resonant, culturally relevant campaign copy that captures attention and drives action.
 
 ${brandContext}
 
-You must write copy that REFLECTS THIS BRAND'S IDENTITY — mentioning specific products, services, and brand strengths.
-Do NOT write generic copy. Every headline and body must feel like it came from THIS brand's marketing team.
-If the brand sells earbuds, mention earbuds. If it's a skincare brand, mention skincare products. Be specific.`;
+YOUR CREATIVE PHILOSOPHY:
+- The campaign KEYWORD/THEME is a creative brief, NOT literal text to paste into headlines
+- A keyword like "summer" means: evoke warmth, sunshine, freedom, vacations, outdoor living — DON'T just write "Summer Sale" or use "summer" as a word
+- A keyword like "diwali" means: evoke celebration, light over darkness, togetherness, festive gifting — weave this EMOTION into the copy
+- A keyword like "fitness" means: evoke energy, transformation, strength, personal bests — make the reader FEEL motivated
+- Extract the EMOTIONAL CORE of the keyword and build the campaign narrative around that emotion
+- Every headline and body must feel like it came from THIS brand's marketing team — mentioning specific products, services, and strengths
+- Create copy that would make a brand manager say "This captures EXACTLY what we wanted to communicate"`;
 
-        const userPrompt = `CAMPAIGN NAME: "${campaignName || keyword}"
-CAMPAIGN GOAL: ${campaignGoal || 'awareness'}
-KEYWORD/TOPIC: "${keyword}"
-CTA: ${cta || 'Shop Now'}
-${price ? `PRICE POINT: ${price}\n` : ''}${productContextLines.length > 0 ? `PRODUCT LINEUP:\n${productContextLines.join('\n')}\n` : ''}${mergedFeatures.length > 0 && productContextLines.length === 0 ? `FEATURES TO HIGHLIGHT:\n${mergedFeatures.map((f, i) => `${i + 1}. ${f}`).join('\n')}\n` : ''}
+        const userPrompt = `CREATIVE BRIEF:
+- Campaign Name: "${campaignName || keyword}"
+- Campaign Theme/Keyword: "${keyword}" — This is the CREATIVE DIRECTION, not text to insert. Use it to set the mood, tone, visual language, and emotional narrative.
+- Campaign Goal: ${campaignGoal || 'awareness'}
+- CTA: ${cta || 'Shop Now'}
+${price ? `- Price Point: ${price}\n` : ''}${productContextLines.length > 0 ? `PRODUCT LINEUP:\n${productContextLines.join('\n')}\n` : ''}${mergedFeatures.length > 0 && productContextLines.length === 0 ? `FEATURES TO HIGHLIGHT:\n${mergedFeatures.map((f, i) => `${i + 1}. ${f}`).join('\n')}\n` : ''}
 Generate ${copyCount} unique ad copy variations as a JSON array.
 
-RULES:
-1. The HEADLINE must feature the campaign name "${campaignName || keyword}" prominently
+CREATIVE RULES:
+1. Headlines (4-8 words): Create EVOCATIVE, scroll-stopping headlines that capture the ESSENCE of "${keyword}" — NOT by using the word "${keyword}" literally, but by channeling its mood, energy, and associations. Think like a creative director writing a tagline.
+   - BAD: "${keyword} Sale" or "${keyword} — Buy Now" (lazy, literal)
+   - GOOD: Headlines that FEEL like the keyword without necessarily containing it — capture the season, trend, emotion, or cultural moment
+   - The campaign name "${campaignName || keyword}" can appear in 1-2 headlines for brand recognition, but the majority should be creative interpretations
 2. ${productContextLines.length > 0 ? 'Each variation MUST match its assigned product and feature' : mergedFeatures.length > 0 ? 'Each body MUST highlight a DIFFERENT feature' : 'Each body approaches from a DIFFERENT angle (benefit, urgency, emotion, social proof, lifestyle)'}
-3. Body copy: 12-20 words, punchy, brand-specific. Reference actual brand products/services.
-4. Headlines: 4-7 words. Must include campaign name.
-5. CTA must be "${cta || 'Shop Now'}" for all.
-6. Add a "feature" field to each JSON object.${productContextLines.length > 0 ? '\n7. Add a "product" field to each JSON object.' : ''}
+3. Body copy: 12-25 words, punchy, brand-specific. Reference actual brand products/services. The tone should REFLECT the keyword's mood.
+4. CTA must be "${cta || 'Shop Now'}" for all.
+5. Add a "feature" field to each JSON object.${productContextLines.length > 0 ? '\n6. Add a "product" field to each JSON object.' : ''}
+6. Add a "theme_direction" field: a short phrase describing the visual mood/color direction this copy suggests (e.g., "warm golden tones, outdoor lifestyle" for summer).
 
-Return ONLY valid JSON: [{"headline":"...","body":"...","cta":"...","feature":"..."${productContextLines.length > 0 ? ',"product":"..."' : ''}}]
+Return ONLY valid JSON: [{"headline":"...","body":"...","cta":"...","feature":"...","theme_direction":"..."${productContextLines.length > 0 ? ',"product":"..."' : ''}}]
 No markdown, no explanation.`;
 
         const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;

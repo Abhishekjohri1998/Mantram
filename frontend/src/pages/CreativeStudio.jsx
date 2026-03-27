@@ -4122,15 +4122,15 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     const brandTagline = activeBrand?.dna?.tagline || '';
                                                     const fallback = Array.from({length: campCount}, (_, i) => {
                                                         const prod = campProducts.length > 1 ? campProducts[i % campProducts.length] : campProducts[0];
-                                                        const pName = prod?.title || brandServices[i % Math.max(1, brandServices.length)] || campKeyword;
+                                                        const pName = prod?.title || brandServices[i % Math.max(1, brandServices.length)] || activeBrand?.name || 'Our Products';
                                                         const pPrice = prod?.price?.amount ? `₹${prod.price.amount.toLocaleString('en-IN')}` : (campPrice || '');
                                                         const feat = prod?.features?.[i % Math.max(1, prod.features?.length || 1)] || campFeatures[i % Math.max(1, campFeatures.length)] || brandUSPs[i % Math.max(1, brandUSPs.length)] || '';
                                                         const angles = [
-                                                            {h: `${campName||campKeyword} — ${feat || `by ${activeBrand?.name}`}`, b: `${brandTagline || `Discover ${pName}`}. ${feat ? feat + '. ' : ''}${pPrice ? pPrice + '. ' : ''}${campCta}.`},
-                                                            {h: `${campName||campKeyword} — Limited Time`, b: `Get ${pName} from ${activeBrand?.name || 'us'}${feat ? ' with ' + feat : ''}. ${pPrice ? 'Just ' + pPrice + '. ' : ''}${campCta}.`},
-                                                            {h: `${campName||campKeyword} — #1 Choice`, b: `Loved by thousands, ${activeBrand?.name}'s ${pName} delivers ${feat || 'excellence'}. ${pPrice ? pPrice + '. ' : ''}${campCta}.`},
+                                                            {h: `${feat || pName} — Reimagined for You`, b: `${brandTagline || `Discover ${pName}`}. ${feat ? feat + '. ' : ''}${pPrice ? pPrice + '. ' : ''}${campCta}.`, td: `Inspired by ${campKeyword} — warm, inviting tones`},
+                                                            {h: `Elevate Your ${feat || 'Experience'}`, b: `${pName} from ${activeBrand?.name || 'us'}${feat ? ' with ' + feat : ''}. ${pPrice ? 'Just ' + pPrice + '. ' : ''}${campCta}.`, td: `${campKeyword}-themed mood, aspirational`},
+                                                            {h: `The ${activeBrand?.name || 'Brand'} Difference`, b: `Loved by thousands. ${pName} delivers ${feat || 'excellence'}. ${pPrice ? pPrice + '. ' : ''}${campCta}.`, td: `Premium ${campKeyword} aesthetic, trust-building`},
                                                         ];
-                                                        return {headline: angles[i % angles.length].h, body: angles[i % angles.length].b, cta: campCta, product: pName, feature: feat};
+                                                        return {headline: angles[i % angles.length].h, body: angles[i % angles.length].b, cta: campCta, product: pName, feature: feat, theme_direction: angles[i % angles.length].td};
                                                     });
                                                     setCampCopies(fallback);
                                                 }
@@ -4140,8 +4140,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 const brandServices = activeBrand?.dna?.servicesOffered || [];
                                                 const errCopies = Array.from({length: campCount}, (_, i) => {
                                                     const prod = campProducts.length > 1 ? campProducts[i % campProducts.length] : campProducts[0];
-                                                    const pName = prod?.title || brandServices[i % Math.max(1, brandServices.length)] || campKeyword;
-                                                    return {headline: `${campName||campKeyword} — ${pName}`, body: `${prod?.features?.[0] || activeBrand?.dna?.tagline || 'Your message here'}. ${prod?.price?.amount ? '₹' + prod.price.amount.toLocaleString('en-IN') + '. ' : ''}${campCta}.`, cta: campCta, product: pName, feature: prod?.features?.[0] || ''};
+                                                    const pName = prod?.title || brandServices[i % Math.max(1, brandServices.length)] || activeBrand?.name || 'Our Products';
+                                                    return {headline: `${pName} — Made for You`, body: `${prod?.features?.[0] || activeBrand?.dna?.tagline || 'Exceptional quality'}. ${prod?.price?.amount ? '₹' + prod.price.amount.toLocaleString('en-IN') + '. ' : ''}${campCta}.`, cta: campCta, product: pName, feature: prod?.features?.[0] || '', theme_direction: `${campKeyword}-inspired visual mood`};
                                                 });
                                                 setCampCopies(errCopies);
                                             }
@@ -4345,28 +4345,37 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 // Feature assignment: per-product features first, then campFeatures fallback
                                                 const featurePool=prodFeatures.length>0?prodFeatures:campFeatures;
                                                 const assignedFeature=featurePool.length>0?featurePool[i%featurePool.length]:null;
-                                                let prompt=`CAMPAIGN CREATIVE #${i+1} for "${campName||campKeyword}" by ${activeBrand?.name||'Brand'}${activeBrand?.dna?.industry ? ` (${activeBrand.dna.industry})` : ''}.${prodData?.title?` Product: ${prodData.title}.`:''}
+                                                let prompt=`CAMPAIGN CREATIVE #${i+1} for ${activeBrand?.name||'Brand'}${activeBrand?.dna?.industry ? ` (${activeBrand.dna.industry})` : ''}.${prodData?.title?` Product: ${prodData.title}.`:''}
 
+CREATIVE THEME/MOOD: "${campKeyword}" — This is the CREATIVE DIRECTION for the visual. Do NOT put the word "${campKeyword}" as text on the image. Instead, visually EMBODY this theme:
+- If "${campKeyword}" is a SEASON (summer, winter, monsoon): Use season-appropriate colors, lighting, props, and atmosphere. Summer = warm golden tones, sunshine, outdoor vibes, bright energy. Winter = cool tones, cozy textures, warm indoor lighting.
+- If "${campKeyword}" is a TREND (fitness, wellness, eco): Use lifestyle imagery, aspirational settings, and emotionally resonant compositions that evoke the trend.
+- If "${campKeyword}" is a FESTIVAL (diwali, christmas, eid): Use festive colors, cultural motifs, celebration imagery, and joyful composition.
+- If "${campKeyword}" is a CONCEPT (luxury, innovation, trust): Use visual metaphors, premium aesthetics, and design elements that communicate the concept.
+${copy.theme_direction ? `VISUAL DIRECTION FROM COPY: ${copy.theme_direction}\n` : ''}
 BRAND CONTEXT:
 - Brand: ${activeBrand?.name || 'Brand'}${activeBrand?.dna?.industry ? `, ${activeBrand.dna.industry}` : ''}
-${activeBrand?.dna?.tagline ? `- Tagline: "${activeBrand.dna.tagline}"\n` : ''}${activeBrand?.dna?.voice?.personality ? `- Brand Personality: ${activeBrand.dna.voice.personality}\n` : ''}${activeBrand?.dna?.targetAudience ? `- Target Audience: ${activeBrand.dna.targetAudience}\n` : ''}${activeBrand?.dna?.colors?.primary || activeBrand?.dna?.colors?.secondary ? `- Brand Colors: Use ${[activeBrand?.dna?.colors?.primary, activeBrand?.dna?.colors?.secondary, activeBrand?.dna?.colors?.accent].filter(Boolean).join(', ')} as the dominant color palette\n` : ''}
-CAMPAIGN NAME (must appear prominently): "${campName||campKeyword}"
-HEADLINE: ${copy.headline}
-BODY TEXT: ${copy.body}
-${assignedFeature?`FEATURE HIGHLIGHT: This creative MUST visually emphasize the feature "${assignedFeature}". Make this feature the visual hero — show it in action, highlight it with callouts, or design the composition around it.\n`:''}${prodPrice?`PRICE: ${prodPrice}\n`:''}CTA BUTTON: ${copy.cta}
+${activeBrand?.dna?.tagline ? `- Tagline: "${activeBrand.dna.tagline}"\n` : ''}${activeBrand?.dna?.voice?.personality ? `- Brand Personality: ${activeBrand.dna.voice.personality}\n` : ''}${activeBrand?.dna?.targetAudience ? `- Target Audience: ${activeBrand.dna.targetAudience}\n` : ''}${activeBrand?.dna?.colors?.primary || activeBrand?.dna?.colors?.secondary ? `- Brand Colors: Blend ${[activeBrand?.dna?.colors?.primary, activeBrand?.dna?.colors?.secondary, activeBrand?.dna?.colors?.accent].filter(Boolean).join(', ')} with the theme's mood palette\n` : ''}
+TEXT OVERLAY (keep clean and minimal):
+- Campaign Name: "${campName||campKeyword}" — display as elegant typography, NOT the largest element
+- Headline: ${copy.headline}
+- Body: ${copy.body}
+${assignedFeature?`- Feature Highlight: "${assignedFeature}" — visually emphasize this through composition, callouts, or iconography\n`:''}${prodPrice?`- Price: ${prodPrice}\n`:''}CTA: ${copy.cta}
+
 CAMPAIGN GOAL: ${campGoal}
 DESIGN STYLE: ${campStyle}
 
 PHOTOGRAPHY DIRECTION: ${angle}
-SCENE/SETTING: ${campScene==='auto'?'AI decides the best scene and setting for maximum impact':campScene==='studio'?'Clean professional studio with neutral/gradient backdrop, controlled lighting':campScene==='outdoor'?'Natural outdoor setting — golden hour, lush greenery, or dramatic sky':campScene==='indoor'?'Styled interior — modern, cozy, or luxurious room setting':campScene==='podium'?'Product displayed on a sleek pedestal/podium with dramatic lighting':campScene==='hands'?'Product being held in elegant hands, human touch, clean background':campScene==='model'?'Attractive person using/wearing the product in a natural, aspirational way':campScene==='flatlay'?'Top-down flat lay arrangement with curated props and styling':campScene==='lifestyle'?'Product in real-life use context — home, office, on-the-go':campScene==='urban'?'Urban street/city background with modern architecture':campScene==='nature'?'Natural landscape — beach, mountains, forest, water':'Minimalist clean backdrop with ample negative space'}
-${productImg?'Feature the provided product image as the hero element, shot from this specific angle/composition direction.\n':''}${campCampaignLogo&&campLogoPlacement!=='none'?`Campaign logo MUST appear at ${campLogoPlacement} position.\n`:''}${campStyleRef?'Match the visual mood and design language of the provided style reference.\n':''}
+SCENE/SETTING: ${campScene==='auto'?`AI decides the best scene that EMBODIES the "${campKeyword}" theme for maximum emotional impact`:campScene==='studio'?'Clean professional studio with neutral/gradient backdrop, controlled lighting':campScene==='outdoor'?'Natural outdoor setting — golden hour, lush greenery, or dramatic sky':campScene==='indoor'?'Styled interior — modern, cozy, or luxurious room setting':campScene==='podium'?'Product displayed on a sleek pedestal/podium with dramatic lighting':campScene==='hands'?'Product being held in elegant hands, human touch, clean background':campScene==='model'?'Attractive person using/wearing the product in a natural, aspirational way':campScene==='flatlay'?'Top-down flat lay arrangement with curated props and styling':campScene==='lifestyle'?'Product in real-life use context — home, office, on-the-go':campScene==='urban'?'Urban street/city background with modern architecture':campScene==='nature'?'Natural landscape — beach, mountains, forest, water':'Minimalist clean backdrop with ample negative space'}
+${productImg?'Feature the provided product image as the hero element, shot from this specific angle/composition direction.\n':''}${campCampaignLogo&&campLogoPlacement!=='none'?`Campaign logo at ${campLogoPlacement} position.\n`:''}${campStyleRef?'Match the visual mood and design language of the provided style reference.\n':''}
 DESIGN RULES:
-- The campaign name "${campName||campKeyword}" must be the LARGEST, most prominent text
-- Supporting copy complements but never overpowers the campaign name
-- Professional advertising creative — scroll-stopping, magazine-quality
+- The VISUAL THEME inspired by "${campKeyword}" should dominate the creative's mood, color palette, and atmosphere
+- Product/subject is the visual hero, with theme elements enhancing the composition
+- Professional advertising creative — scroll-stopping, magazine-quality, emotionally resonant
 - ${campStyle} design aesthetic with premium typography
-- Clear visual hierarchy: Campaign Name → Product → Body → CTA
-${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sticker, or callout in the creative\n`:''}- Aspect ratio: ${size}`;                                                const opts={aspectRatio:size,style:campStyle};
+- Visual hierarchy: Theme Mood → Product/Subject → Supporting Copy → CTA
+- DO NOT literally write the word "${campKeyword}" as decorative text — let the visuals COMMUNICATE the theme
+${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callout that matches the theme\n`:''}- Aspect ratio: ${size}`;                                                const opts={aspectRatio:size,style:campStyle};
                                                 if(productImg&&productImg.startsWith('data:'))opts.baseImage=productImg;
                                                 else if(productImg)opts.productImageUrl=productImg;
                                                 if(campStyleRef)opts.referenceImages={style:campStyleRef};
