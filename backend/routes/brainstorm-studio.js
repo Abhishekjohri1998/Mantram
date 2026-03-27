@@ -5,6 +5,8 @@ import { requireStudio } from '../middleware/studioAccess.js';
 import { requireCredits } from '../middleware/credits.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import BrandStrategy from '../models/BrandStrategy.js';
+import { getRouter } from '../ai/router.js';
+import { extractJSON } from '../utils/ai-parser.js';
 
 const router = Router();
 
@@ -12,39 +14,27 @@ const router = Router();
 // HELPERS
 // ============================================================================
 
-// AI call with smart router (handles language/task intelligence and fallbacks)
 async function aiCall(systemPrompt, userPrompt, options = {}) {
-  const { temperature = 0.7, maxTokens = 4096, taskType = 'blog', timeout = 600000 } = options;
-  const router = getSmartRouter();
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout);
-
+  const { temperature = 0.7, maxTokens = 4096, timeout = 600000 } = options;
+  
   try {
-    const result = await router.generateText(
-      { systemPrompt, userPrompt, temperature, maxTokens },
-      { ...options, taskType, signal: controller.signal }
-    );
+    const aiRouter = getRouter();
+    const result = await aiRouter.generateText({
+      systemPrompt,
+      userPrompt,
+      temperature,
+      maxTokens,
+    }, { provider: options.provider });
+
     return result.text;
-  } catch (e) {
-    if (e.name === 'AbortError') {
-      console.error('Brainstorm AI timeout after', timeout, 'ms');
-      throw e;
-    }
-    console.error('Brainstorm AI Call Error:', e.message);
-    throw new Error('All AI models failed');
-  } finally {
-    clearTimeout(timer);
+  } catch (error) {
+    console.error('Brainstorm aiCall bridge error:', error.message);
+    throw error;
   }
 }
 
-// Parse JSON from AI response (handles markdown code blocks)
 function parseJSON(text) {
-  let clean = text.trim();
-  if (clean.startsWith('```')) {
-    clean = clean.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
-  }
-  return JSON.parse(clean);
+  return extractJSON(text);
 }
 
 // Intent configs — advanced strategic questions with keyword suggestions

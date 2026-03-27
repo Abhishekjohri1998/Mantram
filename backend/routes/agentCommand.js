@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { optionalAuth } from '../middleware/auth.js';
 import { safeErrorMessage } from '../utils/safeError.js';
+import { getRouter } from '../ai/router.js';
+import { extractJSON } from '../utils/ai-parser.js';
 
 const router = Router();
 
@@ -9,109 +11,25 @@ const router = Router();
 // ============================================================================
 async function aiCall(systemPrompt, userPrompt, options = {}) {
     const { temperature = 0.7, maxTokens = 4096, json = false, timeout = 600000 } = options;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeout);
-
+    
     try {
-        // Try Gemini first (cheapest and fast)
-        const geminiKey = process.env.GEMINI_API_KEY;
-        if (geminiKey) {
-            try {
-                const resp = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
-                    {
-                        method: 'POST',
-                        signal: controller.signal,
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            systemInstruction: { parts: [{ text: systemPrompt }] },
-                            contents: [{ parts: [{ text: userPrompt }] }],
-                            generationConfig: {
-                                temperature,
-                                maxOutputTokens: maxTokens,
-                                ...(json ? { responseMimeType: 'application/json' } : {}),
-                            },
-                        }),
-                    }
-                );
-                const data = await resp.json();
-                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (text) return text;
-            } catch (e) {
-                if (e.name === 'AbortError') throw e;
-                console.warn('Gemini error:', e.message);
-            }
-        }
+        const aiRouter = getRouter();
+        const result = await aiRouter.generateText({
+            systemPrompt,
+            userPrompt,
+            temperature,
+            maxTokens,
+        }, { provider: options.provider });
 
-        // Fallback to GPT-4o-mini
-        if (process.env.OPENAI_API_KEY) {
-            try {
-                const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-                    method: 'POST',
-                    signal: controller.signal,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-                    },
-                    body: JSON.stringify({
-                        model: 'gpt-4o-mini',
-                        messages: [
-                            { role: 'system', content: systemPrompt },
-                            { role: 'user', content: userPrompt },
-                        ],
-                        temperature,
-                        max_tokens: maxTokens,
-                        ...(json ? { response_format: { type: 'json_object' } } : {}),
-                    }),
-                });
-                const data = await resp.json();
-                if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
-            } catch (e) {
-                if (e.name === 'AbortError') throw e;
-                console.warn('GPT fallback error:', e.message);
-            }
-        }
-
-        // Last resort: Claude (premium — most expensive)
-        if (process.env.ANTHROPIC_API_KEY) {
-            try {
-                const resp = await fetch('https://api.anthropic.com/v1/messages', {
-                    method: 'POST',
-                    signal: controller.signal,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-api-key': process.env.ANTHROPIC_API_KEY,
-                        'anthropic-version': '2023-06-01',
-                    },
-                    body: JSON.stringify({
-                        model: process.env.DEFAULT_TEXT_MODEL || 'claude-3-5-sonnet-20240620',
-                        max_tokens: maxTokens,
-                        system: systemPrompt,
-                        messages: [{ role: 'user', content: userPrompt }],
-                        temperature,
-                    }),
-                });
-                const data = await resp.json();
-                if (data.content?.[0]?.text) return data.content[0].text;
-                if (data.error) console.warn('Claude failed:', data.error.message);
-            } catch (e) {
-                if (e.name === 'AbortError') throw e;
-                console.warn('Claude error:', e.message);
-            }
-        }
-
-        throw new Error('All AI models failed');
-    } finally {
-        clearTimeout(timer);
+        return result.text;
+    } catch (error) {
+        console.error('Agent aiCall bridge error:', error.message);
+        throw error;
     }
 }
 
 function parseJSON(text) {
-    let clean = text.trim();
-    if (clean.startsWith('```')) {
-        clean = clean.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
-    }
-    return JSON.parse(clean);
+    return extractJSON(text);
 }
 
 // ============================================================================
@@ -401,9 +319,7 @@ RESPONSE FORMAT — respond in STRICT JSON:
             console.log(`🎨 Agent: Generating image (ratio: ${ratio} → ${imageSize}, brand: ${brand?.name || 'none'}, brandImages: ${brandImgs.length})`);
 
             try {
-                const { getRouter } = await import('../ai/router.js');
-                const aiRouter = getRouter();
-                const imageResult = await aiRouter.generateImage({
+                const aiResult = await aiRouter.generateImage({
                     prompt: cleanPrompt,
                     size: imageSize,
                 });

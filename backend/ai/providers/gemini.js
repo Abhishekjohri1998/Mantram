@@ -109,46 +109,48 @@ export class GeminiProvider extends BaseProvider {
      */
     async generateImage({ prompt, size = '1024x1024', model }) {
         const startTime = Date.now();
-        const [width, height] = size.split('x').map(Number);
-        const aspectRatio = width === height ? '1:1' : width > height ? '16:9' : '9:16';
         const imageKey = this.imageApiKey;
-        const models = ['gemini-2.5-flash', 'gemini-2.5-pro'];
+        // Search for a functional image model or fail clearly for fallback
+        const models = [model || this.config.defaultImageModel, 'imagen-3', 'imagen-3-fast'].filter(Boolean);
         let lastError = null;
 
         for (const modelId of models) {
             try {
-                const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
+                // If the model looks like a text model, fail early to trigger fallback
+                if (modelId.includes('flash') || modelId.includes('pro') || modelId.includes('gemini-2')) {
+                    throw new Error(`Model ${modelId} does not support image generation`);
+                }
+
+                const url = `${this.baseUrl}/models/${modelId}:predict?key=${imageKey}`;
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{ role: 'user', parts: [{ text: `Generate an image: ${prompt}` }] }],
-                        generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+                        instances: [{ prompt }],
+                        parameters: { sampleCount: 1, aspectRatio: size.includes('x') ? '1:1' : '1:1' }
                     }),
                 });
 
                 const data = await response.json();
                 if (data.error) {
                     lastError = data.error.message;
-                    continue; // try next model
+                    continue; 
                 }
 
-                const parts = data.candidates?.[0]?.content?.parts || [];
-                for (const part of parts) {
-                    if (part.inlineData?.mimeType?.startsWith('image/')) {
-                        return {
-                            imageUrl: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`,
-                            model: modelId,
-                            provider: 'gemini',
-                            generationTime: Date.now() - startTime,
-                        };
-                    }
+                const prediction = data.predictions?.[0];
+                if (prediction?.bytesBase64Encoded) {
+                    return {
+                        imageUrl: `data:image/png;base64,${prediction.bytesBase64Encoded}`,
+                        model: modelId,
+                        provider: 'gemini',
+                        generationTime: Date.now() - startTime,
+                    };
                 }
             } catch (err) {
                 lastError = err.message;
                 continue;
             }
         }
-        throw new Error(`NanoBanana/Gemini Image models failed. Last error: ${lastError}`);
+        throw new Error(`Gemini Image generation failed. Models tried: ${models.join(', ')}. Last error: ${lastError}`);
     }
 }

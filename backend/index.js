@@ -363,7 +363,8 @@ process.on('uncaughtException', (err) => {
 
 // Catch-all 404 logger — suppress for known bot scans
 app.use((req, res) => {
-    if (!req.isBotScan) {
+    // Catch-all 404 logger — suppress for known bot scans and POST / noise
+    if (!req.isBotScan && !(req.method === 'POST' && req.path === '/')) {
         console.warn(`[404] Not Found: ${req.method} ${req.originalUrl}`);
     }
     res.status(404).json({ success: false, error: `Route ${req.originalUrl} not found` });

@@ -6,8 +6,9 @@ import { requireCredits } from '../middleware/credits.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import SocialStrategy from '../models/SocialStrategy.js';
 import SocialAccount from '../models/SocialAccount.js';
-import SocialPost from '../models/SocialPost.js';
 import { fetchRecentPosts } from '../services/socialService.js';
+import { getRouter } from '../ai/router.js';
+import { extractJSON } from '../utils/ai-parser.js';
 
 const router = Router();
 
@@ -16,86 +17,26 @@ const router = Router();
 // ============================================================================
 
 async function aiCall(systemPrompt, userPrompt, options = {}) {
-    const { temperature = 0.7, maxTokens = 4096, json = false, timeout = 600000 } = options;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeout);
-
+    const { temperature = 0.7, maxTokens = 4096, timeout = 600000 } = options;
+    
     try {
-        if (process.env.OPENAI_API_KEY) {
-            try {
-                const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-                    method: 'POST',
-                    signal: controller.signal,
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-                    body: JSON.stringify({
-                        model: 'gpt-4o-mini',
-                        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-                        temperature, max_tokens: maxTokens,
-                        ...(json ? { response_format: { type: 'json_object' } } : {}),
-                    }),
-                });
-                const data = await resp.json();
-                if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
-                if (data.error) console.warn('GPT-4o-mini failed:', data.error.message);
-            } catch (e) {
-                if (e.name === 'AbortError') throw e;
-                console.warn('GPT-4o-mini error:', e.message);
-            }
-        }
+        const aiRouter = getRouter();
+        const result = await aiRouter.generateText({
+            systemPrompt,
+            userPrompt,
+            temperature,
+            maxTokens,
+        }, { provider: options.provider });
 
-        const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
-        if (geminiKey) {
-            for (const model of ['gemini-2.5-flash', 'gemini-2.5-pro']) {
-                try {
-                    const resp = await fetch(
-                        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
-                        {
-                            method: 'POST', 
-                            signal: controller.signal,
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                systemInstruction: { parts: [{ text: systemPrompt }] },
-                                contents: [{ parts: [{ text: userPrompt }] }],
-                                generationConfig: { temperature, maxOutputTokens: maxTokens, ...(json ? { responseMimeType: 'application/json' } : {}) },
-                            }),
-                        }
-                    );
-                    const data = await resp.json();
-                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (text) return text;
-                } catch (e) {
-                    if (e.name === 'AbortError') throw e;
-                    console.warn(`Gemini ${model} error:`, e.message);
-                }
-            }
-        }
-        throw new Error('All AI models failed');
-    } finally {
-        clearTimeout(timer);
+        return result.text;
+    } catch (error) {
+        console.error('SocialStudio aiCall bridge error:', error.message);
+        throw error;
     }
 }
 
 function parseJSON(text) {
-    if (!text) return {};
-    try {
-        let clean = text.trim();
-        if (clean.startsWith('```')) {
-            clean = clean.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
-        }
-        return JSON.parse(clean);
-    } catch (e) {
-        console.warn('[SocialStudio] JSON Parse failed:', e.message, 'Text snippet:', text.substring(0, 100));
-        // Try to extract JSON if it was wrapped in other text
-        const match = text.match(/\{[\s\S]*\}/);
-        if (match) {
-            try {
-                return JSON.parse(match[0]);
-            } catch {
-                return {};
-            }
-        }
-        return {};
-    }
+    return extractJSON(text);
 }
 
 function buildBrandContext(brand) {

@@ -35,228 +35,49 @@ import {
 } from '../utils/onpage-api.js';
 import { jsRenderCrawl, formatJSCrawlForPrompt } from '../utils/js-crawler.js';
 import { scoreSiteContent, formatContentScoresForPrompt } from '../utils/content-scorer.js';
-import { crawlCompetitor, compareSnapshots, analyzeKeywordOverlap, formatCompetitorMonitorForPrompt } from '../utils/competitor-monitor.js';
 import CompetitorSnapshot from '../models/CompetitorSnapshot.js';
+import { getRouter } from '../ai/router.js';
+import { extractJSON } from '../utils/ai-parser.js';
 
 const router = Router();
 
-// ============================================================================
-// AI CALL HELPER
-// ============================================================================
+// AI calls are now handled by the central ModelRouter in ../ai/router.js
+// JSON extraction is handled by extractJSON in ../utils/ai-parser.js
 
 // Track last AI call's token usage for downstream logging
 let lastTokenUsage = null;
 export function getLastTokenUsage() { return lastTokenUsage; }
 
 async function aiCall(systemPrompt, userPrompt, options = {}) {
-  const { temperature = 0.7, maxTokens = 8192, json = false, timeout = 120000 } = options;
+  const { temperature = 0.7, maxTokens = 8192, json = false, timeout = 120000, provider: preferredProvider } = options;
   lastTokenUsage = null;
 
-  const overallController = new AbortController();
-  const overallTimer = setTimeout(() => overallController.abort(), timeout);
-
-  // Cost optimization: default to Gemini (free/cheapest), Claude only as last resort
-  const defaultProvider = process.env.DEFAULT_TEXT_PROVIDER || 'gemini';
-  const defaultModel = process.env.DEFAULT_TEXT_MODEL;
-  
-  // Provider priority: cheapest → most expensive
-  const providers = [
-    { name: 'gemini', key: process.env.GEMINI_API_KEY || process.env.GEMINI_IMAGE_API_KEY },
-    { name: 'xai', key: process.env.GROK_API_KEY || process.env.XAI_API_KEY },
-    { name: 'openai', key: process.env.OPENAI_API_KEY },
-    { name: 'anthropic', key: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY },
-  ];
-
-  const sortedProviders = [
-    ...providers.filter(p => p.name === defaultProvider),
-    ...providers.filter(p => p.name !== defaultProvider)
-  ];
-
-  const isQuotaError = (status, data) => {
-    if (status === 429) return true;
-    const errText = JSON.stringify(data || {}).toLowerCase();
-    return errText.includes('quota') || errText.includes('rate limit') || errText.includes('limit exceeded') || errText.includes('throttled') || errText.includes('credit balance') || errText.includes('resource_exhausted');
-  };
-
   try {
-    for (const provider of sortedProviders) {
-      if (!provider.key || overallController.signal.aborted) continue;
+    const aiRouter = getRouter();
+    const result = await aiRouter.generateText({
+      systemPrompt,
+      userPrompt,
+      temperature,
+      maxTokens,
+    }, { provider: preferredProvider });
 
-      console.log(`🤖 aiCall: Trying ${provider.name}...`);
+    // Sync lastTokenUsage for backward compatibility with logTokenUsage
+    lastTokenUsage = {
+      inputTokens: Math.floor(result.tokensUsed * 0.3), // Heuristic split
+      outputTokens: Math.floor(result.tokensUsed * 0.7),
+      model: result.model,
+      provider: result.provider
+    };
 
-      try {
-        // We rely entirely on the overallController to enforce strict global budgets.
-
-        if (provider.name === 'anthropic') {
-          const modelId = (defaultProvider === 'anthropic' && defaultModel) ? defaultModel : 'claude-3-5-sonnet-20240620';
-          const resp = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': provider.key,
-              'anthropic-version': '2023-06-01'
-            },
-            body: JSON.stringify({
-              model: modelId,
-              max_tokens: maxTokens,
-              system: systemPrompt,
-              messages: [{ role: 'user', content: userPrompt }],
-              temperature,
-            }),
-            signal: overallController.signal,
-          });
-          const data = await resp.json();
-          if (resp.ok && data.content?.[0]?.text) {
-            lastTokenUsage = { inputTokens: data.usage?.input_tokens || 0, outputTokens: data.usage?.output_tokens || 0, model: modelId, provider: 'anthropic' };
-            return data.content[0].text;
-          } else {
-            const err = data.error?.message || JSON.stringify(data);
-            console.warn(`Claude ${modelId} error (${resp.status}): ${err}`);
-            if (isQuotaError(resp.status, data)) continue;
-          }
-        }
-
-        if (provider.name === 'openai') {
-          const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${provider.key}` },
-            body: JSON.stringify({
-              model: 'gpt-4o-mini',
-              messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-              temperature, max_tokens: maxTokens,
-              ...(json ? { response_format: { type: 'json_object' } } : {}),
-            }),
-            signal: overallController.signal,
-          });
-          const data = await resp.json();
-          if (resp.ok && data.choices?.[0]?.message?.content) {
-            lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'gpt-4o-mini', provider: 'openai' };
-            return data.choices[0].message.content;
-          } else {
-            const err = data.error?.message || JSON.stringify(data);
-            console.warn(`OpenAI error (${resp.status}): ${err}`);
-            if (isQuotaError(resp.status, data)) continue;
-          }
-        }
-
-        if (provider.name === 'xai') {
-          const resp = await fetch('https://api.x.ai/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${provider.key}` },
-            body: JSON.stringify({
-              model: 'grok-3-mini-fast',
-              messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-              temperature, max_tokens: maxTokens,
-              ...(json ? { response_format: { type: 'json_object' } } : {}),
-            }),
-            signal: overallController.signal,
-          });
-          const data = await resp.json();
-          if (resp.ok && data.choices?.[0]?.message?.content) {
-            lastTokenUsage = { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0, model: 'grok-3-mini-fast', provider: 'xai' };
-            return data.choices[0].message.content;
-          } else {
-            console.warn(`Grok error (${resp.status}):`, JSON.stringify(data));
-          }
-        }
-
-        if (provider.name === 'gemini') {
-          const models = ['gemini-2.5-flash', 'gemini-2.5-pro'];
-          for (const modelId of models) {
-            if (overallController.signal.aborted) break;
-            try {
-              const resp = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${provider.key}`,
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
-                    generationConfig: {
-                      temperature, 
-                      maxOutputTokens: maxTokens,
-                      ...(json ? { responseMimeType: 'application/json' } : {}),
-                    },
-                  }),
-                  signal: overallController.signal,
-                }
-              );
-              const data = await resp.json();
-              if (resp.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-                const text = data.candidates[0].content.parts[0].text;
-                lastTokenUsage = { inputTokens: data.usageMetadata?.promptTokenCount || 0, outputTokens: data.usageMetadata?.candidatesTokenCount || 0, model: modelId, provider: 'gemini' };
-                return text;
-              } else {
-                console.warn(`Gemini ${modelId} error (${resp.status}):`, JSON.stringify(data.error || data));
-                // If limit is 0 or quota exceeded, try next Gemini model
-                if (isQuotaError(resp.status, data)) continue;
-              }
-            } catch (e) {
-              console.warn(`Gemini ${modelId} request fail: ${e.message}`);
-            }
-          }
-        }
-      } catch (e) {
-        console.warn(`${provider.name} provider error: ${e.message}`);
-        if (overallController.signal.aborted) throw e;
-      }
-    }
-
-    throw new Error('All AI models failed, quotas exceeded, or total timeout reached');
-  } finally {
-    clearTimeout(overallTimer);
+    return result.text;
+  } catch (error) {
+    console.error('aiCall bridge error:', error.message);
+    throw error;
   }
 }
 
-
-
 function parseJSON(text) {
-  try {
-    let clean = text.trim();
-    // 1. Extract JSON from markdown code blocks
-    if (clean.includes('```')) {
-      const match = clean.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
-      if (match) {
-        clean = match[1].trim();
-      } else {
-        // Truncated markdown: remove only the start indicator
-        clean = clean.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
-      }
-    }
-
-    // 2. Simple truncation repair (heuristic)
-    if (clean.startsWith('{') && !clean.endsWith('}')) {
-      // If a string is open, close it
-      if ((clean.match(/"/g) || []).length % 2 !== 0) {
-        // Basic check for escaped trailing quote: if ends with \" don't add "
-        if (!clean.endsWith('\\"')) clean += '"';
-      }
-      // Re-balance braces and brackets
-      const stack = [];
-      for (let i = 0; i < clean.length; i++) {
-        const char = clean[i];
-        if (char === '{') stack.push('}');
-        else if (char === '[') stack.push(']');
-        else if (char === '}' || char === ']') stack.pop();
-      }
-      while (stack.length) clean += stack.pop();
-    }
-
-    return JSON.parse(clean);
-  } catch (e) {
-    // 3. Last-ditch: extract the first valid-looking object structure
-    const firstBrace = text.indexOf('{');
-    const lastBrace = text.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-      try {
-        return JSON.parse(text.substring(firstBrace, lastBrace + 1));
-      } catch (innerE) {
-        console.error('CRITICAL: AI JSON Parse Failed. Length:', text.length, 'Error:', e.message);
-        throw e;
-      }
-    }
-    throw e;
-  }
+  return extractJSON(text);
 }
 
 // Build brand context

@@ -26,8 +26,9 @@ export async function getPageSpeed(url, strategy = 'mobile') {
     const data = await resp.json();
 
     if (data.error) {
+      const isQuota = data.error.message?.toLowerCase().includes('quota exceeded');
       console.warn(`⚡ PageSpeed error:`, data.error.message);
-      return { success: false, error: data.error.message, url: normalizedUrl, strategy };
+      return { success: false, error: data.error.message, quotaExceeded: isQuota, url: normalizedUrl, strategy };
     }
 
     // Extract Lighthouse scores
