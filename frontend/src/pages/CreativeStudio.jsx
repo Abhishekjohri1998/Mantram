@@ -344,6 +344,8 @@ export default function CreativeStudio() {
     const [publishData, setPublishData] = useState(null) // { image, text } or null
     const [imageModel, setImageModel] = useState('nanobanana-2')
     const [showModelMenu, setShowModelMenu] = useState(false)
+    const [showBusyModal, setShowBusyModal] = useState(false)
+    const [busyModelInfo, setBusyModelInfo] = useState(null)
 
     // ── Image Model Definitions ──
     const IMAGE_MODELS = [
@@ -1091,8 +1093,9 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
 
             // Handle model busy notification
             if (data.modelBusy) {
-                const busyModelName = IMAGE_MODELS.find(m => m.id === data.busyModel)?.name || data.busyModel
-                setError(`⚠️ ${busyModelName} is currently busy. Switch to another model from the dropdown for faster generation.`)
+                const busyModel = IMAGE_MODELS.find(m => m.id === data.busyModel) || { name: data.busyModel }
+                setBusyModelInfo(busyModel)
+                setShowBusyModal(true)
                 return
             }
 
@@ -7902,6 +7905,58 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                 defaultImages={publishData?.images || null}
                 brandId={activeBrand?._id}
             />
+
+            {/* ── Model Busy Warning Modal ── */}
+            {showBusyModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setShowBusyModal(false)} />
+                    
+                    <div className="relative w-full max-w-md transform overflow-hidden rounded-3xl border border-white/10 bg-[#161b22] p-8 text-center shadow-2xl transition-all animate-in fade-in zoom-in duration-300">
+                        {/* Premium Glow effect */}
+                        <div className="absolute -top-24 -left-24 h-48 w-48 rounded-full bg-amber-500/10 blur-[80px]" />
+                        <div className="absolute -bottom-24 -right-24 h-48 w-48 rounded-full bg-rose-500/10 blur-[80px]" />
+
+                        {/* Icon */}
+                        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-amber-500/10 text-amber-500 ring-8 ring-amber-500/5">
+                            <span className="material-symbols-outlined text-4xl">hourglass_empty</span>
+                        </div>
+
+                        {/* Text Content */}
+                        <h3 className="mb-2 text-2xl font-bold text-white">
+                            {busyModelInfo?.name || 'Engine'} is Busy
+                        </h3>
+                        <p className="mb-8 text-slate-400 text-sm leading-relaxed">
+                            We're experiencing unusually high demand for this specific AI model right now. 
+                            Spikes in demand are usually temporary and last only a few minutes.
+                        </p>
+
+                        {/* Action Buttons */}
+                        <div className="space-y-3">
+                            <button
+                                onClick={() => {
+                                    setShowBusyModal(false);
+                                    setShowModelMenu(true); // Open the model picker
+                                }}
+                                className="w-full rounded-2xl bg-white px-6 py-4 text-sm font-bold text-black transition-all hover:bg-slate-100 active:scale-[0.98]"
+                            >
+                                Switch Engine
+                            </button>
+                            <button
+                                onClick={() => setShowBusyModal(false)}
+                                className="w-full rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-sm font-bold text-slate-300 transition-all hover:bg-white/10 active:scale-[0.98]"
+                            >
+                                Wait and Try Again
+                            </button>
+                        </div>
+
+                        {/* Footer Hint */}
+                        <div className="mt-6 flex items-center justify-center gap-2 text-[10px] uppercase tracking-widest text-slate-500">
+                            <span className="h-1 w-1 rounded-full bg-amber-500" />
+                            Mantram AI Premium Intelligence
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </DashboardLayout>
     )

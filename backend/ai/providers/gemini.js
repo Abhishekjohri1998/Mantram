@@ -103,39 +103,95 @@ export class GeminiProvider extends BaseProvider {
     }
 
     /**
-     * Generate image using NanoBanana 2 (gemini-3.1-flash-image-preview).
-     * Uses the dedicated GEMINI_IMAGE_API_KEY (billed key) for image generation.
-     * Direct call — no fallback chain for speed.
+     * Generate image using modern Gemini models (Flash/Pro) or older Imagen models.
+     * Supports gemini-3.1-flash-image-preview, imagen-3, etc.
      */
-    async generateImage({ prompt, size = '1024x1024', model }) {
+    async generateImage({ prompt, aspectRatio = '1:1', model, imageParts = [] }) {
         const startTime = Date.now();
         const imageKey = this.imageApiKey;
-        // Search for a functional image model or fail clearly for fallback
-        const models = [model || this.config.defaultImageModel, 'imagen-3', 'imagen-3-fast'].filter(Boolean);
-        let lastError = null;
+        const modelId = model || this.config.defaultImageModel || 'gemini-3.1-flash-image-preview';
 
-        for (const modelId of models) {
-            try {
-                // If the model looks like a text model, fail early to trigger fallback
-                if (modelId.includes('flash') || modelId.includes('pro') || modelId.includes('gemini-2')) {
-                    throw new Error(`Model ${modelId} does not support image generation`);
+        console.log(`\n══════ GEMINI IMAGE GENERATION (${modelId}) ══════`);
+        console.log(`📐 Aspect Ratio: ${aspectRatio}`);
+        console.log(`📝 Prompt: ${prompt.substring(0, 100)}...`);
+
+        try {
+            // Modern models (Flash 2.5, Flash 3.1 Preview, etc.) use generateContent
+            if (modelId.includes('flash') || modelId.includes('pro') || modelId.includes('preview')) {
+                const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
+                
+                // Build content parts
+                const parts = [];
+                for (const ip of imageParts) {
+                    if (ip.inlineData) parts.push({ inlineData: ip.inlineData });
+                    if (ip.text) parts.push({ text: ip.text });
+                }
+                
+                // Append aspect ratio instruction to prompt if needed
+                const arInstruction = aspectRatio !== '1:1' ? `\n\n[ASPECT RATIO: ${aspectRatio}]` : '';
+                parts.push({ text: prompt + arInstruction });
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ role: 'user', parts }],
+                        generationConfig: {
+                            responseModalities: ['TEXT', 'IMAGE'],
+                            temperature: 0.4,
+                        },
+                    }),
+                });
+
+                const data = await response.json();
+                
+                if (data.error) {
+                    const errMsg = data.error.message || JSON.stringify(data.error);
+                    const isBusy = errMsg.toLowerCase().includes('high demand') || 
+                                   errMsg.toLowerCase().includes('busy') || 
+                                   response.status === 503 || 
+                                   response.status === 429;
+                    
+                    if (isBusy) {
+                        throw new Error(`BUSY: ${errMsg}`);
+                    }
+                    throw new Error(`Gemini Image Error: ${errMsg}`);
                 }
 
+                const resParts = data.candidates?.[0]?.content?.parts || [];
+                let imageUrl = null;
+                for (const part of resParts) {
+                    if (part.inlineData?.mimeType?.startsWith('image/')) {
+                        imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                        break;
+                    }
+                }
+
+                if (imageUrl) {
+                    return {
+                        imageUrl,
+                        model: modelId,
+                        provider: 'gemini',
+                        generationTime: Date.now() - startTime,
+                    };
+                }
+                throw new Error('Gemini returned no image in response');
+            } 
+            
+            // Legacy Imagen models use predict endpoint
+            else {
                 const url = `${this.baseUrl}/models/${modelId}:predict?key=${imageKey}`;
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         instances: [{ prompt }],
-                        parameters: { sampleCount: 1, aspectRatio: size.includes('x') ? '1:1' : '1:1' }
+                        parameters: { sampleCount: 1, aspectRatio: '1:1' }
                     }),
                 });
 
                 const data = await response.json();
-                if (data.error) {
-                    lastError = data.error.message;
-                    continue; 
-                }
+                if (data.error) throw new Error(data.error.message);
 
                 const prediction = data.predictions?.[0];
                 if (prediction?.bytesBase64Encoded) {
@@ -146,11 +202,11 @@ export class GeminiProvider extends BaseProvider {
                         generationTime: Date.now() - startTime,
                     };
                 }
-            } catch (err) {
-                lastError = err.message;
-                continue;
+                throw new Error('Gemini Predict returned no image');
             }
+        } catch (err) {
+            console.error(`❌ Gemini Image generation failed (${modelId}):`, err.message);
+            throw err;
         }
-        throw new Error(`Gemini Image generation failed. Models tried: ${models.join(', ')}. Last error: ${lastError}`);
     }
 }

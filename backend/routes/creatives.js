@@ -13,6 +13,7 @@ import { uploadToS3 } from '../utils/s3.js';
 import { overlayLogo, fetchImageBuffer } from '../utils/logoOverlay.js';
 import { GoogleGenAI } from '@google/genai';
 import { safeErrorMessage } from '../utils/safeError.js';
+import { getRouter } from '../ai/router.js';
 
 const router = Router();
 
@@ -348,23 +349,43 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
 // ── Unified Image Generate — routes to correct provider based on selected model ──
 async function routedImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K', selectedModel = 'nanobanana-2') {
     const modelConfig = IMAGE_MODEL_CONFIG[selectedModel] || IMAGE_MODEL_CONFIG['nanobanana-2'];
+    const router = getRouter();
 
     console.log(`🎯 Image Model Router: ${selectedModel} → ${modelConfig.provider} (${modelConfig.name})`);
 
-    if (modelConfig.provider === 'gemini') {
-        // Gemini Direct — supports reference images
-        return await geminiImageGenerate(promptText, imageParts, temperature, aspectRatio, imageSize, modelConfig.modelId);
-    }
-
+    // Special handling for fal.ai (not yet in central router)
     if (modelConfig.provider === 'fal') {
-        // fal.ai — text-to-image only (no reference image support)
-        if (imageParts.length > 0) {
-            console.warn(`⚠️ ${modelConfig.name} does not support reference images — generating from text only`);
+        try {
+            return await falImageGenerate(promptText, modelConfig.endpoint, aspectRatio);
+        } catch (err) {
+            console.warn(`⚠️ fal.ai failed, attempting fallback to router:`, err.message);
+            // Fallback to router's default image generation (likely OpenAI/Gemini)
+            return await router.generateImage({ prompt: promptText, aspectRatio });
         }
-        return await falImageGenerate(promptText, modelConfig.endpoint, aspectRatio);
     }
 
-    throw new Error(`Unknown image provider: ${modelConfig.provider}`);
+    // Route via central ModelRouter for Gemini/OpenAI with automatic fallbacks
+    try {
+        const result = await router.generateImage({
+            prompt: promptText,
+            aspectRatio,
+            model: modelConfig.modelId,
+            imageParts, // Passed through complex multimodal parts
+            size: imageSize // Standard parameter
+        }, { 
+            provider: modelConfig.provider // Preferred provider
+        });
+
+        return result;
+    } catch (error) {
+        // Specifically handle "Busy" errors for the frontend popup
+        if (error.name === 'AIProviderBusyError' || error.message?.includes('BUSY:') || error.message?.includes('high demand')) {
+            return { imageUrl: null, model: selectedModel, textResponse: '', warnings: [], modelBusy: true, busyModel: selectedModel };
+        }
+        
+        // Re-throw other errors to be caught by the route handler
+        throw error;
+    }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

@@ -173,7 +173,8 @@ class ModelRouter {
                        msg.includes('busy') || 
                        msg.includes('overloaded') ||
                        msg.includes('503') ||
-                       msg.includes('capacity');
+                       msg.includes('capacity') ||
+                       msg.includes('high demand');
         
         const isQuota = msg.includes('quota') || 
                         msg.includes('credit') || 
@@ -185,7 +186,8 @@ class ModelRouter {
                              msg.includes('no longer available') ||
                              msg.includes('not found') ||
                              msg.includes('deprecated') ||
-                             msg.includes('text output');
+                             msg.includes('text output') ||
+                             msg.includes('internal error'); // Internal errors during preview are usually transient model failures
 
         if (isBusy) return new AIProviderBusyError(providerName, error.message);
         if (isQuota) return new AIProviderQuotaError(providerName, error.message);
