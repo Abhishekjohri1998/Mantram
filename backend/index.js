@@ -72,9 +72,14 @@ app.set('trust proxy', 1);
 app.use((req, res, next) => {
     const origin = req.headers.origin || 'none';
     const path = req.path.toLowerCase();
-    const isBotScan = ['.php', '.xml', 'wp-admin', 'vendor', 'phpunit', '.env', '.git'].some(p => path.includes(p));
+    
+    // Detect bot scans and common vulnerabilities
+    req.isBotScan = [
+        '.php', '.xml', 'wp-admin', 'vendor', 'phpunit', '.env', '.git', 
+        'boaform', 'shell', 'cgi-bin', 'autodiscover', 'config', 'admin'
+    ].some(p => path.includes(p.toLowerCase()));
 
-    if (!isBotScan && path !== '/api/health' && path !== '/health') {
+    if (!req.isBotScan && path !== '/api/health' && path !== '/health' && path !== '/favicon.ico' && path !== '/robots.txt') {
         console.log(`[INCOMING] ${req.method} ${req.path} | Origin: ${origin} | User-Agent: ${req.headers['user-agent']}`);
     }
     
@@ -356,9 +361,11 @@ process.on('uncaughtException', (err) => {
     console.error('🚨 Uncaught Exception:', err);
 });
 
-// Catch-all 404 logger
+// Catch-all 404 logger — suppress for known bot scans
 app.use((req, res) => {
-    console.warn(`[404] Not Found: ${req.method} ${req.originalUrl}`);
+    if (!req.isBotScan) {
+        console.warn(`[404] Not Found: ${req.method} ${req.originalUrl}`);
+    }
     res.status(404).json({ success: false, error: `Route ${req.originalUrl} not found` });
 });
 
