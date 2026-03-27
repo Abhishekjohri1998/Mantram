@@ -130,15 +130,20 @@ router.post('/:id/refine', protect, requireCredits('contentRefine'), async (req,
             research: content.aiMeta?.research || {},
             tone: req.body.tone || '',
             language: req.body.language || '',
+            researchDepth: content.aiMeta?.researchDepth || 'quick',
         };
 
-        // Step 3: SEO Optimization
+        // Gather intelligence so SEO + Tone agents have real data
+        const { gatherIntelligence } = await import('../agents/contentStudio/tools.js');
+        state.intelligence = await gatherIntelligence(state);
+
+        // Step 3: SEO Optimization (now with real SEO data)
         state = await seoNode(state);
 
         // Step 4: Tone Matching
         state = await toneMatcherNode(state);
 
-        // Step 5: Quality Critic
+        // Step 5: Quality Critic (with auto-loop)
         state = await qualityCriticNode(state);
 
         // Update content with final optimized version

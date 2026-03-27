@@ -8,7 +8,7 @@
  * Each node: (state) → updatedState
  */
 
-import { callAgent, callAgentText } from '../shared/agentUtils.js';
+import { callAgent } from '../shared/agentUtils.js';
 import { loadBrandContext } from '../shared/agentUtils.js';
 import { gatherIntelligence } from './tools.js';
 import {

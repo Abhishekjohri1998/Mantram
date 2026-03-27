@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const contentSchema = new mongoose.Schema({
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    brand: { type: mongoose.Schema.Types.ObjectId, ref: 'Brand', required: true },
+    brand: { type: mongoose.Schema.Types.ObjectId, ref: 'Brand' }, // optional — brand may not be selected
 
     // Content details
     type: { type: String, enum: ['social', 'blog', 'ad', 'email', 'seo', 'caption', 'promote', 'celebrate', 'launch', 'educate', 'engage', 'brand', 'hijack', 'press_release', 'product_content', 'youtube_video', 'youtube_shorts', 'youtube_content', 'youtube_seo', 'other'], required: true },
@@ -20,6 +20,14 @@ const contentSchema = new mongoose.Schema({
         brandAlignmentScore: { type: Number, default: 0, min: 0, max: 100 },
         systemPromptUsed: { type: String, default: '' },
         temperature: { type: Number, default: 0.7 },
+        // Agentic pipeline metadata
+        agenticPipeline: { type: Boolean, default: false },
+        pipelineStep: { type: String, default: '' }, // draft, refined, edited, youtube_complete, youtube_seo
+        researchDepth: { type: String, enum: ['quick', 'deep', ''], default: '' },
+        research: { type: mongoose.Schema.Types.Mixed }, // Research agent output (JSON)
+        critique: { type: mongoose.Schema.Types.Mixed }, // Quality critic output (JSON)
+        seoOptimized: { type: mongoose.Schema.Types.Mixed }, // SEO agent output (JSON)
+        toneMatched: { type: mongoose.Schema.Types.Mixed }, // Tone matcher output (JSON)
     },
 
     // YouTube-specific structured metadata

@@ -35,7 +35,10 @@ RESPONSE FORMAT — valid JSON only:
     "sections": ["intro hook", "main point 1", "main point 2", "CTA"],
     "estimatedLength": "150-200 words"
   },
-  "brandNotes": "Specific brand voice/style considerations for this content"
+  "competitorInsights": "What competitors are doing/missing based on REAL web research data",
+  "brandNotes": "Specific brand voice/style considerations from Brand DNA",
+  "contentGaps": ["gap 1 from SEO data", "gap 2"],
+  "dataSourcesUsed": ["web", "seo", "trending", "history"]
 }`;
 
 // ══════════════════════════════════════════════════════════════════════════════
