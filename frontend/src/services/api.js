@@ -99,6 +99,7 @@ export const auth = {
     google: () => apiFetch('/auth/google'),
     claimUserId: (userId) => apiFetch('/auth/claim-userid', { method: 'PUT', body: JSON.stringify({ userId }) }),
     changePassword: (currentPassword, newPassword) => apiFetch('/auth/change-password', { method: 'PUT', body: JSON.stringify({ currentPassword, newPassword }) }),
+    verifyEmail: (token) => apiFetch(`/auth/verify-email?token=${token}`),
 };
 
 // ============ Brands API ============
