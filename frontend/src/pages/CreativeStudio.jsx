@@ -3966,103 +3966,65 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         <button disabled={campCopyLoading} onClick={async()=>{
                                             setCampCopyLoading(true);
                                             try{
-                                                const prompt=(() => {
-// Build per-product context for multi-product campaigns
-const productContextLines = [];
-const allFeatures = [];
-for(let vi=0;vi<campCount;vi++){
-    const prod=campProductStrategy==='same'?campProducts[0]:campProducts[vi%campProducts.length];
-    if(prod?.title){
-        const pFeatures=prod.features||[];
-        const pPrice=prod.price?.amount?`₹${prod.price.amount.toLocaleString('en-IN')}`:campPrice;
-        productContextLines.push(`  - Variation ${vi+1}: Product "${prod.title}"${pFeatures.length>0?`, highlight feature: "${pFeatures[vi%pFeatures.length]}"`:campFeatures.length>0?`, highlight feature: "${campFeatures[vi%campFeatures.length]}"`:''}${pPrice?`, price: ${pPrice}`:''}`);
-        if(pFeatures.length>0) allFeatures.push(...pFeatures.filter(f => !allFeatures.includes(f)));
-    } else if(campFeatures.length>0){
-        productContextLines.push(`  - Variation ${vi+1}: Highlight feature "${campFeatures[vi%campFeatures.length]}"`);
-    }
-}
-const mergedFeatures=allFeatures.length>0?allFeatures:campFeatures;
-return `You are an award-winning Brand Manager and Senior Copywriter.
-CAMPAIGN NAME: "${campName||campKeyword}"
-CAMPAIGN GOAL: ${campGoal}
-KEYWORD/TOPIC: "${campKeyword}"
-BRAND: ${activeBrand?.name||'Brand'} — ${activeBrand?.dna?.industry||'general'} industry
-BRAND VOICE: ${activeBrand?.dna?.voice?.personality||'professional, confident'}
-CTA: ${campCta}
-${campPrice?`PRICE POINT: ${campPrice} — incorporate this price strategically in the copy. Make it a selling point.\n`:''}${productContextLines.length>0?`
-PRODUCT LINEUP (each variation focuses on a specific product):
-${productContextLines.join('\n')}
-`:''}${mergedFeatures.length>0&&productContextLines.length===0?`
-PRODUCT FEATURES TO HIGHLIGHT (distribute one per variation):
-${mergedFeatures.map((f,i)=>`${i+1}. ${f}`).join('\n')}
-`:''}
-Generate ${campCount} unique ad copy variations as a JSON array.
-
-IMPORTANT RULES — think like a real campaign manager:
-1. The HEADLINE of each variation MUST lead with or prominently feature the campaign name "${campName||campKeyword}". The campaign name is the brand's identity for this campaign — it MUST be the hero.
-2. ${productContextLines.length>0?`Each copy variation MUST match its assigned product and feature from the PRODUCT LINEUP above. The body copy should make that product's feature the hero selling point.`:`${mergedFeatures.length>0?`Each body copy MUST highlight a DIFFERENT product feature. Distribute features round-robin:
-${mergedFeatures.map((f,i)=>`   - Variation ${i+1}: Highlight feature "${f}"`).join('\n')}${campCount>mergedFeatures.length?`
-   - Variations ${mergedFeatures.length+1}+: Cycle through features again, each with a fresh angle`:''}`:` Each body copy should complement the campaign name from a DIFFERENT angle:
-   - Variation 1: Benefit-led (what the customer gains)
-   - Variation 2: Urgency/FOMO (limited time, exclusive)
-   - Variation 3: Emotional storytelling (aspirational, feel-good)
-   - Variation 4: Social proof (trusted by, loved by)
-   - Variation 5+: Mix of curiosity, value proposition, lifestyle`}`}
-3. Body copy: 12-20 words, punchy, scroll-stopping. No clichés.${mergedFeatures.length>0||productContextLines.length>0?' Each copy must clearly communicate its assigned feature as the hero benefit.':''}
-4. Headlines: 4-7 words. Must include campaign name or a derivative.
-5. CTA must be "${campCta}" for all.
-6. Add a "feature" field to each JSON object with the exact feature being highlighted.${productContextLines.length>0?`
-7. Add a "product" field to each JSON object with the product name.`:''}
-
-Return ONLY a valid JSON array: [{"headline":"...","body":"...","cta":"...","feature":"..."${productContextLines.length>0?',"product":"..."':''}}]
-No markdown, no explanation.`; })();
-                                                const r=await creativesAPI.enhancePrompt({prompt,brandId:activeBrand?._id});
-                                                const raw=r.enhancedPrompt||r.enhanced||r.result||'';
-                                                const jsonMatch=raw.match(/\[[\s\S]*\]/);
-                                                if(jsonMatch){try{const parsed=JSON.parse(jsonMatch[0]);setCampCopies(Array.isArray(parsed)?parsed.slice(0,campCount):[])}catch{
-// Fallback: product-specific copies
-const fallbackCopies=Array.from({length:campCount},(_,i)=>{
-    const prod=campProducts.length>1?campProducts[i%campProducts.length]:campProducts[0];
-    const pName=prod?.title||campKeyword;
-    const pPrice=prod?.price?.amount?`₹${prod.price.amount.toLocaleString('en-IN')}`:(campPrice||'');
-    const feat=prod?.features?.[i%Math.max(1,prod.features?.length||1)]||campFeatures[i%Math.max(1,campFeatures.length)]||'';
-    const angles=[
-        {h:`${campName||campKeyword} — Unleash ${feat||pName}`,b:`Experience the difference ${feat?feat+' makes':'with '+pName}. ${pPrice?'Starting at '+pPrice+'. ':''}${campCta}.`},
-        {h:`${campName||campKeyword} — Limited Time`,b:`Don't miss out on ${pName}${feat?' with '+feat:''}. ${pPrice?'Only '+pPrice+'. ':''}Grab yours now.`},
-        {h:`${campName||campKeyword} — Your Story`,b:`Join thousands who chose ${pName}${feat?' for its '+feat:''}. ${pPrice?pPrice+'. ':''}Make it yours.`},
-        {h:`${campName||campKeyword} — The Smart Choice`,b:`Why settle? ${pName} delivers ${feat||'premium quality'}. ${pPrice?'At just '+pPrice+'. ':''}${campCta}.`},
-        {h:`${campName||campKeyword} — Reimagined`,b:`${feat||pName} like never before. ${pName} sets new standards. ${pPrice?pPrice+'. ':''}Discover more.`},
-        {h:`${campName||campKeyword} — Elevate`,b:`Upgrade to ${pName}${feat?' featuring '+feat:''}. ${pPrice?'Worth every penny at '+pPrice+'. ':''}${campCta}.`},
-        {h:`${campName||campKeyword} — Feel the Difference`,b:`${feat?feat+' in '+pName:'The '+pName+' experience'} speaks for itself. ${pPrice?pPrice+'. ':''}Try it today.`},
-        {h:`${campName||campKeyword} — Trending Now`,b:`Everyone's talking about ${pName}${feat?' and its '+feat:''}. ${pPrice?'Get it for '+pPrice+'. ':''}Be part of the buzz.`},
-    ];
-    const angle=angles[i%angles.length];
-    return{headline:angle.h,body:angle.b,cta:campCta,product:pName,feature:feat};
-});
-setCampCopies(fallbackCopies);}}
-                                                else{
-const fallbackCopies2=Array.from({length:campCount},(_,i)=>{
-    const prod=campProducts.length>1?campProducts[i%campProducts.length]:campProducts[0];
-    const pName=prod?.title||campKeyword;
-    const pPrice=prod?.price?.amount?`₹${prod.price.amount.toLocaleString('en-IN')}`:(campPrice||'');
-    const feat=prod?.features?.[i%Math.max(1,prod.features?.length||1)]||campFeatures[i%Math.max(1,campFeatures.length)]||'';
-    const angles=[
-        {h:`${campName||campKeyword} — Meet ${pName}`,b:`Discover what makes ${pName} special. ${feat?feat+'. ':''}${pPrice?pPrice+'. ':''}${campCta}.`},
-        {h:`${campName||campKeyword} — Why Wait?`,b:`The ${pName} you've been looking for is here. ${feat?'Featuring '+feat+'. ':''}${pPrice?'Just '+pPrice+'. ':''}Shop now.`},
-        {h:`${campName||campKeyword} — #1 Choice`,b:`Loved by thousands, ${pName} delivers ${feat||'excellence'}. ${pPrice?'Available at '+pPrice+'. ':''}${campCta}.`},
-        {h:`${campName||campKeyword} — Next Level`,b:`Take it up a notch with ${pName}. ${feat?feat+' built-in. ':''}${pPrice?pPrice+'. ':''}Get yours today.`},
-        {h:`${campName||campKeyword} — Bold Move`,b:`Stand out with ${pName}${feat?' powered by '+feat:''}. ${pPrice?'From '+pPrice+'. ':''}Make the switch.`},
-    ];
-    const angle=angles[i%angles.length];
-    return{headline:angle.h,body:angle.b,cta:campCta,product:pName,feature:feat};
-});
-setCampCopies(fallbackCopies2);}
-                                            }catch(e){console.error(e);
-const errCopies=Array.from({length:campCount},(_,i)=>{
-    const prod=campProducts.length>1?campProducts[i%campProducts.length]:campProducts[0];
-    return{headline:`${campName||campKeyword} — ${prod?.title||`Creative ${i+1}`}`,body:`${prod?.features?.[0]||'Your message here'}. ${prod?.price?.amount?'₹'+prod.price.amount.toLocaleString('en-IN')+'. ':''}${campCta}.`,cta:campCta,product:prod?.title||'',feature:prod?.features?.[0]||''};
-});
-setCampCopies(errCopies);}
+                                                // Use dedicated campaign copy endpoint with full Brand DNA injection
+                                                const r = await creativesAPI.generateCampaignCopy({
+                                                    brandId: activeBrand?._id,
+                                                    campaignName: campName || campKeyword,
+                                                    campaignGoal: campGoal,
+                                                    keyword: campKeyword,
+                                                    cta: campCta,
+                                                    price: campPrice,
+                                                    count: campCount,
+                                                    features: campFeatures,
+                                                    products: campProducts.map(p => ({
+                                                        title: p.title,
+                                                        features: p.features,
+                                                        price: p.price,
+                                                    })),
+                                                    productStrategy: campProductStrategy,
+                                                });
+                                                if (r.copies && r.copies.length > 0) {
+                                                    setCampCopies(r.copies.slice(0, campCount));
+                                                } else if (r.raw) {
+                                                    // Try parsing raw response
+                                                    const jsonMatch = r.raw.match(/\[[\s\S]*\]/);
+                                                    if (jsonMatch) {
+                                                        try {
+                                                            const parsed = JSON.parse(jsonMatch[0]);
+                                                            setCampCopies(Array.isArray(parsed) ? parsed.slice(0, campCount) : []);
+                                                        } catch { setCampCopies([]); }
+                                                    }
+                                                }
+                                                // If still empty, use brand-aware fallback copies
+                                                if (!r.copies?.length) {
+                                                    const brandServices = activeBrand?.dna?.servicesOffered || [];
+                                                    const brandUSPs = activeBrand?.dna?.uniqueSellingPoints || [];
+                                                    const brandTagline = activeBrand?.dna?.tagline || '';
+                                                    const fallback = Array.from({length: campCount}, (_, i) => {
+                                                        const prod = campProducts.length > 1 ? campProducts[i % campProducts.length] : campProducts[0];
+                                                        const pName = prod?.title || brandServices[i % Math.max(1, brandServices.length)] || campKeyword;
+                                                        const pPrice = prod?.price?.amount ? `₹${prod.price.amount.toLocaleString('en-IN')}` : (campPrice || '');
+                                                        const feat = prod?.features?.[i % Math.max(1, prod.features?.length || 1)] || campFeatures[i % Math.max(1, campFeatures.length)] || brandUSPs[i % Math.max(1, brandUSPs.length)] || '';
+                                                        const angles = [
+                                                            {h: `${campName||campKeyword} — ${feat || `by ${activeBrand?.name}`}`, b: `${brandTagline || `Discover ${pName}`}. ${feat ? feat + '. ' : ''}${pPrice ? pPrice + '. ' : ''}${campCta}.`},
+                                                            {h: `${campName||campKeyword} — Limited Time`, b: `Get ${pName} from ${activeBrand?.name || 'us'}${feat ? ' with ' + feat : ''}. ${pPrice ? 'Just ' + pPrice + '. ' : ''}${campCta}.`},
+                                                            {h: `${campName||campKeyword} — #1 Choice`, b: `Loved by thousands, ${activeBrand?.name}'s ${pName} delivers ${feat || 'excellence'}. ${pPrice ? pPrice + '. ' : ''}${campCta}.`},
+                                                        ];
+                                                        return {headline: angles[i % angles.length].h, body: angles[i % angles.length].b, cta: campCta, product: pName, feature: feat};
+                                                    });
+                                                    setCampCopies(fallback);
+                                                }
+                                            } catch(e) {
+                                                console.error('Campaign copy generation error:', e);
+                                                // Brand-aware error fallback
+                                                const brandServices = activeBrand?.dna?.servicesOffered || [];
+                                                const errCopies = Array.from({length: campCount}, (_, i) => {
+                                                    const prod = campProducts.length > 1 ? campProducts[i % campProducts.length] : campProducts[0];
+                                                    const pName = prod?.title || brandServices[i % Math.max(1, brandServices.length)] || campKeyword;
+                                                    return {headline: `${campName||campKeyword} — ${pName}`, body: `${prod?.features?.[0] || activeBrand?.dna?.tagline || 'Your message here'}. ${prod?.price?.amount ? '₹' + prod.price.amount.toLocaleString('en-IN') + '. ' : ''}${campCta}.`, cta: campCta, product: pName, feature: prod?.features?.[0] || ''};
+                                                });
+                                                setCampCopies(errCopies);
+                                            }
                                             finally{setCampCopyLoading(false)}
                                         }} className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-medium hover:bg-emerald-500/20 transition-all cursor-pointer flex items-center gap-1">
                                             {campCopyLoading?<><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>Generating...</>:<><span className="material-symbols-outlined text-sm">auto_awesome</span>Generate {campCount} Copies</>}
@@ -4263,8 +4225,11 @@ setCampCopies(errCopies);}
                                                 // Feature assignment: per-product features first, then campFeatures fallback
                                                 const featurePool=prodFeatures.length>0?prodFeatures:campFeatures;
                                                 const assignedFeature=featurePool.length>0?featurePool[i%featurePool.length]:null;
-                                                let prompt=`CAMPAIGN CREATIVE #${i+1} for "${campName||campKeyword}" by ${activeBrand?.name||'Brand'}.${prodData?.title?` Product: ${prodData.title}.`:''}
+                                                let prompt=`CAMPAIGN CREATIVE #${i+1} for "${campName||campKeyword}" by ${activeBrand?.name||'Brand'}${activeBrand?.dna?.industry ? ` (${activeBrand.dna.industry})` : ''}.${prodData?.title?` Product: ${prodData.title}.`:''}
 
+BRAND CONTEXT:
+- Brand: ${activeBrand?.name || 'Brand'}${activeBrand?.dna?.industry ? `, ${activeBrand.dna.industry}` : ''}
+${activeBrand?.dna?.tagline ? `- Tagline: "${activeBrand.dna.tagline}"\n` : ''}${activeBrand?.dna?.voice?.personality ? `- Brand Personality: ${activeBrand.dna.voice.personality}\n` : ''}${activeBrand?.dna?.targetAudience ? `- Target Audience: ${activeBrand.dna.targetAudience}\n` : ''}${activeBrand?.dna?.colors?.primary || activeBrand?.dna?.colors?.secondary ? `- Brand Colors: Use ${[activeBrand?.dna?.colors?.primary, activeBrand?.dna?.colors?.secondary, activeBrand?.dna?.colors?.accent].filter(Boolean).join(', ')} as the dominant color palette\n` : ''}
 CAMPAIGN NAME (must appear prominently): "${campName||campKeyword}"
 HEADLINE: ${copy.headline}
 BODY TEXT: ${copy.body}

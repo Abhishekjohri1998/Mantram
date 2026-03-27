@@ -159,6 +159,7 @@ export const content = {
 export const creatives = {
     generate: (data, options = {}) => apiFetch('/creatives/generate', { method: 'POST', body: JSON.stringify(data), ...options }),
     enhancePrompt: (data) => apiFetch('/creatives/enhance-prompt', { method: 'POST', body: JSON.stringify(data) }),
+    generateCampaignCopy: (data) => apiFetch('/creatives/generate-campaign-copy', { method: 'POST', body: JSON.stringify(data) }),
     list: (params = {}) => {
         const query = new URLSearchParams(params).toString();
         return apiFetch(`/creatives?${query}`);

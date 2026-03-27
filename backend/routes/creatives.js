@@ -474,6 +474,142 @@ RESPOND WITH ONLY THE ENHANCED PROMPT TEXT. Nothing else.`;
     }
 });
 
+// POST /api/creatives/generate-campaign-copy
+// Dedicated endpoint for campaign ad copy generation — NOT for image prompts.
+// Uses Brand DNA to generate brand-specific, contextual ad copy.
+router.post('/generate-campaign-copy', protect, requireStudio('creativeStudio'), async (req, res) => {
+    try {
+        const { brandId, campaignName, campaignGoal, keyword, cta, price, count, features, products, productStrategy } = req.body;
+        if (!brandId) return res.status(400).json({ success: false, error: 'Brand is required' });
+
+        const brand = await Brand.findById(brandId);
+        if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
+
+        const dna = brand.dna || {};
+        // Build rich brand context for copy generation
+        const brandContext = [
+            `BRAND NAME: ${brand.name}`,
+            dna.industry ? `INDUSTRY: ${dna.industry}` : '',
+            dna.tagline ? `TAGLINE: "${dna.tagline}"` : '',
+            dna.companyOverview || dna.brandDescription ? `ABOUT: ${(dna.companyOverview || dna.brandDescription).substring(0, 300)}` : '',
+            dna.targetAudience ? `TARGET AUDIENCE: ${dna.targetAudience}` : '',
+            (dna.servicesOffered || []).length > 0 ? `PRODUCTS/SERVICES OFFERED: ${dna.servicesOffered.slice(0, 8).join(', ')}` : '',
+            (dna.uniqueSellingPoints || []).length > 0 ? `UNIQUE SELLING POINTS: ${dna.uniqueSellingPoints.slice(0, 5).join(', ')}` : '',
+            dna.voice?.personality ? `BRAND VOICE: ${dna.voice.personality}` : '',
+            (dna.brandValues || []).length > 0 ? `BRAND VALUES: ${dna.brandValues.slice(0, 4).join(', ')}` : '',
+            dna.missionStatement ? `MISSION: ${dna.missionStatement.substring(0, 150)}` : '',
+        ].filter(Boolean).join('\n');
+
+        // Build per-product context
+        const productContextLines = [];
+        const allFeatures = [];
+        const prodArr = products || [];
+        const featArr = features || [];
+        const copyCount = count || 3;
+        
+        for (let vi = 0; vi < copyCount; vi++) {
+            const prod = productStrategy === 'same' ? prodArr[0] : prodArr[vi % Math.max(1, prodArr.length)];
+            if (prod?.title) {
+                const pFeatures = prod.features || [];
+                const pPrice = prod.price?.amount ? `₹${prod.price.amount.toLocaleString('en-IN')}` : price;
+                productContextLines.push(`  - Variation ${vi + 1}: Product "${prod.title}"${pFeatures.length > 0 ? `, feature: "${pFeatures[vi % pFeatures.length]}"` : featArr.length > 0 ? `, feature: "${featArr[vi % featArr.length]}"` : ''}${pPrice ? `, price: ${pPrice}` : ''}`);
+                if (pFeatures.length > 0) allFeatures.push(...pFeatures.filter(f => !allFeatures.includes(f)));
+            } else if (featArr.length > 0) {
+                productContextLines.push(`  - Variation ${vi + 1}: Highlight feature "${featArr[vi % featArr.length]}"`);
+            }
+        }
+        const mergedFeatures = allFeatures.length > 0 ? allFeatures : featArr;
+
+        const systemPrompt = `You are an award-winning Brand Manager and Senior Copywriter who creates brand-specific, scroll-stopping ad copy.
+
+${brandContext}
+
+You must write copy that REFLECTS THIS BRAND'S IDENTITY — mentioning specific products, services, and brand strengths.
+Do NOT write generic copy. Every headline and body must feel like it came from THIS brand's marketing team.
+If the brand sells earbuds, mention earbuds. If it's a skincare brand, mention skincare products. Be specific.`;
+
+        const userPrompt = `CAMPAIGN NAME: "${campaignName || keyword}"
+CAMPAIGN GOAL: ${campaignGoal || 'awareness'}
+KEYWORD/TOPIC: "${keyword}"
+CTA: ${cta || 'Shop Now'}
+${price ? `PRICE POINT: ${price}\n` : ''}${productContextLines.length > 0 ? `PRODUCT LINEUP:\n${productContextLines.join('\n')}\n` : ''}${mergedFeatures.length > 0 && productContextLines.length === 0 ? `FEATURES TO HIGHLIGHT:\n${mergedFeatures.map((f, i) => `${i + 1}. ${f}`).join('\n')}\n` : ''}
+Generate ${copyCount} unique ad copy variations as a JSON array.
+
+RULES:
+1. The HEADLINE must feature the campaign name "${campaignName || keyword}" prominently
+2. ${productContextLines.length > 0 ? 'Each variation MUST match its assigned product and feature' : mergedFeatures.length > 0 ? 'Each body MUST highlight a DIFFERENT feature' : 'Each body approaches from a DIFFERENT angle (benefit, urgency, emotion, social proof, lifestyle)'}
+3. Body copy: 12-20 words, punchy, brand-specific. Reference actual brand products/services.
+4. Headlines: 4-7 words. Must include campaign name.
+5. CTA must be "${cta || 'Shop Now'}" for all.
+6. Add a "feature" field to each JSON object.${productContextLines.length > 0 ? '\n7. Add a "product" field to each JSON object.' : ''}
+
+Return ONLY valid JSON: [{"headline":"...","body":"...","cta":"...","feature":"..."${productContextLines.length > 0 ? ',"product":"..."' : ''}}]
+No markdown, no explanation.`;
+
+        const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
+        const openaiKey = process.env.OPENAI_API_KEY;
+        let result = '';
+
+        if (geminiKey) {
+            try {
+                const resp = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            systemInstruction: { parts: [{ text: systemPrompt }] },
+                            contents: [{ parts: [{ text: userPrompt }] }],
+                            generationConfig: {
+                                temperature: 0.8,
+                                maxOutputTokens: 2048,
+                                thinkingConfig: { thinkingBudget: 0 },
+                            },
+                        }),
+                    }
+                );
+                const data = await resp.json();
+                result = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            } catch (e) {
+                console.warn('Campaign copy: Gemini failed:', e.message);
+            }
+        }
+
+        if (!result && openaiKey) {
+            try {
+                const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiKey}` },
+                    body: JSON.stringify({
+                        model: 'gpt-4o-mini',
+                        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+                        temperature: 0.8, max_tokens: 2048,
+                    }),
+                });
+                const data = await resp.json();
+                result = data.choices?.[0]?.message?.content || '';
+            } catch (e) {
+                console.warn('Campaign copy: GPT-4o-mini failed:', e.message);
+            }
+        }
+
+        // Parse JSON array from response
+        const jsonMatch = result.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+            try {
+                const copies = JSON.parse(jsonMatch[0]);
+                return res.json({ success: true, copies: Array.isArray(copies) ? copies.slice(0, copyCount) : [] });
+            } catch { /* fall through */ }
+        }
+
+        // Return raw result so frontend can parse
+        res.json({ success: true, copies: [], raw: result });
+    } catch (error) {
+        console.error('Campaign copy error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 // POST /api/creatives/generate
 router.post('/generate', protect, requireStudio('creativeStudio'), requireCredits('creative'), async (req, res) => {
     try {
