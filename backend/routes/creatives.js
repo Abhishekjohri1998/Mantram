@@ -20,10 +20,33 @@ const router = Router();
 // Image models render any label/noun as visible text, so this must be purely descriptive
 function buildBrandDescription(brand) {
     const parts = [];
-    if (brand.dna?.industry) parts.push(`${brand.dna.industry}`);
+    const dna = brand.dna || {};
+    if (dna.industry) parts.push(`${dna.industry}`);
     parts.push(`brand called ${brand.name}`);
-    if (brand.dna?.voice?.personality) parts.push(`with a ${brand.dna.voice.personality} feel`);
-    if (brand.dna?.targetAudience) parts.push(`targeting ${brand.dna.targetAudience}`);
+    if (dna.voice?.personality) parts.push(`with a ${dna.voice.personality} feel`);
+    if (dna.targetAudience) parts.push(`targeting ${dna.targetAudience}`);
+    
+    // Tagline — woven in naturally
+    if (dna.tagline) parts.push(`— "${dna.tagline}"`);
+    
+    // Company overview / brand description — the elevator pitch
+    const overview = dna.companyOverview || dna.brandDescription || '';
+    if (overview) parts.push(`— ${overview.substring(0, 200)}`);
+    
+    // Services/products — described naturally, no bullet points
+    const services = dna.servicesOffered || [];
+    if (services.length > 0) {
+        const serviceList = services.slice(0, 5).join(', ');
+        parts.push(`offering ${serviceList}`);
+    }
+    
+    // USPs — described as strengths, not labels
+    const usps = dna.uniqueSellingPoints || [];
+    if (usps.length > 0) {
+        const uspList = usps.slice(0, 3).join(', ');
+        parts.push(`known for ${uspList}`);
+    }
+    
     return parts.join(' ');
 }
 
@@ -63,6 +86,15 @@ function buildVisualContext(brand) {
     }
     if (dna.contentStyle?.donts?.length) {
         parts.push(`Content avoids: ${dna.contentStyle.donts.slice(0, 3).join(', ')}`);
+    }
+    
+    // ── Brand values & mission — gives AI deeper context for visual storytelling ──
+    const values = dna.brandValues || [];
+    if (values.length > 0) {
+        parts.push(`Brand values: ${values.slice(0, 4).join(', ')}`);
+    }
+    if (dna.missionStatement) {
+        parts.push(`Brand mission: ${dna.missionStatement.substring(0, 150)}`);
     }
     return parts.join('. ');
 }
@@ -500,6 +532,7 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
             '4:5': '1080x1350 social post',
             '3:2': '1620x1080 standard landscape',
             '4:3': '1440x1080 classic landscape',
+            '1.91:1': '1200x628 LinkedIn landscape',
         };
         if (options?.aspectRatio && ratioMap[options.aspectRatio]) {
             platformSize = ratioMap[options.aspectRatio];

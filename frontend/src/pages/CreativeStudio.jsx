@@ -582,7 +582,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [campIntelLoading, setCampIntelLoading] = useState(false)
     const [campIntelProducts, setCampIntelProducts] = useState({}) // product map from intelligence endpoint
     const [campCount, setCampCount] = useState(3)
-    const [campSizes, setCampSizes] = useState(['1:1'])
+    const [campSizes, setCampSizes] = useState(['4:5'])
     const [campProductStrategy, setCampProductStrategy] = useState('same') // same | different
     const [campProducts, setCampProducts] = useState([]) // [{image, source, title, features, price}]
     const [campProductTab, setCampProductTab] = useState('catalog') // catalog | upload | url | bank
@@ -1823,8 +1823,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     ? `Describe your visual for ${activeBrand.name}...`
                                     : "Create a brand first to start generating visuals"}
                                 disabled={!activeBrand || generating}
-                                className="input-glass w-full resize-none py-3.5 px-4 pr-14 pb-12 disabled:opacity-30 text-white text-sm leading-relaxed rounded-2xl"
+                                className="input-glass w-full resize-y py-3.5 px-4 pr-14 pb-12 disabled:opacity-30 text-white text-sm leading-relaxed rounded-2xl overflow-y-auto"
                                 rows={3}
+                                style={{ minHeight: '80px', maxHeight: '200px' }}
                                 autoFocus
                                 ref={promptTextareaRef}
                             />
@@ -3906,7 +3907,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 <div className="studio-card p-5">
                                     <h3 className="font-bold text-white text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-cyan-400 text-lg">aspect_ratio</span>Creative Sizes</h3>
                                     <div className="flex flex-wrap gap-2">
-                                        {[{id:'1:1',l:'IG Post 1:1'},{id:'9:16',l:'Story 9:16'},{id:'4:5',l:'FB Ad 4:5'},{id:'16:9',l:'YouTube 16:9'},{id:'2:3',l:'Pinterest 2:3'},{id:'1.91:1',l:'LinkedIn'}].map(sz=>(
+                                        {[{id:'4:5',l:'IG Post 4:5'},{id:'1:1',l:'Square 1:1'},{id:'9:16',l:'Story 9:16'},{id:'16:9',l:'YouTube 16:9'},{id:'2:3',l:'Pinterest 2:3'},{id:'1.91:1',l:'LinkedIn'}].map(sz=>(
                                             <button key={sz.id} onClick={()=>setCampSizes(p=>p.includes(sz.id)?p.filter(x=>x!==sz.id):[...p,sz.id])} className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer ${campSizes.includes(sz.id)?'border-cyan-400/30 bg-cyan-500/10 text-white':'border-white/[0.06] text-slate-400 hover:text-slate-200'}`}>{sz.l}</button>
                                         ))}
                                     </div>
@@ -4239,7 +4240,7 @@ setCampCopies(errCopies);}
                                         const total=campCount*(campSizes.length||1);
                                         const angles=['Hero product shot — front-facing, centered, dramatic lighting, product as the star','Flat lay / top-down arrangement — product with lifestyle props, styled composition','Lifestyle context — product in-use by a person or in a real environment','Close-up detail — macro focus on product texture, craftsmanship, premium details','Dramatic side angle — dynamic 45° perspective with depth of field','Contextual scene — product placed in its natural habitat or aspirational setting','Overhead bird\'s-eye — clean arrangement with negative space, editorial feel','Artistic detail — selective focus on unique feature or design element','Environmental wide — product small in a beautiful, branded scene','Dynamic action — product in motion or being interacted with, energy and movement'];
                                         for(let i=0;i<campCount;i++){
-                                            for(const size of (campSizes.length?campSizes:['1:1'])){
+                                            for(const size of (campSizes.length?campSizes:['4:5'])){
                                                 const copy=campCopies[i]||{headline:campName||campKeyword,body:'',cta:campCta};
                                                 // Per-product data: get the product for this creative
                                                 const prodData=campProductStrategy==='same'?campProducts[0]:campProducts[i%campProducts.length];

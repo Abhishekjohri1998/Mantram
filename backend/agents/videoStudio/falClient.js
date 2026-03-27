@@ -18,7 +18,7 @@
 import config from '../../config/env.js';
 import { submitKieVideoGeneration } from './kieClient.js';
 import { submitPiApiVideoGeneration } from './piApiClient.js';
-import { submitLaozhangVideoGeneration, getLaozhangVideoStatus, isLaozhangAvailable } from './laozhangClient.js';
+
 
 const FAL_BASE_URL = 'https://queue.fal.run';
 const GROK_BASE_URL = 'https://api.x.ai/v1';
@@ -71,13 +71,12 @@ const MODEL_AVAILABLE = {
 };
 
 // ── Cost table (USD per second of video) ──
-// Lao Zhang pricing used for Veo 3.1 Fast (cheaper than kie.ai)
 export const COST_PER_SECOND = {
     'kling-3.0': { fast: 0.07, quality: 0.12 },
     'veo-3.1': { fast: 0.15, quality: 0.40 },
-    'veo-3.1-fast': { fast: 0.05, quality: 0.10 },  // ↓ Lao Zhang pricing
+    'veo-3.1-fast': { fast: 0.08, quality: 0.15 },  // kie.ai
     'seedance-1.0': { fast: 0.05, quality: 0.08 },
-    'seedance-2.0': { fast: 0.04, quality: 0.08 },  // Lao Zhang primary (PiAPI fallback: 0.08/0.15)
+    'seedance-2.0': { fast: 0.08, quality: 0.15 },  // PiAPI
     'grok-imagine': { fast: 0.08, quality: 0.08 },
     'hunyuan': { fast: 0.03, quality: 0.05 },
 };
@@ -446,36 +445,9 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         };
     }
 
-    // ── Veo 3.1 Fast: Lao Zhang PRIMARY → kie.ai FALLBACK ──
-    // Lao Zhang has veo-3.1-fast at lower cost. Video gen is SYNCHRONOUS.
+    // ── Veo 3.1 Fast: kie.ai ──
     if (model === 'veo-3.1-fast') {
-        if (isLaozhangAvailable()) {
-            try {
-                console.log(`🎬 [Veo 3.1 Fast] Trying Lao Zhang (primary — cheaper)...`);
-                const lzResult = await submitLaozhangVideoGeneration({
-                    model: 'veo-3.1-fast',
-                    prompt,
-                    imageUrl,
-                    duration,
-                    aspectRatio: aspectRatio || '16:9',
-                    generateAudio,
-                });
-                // SYNCHRONOUS: Lao Zhang returns the video URL immediately
-                return {
-                    requestId: `lz-${Date.now()}`,
-                    endpoint: 'laozhang-veo-3.1-fast',
-                    statusUrl: null,
-                    resultUrl: null,
-                    provider: 'laozhang',
-                    _laozhangVideoUrl: lzResult.videoUrl, // Pre-resolved URL
-                };
-            } catch (lzErr) {
-                console.warn(`⚠️ [Veo 3.1 Fast] Lao Zhang failed, falling back to kie.ai: ${lzErr.message}`);
-            }
-        }
-
-        // Fallback to kie.ai
-        console.log(`🎬 [Veo 3.1 Fast] Using kie.ai (fallback)...`);
+        console.log(`🎬 [Veo 3.1 Fast] Using kie.ai...`);
         const result = await submitKieVideoGeneration({ model, prompt, imageUrl, duration, aspectRatio: aspectRatio || '16:9' });
         return {
             requestId: result.taskId,
@@ -486,41 +458,13 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         };
     }
 
-    // ── Seedance 2.0: Lao Zhang PRIMARY → PiAPI FALLBACK ──
-    // Lao Zhang has seedance-2.0 (hidden/unlisted) — needs billing channel activation
-    // Once enabled: 50% cheaper than PiAPI ($0.05 vs $0.10)
+    // ── Seedance 2.0: PiAPI ──
     if (model === 'seedance-2.0') {
-        if (isLaozhangAvailable()) {
-            try {
-                console.log(`🎬 [Seedance 2.0] Trying Lao Zhang (primary — 50% cheaper)...`);
-                const lzResult = await submitLaozhangVideoGeneration({
-                    model: 'seedance-2.0',
-                    prompt,
-                    imageUrl,
-                    duration,
-                    aspectRatio: aspectRatio || '16:9',
-                    generateAudio,
-                });
-                // SYNCHRONOUS: Lao Zhang returns the video URL immediately
-                return {
-                    requestId: `lz-${Date.now()}`,
-                    endpoint: 'laozhang-seedance-2.0',
-                    statusUrl: null,
-                    resultUrl: null,
-                    provider: 'laozhang',
-                    _laozhangVideoUrl: lzResult.videoUrl, // Pre-resolved URL
-                };
-            } catch (lzErr) {
-                console.warn(`⚠️ [Seedance 2.0] Lao Zhang failed (${lzErr.message}), falling back to PiAPI...`);
-            }
-        }
-
-        // Fallback to PiAPI — check key first
         const piApiKey = process.env.PIAPI_API_KEY;
         if (!piApiKey) {
-            throw new Error('Seedance 2.0 generation failed — primary provider (Lao Zhang) is unavailable and backup provider (PiAPI) is not configured. Please try a different video model or try again later.');
+            throw new Error('Seedance 2.0 requires PIAPI_API_KEY to be configured. Please add it to .env or try a different video model.');
         }
-        console.log(`🎬 [Seedance 2.0] Using PiAPI (fallback)...`);
+        console.log(`🎬 [Seedance 2.0] Using PiAPI...`);
         const result = await submitPiApiVideoGeneration({ prompt, imageUrl, duration, aspectRatio: aspectRatio || '16:9', generateAudio, referenceImages: referenceImages || [], qualityMode: mode || 'fast' });
         return {
             requestId: result.taskId,
@@ -528,7 +472,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             statusUrl: null,
             resultUrl: null,
             provider: 'piapi',
-            _piApiPayload: result._payload, // Store for auto-retry
+            _piApiPayload: result._payload,
         };
     }
 

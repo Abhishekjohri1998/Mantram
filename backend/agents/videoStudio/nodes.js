@@ -27,7 +27,7 @@ import {
 import { estimateCost, submitVideoGeneration, getGenerationStatus, getGrokGenerationStatus, MODEL_CAPABILITIES } from './falClient.js';
 import { getKieGenerationStatus } from './kieClient.js';
 import { getPiApiGenerationStatus, resubmitPiApiTask, uploadImageToHostedUrl } from './piApiClient.js';
-import { getLaozhangVideoStatus } from './laozhangClient.js';
+
 import { getPastProjects } from './selfLearning.js';
 
 // ── Helper: Parse JSON from any AI response ──
@@ -308,7 +308,7 @@ export async function videoGeneratorNode(state) {
     // Pass shots for Kling multi-prompt support
     const shots = state.script?.shots || [];
 
-    const { requestId, endpoint, statusUrl, resultUrl, provider, _piApiPayload, _laozhangVideoUrl } = await submitVideoGeneration({
+    const { requestId, endpoint, statusUrl, resultUrl, provider, _piApiPayload } = await submitVideoGeneration({
         model,
         prompt,
         imageUrl,
@@ -325,18 +325,17 @@ export async function videoGeneratorNode(state) {
         generation: {
             falRequestId: requestId,
             falEndpoint: endpoint,
-            falStatusUrl: statusUrl,   // null for Grok/LaoZhang
-            falResultUrl: resultUrl,   // null for Grok/LaoZhang
-            provider: provider || 'fal', // 'grok', 'fal', 'laozhang', etc
+            falStatusUrl: statusUrl,   // null for Grok
+            falResultUrl: resultUrl,   // null for Grok
+            provider: provider || 'fal', // 'grok', 'fal', 'kie', 'piapi'
             _piApiPayload: _piApiPayload || null, // For PiAPI auto-retry
-            videoUrl: _laozhangVideoUrl || '', // Pre-resolved for Lao Zhang (synchronous)
+            videoUrl: '',
             thumbnailUrl: '',
-            progress: _laozhangVideoUrl ? 100 : 5, // Already done if Lao Zhang
+            progress: 5,
             startedAt: new Date(),
-            ...(_laozhangVideoUrl ? { completedAt: new Date() } : {}),
             error: '',
         },
-        status: _laozhangVideoUrl ? 'critique' : 'generating', // Skip to critique if already done
+        status: 'generating',
     };
 }
 
@@ -349,18 +348,10 @@ export async function pollGenerationStatus(state) {
     let statusResult;
 
     // Branch polling based on provider
-    if (state.generation?.provider === 'laozhang') {
-        // Lao Zhang video is SYNCHRONOUS — URL was already resolved during submission
-        // If videoUrl exists, it's already complete
-        if (state.generation?.videoUrl) {
-            statusResult = { status: 'COMPLETED', progress: 100, videoUrl: state.generation.videoUrl };
-        } else {
-            statusResult = await getLaozhangVideoStatus(state.generation.falRequestId);
-        }
-    } else if (state.generation?.provider === 'grok' || state.routing?.selectedModel === 'grok-imagine') {
+    if (state.generation?.provider === 'grok' || state.routing?.selectedModel === 'grok-imagine') {
         statusResult = await getGrokGenerationStatus(state.generation.falRequestId);
-    } else if (state.generation?.provider === 'piapi' || (state.routing?.selectedModel === 'seedance-2.0' && state.generation?.provider !== 'laozhang')) {
-        // PiAPI polling — Seedance 2.0 fallback
+    } else if (state.generation?.provider === 'piapi' || state.routing?.selectedModel === 'seedance-2.0') {
+        // PiAPI polling — Seedance 2.0
         statusResult = await getPiApiGenerationStatus(state.generation.falRequestId);
 
         // AUTO-RETRY: PiAPI intermittently fails with "failed to process task" (code 10000)
