@@ -132,7 +132,11 @@ class ModelRouter {
                 try {
                     triedProviders.add(fallback.name);
                     console.log(`Trying fallback provider: ${fallback.name}`);
-                    const result = await fallback.generateText(params);
+                    
+                    // Strip the model ID so the fallback uses its own default model
+                    const { model: _, ...fallbackParams } = params;
+                    const result = await fallback.generateText(fallbackParams);
+                    
                     this._logUsage('text', fallback.name, result.tokensUsed);
                     return result;
                 } catch (fallbackError) {
@@ -208,7 +212,9 @@ class ModelRouter {
             const fallback = this._getFallback(provider.name, 'image');
             if (fallback) {
                 try { 
-                    return await fallback.generateImage(params); 
+                    // Strip the model ID so the fallback uses its own default model
+                    const { model: _, ...fallbackParams } = params;
+                    return await fallback.generateImage(fallbackParams); 
                 } catch (e) {
                     lastError = e;
                 }
@@ -232,7 +238,10 @@ class ModelRouter {
             if (fallback) {
                 try {
                     console.log(`Trying fallback image provider: ${fallback.name}`);
-                    return await fallback.generateImage(params);
+                    
+                    // Strip the model ID so the fallback uses its own default model
+                    const { model: _, ...fallbackParams } = params;
+                    return await fallback.generateImage(fallbackParams);
                 } catch (fallbackError) {
                     lastError = fallbackError;
                 }
