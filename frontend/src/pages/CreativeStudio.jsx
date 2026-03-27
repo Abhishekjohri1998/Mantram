@@ -707,6 +707,15 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const abortControllerRef = useRef(null)
     const activeBrandIdRef = useRef(activeBrand?._id)
 
+    // Auto-resize textarea when prompt changes programmatically (e.g. enhance)
+    useEffect(() => {
+        const ta = promptTextareaRef.current
+        if (ta) {
+            ta.style.height = 'auto'
+            ta.style.height = Math.min(ta.scrollHeight, 400) + 'px'
+        }
+    }, [prompt])
+
     // ── Helper Functions ──
     async function handleDownloadImage(url, filename) {
         if (!url) return

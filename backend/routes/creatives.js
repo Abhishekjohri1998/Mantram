@@ -425,7 +425,11 @@ RESPOND WITH ONLY THE ENHANCED PROMPT TEXT. Nothing else.`;
                         body: JSON.stringify({
                             systemInstruction: { parts: [{ text: systemPrompt }] },
                             contents: [{ parts: [{ text: userPrompt }] }],
-                            generationConfig: { temperature: 0.7, maxOutputTokens: 300 },
+                            generationConfig: {
+                                temperature: 0.7,
+                                maxOutputTokens: 2048,
+                                thinkingConfig: { thinkingBudget: 0 },
+                            },
                         }),
                     }
                 );
@@ -445,7 +449,7 @@ RESPOND WITH ONLY THE ENHANCED PROMPT TEXT. Nothing else.`;
                     body: JSON.stringify({
                         model: 'gpt-4o-mini',
                         messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-                        temperature: 0.7, max_tokens: 300,
+                        temperature: 0.7, max_tokens: 1024,
                     }),
                 });
                 const data = await resp.json();
