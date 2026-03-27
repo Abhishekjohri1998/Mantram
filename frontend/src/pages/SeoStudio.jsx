@@ -198,6 +198,7 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
             const d = await seoAPI.manageCompetitors({ brandId: activeBrand._id, action: 'add', competitor: { url: newCompUrl.trim() } })
             if (d.competitors) { setCompetitors(d.competitors); setNewCompUrl('') }
         } catch (e) { 
+            if (e.name === 'AbortError') return
             setError({ 
                 message: e.message, 
                 isProviderError: e.isProviderError, 
@@ -224,6 +225,7 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
                 setShowComparePrompt(true)
             }
         } catch (e) { 
+            if (e.name === 'AbortError') return
             setError({ 
                 message: e.message, 
                 isProviderError: e.isProviderError, 
@@ -335,6 +337,7 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
                 provider: data.provider 
             })
         } catch (e) { 
+            if (e.name === 'AbortError') return
             setError({ 
                 message: e.message, 
                 isProviderError: e.isProviderError, 
@@ -2253,6 +2256,7 @@ function IssueCard({ issue, brandId, url }) {
                 setFixData({ code: '/* No specific code fix generated. Follow manual instructions. */', language: 'text', instructions: 'Review the issue details manually.' })
             }
         } catch (err) {
+            if (err.name === 'AbortError') return
             console.error(err)
             setFixData({ code: '/* Error generating fix. Please try again or check your credit balance. */', language: 'text' })
         }

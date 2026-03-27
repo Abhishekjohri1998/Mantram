@@ -281,6 +281,7 @@ export default function VideoStudio() {
             setPipeline(data.project.pipeline)
             setStep(1)
         } catch (err) { 
+            if (err.name === 'AbortError') return
             setError({ 
                 message: err.message, 
                 isProviderError: err.isProviderError, 
@@ -306,6 +307,7 @@ export default function VideoStudio() {
             setPipeline(data.project.pipeline)
             setStep(2)
         } catch (err) { 
+            if (err.name === 'AbortError') return
             setError({ 
                 message: err.message, 
                 isProviderError: err.isProviderError, 
@@ -342,6 +344,7 @@ export default function VideoStudio() {
             }
             setStep(3) // voice over preview step
         } catch (err) { 
+            if (err.name === 'AbortError') return
             setError({ 
                 message: err.message, 
                 isProviderError: err.isProviderError, 
@@ -373,6 +376,7 @@ export default function VideoStudio() {
             })
             setVoiceoverAudioUrl(data.audioUrl)
         } catch (err) { 
+            if (err.name === 'AbortError') return
             setError({ 
                 message: err.message, 
                 isProviderError: err.isProviderError, 
@@ -402,6 +406,7 @@ export default function VideoStudio() {
             setStep(5)
             startPolling()
         } catch (err) { 
+            if (err.name === 'AbortError') return
             setError({ 
                 message: err.message, 
                 isProviderError: err.isProviderError, 
@@ -453,6 +458,7 @@ export default function VideoStudio() {
             setStep(5)
             startPolling()
         } catch (err) { 
+            if (err.name === 'AbortError') return
             setError({ 
                 message: err.message, 
                 isProviderError: err.isProviderError, 
@@ -473,6 +479,7 @@ export default function VideoStudio() {
             setRouting(null); setGeneration(null); setCritique(null)
             api('/video-studio?limit=10').then(d => setProjects(d.projects || [])).catch(() => { })
         } catch (err) { 
+            if (err.name === 'AbortError') return
             setError({ 
                 message: err.message, 
                 isProviderError: err.isProviderError, 
@@ -518,6 +525,7 @@ export default function VideoStudio() {
             setShowHistory(false)
             if (p.status === 'generating') startPolling()
         } catch (err) { 
+            if (err.name === 'AbortError') return
             setError({ 
                 message: err.message, 
                 isProviderError: err.isProviderError, 

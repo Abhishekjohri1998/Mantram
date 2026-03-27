@@ -241,6 +241,7 @@ export default function BrainstormStudio() {
                 })
             }
         } catch (e) {
+            if (e.name === 'AbortError') return
             setError({
                 message: e.message,
                 isProviderError: e.isProviderError,
@@ -286,6 +287,7 @@ export default function BrainstormStudio() {
                 })
             }
         } catch (e) {
+            if (e.name === 'AbortError') return
             setError({
                 message: e.message,
                 isProviderError: e.isProviderError,
@@ -319,6 +321,7 @@ export default function BrainstormStudio() {
                 })
             }
         } catch (e) {
+            if (e.name === 'AbortError') return
             setError({
                 message: e.message,
                 isProviderError: e.isProviderError,
@@ -372,6 +375,7 @@ export default function BrainstormStudio() {
                 provider: data.provider
             })
         } catch (e) {
+            if (e.name === 'AbortError') return
             setError({
                 message: e.message,
                 isProviderError: e.isProviderError,
@@ -415,6 +419,7 @@ export default function BrainstormStudio() {
                 setChatHistory(prev => [...prev, { role: 'ai', text: data.error || 'Sorry, I couldn\'t process that. Try again.' }])
             }
         } catch (e) {
+            if (e.name === 'AbortError') return
             setChatHistory(prev => [...prev, { role: 'ai', text: `Error: ${e.message}` }])
         } finally {
             setChatLoading(false)
@@ -455,6 +460,7 @@ export default function BrainstormStudio() {
                 })
             }
         } catch (e) {
+            if (e.name === 'AbortError') return
             setError({
                 message: e.message,
                 isProviderError: e.isProviderError,
@@ -485,6 +491,7 @@ export default function BrainstormStudio() {
                 })
             }
         } catch (e) {
+            if (e.name === 'AbortError') return
             setError({
                 message: e.message,
                 isProviderError: e.isProviderError,
@@ -531,6 +538,7 @@ export default function BrainstormStudio() {
                 setStep(6)
             }
         } catch (e) {
+            if (e.name === 'AbortError') return
             setError({
                 message: e.message,
                 isProviderError: e.isProviderError,

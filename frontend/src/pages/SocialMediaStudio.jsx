@@ -174,6 +174,7 @@ export default function SocialMediaStudio() {
                 provider: d.provider
             })
         } catch (e) {
+            if (e.name === 'AbortError') return
             setError({
                 message: e.message,
                 isProviderError: e.isProviderError,
@@ -192,6 +193,7 @@ export default function SocialMediaStudio() {
                 provider: d.provider
             })
         } catch (e) {
+            if (e.name === 'AbortError') return
             setError({
                 message: e.message,
                 isProviderError: e.isProviderError,
@@ -211,6 +213,7 @@ export default function SocialMediaStudio() {
                 provider: d.provider
             })
         } catch (e) {
+            if (e.name === 'AbortError') return
             setError({
                 message: e.message,
                 isProviderError: e.isProviderError,
@@ -228,6 +231,7 @@ export default function SocialMediaStudio() {
                 provider: d.provider
             })
         } catch (e) {
+            if (e.name === 'AbortError') return
             setError({
                 message: e.message,
                 isProviderError: e.isProviderError,
@@ -247,6 +251,7 @@ export default function SocialMediaStudio() {
                 provider: d.provider
             })
         } catch (e) {
+            if (e.name === 'AbortError') return
             setError({
                 message: e.message,
                 isProviderError: e.isProviderError,
@@ -272,6 +277,7 @@ export default function SocialMediaStudio() {
             if (comp.status === 'fulfilled' && comp.value?.success) setCompResult(comp.value.analysis)
             loadHistory()
         } catch (e) {
+            if (e.name === 'AbortError') return
             setError({
                 message: e.message,
                 isProviderError: e.isProviderError,

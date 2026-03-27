@@ -1020,6 +1020,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 setPrompt(data.enhancedPrompt)
             }
         } catch (err) {
+            if (err.name === 'AbortError') return
             console.error('Enhance prompt failed:', err)
         } finally {
             setEnhancing(false)
@@ -1110,6 +1111,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 setGenerationHistory(prev => [{ ...creative, _prompt: prompt, _timestamp: Date.now() }, ...prev])
             }
         } catch (e) {
+            if (e.name === 'AbortError') return
             console.error('❌ Generation error:', e)
             setError({
                 message: e.message,
@@ -1363,6 +1365,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 throw new Error(data.error || 'Generation failed')
             }
         } catch (err) {
+            if (err.name === 'AbortError') return
             console.error('❌ Template generation error:', err)
             setTemplateError({
                 message: err.message,
@@ -1438,6 +1441,7 @@ Return ONLY the prompt formula text, no explanation. Start directly with "Create
                 setTemplatePromptPreview(`Create a design matching this reference style for ${brandName}. Use brand colors (${brandColors}). Maintain the same layout, typography hierarchy, and visual elements. {{HEADLINE}} as the main text. {{SUBTEXT}} as supporting text. {{CTA}} as call-to-action.`)
             }
         } catch (err) {
+            if (err.name === 'AbortError') return
             console.error('Reverse prompt error:', err)
             setTemplatePromptPreview(`Create a design matching the uploaded reference style for ${activeBrand.name}. Use brand colors. {{HEADLINE}} as the main text. {{SUBTEXT}} as supporting text. {{CTA}} as call-to-action.`)
         }
@@ -1452,7 +1456,10 @@ Return ONLY the prompt formula text, no explanation. Start directly with "Create
         try {
             const data = await brandsAPI.getTemplates(activeBrand._id)
             if (data.success) setSavedTemplates(data.templates || [])
-        } catch (err) { console.error('Load templates error:', err) }
+        } catch (err) {
+            if (err.name === 'AbortError') return
+            console.error('Load templates error:', err)
+        }
     }
 
 
