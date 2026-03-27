@@ -1805,6 +1805,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 onChange={e => {
                                     const val = e.target.value
                                     setPrompt(val)
+                                    // Auto-grow: reset height then set to scrollHeight
+                                    e.target.style.height = 'auto'
+                                    e.target.style.height = Math.min(e.target.scrollHeight, 400) + 'px'
                                     const cursor = e.target.selectionStart
                                     const textBefore = val.substring(0, cursor)
                                     const atMatch = textBefore.match(/@(\w*)$/)
@@ -1823,9 +1826,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     ? `Describe your visual for ${activeBrand.name}...`
                                     : "Create a brand first to start generating visuals"}
                                 disabled={!activeBrand || generating}
-                                className="input-glass w-full resize-y py-3.5 px-4 pr-14 pb-12 disabled:opacity-30 text-white text-sm leading-relaxed rounded-2xl overflow-y-auto"
-                                rows={3}
-                                style={{ minHeight: '80px', maxHeight: '200px' }}
+                                className="input-glass w-full resize-none py-3.5 px-4 pr-14 pb-12 disabled:opacity-30 text-white text-sm leading-relaxed rounded-2xl overflow-hidden"
+                                rows={4}
+                                style={{ minHeight: '120px', maxHeight: '400px', overflowY: 'auto' }}
                                 autoFocus
                                 ref={promptTextareaRef}
                             />
