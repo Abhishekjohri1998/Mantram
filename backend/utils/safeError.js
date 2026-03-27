@@ -36,6 +36,7 @@ export function safeErrorMessage(error, fallback = 'Internal server error') {
         return msg || fallback;
     }
 
+
     // In production: check if the error is user-facing (API/provider issue)
     const lowerMsg = msg.toLowerCase();
     const isUserFacing = USER_FACING_PATTERNS.some(pattern => lowerMsg.includes(pattern));
@@ -48,3 +49,4 @@ export function safeErrorMessage(error, fallback = 'Internal server error') {
     // Truly internal error — hide details
     return fallback;
 }
+
