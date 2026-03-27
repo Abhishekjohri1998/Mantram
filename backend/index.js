@@ -98,6 +98,7 @@ app.use((req, res, next) => {
 
 // Alias for health checks
 app.get(['/health', '/api/health'], (req, res) => res.json({ status: 'ok', port: config.port }));
+app.get('/favicon.ico', (req, res) => res.status(204).end());
 app.get('/', (req, res) => res.json({ status: 'ok', message: 'Mantram AI API' }));
 
 const server = app.listen(config.port, '0.0.0.0', () => {
