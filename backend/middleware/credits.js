@@ -379,6 +379,12 @@ const MODEL_COSTS = {
     'laozhang-veo': { flatCost: 5.0, type: 'video' },      // Lao Zhang Veo 3.1 Fast
     'piapi-wan': { flatCost: 8.0, type: 'video' },
     'laozhang-nanobanana2': { flatCost: 5.0, type: 'image' }, // Lao Zhang image fallback
+    // ── New selectable image models (fal.ai) ──
+    'fal-ai/flux-pro/v1.1': { flatCost: 5.0, type: 'image' },    // Flux Pro v1.1
+    'fal-ai/flux-pro/v2': { flatCost: 8.0, type: 'image' },      // Flux 2 Pro (premium)
+    'fal-ai/seedream-3': { flatCost: 5.0, type: 'image' },        // Seedream 5
+    'fal-ai/ideogram/v3': { flatCost: 6.0, type: 'image' },       // Ideogram v3
+    'gemini-3-pro-image-preview': { flatCost: 6.0, type: 'image' }, // NanoBanana Pro
     // ── Voice models (flat cost per call in USD cents) ──
     'sarvam-stt-saaras-v3': { flatCost: 0.5, type: 'voice' },
     'sarvam-tts-bulbul-v2': { flatCost: 1.0, type: 'voice' },

@@ -341,6 +341,18 @@ export default function CreativeStudio() {
     const [fromContent, setFromContent] = useState(false)
     const [aspectRatio, setAspectRatio] = useState('1:1')
     const [publishData, setPublishData] = useState(null) // { image, text } or null
+    const [imageModel, setImageModel] = useState('nanobanana-2')
+    const [showModelMenu, setShowModelMenu] = useState(false)
+
+    // ── Image Model Definitions ──
+    const IMAGE_MODELS = [
+        { id: 'nanobanana-2', name: 'NanoBanana 2', icon: 'auto_awesome', desc: 'Default • Fast • Best with references', provider: 'Gemini', badge: '⚡', color: '#a855f7' },
+        { id: 'nanobanana-pro', name: 'NanoBanana Pro', icon: 'diamond', desc: 'Premium quality • Better details', provider: 'Gemini', badge: '💎', color: '#ec4899' },
+        { id: 'flux-pro-v1.1', name: 'Flux Pro v1.1', icon: 'bolt', desc: 'Photorealistic • Great anatomy', provider: 'fal.ai', badge: '🔥', color: '#f97316' },
+        { id: 'flux-2-pro', name: 'Flux 2 Pro', icon: 'stars', desc: 'Latest Flux • Premium photorealism', provider: 'fal.ai', badge: '✨', color: '#eab308' },
+        { id: 'seedream-5', name: 'Seedream 5', icon: 'park', desc: 'Creative • Artistic style', provider: 'fal.ai', badge: '🌱', color: '#22c55e' },
+        { id: 'ideogram', name: 'Ideogram v3', icon: 'text_fields', desc: 'Best for text in images', provider: 'fal.ai', badge: '🎨', color: '#06b6d4' },
+    ]
 
     // ── Animate State ──
     const [animateModalOpen, setAnimateModalOpen] = useState(false)
@@ -1012,6 +1024,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 logoPosition,
                 logoSize,
                 aspectRatio,
+                imageModel,
             }
             if (designBaseImage) {
                 // Use template inpainting mode — preserves layout, characters, products from the original image
@@ -1055,6 +1068,13 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 prompt: fullPrompt,
                 options,
             }, { signal })
+
+            // Handle model busy notification
+            if (data.modelBusy) {
+                const busyModelName = IMAGE_MODELS.find(m => m.id === data.busyModel)?.name || data.busyModel
+                setError(`⚠️ ${busyModelName} is currently busy. Switch to another model from the dropdown for faster generation.`)
+                return
+            }
 
             let creative = data.creative
             if (data.warnings?.length > 0) {
@@ -1304,7 +1324,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 brandId: activeBrand._id,
                 type: tmpl.type,
                 prompt: builtPrompt,
-                options,
+                options: { ...options, imageModel },
             }, { signal, timeout: 180000 })
 
             if (data.success && data.creative) {
@@ -1918,7 +1938,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         </div>
 
-                        {/* ── Action Row: Format + Generate + Options ── */}
+                        {/* ── Action Row: Format + Model + Generate + Options ── */}
                         <div className="space-y-2">
                             {/* Format selector row */}
                             {selectedTypeInfo && (
@@ -1930,6 +1950,39 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <span className="material-symbols-outlined text-[10px] text-slate-600 ml-auto">expand_more</span>
                                 </button>
                             )}
+
+                            {/* Model selector row */}
+                            <div className="relative">
+                                <button onClick={() => setShowModelMenu(!showModelMenu)}
+                                    className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-[11px] font-bold bg-white/[0.04] text-slate-300 hover:text-white border border-white/[0.06] hover:border-white/10 transition-all cursor-pointer">
+                                    <span className="material-symbols-outlined text-xs" style={{ color: IMAGE_MODELS.find(m => m.id === imageModel)?.color || '#a855f7' }}>
+                                        {IMAGE_MODELS.find(m => m.id === imageModel)?.icon || 'auto_awesome'}
+                                    </span>
+                                    <span>{IMAGE_MODELS.find(m => m.id === imageModel)?.name || 'NanoBanana 2'}</span>
+                                    <span className="text-[9px] text-slate-500 ml-0.5">{IMAGE_MODELS.find(m => m.id === imageModel)?.provider}</span>
+                                    <span className="material-symbols-outlined text-[10px] text-slate-600 ml-auto">{showModelMenu ? 'expand_less' : 'expand_more'}</span>
+                                </button>
+                                {showModelMenu && (
+                                    <div className="absolute left-0 right-0 bottom-full mb-1 bg-[#1a1a2e]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden" style={{ animation: 'fadeUp 0.15s ease-out' }}>
+                                        <div className="p-1.5 space-y-0.5 max-h-[280px] overflow-y-auto">
+                                            {IMAGE_MODELS.map(m => (
+                                                <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
+                                                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer ${imageModel === m.id ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'}`}>
+                                                    <span className="material-symbols-outlined text-sm" style={{ color: m.color }}>{m.icon}</span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-[11px] font-bold truncate">{m.name}</span>
+                                                            {m.id === 'nanobanana-2' && <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold">DEFAULT</span>}
+                                                        </div>
+                                                        <span className="text-[9px] text-slate-500 block truncate">{m.desc}</span>
+                                                    </div>
+                                                    {imageModel === m.id && <span className="material-symbols-outlined text-xs text-primary">check_circle</span>}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
 
                             {/* Generate + action icons row */}
                             <div className="flex items-center gap-2">
@@ -3052,6 +3105,39 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )}
 
+                        {/* Model Selector for Photoshoot */}
+                        <div className="relative mb-2">
+                            <button onClick={() => setShowModelMenu(!showModelMenu)}
+                                className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-[11px] font-bold bg-white/[0.04] text-slate-300 hover:text-white border border-white/[0.06] hover:border-white/10 transition-all cursor-pointer">
+                                <span className="material-symbols-outlined text-xs" style={{ color: IMAGE_MODELS.find(m => m.id === imageModel)?.color || '#a855f7' }}>
+                                    {IMAGE_MODELS.find(m => m.id === imageModel)?.icon || 'auto_awesome'}
+                                </span>
+                                <span>{IMAGE_MODELS.find(m => m.id === imageModel)?.name || 'NanoBanana 2'}</span>
+                                <span className="text-[9px] text-slate-500 ml-0.5">{IMAGE_MODELS.find(m => m.id === imageModel)?.provider}</span>
+                                <span className="material-symbols-outlined text-[10px] text-slate-600 ml-auto">{showModelMenu ? 'expand_less' : 'expand_more'}</span>
+                            </button>
+                            {showModelMenu && (
+                                <div className="absolute left-0 right-0 bottom-full mb-1 bg-[#1a1a2e]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden" style={{ animation: 'fadeUp 0.15s ease-out' }}>
+                                    <div className="p-1.5 space-y-0.5 max-h-[280px] overflow-y-auto">
+                                        {IMAGE_MODELS.map(m => (
+                                            <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
+                                                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer ${imageModel === m.id ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'}`}>
+                                                <span className="material-symbols-outlined text-sm" style={{ color: m.color }}>{m.icon}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-[11px] font-bold truncate">{m.name}</span>
+                                                        {m.id === 'nanobanana-2' && <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold">DEFAULT</span>}
+                                                    </div>
+                                                    <span className="text-[9px] text-slate-500 block truncate">{m.desc}</span>
+                                                </div>
+                                                {imageModel === m.id && <span className="material-symbols-outlined text-xs text-primary">check_circle</span>}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         {/* Generate Button */}
                         <CreditTooltipWrapper action="photoshoot">
                             <button
@@ -3071,6 +3157,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             brandColors,
                                             fidelity,
                                             aspectRatio,
+                                            imageModel,
                                             // Reference images
                                             styleRef: referenceImages.style || null,
                                             characterRef: referenceImages.character || null,
@@ -3088,6 +3175,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             setPhotoshootResult(data)
                                             // Auto-save to image bank
                                             saveToImageBank(data)
+                                        } else if (data.modelBusy) {
+                                            setPhotoshootError(`⚡ Model is busy — try switching to a different model using the selector above.`)
                                         } else {
                                             setPhotoshootError({
                                                 message: data.error || 'Generation failed',
@@ -3446,7 +3535,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     const brandColors=clgColorMode==='brand'&&activeBrand?.dna?.colors?.length?activeBrand.dna.colors.map(c=>typeof c==='string'?c:c.hex||c.name||'').filter(Boolean).join(', '):clgCustomColors;
                                     const v=clgResults.length+1;
                                     const prompt=`Generate a CAMPAIGN LOGO / EVENT BADGE design.\n\nTEXT: "${clgText}"\nSTYLE: ${clgStyle||'modern'}\n${clgOccasion?`OCCASION: ${clgOccasion}\n`:''}${clgIcon?`ICON ELEMENTS: Include ${clgIcon} visual elements\n`:''}COLORS: Use ${brandColors||'vibrant, eye-catching colors'}\nBACKGROUND: ${clgBg==='transparent'?'transparent/alpha background (PNG-ready)':clgBg}\nSHAPE: ${clgShape}\n${clgEnhance?`STYLE KEYWORDS: ${clgEnhance}\n`:''}VARIANT: ${v} — create a unique, visually distinctive design\n\nCRITICAL RULES:\n- This is a LOGO/BADGE, not a poster — keep it compact and icon-like\n- The text "${clgText}" must be clearly readable and be the HERO element\n- Use professional typography — bold, impactful lettering\n- Make it suitable for use as a campaign identifier across marketing materials\n- ${clgBg==='transparent'?'Ensure the background is fully transparent':'Fill the background as specified'}\n- Do NOT add placeholder text or watermarks`;
-                                    const res=await creativesAPI.generate({prompt,brandId:activeBrand?._id,type:'campaign-logo',options:{aspectRatio:'1:1',style:'logo'}}, { timeout: 180000 });
+                                    const res=await creativesAPI.generate({prompt,brandId:activeBrand?._id,type:'campaign-logo',options:{aspectRatio:'1:1',style:'logo',imageModel}}, { timeout: 180000 });
                                     if (res.warnings?.length > 0) {
                                         setAiWarnings(prev => [...new Set([...prev, ...res.warnings])]);
                                     }
@@ -4188,7 +4277,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" prominently as a badge, sti
                                                     opts.addLogo=true;
                                                     opts.logoPosition=campLogoPlacement;
                                                 }
-                                                const payload={prompt,brandId:activeBrand?._id,type:'campaign',options:opts};
+                                                const payload={prompt,brandId:activeBrand?._id,type:'campaign',options:{...opts,imageModel}};
                                                 // Retry up to 2 times per creative
                                                 let res=null;
                                                 for(let attempt=0;attempt<2;attempt++){

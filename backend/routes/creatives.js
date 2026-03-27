@@ -94,14 +94,142 @@ function extractBase64(dataUri) {
     return { mimeType, data };
 }
 
-// ── Gemini image generation via REST API (NanoBanana 2) ─────────────────
-async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K') {
+// ── Image Model Configuration ──────────────────────────────────────────
+// User-selectable models — NO auto-fallback chain. Default: NanoBanana 2.
+// Gemini-native models use Google Direct API; others route through fal.ai.
+const IMAGE_MODEL_CONFIG = {
+    'nanobanana-2': {
+        provider: 'gemini',
+        modelId: 'gemini-3.1-flash-image-preview',
+        name: 'NanoBanana 2',
+        supportsRefImages: true,
+    },
+    'nanobanana-pro': {
+        provider: 'gemini',
+        modelId: 'gemini-3-pro-image-preview',
+        name: 'NanoBanana Pro',
+        supportsRefImages: true,
+    },
+    'flux-pro-v1.1': {
+        provider: 'fal',
+        endpoint: 'fal-ai/flux-pro/v1.1',
+        name: 'Flux Pro v1.1',
+        supportsRefImages: false,
+    },
+    'flux-2-pro': {
+        provider: 'fal',
+        endpoint: 'fal-ai/flux-pro/v2',
+        name: 'Flux 2 Pro',
+        supportsRefImages: false,
+    },
+    'seedream-5': {
+        provider: 'fal',
+        endpoint: 'fal-ai/seedream-3',
+        name: 'Seedream 5',
+        supportsRefImages: false,
+    },
+    'ideogram': {
+        provider: 'fal',
+        endpoint: 'fal-ai/ideogram/v3',
+        name: 'Ideogram v3',
+        supportsRefImages: false,
+    },
+};
+
+// ── fal.ai Image Generation (queue-based async) ─────────────────────────
+async function falImageGenerate(promptText, endpoint, aspectRatio = '1:1') {
+    const falKey = process.env.FAL_KEY || process.env.FAL_API_KEY;
+    if (!falKey) throw new Error('FAL_KEY not configured for image generation');
+
+    // Map aspect ratio to fal.ai image_size
+    const sizeMap = {
+        '1:1': { width: 1024, height: 1024 },
+        '16:9': { width: 1344, height: 768 },
+        '9:16': { width: 768, height: 1344 },
+        '4:5': { width: 896, height: 1120 },
+        '2:3': { width: 832, height: 1248 },
+        '3:4': { width: 896, height: 1184 },
+        '3:2': { width: 1248, height: 832 },
+        '4:3': { width: 1184, height: 896 },
+    };
+    const imgSize = sizeMap[aspectRatio] || sizeMap['1:1'];
+
+    console.log(`\n══════ FAL.AI IMAGE GENERATION ══════`);
+    console.log(`🎨 Endpoint: ${endpoint}`);
+    console.log(`📐 Size: ${imgSize.width}x${imgSize.height} (${aspectRatio})`);
+    console.log(`📝 Prompt (first 200 chars): ${promptText.substring(0, 200)}...`);
+
+    // Submit to fal.ai queue
+    const submitResp = await fetch(`https://queue.fal.run/${endpoint}`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Key ${falKey}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            prompt: promptText,
+            image_size: imgSize,
+            num_images: 1,
+            sync_mode: true, // Wait for result (up to 60s)
+        }),
+        signal: AbortSignal.timeout(90000),
+    });
+
+    if (!submitResp.ok) {
+        const errText = await submitResp.text();
+        console.error(`❌ fal.ai image error (${submitResp.status}):`, errText);
+        throw new Error(`fal.ai image generation failed (${submitResp.status}): ${errText.substring(0, 200)}`);
+    }
+
+    const data = await submitResp.json();
+
+    // fal.ai returns { images: [{ url, content_type }], ... } or { request_id } for async
+    let imageUrl = '';
+    if (data.images?.[0]?.url) {
+        imageUrl = data.images[0].url;
+    } else if (data.output?.images?.[0]?.url) {
+        imageUrl = data.output.images[0].url;
+    } else if (data.request_id) {
+        // Async mode — poll for result
+        console.log(`⏳ fal.ai queued: ${data.request_id}, polling...`);
+        const resultUrl = `https://queue.fal.run/${endpoint}/requests/${data.request_id}`;
+        for (let i = 0; i < 30; i++) {
+            await new Promise(r => setTimeout(r, 3000));
+            try {
+                const pollResp = await fetch(resultUrl, {
+                    headers: { 'Authorization': `Key ${falKey}` },
+                });
+                if (pollResp.status === 200) {
+                    const pollData = await pollResp.json();
+                    if (pollData.images?.[0]?.url) {
+                        imageUrl = pollData.images[0].url;
+                        break;
+                    }
+                    if (pollData.output?.images?.[0]?.url) {
+                        imageUrl = pollData.output.images[0].url;
+                        break;
+                    }
+                }
+            } catch { /* retry */ }
+        }
+    }
+
+    if (!imageUrl) throw new Error('fal.ai returned no image');
+
+    console.log(`✅ Image generated via fal.ai: ${imageUrl.substring(0, 100)}...`);
+    console.log(`══════ END FAL.AI IMAGE GENERATION ══════\n`);
+
+    return { imageUrl, model: endpoint, textResponse: '', warnings: [] };
+}
+
+// ── Gemini image generation via REST API ────────────────────────────────
+// Used for NanoBanana 2 and NanoBanana Pro. NO auto-fallback chain.
+// If the model is busy (503), returns modelBusy flag so frontend can notify user.
+async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K', selectedModelId = 'gemini-3.1-flash-image-preview') {
     const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
     if (!imageKey) throw new Error('Gemini API key not configured');
 
     const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-    // NanoBanana 2 primary, gemini-2.5-flash-image as single fallback for 503/overload
-    const models = ['gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image'];
 
     // Build content parts — images as inlineData, then text prompt last
     const parts = [];
@@ -116,7 +244,7 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
     let usedModel = '';
 
     const imageCount = parts.filter(p => p.inlineData).length;
-    console.log(`\n══════ CREATIVE STUDIO IMAGE GENERATION (NanoBanana 2) ══════`);
+    console.log(`\n══════ CREATIVE STUDIO IMAGE GENERATION (${selectedModelId}) ══════`);
     console.log(`🖼️  Reference images: ${imageCount}`);
     console.log(`📐 Aspect ratio: ${aspectRatio} | Resolution: ${imageSize}`);
     console.log(`📝 Prompt (first 200 chars): ${promptText.substring(0, 200)}...`);
@@ -131,94 +259,80 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
 
     const warnings = [];
 
-    for (const modelId of models) {
-        try {
-            console.log(`🎨 Trying: ${modelId}...`);
-            const url = `${baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
-            const resp = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ role: 'user', parts }],
-                    generationConfig: {
-                        responseModalities: ['TEXT', 'IMAGE'],
-                        temperature,
-                    },
-                }),
-            });
+    try {
+        console.log(`🎨 Using: ${selectedModelId}...`);
+        const url = `${baseUrl}/models/${selectedModelId}:generateContent?key=${imageKey}`;
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ role: 'user', parts }],
+                generationConfig: {
+                    responseModalities: ['TEXT', 'IMAGE'],
+                    temperature,
+                },
+            }),
+        });
 
-            const data = await resp.json();
-            if (data.error) {
-                const errMsg = data.error.message || JSON.stringify(data.error);
-                console.warn(`⚠️ ${modelId}: ${errMsg}`);
-                
-                // Propagate "high demand" or other provider-side warnings to the user
-                if (errMsg.toLowerCase().includes('high demand') || errMsg.toLowerCase().includes('busy') || resp.status === 503) {
-                    warnings.push(`${modelId} is currently experiencing high demand. Falling back to an alternative model.`);
-                } else {
-                    warnings.push(`${modelId} failed: ${errMsg.substring(0, 100)}...`);
-                }
-                continue; // try fallback
-            }
+        const data = await resp.json();
+        if (data.error) {
+            const errMsg = data.error.message || JSON.stringify(data.error);
+            console.warn(`⚠️ ${selectedModelId}: ${errMsg}`);
 
-            const resParts = data.candidates?.[0]?.content?.parts || [];
-            for (const part of resParts) {
-                if (part.inlineData?.mimeType?.startsWith('image/')) {
-                    imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                }
-                if (part.text) textResponse += part.text;
+            // Check for busy/overload — return modelBusy flag for frontend notification
+            if (errMsg.toLowerCase().includes('high demand') || errMsg.toLowerCase().includes('busy') || resp.status === 503 || resp.status === 429) {
+                console.log(`🔴 ${selectedModelId} is BUSY — returning modelBusy flag`);
+                return { imageUrl: null, model: selectedModelId, textResponse: '', warnings: [], modelBusy: true };
             }
-
-            if (imageUrl) {
-                usedModel = modelId;
-                console.log(`✅ Image generated successfully with ${modelId}`);
-                break;
-            }
-            console.warn(`⚠️ ${modelId}: no image in response`);
-            warnings.push(`${modelId} returned no image.`);
-        } catch (e) {
-            console.error(`❌ ${modelId} error:`, e.message);
-            warnings.push(`${modelId} connection error: ${e.message}`);
-            continue;
+            throw new Error(`${selectedModelId}: ${errMsg}`);
         }
-    }
 
-    if (!imageUrl) {
-        // ── Lao Zhang fallback — try proxy API when Google Direct fails ──
-        if (process.env.LAOZHANG_API_KEY) {
-            try {
-                console.log(`🔄 Google Direct failed — trying Lao Zhang fallback...`);
-                const lzResp = await fetch(`${process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1'}/images/generations`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${process.env.LAOZHANG_API_KEY}`,
-                    },
-                    body: JSON.stringify({
-                        model: 'gemini-3.1-flash-image-preview',
-                        prompt: promptText,
-                        n: 1,
-                        size: '1024x1024',
-                    }),
-                    signal: AbortSignal.timeout(60000),
-                });
-                const lzData = await lzResp.json();
-                const lzUrl = lzData.data?.[0]?.url || lzData.data?.[0]?.b64_json;
-                if (lzUrl) {
-                    imageUrl = lzUrl.startsWith('http') ? lzUrl : `data:image/png;base64,${lzUrl}`;
-                    usedModel = 'laozhang-nanobanana2';
-                    console.log(`✅ Image generated via Lao Zhang fallback`);
-                }
-            } catch (lzErr) {
-                console.warn(`❌ Lao Zhang image fallback also failed:`, lzErr.message);
+        const resParts = data.candidates?.[0]?.content?.parts || [];
+        for (const part of resParts) {
+            if (part.inlineData?.mimeType?.startsWith('image/')) {
+                imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
             }
+            if (part.text) textResponse += part.text;
         }
-    }
 
-    if (!imageUrl) throw new Error('Image generation failed — all models unavailable (Google Direct + Lao Zhang)');
+        if (imageUrl) {
+            usedModel = selectedModelId;
+            console.log(`✅ Image generated successfully with ${selectedModelId}`);
+        } else {
+            console.warn(`⚠️ ${selectedModelId}: no image in response`);
+            warnings.push(`${selectedModelId} returned no image.`);
+            throw new Error(`${selectedModelId} returned no image in response`);
+        }
+    } catch (e) {
+        if (e.message?.includes('modelBusy')) throw e; // re-throw busy
+        console.error(`❌ ${selectedModelId} error:`, e.message);
+        throw e;
+    }
 
     console.log(`══════ END IMAGE GENERATION ══════\n`);
     return { imageUrl, model: usedModel, textResponse, warnings };
+}
+
+// ── Unified Image Generate — routes to correct provider based on selected model ──
+async function routedImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K', selectedModel = 'nanobanana-2') {
+    const modelConfig = IMAGE_MODEL_CONFIG[selectedModel] || IMAGE_MODEL_CONFIG['nanobanana-2'];
+
+    console.log(`🎯 Image Model Router: ${selectedModel} → ${modelConfig.provider} (${modelConfig.name})`);
+
+    if (modelConfig.provider === 'gemini') {
+        // Gemini Direct — supports reference images
+        return await geminiImageGenerate(promptText, imageParts, temperature, aspectRatio, imageSize, modelConfig.modelId);
+    }
+
+    if (modelConfig.provider === 'fal') {
+        // fal.ai — text-to-image only (no reference image support)
+        if (imageParts.length > 0) {
+            console.warn(`⚠️ ${modelConfig.name} does not support reference images — generating from text only`);
+        }
+        return await falImageGenerate(promptText, modelConfig.endpoint, aspectRatio);
+    }
+
+    throw new Error(`Unknown image provider: ${modelConfig.provider}`);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -341,6 +455,7 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
         if (options) {
             console.log('  🎨 style:', options.style);
             console.log('  📐 aspectRatio:', options.aspectRatio);
+            console.log('  🤖 imageModel:', options.imageModel || 'nanobanana-2 (default)');
             console.log('  📝 textOverlay:', options.textOverlay || '(none)');
             console.log('  🏷️  addLogo:', options.addLogo);
             console.log('  📍 logoPosition:', options.logoPosition);
@@ -574,15 +689,28 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
 
         console.log('📸 Full prompt (first 300 chars):', fullPrompt.substring(0, 300) + '...');
 
+        const selectedImageModel = options?.imageModel || 'nanobanana-2';
+
         if (hasImages) {
-            // Multi-image Gemini call — lower temperature (0.2) for higher quality
-            console.log(`🎨 Creative Studio: generating with ${imageParts.filter(p => p.inlineData).length} reference image(s) + ${imageParts.filter(p => p.text).length} labels, aspect: ${geminiAspectRatio}`);
-            const genResult = await geminiImageGenerate(fullPrompt, imageParts, 0.2, geminiAspectRatio, geminiImageSize);
+            // Multi-image call — lower temperature (0.2) for higher quality
+            console.log(`🎨 Creative Studio: generating with ${imageParts.filter(p => p.inlineData).length} reference image(s) + ${imageParts.filter(p => p.text).length} labels, aspect: ${geminiAspectRatio}, model: ${selectedImageModel}`);
+            const genResult = await routedImageGenerate(fullPrompt, imageParts, 0.2, geminiAspectRatio, geminiImageSize, selectedImageModel);
+
+            // Handle model busy — notify frontend instead of silent fallback
+            if (genResult.modelBusy) {
+                return res.status(200).json({
+                    success: false,
+                    modelBusy: true,
+                    busyModel: selectedImageModel,
+                    error: `${IMAGE_MODEL_CONFIG[selectedImageModel]?.name || selectedImageModel} is currently busy. Please try a different model for faster generation.`,
+                });
+            }
+
             result = {
                 title: `${type.replace('-', ' ')} — ${brand.name}`,
                 imageUrl: genResult.imageUrl || '',
                 aiMeta: {
-                    provider: 'gemini',
+                    provider: IMAGE_MODEL_CONFIG[selectedImageModel]?.provider || 'gemini',
                     model: genResult.model,
                     method: referenceInstructions.length > 0 ? 'reference-guided' : 'base-image-edit',
                     referenceTypes: Object.keys(refs).filter(k => refs[k]),
@@ -590,15 +718,26 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
                 },
             };
         } else {
-            // Text-only generation — use Gemini directly for brand-aware output
-            console.log(`🎨 Creative Studio: generating from text prompt, aspect: ${geminiAspectRatio}`);
-            const genResult = await geminiImageGenerate(fullPrompt, [], 0.3, geminiAspectRatio, geminiImageSize);
+            // Text-only generation — route to selected model
+            console.log(`🎨 Creative Studio: generating from text prompt, aspect: ${geminiAspectRatio}, model: ${selectedImageModel}`);
+            const genResult = await routedImageGenerate(fullPrompt, [], 0.3, geminiAspectRatio, geminiImageSize, selectedImageModel);
+
+            // Handle model busy
+            if (genResult.modelBusy) {
+                return res.status(200).json({
+                    success: false,
+                    modelBusy: true,
+                    busyModel: selectedImageModel,
+                    error: `${IMAGE_MODEL_CONFIG[selectedImageModel]?.name || selectedImageModel} is currently busy. Please try a different model for faster generation.`,
+                });
+            }
+
             if (genResult.imageUrl) {
                 result = {
                     title: `${type.replace('-', ' ')} — ${brand.name}`,
                     imageUrl: genResult.imageUrl,
                     aiMeta: {
-                        provider: 'gemini',
+                        provider: IMAGE_MODEL_CONFIG[selectedImageModel]?.provider || 'gemini',
                         model: genResult.model,
                         method: 'text-to-image',
                         brandAlignmentScore: 80 + Math.floor(Math.random() * 15),

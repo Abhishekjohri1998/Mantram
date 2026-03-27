@@ -1469,7 +1469,7 @@ router.post('/seed-demo', protect, async (req, res) => {
         res.json({ success: true, message: `Seeded ${created.length} demo campaigns`, campaigns: created });
     } catch (error) {
         console.error('PM seed error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -1488,7 +1488,7 @@ router.delete('/seed-demo', protect, async (req, res) => {
         res.json({ success: true, message: `Removed ${campDel.deletedCount} campaigns, ${repDel.deletedCount} reports, ${intDel.deletedCount} integrations` });
     } catch (error) {
         console.error('PM seed delete error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

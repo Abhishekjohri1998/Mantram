@@ -864,7 +864,7 @@ router.delete('/brands/:id', async (req, res) => {
         res.json({ success: true, message: 'Brand and all associated data deleted' });
     } catch (error) {
         console.error('DELETE BRAND ERROR:', error);
-        res.status(500).json({ success: false, error: 'Deletion failed: ' + (error.message || 'Internal error') });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
@@ -911,7 +911,7 @@ router.delete('/content/:id', async (req, res) => {
         res.json({ success: true, message: 'Content deleted' });
     } catch (error) {
         console.error('DELETE CONTENT ERROR:', error);
-        res.status(500).json({ success: false, error: 'Deletion failed: ' + (error.message || 'Internal error') });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

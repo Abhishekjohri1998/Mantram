@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { protect, authorize } from '../middleware/auth.js';
 import { getDataForSEOProviderStatus } from '../utils/dataforseo.js';
+import { safeErrorMessage } from '../utils/safeError.js';
 import config from '../config/env.js';
 
 const router = Router();
@@ -35,7 +36,7 @@ router.get('/provider-status', protect, authorize('superadmin'), async (req, res
 
         res.json({ success: true, providers: providerStatus });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

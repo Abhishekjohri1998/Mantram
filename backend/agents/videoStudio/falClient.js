@@ -515,7 +515,11 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             }
         }
 
-        // Fallback to PiAPI
+        // Fallback to PiAPI — check key first
+        const piApiKey = process.env.PIAPI_API_KEY;
+        if (!piApiKey) {
+            throw new Error('Seedance 2.0 generation failed — primary provider (Lao Zhang) is unavailable and backup provider (PiAPI) is not configured. Please try a different video model or try again later.');
+        }
         console.log(`🎬 [Seedance 2.0] Using PiAPI (fallback)...`);
         const result = await submitPiApiVideoGeneration({ prompt, imageUrl, duration, aspectRatio: aspectRatio || '16:9', generateAudio, referenceImages: referenceImages || [], qualityMode: mode || 'fast' });
         return {

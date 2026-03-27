@@ -458,6 +458,7 @@ router.post('/ai-photoshoot', optionalAuth, async (req, res) => {
     const { image, brief, brandName, brandColors, fidelity: rawFidelity, aspectRatio,
             styleRef, characterRef,
             cameraAngle, lens, lightingStyle, lightDirection, surface, modelPresence, mood,
+            imageModel,
             // Legacy params (backward compat)
             scene, keywords } = req.body;
         if (!image) return res.status(400).json({ success: false, error: 'Product image is required' });
@@ -614,17 +615,120 @@ Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhr
 
         console.log(`📸 AI Photo Studio: angle=${cameraAngle} lens=${lens} light=${lightingStyle}/${lightDirection} surface=${surface} model=${modelPresence} mood=${mood?.join(',')} fidelity=${fidelity} ratio=${aspectRatio}`);
 
-        // NanoBanana 2 — direct, with fallbacks for experimental flakiness
-        const models = ['gemini-2.5-flash', 'gemini-2.5-pro'];
+        // ── Model selection & routing ─────────────────────────────────────
+        const PHOTOSHOOT_MODELS = {
+            'nanobanana-2':   { provider: 'gemini', modelId: 'gemini-3.1-flash-image-preview', name: 'NanoBanana 2' },
+            'nanobanana-pro': { provider: 'gemini', modelId: 'gemini-3-pro-image-preview', name: 'NanoBanana Pro' },
+            'flux-pro-v1.1':  { provider: 'fal', endpoint: 'fal-ai/flux-pro/v1.1', name: 'Flux Pro v1.1' },
+            'flux-2-pro':     { provider: 'fal', endpoint: 'fal-ai/flux-pro/v2', name: 'Flux 2 Pro' },
+            'seedream-5':     { provider: 'fal', endpoint: 'fal-ai/seedream-3', name: 'Seedream 5' },
+            'ideogram':       { provider: 'fal', endpoint: 'fal-ai/ideogram/v3', name: 'Ideogram v3' },
+        };
+
+        const modelCfg = PHOTOSHOOT_MODELS[imageModel] || PHOTOSHOOT_MODELS['nanobanana-2'];
+        console.log(`📸 Photoshoot model: ${modelCfg.name} (${modelCfg.provider})`);
 
         let resultImage = null;
         let resultText = '';
-        let usedModel = '';
+        let usedModel = modelCfg.name;
 
-        for (const modelId of models) {
+        // ── fal.ai path (Flux, Seedream, Ideogram) — text-to-image only ──
+        if (modelCfg.provider === 'fal') {
+            const falKey = process.env.FAL_KEY || process.env.FAL_API_KEY;
+            if (!falKey) {
+                return res.status(200).json({ success: false, error: `${modelCfg.name} requires FAL_KEY to be configured. Please try NanoBanana 2 or NanoBanana Pro instead.` });
+            }
+
+            // Warn user: fal.ai models don't support reference images
+            const falWarnings = [];
+            if (styleRef || characterRef) {
+                falWarnings.push('Note: Reference images are not supported by this model and were ignored.');
+            }
+
+            // Map aspect ratio to pixel size
+            const sizeMap = {
+                '1:1': { width: 1024, height: 1024 },
+                '16:9': { width: 1344, height: 768 },
+                '9:16': { width: 768, height: 1344 },
+                '4:5': { width: 896, height: 1120 },
+                '2:3': { width: 832, height: 1248 },
+                '3:4': { width: 896, height: 1184 },
+                '3:2': { width: 1248, height: 832 },
+                '4:3': { width: 1184, height: 896 },
+            };
+            const imgSize = sizeMap[aspectRatio] || sizeMap['1:1'];
+
             try {
-                console.log(`AI Photoshoot: trying model ${modelId}...`);
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${imageKey}`;
+                console.log(`🎨 Photoshoot via fal.ai: ${modelCfg.endpoint}`);
+                const submitResp = await fetch(`https://queue.fal.run/${modelCfg.endpoint}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Key ${falKey}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        prompt: photoshootPrompt,
+                        image_size: imgSize,
+                        num_images: 1,
+                        sync_mode: true,
+                    }),
+                    signal: AbortSignal.timeout(90000),
+                });
+
+                if (!submitResp.ok) {
+                    const errText = await submitResp.text();
+                    console.error(`❌ fal.ai photoshoot error (${submitResp.status}):`, errText);
+                    if (submitResp.status === 429 || submitResp.status === 503) {
+                        return res.status(200).json({ success: false, modelBusy: true, error: `${modelCfg.name} is currently busy. Please try again or switch to a different model.` });
+                    }
+                    if (errText.toLowerCase().includes('safety') || errText.toLowerCase().includes('blocked') || errText.toLowerCase().includes('content')) {
+                        return res.status(200).json({ success: false, error: `Content policy violation: ${errText.substring(0, 200)}. Try adjusting your photoshoot description.` });
+                    }
+                    return res.status(200).json({ success: false, error: `${modelCfg.name} generation failed: ${errText.substring(0, 200)}` });
+                }
+
+                const data = await submitResp.json();
+                resultImage = data.images?.[0]?.url || data.output?.images?.[0]?.url || '';
+
+                if (!resultImage) {
+                    // Async mode — poll
+                    if (data.request_id) {
+                        console.log(`⏳ fal.ai queued: ${data.request_id}, polling...`);
+                        const resultUrl = `https://queue.fal.run/${modelCfg.endpoint}/requests/${data.request_id}`;
+                        for (let i = 0; i < 30; i++) {
+                            await new Promise(r => setTimeout(r, 3000));
+                            try {
+                                const pollResp = await fetch(resultUrl, { headers: { 'Authorization': `Key ${falKey}` } });
+                                if (pollResp.status === 200) {
+                                    const pollData = await pollResp.json();
+                                    resultImage = pollData.images?.[0]?.url || pollData.output?.images?.[0]?.url || '';
+                                    if (resultImage) break;
+                                }
+                            } catch { /* retry */ }
+                        }
+                    }
+                }
+
+                if (!resultImage) {
+                    return res.status(200).json({ success: false, error: `${modelCfg.name} returned no image. Try a different prompt or model.` });
+                }
+
+                resultText = falWarnings.join(' ');
+            } catch (falErr) {
+                console.error(`fal.ai photoshoot exception:`, falErr.message);
+                if (falErr.name === 'TimeoutError' || falErr.message?.includes('timed out')) {
+                    return res.status(200).json({ success: false, error: `${modelCfg.name} took too long to respond. Try again or switch to NanoBanana 2 for faster results.` });
+                }
+                throw falErr;
+            }
+        }
+
+        // ── Gemini path (NanoBanana 2, NanoBanana Pro) — supports reference images ──
+        if (modelCfg.provider === 'gemini') {
+            try {
+                const selectedModelId = modelCfg.modelId;
+                console.log(`AI Photoshoot: using model ${selectedModelId}...`);
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModelId}:generateContent?key=${imageKey}`;
 
                 const requestBody = {
                     contents: [{
@@ -686,8 +790,22 @@ Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhr
                 const data = await response.json();
 
                 if (data.error) {
-                    console.error(`Model ${modelId} error:`, data.error.message);
-                    continue; // try next model
+                    const errMsg = data.error.message || JSON.stringify(data.error);
+                    console.error(`Model ${selectedModelId} error:`, errMsg);
+                    // Return descriptive error instead of generic 500
+                    if (errMsg.toLowerCase().includes('high demand') || errMsg.toLowerCase().includes('busy') || response.status === 503 || response.status === 429) {
+                        return res.status(200).json({ success: false, modelBusy: true, error: `${modelCfg.name} is currently busy with high demand. Please try again or switch to a different model.` });
+                    }
+                    if (errMsg.toLowerCase().includes('safety') || errMsg.toLowerCase().includes('blocked') || errMsg.toLowerCase().includes('harmful')) {
+                        return res.status(200).json({ success: false, error: `Content policy: ${errMsg.substring(0, 200)}. Try adjusting your photoshoot description.` });
+                    }
+                    if (errMsg.toLowerCase().includes('too long') || errMsg.toLowerCase().includes('token')) {
+                        return res.status(200).json({ success: false, error: `Prompt too long. Please shorten your description and try again.` });
+                    }
+                    if (errMsg.toLowerCase().includes('no longer available') || errMsg.toLowerCase().includes('not found')) {
+                        return res.status(200).json({ success: false, error: `${modelCfg.name} model is temporarily unavailable. Please switch to a different model.` });
+                    }
+                    throw new Error(errMsg);
                 }
 
                 // Extract the generated image
@@ -701,20 +819,15 @@ Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhr
                     }
                 }
 
-                if (resultImage) {
-                    usedModel = modelId;
-                    break; // success
+                if (!resultImage) {
+                    return res.status(200).json({ success: false, error: `${modelCfg.name} returned no image. Try different keywords or a simpler prompt.` });
                 }
 
-                console.warn(`Model ${modelId}: no image in response, trying next...`);
+                usedModel = selectedModelId;
             } catch (modelErr) {
-                console.error(`Model ${modelId} exception:`, modelErr.message);
-                continue; // try next model
+                console.error(`Gemini photoshoot exception:`, modelErr.message);
+                throw modelErr;
             }
-        }
-
-        if (!resultImage) {
-            throw new Error('No image generated. All models failed. Try different keywords or a smaller image.');
         }
 
         // Apply watermark if enabled
