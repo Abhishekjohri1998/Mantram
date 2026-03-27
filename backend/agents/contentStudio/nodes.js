@@ -1,9 +1,9 @@
 /**
- * Content Studio — Agentic Pipeline Node Functions (v2)
+ * Content Studio — Agentic Pipeline Node Functions (v3)
  * 
- * TRULY AGENTIC: Each agent now uses real data via tools (web search, SEO, trends, history)
+ * TRULY AGENTIC: Each agent uses real data via 5 tools (web search, SEO, trends, history, competitors)
  * 
- * 5-agent chain: Research → Writer → SEO → ToneMatcher → QualityCritic
+ * 7-agent chain: Research → Strategist → Writer → SEO → ToneMatcher → PlatformOptimizer → QualityCritic
  * Quality Critic auto-loops to Writer if score < 8 (max 2 loops)
  * Each node: (state) → updatedState
  */
@@ -17,6 +17,8 @@ import {
     SEO_PROMPT,
     TONE_MATCHER_PROMPT,
     QUALITY_CRITIC_PROMPT,
+    CONTENT_STRATEGIST_PROMPT,
+    PLATFORM_OPTIMIZER_PROMPT,
     YOUTUBE_RESEARCH_PROMPT,
     YOUTUBE_WRITER_PROMPT,
     YOUTUBE_SEO_PROMPT,
@@ -82,6 +84,16 @@ export async function writerNode(state) {
         ? `\n\nBRAND'S SEO DATA:\nSite Health: ${state.intelligence.seo.data?.siteHealthScore}/100\nTop Keywords: ${(state.intelligence.seo.data?.topKeywords || []).slice(0, 8).join(', ')}\nContent Gaps: ${(state.intelligence.seo.data?.contentGaps || []).slice(0, 3).join(', ')}`
         : '';
 
+    // Strategy context from Content Strategist (if run)
+    const strategyContext = state.strategy
+        ? `\n\nSTRATEGIC PLAN FROM STRATEGIST:\nChosen Angle: ${state.strategy.chosenAngle || ''}\nFunnel Position: ${state.strategy.funnelPosition || ''}\nHook Strategy: ${state.strategy.hookStrategy || ''}\nCTA Strategy: ${state.strategy.ctaStrategy || ''}\nCompetitor Differentiator: ${state.strategy.competitorDifferentiator || ''}\nStructure: ${state.strategy.structureRecommendation || ''}`
+        : '';
+
+    // Competitor analysis from intelligence tools
+    const competitorInsights = state.intelligence?.competitors?.success
+        ? `\n\nCOMPETITOR ANALYSIS:\n${state.intelligence.competitors.data?.analysis || ''}`
+        : '';
+
     const userPrompt = [
         `WRITE CONTENT FOR: ${state.brief}`,
         `TYPE: ${state.contentType || 'social'}`,
@@ -98,6 +110,8 @@ export async function writerNode(state) {
         webInsights,
         trendingInsights,
         seoInsights,
+        strategyContext,
+        competitorInsights,
         rewriteNote,
     ].filter(Boolean).join('\n');
 
@@ -167,7 +181,75 @@ export async function toneMatcherNode(state) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// NODE 5: QUALITY CRITIC — Final assessment with AUTO-LOOP
+// NODE 5: CONTENT STRATEGIST — Turn research into strategic content plan (NEW)
+// ══════════════════════════════════════════════════════════════════════════════
+export async function contentStrategistNode(state) {
+    console.log('🎯 Content Agent: Strategist — creating content strategy...');
+
+    const { brandContext } = await loadBrandContext(state.brandId);
+
+    // Competitor context if available
+    const competitorContext = state.intelligence?.competitors?.success
+        ? `\n\nCOMPETITOR ANALYSIS:\n${state.intelligence.competitors.data?.analysis || 'No analysis available'}\nCompetitors analyzed: ${state.intelligence.competitors.data?.competitorsAnalyzed || 0}`
+        : '';
+
+    const userPrompt = [
+        `CREATE A STRATEGIC CONTENT PLAN:`,
+        `Brief: ${state.brief}`,
+        `Platform: ${state.platform || 'instagram'}`,
+        `Content Type: ${state.contentType || 'social'}`,
+        `\nRESEARCH FINDINGS:`,
+        `Key Angles: ${(state.research?.keyAngles || []).join(', ')}`,
+        `Trending Hooks: ${(state.research?.trendingHooks || []).join(', ')}`,
+        `Keywords: ${(state.research?.targetKeywords || []).join(', ')}`,
+        `Brand Notes: ${state.research?.brandNotes || ''}`,
+        `Competitor Gap: ${state.research?.competitorInsights || ''}`,
+        `Content Gaps: ${(state.research?.contentGaps || []).join(', ')}`,
+        competitorContext,
+        state.intelligence?.contentHistory?.success
+            ? `\nPAST CONTENT PERFORMANCE: ${state.intelligence.contentHistory.data?.totalPieces || 0} pieces previously created`
+            : '',
+    ].filter(Boolean).join('\n');
+
+    const result = await callAgent(CONTENT_STRATEGIST_PROMPT(brandContext), userPrompt, 0.5);
+
+    return {
+        ...state,
+        strategy: result,
+        status: 'strategy',
+    };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// NODE 6: PLATFORM OPTIMIZER — Adapt content for target platform algorithm (NEW)
+// ══════════════════════════════════════════════════════════════════════════════
+export async function platformOptimizerNode(state) {
+    console.log(`📱 Content Agent: Platform Optimizer — optimizing for ${state.platform || 'general'}...`);
+
+    const { brandContext } = await loadBrandContext(state.brandId);
+
+    const userPrompt = [
+        `OPTIMIZE THIS CONTENT FOR ${(state.platform || 'instagram').toUpperCase()}:`,
+        `Title: ${state.seoOptimized?.optimizedTitle || state.draft?.title || ''}`,
+        `Content: ${state.toneMatched?.matchedContent || state.seoOptimized?.optimizedContent || state.draft?.content || ''}`,
+        `Platform: ${state.platform || 'instagram'}`,
+        `Content Type: ${state.contentType || 'social'}`,
+        state.strategy?.ctaStrategy ? `CTA Strategy: ${state.strategy.ctaStrategy}` : '',
+        state.strategy?.hookStrategy ? `Hook Strategy: ${state.strategy.hookStrategy}` : '',
+        state.research?.targetKeywords ? `Target Keywords: ${state.research.targetKeywords.join(', ')}` : '',
+    ].filter(Boolean).join('\n');
+
+    const result = await callAgent(PLATFORM_OPTIMIZER_PROMPT(brandContext), userPrompt, 0.4);
+
+    return {
+        ...state,
+        platformOptimized: result,
+        status: 'platform',
+    };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// NODE 7: QUALITY CRITIC — Final assessment with AUTO-LOOP
 // ══════════════════════════════════════════════════════════════════════════════
 export async function qualityCriticNode(state) {
     console.log(`⭐ Content Agent: Quality Critic — scoring... (attempt ${(state.rewriteCount || 0) + 1})`);
@@ -219,8 +301,10 @@ export async function qualityCriticNode(state) {
         critique: result,
         qualityScore: overallScore,
         rewriteCount,
-        finalContent: state.toneMatched?.matchedContent || state.seoOptimized?.optimizedContent || state.draft?.content || '',
-        finalTitle: state.seoOptimized?.optimizedTitle || state.draft?.title || '',
+        finalContent: state.platformOptimized?.optimizedContent || state.toneMatched?.matchedContent || state.seoOptimized?.optimizedContent || state.draft?.content || '',
+        finalTitle: state.platformOptimized?.optimizedTitle || state.seoOptimized?.optimizedTitle || state.draft?.title || '',
+        platformMeta: state.platformOptimized?.platformMeta || null,
+        engagementHooks: state.platformOptimized?.engagementHooks || null,
         status: 'critique',
     };
 }

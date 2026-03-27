@@ -143,6 +143,7 @@ export const content = {
     // Agentic pipeline (v2 — with real intelligence gathering)
     agenticStart: (data) => apiFetch('/content/agentic/start', { method: 'POST', body: JSON.stringify(data) }),
     agenticRefine: (id, data) => apiFetch(`/content/agentic/${id}/refine`, { method: 'POST', body: JSON.stringify(data) }),
+    parseIntent: (input) => apiFetch('/content/agentic/parse-intent', { method: 'POST', body: JSON.stringify({ input }) }),
     list: (params = {}) => {
         const query = new URLSearchParams(params).toString();
         return apiFetch(`/content?${query}`);

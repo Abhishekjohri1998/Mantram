@@ -183,32 +183,41 @@ function SmartInput({ onParse, onSkip }) {
     const handleSubmit = async () => {
         if (!input.trim()) return
         setParsing(true)
-        // For now, do basic keyword detection. In future, this hits AI.
-        const lower = input.toLowerCase()
-        let goal = null, subType = null, channel = null
+        try {
+            // AI-powered intent parsing via Grok
+            const data = await contentAPI.parseIntent(input)
+            const p = data.parsed || {}
+            onParse({
+                goal: p.goal || null,
+                subType: p.subType || null,
+                channel: p.channel || null,
+                tone: p.tone || null,
+                rawInput: input,
+                brief: p.brief || input,
+                confidence: p.confidence || 0.5,
+                method: data.method || 'ai',
+            })
+        } catch (err) {
+            // Fallback to basic keyword detection
+            console.warn('AI intent parse failed, using basic detection:', err.message)
+            const lower = input.toLowerCase()
+            let goal = null, channel = null
+            if (/promot|offer|sale|discount|deal|product/.test(lower)) goal = 'promote'
+            else if (/festival|diwali|christmas|celebrat/.test(lower)) goal = 'celebrate'
+            else if (/launch|announce|pr |press/.test(lower)) goal = 'launch'
+            else if (/blog|seo|article|guide|educat/.test(lower)) goal = 'educate'
+            else if (/brand|story|about|tagline/.test(lower)) goal = 'brand'
 
-        // Detect goal
-        if (/promot|offer|sale|discount|deal|product/.test(lower)) goal = 'promote'
-        else if (/festival|diwali|christmas|celebrat|occasion|milestone/.test(lower)) goal = 'celebrate'
-        else if (/launch|new|announce|pr |press|collab/.test(lower)) goal = 'launch'
-        else if (/blog|seo|article|guide|how.to|educat|tip/.test(lower)) goal = 'educate'
-        else if (/brand|story|about|tagline|website|vision/.test(lower)) goal = 'brand'
+            if (/instagram|insta/i.test(lower)) channel = 'instagram'
+            else if (/linkedin/i.test(lower)) channel = 'linkedin'
+            else if (/twitter|tweet/i.test(lower)) channel = 'twitter'
+            else if (/youtube|yt /i.test(lower)) channel = 'youtube'
+            else if (/website|blog|web/i.test(lower)) channel = 'website'
 
-        // Detect channel
-        if (/instagram|insta/i.test(lower)) channel = 'instagram'
-        else if (/facebook|fb/i.test(lower)) channel = 'facebook'
-        else if (/linkedin/i.test(lower)) channel = 'linkedin'
-        else if (/twitter|tweet/i.test(lower)) channel = 'twitter'
-        else if (/email|newsletter/i.test(lower)) channel = 'email'
-        else if (/amazon|ecommerce|shopify/i.test(lower)) channel = 'ecommerce'
-        else if (/website|blog|web/i.test(lower)) channel = 'website'
-        else if (/whatsapp/i.test(lower)) channel = 'whatsapp'
-        else if (/youtube|yt |video script|shorts/i.test(lower)) channel = 'youtube'
-
-        setTimeout(() => {
+            onParse({ goal, subType: null, channel, rawInput: input, brief: input, confidence: 0.3, method: 'regex' })
+        } finally {
             setParsing(false)
-            onParse({ goal, subType, channel, rawInput: input })
-        }, 600)
+        }
     }
 
     return (

@@ -337,6 +337,124 @@ Return JSON:
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// TOOL 5: COMPETITOR SCRAPING — Analyze competitor content strategy
+// ══════════════════════════════════════════════════════════════════════════════
+export async function scrapeCompetitor(brandId) {
+    console.log(`🏢 Content Tool: scrapeCompetitor — analyzing competitor content`);
+
+    try {
+        const brand = brandId ? await Brand.findById(brandId).lean() : null;
+        if (!brand) return { success: false, data: null, reason: 'No brand found' };
+
+        // Get competitor URLs from Brand DNA
+        const dna = brand.dna || {};
+        const competitors = dna.competitors || dna.competitorUrls || [];
+        const competitorNames = dna.competitorNames || [];
+
+        if (!competitors.length && !competitorNames.length) {
+            return { success: false, data: null, reason: 'No competitors in Brand DNA' };
+        }
+
+        // Dynamically import crawlPage from web-research.js
+        const { crawlPage } = await import('../../utils/web-research.js');
+
+        // Crawl up to 3 competitor homepages (with timeout)
+        const urlsToCrawl = competitors.slice(0, 3).map(url => {
+            if (!url.startsWith('http')) url = 'https://' + url;
+            return url;
+        });
+
+        if (!urlsToCrawl.length) {
+            return { success: false, data: null, reason: 'No valid competitor URLs' };
+        }
+
+        const crawlResults = await Promise.allSettled(
+            urlsToCrawl.map(url =>
+                Promise.race([
+                    crawlPage(url),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000))
+                ])
+            )
+        );
+
+        const competitorData = crawlResults
+            .filter(r => r.status === 'fulfilled' && r.value?.success)
+            .map(r => {
+                const page = r.value;
+                return {
+                    url: page.url,
+                    title: page.title || '',
+                    headings: (page.h1 || []).concat(page.h2 || []).slice(0, 8),
+                    wordCount: page.wordCount || 0,
+                    contentSnippet: (page.contentSnippet || '').substring(0, 300),
+                    hasSchema: page.hasSchemaOrg || false,
+                    tech: (page.tech || []).slice(0, 5),
+                    internalLinks: page.internalLinkCount || 0,
+                };
+            });
+
+        if (!competitorData.length) {
+            return { success: false, data: null, reason: 'All competitor crawls failed' };
+        }
+
+        // Quick AI analysis of competitor content strategy
+        const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+        let analysis = '';
+        if (grokKey) {
+            try {
+                const resp = await fetch('https://api.x.ai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${grokKey}` },
+                    body: JSON.stringify({
+                        model: 'grok-3-mini-fast',
+                        messages: [{
+                            role: 'user',
+                            content: `Analyze these competitors' content strategy for "${brand.name}" (${dna.industry || ''}).
+
+COMPETITOR DATA:
+${competitorData.map(c => `
+URL: ${c.url}
+Title: ${c.title}
+Headings: ${c.headings.join(', ')}
+Word count: ${c.wordCount}
+Content preview: ${c.contentSnippet}
+`).join('\n---\n')}
+
+In 3-4 sentences, summarize:
+1. What content strategies competitors are using
+2. What topics/angles they're covering
+3. Content gaps ${brand.name} could exploit
+4. Tone and style patterns you notice`
+                        }],
+                        max_tokens: 500,
+                        temperature: 0.3,
+                    }),
+                    signal: AbortSignal.timeout(8000),
+                });
+                const data = await resp.json();
+                analysis = (data.choices?.[0]?.message?.content || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+            } catch (err) {
+                console.warn('Competitor AI analysis failed:', err.message);
+            }
+        }
+
+        return {
+            success: true,
+            data: {
+                competitorsAnalyzed: competitorData.length,
+                competitors: competitorData,
+                analysis,
+                competitorNames: competitorNames.slice(0, 5),
+            },
+            source: 'CompetitorScraper'
+        };
+    } catch (err) {
+        console.warn('scrapeCompetitor error:', err.message);
+        return { success: false, data: null, error: err.message };
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // MASTER: GATHER INTELLIGENCE — Runs all relevant tools in parallel
 // ══════════════════════════════════════════════════════════════════════════════
 export async function gatherIntelligence(state) {
@@ -350,12 +468,13 @@ export async function gatherIntelligence(state) {
     // Build search query from brief + brand context
     const searchQuery = state.brief;
 
-    // Run tools in parallel for speed
-    const [webData, seoData, historyData, trendingData] = await Promise.allSettled([
+    // Run ALL tools in parallel for speed (5 tools now)
+    const [webData, seoData, historyData, trendingData, competitorData] = await Promise.allSettled([
         webSearch(searchQuery, searchMode),
         fetchSEOAudit(state.brandId),
         fetchContentHistory(state.brandId, state.platform),
         fetchTrending(state.brandId),
+        scrapeCompetitor(state.brandId),
     ]);
 
     const intelligence = {
@@ -363,6 +482,7 @@ export async function gatherIntelligence(state) {
         seo: seoData.status === 'fulfilled' ? seoData.value : { success: false },
         contentHistory: historyData.status === 'fulfilled' ? historyData.value : { success: false },
         trending: trendingData.status === 'fulfilled' ? trendingData.value : { success: false },
+        competitors: competitorData.status === 'fulfilled' ? competitorData.value : { success: false },
         researchDepth: searchMode,
         gatheredAt: new Date().toISOString(),
     };
@@ -373,8 +493,10 @@ export async function gatherIntelligence(state) {
     if (intelligence.seo.success) sources.push('SEO');
     if (intelligence.contentHistory.success) sources.push(`History(${intelligence.contentHistory.data?.totalPieces || 0})`);
     if (intelligence.trending.success) sources.push('Trending');
+    if (intelligence.competitors.success) sources.push(`Competitors(${intelligence.competitors.data?.competitorsAnalyzed || 0})`);
     console.log(`   ✅ Intelligence gathered from: ${sources.join(', ') || 'none'}`);
     console.log(`═══════════════════════════════════════\n`);
 
     return intelligence;
 }
+
