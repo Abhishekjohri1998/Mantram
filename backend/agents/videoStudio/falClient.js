@@ -740,7 +740,7 @@ export function getModelsInfo() {
             costPerSecond: COST_PER_SECOND['seedance-2.0'],
             duration: DURATION_LIMITS['seedance-2.0'],
             features: ['native-audio', 'camera-control', 'cinematic', 'image-to-video', '4-15s'],
-            available: !!(config.kie?.apiKey || process.env.KIE_API_KEY),
+            available: !!(config.piapi?.apiKey || process.env.PIAPI_API_KEY),
             recommended: false,
         },
         {
