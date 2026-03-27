@@ -2229,7 +2229,7 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
 // RESULT VIEW (with Edit & AI Refine)
 // ============================================================================
 
-function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating, activeBrand, onCreateVisual, accepted, onRefine, contentFeedback, imageUrl }) {
+function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating, activeBrand, onCreateVisual, accepted, onRefine, contentFeedback, imageUrl, onABTest, abTestData, abTestLoading }) {
     const [copied, setCopied] = useState(false)
     const [editing, setEditing] = useState(false)
     const [editContent, setEditContent] = useState(result?.content || '')
@@ -2247,10 +2247,22 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
         setTimeout(() => setCopied(false), 2000)
     }
 
-    const handleSaveEdit = () => {
+    const handleSaveEdit = async () => {
         if (editContent !== result.content) {
-            // Save manual edit via callback
-            onRefine && onRefine({ manualEdit: editContent })
+            // Use agentic edit endpoint for re-critique
+            if (result._id) {
+                try {
+                    const data = await contentAPI.agenticEdit(result._id, { editedContent: editContent, editedTitle: result.title })
+                    if (data.success) {
+                        onRefine && onRefine({ manualEdit: editContent, aiMeta: data.content?.aiMeta })
+                    }
+                } catch {
+                    // Fallback to generic save
+                    onRefine && onRefine({ manualEdit: editContent })
+                }
+            } else {
+                onRefine && onRefine({ manualEdit: editContent })
+            }
         }
         setEditing(false)
     }
@@ -2447,6 +2459,13 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-[#1877F2]/10 text-[#1877F2] hover:bg-[#1877F2]/20 transition-all cursor-pointer border border-[#1877F2]/30">
                     <span className="material-symbols-outlined text-lg">share</span> Publish
                 </button>
+                {result?._id && (
+                    <button onClick={onABTest} disabled={abTestLoading}
+                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-all cursor-pointer border border-violet-500/30 disabled:opacity-30">
+                        <span className={`material-symbols-outlined text-lg ${abTestLoading ? 'animate-spin' : ''}`}>{abTestLoading ? 'progress_activity' : 'science'}</span>
+                        {abTestLoading ? 'Creating...' : 'A/B Test'}
+                    </button>
+                )}
             </div>
 
             <PublishModal
@@ -2480,6 +2499,55 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     </button>
                 </CreditTooltipWrapper>
             </div>
+
+            {/* A/B Test Variants */}
+            {abTestData && abTestData.variants && abTestData.variants.length > 0 && (
+                <div className="mt-6 glass-panel rounded-2xl p-5 border border-violet-500/20">
+                    <div className="flex items-center gap-2 mb-4">
+                        <span className="material-symbols-outlined text-violet-400">science</span>
+                        <h4 className="text-sm font-bold text-white">A/B Test Variants</h4>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-400/10 text-violet-400 border border-violet-400/20">
+                            {abTestData.testPlan?.primaryMetric?.replace('_', ' ')} • {abTestData.testPlan?.testDuration}
+                        </span>
+                    </div>
+                    <div className="space-y-3">
+                        {abTestData.variants.map((v, i) => (
+                            <div key={i} className={`rounded-xl p-4 border transition-all ${
+                                v.isControl ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-white/[0.02] border-white/[0.06] hover:border-violet-500/30'
+                            }`}>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${v.isControl ? 'bg-emerald-400/10 text-emerald-400' : 'bg-violet-400/10 text-violet-400'}`}>
+                                        {v.variantLabel || `Variant ${String.fromCharCode(65 + i)}`}
+                                    </span>
+                                    {v.abTestChangeType && v.abTestChangeType !== 'control' && (
+                                        <span className="text-[10px] text-slate-500">{v.abTestChangeType} change</span>
+                                    )}
+                                </div>
+                                <p className="text-sm text-slate-300 whitespace-pre-line line-clamp-4">{v.content}</p>
+                                {v.abTestHypothesis && (
+                                    <p className="text-xs text-slate-500 mt-2 italic">💡 {v.abTestHypothesis}</p>
+                                )}
+                                <button onClick={() => { navigator.clipboard.writeText(v.content); }}
+                                    className="mt-2 text-xs text-slate-500 hover:text-white flex items-center gap-1 transition-colors cursor-pointer">
+                                    <span className="material-symbols-outlined text-xs">content_copy</span> Copy variant
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Intelligence Sources */}
+            {result?.agenticData?.research?.sources && result.agenticData.research.sources.length > 0 && (
+                <div className="mt-4 flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] text-slate-600 font-medium">Data sources:</span>
+                    {result.agenticData.research.sources.map(s => (
+                        <span key={s} className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-slate-400 border border-white/[0.06] font-medium">
+                            {s === 'Playbook' ? '📊 ' : s === 'GA4' ? '📈 ' : s === 'Competitors' ? '🔍 ' : s === 'Trending' ? '📰 ' : s === 'SEO Audit' ? '🔧 ' : ''}{s}
+                        </span>
+                    ))}
+                </div>
+            )}
 
             {/* Learning note */}
             <div className="mt-6 p-3 rounded-xl bg-primary/5 border border-primary/10 text-center">
@@ -2984,6 +3052,23 @@ export default function ContentStudio() {
     }
 
     const [contentFeedback, setContentFeedback] = useState(null) // 'liked' | 'disliked'
+    const [abTestData, setAbTestData] = useState(null)
+    const [abTestLoading, setAbTestLoading] = useState(false)
+
+    const handleABTest = async () => {
+        if (!result?._id || abTestLoading) return
+        setAbTestLoading(true)
+        try {
+            const data = await contentAPI.agenticABVariants(result._id)
+            if (data.success) {
+                setAbTestData(data)
+            }
+        } catch (err) {
+            console.error('A/B test error:', err)
+        } finally {
+            setAbTestLoading(false)
+        }
+    }
 
     const handleFeedback = async (signalType, extra = {}) => {
         // Immediate visual feedback regardless of _id
@@ -3397,6 +3482,9 @@ SPOKESPERSON QUOTES:`
                     onCreateVisual={handleCreateVisual}
                     onRefine={handleRefine}
                     contentFeedback={contentFeedback}
+                    onABTest={handleABTest}
+                    abTestData={abTestData}
+                    abTestLoading={abTestLoading}
                 />
             )}
 
