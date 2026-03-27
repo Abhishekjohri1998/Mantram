@@ -92,6 +92,19 @@ const GOALS = [
         ],
     },
     {
+        id: 'blog', icon: 'edit_note', label: 'Write Blog / Article',
+        desc: 'Long-form blogs, SEO articles, listicles, pillar content',
+        color: 'from-teal-500/20 to-cyan-500/10', accent: '#14B8A6',
+        subTypes: [
+            { id: 'seo_blog', icon: 'search', label: 'SEO Blog Article' },
+            { id: 'long_form', icon: 'article', label: 'Long-form Article' },
+            { id: 'listicle', icon: 'format_list_numbered', label: 'Listicle (Top 10, Best Of)' },
+            { id: 'case_study', icon: 'assignment', label: 'Case Study' },
+            { id: 'comparison', icon: 'compare', label: 'Comparison / vs Article' },
+            { id: 'pillar_content', icon: 'hub', label: 'Pillar Content (3000+ words)' },
+        ],
+    },
+    {
         id: 'press_release', icon: 'newspaper', label: 'Write Press Release',
         desc: 'Professional PR for launches, announcements, events',
         color: 'from-rose-500/20 to-pink-500/10', accent: '#F43F5E',
@@ -2312,7 +2325,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     <p className="text-sm text-slate-300 leading-relaxed line-clamp-3">{result.content}</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                     <button onClick={onCreateVisual}
                         className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-primary/30 transition-all cursor-pointer text-left group border border-white/[0.06]">
                         <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-3 group-hover:scale-110 transition-transform">
@@ -2337,11 +2350,72 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                         <h4 className="text-base font-bold text-white mb-1">Create New Content</h4>
                         <p className="text-[11px] text-slate-500">Start a new content generation from scratch</p>
                     </button>
+                    {result?._id && (
+                        <button onClick={onABTest} disabled={abTestLoading}
+                            className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-violet-500/30 transition-all cursor-pointer text-left group border border-white/[0.06] disabled:opacity-40">
+                            <div className="size-12 rounded-xl bg-violet-400/10 flex items-center justify-center text-violet-400 mb-3 group-hover:scale-110 transition-transform">
+                                <span className={`material-symbols-outlined text-2xl ${abTestLoading ? 'animate-spin' : ''}`}>{abTestLoading ? 'progress_activity' : 'science'}</span>
+                            </div>
+                            <h4 className="text-base font-bold text-white mb-1">{abTestLoading ? 'Creating...' : '🔬 A/B Test'}</h4>
+                            <p className="text-[11px] text-slate-500">Generate 2-3 variants to test what performs best</p>
+                        </button>
+                    )}
+                    <button onClick={() => setShowPublish(true)}
+                        className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-blue-500/30 transition-all cursor-pointer text-left group border border-white/[0.06]">
+                        <div className="size-12 rounded-xl bg-blue-400/10 flex items-center justify-center text-blue-400 mb-3 group-hover:scale-110 transition-transform">
+                            <span className="material-symbols-outlined text-2xl">share</span>
+                        </div>
+                        <h4 className="text-base font-bold text-white mb-1">Publish Now</h4>
+                        <p className="text-[11px] text-slate-500">Post directly to your social media accounts</p>
+                    </button>
                 </div>
                 <div className="p-3 rounded-xl bg-primary/5 border border-primary/10 text-center">
                     <p className="text-sm text-primary font-bold">🧠 AI is learning from your acceptance</p>
                     <p className="text-sm text-slate-500">Future content will align closer to this style and tone</p>
                 </div>
+
+                {/* A/B Test Variants in accepted view */}
+                {abTestData && abTestData.variants && abTestData.variants.length > 0 && (
+                    <div className="mt-6 glass-panel rounded-2xl p-5 border border-violet-500/20">
+                        <div className="flex items-center gap-2 mb-4">
+                            <span className="material-symbols-outlined text-violet-400">science</span>
+                            <h4 className="text-sm font-bold text-white">A/B Test Variants</h4>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-400/10 text-violet-400 border border-violet-400/20">
+                                {abTestData.variants.length} variants generated
+                            </span>
+                        </div>
+                        <div className="space-y-3">
+                            {abTestData.variants.map((v, i) => (
+                                <div key={i} className={`rounded-xl p-4 border transition-all ${v.isControl ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-white/[0.02] border-white/[0.06]'}`}>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${v.isControl ? 'bg-emerald-400/10 text-emerald-400' : 'bg-violet-400/10 text-violet-400'}`}>
+                                            {v.variantLabel || `Variant ${String.fromCharCode(65 + i)}`}
+                                        </span>
+                                        {v.abTestChangeType && v.abTestChangeType !== 'control' && (
+                                            <span className="text-[10px] text-slate-500">{v.abTestChangeType} change</span>
+                                        )}
+                                    </div>
+                                    <p className="text-sm text-slate-300 whitespace-pre-line line-clamp-4">{v.content}</p>
+                                    {v.abTestHypothesis && (
+                                        <p className="text-xs text-slate-500 mt-2 italic">💡 {v.abTestHypothesis}</p>
+                                    )}
+                                    <button onClick={() => { navigator.clipboard.writeText(v.content); }}
+                                        className="mt-2 text-xs text-slate-500 hover:text-white flex items-center gap-1 transition-colors cursor-pointer">
+                                        <span className="material-symbols-outlined text-xs">content_copy</span> Copy variant
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                <PublishModal
+                    isOpen={showPublish}
+                    onClose={() => setShowPublish(false)}
+                    defaultText={result?.content || ''}
+                    defaultImage={null}
+                    brandId={activeBrand?._id}
+                />
             </div>
         )
     }
@@ -2355,6 +2429,22 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     <p className="text-sm text-slate-400 mt-1">
                         Generated for {activeBrand?.name} • Brand voice: {activeBrand?.dna?.voice?.personality || 'Active'}
                     </p>
+                    {/* Intelligence Sources */}
+                    {result?.agenticData?.research?.sources && result.agenticData.research.sources.length > 0 && (
+                        <div className="flex items-center gap-1.5 mt-2">
+                            <span className="text-[10px] text-slate-600">Powered by:</span>
+                            {result.agenticData.research.sources.map(s => (
+                                <span key={s} className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium border ${
+                                    s === 'Playbook' ? 'bg-violet-500/10 text-violet-400 border-violet-500/20' :
+                                    s === 'GA4' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                    s === 'Competitors' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                                    'bg-white/[0.04] text-slate-400 border-white/[0.06]'
+                                }`}>
+                                    {s === 'Playbook' ? '📊' : s === 'GA4' ? '📈' : s === 'Competitors' ? '🔍' : s === 'Trending' ? '📰' : s === 'SEO Audit' ? '🔧' : s === 'Web' ? '🌐' : '📝'} {s}
+                                </span>
+                            ))}
+                        </div>
+                    )}
                 </div>
                 <div className="flex gap-2">
                     <button onClick={() => { setEditing(!editing); if (!editing) setTimeout(() => refineRef.current?.focus(), 100) }}
