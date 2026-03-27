@@ -97,8 +97,18 @@ app.use((req, res, next) => {
 });
 
 // Alias for health checks
-app.get(['/health', '/api/health'], (req, res) => res.json({ status: 'ok', port: config.port }));
+// ── HEALTH & LOG HYGIENE ──────────────────────────────────────
+app.get(['/health', '/api/health'], (req, res) => {
+    const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+    res.json({ 
+        status: dbStatus === 'connected' ? 'ok' : 'error', 
+        database: dbStatus,
+        port: config.port,
+        timestamp: new Date().toISOString()
+    });
+});
 app.get('/favicon.ico', (req, res) => res.status(204).end());
+app.get('/robots.txt', (req, res) => res.status(204).end());
 app.get('/', (req, res) => res.json({ status: 'ok', message: 'Mantram AI API' }));
 
 const server = app.listen(config.port, '0.0.0.0', () => {

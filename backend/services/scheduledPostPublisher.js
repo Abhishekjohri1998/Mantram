@@ -5,6 +5,7 @@
  * and publishes them via the platform-specific APIs.
  */
 
+import mongoose from 'mongoose';
 import SocialPost from '../models/SocialPost.js';
 import SocialAccount from '../models/SocialAccount.js';
 import {
@@ -100,6 +101,11 @@ async function publishScheduledPost(post) {
 async function processDuePosts() {
     if (isRunning) return; // Prevent overlap
     isRunning = true;
+
+    if (mongoose.connection.readyState !== 1) {
+        console.warn('[SCHEDULER] Database not connected, skipping post processing tick');
+        return;
+    }
 
     try {
         const now = new Date();
