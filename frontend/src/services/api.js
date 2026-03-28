@@ -169,6 +169,7 @@ export const content = {
 // ============ Creatives API ============
 export const creatives = {
     generate: (data, options = {}) => apiFetch('/creatives/generate', { method: 'POST', body: JSON.stringify(data), ...options }),
+    pollProgress: (progressId) => apiFetch(`/creatives/progress/${progressId}`),
     enhancePrompt: (data) => apiFetch('/creatives/enhance-prompt', { method: 'POST', body: JSON.stringify(data) }),
     generateCampaignCopy: (data) => apiFetch('/creatives/generate-campaign-copy', { method: 'POST', body: JSON.stringify(data) }),
     list: (params = {}) => {

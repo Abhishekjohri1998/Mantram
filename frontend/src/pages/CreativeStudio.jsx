@@ -330,6 +330,7 @@ export default function CreativeStudio() {
     const [showProductPicker, setShowProductPicker] = useState(false)
     const [productsList, setProductsList] = useState([])
     const [generating, setGenerating] = useState(false)
+    const [pipelineSteps, setPipelineSteps] = useState([]) // Real-time agentic pipeline progress
     const [autoGenerate, setAutoGenerate] = useState(false)
     const [enhancing, setEnhancing] = useState(false)
     const [result, setResult] = useState(null)
@@ -340,7 +341,7 @@ export default function CreativeStudio() {
     const [style, setStyle] = useState('modern')
     const [textOverlay, setTextOverlay] = useState('')
     const [fromContent, setFromContent] = useState(false)
-    const [aspectRatio, setAspectRatio] = useState('1:1')
+    const [aspectRatio, setAspectRatio] = useState('4:5')
     const [publishData, setPublishData] = useState(null) // { image, text } or null
     const [imageModel, setImageModel] = useState('nanobanana-2')
     const [showModelMenu, setShowModelMenu] = useState(false)
@@ -1068,10 +1069,15 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     async function handleGenerate() {
         if (!prompt.trim() || !activeBrand) return
         setGenerating(true)
+        setPipelineSteps([])
         setError('')
         setFeedbackState(null)
         setFeedbackToast('')
         setShowQuickStart(false)
+
+        // Generate unique progress ID for real-time tracking
+        const progressId = `p_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+        let progressInterval = null
 
         try {
             let fullPrompt = prompt
@@ -1086,6 +1092,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 aspectRatio,
                 imageModel,
                 agenticQuality,
+                progressId, // Pass to backend for progress tracking
             }
             if (designBaseImage) {
                 // Use template inpainting mode — preserves layout, characters, products from the original image
@@ -1119,9 +1126,21 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 hasProductImage: !!options.productImageUrl,
                 textOverlay: textOverlay || '(none)',
                 addLogo,
+                progressId,
             })
 
             setAiWarnings([])
+
+            // Start polling for pipeline progress
+            progressInterval = setInterval(async () => {
+                try {
+                    const progress = await creativesAPI.pollProgress(progressId)
+                    if (progress?.steps?.length > 0) {
+                        setPipelineSteps(progress.steps)
+                    }
+                } catch { /* ignore polling errors */ }
+            }, 1500)
+
             const signal = getSignal(aiCreateAbortRef)
             const data = await creativesAPI.generate({
                 brandId: activeBrand._id,
@@ -1129,6 +1148,9 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 prompt: fullPrompt,
                 options,
             }, { signal })
+
+            // Stop polling
+            if (progressInterval) clearInterval(progressInterval)
 
             // Handle model busy notification
             if (data.modelBusy) {
@@ -1157,6 +1179,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 provider: e.provider
             })
         } finally {
+            if (progressInterval) clearInterval(progressInterval)
             setGenerating(false)
         }
     }
@@ -1819,6 +1842,52 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )}
 
+                        {/* ── Format Selector (always visible) ── */}
+                        <div className="mb-3">
+                            <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Format</span>
+                                {selectedTypeInfo && (
+                                    <span className="text-[9px] text-slate-600">{selectedTypeInfo.size} · {selectedTypeInfo.aspectRatio}</span>
+                                )}
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                                {creativeTypes.map(ct => (
+                                    <button key={ct.id} onClick={() => setSelectedType(ct.id)}
+                                        className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${selectedType === ct.id
+                                            ? 'bg-primary/20 text-primary border border-primary/30 shadow-sm shadow-primary/10'
+                                            : 'bg-white/[0.04] text-slate-500 hover:text-white border border-transparent hover:border-white/[0.08]'}`}>
+                                        <span className="material-symbols-outlined text-xs">{ct.icon}</span>
+                                        {ct.label}
+                                    </button>
+                                ))}
+                            </div>
+                            {/* Format-specific intelligence hint */}
+                            {selectedType === 'youtube-thumb' && (
+                                <p className="text-[10px] text-amber-400/70 mt-1.5 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[11px]">tips_and_updates</span>
+                                    AI will optimize for: bold headline text, expressive face, high contrast, click-worthy composition
+                                </p>
+                            )}
+                            {selectedType === 'instagram-story' && (
+                                <p className="text-[10px] text-pink-400/70 mt-1.5 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[11px]">tips_and_updates</span>
+                                    AI will optimize for: vertical composition, thumb-stopping visual, story-ready layout
+                                </p>
+                            )}
+                            {selectedType === 'banner' && (
+                                <p className="text-[10px] text-cyan-400/70 mt-1.5 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[11px]">tips_and_updates</span>
+                                    AI will optimize for: wide composition, hero layout, text-safe zones on left/right
+                                </p>
+                            )}
+                            {selectedType === 'linkedin-post' && (
+                                <p className="text-[10px] text-blue-400/70 mt-1.5 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[11px]">tips_and_updates</span>
+                                    AI will optimize for: professional tone, clean layout, corporate-friendly aesthetic
+                                </p>
+                            )}
+                        </div>
+
                         {/* ── Compact References Row ── */}
                         <div className="flex items-center gap-2 mb-3">
                             <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Refs</span>
@@ -2038,18 +2107,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         </div>
 
-                        {/* ── Action Row: Format + Model + Generate + Options ── */}
+                        {/* ── Action Row: Model + Generate + Options ── */}
                         <div className="space-y-2">
-                            {/* Format selector row */}
-                            {selectedTypeInfo && (
-                                <button onClick={() => setShowAdvanced(!showAdvanced)}
-                                    className="flex items-center gap-1.5 w-full px-3 py-2 rounded-xl text-[11px] font-bold bg-white/[0.04] text-slate-400 hover:text-white border border-white/[0.06] hover:border-white/10 transition-all cursor-pointer">
-                                    <span className="material-symbols-outlined text-xs text-primary">{selectedTypeInfo.icon}</span>
-                                    {selectedTypeInfo.label}
-                                    <span className="text-[9px] text-slate-500">{selectedTypeInfo.size}</span>
-                                    <span className="material-symbols-outlined text-[10px] text-slate-600 ml-auto">expand_more</span>
-                                </button>
-                            )}
 
                             {/* Model selector row */}
                             <div className="relative">
@@ -2150,21 +2209,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
                             </div>
 
-                            {/* Format */}
-                            <div>
-                                <p className="text-xs font-bold text-slate-400 mb-2">Format</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {creativeTypes.map(ct => (
-                                        <button key={ct.id} onClick={() => setSelectedType(ct.id)}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${selectedType === ct.id
-                                                ? 'bg-primary/20 text-primary border border-primary/30'
-                                                : 'bg-white/[0.04] text-slate-400 hover:text-white border border-transparent'}`}>
-                                            <span className="material-symbols-outlined text-xs">{ct.icon}</span>
-                                            {ct.label}
-                                            <span className="text-[9px] opacity-60">{ct.size}</span>
-                                        </button>
-                                    ))}
-                                </div>
+                            {/* Format moved to above prompt area — this section now just shows the lock */}
+                            <div className="flex items-center gap-2 py-2 px-3 rounded-xl bg-primary/5 border border-primary/10">
+                                <span className="material-symbols-outlined text-sm text-primary">{selectedTypeInfo?.icon || 'photo_camera'}</span>
+                                <p className="text-[11px] text-slate-400">
+                                    Format: <strong className="text-white">{selectedTypeInfo?.label || 'Instagram Post'}</strong>
+                                    <span className="text-slate-600 ml-1">{selectedTypeInfo?.size} · {selectedTypeInfo?.aspectRatio}</span>
+                                </p>
+                                <span className="text-[9px] text-slate-600 ml-auto">Change above ↑</span>
                             </div>
 
                             {/* Style + Ratio Row */}
@@ -2486,9 +2538,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         <GlobalLoader 
                             isActive={generating} 
                             title="Creating your visual..." 
+                            pipelineSteps={pipelineSteps}
                             currentStage={`${prompt.substring(0, 50)}${prompt.length > 50 ? '...' : ''}`}
                             icon="photo_camera"
-                            estimatedDuration={30}
+                            estimatedDuration={60}
                         />
 
                         {/* ── In-Session Generation Gallery (scrollable grid) ── */}

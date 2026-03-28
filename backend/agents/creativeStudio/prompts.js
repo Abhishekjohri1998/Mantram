@@ -27,7 +27,7 @@ RULES:
 4. Consider the target audience's visual expectations in this industry
 5. Output must be actionable direction for a prompt engineer, not vague adjectives
 6. ALWAYS specify lighting direction — it's the #1 quality differentiator in AI images
-7. NEVER suggest text on the image unless explicitly requested — text renders poorly in AI
+7. TEXT ON IMAGE: For YouTube thumbnails and LinkedIn posts, you MUST suggest bold headline text. For Instagram/Facebook, prefer no text unless the brief specifically asks for it. When suggesting text, keep it 3-5 words, catchy, and relevant to the theme + product.
 8. ANTI-HALLUCINATION: If REAL PRODUCT DATA is provided, your creative direction MUST be based on that real product. Do NOT imagine what the product looks like — describe ONLY what the data tells you. If product images are referenced, your direction should assume the AI model will SEE the actual product photo.
 
 RESPONSE FORMAT — valid JSON only:
@@ -40,6 +40,7 @@ RESPONSE FORMAT — valid JSON only:
   "composition": "Precise layout: 'Hero product lower-third, negative space top-left for breathing room, leading lines from bottom-right'",
   "keyElements": ["Subject treatment", "Background concept", "Depth layers", "Textural focus"],
   "scrollStopFactor": "The ONE thing that makes someone pause mid-scroll",
+  "suggestedHeadline": "A catchy 3-5 word headline for the image (null if format does not need text). For YouTube: clickbait-worthy. For LinkedIn: thought-leadership. Combine the brief theme with the product name creatively.",
   "avoidList": ["Generic stock-photo poses", "Cluttered compositions", "Things that don't match brand"]
 }`;
 
@@ -66,7 +67,8 @@ RULES:
 6. Describe colors ONLY by visual appearance: "deep ocean teal" not "#0d9488"
 7. Include camera/lens hints for photorealistic styles: "shot on 85mm f/1.4, shallow depth of field"
 8. End with quality modifiers appropriate to the style
-9. ANTI-HALLUCINATION: If REAL PRODUCT DATA is provided, your prompt MUST faithfully describe that product based ONLY on the given data (name, description, features, category). NEVER invent product shapes, colors, designs, or features not mentioned in the data. If real product images will be provided as references to the image model, write the prompt to complement those images — describe the scene, lighting, and environment around the real product.
+9. ANTI-HALLUCINATION: If REAL PRODUCT DATA is provided, your prompt MUST faithfully describe that product based ONLY on the given data. NEVER invent product shapes, colors, designs, or features not in the data.
+10. TEXT/HEADLINE: If the art direction includes a "suggestedHeadline", INCORPORATE it into the prompt like: 'Bold text reading "HEADLINE" prominently displayed in high-contrast lettering'. If suggestedHeadline is null, do NOT add text.
 
 RESPONSE FORMAT — valid JSON only:
 {

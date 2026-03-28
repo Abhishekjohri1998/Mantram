@@ -3,6 +3,7 @@ import { Router } from 'express';
 import Creative from '../models/Creative.js';
 import Feedback from '../models/Feedback.js';
 import Brand from '../models/Brand.js';
+import Product from '../models/Product.js';
 import { protect } from '../middleware/auth.js';
 import { requireStudio } from '../middleware/studioAccess.js';
 import { requireCredits, refundCredits } from '../middleware/credits.js';
@@ -15,8 +16,19 @@ import { GoogleGenAI } from '@google/genai';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { getRouter } from '../ai/router.js';
 import { runCreativePipeline } from '../agents/creativeStudio/nodes.js';
+import { startProgress, addStep, getProgress, endProgress } from '../utils/progressStore.js';
 
 const router = Router();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GET /api/creatives/progress/:id — Poll real-time pipeline progress
+// Lightweight endpoint — no auth required (progress IDs are UUIDs, unguessable)
+// ══════════════════════════════════════════════════════════════════════════════
+router.get('/progress/:id', (req, res) => {
+    const progress = getProgress(req.params.id);
+    if (!progress) return res.json({ steps: [] });
+    res.json(progress);
+});
 
 // ── Build a natural-language brand description (NO labels, NO structured metadata)
 // Image models render any label/noun as visible text, so this must be purely descriptive
@@ -390,7 +402,9 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// POST /api/creatives/enhance-prompt — AI-powered prompt enhancement
+// POST /api/creatives/enhance-prompt — AI-powered AGENTIC prompt enhancement
+// Intelligently matches products, injects format-specific creative direction, and builds
+// a detailed prompt that combines the user's theme with real brand/product data.
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/enhance-prompt', protect, requireCredits('promptEnhance'), async (req, res) => {
     try {
@@ -401,42 +415,120 @@ router.post('/enhance-prompt', protect, requireCredits('promptEnhance'), async (
         const brandDesc = brand ? buildBrandDescription(brand) : 'a professional brand';
         const colorPhrase = brand ? getColorPhrase(brand) : '';
         const visualCtx = brand ? buildVisualContext(brand) : '';
+        const dna = brand?.dna || {};
 
-        const systemPrompt = `You are an expert prompt engineer for AI image generation (Gemini / NanoBanana 2). 
-Your job is to take a rough user description and transform it into a detailed, vivid, specific image generation prompt.
+        // ── AGENTIC: Fetch products and match to the brief ──
+        let productContext = '';
+        let matchedProductName = '';
+        if (brand) {
+            const products = await Product.find(
+                { brand: brand._id, status: 'active' },
+                { title: 1, shortDescription: 1, description: 1, features: 1, category: 1, tags: 1, productType: 1 }
+            ).lean().limit(20);
+
+            if (products.length > 0) {
+                const briefLower = prompt.toLowerCase();
+                const SEMANTIC_MAP = {
+                    beat: ['earbuds', 'headphones', 'speaker', 'audio', 'music', 'sound', 'bass'],
+                    beats: ['earbuds', 'headphones', 'speaker', 'audio', 'music', 'sound', 'bass'],
+                    music: ['earbuds', 'headphones', 'speaker', 'audio', 'neckband'],
+                    sound: ['earbuds', 'headphones', 'speaker', 'audio'],
+                    listen: ['earbuds', 'headphones'],
+                    summer: ['light', 'outdoor', 'portable', 'wireless', 'sport'],
+                    winter: ['warm', 'cozy', 'premium'],
+                    travel: ['portable', 'wireless', 'powerbank'],
+                    fitness: ['sport', 'wireless', 'neckband', 'earbuds'],
+                    gaming: ['headphones', 'bass'],
+                    style: ['watch', 'earbuds', 'premium'],
+                    gift: ['watch', 'earbuds', 'powerbank'],
+                };
+                const briefWords = briefLower.split(/\s+/).filter(w => w.length > 2);
+                const expanded = new Set(briefWords);
+                for (const w of briefWords) { (SEMANTIC_MAP[w] || []).forEach(kw => expanded.add(kw)); }
+                const expandedBrief = [...expanded].join(' ');
+
+                let bestScore = 0, bestProduct = null;
+                for (const p of products) {
+                    let score = 0;
+                    const titleWords = (p.title || '').toLowerCase().split(/\s+/);
+                    const descWords = (p.description || p.shortDescription || '').toLowerCase().split(/\s+/);
+                    for (const w of titleWords) { if (w.length > 2 && briefLower.includes(w)) score += 3; }
+                    for (const w of [...titleWords, ...descWords, ...(p.tags || []).map(t => t.toLowerCase())]) {
+                        if (w.length > 2 && expandedBrief.includes(w)) score += 1;
+                    }
+                    if (briefLower.includes(p.title.toLowerCase())) score += 10;
+                    if (score > bestScore) { bestScore = score; bestProduct = p; }
+                }
+                if (bestScore < 1) bestProduct = products[Math.floor(Math.random() * products.length)];
+
+                if (bestProduct) {
+                    matchedProductName = bestProduct.title;
+                    const features = (bestProduct.features || []).slice(0, 3).join(', ');
+                    const desc = (bestProduct.shortDescription || bestProduct.description || '').substring(0, 100);
+                    productContext = `\nMATCHED PRODUCT FOR THIS BRIEF: "${bestProduct.title}"${desc ? ` — ${desc}` : ''}${features ? `\nKEY FEATURES: ${features}` : ''}\nIMPORTANT: Weave this product into the enhanced prompt as the HERO visual element. The image should prominently feature "${bestProduct.title}".`;
+                }
+                productContext += `\nALL PRODUCTS IN CATALOG: ${products.map(p => p.title).join(', ')}`;
+            } else {
+                const services = (dna.servicesOffered || []).slice(0, 5);
+                const usps = (dna.uniqueSellingPoints || []).slice(0, 3);
+                if (services.length > 0 || usps.length > 0) {
+                    productContext = `\nSERVICE BRAND — KEY OFFERINGS: ${services.join(', ')}${usps.length > 0 ? `\nUNIQUE SELLING POINTS: ${usps.join(', ')}` : ''}\nIMPORTANT: Weave these services into the visual narrative.`;
+                }
+            }
+        }
+
+        // ── FORMAT-SPECIFIC INTELLIGENCE ──
+        const FORMAT_INTEL = {
+            'youtube-thumb': { label: 'YouTube Thumbnail (16:9)', needsText: true, rules: 'MUST include bold, readable headline text as the HERO visual element. Suggest a catchy 3-5 word headline that relates to the brief and product. High contrast, expressive face if relevant, rule of thirds, click-worthy composition.' },
+            'instagram-post': { label: 'Instagram Post (4:5)', needsText: false, rules: 'Optimize for feed scroll-stopping. Lifestyle-first aesthetic, center-weighted key elements.' },
+            'instagram-story': { label: 'Instagram Story (9:16)', needsText: false, rules: 'Full vertical, key content in center 60%. Story-native, raw and engaging.' },
+            'facebook-ad': { label: 'Facebook Ad (4:5)', needsText: false, rules: 'Minimal text (<20%). Single clear value proposition. CTA-ready composition.' },
+            'linkedin-post': { label: 'LinkedIn Post (1:1)', needsText: true, rules: 'Professional, clean. Can include a short thought-leadership headline. Corporate-friendly palette.' },
+            'banner': { label: 'Website Banner (16:9)', needsText: false, rules: 'Ultra-wide, leave text-safe zones on sides. Editorial quality.' },
+        };
+        const formatInfo = FORMAT_INTEL[format] || null;
+
+        const systemPrompt = `You are an award-winning Creative Director and prompt engineer for AI image generation.
+You transform rough user ideas into STUNNING, brand-specific, product-aware image generation prompts.
+
+YOUR AGENTIC INTELLIGENCE:
+- You DON'T just enhance text — you RESEARCH the brief against the brand's product catalog and intelligently select which product to feature
+- You understand that "summer beats" for an electronics brand means: feature their EARBUDS/HEADPHONES in a summer lifestyle setting
+- You combine the user's THEME with the brand's ACTUAL PRODUCTS to create a compelling visual narrative
 
 RULES:
-1. Keep the user's core intent but make it 10x more detailed and specific
-2. Add specific details about: composition, lighting, textures, materials, atmosphere, color palette, depth of field
-3. NEVER include labels, hex codes, font names, or metadata text — these render as visible text in images
-4. Describe colors by appearance, not codes (e.g. "warm amber tones" not "#f59e0b")
-5. Make it professional-quality, polished, ready for a design agency
-6. Keep it under 150 words — concise but vivid
-7. If reference images are mentioned, incorporate their visual elements into the enhanced prompt
-8. Match the brand's personality and style
-9. NEVER wrap in quotes or add prefixes like "Generate:" — just return the raw enhanced prompt text
-10. NEVER describe the output as a "design mockup", "floating card", "framed poster", or "presented on a background". The prompt must describe the ACTUAL content that fills the entire canvas — not a presentation of content.
+1. Keep the user's core theme/mood but ADD the matched product as the hero visual element
+2. If a MATCHED PRODUCT is provided, describe it as the KEY VISUAL in the scene — show it being used, worn, or displayed prominently
+3. Add vivid details: composition, lighting, textures, materials, atmosphere, color palette
+4. NEVER include hex codes, font names, or metadata text
+5. Describe colors by visual appearance, not codes
+6. Premium quality — ready for a global brand campaign
+7. Keep under 150 words — concise but vivid
+8. Match the brand's personality and aesthetic
+${formatInfo ? `9. FORMAT: ${formatInfo.label} — ${formatInfo.rules}` : ''}
+${formatInfo?.needsText ? `10. TEXT ON IMAGE: Since this is a ${formatInfo.label}, your prompt MUST include a SUGGESTED HEADLINE. Write it like: "Bold text reading 'YOUR HEADLINE HERE' prominently displayed..." Make the headline catchy, 3-5 words, and combine the brief theme with the product.` : ''}
+11. NEVER wrap in quotes or add prefixes like "Generate:" — return ONLY the raw enhanced prompt
+12. NEVER describe the output as a "mockup" or "presentation" — describe the ACTUAL visual content
 
 RESPOND WITH ONLY THE ENHANCED PROMPT TEXT. Nothing else.`;
 
         const userPrompt = [
-            `ROUGH PROMPT: ${prompt}`,
+            `USER'S IDEA: ${prompt}`,
             brand ? `BRAND: ${brandDesc}` : '',
             colorPhrase ? `BRAND COLORS: ${colorPhrase}` : '',
-            visualCtx ? `BRAND GUIDELINES: ${visualCtx}` : '',
+            visualCtx ? `BRAND VISUAL STYLE: ${visualCtx}` : '',
+            productContext,
             style ? `STYLE: ${style}` : '',
-            format ? `FORMAT: ${format}` : '',
+            formatInfo ? `FORMAT: ${formatInfo.label}` : format ? `FORMAT: ${format}` : '',
             aspectRatio ? `ASPECT RATIO: ${aspectRatio}` : '',
             referenceDescriptions ? `REFERENCE IMAGES: ${referenceDescriptions}` : '',
         ].filter(Boolean).join('\n');
 
-        // Prompt enhancement is a lightweight text task — use ONLY cheap models.
-        // Gemini Flash (~free) or GPT-4o-mini ($0.015/1K). Never waste Claude on this.
+        // Use Gemini Flash (cheapest)
         const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
         const openaiKey = process.env.OPENAI_API_KEY;
         let enhanced = '';
 
-        // Try Gemini first (cheapest)
         if (geminiKey) {
             try {
                 const resp = await fetch(
@@ -462,7 +554,6 @@ RESPOND WITH ONLY THE ENHANCED PROMPT TEXT. Nothing else.`;
             }
         }
 
-        // Fallback to GPT-4o-mini (still cheap)
         if (!enhanced && openaiKey) {
             try {
                 const resp = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -481,14 +572,14 @@ RESPOND WITH ONLY THE ENHANCED PROMPT TEXT. Nothing else.`;
             }
         }
 
-        // Last resort: return original prompt (never call Claude for this)
         if (!enhanced) enhanced = prompt;
 
-        // Clean up the response — remove quotes, "Generate:" prefixes, etc.
+        // Clean up
         enhanced = enhanced.trim();
         enhanced = enhanced.replace(/^["']|["']$/g, '').trim();
         enhanced = enhanced.replace(/^(Generate|Create|Design|Prompt|Enhanced):?\s*/i, '').trim();
 
+        console.log(`✨ Enhanced prompt for "${prompt.substring(0, 30)}..." → format: ${format}, matched product: ${matchedProductName || 'none'}`);
         res.json({ success: true, enhancedPrompt: enhanced });
     } catch (error) {
         console.error('Prompt enhance error:', error);
@@ -645,6 +736,8 @@ No markdown, no explanation.`;
 router.post('/generate', protect, requireStudio('creativeStudio'), requireCredits('creative'), async (req, res) => {
     try {
         const { brandId, type, prompt, options } = req.body;
+        const progressId = options?.progressId || null;
+        if (progressId) startProgress(progressId);
         if (!brandId || !prompt) {
             return res.status(400).json({ success: false, error: 'brandId and prompt are required' });
         }
@@ -879,6 +972,7 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
                     style: styleWord,
                     imageModel: options?.imageModel || 'nanobanana-2',
                     mode: agenticQuality,
+                    onProgress: progressId ? (step) => addStep(progressId, step) : undefined,
                 });
 
                 // Use agent-crafted prompt + append safety instructions
@@ -904,19 +998,26 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
                 // ── ANTI-HALLUCINATION: Auto-inject real product images as reference ──
                 const mp = pipelineResult.matchedProduct;
                 const brandImgs = pipelineResult.brandIntel?.brandImages || [];
+                const matchedDnaImgs = pipelineResult.brandIntel?.matchedDnaImages || [];
                 const productCandidates = pipelineResult.brandIntel?.productCandidates || [];
                 const isProductBrand = pipelineResult.brandIntel?.brandType === 'product';
                 let injectedProductImg = false;
 
-                // Step 1: Inject matched product images (for product accuracy)
+                // Step 1: Inject matched product images (direct or from brand DNA)
+                if (progressId) addStep(progressId, { agent: 'image-inject', message: 'Injecting product reference images...', status: 'working' });
                 if (mp?.images?.length > 0) {
-                    console.log(`📸 Anti-hallucination: injecting ${mp.images.length} real product image(s) for "${mp.title}"`);
+                    const imgSource = mp.usingDnaImages ? 'brand DNA' : 'product catalog';
+                    console.log(`📸 Anti-hallucination: injecting ${mp.images.length} ${imgSource} image(s) for "${mp.title}"`);
                     for (const imgUrl of mp.images.slice(0, 2)) {
                         try {
-                            const resolved = await resolveRefImage(imgUrl, 'catalog-product');
+                            const resolved = await resolveRefImage(imgUrl, mp.usingDnaImages ? 'brand-dna-product' : 'catalog-product');
                             if (resolved) {
                                 imageParts.push({ inlineData: { mimeType: resolved.part.mimeType, data: resolved.part.data } });
-                                referenceInstructions.push(`REAL PRODUCT IMAGE: This is "${mp.title}" — the ACTUAL product being promoted. The generated image MUST feature this exact product. Do NOT invent or imagine a different product.`);
+                                if (mp.usingDnaImages) {
+                                    referenceInstructions.push(`BRAND PRODUCT REFERENCE: This is a real brand image from ${brand.name}'s website showing their product "${mp.title}" or related products. Use this as visual reference for the product's appearance, style, and brand aesthetic. Feature this brand's real products.`);
+                                } else {
+                                    referenceInstructions.push(`REAL PRODUCT IMAGE: This is "${mp.title}" — the ACTUAL product being promoted. The generated image MUST feature this exact product. Do NOT invent or imagine a different product.`);
+                                }
                                 injectedProductImg = true;
                             } else {
                                 console.warn(`⚠️ Product image could not be resolved (broken link?): ${imgUrl.substring(0, 100)}`);
@@ -945,14 +1046,31 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
                         }
                     }
                     if (!injectedProductImg) {
-                        console.warn('⚠️ All product candidate images failed to resolve — no product image injected');
+                        console.warn('⚠️ All product candidate images failed to resolve — trying brand DNA images...');
+                    }
+                }
+
+                // Step 1c: If still no product images, use matchedDnaImages from brand intel
+                // Works for both product and service brands — these are real brand visuals
+                if (!injectedProductImg && matchedDnaImgs.length > 0) {
+                    console.log(`🔍 Using ${matchedDnaImgs.length} product-relevant brand DNA images as visual reference...`);
+                    for (const imgUrl of matchedDnaImgs.slice(0, 2)) {
+                        try {
+                            const resolved = await resolveRefImage(imgUrl, 'brand-dna-product');
+                            if (resolved) {
+                                imageParts.push({ inlineData: { mimeType: resolved.part.mimeType, data: resolved.part.data } });
+                                referenceInstructions.push(`BRAND PRODUCT REFERENCE: This image is from ${brand.name}'s real website and shows their products. Use this as visual reference for the brand's product style and aesthetic. Feature products that look like this.`);
+                                injectedProductImg = true;
+                                console.log(`✅ Brand DNA product image injected: ${imgUrl.substring(imgUrl.lastIndexOf('/') + 1)}`);
+                            }
+                        } catch (e) { /* skip broken image */ }
                     }
                 }
 
                 // Step 2: ALWAYS inject brand DNA images for visual style grounding
                 // These help the AI understand the brand's visual aesthetic
                 if (brandImgs.length > 0) {
-                    const maxBrandImgs = injectedProductImg ? 1 : 2; // fewer if product images already injected
+                    const maxBrandImgs = injectedProductImg ? 1 : 3; // more if no product images injected
                     console.log(`🎨 Brand DNA: injecting ${Math.min(brandImgs.length, maxBrandImgs)} brand image(s) for style reference`);
                     for (const imgUrl of brandImgs.slice(0, maxBrandImgs)) {
                         try {
@@ -1017,6 +1135,10 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
         if (hasImagesNow) {
             // Multi-image call — lower temperature (0.2) for higher quality
             console.log(`🎨 Creative Studio: generating with ${imageParts.filter(p => p.inlineData).length} reference image(s) + ${imageParts.filter(p => p.text).length} labels, aspect: ${geminiAspectRatio}, model: ${selectedImageModel}`);
+            if (progressId) {
+                addStep(progressId, { agent: 'image-inject', message: `${imageParts.filter(p => p.inlineData).length} reference images loaded`, status: 'done' });
+                addStep(progressId, { agent: 'generating', message: 'Generating image with AI...', status: 'working' });
+            }
             const genResult = await routedImageGenerate(fullPrompt, imageParts, 0.2, geminiAspectRatio, geminiImageSize, selectedImageModel);
 
             // Handle model busy — notify frontend instead of silent fallback
@@ -1043,6 +1165,7 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
         } else {
             // Text-only generation — route to selected model
             console.log(`🎨 Creative Studio: generating from text prompt, aspect: ${geminiAspectRatio}, model: ${selectedImageModel}`);
+            if (progressId) addStep(progressId, { agent: 'generating', message: 'Generating image with AI...', status: 'working' });
             const genResult = await routedImageGenerate(fullPrompt, [], 0.3, geminiAspectRatio, geminiImageSize, selectedImageModel);
 
             // Handle model busy
@@ -1115,6 +1238,11 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
 
         // ── RESPOND IMMEDIATELY — user sees image in ~18-22s ──
         res.json({ success: true, creative, warnings: result.warnings || [] });
+        if (progressId) {
+            addStep(progressId, { agent: 'generating', message: 'Image created successfully!', status: 'done' });
+            addStep(progressId, { agent: 'complete', message: 'Creative ready!', status: 'done' });
+            endProgress(progressId);
+        }
 
         // ══════════════════════════════════════════════════════════════════
         // BACKGROUND POST-PROCESSING (runs AFTER response is sent)
