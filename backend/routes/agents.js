@@ -9,34 +9,8 @@ import { mirrorUrlToS3 } from '../utils/s3.js';
 
 const router = Router();
 
-// Helper: Mirror brand assets to S3
-async function mirrorBrandAssets(dna, brandId) {
-    if (!dna) return;
-
-    // Mirror logo
-    if (dna.logo?.url && !dna.logo.url.includes('s3.amazonaws.com') && !dna.logo.url.startsWith('data:')) {
-        const s3Url = await mirrorUrlToS3(dna.logo.url, `brands/${brandId}/logo.png`);
-        if (s3Url) dna.logo.url = s3Url;
-    }
-
-    // Mirror brand images
-    if (dna.brandImages && dna.brandImages.length > 0) {
-        dna.brandImages = await Promise.all(dna.brandImages.map(async (img, idx) => {
-            if (!img.url || img.url.includes('s3.amazonaws.com') || img.url.startsWith('data:')) return img;
-            const s3Url = await mirrorUrlToS3(img.url, `brands/${brandId}/images/img_${idx}.png`);
-            return s3Url ? { ...img, url: s3Url } : img;
-        }));
-    }
-
-    // Mirror banner images
-    if (dna.bannerImages && dna.bannerImages.length > 0) {
-        dna.bannerImages = await Promise.all(dna.bannerImages.map(async (img, idx) => {
-            if (!img.url || img.url.includes('s3.amazonaws.com') || img.url.startsWith('data:')) return img;
-            const s3Url = await mirrorUrlToS3(img.url, `brands/${brandId}/banners/banner_${idx}.png`);
-            return s3Url ? { ...img, url: s3Url } : img;
-        }));
-    }
-}
+import { mirrorBrandAssets, mirrorSingleAsset } from '../services/assetMirror.js';
+import crypto from 'crypto';
 
 // POST /api/agents/scan-website — Brand Scanner Agent
 router.post('/scan-website', optionalAuth, async (req, res) => {
@@ -213,7 +187,10 @@ router.post('/generate-logo', optionalAuth, async (req, res) => {
 
         const result = await router.generateImage({ prompt, size: '1024x1024' });
 
-        res.json({ success: true, logoUrl: result.imageUrl });
+        // Mirror generated logo to S3 immediately
+        const logoUrl = await mirrorSingleAsset(result.imageUrl, `temp/generated_logos/${Date.now()}.png`);
+
+        res.json({ success: true, logoUrl: logoUrl || result.imageUrl });
     } catch (error) {
         console.error('Logo generation error:', error.message);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -836,9 +813,12 @@ Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhr
             resultImage = await addWatermark(resultImage, { enabled: true });
         }
 
+        // Mirror photoshoot result to S3 immediately
+        const s3ImageUrl = await mirrorSingleAsset(resultImage, `temp/photoshoots/${Date.now()}.png`);
+
         res.json({
             success: true,
-            imageUrl: resultImage,
+            imageUrl: s3ImageUrl || resultImage,
             description: resultText,
             model: usedModel,
         });

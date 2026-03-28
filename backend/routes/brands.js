@@ -8,8 +8,7 @@ import { protect } from '../middleware/auth.js';
 import { requireBrandOwner } from '../middleware/requireBrandOwner.js';
 import multer from 'multer';
 import crypto from 'crypto';
-import { getOrchestrator } from '../agents/orchestrator.js';
-import { safeErrorMessage } from '../utils/safeError.js';
+import { mirrorBrandAssets } from '../services/assetMirror.js';
 import { uploadToS3, mirrorUrlToS3 } from '../utils/s3.js';
 
 
@@ -125,11 +124,14 @@ router.post('/', protect, async (req, res) => {
             });
         }
 
+        // Mirror assets if DNA is provided manually
+        if (req.body.dna) {
+            const tempId = crypto.randomUUID();
+            await mirrorBrandAssets(req.body.dna, tempId);
+        }
+
         const brand = await Brand.create({ ...req.body, user: userId });
         await req.user.updateOne({ $inc: { 'usage.brandsCreated': 1 } });
-        await logAudit(brand, req.user, 'brand_created', {
-            summary: `Brand "${brand.name}" created via ${brand.onboardingMethod || 'website'} onboarding`,
-        });
         res.status(201).json({ success: true, brand });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -141,6 +143,11 @@ router.post('/', protect, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 router.put('/:id', protect, async (req, res) => {
     try {
+        // Mirror assets if DNA is updated
+        if (req.body.dna) {
+            await mirrorBrandAssets(req.body.dna, req.params.id);
+        }
+
         const brand = await Brand.findOneAndUpdate(
             { _id: req.params.id, $or: [{ user: req.user._id }, { sharedWith: req.user._id }] },
             req.body,
@@ -379,27 +386,28 @@ router.post('/:id/rescan', protect, async (req, res) => {
         const orchestrator = getOrchestrator();
         const scanResult = await orchestrator.scanWebsite(brand.website);
 
-        if (!scanResult?.dna) {
-            return res.status(500).json({ success: false, error: 'Website scan returned no data' });
-        }
-
         const newDna = scanResult.dna;
         const updates = {};
 
+        // ── Mirror all assets in DNA using centralized service ──
+        await mirrorBrandAssets(newDna, brand._id);
+        
         // ── Merge brand images (add new, keep existing) ──
         if (newDna.brandImages?.length > 0) {
             const existingUrls = new Set((brand.dna.brandImages || []).map(i => i.url));
-            const newImages = newDna.brandImages.filter(i => i.url && !existingUrls.has(i.url));
-            if (newImages.length > 0) {
-                // Mirror new images to S3
-                const { mirrorUrlToS3: mirror } = await import('../utils/s3.js');
-                const mirrored = await Promise.all(newImages.map(async (img, idx) => {
-                    if (img.url.includes('s3.amazonaws.com') || img.url.startsWith('data:')) return img;
-                    const s3Url = await mirror(img.url, `brands/${brand._id}/images/rescan_${Date.now()}_${idx}.png`);
-                    return s3Url ? { ...img, url: s3Url } : img;
-                }));
-                updates['dna.brandImages'] = [...(brand.dna.brandImages || []), ...mirrored.filter(i => i.url)];
-                console.log(`📸 Added ${mirrored.length} new brand images`);
+            const freshImages = newDna.brandImages.filter(i => i.url && !existingUrls.has(i.url));
+            if (freshImages.length > 0) {
+                updates['dna.brandImages'] = [...(brand.dna.brandImages || []), ...freshImages];
+                console.log(`📸 Added ${freshImages.length} new brand images`);
+            }
+        }
+
+        // ── Merge banner images (add new, keep existing) ──
+        if (newDna.bannerImages?.length > 0) {
+            const existingUrls = new Set((brand.dna.bannerImages || []).map(i => i.url));
+            const freshBanners = newDna.bannerImages.filter(i => i.url && !existingUrls.has(i.url));
+            if (freshBanners.length > 0) {
+                updates['dna.bannerImages'] = [...(brand.dna.bannerImages || []), ...freshBanners];
             }
         }
 
