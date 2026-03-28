@@ -11,13 +11,19 @@
  * Request format (from docs):
  *   {
  *     "model": "seedance",                    // NOT "seedance-2-0"
- *     "task_type": "seedance-2-preview",       // NOT "video_generation" or "image_to_video"
+ *     "task_type": "seedance-2",              // paid, no watermark (use "seedance-2-preview" for free/trial only)
  *     "input": {
  *       "prompt": "...",                       // For image refs, embed URL in prompt text
  *       "duration": 5,                         // INTEGER, not string
  *       "aspect_ratio": "16:9"
  *     }
  *   }
+ * 
+ * task_type values:
+ *   - "seedance-2"              → quality mode, PAID, no watermark
+ *   - "seedance-2-fast"         → fast mode,    PAID, no watermark
+ *   - "seedance-2-preview"      → quality mode, FREE/TRIAL, adds watermark
+ *   - "seedance-2-fast-preview" → fast mode,    FREE/TRIAL, adds watermark
  * 
  * Response format:
  *   { "code": 200, "data": { "task_id": "...", "status": "pending" } }
@@ -390,7 +396,8 @@ export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, a
         console.log(`📸 Sending ${imageUrls.length} image(s) via input.image_urls:`, imageUrls.map(u => u.substring(0, 60)));
     }
 
-    const taskType = qualityMode === 'quality' ? 'seedance-2-preview' : 'seedance-2-fast-preview';
+    // Use paid task types (no watermark) — "-preview" suffix is free/trial only
+    const taskType = qualityMode === 'quality' ? 'seedance-2' : 'seedance-2-fast';
     console.log(`🎯 PiAPI task_type: ${taskType} (quality mode: ${qualityMode})`);
 
     const payload = {
@@ -459,7 +466,8 @@ export async function submitPiApiImageToVideo({ imageUrl, prompt, duration, aspe
     // Truncate to PiAPI's max prompt length (2000 chars)
     finalPrompt = truncatePrompt(finalPrompt);
 
-    const taskType = qualityMode === 'quality' ? 'seedance-2-preview' : 'seedance-2-fast-preview';
+    // Use paid task types (no watermark) — "-preview" suffix is free/trial only
+    const taskType = qualityMode === 'quality' ? 'seedance-2' : 'seedance-2-fast';
     console.log(`🎯 PiAPI I2V task_type: ${taskType}`);
 
     const payload = {
@@ -502,7 +510,8 @@ export async function submitPiApiVideoExtend({ parentTaskId, prompt, duration, q
 
     console.log(`🔗 PiAPI Extend: parentTaskId=${parentTaskId}, duration=${dur}s, quality=${qualityMode}`);
 
-    const taskType = qualityMode === 'quality' ? 'seedance-2-preview' : 'seedance-2-fast-preview';
+    // Use paid task types (no watermark) — "-preview" suffix is free/trial only
+    const taskType = qualityMode === 'quality' ? 'seedance-2' : 'seedance-2-fast';
 
     const payload = {
         model: 'seedance',
