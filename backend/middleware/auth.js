@@ -58,7 +58,9 @@ export const protect = async (req, res, next) => {
             return res.status(401).json({ success: false, error: 'Shopify store not connected. Please install the app first.' });
         }
     } catch (shopifyErr) {
-        console.error(`❌ [AUTH] Token verification failed (Standard & Shopify): ${shopifyErr.message}`);
+        if (shopifyErr.message !== 'jwt malformed') {
+            console.error(`❌ [AUTH] Token verification failed (Standard & Shopify): ${shopifyErr.message}`);
+        }
         return res.status(401).json({ success: false, error: 'Token invalid or expired' });
     }
 };
