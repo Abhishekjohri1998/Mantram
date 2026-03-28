@@ -449,6 +449,8 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             throw new Error('Seedance 2.0 requires PIAPI_API_KEY to be configured. Please add it to .env or try a different video model.');
         }
 
+
+
         console.log(`🎬 [Seedance 2.0] Using PiAPI...`);
         const result = await submitPiApiVideoGeneration({ prompt, imageUrl, duration, aspectRatio: aspectRatio || '16:9', generateAudio, referenceImages: referenceImages || [], qualityMode: mode || 'fast' });
         return {

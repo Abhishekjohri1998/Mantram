@@ -142,9 +142,12 @@ export const content = {
     generate: (data) => apiFetch('/content/generate', { method: 'POST', body: JSON.stringify(data) }),
     // Agentic pipeline (v2 — with real intelligence gathering)
     agenticStart: (data) => apiFetch('/content/agentic/start', { method: 'POST', body: JSON.stringify(data) }),
-    agenticRefine: (id, data) => apiFetch(`/content/agentic/${id}/refine`, { method: 'POST', body: JSON.stringify(data) }),
     agenticEdit: (id, data) => apiFetch(`/content/agentic/${id}/edit`, { method: 'POST', body: JSON.stringify(data) }),
     agenticABVariants: (id) => apiFetch(`/content/agentic/${id}/ab-variants`, { method: 'POST' }),
+    // Blog-specific agentic pipeline
+    blogGenerate: (data) => apiFetch('/content/agentic/blog/generate', { method: 'POST', body: JSON.stringify(data) }),
+    blogGenerateImage: (id, data) => apiFetch(`/content/agentic/blog/${id}/generate-image`, { method: 'POST', body: JSON.stringify(data) }),
+    blogPublishWebsite: (id) => apiFetch(`/content/agentic/blog/${id}/publish-website`, { method: 'POST' }),
     parseIntent: (input) => apiFetch('/content/agentic/parse-intent', { method: 'POST', body: JSON.stringify({ input }) }),
     list: (params = {}) => {
         const query = new URLSearchParams(params).toString();

@@ -125,81 +125,8 @@ Provide 6-8 trending topics and 10-12 keywords. Be SPECIFIC to ${industry} + ${c
     }
 });
 
-// POST /api/content/blog-image — Lightweight AI image generation for blog editor
-router.post('/blog-image', protect, async (req, res) => {
-    try {
-        const { brandId, prompt, context } = req.body;
-        if (!prompt) return res.status(400).json({ success: false, error: 'Prompt is required' });
 
-        const brand = brandId ? await Brand.findById(brandId) : null;
 
-        // Use Gemini for image generation (same as creative studio but without studio/credit middleware)
-        const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
-        if (!imageKey) return res.status(500).json({ success: false, error: 'Image generation not configured' });
-
-        const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-        const models = ['gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image'];
-
-        const brandContext = brand?.name ? ` for ${brand.name}${brand.dna?.industry ? ` (${brand.dna.industry})` : ''}` : '';
-        const fullPrompt = `${prompt}${brandContext}. The image should be suitable as a blog article illustration. High quality, editorial style, 16:9 aspect ratio. No text, watermarks, or overlays.`;
-
-        let imageUrl = null;
-        for (const modelId of models) {
-            try {
-                console.log(`📸 Blog image: trying ${modelId}...`);
-                const url = `${baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
-                const resp = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-                        generationConfig: {
-                            responseModalities: ['TEXT', 'IMAGE'],
-                            temperature: 0.4,
-                        },
-                    }),
-                });
-
-                const data = await resp.json();
-                if (data.error) {
-                    console.warn(`⚠️ Blog image ${modelId}: ${data.error.message}`);
-                    continue;
-                }
-
-                const resParts = data.candidates?.[0]?.content?.parts || [];
-                for (const part of resParts) {
-                    if (part.inlineData?.mimeType?.startsWith('image/')) {
-                        imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                        break;
-                    }
-                }
-                if (imageUrl) {
-                    console.log(`✅ Blog image generated with ${modelId}`);
-                    break;
-                }
-            } catch (e) {
-                console.error(`❌ Blog image ${modelId} error:`, e.message);
-            }
-        }
-
-        if (!imageUrl) return res.status(500).json({ success: false, error: 'Image generation failed' });
-
-        // Upload to S3 for persistent URL
-        try {
-            const { uploadToS3 } = await import('../utils/s3.js');
-            const s3Url = await uploadToS3(imageUrl, `blog-images/${brandId || 'general'}/${Date.now()}.png`);
-            imageUrl = s3Url;
-        } catch (s3Err) {
-            console.warn('Blog image S3 upload failed, returning base64:', s3Err.message);
-            // Keep base64 data URI as fallback
-        }
-
-        res.json({ success: true, imageUrl });
-    } catch (error) {
-        console.error('Blog image error:', error);
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
-    }
-});
 
 // POST /api/content/generate — AI content generation (credits deducted)
 router.post('/generate', protect, requireStudio('contentStudio'), requireCredits('content'), async (req, res) => {

@@ -27,6 +27,7 @@ import {
     youtubeResearchNode,
     youtubeWriterNode,
     youtubeSeoNode,
+    blogWriterNode,
 } from '../agents/contentStudio/nodes.js';
 
 const router = Router();
@@ -578,6 +579,343 @@ router.post('/youtube-seo', protect, requireCredits('content'), async (req, res)
         if (req.creditsDeducted > 0) {
             await refundCredits(req.user._id, req.creditsDeducted, 'contentGenerate', `Refund: YouTube SEO Generation Failure (${safeErrorMessage(error)})`, 'content');
         }
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/content/agentic/blog/generate — Generate structured blog article
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/blog/generate', protect, requireCredits('content'), async (req, res) => {
+    try {
+        const { brandId, topic, blogType, targetWordCount, keywords, targetAudience, tone } = req.body;
+        if (!topic) return res.status(400).json({ success: false, error: 'Topic is required' });
+
+        // Step 1: Research (same intelligence gathering as /start)
+        let state = {
+            userId: req.user._id.toString(),
+            brandId: brandId || null,
+            brief: topic,
+            topic,
+            blogType: blogType || 'seo_blog',
+            targetWordCount: targetWordCount || 1500,
+            keywords: keywords || [],
+            targetAudience: targetAudience || 'general',
+            tone: tone || 'professional',
+            contentType: 'blog',
+            platform: 'website',
+            researchDepth: 'quick',
+        };
+
+        state = await researchNode(state);
+
+        // Step 2: Blog Writer (structured JSON output)
+        state = await blogWriterNode(state);
+
+        const blogData = state.blogData || {};
+        const fullContent = (blogData.sections || []).map(s => `## ${s.heading}\n\n${s.body}`).join('\n\n') || `Blog article about: ${topic}`;
+
+        // Save to Content model
+        const content = await Content.create({
+            user: req.user._id,
+            brand: brandId || undefined,
+            type: 'blog',
+            title: blogData.title || topic,
+            content: fullContent,
+            prompt: topic,
+            platform: 'website',
+            originalContent: fullContent,
+            blogMeta: {
+                slug: blogData.slug || topic.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+                metaTitle: blogData.metaTitle || blogData.title || '',
+                metaDescription: blogData.metaDescription || '',
+                subtitle: blogData.subtitle || '',
+                keywords: blogData.keywords || keywords || [],
+                sections: (blogData.sections || []).map(s => ({
+                    heading: s.heading,
+                    body: s.body,
+                    imagePrompt: s.imagePrompt || '',
+                    imageUrl: '',
+                })),
+                tableOfContents: (blogData.sections || []).map(s => s.heading),
+                estimatedReadTime: blogData.estimatedReadTime || `${Math.ceil(fullContent.split(/\s+/).length / 200)} min read`,
+                targetWordCount: targetWordCount || 1500,
+            },
+            aiMeta: {
+                provider: 'router',
+                model: 'auto',
+                agenticPipeline: true,
+                pipelineStep: 'blog_draft',
+                research: state.research,
+                researchDepth: 'quick',
+            },
+        });
+
+        await req.user.updateOne({ $inc: { 'usage.contentGenerated': 1 } });
+
+        res.json({
+            success: true,
+            content: {
+                ...content.toObject(),
+                agenticData: {
+                    research: state.research,
+                    intelligence: {
+                        sourcesUsed: [
+                            state.intelligence?.web?.success ? `Web(${state.intelligence.web.source})` : null,
+                            state.intelligence?.seo?.success ? 'SEO Audit' : null,
+                            state.intelligence?.trending?.success ? 'Trending' : null,
+                            state.intelligence?.competitors?.success ? 'Competitors' : null,
+                            state.intelligence?.performanceLearnings?.success ? 'Playbook' : null,
+                            state.intelligence?.ga4?.success ? 'GA4' : null,
+                        ].filter(Boolean),
+                    },
+                },
+            },
+        });
+    } catch (error) {
+        console.error('Blog generation error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'contentGenerate', `Refund: Blog Generation Failure (${safeErrorMessage(error)})`, 'content');
+        }
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/content/agentic/blog/:id/generate-image — Generate AI image for blog section
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/blog/:id/generate-image', protect, async (req, res) => {
+    try {
+        const { sectionIndex, customPrompt, imageStyle, brandImageUrl, brandImageRef } = req.body;
+        // brandImageUrl = Use brand image directly (no AI generation)
+        // brandImageRef = Use brand image as reference for NanoBanana 2 AI generation
+        const content = await Content.findOne({ _id: req.params.id, user: req.user._id });
+        if (!content) return res.status(404).json({ success: false, error: 'Content not found' });
+
+        const isHero = sectionIndex === -1 || sectionIndex === undefined;
+
+        // ── Mode 1: Use brand image DIRECTLY (no AI) ──
+        if (brandImageUrl && !brandImageRef) {
+            const seoContext = isHero
+                ? (content.title || 'Blog')
+                : (content.blogMeta?.sections?.[sectionIndex]?.heading || 'Blog section');
+            const seoAltText = `${seoContext} - Brand image`.substring(0, 125);
+
+            if (isHero) {
+                content.blogMeta.heroImageUrl = brandImageUrl;
+                content.blogMeta.heroImagePrompt = 'Brand DNA image (used directly)';
+                content.blogMeta.heroImageAlt = seoAltText;
+            } else {
+                content.blogMeta.sections[sectionIndex].imageUrl = brandImageUrl;
+                content.blogMeta.sections[sectionIndex].imageAlt = seoAltText;
+            }
+            content.markModified('blogMeta');
+            await content.save();
+            return res.json({ success: true, imageUrl: brandImageUrl, altText: seoAltText, sectionIndex: isHero ? -1 : sectionIndex, model: 'Brand DNA' });
+        }
+
+
+
+        // ── Build contextual prompt from blog content ──
+        const styleMap = {
+            editorial: 'Professional editorial photography, clean composition, modern magazine style',
+            infographic: 'Clean infographic style, data visualization, modern flat design with icons and charts',
+            lifestyle: 'Lifestyle photography, candid natural look, warm lighting, authentic feel',
+            '3d': '3D rendered illustration, glossy materials, clean studio lighting, modern 3D art style',
+            line_drawing: 'Minimalist line drawing, elegant sketch style, black ink on white, editorial illustration',
+            flat_illustration: 'Modern flat illustration, geometric shapes, vibrant colors, digital art style',
+            photorealistic: 'Photorealistic, ultra detailed, professional stock photography quality',
+            watercolor: 'Watercolor painting style, soft edges, artistic, flowing colors',
+        };
+
+        const styleDirective = styleMap[imageStyle] || styleMap.editorial;
+        let imagePrompt, seoContext;
+
+        if (customPrompt) {
+            imagePrompt = `${customPrompt}. Style: ${styleDirective}`;
+            seoContext = customPrompt;
+        } else if (isHero) {
+            const blogTitle = content.title || '';
+            const blogSubtitle = content.blogMeta?.subtitle || '';
+            imagePrompt = `${styleDirective}. Blog hero image for article titled "${blogTitle}"${blogSubtitle ? `. ${blogSubtitle}` : ''}. Wide cinematic composition, professional, high quality.`;
+            seoContext = `${blogTitle} ${blogSubtitle}`;
+        } else {
+            const section = content.blogMeta?.sections?.[sectionIndex];
+            if (!section) return res.status(400).json({ success: false, error: 'Section not found' });
+            const bodyContext = (section.body || '').substring(0, 200).replace(/[*#>\[\]()-]/g, '').trim();
+            imagePrompt = `${styleDirective}. Image for blog section: "${section.heading}". Context: ${bodyContext}. Professional quality, visually appealing.`;
+            seoContext = `${section.heading} - ${bodyContext.substring(0, 80)}`;
+        }
+
+        // ── Generate SEO alt text ──
+        const altText = seoContext
+            .replace(/[*#>\[\]()"-]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .substring(0, 125);
+        const seoAltText = isHero
+            ? `${altText} - Featured blog image`
+            : `${altText} - ${(imageStyle || 'editorial')} illustration`;
+
+        console.log(`🎨 Blog image gen (NanoBanana 2): ${isHero ? 'HERO' : `Section ${sectionIndex}`}, style: ${imageStyle || 'editorial'}`);
+        console.log(`   Prompt: ${imagePrompt.substring(0, 120)}...`);
+        console.log(`   SEO Alt: ${seoAltText}`);
+
+        // ── Call NanoBanana 2 (gemini-3.1-flash-image-preview) directly ──
+        const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
+        if (!imageKey) return res.status(500).json({ success: false, error: 'Image generation API key not configured' });
+
+        const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+        const modelId = 'gemini-3.1-flash-image-preview'; // NanoBanana 2
+        const aspectRatio = isHero ? '16:9' : '3:2';
+        const arInstruction = `Generate this image in ${aspectRatio} aspect ratio (${aspectRatio === '16:9' ? 'landscape/horizontal' : 'standard landscape'}). `;
+
+        // Build parts array — optionally include brand reference image
+        const contentParts = [];
+
+        // ── Mode 2: Use brand image as REFERENCE for AI generation ──
+        if (brandImageRef) {
+            try {
+                console.log(`📥 Fetching brand reference image: ${brandImageRef.substring(0, 80)}...`);
+                const imgResp = await fetch(brandImageRef, {
+                    headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'image/*' },
+                    redirect: 'follow',
+                });
+                if (imgResp.ok) {
+                    const buf = await imgResp.arrayBuffer();
+                    const ct = (imgResp.headers.get('content-type') || 'image/jpeg').split(';')[0];
+                    const b64 = Buffer.from(buf).toString('base64');
+                    contentParts.push({ inlineData: { mimeType: ct, data: b64 } });
+                    // Modify prompt to reference the brand image
+                    imagePrompt = `Using the provided brand reference image as visual inspiration — match its style, colors, and mood. Create a NEW image that is contextually relevant to this blog section. ${imagePrompt}`;
+                    console.log(`✅ Brand reference image attached (${Math.round(buf.byteLength / 1024)}KB)`);
+                }
+            } catch (refErr) {
+                console.warn('⚠️ Failed to fetch brand reference image:', refErr.message);
+            }
+        }
+
+        contentParts.push({ text: arInstruction + imagePrompt });
+
+        const url = `${baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ role: 'user', parts: contentParts }],
+                generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.4 },
+            }),
+        });
+
+        const data = await resp.json();
+        if (data.error) {
+            console.error(`❌ NanoBanana 2 error: ${data.error.message}`);
+            return res.status(500).json({ success: false, error: `Image generation failed: ${data.error.message}` });
+        }
+
+        // Extract image from response
+        const parts = data.candidates?.[0]?.content?.parts || [];
+        let imageBase64 = null, imageMime = null;
+        for (const part of parts) {
+            if (part.inlineData?.mimeType?.startsWith('image/')) {
+                imageBase64 = part.inlineData.data;
+                imageMime = part.inlineData.mimeType;
+                break;
+            }
+        }
+
+        if (!imageBase64) {
+            console.warn('NanoBanana 2 returned no image in response');
+            return res.status(500).json({ success: false, error: 'NanoBanana 2 returned no image. Please try again.' });
+        }
+
+        // ── Upload to S3 for persistent URL ──
+        let imageUrl;
+        try {
+            const { uploadToS3 } = await import('../utils/s3.js');
+            const buffer = Buffer.from(imageBase64, 'base64');
+            const ext = imageMime === 'image/png' ? 'png' : 'jpg';
+            const fileName = `blog-images/${content._id}/${isHero ? 'hero' : `section-${sectionIndex}`}-${Date.now()}.${ext}`;
+            imageUrl = await uploadToS3(buffer, fileName, imageMime);
+            console.log(`✅ Blog image uploaded to S3: ${imageUrl.substring(0, 80)}...`);
+        } catch (s3Err) {
+            console.warn('S3 upload failed, using base64 data URI:', s3Err.message);
+            imageUrl = `data:${imageMime};base64,${imageBase64}`;
+        }
+
+        // ── Save to content with SEO alt text ──
+        if (isHero) {
+            content.blogMeta.heroImageUrl = imageUrl;
+            content.blogMeta.heroImagePrompt = imagePrompt;
+            content.blogMeta.heroImageAlt = seoAltText;
+        } else {
+            content.blogMeta.sections[sectionIndex].imageUrl = imageUrl;
+            content.blogMeta.sections[sectionIndex].imageAlt = seoAltText;
+        }
+        content.markModified('blogMeta');
+        await content.save();
+
+        res.json({ success: true, imageUrl, altText: seoAltText, sectionIndex: isHero ? -1 : sectionIndex, model: 'NanoBanana 2' });
+    } catch (error) {
+        console.error('Blog image generation error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/content/agentic/blog/:id/publish-website — Publish blog to website
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/blog/:id/publish-website', protect, async (req, res) => {
+    try {
+        const content = await Content.findOne({ _id: req.params.id, user: req.user._id });
+        if (!content) return res.status(404).json({ success: false, error: 'Content not found' });
+
+        // Build structured HTML from blog data
+        const blogMeta = content.blogMeta || {};
+        const sections = blogMeta.sections || [];
+
+        let html = `<article>\n`;
+        html += `<h1>${content.title || ''}</h1>\n`;
+        if (blogMeta.subtitle) html += `<p class="subtitle">${blogMeta.subtitle}</p>\n`;
+        if (blogMeta.heroImageUrl) html += `<img src="${blogMeta.heroImageUrl}" alt="${content.title}" class="hero-image" />\n`;
+
+        for (const section of sections) {
+            html += `\n<h2>${section.heading}</h2>\n`;
+            // Convert markdown bold/italic to HTML
+            let body = (section.body || '')
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                .replace(/^- (.+)$/gm, '<li>$1</li>')
+                .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
+                .replace(/\n\n/g, '</p>\n<p>')
+                .replace(/^/, '<p>').replace(/$/, '</p>');
+            html += body + '\n';
+            if (section.imageUrl) {
+                html += `<img src="${section.imageUrl}" alt="${section.heading}" class="section-image" />\n`;
+            }
+        }
+
+        html += `</article>`;
+
+        // Update content status
+        content.status = 'published';
+        content.publishedAt = new Date();
+        content.blogMeta.publishUrl = 'clipboard'; // Will be updated if Shopify publish succeeds
+        await content.save();
+
+        res.json({
+            success: true,
+            html,
+            blogMeta: {
+                title: content.title,
+                slug: blogMeta.slug,
+                metaTitle: blogMeta.metaTitle,
+                metaDescription: blogMeta.metaDescription,
+                keywords: blogMeta.keywords,
+            },
+        });
+    } catch (error) {
+        console.error('Blog publish error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });

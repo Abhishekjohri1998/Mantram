@@ -23,6 +23,7 @@ import {
     YOUTUBE_RESEARCH_PROMPT,
     YOUTUBE_WRITER_PROMPT,
     YOUTUBE_SEO_PROMPT,
+    BLOG_STRUCTURED_PROMPT,
 } from './prompts.js';
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -532,4 +533,77 @@ function buildIntelligenceContext(intelligence) {
     parts.push('\n═══ USE THIS REAL DATA — do NOT invent facts ═══');
 
     return parts.join('\n');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// NODE: BLOG WRITER — Generates structured JSON blog article
+// ══════════════════════════════════════════════════════════════════════════════
+export async function blogWriterNode(state) {
+    console.log('📝 Blog Agent: Writing structured blog article...');
+
+    const { brandContext } = await loadBrandContext(state.brandId);
+    const intelligenceContext = buildIntelligenceContext(state.intelligence || {});
+
+    const prompt = BLOG_STRUCTURED_PROMPT
+        .replace('{brandContext}', brandContext || 'No brand context')
+        .replace('{researchContext}', intelligenceContext || 'No research data')
+        .replace('{topic}', state.topic || state.brief || '')
+        .replace('{blogType}', state.blogType || 'seo_blog')
+        .replace('{targetWordCount}', String(state.targetWordCount || 1500))
+        .replace('{keywords}', (state.keywords || []).join(', ') || 'auto-detect')
+        .replace('{audience}', state.targetAudience || 'general')
+        .replace('{tone}', state.tone || 'professional, engaging');
+
+    const result = await callAgent(prompt, `Generate a structured blog article about: ${state.topic || state.brief}`, 0.7, 8192);
+
+    // callAgent already parses JSON and returns an object
+    // result is either { title, subtitle, slug, sections, ... } or { error, raw }
+    let blogData;
+    if (result && result.sections && Array.isArray(result.sections)) {
+        // callAgent successfully parsed the structured blog JSON
+        blogData = result;
+    } else if (result && !result.error) {
+        // callAgent returned a parsed object but not in expected format — try to use it
+        console.warn('Blog writer returned unexpected structure, adapting:', Object.keys(result));
+        blogData = {
+            title: result.title || state.topic || 'Blog Article',
+            subtitle: result.subtitle || '',
+            slug: result.slug || (state.topic || 'blog-article').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+            metaTitle: result.metaTitle || result.title || state.topic || '',
+            metaDescription: result.metaDescription || '',
+            keywords: result.keywords || state.keywords || [],
+            estimatedReadTime: result.estimatedReadTime || '5 min read',
+            sections: result.sections || [{
+                heading: 'Introduction',
+                body: result.raw || JSON.stringify(result).substring(0, 2000),
+                imagePrompt: `Professional photograph related to ${state.topic}`,
+            }],
+        };
+    } else {
+        // Fallback: callAgent parsing failed entirely
+        console.warn('Blog JSON parse failed, using raw content');
+        const rawText = result?.raw || '';
+        blogData = {
+            title: state.topic || 'Blog Article',
+            subtitle: '',
+            slug: (state.topic || 'blog-article').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+            metaTitle: state.topic || '',
+            metaDescription: '',
+            keywords: state.keywords || [],
+            estimatedReadTime: '5 min read',
+            sections: [{
+                heading: 'Introduction',
+                body: rawText || `Blog article about ${state.topic || 'the requested topic'}`,
+                imagePrompt: `Professional photograph related to ${state.topic}`,
+            }],
+        };
+    }
+
+    console.log(`📝 Blog Agent: Generated ${blogData.sections?.length || 0} sections, title: "${blogData.title}"`);
+
+    return {
+        ...state,
+        blogData,
+        status: 'blog_written',
+    };
 }

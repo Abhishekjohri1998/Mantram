@@ -573,3 +573,58 @@ RESPONSE FORMAT — valid JSON only:
   },
   "competitorInsight": "What top-ranking similar videos do well vs what they miss"
 }`;
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// BLOG STRUCTURED PROMPT — Generates structured JSON blog article
+// ══════════════════════════════════════════════════════════════════════════════
+export const BLOG_STRUCTURED_PROMPT = `You are a world-class blog writer and SEO specialist. Generate a STRUCTURED blog article in JSON format.
+
+BRAND CONTEXT:
+{brandContext}
+
+RESEARCH INTELLIGENCE (use this data — do NOT invent facts):
+{researchContext}
+
+BLOG BRIEF:
+- Topic: {topic}
+- Blog Type: {blogType}
+- Target Word Count: {targetWordCount}
+- Target Keywords: {keywords}
+- Target Audience: {audience}
+- Tone: {tone}
+
+INSTRUCTIONS:
+1. Write a thoroughly researched, engaging blog article
+2. Use the research intelligence to back claims with real data
+3. Each section should be 200-400 words with a clear heading
+4. Include an image suggestion prompt for each section (describe what image would complement the text)
+5. Optimize for the target keywords naturally — NO keyword stuffing
+6. Meta description must be 150-160 characters
+7. Slug should be URL-friendly (lowercase, hyphens, no special chars)
+8. Generate a compelling subtitle that hooks the reader
+9. Each section body should use markdown formatting (bold, italic, bullet points, blockquotes)
+
+RESPOND IN STRICT JSON — NO markdown fences, NO extra text:
+{
+  "title": "Compelling, SEO-optimized headline (60-70 chars)",
+  "subtitle": "Hook subtitle that makes readers want to continue (1-2 sentences)",
+  "slug": "url-friendly-slug-from-title",
+  "metaTitle": "SEO-optimized meta title (50-60 chars)",
+  "metaDescription": "Compelling meta description with CTA (150-160 chars)",
+  "keywords": ["primary keyword", "secondary keyword", "long-tail keyword 1", "long-tail keyword 2"],
+  "estimatedReadTime": "X min read",
+  "sections": [
+    {
+      "heading": "Section Heading (H2)",
+      "body": "Full section content in markdown. 200-400 words. Use **bold**, *italic*, bullet points, and > blockquotes where appropriate.",
+      "imagePrompt": "Detailed image generation prompt: describe style, subject, mood, colors. E.g. 'Professional flat-lay photograph of...' or 'Modern isometric illustration showing...'"
+    },
+    {
+      "heading": "Second Section",
+      "body": "Content...",
+      "imagePrompt": "Image prompt..."
+    }
+  ]
+}`;
+

@@ -79,6 +79,27 @@ const contentSchema = new mongoose.Schema({
     // User rating (for RLHF)
     rating: { type: Number, min: 1, max: 5 },
 
+    // Blog-specific structured metadata
+    blogMeta: {
+        slug: { type: String, default: '' },
+        metaTitle: { type: String, default: '' },
+        metaDescription: { type: String, default: '' },
+        keywords: [String],
+        heroImageUrl: { type: String, default: '' },
+        heroImagePrompt: { type: String, default: '' },
+        subtitle: { type: String, default: '' },
+        sections: [{
+            heading: { type: String, default: '' },
+            body: { type: String, default: '' },
+            imageUrl: { type: String, default: '' },
+            imagePrompt: { type: String, default: '' },
+        }],
+        tableOfContents: [String],
+        estimatedReadTime: { type: String, default: '' },
+        publishUrl: { type: String, default: '' },
+        targetWordCount: { type: Number, default: 1500 },
+    },
+
     // Tags
     tags: [String],
 
