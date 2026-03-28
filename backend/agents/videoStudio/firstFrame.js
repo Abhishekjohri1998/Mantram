@@ -8,6 +8,8 @@
 
 const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro'];
 
+import { uploadToS3 } from '../../utils/s3.js';
+
 /**
  * Generate an image using Gemini's native image generation
  * Returns { imageUrl } with either an HTTP URL (via fal storage) or base64 data URI
@@ -84,6 +86,19 @@ export async function geminiImageGenerate(prompt, imageParts = [], temperature =
  * Returns HTTP URL or null on failure
  */
 async function uploadToFalStorage(base64Data, mimeType) {
+    // ── Method 0: Upload to S3 (Standard for this project) ──────────────
+    try {
+        const dataUri = base64Data.startsWith('data:') ? base64Data : `data:${mimeType};base64,${base64Data}`;
+        const filename = `first-frame-${Date.now()}.${mimeType.includes('png') ? 'png' : 'jpg'}`;
+        const s3Url = await uploadToS3(dataUri, `video-studio/uploads/${filename}`, mimeType);
+        if (s3Url) {
+            console.log(`📤 Image uploaded to S3: ${s3Url.substring(0, 80)}...`);
+            return s3Url;
+        }
+    } catch (s3Error) {
+        console.warn('⚠️ S3 upload failed, trying FAL fallback:', s3Error.message);
+    }
+
     const falKey = process.env.FAL_API_KEY || process.env.FAL_KEY;
     if (!falKey) {
         console.warn('⚠️ FAL_API_KEY not set — cannot upload first frame to fal storage');

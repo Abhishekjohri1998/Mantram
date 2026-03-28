@@ -3349,56 +3349,65 @@ router.post('/upload-image', protect, async (req, res) => {
         const mimeType = match[1];
         const base64 = match[2];
 
-        // Upload to fal storage
-        const { default: firstFrameModule } = await import('../agents/videoStudio/firstFrame.js');
-        // Use the uploadToFalStorage function directly
-        const falKey = process.env.FAL_API_KEY || process.env.FAL_KEY;
-        if (!falKey) return res.status(500).json({ success: false, error: 'FAL_API_KEY not configured' });
-
-        const buffer = Buffer.from(base64, 'base64');
-        const ext = mimeType.includes('png') ? 'png' : 'jpg';
-        const filename = `ref-image-${Date.now()}.${ext}`;
-
-        // Try fal initiate upload
+        // ── Upload to S3 (Primary) ───────────────────────────────────────────
         let hostedUrl = null;
         try {
-            const initResp = await fetch('https://fal.ai/api/storage/upload/initiate', {
-                method: 'POST',
-                headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ file_name: filename, content_type: mimeType }),
-            });
-            if (initResp.ok) {
-                const data = await initResp.json();
-                if (data.upload_url) {
-                    const putResp = await fetch(data.upload_url, {
-                        method: 'PUT', headers: { 'Content-Type': mimeType }, body: buffer,
+            const filename = `video-studio-${Date.now()}.${mimeType.includes('png') ? 'png' : 'jpg'}`;
+            hostedUrl = await uploadToS3(imageData, `video-studio/uploads/${filename}`, mimeType);
+            console.log(`📤 Image uploaded to S3: ${hostedUrl.substring(0, 80)}...`);
+        } catch (s3Error) {
+            console.warn('⚠️ S3 upload failed, trying FAL fallback:', s3Error.message);
+        }
+
+        // ── Fallback: Upload to fal storage ──────────────────────────────────
+        if (!hostedUrl) {
+            const falKey = process.env.FAL_API_KEY || process.env.FAL_KEY;
+            if (falKey) {
+                const buffer = Buffer.from(base64, 'base64');
+                const ext = mimeType.includes('png') ? 'png' : 'jpg';
+                const filename = `ref-image-${Date.now()}.${ext}`;
+
+                // Try FAL initiate upload (legacy method, currently returning 404 in some envs)
+                try {
+                    const initResp = await fetch('https://fal.ai/api/storage/upload/initiate', {
+                        method: 'POST',
+                        headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ file_name: filename, content_type: mimeType }),
                     });
-                    if (putResp.ok && data.file_url) hostedUrl = data.file_url;
+                    if (initResp.ok) {
+                        const data = await initResp.json();
+                        if (data.upload_url) {
+                            const putResp = await fetch(data.upload_url, {
+                                method: 'PUT', headers: { 'Content-Type': mimeType }, body: buffer,
+                            });
+                            if (putResp.ok && data.file_url) hostedUrl = data.file_url;
+                        }
+                    }
+                } catch (e) { console.warn('fal upload error:', e.message); }
+
+                // Fallback: base64 upload via REST
+                if (!hostedUrl) {
+                    try {
+                        const resp = await fetch('https://rest.alpha.fal.ai/storage/upload/base64', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ data: base64, content_type: mimeType, file_name: filename }),
+                        });
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            hostedUrl = data.url || data.file_url;
+                        }
+                    } catch (e) { console.warn('fal base64 upload error:', e.message); }
                 }
             }
-        } catch (e) { console.warn('fal upload error:', e.message); }
-
-        // Fallback: base64 upload via REST
-        if (!hostedUrl) {
-            try {
-                const resp = await fetch('https://rest.alpha.fal.ai/storage/upload/base64', {
-                    method: 'POST',
-                    headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ data: base64, content_type: mimeType, file_name: filename }),
-                });
-                if (resp.ok) {
-                    const data = await resp.json();
-                    hostedUrl = data.url || data.file_url;
-                }
-            } catch (e) { console.warn('fal base64 upload error:', e.message); }
         }
 
         if (hostedUrl) {
-            console.log(`📤 Image uploaded: ${hostedUrl.substring(0, 80)}...`);
             res.json({ success: true, url: hostedUrl });
         } else {
-            res.status(500).json({ success: false, error: 'Failed to upload image' });
+            res.status(500).json({ success: false, error: 'Failed to upload image to any storage provider' });
         }
+
     } catch (err) {
         console.error('Upload image error:', err);
         res.status(500).json({ success: false, error: safeErrorMessage(err) });
