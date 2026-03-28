@@ -69,16 +69,6 @@ const GOALS = [
         ],
     },
     {
-        id: 'write_blog', icon: 'edit_note', label: 'Write Blog',
-        desc: 'AI-powered blog with rich text editor — publish-ready',
-        color: 'from-amber-500/20 to-orange-500/10', accent: '#D97706',
-        subTypes: [
-            { id: 'seo_blog', icon: 'search', label: 'SEO Blog Article' },
-            { id: 'case_study_blog', icon: 'assignment', label: 'Case Study' },
-            { id: 'how_to_blog', icon: 'menu_book', label: 'How-To Guide' },
-        ],
-    },
-    {
         id: 'brand', icon: 'diamond', label: 'Build Brand',
         desc: 'Brand story, about us, website copy, taglines',
         color: 'from-violet-500/20 to-indigo-500/10', accent: '#8B5CF6',
@@ -3720,8 +3710,8 @@ export default function ContentStudio() {
             if (detectedGoal === 'youtube_content') {
                 setGoal('youtube_content')
                 setStep(1)  // Show YouTube sub-types (Script vs SEO)
-            } else if (detectedGoal === 'write_blog') {
-                setGoal('write_blog')
+            } else if (detectedGoal === 'blog') {
+                setGoal('blog')
                 setBlogBrief(prompt)
                 setStep(12)  // Jump to blog input
             } else if (detectedGoal) {
@@ -3741,8 +3731,8 @@ export default function ContentStudio() {
 
     // Smart input handler
     const handleSmartParse = (parsed) => {
-        if (parsed.goal === 'write_blog') {
-            setGoal('write_blog')
+        if (parsed.goal === 'blog') {
+            setGoal('blog')
             setBlogBrief(parsed.rawInput)
             setStep(12)
         } else if (parsed.goal) {
