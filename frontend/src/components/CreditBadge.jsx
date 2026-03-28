@@ -52,7 +52,7 @@ export function CreditBadge({ action, className = '' }) {
  * CreditTooltipWrapper — wraps a button and shows a tooltip on hover with credit cost info.
  * Usage: <CreditTooltipWrapper action="content"><button>Generate</button></CreditTooltipWrapper>
  */
-export function CreditTooltipWrapper({ action, children, position = 'top' }) {
+export function CreditTooltipWrapper({ action, children, position = 'top', className = '' }) {
     const [show, setShow] = useState(false)
     const { costs, balance } = useCredits()
 
@@ -74,10 +74,9 @@ export function CreditTooltipWrapper({ action, children, position = 'top' }) {
 
     return (
         <div
-            className="relative inline-flex"
+            className={`relative inline-flex ${className}`}
             onMouseEnter={() => setShow(true)}
             onMouseLeave={() => setShow(false)}
-            style={{ width: '100%' }}
         >
             {children}
             {show && (
