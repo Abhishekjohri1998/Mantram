@@ -176,6 +176,8 @@ function ProductCatalog({ brandId, brandWebsite, setError }) {
     const [search, setSearch] = useState('')
     const [scanning, setScanning] = useState(false)
 
+    const [repairing, setRepairing] = useState(false)
+
     const fetchProducts = useCallback(async () => {
         if (!brandId) return
         setLoading(true)
@@ -224,6 +226,16 @@ function ProductCatalog({ brandId, brandWebsite, setError }) {
         }
         finally { setScanning(false) }
     }
+    const handleRepairImages = async () => {
+        setRepairing(true)
+        try {
+            const res = await productsAPI.repairImages(brandId)
+            alert(`${res.message}`)
+            fetchProducts()
+        } catch (err) {
+            setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider })
+        } finally { setRepairing(false) }
+    }
 
     return (
         <div className="col-span-12 glass-panel rounded-2xl p-6 animate-fade-in" style={{ animationDelay: '540ms' }}>
@@ -239,6 +251,11 @@ function ProductCatalog({ brandId, brandWebsite, setError }) {
                             {scanning ? 'Scanning...' : 'Scan Website'}
                         </button>
                     )}
+                    <button onClick={handleRepairImages} disabled={repairing}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/5 transition-all cursor-pointer disabled:opacity-50">
+                        <span className="material-symbols-outlined text-sm">{repairing ? 'progress_activity' : 'build'}</span>
+                        {repairing ? 'Repairing...' : 'Repair Images'}
+                    </button>
                     <button onClick={() => { setEditProduct(null); setShowAdd(true) }}
                         className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-medium text-primary hover:bg-primary/5 transition-all cursor-pointer">
                         <span className="material-symbols-outlined text-sm">add</span> Add Product
@@ -1128,6 +1145,8 @@ export default function BrandDNA() {
     const [auditLogs, setAuditLogs] = useState([])
     const [auditLoading, setAuditLoading] = useState(false)
     const [showDelete, setShowDelete] = useState(false)
+    const [rescanning, setRescanning] = useState(false)
+    const [rescanResult, setRescanResult] = useState(null)
 
     // Load audit log
     useEffect(() => {
@@ -1304,9 +1323,26 @@ export default function BrandDNA() {
             <div className="flex items-end justify-between mb-6">
                 <div></div>
                 <div className="flex items-center gap-2">
-                    <button onClick={() => navigate('/onboarding')}
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer">
-                        <span className="material-symbols-outlined text-sm">language</span> Re-scan Website
+                    <button onClick={async () => {
+                        if (rescanning || !brand?.website) return
+                        setRescanning(true)
+                        setRescanResult(null)
+                        try {
+                            const res = await brandsAPI.rescan(brand._id)
+                            setRescanResult({ success: true, message: res.message || `Re-scan complete! ${res.updates || 0} fields refreshed.` })
+                            // Refresh brand context
+                            if (res.brand) window.location.reload()
+                        } catch (err) {
+                            setRescanResult({ success: false, message: err.message || 'Re-scan failed' })
+                        } finally { setRescanning(false) }
+                    }} disabled={rescanning || !brand?.website}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer disabled:opacity-50 ${
+                            rescanning ? 'text-primary bg-primary/10 border border-primary/20' : 'text-slate-400 hover:text-primary hover:bg-primary/5'
+                        }`}>
+                        <span className={`material-symbols-outlined text-sm ${rescanning ? 'animate-spin' : ''}`}>
+                            {rescanning ? 'progress_activity' : 'language'}
+                        </span>
+                        {rescanning ? 'Scanning Website...' : 'Re-scan Website'}
                     </button>
                     <button onClick={() => setShowDelete(true)}
                         className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-rose-400/60 hover:text-rose-400 hover:bg-rose-500/5 transition-all cursor-pointer">
@@ -1314,6 +1350,30 @@ export default function BrandDNA() {
                     </button>
                 </div>
             </div>
+
+            {/* Rescan Status Banner */}
+            {rescanning && (
+                <div className="glass-panel rounded-2xl p-4 mb-4 flex items-center gap-3 border border-primary/20 bg-primary/5 animate-fade-in">
+                    <span className="material-symbols-outlined text-primary animate-spin">progress_activity</span>
+                    <div>
+                        <div className="text-sm font-medium text-white">Scanning your website...</div>
+                        <div className="text-xs text-slate-400">Refreshing brand images, products, and DNA. This may take up to a minute.</div>
+                    </div>
+                </div>
+            )}
+            {rescanResult && !rescanning && (
+                <div className={`glass-panel rounded-2xl p-4 mb-4 flex items-center gap-3 border animate-fade-in ${
+                    rescanResult.success ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-rose-500/20 bg-rose-500/5'
+                }`}>
+                    <span className={`material-symbols-outlined ${rescanResult.success ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {rescanResult.success ? 'check_circle' : 'error'}
+                    </span>
+                    <div className="text-sm text-white flex-1">{rescanResult.message}</div>
+                    <button onClick={() => setRescanResult(null)} className="text-slate-400 hover:text-white">
+                        <span className="material-symbols-outlined text-sm">close</span>
+                    </button>
+                </div>
+            )}
 
             {/* Brand Identity Header */}
             <div className="glass-panel rounded-2xl p-6 mb-6 flex items-center gap-6 animate-fade-in">

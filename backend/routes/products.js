@@ -776,6 +776,81 @@ RULES:
     }
 });
 
+// POST /api/products/repair-images — Fix broken product image S3 links
+router.post('/repair-images', protect, async (req, res) => {
+    try {
+        const { brandId } = req.body;
+        if (!brandId) return res.status(400).json({ success: false, error: 'brandId is required' });
+
+        const products = await Product.find({ brand: brandId, status: { $ne: 'archived' } });
+        let repaired = 0, broken = 0, ok = 0;
+
+        for (const product of products) {
+            if (!product.images || product.images.length === 0) continue;
+
+            let updated = false;
+            const fixedImages = await Promise.all(product.images.map(async (img) => {
+                if (!img.url) { broken++; return img; }
+
+                // Test if image URL is accessible
+                try {
+                    const testResp = await fetch(img.url, { method: 'HEAD', redirect: 'follow', signal: AbortSignal.timeout(5000) });
+                    if (testResp.ok) { ok++; return img; }
+                } catch { /* broken */ }
+
+                // Image is broken — try to find source URL and re-mirror
+                broken++;
+                const sourceUrl = product.sourceUrl;
+                if (!sourceUrl) return img;
+
+                // Try to re-scrape the product page for images
+                try {
+                    const pageResp = await fetch(sourceUrl, { 
+                        headers: { 'User-Agent': 'Mozilla/5.0' }, 
+                        redirect: 'follow',
+                        signal: AbortSignal.timeout(10000),
+                    });
+                    if (!pageResp.ok) return img;
+                    const html = await pageResp.text();
+                    const cheerioMod = await import('cheerio');
+                    const $ = cheerioMod.load(html);
+                    
+                    // Find product images on the page
+                    const imgEl = $('img[src*="product"], .product-image img, img[alt*="' + (product.title || '').replace(/"/g, '') + '"]').first();
+                    const imgSrc = imgEl?.attr('data-src') || imgEl?.attr('src') || '';
+                    if (!imgSrc) return img;
+
+                    const fullUrl = new URL(imgSrc, sourceUrl).href;
+                    const safeTitle = product.title.replace(/[^a-z0-9]/gi, '_').toLowerCase().slice(0, 30);
+                    const targetKey = `products/${brandId}/${safeTitle}_repair_${Date.now()}.png`;
+                    const s3Url = await mirrorUrlToS3(fullUrl, targetKey);
+                    if (s3Url) {
+                        repaired++;
+                        updated = true;
+                        return { url: s3Url, alt: img.alt || product.title };
+                    }
+                } catch (e) { console.warn(`⚠️ Repair failed for ${product.title}:`, e.message); }
+                return img;
+            }));
+
+            if (updated) {
+                product.images = fixedImages;
+                await product.save();
+            }
+        }
+
+        res.json({ 
+            success: true, 
+            message: `Image check complete: ${ok} OK, ${broken} broken, ${repaired} repaired`,
+            ok, broken, repaired,
+            totalProducts: products.length,
+        });
+    } catch (error) {
+        console.error('Repair images error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 // POST /api/products — Add product manually
 router.post('/', protect, async (req, res) => {
     try {

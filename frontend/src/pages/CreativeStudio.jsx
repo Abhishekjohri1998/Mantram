@@ -692,6 +692,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [galleryFilter, setGalleryFilter] = useState('All')
     const [viewMode, setViewMode] = useState('list')
     const [showAdvanced, setShowAdvanced] = useState(false)
+    const [agenticQuality, setAgenticQuality] = useState('fast') // 'fast' | 'quality'
     const [activeQuickTemplate, setActiveQuickTemplate] = useState(null)
     const [showQuickStart, setShowQuickStart] = useState(true)
     const [guidedForm, setGuidedForm] = useState(null)
@@ -724,6 +725,17 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     }, [prompt])
 
     // ── Helper Functions ──
+    const [upscaleMenu, setUpscaleMenu] = useState(null) // { url, filename, x, y } — tracks which download menu is open
+    const [upscalingState, setUpscalingState] = useState(null) // null | '2k' | '4k' — loading indicator
+    const upscaleMenuRef = useRef(null)
+
+    // Close upscale menu on outside click
+    useEffect(() => {
+        function handleClick(e) { if (upscaleMenu && upscaleMenuRef.current && !upscaleMenuRef.current.contains(e.target)) setUpscaleMenu(null) }
+        document.addEventListener('mousedown', handleClick)
+        return () => document.removeEventListener('mousedown', handleClick)
+    }, [upscaleMenu])
+
     async function handleDownloadImage(url, filename) {
         if (!url) return
         try {
@@ -740,6 +752,31 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         } catch (err) {
             console.error('Download failed, falling back to new tab:', err)
             window.open(url, '_blank')
+        }
+    }
+
+    async function handleDownloadWithUpscale(url, filename, scale) {
+        if (!url) return
+        setUpscaleMenu(null)
+        if (!scale || scale === '1k') {
+            return handleDownloadImage(url, filename)
+        }
+        try {
+            setUpscalingState(scale)
+            const result = await creativesAPI.upscale({ imageUrl: url, scale })
+            if (result?.success && result?.imageUrl) {
+                const suffix = scale === '2k' ? '_2K-HD' : '_4K-UltraHD'
+                const upFilename = (filename || 'mantram-creative.png').replace(/\.png$/i, `${suffix}.png`)
+                await handleDownloadImage(result.imageUrl, upFilename)
+            } else {
+                throw new Error(result?.error || 'Upscale failed')
+            }
+        } catch (err) {
+            console.error(`Upscale ${scale} failed:`, err)
+            // Fallback to original
+            await handleDownloadImage(url, filename)
+        } finally {
+            setUpscalingState(null)
         }
     }
 
@@ -1048,6 +1085,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 logoSize,
                 aspectRatio,
                 imageModel,
+                agenticQuality,
             }
             if (designBaseImage) {
                 // Use template inpainting mode — preserves layout, characters, products from the original image
@@ -2091,6 +2129,27 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </button>
                             </div>
 
+                            {/* AI Generation Mode */}
+                            <div className="flex items-center justify-between pb-3 border-b border-white/[0.05]">
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-sm text-amber-400">psychology</span>
+                                    <div>
+                                        <p className="text-xs font-bold text-white">AI Mode</p>
+                                        <p className="text-[10px] text-slate-500">{agenticQuality === 'fast' ? 'Speed-optimized (~2s agents)' : 'Full agent chain + critique'}</p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-0.5 bg-white/[0.04] rounded-lg p-0.5">
+                                    <button onClick={() => setAgenticQuality('fast')}
+                                        className={`px-2.5 py-1.5 rounded-md text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${agenticQuality === 'fast' ? 'bg-amber-500/20 text-amber-400 shadow-sm' : 'text-slate-500 hover:text-white'}`}>
+                                        <span className="material-symbols-outlined text-xs">bolt</span> Fast
+                                    </button>
+                                    <button onClick={() => setAgenticQuality('quality')}
+                                        className={`px-2.5 py-1.5 rounded-md text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${agenticQuality === 'quality' ? 'bg-violet-500/20 text-violet-400 shadow-sm' : 'text-slate-500 hover:text-white'}`}>
+                                        <span className="material-symbols-outlined text-xs">target</span> Quality
+                                    </button>
+                                </div>
+                            </div>
+
                             {/* Format */}
                             <div>
                                 <p className="text-xs font-bold text-slate-400 mb-2">Format</p>
@@ -2366,9 +2425,39 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         {feedbackState === 'accepted' ? 'Accepted' : 'Accept'}
                                     </button>
                                     <button onClick={() => handleDownloadImage(result?.imageUrl, `${result?.title || 'creative'}.png`)}
-                                        className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] cursor-pointer transition-all" title="Download">
+                                        className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] cursor-pointer transition-all" title="Download Original (1K)">
                                         <span className="material-symbols-outlined text-sm">download</span>
                                     </button>
+                                    <div className="relative">
+                                        <button onClick={(e) => { e.stopPropagation(); setUpscaleMenu(upscaleMenu ? null : { url: result?.imageUrl, filename: `${result?.title || 'creative'}.png` }) }}
+                                            className="p-1.5 rounded-lg text-slate-500 hover:text-amber-400 hover:bg-amber-400/10 cursor-pointer transition-all" title="Download HD / 4K">
+                                            {upscalingState ? <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> : <span className="material-symbols-outlined text-sm">high_quality</span>}
+                                        </button>
+                                        {upscaleMenu && upscaleMenu.url === result?.imageUrl && (
+                                            <div ref={upscaleMenuRef} className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-800/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl p-1.5 min-w-[180px] z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                                                <div className="text-[10px] text-slate-500 px-2 pt-1 pb-1.5 font-semibold uppercase tracking-wider">Download Quality</div>
+                                                <button onClick={() => handleDownloadWithUpscale(upscaleMenu.url, upscaleMenu.filename, '1k')}
+                                                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer">
+                                                    <span className="material-symbols-outlined text-sm text-slate-500">image</span>
+                                                    <div><div className="font-semibold">1K Original</div><div className="text-[10px] text-slate-500">1024px • Instant</div></div>
+                                                </button>
+                                                <button onClick={() => handleDownloadWithUpscale(upscaleMenu.url, upscaleMenu.filename, '2k')}
+                                                    disabled={upscalingState === '2k'}
+                                                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-slate-300 hover:bg-emerald-500/10 hover:text-emerald-400 transition-all cursor-pointer disabled:opacity-50">
+                                                    <span className="material-symbols-outlined text-sm text-emerald-500">hd</span>
+                                                    <div><div className="font-semibold">2K HD{upscalingState === '2k' ? ' — Upscaling...' : ''}</div><div className="text-[10px] text-slate-500">2048px • ~1s • Free</div></div>
+                                                    {upscalingState === '2k' && <span className="material-symbols-outlined text-sm animate-spin ml-auto text-emerald-400">progress_activity</span>}
+                                                </button>
+                                                <button onClick={() => handleDownloadWithUpscale(upscaleMenu.url, upscaleMenu.filename, '4k')}
+                                                    disabled={upscalingState === '4k'}
+                                                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-slate-300 hover:bg-amber-500/10 hover:text-amber-400 transition-all cursor-pointer disabled:opacity-50">
+                                                    <span className="material-symbols-outlined text-sm text-amber-500">4k</span>
+                                                    <div><div className="font-semibold">4K Ultra HD{upscalingState === '4k' ? ' — AI Upscaling...' : ''}</div><div className="text-[10px] text-slate-500">4096px • ~5s • AI Enhanced</div></div>
+                                                    {upscalingState === '4k' && <span className="material-symbols-outlined text-sm animate-spin ml-auto text-amber-400">progress_activity</span>}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                     <button onClick={() => setPublishData({ image: result?.imageUrl, text: result?.title || '' })}
                                         className="p-1.5 rounded-lg text-slate-500 hover:text-[#1877F2] hover:bg-[#1877F2]/10 cursor-pointer transition-all" title="Publish">
                                         <span className="material-symbols-outlined text-sm">share</span>
@@ -6327,9 +6416,39 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                         <img src={zoomImage} alt="Zoomed" className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain" />
                         <div className="absolute top-3 right-3 flex gap-2">
                             <button onClick={(e) => { e.stopPropagation(); handleDownloadImage(zoomImage, 'mantram-creative.png') }}
-                                className="p-2 rounded-full bg-black/60 text-white hover:bg-white/20 backdrop-blur-sm cursor-pointer transition-colors">
+                                className="p-2 rounded-full bg-black/60 text-white hover:bg-white/20 backdrop-blur-sm cursor-pointer transition-colors" title="Download 1K">
                                 <span className="material-symbols-outlined text-lg">download</span>
                             </button>
+                            <div className="relative">
+                                <button onClick={(e) => { e.stopPropagation(); setUpscaleMenu(upscaleMenu ? null : { url: zoomImage, filename: 'mantram-creative.png' }) }}
+                                    className="p-2 rounded-full bg-black/60 text-white hover:bg-amber-400 backdrop-blur-sm cursor-pointer transition-colors" title="Download HD / 4K">
+                                    {upscalingState ? <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span> : <span className="material-symbols-outlined text-lg">high_quality</span>}
+                                </button>
+                                {upscaleMenu && upscaleMenu.url === zoomImage && (
+                                    <div ref={upscaleMenuRef} className="absolute top-full mt-2 right-0 bg-slate-800/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl p-1.5 min-w-[200px] z-50">
+                                        <div className="text-[10px] text-slate-500 px-2 pt-1 pb-1.5 font-semibold uppercase tracking-wider">Download Quality</div>
+                                        <button onClick={() => handleDownloadWithUpscale(upscaleMenu.url, upscaleMenu.filename, '1k')}
+                                            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer">
+                                            <span className="material-symbols-outlined text-base text-slate-500">image</span>
+                                            <div><div className="font-semibold">1K Original</div><div className="text-[10px] text-slate-500">1024px • Instant</div></div>
+                                        </button>
+                                        <button onClick={() => handleDownloadWithUpscale(upscaleMenu.url, upscaleMenu.filename, '2k')}
+                                            disabled={upscalingState === '2k'}
+                                            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:bg-emerald-500/10 hover:text-emerald-400 transition-all cursor-pointer disabled:opacity-50">
+                                            <span className="material-symbols-outlined text-base text-emerald-500">hd</span>
+                                            <div><div className="font-semibold">2K HD{upscalingState === '2k' ? ' — Upscaling...' : ''}</div><div className="text-[10px] text-slate-500">2048px • ~1s • Free</div></div>
+                                            {upscalingState === '2k' && <span className="material-symbols-outlined text-sm animate-spin ml-auto text-emerald-400">progress_activity</span>}
+                                        </button>
+                                        <button onClick={() => handleDownloadWithUpscale(upscaleMenu.url, upscaleMenu.filename, '4k')}
+                                            disabled={upscalingState === '4k'}
+                                            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:bg-amber-500/10 hover:text-amber-400 transition-all cursor-pointer disabled:opacity-50">
+                                            <span className="material-symbols-outlined text-base text-amber-500">4k</span>
+                                            <div><div className="font-semibold">4K Ultra HD{upscalingState === '4k' ? ' — AI Upscaling...' : ''}</div><div className="text-[10px] text-slate-500">4096px • ~5s • AI Enhanced</div></div>
+                                            {upscalingState === '4k' && <span className="material-symbols-outlined text-sm animate-spin ml-auto text-amber-400">progress_activity</span>}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                             <button onClick={(e) => {
                                 e.stopPropagation()
                                 if (navigator.share) {

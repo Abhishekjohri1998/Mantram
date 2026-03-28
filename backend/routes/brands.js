@@ -365,6 +365,123 @@ router.put('/:id/autonomy', protect, async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════
+// POST /api/brands/:id/rescan — Re-scan brand's website & refresh DNA
+// Preserves user-edited fields, refreshes brand images & products
+// ═══════════════════════════════════════════════════════════════
+router.post('/:id/rescan', protect, async (req, res) => {
+    try {
+        const brand = await findBrandWithAccess(req.params.id, req.user._id);
+        if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
+        if (!brand.website) return res.status(400).json({ success: false, error: 'Brand has no website URL to scan' });
+
+        console.log(`🔄 Re-scanning brand "${brand.name}" from ${brand.website}...`);
+
+        const orchestrator = getOrchestrator();
+        const scanResult = await orchestrator.scanWebsite(brand.website);
+
+        if (!scanResult?.dna) {
+            return res.status(500).json({ success: false, error: 'Website scan returned no data' });
+        }
+
+        const newDna = scanResult.dna;
+        const updates = {};
+
+        // ── Merge brand images (add new, keep existing) ──
+        if (newDna.brandImages?.length > 0) {
+            const existingUrls = new Set((brand.dna.brandImages || []).map(i => i.url));
+            const newImages = newDna.brandImages.filter(i => i.url && !existingUrls.has(i.url));
+            if (newImages.length > 0) {
+                // Mirror new images to S3
+                const { mirrorUrlToS3: mirror } = await import('../utils/s3.js');
+                const mirrored = await Promise.all(newImages.map(async (img, idx) => {
+                    if (img.url.includes('s3.amazonaws.com') || img.url.startsWith('data:')) return img;
+                    const s3Url = await mirror(img.url, `brands/${brand._id}/images/rescan_${Date.now()}_${idx}.png`);
+                    return s3Url ? { ...img, url: s3Url } : img;
+                }));
+                updates['dna.brandImages'] = [...(brand.dna.brandImages || []), ...mirrored.filter(i => i.url)];
+                console.log(`📸 Added ${mirrored.length} new brand images`);
+            }
+        }
+
+        // ── Update fields ONLY if they were empty (preserve user edits) ──
+        const fillIfEmpty = (key, newVal) => {
+            if (newVal && !brand.dna[key]) updates[`dna.${key}`] = newVal;
+        };
+        fillIfEmpty('industry', newDna.industry);
+        fillIfEmpty('targetAudience', newDna.targetAudience);
+        fillIfEmpty('companyOverview', newDna.companyOverview);
+        fillIfEmpty('missionStatement', newDna.missionStatement);
+        fillIfEmpty('tagline', newDna.tagline);
+        fillIfEmpty('photographyStyle', newDna.photographyStyle);
+
+        // ── Always refresh: services, USPs, values (additive) ──
+        if (newDna.servicesOffered?.length > 0) {
+            const existing = new Set(brand.dna.servicesOffered || []);
+            const merged = [...(brand.dna.servicesOffered || []), ...newDna.servicesOffered.filter(s => !existing.has(s))];
+            if (merged.length > (brand.dna.servicesOffered || []).length) updates['dna.servicesOffered'] = merged;
+        }
+        if (newDna.uniqueSellingPoints?.length > 0) {
+            const existing = new Set(brand.dna.uniqueSellingPoints || []);
+            const merged = [...(brand.dna.uniqueSellingPoints || []), ...newDna.uniqueSellingPoints.filter(s => !existing.has(s))];
+            if (merged.length > (brand.dna.uniqueSellingPoints || []).length) updates['dna.uniqueSellingPoints'] = merged;
+        }
+
+        // ── Social links (always update if new ones found) ──
+        if (newDna.socialLinks) {
+            for (const [platform, link] of Object.entries(newDna.socialLinks)) {
+                if (link && (!brand.dna.socialLinks || !brand.dna.socialLinks[platform])) {
+                    updates[`dna.socialLinks.${platform}`] = link;
+                }
+            }
+        }
+
+        // Apply updates
+        const updateCount = Object.keys(updates).length;
+        if (updateCount > 0) {
+            await Brand.findOneAndUpdate(
+                { _id: brand._id },
+                { $set: updates }
+            );
+        }
+
+        // Re-trigger Visual DNA analysis in background
+        import('../services/visualDNA.js').then(async ({ analyzeVisualDNA }) => {
+            try {
+                const updatedBrand = await Brand.findById(brand._id);
+                const visualDNA = await analyzeVisualDNA(updatedBrand);
+                if (visualDNA) {
+                    await Brand.findOneAndUpdate(
+                        { _id: brand._id },
+                        { $set: { 'dna.visualDNA': visualDNA } }
+                    );
+                    console.log(`✅ Visual DNA re-analyzed for ${brand.name}`);
+                }
+            } catch (e) { console.warn('⚠️ Re-scan Visual DNA failed:', e.message); }
+        });
+
+        await logAudit(brand, req.user, 'brand_rescanned', {
+            section: 'dna',
+            summary: `Website re-scanned. Updated ${updateCount} fields.`,
+            changes: { updatedFields: Object.keys(updates) },
+        });
+
+        // Fetch updated brand to return
+        const updatedBrand = await Brand.findById(brand._id);
+        console.log(`✅ Re-scan complete for "${brand.name}" — ${updateCount} fields updated`);
+
+        res.json({
+            success: true,
+            brand: updatedBrand,
+            updates: updateCount,
+            message: `Re-scan complete! ${updateCount} fields refreshed.`,
+        });
+    } catch (error) {
+        console.error('❌ Brand re-scan error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
 // DELETE /api/brands/:id — cascade delete brand and all related data
 // ═══════════════════════════════════════════════════════════════
 router.delete('/:id', protect, requireBrandOwner, async (req, res) => {
