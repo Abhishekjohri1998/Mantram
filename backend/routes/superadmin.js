@@ -754,13 +754,14 @@ router.get('/coupons', async (req, res) => {
 
 router.post('/coupons', async (req, res) => {
     try {
-        const { code, description, discountType, discountValue, maxUses, maxUsesPerUser, validFrom, validUntil, applicablePlans } = req.body;
+        const { code, description, discountType, discountValue, maxUses, maxUsesPerUser, validFrom, validUntil, applicablePlans, minPurchase } = req.body;
         if (!code || !discountType || !discountValue) return res.status(400).json({ success: false, error: 'code, discountType, and discountValue required' });
         const existing = await Coupon.findOne({ code: code.toUpperCase() });
         if (existing) return res.status(400).json({ success: false, error: 'Coupon code already exists' });
         const coupon = await Coupon.create({
             code: code.toUpperCase(), description, discountType, discountValue,
             maxUses: maxUses || 0, maxUsesPerUser: maxUsesPerUser || 1,
+            minPurchase: minPurchase || 0,
             validFrom: validFrom || new Date(), validUntil: validUntil || null,
             applicablePlans: applicablePlans || [], createdBy: req.user._id,
         });

@@ -19,7 +19,7 @@ const couponSchema = new mongoose.Schema({
     isActive: { type: Boolean, default: true },
 
     // Restrictions
-    applicablePlans: [{ type: String, enum: ['starter', 'professional', 'enterprise'] }], // empty = all plans
+    applicablePlans: [{ type: String }], // empty = all plans (can be package slug or credit pack slug)
     minPurchaseAmount: { type: Number, default: 0 },
 
     // Tracking
