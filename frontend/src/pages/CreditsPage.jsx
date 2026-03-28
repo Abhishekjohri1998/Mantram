@@ -82,6 +82,10 @@ export default function CreditsPage() {
     const [couponLoading, setCouponLoading] = useState(false)
     const [couponError, setCouponError] = useState('')
 
+    // Checkout Modal state
+    const [showCheckout, setShowCheckout] = useState(false)
+    const [checkoutItem, setCheckoutItem] = useState(null) // { type: 'topup' | 'subscription', ...item }
+
 
     useEffect(() => { loadSummary(); loadUsage(); loadStoreVisibility(); loadSubStatus() }, [])
     useEffect(() => { loadUsage() }, [page])
@@ -163,7 +167,15 @@ export default function CreditsPage() {
         } catch (e) { console.error(e) }
     }
 
-    const handleUpgrade = async (pkg) => {
+    const handleUpgrade = (pkg) => {
+        setCheckoutItem({ type: 'subscription', ...pkg })
+        setShowCheckout(true)
+        setAppliedCoupon(null) // Reset coupon for new selection
+        setCouponInput('')
+        setCouponError('')
+    }
+
+    const confirmUpgrade = async (pkg) => {
         try {
             const { orderId, amount, currency, proRata } = await paymentsAPI.createOrder(pkg._id, billingCycle, appliedCoupon?.coupon?.code)
             const options = {
@@ -222,7 +234,15 @@ export default function CreditsPage() {
         }
     }
 
-    const handleTopup = async (pack) => {
+    const handleTopup = (pack) => {
+        setCheckoutItem({ type: 'topup', ...pack })
+        setShowCheckout(true)
+        setAppliedCoupon(null) // Reset coupon for new selection
+        setCouponInput('')
+        setCouponError('')
+    }
+
+    const confirmTopup = async (pack) => {
         try {
             const { orderId, amount, currency, creditsToAdd } = await paymentsAPI.createTopupOrder(pack.id, appliedCoupon?.coupon?.code)
             const options = {
@@ -268,16 +288,14 @@ export default function CreditsPage() {
     }
 
     const handleApplyCoupon = async () => {
-        if (!couponInput.trim()) return
+        if (!couponInput.trim() || !checkoutItem) return
         setCouponLoading(true)
         setCouponError('')
         try {
-            // We just validate globally first, or we can validate against the "first" item 
-            // but in Razorpay flow, we'll re-validate anyway.
-            // For UI feedback, let's just check if the code exists and is active.
             const data = await paymentsAPI.validateCoupon({ 
                 code: couponInput.trim(),
-                // If we're in topup tab, we could pick a representative pack, but let's just check validity
+                planId: checkoutItem.type === 'subscription' ? checkoutItem._id : null,
+                packId: checkoutItem.type === 'topup' ? (checkoutItem.id || checkoutItem._id) : null
             })
             setAppliedCoupon(data)
             setCouponInput('')
@@ -503,43 +521,7 @@ export default function CreditsPage() {
                                 </div>
                             )}
 
-                            {/* Coupon Section */}
-                            <div className="glass-panel p-6 rounded-2xl border border-white/[0.08] flex flex-wrap items-center justify-between gap-4">
-                                <div className="flex items-center gap-3">
-                                    <span className="material-symbols-outlined text-2xl text-primary">local_offer</span>
-                                    <div>
-                                        <h4 className="text-sm font-bold text-white">Have a Coupon?</h4>
-                                        <p className="text-xs text-slate-500">Apply a code to get extra discounts on your purchase.</p>
-                                    </div>
-                                </div>
-                                {appliedCoupon ? (
-                                    <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-xl">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm font-bold text-emerald-400">{appliedCoupon.coupon.code}</span>
-                                            <span className="text-xs text-emerald-500">Applied</span>
-                                        </div>
-                                        <button onClick={removeCoupon} className="material-symbols-outlined text-sm text-emerald-500 hover:text-white transition-all">cancel</button>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center gap-2">
-                                        <input 
-                                            type="text" 
-                                            placeholder="Enter code..." 
-                                            value={couponInput}
-                                            onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
-                                            className="bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-primary/50"
-                                        />
-                                        <button 
-                                            onClick={handleApplyCoupon}
-                                            disabled={couponLoading || !couponInput.trim()}
-                                            className="px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl text-sm font-bold hover:bg-primary/20 transition-all disabled:opacity-50"
-                                        >
-                                            {couponLoading ? '...' : 'Apply'}
-                                        </button>
-                                    </div>
-                                )}
-                                {couponError && <p className="w-full text-xs text-rose-500">{couponError}</p>}
-                            </div>
+
 
                             {/* ── Promo Section (Kling-style green border) ── */}
                             {promoPacks.length > 0 && (
@@ -619,14 +601,8 @@ export default function CreditsPage() {
                                         </div>
                                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/[0.06]">
                                             <div>
-                                                {appliedCoupon ? (
-                                                    <div className="flex flex-col">
-                                                         <span className="text-lg font-black text-emerald-400">₹ {(Math.max(0, pack.price - (appliedCoupon.coupon.discountType === 'percentage' ? Math.round(pack.price * appliedCoupon.coupon.discountValue / 100) : appliedCoupon.coupon.discountValue))).toLocaleString()}</span>
-                                                         <span className="text-[10px] text-slate-500 line-through">₹ {pack.price?.toLocaleString()}</span>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-lg font-black text-white">₹ {pack.price?.toLocaleString()}</span>
-                                                )}
+                                                <span className="text-lg font-black text-white">₹ {pack.price?.toLocaleString()}</span>
+
                                                 <p className="text-[10px] text-slate-500">₹{pack.perCredit}/cr • {pack.validityDays}d</p>
                                             </div>
                                             <button
@@ -885,20 +861,11 @@ export default function CreditsPage() {
                                                     </div>
                                                     <p className="text-sm text-slate-500 mb-6">{pkg.description}</p>
                                                     <div className="mb-6">
-                                                        {appliedCoupon ? (
-                                                            <div className="flex flex-col">
-                                                                <div className="flex items-baseline gap-1">
-                                                                    <span className="text-3xl font-black text-emerald-400">{pkg.pricing.currency === 'INR' ? '₹' : '$'}{(Math.max(0, price - (appliedCoupon.coupon.discountType === 'percentage' ? Math.round(price * appliedCoupon.coupon.discountValue / 100) : appliedCoupon.coupon.discountValue))).toLocaleString()}</span>
-                                                                    <span className="text-slate-500 text-sm">/{billingCycle === 'yearly' ? 'yr' : billingCycle === 'quarterly' ? 'qtr' : 'mo'}</span>
-                                                                </div>
-                                                                <span className="text-slate-600 text-xs line-through">₹ {price?.toLocaleString()}</span>
-                                                            </div>
-                                                        ) : (
-                                                            <>
-                                                                <span className="text-3xl font-black text-white">{pkg.pricing.currency === 'INR' ? '₹' : '$'}{price?.toLocaleString()}</span>
-                                                                <span className="text-slate-500 text-sm">/{billingCycle === 'yearly' ? 'yr' : billingCycle === 'quarterly' ? 'qtr' : 'mo'}</span>
-                                                            </>
-                                                        )}
+                                                        <>
+                                                            <span className="text-3xl font-black text-white">{pkg.pricing.currency === 'INR' ? '₹' : '$'}{price?.toLocaleString()}</span>
+                                                            <span className="text-slate-500 text-sm">/{billingCycle === 'yearly' ? 'yr' : billingCycle === 'quarterly' ? 'qtr' : 'mo'}</span>
+                                                        </>
+
                                                         {savings > 0 && (
                                                             <span className="ml-2 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold">
                                                                 Save {savings}%
@@ -1135,6 +1102,125 @@ export default function CreditsPage() {
                             </button>
                         </>
                     )}
+                </div>
+            </div>
+        )}
+        {/* ══════════ Checkout Modal ══════════ */}
+        {showCheckout && checkoutItem && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                <div 
+                    className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" 
+                    onClick={() => setShowCheckout(false)} 
+                />
+                <div className="relative w-full max-w-md bg-[#0f172a] border border-white/[0.08] rounded-3xl overflow-hidden shadow-2xl animate-scale-in">
+                    {/* Header */}
+                    <div className="p-6 pb-4 border-b border-white/[0.04] flex items-center justify-between">
+                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary">shopping_cart</span>
+                            Review Order
+                        </h3>
+                        <button onClick={() => setShowCheckout(false)} className="material-symbols-outlined text-slate-500 hover:text-white transition-all">close</button>
+                    </div>
+
+                    <div className="p-6 space-y-6">
+                        {/* Item Summary */}
+                        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-4 flex items-center gap-4">
+                            <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                                <span className="material-symbols-outlined text-2xl text-primary">
+                                    {checkoutItem.type === 'subscription' ? 'diamond' : (checkoutItem.icon || 'token')}
+                                </span>
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="text-white font-bold">{checkoutItem.name || (checkoutItem.type === 'subscription' ? 'Subscription Upgrade' : `${checkoutItem.total} Credits`)}</h4>
+                                <p className="text-xs text-slate-500">
+                                    {checkoutItem.type === 'subscription' ? `Billed ${billingCycle}` : `${checkoutItem.validityDays} Days Validity`}
+                                </p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-lg font-black text-white">₹{(checkoutItem.type === 'subscription' ? (checkoutItem.pricing?.[billingCycle] || checkoutItem.pricing?.monthly) : checkoutItem.price)?.toLocaleString()}</p>
+                            </div>
+                        </div>
+
+                        {/* Coupon Section */}
+                        <div className="space-y-3">
+                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1">Promo Code</h4>
+                            {appliedCoupon ? (
+                                <div className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 px-4 py-3 rounded-2xl">
+                                    <div className="flex items-center gap-3">
+                                        <span className="material-symbols-outlined text-emerald-400">local_offer</span>
+                                        <div>
+                                            <p className="text-sm font-bold text-emerald-400">{appliedCoupon.coupon.code}</p>
+                                            <p className="text-[10px] text-emerald-500/80">
+                                                {appliedCoupon.coupon.discountType === 'percentage' 
+                                                    ? `${appliedCoupon.coupon.discountValue}% OFF Applied` 
+                                                    : `₹${appliedCoupon.coupon.discountValue} OFF Applied`}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={removeCoupon}
+                                        className="text-xs font-bold text-emerald-500 hover:text-rose-400 transition-all"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="relative group">
+                                    <input 
+                                        type="text" 
+                                        placeholder="Enter coupon code..." 
+                                        value={couponInput}
+                                        onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                                        className="w-full bg-white/[0.04] border border-white/[0.1] rounded-2xl px-5 py-3.5 pr-24 text-sm text-white focus:outline-none focus:border-primary/50 transition-all"
+                                    />
+                                    <button 
+                                        onClick={handleApplyCoupon}
+                                        disabled={couponLoading || !couponInput.trim()}
+                                        className="absolute right-2 top-2 bottom-2 px-4 bg-primary/10 text-primary border border-primary/20 rounded-xl text-xs font-bold hover:bg-primary/20 transition-all disabled:opacity-50"
+                                    >
+                                        {couponLoading ? '...' : 'Apply'}
+                                    </button>
+                                </div>
+                            )}
+                            {couponError && <p className="text-[10px] text-rose-500 px-1">{couponError}</p>}
+                        </div>
+
+                        {/* Totals */}
+                        <div className="space-y-3 pt-2">
+                            <div className="flex justify-between text-sm text-slate-400">
+                                <span>Subtotal</span>
+                                <span>₹{(checkoutItem.type === 'subscription' ? (checkoutItem.pricing?.[billingCycle] || checkoutItem.pricing?.monthly) : checkoutItem.price)?.toLocaleString()}</span>
+                            </div>
+                            {appliedCoupon && (
+                                <div className="flex justify-between text-sm text-emerald-400">
+                                    <span>Discount ({appliedCoupon.coupon.code})</span>
+                                    <span>-₹{appliedCoupon.discount?.toLocaleString()}</span>
+                                </div>
+                            )}
+                            <div className="flex justify-between items-center pt-3 border-t border-white/[0.08]">
+                                <span className="text-white font-bold">Total Amount</span>
+                                <span className="text-2xl font-black text-white">
+                                    ₹{(appliedCoupon?.finalPrice || (checkoutItem.type === 'subscription' ? (checkoutItem.pricing?.[billingCycle] || checkoutItem.pricing?.monthly) : checkoutItem.price))?.toLocaleString()}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Action */}
+                        <button 
+                            onClick={() => {
+                                if (checkoutItem.type === 'topup') confirmTopup(checkoutItem)
+                                else confirmUpgrade(checkoutItem)
+                                setShowCheckout(false)
+                            }}
+                            className="w-full py-4 bg-primary text-black font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        >
+                            Proceed to Payment
+                        </button>
+                        
+                        <p className="text-[10px] text-slate-600 text-center">
+                            By proceeding, you agree to our Terms of Service. Payments are processed securely via Razorpay.
+                        </p>
+                    </div>
                 </div>
             </div>
         )}
