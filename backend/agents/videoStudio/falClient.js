@@ -207,9 +207,9 @@ export function estimateCost(model = 'kling-3.0', durationSeconds = 5, resolutio
     const resMult = resolution === '720p' ? 0.7 : 1.0;
     const usd = Number((costPerSec * durationSeconds * resMult).toFixed(2));
     const inr = Number((usd * 85).toFixed(0));
-    // ceil(usd × 34) ensures ≥50% gross margin at ₹5/credit floor price
+    // ceil(usd × 70) ensures ~75% gross margin at ₹5/credit floor price
     // Min 5 credits for any video generation
-    const credits = Math.max(Math.ceil(usd * 34), 5);
+    const credits = Math.max(Math.ceil(usd * 70), 5);
 
     return {
         usd, inr, credits,

@@ -76,7 +76,7 @@ const DEFAULT_CREDIT_COSTS = {
     trendRefresh: 1,
     videoBrainstorm: 2,
     videoGenerate: 'dynamic',      // DYNAMIC — calculated per request
-    videoEdit: 10,                 // ↑ from 5 (re-renders video via PiAPI)
+    videoEdit: 20,                 // ↑ from 10 (re-renders video via PiAPI)
     socialMedia: 3,
     socialMediaCalendar: 3,
     socialMediaAudit: 4,
@@ -153,8 +153,8 @@ export const requireCredits = (actionOrCost = 1) => {
                     const { model = 'kling-3.0', duration = 5,
                             resolution = '1080p', qualityMode = 'fast' } = req.body;
                     const estimate = estimateCost(model, duration, resolution, qualityMode);
-                    // ceil(USD × 34) ensures 50% margin at ₹5/credit floor
-                    cost = Math.max(Math.ceil(estimate.usd * 34), 5);
+                    // ceil(USD × 70) ensures ~75% margin at ₹5/credit floor
+                    cost = Math.max(Math.ceil(estimate.usd * 70), 5);
                     console.log(`🎬 Dynamic video credits: ${model} ${duration}s ${resolution} ${qualityMode} → $${estimate.usd} → ${cost} credits`);
                 } else {
                     cost = (typeof rawCost === 'number' ? rawCost : null) || 1;
