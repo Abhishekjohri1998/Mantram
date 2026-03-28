@@ -71,15 +71,13 @@ class ModelRouter {
     }
 
     /**
-     * Get the best available image provider
-     * Priority: Gemini (Imagen 3) > OpenAI (DALL-E)
+     * Get the image provider — Gemini only, NO OpenAI fallback
      */
     getImageProvider(preferences = {}) {
         const priority = [
             preferences.provider,
             config.ai.defaultImageProvider,
             'gemini',
-            'openai',
         ].filter(Boolean);
 
         for (const name of priority) {
@@ -87,7 +85,7 @@ class ModelRouter {
                 return this.providers[name];
             }
         }
-        throw new Error('No image AI provider available. Add an API key to .env');
+        throw new Error('No image AI provider available. Gemini API key required.');
     }
 
     /**
@@ -202,51 +200,29 @@ class ModelRouter {
     }
 
     /**
-     * Generate image with automatic provider selection and fallback
+     * Generate image — NO FALLBACK. If the selected provider fails, throw immediately.
+     * Users see a clear error message and can retry manually.
      */
     async generateImage(params, preferences = {}) {
         const provider = this.getImageProvider(preferences);
-        let lastError = null;
 
+        // If provider is in cooldown, throw immediately — don't try fallbacks
         if (provider.cooldownUntil && Date.now() < provider.cooldownUntil) {
-            const fallback = this._getFallback(provider.name, 'image');
-            if (fallback) {
-                try { 
-                    // Strip the model ID so the fallback uses its own default model
-                    const { model: _, ...fallbackParams } = params;
-                    return await fallback.generateImage(fallbackParams); 
-                } catch (e) {
-                    lastError = e;
-                }
-            }
+            throw new AIProviderBusyError(provider.name, `${provider.name} is in cooldown. Please try again in a few minutes.`);
         }
 
         try {
             return await provider.generateImage(params);
         } catch (error) {
-            lastError = error;
             const isQuotaError = this._testQuotaError(error);
-
             if (isQuotaError) {
                 provider.cooldownUntil = Date.now() + (5 * 60 * 1000);
                 console.warn(`⏳ Image provider ${provider.name} hit quota limits. Cooling down.`);
             }
 
-            console.error(`Image provider ${provider.name} failed:`, error.message);
-            // Try fallback provider
-            const fallback = this._getFallback(provider.name, 'image');
-            if (fallback) {
-                try {
-                    console.log(`Trying fallback image provider: ${fallback.name}`);
-                    
-                    // Strip the model ID so the fallback uses its own default model
-                    const { model: _, ...fallbackParams } = params;
-                    return await fallback.generateImage(fallbackParams);
-                } catch (fallbackError) {
-                    lastError = fallbackError;
-                }
-            }
-            throw this._categorizeError(lastError, 'image', provider.name);
+            console.error(`❌ Image provider ${provider.name} failed:`, error.message);
+            // NO FALLBACK — throw immediately so user gets a clear error
+            throw this._categorizeError(error, 'image', provider.name);
         }
     }
 

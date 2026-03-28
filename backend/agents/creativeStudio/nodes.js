@@ -11,6 +11,7 @@ import Brand from '../../models/Brand.js';
 import Product from '../../models/Product.js';
 import {
     ART_DIRECTOR_PROMPT,
+    FAST_CREATIVE_DIRECTOR_PROMPT,
     PROMPT_ENGINEER_PROMPT,
     STYLE_CRITIC_PROMPT,
     VARIATION_PROMPT,
@@ -44,11 +45,13 @@ export async function brandIntelligenceNode(state) {
     // Maps thematic/abstract words to product-relevant keywords
     const SEMANTIC_MAP = {
         // Music/Audio
-        beat: ['earbuds', 'headphones', 'speaker', 'audio', 'music', 'sound', 'bass', 'wireless'],
-        beats: ['earbuds', 'headphones', 'speaker', 'audio', 'music', 'sound', 'bass', 'wireless'],
-        music: ['earbuds', 'headphones', 'speaker', 'audio', 'sound', 'neckband'],
-        sound: ['earbuds', 'headphones', 'speaker', 'audio', 'neckband'],
+        beat: ['earbuds', 'headphones', 'speaker', 'audio', 'music', 'sound', 'bass', 'wireless', 'neckband'],
+        beats: ['earbuds', 'headphones', 'speaker', 'audio', 'music', 'sound', 'bass', 'wireless', 'neckband'],
+        music: ['earbuds', 'headphones', 'speaker', 'audio', 'sound', 'neckband', 'soundbar'],
+        sound: ['earbuds', 'headphones', 'speaker', 'audio', 'neckband', 'soundbar'],
         listen: ['earbuds', 'headphones', 'neckband', 'audio'],
+        bass: ['speaker', 'headphones', 'earbuds', 'soundbar', 'audio'],
+        speaker: ['speaker', 'soundbar', 'portable', 'boom', 'bluetooth', 'audio'],
         // Fashion/Lifestyle
         summer: ['light', 'casual', 'outdoor', 'travel', 'portable', 'wireless', 'sport'],
         winter: ['warm', 'cozy', 'premium', 'over-ear', 'studio'],
@@ -56,10 +59,24 @@ export async function brandIntelligenceNode(state) {
         fitness: ['sport', 'wireless', 'sweat', 'gym', 'active', 'neckband'],
         workout: ['sport', 'wireless', 'neckband', 'earbuds', 'active'],
         // Tech
-        gaming: ['headphones', 'gaming', 'rgb', 'bass', 'over-ear', 'studio'],
+        gaming: ['headphones', 'gaming', 'rgb', 'bass', 'over-ear', 'studio', 'tws'],
         work: ['headphones', 'neckband', 'noise', 'office', 'professional'],
         gift: ['premium', 'watch', 'earbuds', 'headphones', 'powerbank'],
         style: ['watch', 'earbuds', 'premium', 'fashion'],
+        watch: ['watch', 'smartwatch', 'wrist', 'fitness'],
+        charge: ['powerbank', 'charger', 'charging', 'cable', 'type-c'],
+        // Occasions — no specific product preference
+        birthday: [],
+        holi: [],
+        diwali: [],
+        christmas: [],
+        valentine: [],
+        anniversary: [],
+        party: ['speaker', 'earbuds', 'headphones', 'soundbar'],
+        celebration: [],
+        festival: [],
+        wish: [],
+        greeting: [],
     };
 
     // ── Auto-detect which product the user is referring to ──
@@ -67,6 +84,10 @@ export async function brandIntelligenceNode(state) {
     if (hasProducts && state.brief) {
         const briefLower = state.brief.toLowerCase();
         const briefWords = briefLower.split(/\s+/).filter(w => w.length > 2);
+
+        // Check if it's purely an occasion (no product context at all)
+        const occasionWords = ['birthday', 'holi', 'diwali', 'christmas', 'valentine', 'anniversary', 'wish', 'greeting', 'festival', 'happy', 'celebration', 'congratulation'];
+        const isOnlyOccasion = briefWords.every(w => occasionWords.includes(w) || w.length <= 2);
 
         // Expand brief with semantic keywords
         const expandedKeywords = new Set(briefWords);
@@ -78,56 +99,74 @@ export async function brandIntelligenceNode(state) {
         }
         const expandedBrief = [...expandedKeywords].join(' ');
 
-        // Score each product by keyword overlap with the user's brief + semantic expansion
-        let bestScore = 0;
-        for (const p of products) {
-            let score = 0;
-            const titleWords = (p.title || '').toLowerCase().split(/\s+/);
-            const descWords = (p.description || p.shortDescription || '').toLowerCase().split(/\s+/);
-            const allProductWords = [...titleWords, ...descWords, ...(p.tags || []).map(t => t.toLowerCase())];
+        if (!isOnlyOccasion) {
+            // Score each product by keyword overlap with the user's brief + semantic expansion
+            let bestScore = 0;
+            for (const p of products) {
+                let score = 0;
+                const titleLower = (p.title || '').toLowerCase();
+                const titleWords = titleLower.split(/\s+/).filter(w => w.length > 2);
+                const descLower = (p.description || p.shortDescription || '').toLowerCase();
+                const categoryLower = (p.category || '').toLowerCase();
 
-            // Direct match in original brief
-            for (const w of titleWords) {
-                if (w.length > 2 && briefLower.includes(w)) score += 3;
-            }
+                // Direct title word match in original brief (strongest signal)
+                for (const w of titleWords) {
+                    if (briefLower.includes(w)) score += 3;
+                }
 
-            // Semantic match from expanded keywords
-            for (const w of allProductWords) {
-                if (w.length > 2 && expandedBrief.includes(w)) score += 1;
-            }
+                // Expanded brief keywords found in product title (semantic match)
+                for (const kw of expandedKeywords) {
+                    if (kw.length > 2 && titleLower.includes(kw)) score += 4; // Title match is strongest
+                    if (kw.length > 2 && descLower.includes(kw)) score += 1;
+                }
 
-            // Check tags, category, productType
-            for (const tag of (p.tags || [])) {
-                if (briefLower.includes(tag.toLowerCase())) score += 2;
-                if (expandedBrief.includes(tag.toLowerCase())) score += 1;
+                // Category match with expanded brief (very strong signal)
+                if (categoryLower) {
+                    for (const kw of expandedKeywords) {
+                        if (kw.length > 2 && categoryLower.includes(kw)) score += 5;
+                    }
+                }
+
+                // Check tags
+                for (const tag of (p.tags || [])) {
+                    if (briefLower.includes(tag.toLowerCase())) score += 2;
+                    if (expandedBrief.includes(tag.toLowerCase())) score += 1;
+                }
+
+                // Bonus: full product name appears in brief
+                if (briefLower.includes(titleLower)) score += 10;
+
+                // NEGATIVE scoring: penalize category mismatch
+                // If brief clearly mentions "speaker" but product is "SmartWatch", subtract
+                if (categoryLower === 'smartwatch' && (expandedBrief.includes('speaker') || expandedBrief.includes('headphones') || expandedBrief.includes('earbuds') || expandedBrief.includes('soundbar'))) {
+                    score -= 5;
+                }
+                if ((categoryLower === 'true wireless earbuds' || categoryLower === 'earbuds') && expandedBrief.includes('speaker') && !expandedBrief.includes('earbuds') && !expandedBrief.includes('wireless')) {
+                    score -= 3;
+                }
+
+                if (score > bestScore) {
+                    bestScore = score;
+                    matchedProduct = p;
+                }
             }
-            if (p.category && (briefLower.includes(p.category.toLowerCase()) || expandedBrief.includes(p.category.toLowerCase()))) score += 2;
-            if (p.productType && (briefLower.includes(p.productType.toLowerCase()) || expandedBrief.includes(p.productType.toLowerCase()))) score += 2;
-            // Bonus: if product name appears as a whole phrase
-            if (briefLower.includes(p.title.toLowerCase())) score += 10;
-            
-            if (score > bestScore) {
-                bestScore = score;
-                matchedProduct = p;
+            // Only match if there's reasonable confidence
+            if (bestScore < 2) matchedProduct = null;
+            if (matchedProduct) {
+                console.log(`🎯 Product matched: "${matchedProduct.title}" (score: ${bestScore}, images: ${(matchedProduct.images || []).length}, category: ${matchedProduct.category || 'none'})`);
             }
-        }
-        // Only match if there's reasonable confidence (lowered from 2 to 1 for semantic matches)
-        if (bestScore < 1) matchedProduct = null;
-        if (matchedProduct) {
-            console.log(`🎯 Product matched: "${matchedProduct.title}" (score: ${bestScore}, images: ${(matchedProduct.images || []).length}, semantic: ${bestScore > 0 && !briefLower.includes(matchedProduct.title.toLowerCase().split(/\s+/)[0])})`);
+        } else {
+            console.log(`🎉 Occasion-only brief detected: "${state.brief}" — no specific product match needed`);
         }
     }
 
     // If no specific match but brand has products, pick a random product for variety
-    // (Even if product has no images — we'll use brand DNA images as fallback)
     if (!matchedProduct && hasProducts) {
-        // Prefer products with images, but fall back to any product
         const productsWithImages = products.filter(p => (p.images || []).length > 0);
         if (productsWithImages.length > 0) {
             matchedProduct = productsWithImages[Math.floor(Math.random() * productsWithImages.length)];
             console.log(`📦 No specific product match — auto-selecting product with images: "${matchedProduct.title}"`);
         } else {
-            // No products have images — still select one for prompt grounding, and use brand DNA images
             matchedProduct = products[Math.floor(Math.random() * products.length)];
             console.log(`📦 No products have images — auto-selecting "${matchedProduct.title}" for prompt grounding (will use brand DNA images)`);
         }
@@ -353,8 +392,41 @@ export async function artDirectorNode(state) {
     const formatKey = state.format || 'instagram-post';
     const formatIntel = FORMAT_INTELLIGENCE[formatKey];
 
+    // ── Detect occasion/theme from the brief ──
+    const briefLower = (state.brief || '').toLowerCase();
+    const OCCASIONS = {
+        birthday: '🎂 BIRTHDAY CELEBRATION — cake, balloons, confetti, gifts, party atmosphere',
+        holi: '🌈 HOLI FESTIVAL — colorful powder (gulal), joy, people celebrating, vibrant color explosions',
+        diwali: '🪔 DIWALI FESTIVAL — diyas, sparklers, rangoli, warm golden lights, festive glow',
+        christmas: '🎄 CHRISTMAS — snow, gifts, decorations, warm cozy vibes, red and green',
+        'new year': '🎆 NEW YEAR — fireworks, midnight celebration, countdown, champagne, fresh starts',
+        valentine: '💕 VALENTINE\'S DAY — hearts, roses, romantic mood, love, couple vibes',
+        'independence day': '🇮🇳 INDEPENDENCE DAY — tricolor, patriotic, proud, national celebration',
+        'republic day': '🇮🇳 REPUBLIC DAY — tricolor, patriotic, parade, national pride',
+        rakhi: '🧵 RAKSHA BANDHAN — rakhi thread, brother-sister bond, festive celebration',
+        eid: '🌙 EID — crescent moon, lanterns, celebration, warm gathering',
+        navratri: '🕺 NAVRATRI — garba dance, dandiya, vibrant colors, festive energy',
+        ganesh: '🐘 GANESH CHATURTHI — Lord Ganesha, modak, festive procession, celebration',
+        onam: '🌸 ONAM — pookalam floral carpet, sadya feast, Kerala harvest festival',
+        pongal: '🍚 PONGAL — harvest celebration, pot overflowing, sugarcane, sun',
+        makar: '🪁 MAKAR SANKRANTI — kite flying, sky full of kites, festival vibes',
+        summer: '☀️ SUMMER VIBES — bright sunshine, outdoor, tropical, cool, refreshing',
+        monsoon: '🌧️ MONSOON — rain, green, cozy, refreshing, petrichor mood',
+        winter: '❄️ WINTER — cozy, warm, mist, layered, premium comfort',
+        party: '🎉 PARTY — energetic, dance, lights, music, celebration',
+    };
+
+    let occasionHint = '';
+    for (const [key, description] of Object.entries(OCCASIONS)) {
+        if (briefLower.includes(key)) {
+            occasionHint = `\n🎯 DETECTED OCCASION/THEME: ${description}\n⚠️ THIS MUST BE THE VISUAL HERO OF THE IMAGE. The brand/product should be integrated into this occasion scene naturally — NOT the other way around.\nExample: If it's a birthday post for an earbuds brand → Show a birthday party scene with the earbuds as a gift on the table, NOT just earbuds with "Happy Birthday" text.\n`;
+            break;
+        }
+    }
+
     const userPrompt = [
         `CREATIVE BRIEF: ${state.brief}`,
+        occasionHint,
         `FORMAT: ${formatIntel?.label || formatKey} (${formatIntel?.spec || state.aspectRatio || '1:1'})`,
         `ASPECT RATIO: ${state.aspectRatio || '1:1'}`,
         // Platform-specific creative rules
@@ -364,14 +436,13 @@ export async function artDirectorNode(state) {
         intel.designStyle ? `BRAND DESIGN STYLE: ${intel.designStyle}` : '',
         intel.imageMood ? `BRAND IMAGE MOOD: ${intel.imageMood}` : '',
         intel.photographyStyle ? `PHOTOGRAPHY DIRECTION: ${intel.photographyStyle}` : '',
-        intel.colors?.length > 0 ? `BRAND COLOR PALETTE: ${intel.colors.join(', ')} — use these as the foundation` : '',
+        intel.colors?.length > 0 ? `BRAND COLOR PALETTE: ${intel.colors.join(', ')} — use these as accent colors that complement the occasion's mood` : '',
         intel.designRules?.length > 0 ? `DESIGN RULES (must follow): ${intel.designRules.slice(0, 3).join('; ')}` : '',
         intel.designAvoid?.length > 0 ? `AVOID: ${intel.designAvoid.slice(0, 3).join('; ')}` : '',
         state.references ? `REFERENCE NOTES: ${state.references}` : '',
         state.productName ? `PRODUCT: ${state.productName}` : '',
         productContext,
-        intel.brandType === 'product' && !mp ? `NOTE: This brand sells physical products. If the brief involves a product, base your direction on the brand's actual product catalog — do NOT invent product shapes or designs.` : '',
-        // When no specific product matched, tell the agent about available products
+        intel.brandType === 'product' && !mp ? `NOTE: This brand sells physical products. If the brief involves a product, base your direction on the brand's actual product catalog.` : '',
         !mp && intel.productCandidates?.length > 0 ? `AVAILABLE PRODUCTS IN CATALOG (pick the most relevant for this brief):\n${intel.productCandidates.map(c => `• ${c.title}${c.category ? ` [${c.category}]` : ''}: ${c.description || 'No description'}`).join('\n')}` : '',
     ].filter(Boolean).join('\n');
 
@@ -382,6 +453,86 @@ export async function artDirectorNode(state) {
         ...state,
         artDirection: result,
         status: 'art-direction',
+    };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FAST NODE: CREATIVE DIRECTOR — Art Direction + Prompt Engineering in ONE call
+// Saves ~10-15s by eliminating the second LLM round-trip
+// ══════════════════════════════════════════════════════════════════════════════
+export async function fastCreativeDirectorNode(state) {
+    console.log('⚡ Creative Agent: Fast Creative Director — combined vision + prompt...');
+    const startMs = Date.now();
+
+    const brandContext = state.brandContext || (await loadBrandContext(state.brandId)).brandContext;
+    const intel = state.brandIntel || {};
+
+    // Build product context (same as artDirectorNode)
+    const mp = state.matchedProduct;
+    const productContext = mp ? [
+        `\n⚠️ REAL PRODUCT DATA (DO NOT HALLUCINATE — use ONLY this info):`,
+        `PRODUCT NAME: ${mp.title}`,
+        mp.description ? `PRODUCT DESCRIPTION: ${mp.description}` : '',
+        mp.features?.length > 0 ? `KEY FEATURES: ${mp.features.join(', ')}` : '',
+        mp.category ? `CATEGORY: ${mp.category}` : '',
+        mp.images?.length > 0 ? `📸 REAL PRODUCT IMAGES ARE PROVIDED AS REFERENCE.` : '',
+    ].filter(Boolean).join('\n') : '';
+
+    const formatKey = state.format || 'instagram-post';
+    const formatIntel = FORMAT_INTELLIGENCE[formatKey];
+
+    // Occasion detection (same as artDirectorNode)
+    const briefLower = (state.brief || '').toLowerCase();
+    const OCCASIONS = {
+        birthday: '🎂 BIRTHDAY — cake, balloons, confetti, party vibes',
+        holi: '🌈 HOLI — colorful powder, joy, vibrant color explosions',
+        diwali: '🪔 DIWALI — diyas, sparklers, rangoli, golden lights',
+        christmas: '🎄 CHRISTMAS — snow, gifts, decorations, cozy vibes',
+        'new year': '🎆 NEW YEAR — fireworks, celebration, countdown',
+        valentine: '💕 VALENTINE — hearts, roses, romantic mood',
+        summer: '☀️ SUMMER — bright sunshine, outdoor, refreshing',
+        party: '🎉 PARTY — energetic, dance, lights, music',
+        eid: '🌙 EID — crescent moon, lanterns, celebration',
+        navratri: '🕺 NAVRATRI — garba, dandiya, vibrant colors',
+    };
+
+    let occasionHint = '';
+    for (const [key, desc] of Object.entries(OCCASIONS)) {
+        if (briefLower.includes(key)) {
+            occasionHint = `\n🎯 DETECTED OCCASION: ${desc}\n⚠️ THIS MUST BE THE VISUAL HERO. Brand/product integrates naturally into this celebration scene.\n`;
+            break;
+        }
+    }
+
+    const userPrompt = [
+        `CREATIVE BRIEF: ${state.brief}`,
+        occasionHint,
+        `FORMAT: ${formatIntel?.label || formatKey} (${formatIntel?.spec || state.aspectRatio || '1:1'})`,
+        `ASPECT RATIO: ${state.aspectRatio || '1:1'}`,
+        formatIntel ? `\nPLATFORM RULES for ${formatIntel.label.toUpperCase()}:\n${formatIntel.rules}` : '',
+        state.style ? `STYLE: ${state.style}` : '',
+        intel.designStyle ? `BRAND STYLE: ${intel.designStyle}` : '',
+        intel.colors?.length > 0 ? `BRAND COLORS: ${intel.colors.join(', ')}` : '',
+        `IMAGE MODEL: ${state.imageModel || 'gemini'} — optimize prompt accordingly`,
+        productContext,
+    ].filter(Boolean).join('\n');
+
+    const result = await callAgent(FAST_CREATIVE_DIRECTOR_PROMPT(brandContext), userPrompt, 0.6, 2048);
+    console.log(`⚡ Fast Creative Director done in ${Date.now() - startMs}ms`);
+
+    return {
+        ...state,
+        artDirection: {
+            mood: result.mood,
+            visualStyle: result.visualStyle,
+            suggestedHeadline: result.suggestedHeadline,
+        },
+        engineeredPrompt: {
+            primaryPrompt: result.primaryPrompt,
+            negativePrompt: result.negativePrompt,
+            engineeringNotes: result.engineeringNotes,
+        },
+        status: 'creative-direction',
     };
 }
 
@@ -546,7 +697,7 @@ export async function runCreativePipeline(params) {
 
     let state = {
         brandId,
-        brandContext, // Shared across all nodes — eliminates 4× redundant Brand+Product DB round-trips
+        brandContext,
         brief,
         format: format || 'instagram-post',
         aspectRatio: aspectRatio || '1:1',
@@ -559,24 +710,32 @@ export async function runCreativePipeline(params) {
     const productName = state.matchedProduct?.title || '';
     emit('brand-intel', productName ? `Matched product: ${productName}` : 'Brand context loaded', 'done', productName ? `Using "${productName}" as hero product` : '');
 
-    // Node 1: Art Director (Gemini Flash, ~10-15s)
-    emit('art-director', 'Art Director crafting creative vision...', 'working');
-    state = await artDirectorNode(state);
-    emit('art-director', `Creative direction: ${state.artDirection?.mood || 'defined'}`, 'done', state.artDirection?.visualStyle || '');
+    if (mode === 'fast') {
+        // ══════════════════════════════════════════════════════════════════
+        // FAST MODE: Single LLM call — Art Director + Prompt Engineer combined
+        // Saves ~10-15s by eliminating the second round-trip
+        // ══════════════════════════════════════════════════════════════════
+        emit('art-director', 'Creative Director crafting vision & prompt...', 'working');
+        state = await fastCreativeDirectorNode(state);
+        emit('art-director', `Direction: ${state.artDirection?.mood || 'defined'}`, 'done', state.artDirection?.visualStyle || '');
+        state.finalPrompt = state.engineeredPrompt?.primaryPrompt || brief;
+    } else {
+        // ══════════════════════════════════════════════════════════════════
+        // QUALITY MODE: Sequential agents for maximum quality
+        // ══════════════════════════════════════════════════════════════════
+        emit('art-director', 'Art Director crafting creative vision...', 'working');
+        state = await artDirectorNode(state);
+        emit('art-director', `Creative direction: ${state.artDirection?.mood || 'defined'}`, 'done', state.artDirection?.visualStyle || '');
 
-    // Node 2: Prompt Engineer (Gemini Flash, ~10-18s)
-    emit('prompt-engineer', 'Prompt Engineer optimizing for image model...', 'working');
-    state = await promptEngineerNode(state);
-    emit('prompt-engineer', 'Prompt optimized for maximum quality', 'done');
+        emit('prompt-engineer', 'Prompt Engineer optimizing for image model...', 'working');
+        state = await promptEngineerNode(state);
+        emit('prompt-engineer', 'Prompt optimized for maximum quality', 'done');
 
-    // Node 3: Style Critic (optional in fast mode)
-    if (mode === 'quality') {
         emit('style-critic', 'Style Critic reviewing brand alignment...', 'working');
         state = await styleCriticNode(state);
         emit('style-critic', 'Brand alignment verified', 'done');
-    } else {
-        // In fast mode, use the engineered prompt directly
-        state.finalPrompt = state.engineeredPrompt?.primaryPrompt || brief;
+
+        state.finalPrompt = state.styleCritique?.improvedPrompt || state.engineeredPrompt?.primaryPrompt || brief;
     }
 
     const totalMs = Date.now() - pipelineStart;

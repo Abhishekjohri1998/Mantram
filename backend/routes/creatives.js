@@ -366,38 +366,45 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
 
     console.log(`🎯 Image Model Router: ${selectedModel} → ${modelConfig.provider} (${modelConfig.name})`);
 
-    // Special handling for fal.ai (not yet in central router)
-    if (modelConfig.provider === 'fal') {
-        try {
-            return await falImageGenerate(promptText, modelConfig.endpoint, aspectRatio);
-        } catch (err) {
-            console.warn(`⚠️ fal.ai failed, attempting fallback to router:`, err.message);
-            // Fallback to router's default image generation (likely OpenAI/Gemini)
-            return await router.generateImage({ prompt: promptText, aspectRatio });
-        }
-    }
+    // ── HARD TIMEOUT: 120 seconds max for any image generation ──
+    const TIMEOUT_MS = 120_000;
+    const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Image generation timed out after 120 seconds. Please try again.')), TIMEOUT_MS)
+    );
 
-    // Route via central ModelRouter for Gemini/OpenAI with automatic fallbacks
-    try {
-        const result = await router.generateImage({
+    const generatePromise = (async () => {
+        // Special handling for fal.ai
+        if (modelConfig.provider === 'fal') {
+            return await falImageGenerate(promptText, modelConfig.endpoint, aspectRatio);
+        }
+
+        // Route via central ModelRouter — Gemini only, NO OpenAI fallback
+        return await router.generateImage({
             prompt: promptText,
             aspectRatio,
             model: modelConfig.modelId,
-            imageParts, // Passed through complex multimodal parts
-            size: imageSize // Standard parameter
+            imageParts,
+            size: imageSize
         }, { 
-            provider: modelConfig.provider // Preferred provider
+            provider: modelConfig.provider
         });
+    })();
 
-        return result;
+    try {
+        return await Promise.race([generatePromise, timeoutPromise]);
     } catch (error) {
-        // Specifically handle "Busy" errors for the frontend popup
-        if (error.name === 'AIProviderBusyError' || error.message?.includes('BUSY:') || error.message?.includes('high demand')) {
-            return { imageUrl: null, model: selectedModel, textResponse: '', warnings: [], modelBusy: true, busyModel: selectedModel };
-        }
+        console.error(`❌ Image generation failed (${selectedModel}):`, error.message);
         
-        // Re-throw other errors to be caught by the route handler
-        throw error;
+        // ALL failures return modelBusy — no silent fallbacks
+        return { 
+            imageUrl: null, 
+            model: selectedModel, 
+            textResponse: '', 
+            warnings: [], 
+            modelBusy: true, 
+            busyModel: selectedModel,
+            errorMessage: error.message,
+        };
     }
 }
 
@@ -996,6 +1003,7 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
                 };
 
                 // ── ANTI-HALLUCINATION: Auto-inject real product images as reference ──
+                // PERFORMANCE: All image fetches happen in PARALLEL
                 const mp = pipelineResult.matchedProduct;
                 const brandImgs = pipelineResult.brandIntel?.brandImages || [];
                 const matchedDnaImgs = pipelineResult.brandIntel?.matchedDnaImages || [];
@@ -1003,86 +1011,66 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
                 const isProductBrand = pipelineResult.brandIntel?.brandType === 'product';
                 let injectedProductImg = false;
 
-                // Step 1: Inject matched product images (direct or from brand DNA)
-                if (progressId) addStep(progressId, { agent: 'image-inject', message: 'Injecting product reference images...', status: 'working' });
-                if (mp?.images?.length > 0) {
-                    const imgSource = mp.usingDnaImages ? 'brand DNA' : 'product catalog';
-                    console.log(`📸 Anti-hallucination: injecting ${mp.images.length} ${imgSource} image(s) for "${mp.title}"`);
-                    for (const imgUrl of mp.images.slice(0, 2)) {
-                        try {
-                            const resolved = await resolveRefImage(imgUrl, mp.usingDnaImages ? 'brand-dna-product' : 'catalog-product');
-                            if (resolved) {
-                                imageParts.push({ inlineData: { mimeType: resolved.part.mimeType, data: resolved.part.data } });
-                                if (mp.usingDnaImages) {
-                                    referenceInstructions.push(`BRAND PRODUCT REFERENCE: This is a real brand image from ${brand.name}'s website showing their product "${mp.title}" or related products. Use this as visual reference for the product's appearance, style, and brand aesthetic. Feature this brand's real products.`);
-                                } else {
-                                    referenceInstructions.push(`REAL PRODUCT IMAGE: This is "${mp.title}" — the ACTUAL product being promoted. The generated image MUST feature this exact product. Do NOT invent or imagine a different product.`);
-                                }
-                                injectedProductImg = true;
-                            } else {
-                                console.warn(`⚠️ Product image could not be resolved (broken link?): ${imgUrl.substring(0, 100)}`);
-                            }
-                        } catch (e) { console.warn('⚠️ Failed to fetch product image:', e.message, imgUrl?.substring(0, 100)); }
+                if (progressId) addStep(progressId, { agent: 'image-inject', message: 'Loading product & brand images...', status: 'working' });
+
+                // ── PARALLEL IMAGE FETCH: Resolve all images at once ──
+                const imgFetchStart = Date.now();
+                const productImgUrls = (mp?.images || []).slice(0, 3);
+
+                // ── KEY FIX: Only inject images of the MATCHED product ──
+                // If the matched product is "Speaker Boom X" but brand DNA images show earbuds,
+                // injecting those earbuds images would cause the AI to generate earbuds instead of speaker.
+                // RULE: Only inject images that belong to the matched product itself.
+                
+                if (productImgUrls.length > 0) {
+                    // Matched product HAS images — fetch them in parallel
+                    const productFetches = productImgUrls.map(url => 
+                        resolveRefImage(url, mp?.usingDnaImages ? 'brand-dna-product' : 'catalog-product')
+                            .then(r => r ? { resolved: r, title: mp.title, isDna: mp?.usingDnaImages } : null)
+                            .catch(() => null)
+                    );
+
+                    const fetchTimeout = new Promise(resolve => setTimeout(() => resolve([]), 8000));
+                    const results = await Promise.race([
+                        Promise.allSettled(productFetches).then(r => r.map(x => x.status === 'fulfilled' ? x.value : null).filter(Boolean)),
+                        fetchTimeout,
+                    ]);
+
+                    console.log(`📸 Product image fetch: ${results.length}/${productFetches.length} resolved in ${Date.now() - imgFetchStart}ms`);
+
+                    for (const r of results) {
+                        imageParts.push({ inlineData: { mimeType: r.resolved.part.mimeType, data: r.resolved.part.data } });
+                        referenceInstructions.push(r.isDna
+                            ? `BRAND PRODUCT REFERENCE: Real brand image showing "${r.title}". Use as visual reference for this specific product.`
+                            : `REAL PRODUCT IMAGE: "${r.title}" — feature this EXACT product. Match its shape, color, and design precisely.`);
+                        injectedProductImg = true;
                     }
                 }
 
-                // Step 1b: If matched product images failed, try other product candidates
-                if (!injectedProductImg && isProductBrand && productCandidates.length > 0) {
-                    console.log(`📦 Matched product images failed or missing — trying ${productCandidates.length} other product candidates...`);
-                    // Shuffle candidates for variety
-                    const shuffled = [...productCandidates].sort(() => Math.random() - 0.5);
-                    for (const candidate of shuffled) {
-                        if (injectedProductImg) break;
-                        for (const imgUrl of (candidate.images || []).slice(0, 1)) {
-                            try {
-                                const resolved = await resolveRefImage(imgUrl, 'catalog-product');
-                                if (resolved) {
-                                    imageParts.push({ inlineData: { mimeType: resolved.part.mimeType, data: resolved.part.data } });
-                                    referenceInstructions.push(`REAL PRODUCT IMAGE: This is "${candidate.title}" — a REAL product from this brand's catalog. Feature this actual product in the image. Do NOT invent or imagine a different product.`);
-                                    injectedProductImg = true;
-                                    console.log(`✅ Fallback product image injected: "${candidate.title}"`);
-                                }
-                            } catch (e) { /* skip broken candidate */ }
+                // If matched product has NO images, do NOT inject random brand images
+                // Instead, add a STRONG text instruction to generate from description
+                if (!injectedProductImg && mp) {
+                    console.log(`⚠️ Matched product "${mp.title}" has no images — generating from text description only (no reference images to avoid mismatch)`);
+                    referenceInstructions.push(`⚠️ CRITICAL: No reference image is available for "${mp.title}". You MUST generate this product based ONLY on the text description in the prompt. Do NOT copy any other product's appearance. Create a ${mp.category || 'product'} that matches the name "${mp.title}".`);
+                }
+
+                // Only inject brand style images if no specific product was matched
+                // This prevents earbuds images from overriding a speaker prompt
+                if (!mp && brandImgs.length > 0) {
+                    const brandImgUrls = brandImgs.slice(0, 2);
+                    const brandFetches = brandImgUrls.map(url => 
+                        resolveRefImage(url, 'brand-dna').catch(() => null)
+                    );
+                    const brandResults = await Promise.allSettled(brandFetches);
+                    let brandCount = 0;
+                    for (const r of brandResults) {
+                        if (r.status === 'fulfilled' && r.value && brandCount < 2) {
+                            imageParts.push({ inlineData: { mimeType: r.value.part.mimeType, data: r.value.part.data } });
+                            referenceInstructions.push('BRAND STYLE REFERENCE: Match this brand\'s visual style and aesthetic.');
+                            brandCount++;
                         }
                     }
-                    if (!injectedProductImg) {
-                        console.warn('⚠️ All product candidate images failed to resolve — trying brand DNA images...');
-                    }
-                }
-
-                // Step 1c: If still no product images, use matchedDnaImages from brand intel
-                // Works for both product and service brands — these are real brand visuals
-                if (!injectedProductImg && matchedDnaImgs.length > 0) {
-                    console.log(`🔍 Using ${matchedDnaImgs.length} product-relevant brand DNA images as visual reference...`);
-                    for (const imgUrl of matchedDnaImgs.slice(0, 2)) {
-                        try {
-                            const resolved = await resolveRefImage(imgUrl, 'brand-dna-product');
-                            if (resolved) {
-                                imageParts.push({ inlineData: { mimeType: resolved.part.mimeType, data: resolved.part.data } });
-                                referenceInstructions.push(`BRAND PRODUCT REFERENCE: This image is from ${brand.name}'s real website and shows their products. Use this as visual reference for the brand's product style and aesthetic. Feature products that look like this.`);
-                                injectedProductImg = true;
-                                console.log(`✅ Brand DNA product image injected: ${imgUrl.substring(imgUrl.lastIndexOf('/') + 1)}`);
-                            }
-                        } catch (e) { /* skip broken image */ }
-                    }
-                }
-
-                // Step 2: ALWAYS inject brand DNA images for visual style grounding
-                // These help the AI understand the brand's visual aesthetic
-                if (brandImgs.length > 0) {
-                    const maxBrandImgs = injectedProductImg ? 1 : 3; // more if no product images injected
-                    console.log(`🎨 Brand DNA: injecting ${Math.min(brandImgs.length, maxBrandImgs)} brand image(s) for style reference`);
-                    for (const imgUrl of brandImgs.slice(0, maxBrandImgs)) {
-                        try {
-                            const resolved = await resolveRefImage(imgUrl, 'brand-dna');
-                            if (resolved) {
-                                imageParts.push({ inlineData: { mimeType: resolved.part.mimeType, data: resolved.part.data } });
-                                referenceInstructions.push('BRAND STYLE REFERENCE: Match the visual style, quality, color palette, and aesthetic of this real brand image. Use it for style guidance.');
-                            } else {
-                                console.warn(`⚠️ Brand DNA image could not be resolved: ${imgUrl.substring(0, 100)}`);
-                            }
-                        } catch (e) { console.warn('⚠️ Failed to fetch brand DNA image:', e.message); }
-                    }
+                    if (brandCount > 0) console.log(`🎨 Brand style images injected: ${brandCount}`);
                 }
 
                 // ── WARN-1 FIX: Re-build fullPrompt with updated referenceInstructions ──
@@ -1318,6 +1306,17 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
         if (req.creditsDeducted > 0) {
             await refundCredits(req.user._id, req.creditsDeducted, 'creativeGenerate', `Refund: Image Generation Sync Failure (${safeErrorMessage(error)})`, 'creative');
         }
+        
+        // Detect model busy / high demand errors and send clear message to frontend
+        const errMsg = (error.message || '').toLowerCase();
+        if (errMsg.includes('busy') || errMsg.includes('high demand') || errMsg.includes('overloaded') || errMsg.includes('503') || errMsg.includes('429')) {
+            return res.status(503).json({ 
+                success: false, 
+                error: 'AI model servers are currently busy. Please try again in a few seconds or switch to a different image model.',
+                modelBusy: true,
+            });
+        }
+        
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });

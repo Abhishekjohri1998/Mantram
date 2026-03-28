@@ -334,7 +334,8 @@ export default function CreativeStudio() {
     const [autoGenerate, setAutoGenerate] = useState(false)
     const [enhancing, setEnhancing] = useState(false)
     const [result, setResult] = useState(null)
-    const [generationHistory, setGenerationHistory] = useState([]) // In-session gallery for AI Create
+    const [generationHistory, setGenerationHistory] = useState([]) // Persistent gallery for AI Create
+    const [historyLoaded, setHistoryLoaded] = useState(false)
     const [error, setError] = useState(null)
     const [feedbackState, setFeedbackState] = useState(null)  // 'liked' | 'disliked' | 'accepted'
     const [feedbackToast, setFeedbackToast] = useState('')
@@ -837,8 +838,24 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     useEffect(() => {
         if (activeBrand?._id) {
             loadImageBank()
+            // Load previous generation history from server (persists across refresh)
+            if (!historyLoaded) {
+                creativesAPI.list({ brandId: activeBrand._id, limit: 30, sort: '-createdAt' })
+                    .then(data => {
+                        const creatives = (data.creatives || []).filter(c => c.imageUrl)
+                        if (creatives.length > 0 && generationHistory.length === 0) {
+                            setGenerationHistory(creatives.map(c => ({
+                                ...c,
+                                _prompt: c.prompt || c.title || '',
+                                _timestamp: new Date(c.createdAt).getTime(),
+                            })))
+                        }
+                        setHistoryLoaded(true)
+                    })
+                    .catch(() => setHistoryLoaded(true))
+            }
         }
-    }, [activeBrand?._id])
+    }, [activeBrand?._id]) // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (studioMode === 'templates' && activeBrand?._id) loadCustomTemplates()
@@ -1139,15 +1156,22 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                         setPipelineSteps(progress.steps)
                     }
                 } catch { /* ignore polling errors */ }
-            }, 1500)
+            }, 3000)
 
-            const signal = getSignal(aiCreateAbortRef)
+            // Create abort controller with 2-minute timeout
+            const controller = new AbortController()
+            const signal = controller.signal
+            const timeoutId = setTimeout(() => {
+                controller.abort()
+            }, 120_000) // 2 minute hard timeout
+
             const data = await creativesAPI.generate({
                 brandId: activeBrand._id,
                 type: selectedType,
                 prompt: fullPrompt,
                 options,
             }, { signal })
+            clearTimeout(timeoutId)
 
             // Stop polling
             if (progressInterval) clearInterval(progressInterval)
@@ -1171,13 +1195,50 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 setGenerationHistory(prev => [{ ...creative, _prompt: prompt, _timestamp: Date.now() }, ...prev])
             }
         } catch (e) {
-            if (e.name === 'AbortError') return
+            if (e.name === 'AbortError') {
+                // Check if it was our timeout abort (not user cancel)
+                setError({
+                    message: '⏱️ Image generation timed out. The AI model server may be overloaded. Please try again or switch to a different image model.',
+                    isProviderError: true,
+                    provider: 'Timeout',
+                    isRetryable: true,
+                })
+                return
+            }
             console.error('❌ Generation error:', e)
-            setError({
-                message: e.message,
-                isProviderError: e.isProviderError,
-                provider: e.provider
-            })
+            
+            const errMsg = (e.message || '').toLowerCase()
+            
+            // Detect model busy / server overloaded
+            if (errMsg.includes('busy') || errMsg.includes('high demand') || errMsg.includes('overloaded') || errMsg.includes('503') || errMsg.includes('429') || errMsg.includes('rate limit')) {
+                setError({
+                    message: '🔄 AI model servers are currently experiencing high demand. Please try again in a few seconds, or switch to a different image model.',
+                    isProviderError: true,
+                    provider: 'AI Server',
+                    isRetryable: true,
+                })
+            } else if (errMsg.includes('timeout') || errMsg.includes('timed out') || errMsg.includes('network') || errMsg.includes('fetch failed') || errMsg.includes('econnreset')) {
+                setError({
+                    message: '⏱️ Request timed out. The server might be under heavy load. Please try again.',
+                    isProviderError: true,
+                    provider: 'Network',
+                    isRetryable: true,
+                })
+            } else if (errMsg.includes('no image') || errMsg.includes('produced no image')) {
+                setError({
+                    message: '🎨 AI couldn\'t generate an image for this prompt. Try rephrasing your brief or using a different style.',
+                    isProviderError: true,
+                    provider: 'Image Model',
+                    isRetryable: true,
+                })
+            } else {
+                setError({
+                    message: e.message || 'Something went wrong. Please try again.',
+                    isProviderError: e.isProviderError,
+                    provider: e.provider,
+                    isRetryable: true,
+                })
+            }
         } finally {
             if (progressInterval) clearInterval(progressInterval)
             setGenerating(false)
@@ -2417,12 +2478,26 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                         {/* ── Error ── */}
                         {error && (
-                            <div className={`mb-4 p-3 rounded-xl border flex items-center gap-2 ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
-                                <span className="material-symbols-outlined text-sm">{error.isProviderError ? 'warning' : 'error'}</span>
-                                <div className="flex-1">
-                                    <span className="font-bold mr-1">{error.isProviderError ? `${error.provider || 'AI Provider'} Notice:` : 'Error:'}</span>
-                                    {error.message}
+                            <div className={`mb-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
+                                <div className="flex items-start gap-2">
+                                    <span className="material-symbols-outlined text-lg mt-0.5">{error.isProviderError ? 'warning' : 'error'}</span>
+                                    <div className="flex-1">
+                                        <span className="font-bold mr-1">{error.isProviderError ? `${error.provider || 'AI Provider'} Notice:` : 'Error:'}</span>
+                                        {error.message}
+                                    </div>
                                 </div>
+                                {error.isRetryable && (
+                                    <div className="flex gap-2 mt-3 ml-7">
+                                        <button onClick={() => { setError(null); handleGenerate() }}
+                                            className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-white/10 hover:bg-white/20 transition text-white border border-white/10">
+                                            🔄 Try Again
+                                        </button>
+                                        <button onClick={() => setError(null)}
+                                            className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-white/5 hover:bg-white/10 transition text-white/60 border border-white/5">
+                                            Dismiss
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -2440,10 +2515,18 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     onClick={() => result.imageUrl && setZoomImage(result.imageUrl)}>
                                     {result.imageUrl ? (
                                         <>
-                                            <img src={result.imageUrl} alt={result.title || 'Generated creative'} loading="lazy" decoding="async"
+                                            <img src={result.imageUrl} alt={result.title || 'Generated creative'} loading="eager" decoding="async"
                                                 className="w-full h-auto object-contain"
                                                 style={{ maxHeight: '500px' }}
-                                                onError={(e) => { e.target.style.display = 'none'; }} />
+                                                onError={(e) => {
+                                                    // Retry once after a short delay (base64 images can be slow to decode)
+                                                    if (!e.target.dataset.retried) {
+                                                        e.target.dataset.retried = 'true'
+                                                        setTimeout(() => { e.target.src = result.imageUrl }, 1500)
+                                                    } else {
+                                                        e.target.style.display = 'none'
+                                                    }
+                                                }} />
                                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
                                                 <span className="material-symbols-outlined text-3xl text-white bg-black/50 rounded-full p-2">zoom_in</span>
                                             </div>
@@ -2544,46 +2627,161 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             estimatedDuration={60}
                         />
 
-                        {/* ── In-Session Generation Gallery (scrollable grid) ── */}
-                        {generationHistory.length > 1 && (
+                        {/* ── Session Generation Gallery (persistent + viewMode-aware) ── */}
+                        {generationHistory.length > 0 && (
                             <div className="mb-5">
                                 <div className="flex items-center justify-between mb-3">
                                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                                         <span className="material-symbols-outlined text-sm text-violet-400">history</span>
-                                        Session Gallery ({generationHistory.length})
+                                        Generations ({generationHistory.length})
                                     </h4>
                                     <button onClick={() => setGenerationHistory([])} className="text-[10px] text-slate-600 hover:text-slate-400 cursor-pointer transition-all">Clear</button>
                                 </div>
-                                <div className="grid grid-cols-2 gap-2.5 max-h-[600px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
-                                    {generationHistory.map((item, idx) => (
-                                        <div key={item._id || idx} className={`group relative rounded-xl overflow-hidden border ${idx === 0 ? 'border-violet-500/30 ring-1 ring-violet-500/20' : 'border-white/[0.06]'} bg-black/20 cursor-pointer transition-all hover:border-white/[0.12]`}
-                                            onClick={() => setZoomImage(item.imageUrl)}>
-                                            <img src={item.imageUrl} alt={item._prompt || 'Creative'} loading="lazy" decoding="async" className="w-full aspect-square object-cover" />
-                                            {idx === 0 && <span className="absolute top-1.5 left-1.5 text-[8px] font-bold text-violet-300 bg-violet-500/30 px-1.5 py-0.5 rounded-md">Latest</span>}
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
-                                                <p className="text-[9px] text-white/80 line-clamp-2 mb-1.5 leading-tight">{item._prompt || 'AI Generated'}</p>
-                                                <div className="flex gap-1">
-                                                    <button onClick={(e) => { e.stopPropagation(); handleDownloadImage(item.imageUrl, `creative-${idx}.png`) }}
-                                                        className="p-1 rounded-md bg-white/10 text-white hover:bg-white/20 transition-all" title="Download">
-                                                        <span className="material-symbols-outlined text-xs">download</span>
-                                                    </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); setDesignBaseImage(item.imageUrl); setPrompt(item._prompt || ''); }}
-                                                        className="p-1 rounded-md bg-white/10 text-white hover:bg-primary/40 transition-all" title="Edit">
-                                                        <span className="material-symbols-outlined text-xs">edit</span>
-                                                    </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); setPublishData({ image: item.imageUrl, text: item._prompt || '' }) }}
-                                                        className="p-1 rounded-md bg-white/10 text-white hover:bg-[#1877F2]/40 transition-all" title="Publish">
-                                                        <span className="material-symbols-outlined text-xs">share</span>
-                                                    </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); setResult(item); }}
-                                                        className="p-1 rounded-md bg-white/10 text-white hover:bg-emerald-500/40 transition-all" title="View full">
-                                                        <span className="material-symbols-outlined text-xs">open_in_full</span>
-                                                    </button>
+
+                                {viewMode === 'grid' ? (
+                                    /* ── Grid / Tiled View ── */
+                                    <div className="grid grid-cols-3 gap-2 max-h-[700px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+                                        {generationHistory.map((item, idx) => (
+                                            <div key={item._id || idx} className={`group relative rounded-xl overflow-hidden border ${idx === 0 ? 'border-violet-500/30 ring-1 ring-violet-500/20' : 'border-white/[0.06]'} bg-black/20 cursor-pointer transition-all hover:border-white/[0.12] hover:scale-[1.02]`}
+                                                onClick={() => setZoomImage(item.imageUrl)}>
+                                                <img src={item.imageUrl} alt={item._prompt || 'Creative'} loading="lazy" decoding="async" className="w-full aspect-square object-cover" />
+                                                {idx === 0 && <span className="absolute top-1.5 left-1.5 text-[8px] font-bold text-violet-300 bg-violet-500/30 px-1.5 py-0.5 rounded-md backdrop-blur-sm">Latest</span>}
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
+                                                    <p className="text-[9px] text-white/80 line-clamp-2 mb-1.5 leading-tight">{item._prompt || 'AI Generated'}</p>
+                                                    <div className="flex gap-1">
+                                                        <button onClick={(e) => { e.stopPropagation(); handleDownloadImage(item.imageUrl, `creative-${idx}.png`) }}
+                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-white/20 transition-all" title="Download">
+                                                            <span className="material-symbols-outlined text-xs">download</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setDesignBaseImage(item.imageUrl); setPrompt(item._prompt || ''); }}
+                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-primary/40 transition-all" title="Edit">
+                                                            <span className="material-symbols-outlined text-xs">edit</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setResult(item); setAnimateModalOpen(false); setTimeout(() => handleAnimateClick(), 100); }}
+                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-pink-500/40 transition-all" title="Animate">
+                                                            <span className="material-symbols-outlined text-xs">movie</span>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setResult(item); }}
+                                                            className="p-1 rounded-md bg-white/10 text-white hover:bg-emerald-500/40 transition-all" title="View full">
+                                                            <span className="material-symbols-outlined text-xs">open_in_full</span>
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    /* ── List View — grouped by prompt, full image on left ── */
+                                    <div className="space-y-4 max-h-[700px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+                                        {(() => {
+                                            // Group items by prompt (normalized) so regenerations appear side by side
+                                            const groups = [];
+                                            const promptMap = new Map();
+                                            generationHistory.forEach((item, idx) => {
+                                                const key = (item._prompt || '').trim().toLowerCase().slice(0, 80);
+                                                if (promptMap.has(key)) {
+                                                    promptMap.get(key).items.push({ ...item, _idx: idx });
+                                                } else {
+                                                    const group = { prompt: item._prompt || 'AI Generated', items: [{ ...item, _idx: idx }] };
+                                                    promptMap.set(key, group);
+                                                    groups.push(group);
+                                                }
+                                            });
+
+                                            return groups.map((group, gIdx) => (
+                                                <div key={gIdx} className={`rounded-xl border ${gIdx === 0 ? 'border-violet-500/20 bg-violet-500/[0.03]' : 'border-white/[0.06] bg-white/[0.02]'} overflow-hidden transition-all hover:border-white/[0.12]`}>
+                                                    <div className="flex flex-col md:flex-row">
+                                                        {/* Left: Image(s) — full size, no crop */}
+                                                        <div className="flex-shrink-0 overflow-hidden" style={{ width: '45%', maxWidth: '45%' }}>
+                                                            {group.items.length === 1 ? (
+                                                                <div className="relative cursor-pointer group/img" onClick={() => setZoomImage(group.items[0].imageUrl)}>
+                                                                    <img src={group.items[0].imageUrl} alt={group.prompt} loading="lazy" decoding="async"
+                                                                        className="w-full h-auto object-contain" />
+                                                                    {group.items[0]._idx === 0 && <span className="absolute top-2 left-2 text-[9px] font-bold text-violet-300 bg-violet-500/30 px-2 py-0.5 rounded-md backdrop-blur-sm">Latest</span>}
+                                                                    <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover/img:opacity-100">
+                                                                        <span className="material-symbols-outlined text-xl text-white bg-black/50 rounded-full p-1.5">zoom_in</span>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="grid gap-1 p-1" style={{ gridTemplateColumns: `repeat(${Math.min(group.items.length, 2)}, 1fr)` }}>
+                                                                    {group.items.map((item, iIdx) => (
+                                                                        <div key={item._id || iIdx} className="relative cursor-pointer group/img rounded-lg overflow-hidden"
+                                                                            onClick={() => setZoomImage(item.imageUrl)}>
+                                                                            <img src={item.imageUrl} alt={group.prompt} loading="lazy" decoding="async"
+                                                                                className="w-full h-auto object-contain" />
+                                                                            {item._idx === 0 && <span className="absolute top-1.5 left-1.5 text-[8px] font-bold text-violet-300 bg-violet-500/30 px-1.5 py-0.5 rounded-md backdrop-blur-sm">Latest</span>}
+                                                                            <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover/img:opacity-100">
+                                                                                <span className="material-symbols-outlined text-lg text-white bg-black/50 rounded-full p-1">zoom_in</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Right: Prompt + metadata + actions */}
+                                                        <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
+                                                            <div>
+                                                                <p className="text-xs text-slate-300 mb-2 leading-relaxed">{group.prompt}</p>
+
+                                                                {/* Metadata badges */}
+                                                                <div className="flex items-center gap-1.5 mb-2.5 flex-wrap">
+                                                                    {group.items.length > 1 && (
+                                                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-violet-500/15 text-violet-400">{group.items.length} variations</span>
+                                                                    )}
+                                                                    {group.items[0].aspectRatio && (
+                                                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-white/[0.06] text-slate-400">{group.items[0].aspectRatio}</span>
+                                                                    )}
+                                                                    {group.items[0].model && (
+                                                                        <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-md bg-white/[0.04] text-slate-500">{group.items[0].model}</span>
+                                                                    )}
+                                                                    {group.items[0].createdAt && (
+                                                                        <span className="text-[9px] text-slate-600">{getTimeAgo(group.items[0].createdAt)}</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Actions row */}
+                                                            <div className="flex items-center gap-1 flex-wrap">
+                                                                <button onClick={() => { setPrompt(group.prompt); }}
+                                                                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 cursor-pointer transition-all" title="Reuse this prompt">
+                                                                    <span className="material-symbols-outlined text-xs">replay</span>
+                                                                    Reuse
+                                                                </button>
+                                                                <button onClick={() => { navigator.clipboard.writeText(group.prompt); setFeedbackToast('Prompt copied!'); setTimeout(() => setFeedbackToast(''), 2000); }}
+                                                                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-slate-400 bg-white/[0.04] hover:bg-white/[0.08] cursor-pointer transition-all" title="Copy prompt">
+                                                                    <span className="material-symbols-outlined text-xs">content_copy</span>
+                                                                    Copy
+                                                                </button>
+                                                                <button onClick={() => { setResult(group.items[0]); setTimeout(() => handleAnimateClick(), 100); }}
+                                                                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-pink-400 bg-pink-500/10 hover:bg-pink-500/20 cursor-pointer transition-all" title="Animate this image">
+                                                                    <span className="material-symbols-outlined text-xs">movie</span>
+                                                                    Animate
+                                                                </button>
+                                                                <button onClick={() => handleDownloadImage(group.items[0].imageUrl, `creative-${gIdx}.png`)}
+                                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] cursor-pointer transition-all" title="Download">
+                                                                    <span className="material-symbols-outlined text-sm">download</span>
+                                                                </button>
+                                                                <button onClick={() => { setDesignBaseImage(group.items[0].imageUrl); setPrompt(group.prompt); }}
+                                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-primary hover:bg-primary/10 cursor-pointer transition-all" title="Edit / Remix">
+                                                                    <span className="material-symbols-outlined text-sm">edit</span>
+                                                                </button>
+                                                                <button onClick={() => setPublishData({ image: group.items[0].imageUrl, text: group.prompt })}
+                                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-[#1877F2] hover:bg-[#1877F2]/10 cursor-pointer transition-all" title="Publish">
+                                                                    <span className="material-symbols-outlined text-sm">share</span>
+                                                                </button>
+                                                                <button onClick={() => { setResult(group.items[0]); }}
+                                                                    className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer transition-all" title="View full">
+                                                                    <span className="material-symbols-outlined text-sm">open_in_full</span>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ));
+                                        })()}
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -2611,7 +2809,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             {/* ── Grid View ── */}
                             if (viewMode === 'grid') {
                                 return (
-                                    <div className="grid grid-cols-2 gap-2.5">
+                                    <div className="grid grid-cols-3 gap-2">
                                         {filtered.map(img => (
                                             <div key={img._id} className="group relative rounded-xl overflow-hidden border border-white/[0.06] bg-black/20 cursor-pointer transition-all hover:border-white/[0.12]"
                                                 onClick={() => setZoomImage(img.imageUrl || img.thumbnailUrl)}>
@@ -2682,7 +2880,22 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         </div>
 
                                         {/* Actions */}
-                                        <div className="flex gap-1.5">
+                                        <div className="flex items-center gap-1">
+                                            <button onClick={() => { setPrompt(img.prompt || ''); }}
+                                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 cursor-pointer transition-all" title="Reuse this prompt">
+                                                <span className="material-symbols-outlined text-xs">replay</span>
+                                                Reuse
+                                            </button>
+                                            <button onClick={() => { navigator.clipboard.writeText(img.prompt || img.title || ''); setFeedbackToast('Prompt copied!'); setTimeout(() => setFeedbackToast(''), 2000); }}
+                                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-slate-400 bg-white/[0.04] hover:bg-white/[0.08] cursor-pointer transition-all" title="Copy prompt">
+                                                <span className="material-symbols-outlined text-xs">content_copy</span>
+                                                Copy
+                                            </button>
+                                            <button onClick={() => { setResult(img); setTimeout(() => handleAnimateClick(), 100); }}
+                                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-pink-400 bg-pink-500/10 hover:bg-pink-500/20 cursor-pointer transition-all" title="Animate this image">
+                                                <span className="material-symbols-outlined text-xs">movie</span>
+                                                Animate
+                                            </button>
                                             <button onClick={() => handleDownloadImage(img.imageUrl || img.thumbnailUrl, `${img.title || 'creative'}.png`)}
                                                 className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] cursor-pointer transition-all" title="Download">
                                                 <span className="material-symbols-outlined text-sm">download</span>
@@ -2694,6 +2907,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             <button onClick={() => setPublishData({ image: img.imageUrl || img.thumbnailUrl, text: img.title || '' })}
                                                 className="p-1.5 rounded-lg text-slate-500 hover:text-[#1877F2] hover:bg-[#1877F2]/10 cursor-pointer transition-all" title="Publish">
                                                 <span className="material-symbols-outlined text-sm">share</span>
+                                            </button>
+                                            <button onClick={() => { setResult(img); }}
+                                                className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer transition-all" title="View full">
+                                                <span className="material-symbols-outlined text-sm">open_in_full</span>
                                             </button>
                                         </div>
                                     </div>
