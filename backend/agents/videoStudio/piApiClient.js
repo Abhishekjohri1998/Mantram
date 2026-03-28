@@ -30,6 +30,7 @@
 
 import config from '../../config/env.js';
 import sharp from 'sharp';
+import { uploadToS3, ensureS3Url } from '../../utils/s3.js';
 
 const PIAPI_BASE_URL = 'https://api.piapi.ai';
 const PIAPI_MAX_PROMPT_LENGTH = 1950; // PiAPI enforces 2000 char limit; leave buffer
@@ -131,114 +132,10 @@ async function verifyHostedUrl(url) {
  * Returns hosted URL or null.
  */
 export async function uploadImageToHostedUrl(base64DataUri) {
-    const match = base64DataUri.match(/^data:([\w/+]+);base64,(.+)$/);
-    if (!match) {
-        console.warn('⚠️ Invalid base64 data URI');
-        return null;
-    }
-
-    const mimeType = match[1];
-    const base64Data = match[2];
-    const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg';
-    const fileName = `ref-${Date.now()}.${ext}`;
-    const buffer = Buffer.from(base64Data, 'base64');
-
-    console.log(`📤 Uploading ref image (${fileName}, ${Math.round(buffer.length / 1024)}KB)...`);
-
-    // Method 1: catbox.moe — PRIMARY
-    for (let attempt = 1; attempt <= 2; attempt++) {
-        try {
-            const { Blob } = await import('buffer');
-            const formData = new FormData();
-            formData.append('reqtype', 'fileupload');
-            const blob = new Blob([buffer], { type: mimeType });
-            formData.append('fileToUpload', blob, fileName);
-
-            const resp = await fetch('https://catbox.moe/user/api.php', {
-                method: 'POST',
-                body: formData,
-                signal: AbortSignal.timeout(15000),
-            });
-            const text = await resp.text();
-            console.log(`📥 catbox response attempt ${attempt} (${resp.status}): ${text.trim().substring(0, 200)}`);
-            if (resp.ok && text.trim().startsWith('http')) {
-                const url = text.trim();
-                const ok = await verifyHostedUrl(url);
-                if (ok) {
-                    console.log(`✅ Image hosted at: ${url} (verified)`);
-                    return url;
-                }
-                console.warn(`⚠️ catbox URL not fetchable, trying next method`);
-                break;
-            }
-            console.warn(`⚠️ catbox upload failed attempt ${attempt} (${resp.status}): ${text.trim().substring(0, 200)}`);
-        } catch (e) {
-            console.warn(`⚠️ catbox upload error attempt ${attempt}: ${e.message}`);
-        }
-        if (attempt < 2) {
-            console.log(`🔄 Retrying catbox in 1s...`);
-            await new Promise(r => setTimeout(r, 1000));
-        }
-    }
-
-    // Method 2: tmpfiles.org — fallback
-    try {
-        const { Blob } = await import('buffer');
-        const formData = new FormData();
-        const blob = new Blob([buffer], { type: mimeType });
-        formData.append('file', blob, fileName);
-
-        const resp = await fetch('https://tmpfiles.org/api/v1/upload', {
-            method: 'POST',
-            body: formData,
-            signal: AbortSignal.timeout(15000),
-        });
-        const json = await resp.json();
-        console.log(`📥 tmpfiles.org response (${resp.status}):`, JSON.stringify(json).substring(0, 200));
-        if (json.status === 'success' && json.data?.url) {
-            const directUrl = json.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/').replace('http://', 'https://');
-            const ok = await verifyHostedUrl(directUrl);
-            if (ok) {
-                console.log(`✅ Image hosted at: ${directUrl} (verified)`);
-                return directUrl;
-            }
-            console.warn(`⚠️ tmpfiles.org URL not fetchable: ${directUrl}`);
-        }
-        console.warn(`⚠️ tmpfiles.org upload failed:`, JSON.stringify(json).substring(0, 200));
-    } catch (e) {
-        console.warn(`⚠️ tmpfiles.org upload error: ${e.message}`);
-    }
-
-    // Method 3: 0x0.st — last resort
-    try {
-        const { Blob } = await import('buffer');
-        const formData = new FormData();
-        const blob = new Blob([buffer], { type: mimeType });
-        formData.append('file', blob, fileName);
-
-        const resp = await fetch('https://0x0.st', {
-            method: 'POST',
-            body: formData,
-            signal: AbortSignal.timeout(15000),
-        });
-        const text = await resp.text();
-        console.log(`📥 0x0.st response (${resp.status}): ${text.trim().substring(0, 200)}`);
-        if (resp.ok && text.trim().startsWith('http')) {
-            const url = text.trim();
-            const ok = await verifyHostedUrl(url);
-            if (ok) {
-                console.log(`✅ Image hosted at: ${url} (verified)`);
-                return url;
-            }
-        }
-        console.warn(`⚠️ 0x0.st upload failed (${resp.status})`);
-    } catch (e) {
-        console.warn(`⚠️ 0x0.st upload error: ${e.message}`);
-    }
-
-    console.warn('❌ All image upload services failed');
-    return null;
+    // This helper now uses the central ensureS3Url utility
+    return await ensureS3Url(base64DataUri, 'video-studio/piapi');
 }
+
 
 /**
  * Submit a raw PiAPI payload and return the taskId.

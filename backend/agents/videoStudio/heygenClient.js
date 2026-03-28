@@ -12,6 +12,7 @@
  */
 
 import config from '../../config/env.js';
+import { ensureS3Url } from '../../utils/s3.js';
 
 const HEYGEN_BASE_URL = 'https://api.heygen.com';
 
@@ -145,9 +146,10 @@ export async function generateUGCVideo({
         payload.motion_prompt = motionPrompt.trim();
     }
 
-    // Background config
+    // Background config (Standardize to S3)
     if (backgroundUrl) {
-        payload.background = { type: 'image', url: backgroundUrl };
+        const s3BackgroundUrl = await ensureS3Url(backgroundUrl, 'video-studio/heygen');
+        payload.background = { type: 'image', url: s3BackgroundUrl };
     } else if (backgroundColor) {
         payload.background = { type: 'color', value: backgroundColor };
     }
@@ -355,8 +357,11 @@ export async function generatePhotoAvatarVideo({
     if (!voiceId && !audioUrl) throw new Error('Voice ID or audio URL is required');
 
     // Build payload using the new flat /v2/videos format
+    // Standardize photoUrl to S3
+    const s3PhotoUrl = await ensureS3Url(photoUrl, 'video-studio/heygen-avatars');
+    
     const payload = {
-        image_url: photoUrl,
+        image_url: s3PhotoUrl,
         title: title || 'Mantram AI Photo Avatar Video',
         aspect_ratio: aspectRatio,
     };
@@ -410,7 +415,10 @@ export async function generateVideoWithAudio({
     if (!audioUrl) throw new Error('Audio URL is required');
 
     let background = { type: 'color', value: backgroundColor || '#f0f0f0' };
-    if (backgroundUrl) background = { type: 'image', url: backgroundUrl };
+    if (backgroundUrl) {
+        const s3BackgroundUrl = await ensureS3Url(backgroundUrl, 'video-studio/heygen');
+        background = { type: 'image', url: s3BackgroundUrl };
+    }
 
     const dimension = aspectRatio === '9:16'
         ? { width: 1080, height: 1920 }

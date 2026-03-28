@@ -18,6 +18,7 @@
  */
 
 import config from '../../config/env.js';
+import { ensureS3Url } from '../../utils/s3.js';
 
 const KIE_BASE_URL = 'https://api.kie.ai';
 
@@ -69,9 +70,9 @@ export async function submitKieVideoGeneration({ model, prompt, imageUrl, durati
         payload.generate_audio = true;
     }
 
-    // Add image for image-to-video
+    // Add image for image-to-video (standardize to S3)
     if (imageUrl) {
-        payload.image_url = imageUrl;
+        payload.image_url = await ensureS3Url(imageUrl, 'video-studio/kie');
     }
 
     console.log(`🎬 Submitting to kie.ai: ${model} → ${modelConfig.generateUrl}`);

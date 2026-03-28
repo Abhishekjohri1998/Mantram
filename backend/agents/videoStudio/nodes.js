@@ -286,9 +286,10 @@ export async function videoGeneratorNode(state) {
     ].filter(Boolean);
 
     // Helper: check if a URL is accessible by external APIs
+    // Note: base64 is now allowed here because clients use ensureS3Url to upload to S3 before submission
     const isExternallyAccessible = (url) => {
         if (!url) return false;
-        if (url.startsWith('data:')) return false;
+        if (url.startsWith('data:')) return true; // Allowed (will be S3-hosted by client)
         if (url.includes('localhost') || url.includes('127.0.0.1') || url.includes('0.0.0.0')) return false;
         return url.startsWith('http');
     };
@@ -595,11 +596,11 @@ export async function advancedGenerateNode(state) {
 
     console.log(`🎬 Advanced Generate: ${model}, ${duration}s, refImages: ${(state.referenceImages || []).length}, prompt: ${prompt.substring(0, 100)}...`);
 
-    // For PiAPI (seedance), base64 is supported in image_urls — only skip for fal/other providers
+    // For PiAPI (seedance), base64 is supported in image_urls — other providers use ensureS3Url
     let imageUrl = state.firstImageUrl || undefined;
     if (imageUrl && model !== 'seedance-2.0') {
-        if (imageUrl.startsWith('data:') || imageUrl.includes('localhost') || imageUrl.includes('127.0.0.1')) {
-            console.warn('⚠️ firstImageUrl is base64/localhost — external video APIs can\'t access it. Skipping.');
+        if (imageUrl.includes('localhost') || imageUrl.includes('127.0.0.1')) {
+            console.warn('⚠️ firstImageUrl is localhost — external video APIs can\'t access it. Skipping.');
             imageUrl = undefined;
         }
     }

@@ -18,6 +18,7 @@
 import config from '../../config/env.js';
 import { submitKieVideoGeneration } from './kieClient.js';
 import { submitPiApiVideoGeneration } from './piApiClient.js';
+import { ensureS3Url } from '../../utils/s3.js';
 
 
 const FAL_BASE_URL = 'https://queue.fal.run';
@@ -417,9 +418,21 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         throw new Error(`Model '${model}' is not available. Use kling-3.0, veo-3.1, veo-3.1-fast, seedance-1.0, seedance-2.0, or grok-imagine.`);
     }
 
+    // Standardize storage: Upload to S3 if base64
+    const s3ImageUrl = await ensureS3Url(imageUrl, 'video-studio/generations');
+    const s3ReferenceImages = referenceImages?.length > 0 
+        ? await Promise.all(referenceImages.map(img => ensureS3Url(img, 'video-studio/references')))
+        : [];
+
     // ── Grok Imagine: use native xAI API instead of fal.ai ──
     if (model === 'grok-imagine') {
-        const result = await submitGrokVideoGeneration({ prompt, imageUrl, duration, resolution, aspectRatio });
+        const result = await submitGrokVideoGeneration({ 
+            prompt, 
+            imageUrl: s3ImageUrl, 
+            duration, 
+            resolution, 
+            aspectRatio 
+        });
         return {
             requestId: result.requestId,
             endpoint: 'grok-imagine-video',
@@ -432,7 +445,13 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     // ── Veo 3.1 Fast: kie.ai ──
     if (model === 'veo-3.1-fast') {
         console.log(`🎬 [Veo 3.1 Fast] Using kie.ai...`);
-        const result = await submitKieVideoGeneration({ model, prompt, imageUrl, duration, aspectRatio: aspectRatio || '16:9' });
+        const result = await submitKieVideoGeneration({ 
+            model, 
+            prompt, 
+            imageUrl: s3ImageUrl, 
+            duration, 
+            aspectRatio: aspectRatio || '16:9' 
+        });
         return {
             requestId: result.taskId,
             endpoint: `kie-${model}`,
@@ -449,10 +468,16 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             throw new Error('Seedance 2.0 requires PIAPI_API_KEY to be configured. Please add it to .env or try a different video model.');
         }
 
-
-
         console.log(`🎬 [Seedance 2.0] Using PiAPI...`);
-        const result = await submitPiApiVideoGeneration({ prompt, imageUrl, duration, aspectRatio: aspectRatio || '16:9', generateAudio, referenceImages: referenceImages || [], qualityMode: mode || 'fast' });
+        const result = await submitPiApiVideoGeneration({ 
+            prompt, 
+            imageUrl: s3ImageUrl, 
+            duration, 
+            aspectRatio: aspectRatio || '16:9', 
+            generateAudio, 
+            referenceImages: s3ReferenceImages, 
+            qualityMode: mode || 'fast' 
+        });
         return {
             requestId: result.taskId,
             endpoint: `piapi-seedance-2.0`,
@@ -470,14 +495,22 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     if (!endpoints) throw new Error(`Unknown video model: ${model}`);
 
     // Choose text-to-video vs image-to-video
-    const endpoint = imageUrl ? endpoints.imageToVideo : endpoints.textToVideo;
+    const endpoint = s3ImageUrl ? endpoints.imageToVideo : endpoints.textToVideo;
 
     // Build payload
-    const payload = buildPayload(model, { prompt, imageUrl, duration, resolution, mode, shots, generateAudio });
+    const payload = buildPayload(model, { 
+        prompt, 
+        imageUrl: s3ImageUrl, 
+        duration, 
+        resolution, 
+        mode, 
+        shots, 
+        generateAudio 
+    });
 
     // Add image URL for image-to-video
-    if (imageUrl) {
-        payload.image_url = imageUrl;
+    if (s3ImageUrl) {
+        payload.image_url = s3ImageUrl;
     }
 
     console.log(`🎬 Submitting to fal.ai: ${endpoint} (model: ${model})`);

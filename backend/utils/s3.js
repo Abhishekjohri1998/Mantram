@@ -87,5 +87,31 @@ export const mirrorUrlToS3 = async (url, targetKey, defaultMimeType = "image/png
     }
 };
 
+/**
+ * Ensures a string is a publicly accessible URL.
+ * If it's a base64 string, it uploads it to S3 and returns the S3 URL.
+ * If it's already a URL, it returns it as is.
+ * @param {string} input - The URL or base64 string
+ * @param {string} folder - The S3 folder/prefix (default: 'video-studio/assets')
+ * @returns {Promise<string>} - The S3 URL or original URL
+ */
+export const ensureS3Url = async (input, folder = 'video-studio/assets') => {
+    if (!input || typeof input !== 'string') return input;
+    if (!input.startsWith('data:')) return input; // Already a URL (probably)
+
+    try {
+        const mimeMatch = input.match(/^data:([\w/+]+);base64,/);
+        const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+        const ext = mimeType.includes('png') ? 'png' : 'jpg';
+        const filename = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+
+        console.log(`📤 ensureS3Url: Uploading base64 to S3: ${filename}`);
+        return await uploadToS3(input, filename, mimeType);
+    } catch (e) {
+        console.error(`❌ ensureS3Url failed: ${e.message}`);
+        return input; // Fallback to original (even if base64, might work or fail downstream)
+    }
+};
+
 export { s3Client };
-export default { uploadToS3, mirrorUrlToS3 };
+export default { uploadToS3, mirrorUrlToS3, ensureS3Url };

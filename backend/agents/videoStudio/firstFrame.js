@@ -8,7 +8,7 @@
 
 const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro'];
 
-import { uploadToS3 } from '../../utils/s3.js';
+import { ensureS3Url } from '../../utils/s3.js';
 
 /**
  * Generate an image using Gemini's native image generation
@@ -86,94 +86,8 @@ export async function geminiImageGenerate(prompt, imageParts = [], temperature =
  * Returns HTTP URL or null on failure
  */
 async function uploadToFalStorage(base64Data, mimeType) {
-    // ── Method 0: Upload to S3 (Standard for this project) ──────────────
-    try {
-        const dataUri = base64Data.startsWith('data:') ? base64Data : `data:${mimeType};base64,${base64Data}`;
-        const filename = `first-frame-${Date.now()}.${mimeType.includes('png') ? 'png' : 'jpg'}`;
-        const s3Url = await uploadToS3(dataUri, `video-studio/uploads/${filename}`, mimeType);
-        if (s3Url) {
-            console.log(`📤 Image uploaded to S3: ${s3Url.substring(0, 80)}...`);
-            return s3Url;
-        }
-    } catch (s3Error) {
-        console.warn('⚠️ S3 upload failed, trying FAL fallback:', s3Error.message);
-    }
-
-    const falKey = process.env.FAL_API_KEY || process.env.FAL_KEY;
-    if (!falKey) {
-        console.warn('⚠️ FAL_API_KEY not set — cannot upload first frame to fal storage');
-        return null;
-    }
-
-    // Method 1: Initiate upload flow
-    try {
-        const buffer = Buffer.from(base64Data, 'base64');
-        const ext = mimeType.includes('png') ? 'png' : 'jpg';
-        const filename = `first-frame-${Date.now()}.${ext}`;
-
-        console.log(`📤 Trying fal.ai upload (${buffer.length} bytes, ${filename})...`);
-
-        const response = await fetch('https://fal.ai/api/storage/upload/initiate', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Key ${falKey}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                file_name: filename,
-                content_type: mimeType,
-            }),
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            console.log(`📤 fal upload initiate response:`, JSON.stringify(data).substring(0, 300));
-            if (data.upload_url) {
-                const uploadResp = await fetch(data.upload_url, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': mimeType },
-                    body: buffer,
-                });
-                if (uploadResp.ok && data.file_url) {
-                    return data.file_url;
-                }
-                console.warn(`⚠️ fal upload PUT failed: ${uploadResp.status}`);
-            }
-        } else {
-            const errText = await response.text();
-            console.warn(`⚠️ fal upload initiate failed (${response.status}):`, errText.substring(0, 200));
-        }
-    } catch (e) {
-        console.warn('fal storage upload error:', e.message);
-    }
-
-    // Method 2: Try base64 upload via REST API
-    try {
-        console.log('📤 Trying fal.ai base64 upload...');
-        const response = await fetch('https://rest.alpha.fal.ai/storage/upload/base64', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Key ${falKey}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                data: base64Data,
-                content_type: mimeType,
-                file_name: `first-frame-${Date.now()}.png`,
-            }),
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            console.log(`📤 fal base64 upload response:`, JSON.stringify(data).substring(0, 300));
-            return data.url || data.file_url || null;
-        } else {
-            const errText = await response.text();
-            console.warn(`⚠️ fal base64 upload failed (${response.status}):`, errText.substring(0, 200));
-        }
-    } catch (e) {
-        console.warn('fal base64 upload error:', e.message);
-    }
-
-    return null;
+    // This helper now uses the central ensureS3Url utility
+    const dataUri = base64Data.startsWith('data:') ? base64Data : `data:${mimeType};base64,${base64Data}`;
+    return await ensureS3Url(dataUri, 'video-studio/first-frames');
 }
+
