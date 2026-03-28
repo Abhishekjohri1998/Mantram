@@ -84,9 +84,9 @@ export async function geminiImageGenerate(prompt, imageParts = [], temperature =
  * Returns HTTP URL or null on failure
  */
 async function uploadToFalStorage(base64Data, mimeType) {
-    const falKey = process.env.FAL_KEY;
+    const falKey = process.env.FAL_API_KEY || process.env.FAL_KEY;
     if (!falKey) {
-        console.warn('⚠️ FAL_KEY not set — cannot upload first frame to fal storage');
+        console.warn('⚠️ FAL_API_KEY not set — cannot upload first frame to fal storage');
         return null;
     }
 

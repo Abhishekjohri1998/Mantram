@@ -3352,8 +3352,8 @@ router.post('/upload-image', protect, async (req, res) => {
         // Upload to fal storage
         const { default: firstFrameModule } = await import('../agents/videoStudio/firstFrame.js');
         // Use the uploadToFalStorage function directly
-        const falKey = process.env.FAL_KEY;
-        if (!falKey) return res.status(500).json({ success: false, error: 'FAL_KEY not configured' });
+        const falKey = process.env.FAL_API_KEY || process.env.FAL_KEY;
+        if (!falKey) return res.status(500).json({ success: false, error: 'FAL_API_KEY not configured' });
 
         const buffer = Buffer.from(base64, 'base64');
         const ext = mimeType.includes('png') ? 'png' : 'jpg';
