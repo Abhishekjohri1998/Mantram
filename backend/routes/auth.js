@@ -83,8 +83,29 @@ router.post('/register', async (req, res) => {
             verificationExpires,
             isVerified: false,
             approvalStatus: autoApprove ? 'approved' : 'pending',
-            queueNumber
+            queueNumber,
+            milestones: {
+                addedBrand: !!company
+            }
         });
+        
+        // Auto-create initial brand if company is provided
+        if (company) {
+            try {
+                await Brand.create({
+                    user: user._id,
+                    name: company,
+                    onboardingMethod: 'website',
+                    status: 'active',
+                    dna: {
+                        brandDescription: `Brand automatically created for ${company} during registration.`
+                    }
+                });
+                console.log(`✨ Auto-created initial brand for: ${user.email} (${company})`);
+            } catch (brandErr) {
+                console.error('⚠️ Failed to auto-create initial brand:', brandErr.message);
+            }
+        }
         
         // Update waitlist status if exists
         await Waitlist.findOneAndUpdate({ email: email.toLowerCase() }, { status: 'registered' });

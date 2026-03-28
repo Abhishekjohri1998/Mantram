@@ -8,7 +8,7 @@ const BrandContext = createContext(null);
 const STORAGE_KEY = 'mantram_active_brand';
 
 export function BrandProvider({ children }) {
-    const { isAuthenticated, user } = useAuth();
+    const { isAuthenticated, user, refreshUser } = useAuth();
     const navigate = useNavigate();
     const [brands, setBrands] = useState([]);
     const [activeBrand, setActiveBrandState] = useState(null);
@@ -66,6 +66,12 @@ export function BrandProvider({ children }) {
                             rawScanData: pendingBrand.rawScanData,
                         });
                         if (saved.brand) console.log('✅ New brand created:', saved.brand.name);
+                    }
+                    
+                    // CRITICAL: Refresh user to update brandCount in AuthContext
+                    if (refreshUser) {
+                        console.log('🔄 Refreshing user after brand creation...');
+                        await refreshUser();
                     }
                 } catch (saveErr) {
                     console.error('Failed to save pending brand:', saveErr);

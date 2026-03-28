@@ -51,7 +51,8 @@ export default function Auth() {
             
             if (dest === '/dashboard') {
                 const hasBrand = (user?.brandCount ?? 0) > 0;
-                if (!hasBrand) {
+                const hasPendingBrand = !!localStorage.getItem('mantram_pending_brand');
+                if (!hasBrand && !hasPendingBrand) {
                     dest = '/onboarding';
                 }
             }
@@ -86,7 +87,8 @@ export default function Auth() {
             // If the destination is the default dashboard...
             if (dest === '/dashboard') {
                 const hasBrand = (res?.user?.brandCount ?? 0) > 0;
-                if (!hasBrand) {
+                const hasPendingBrand = !!localStorage.getItem('mantram_pending_brand');
+                if (!hasBrand && !hasPendingBrand) {
                     dest = '/onboarding';
                 }
             }
