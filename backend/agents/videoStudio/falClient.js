@@ -418,11 +418,11 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         throw new Error(`Model '${model}' is not available. Use kling-3.0, veo-3.1, veo-3.1-fast, seedance-1.0, seedance-2.0, or grok-imagine.`);
     }
 
-    // Standardize storage: Upload to S3 if base64
-    const s3ImageUrl = await ensureS3Url(imageUrl, 'video-studio/generations');
-    const s3ReferenceImages = referenceImages?.length > 0 
-        ? await Promise.all(referenceImages.map(img => ensureS3Url(img, 'video-studio/references')))
-        : [];
+    // Standardize storage: Upload all images to S3 in parallel
+    const [s3ImageUrl, ...s3ReferenceImages] = await Promise.all([
+        ensureS3Url(imageUrl, 'video-studio/generations'),
+        ...(referenceImages || []).map(img => ensureS3Url(img, 'video-studio/references'))
+    ]);
 
     // ── Grok Imagine: use native xAI API instead of fal.ai ──
     if (model === 'grok-imagine') {

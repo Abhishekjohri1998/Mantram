@@ -215,41 +215,27 @@ export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, a
     let finalPrompt = prompt;
     const imageUrls = [];
 
-    // Upload reference images to catbox and embed URLs in prompt
+    // Upload reference images to S3 in parallel
     if (referenceImages && referenceImages.length > 0) {
-        for (let i = 0; i < referenceImages.length; i++) {
-            let url = referenceImages[i];
-            if (!url) continue;
+        console.log(`📸 Parallelizing upload for ${referenceImages.length} reference image(s)...`);
+        const uploadedUrls = await Promise.all(
+            referenceImages.map((img, i) => ensureS3Url(img, 'video-studio/piapi'))
+        );
 
-            if (url.startsWith('data:')) {
-                const hostedUrl = await uploadImageToHostedUrl(url);
-                if (hostedUrl) {
-                    url = hostedUrl;
-                } else {
-                    console.warn(`⚠️ Could not upload ref image ${i + 1}, skipping`);
-                    continue;
+        uploadedUrls.forEach((url, i) => {
+            if (url) {
+                imageUrls.push(url);
+                const tag = `@image${imageUrls.length}`; // use 1-based index in the final array
+                if (!finalPrompt.includes(tag)) {
+                    finalPrompt += ` Use ${tag} as visual reference.`;
                 }
             }
-
-            console.log(`📸 Ref image ${i + 1} hosted: ${url.substring(0, 60)}...`);
-            imageUrls.push(url);
-
-            const tag = `@image${i + 1}`;
-            if (!finalPrompt.includes(tag)) {
-                finalPrompt += ` Use ${tag} as visual reference.`;
-                console.log(`📸 Appended ${tag} reference to prompt`);
-            }
-        }
+        });
     }
 
-    // Handle first frame image
+    // Handle first frame image (ensuring it's at the front)
     if (imageUrl) {
-        let url = imageUrl;
-        if (url.startsWith('data:')) {
-            const hostedUrl = await uploadImageToHostedUrl(url);
-            if (hostedUrl) url = hostedUrl;
-            else url = null;
-        }
+        const url = await ensureS3Url(imageUrl, 'video-studio/piapi');
         if (url) {
             imageUrls.unshift(url);
             console.log(`📸 First frame ready: ${url.substring(0, 60)}...`);
@@ -314,13 +300,19 @@ export async function submitPiApiImageToVideo({ imageUrl, prompt, duration, aspe
 
     console.log(`🖼️→🎬 PiAPI I2V: imageUrl=${imageUrl.substring(0, 60)}..., refs=${referenceImages.length}, quality=${qualityMode}`);
 
-    // Upload to catbox if base64
-    let hostedUrl = imageUrl;
-    if (imageUrl.startsWith('data:')) {
-        const resized = await resizeToAspectRatio(imageUrl, aspectRatio || '16:9');
-        hostedUrl = await uploadImageToHostedUrl(resized);
-        if (!hostedUrl) throw new Error('Failed to host image for I2V generation');
-    }
+    // Upload main image and any additional references in parallel
+    console.log(`🖼️→🎬 Parallelizing I2V upload and references...`);
+    const [hostedUrl, ...hostedRefs] = await Promise.all([
+        (async () => {
+            const resized = imageUrl.startsWith('data:') 
+                ? await resizeToAspectRatio(imageUrl, aspectRatio || '16:9') 
+                : imageUrl;
+            return await ensureS3Url(resized, 'video-studio/piapi');
+        })(),
+        ...referenceImages.map(img => ensureS3Url(img, 'video-studio/piapi'))
+    ]);
+
+    if (!hostedUrl) throw new Error('Failed to host image for I2V generation');
 
     let finalPrompt = prompt || 'Animate this image with natural cinematic motion';
     if (!finalPrompt.includes('@image1')) {
@@ -338,7 +330,7 @@ export async function submitPiApiImageToVideo({ imageUrl, prompt, duration, aspe
         task_type: taskType,
         input: {
             prompt: finalPrompt,
-            image_urls: [hostedUrl, ...referenceImages.filter(Boolean)],
+            image_urls: [hostedUrl, ...hostedRefs.filter(Boolean)],
             aspect_ratio: aspectRatio || '16:9',
             duration: dur,
             no_watermark: true, // Remove watermark on paid PiAPI plans

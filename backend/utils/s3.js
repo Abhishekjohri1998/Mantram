@@ -97,7 +97,13 @@ export const mirrorUrlToS3 = async (url, targetKey, defaultMimeType = "image/png
  */
 export const ensureS3Url = async (input, folder = 'video-studio/assets') => {
     if (!input || typeof input !== 'string') return input;
-    if (!input.startsWith('data:')) return input; // Already a URL (probably)
+    
+    // Bypass if already an S3 URL from our bucket
+    if (input.includes('mantram-media-assets.s3') || input.includes('mantram.ai/api/video/stream')) {
+        return input;
+    }
+    
+    if (!input.startsWith('data:')) return input; // Already a URL (probably external)
 
     try {
         const mimeMatch = input.match(/^data:([\w/+]+);base64,/);
