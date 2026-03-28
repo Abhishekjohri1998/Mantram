@@ -483,7 +483,8 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
       // Missing meta descriptions
       missingMetaDescCount: si.missingMetaDescriptions?.length || 0,
     };
-    parsed.pageReports = pages.slice(0, 50).map(p => ({
+    parsed.crawledUrls = pages.map(p => p.url);
+    parsed.pageReports = pages.map(p => ({
       url: p.url,
       title: p.title || 'Untitled',
       statusCode: p.statusCode || 200,

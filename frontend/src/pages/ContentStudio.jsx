@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { content as contentAPI, agents as agentsAPI, creatives as creativesAPI, products as productsAPI } from '../services/api'
@@ -10,7 +10,7 @@ import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
 import PublishModal from '../components/PublishModal'
 import { useCallback, lazy, Suspense } from 'react'
 
-const BlogEditor = lazy(() => import('../components/BlogEditor'))
+
 
 // ============================================================================
 // DATA: Goals, sub-types, channels, tones
@@ -89,6 +89,19 @@ const GOALS = [
             { id: 'website_copy', icon: 'web', label: 'Website Copy' },
             { id: 'taglines', icon: 'format_quote', label: 'Taglines / Slogans' },
             { id: 'voice_doc', icon: 'record_voice_over', label: 'Voice & Tone Doc' },
+        ],
+    },
+    {
+        id: 'blog', icon: 'edit_note', label: 'Write Blog / Article',
+        desc: 'Long-form blogs, SEO articles, listicles, pillar content',
+        color: 'from-teal-500/20 to-cyan-500/10', accent: '#14B8A6',
+        subTypes: [
+            { id: 'seo_blog', icon: 'search', label: 'SEO Blog Article' },
+            { id: 'long_form', icon: 'article', label: 'Long-form Article' },
+            { id: 'listicle', icon: 'format_list_numbered', label: 'Listicle (Top 10, Best Of)' },
+            { id: 'case_study', icon: 'assignment', label: 'Case Study' },
+            { id: 'comparison', icon: 'compare', label: 'Comparison / vs Article' },
+            { id: 'pillar_content', icon: 'hub', label: 'Pillar Content (3000+ words)' },
         ],
     },
     {
@@ -183,32 +196,41 @@ function SmartInput({ onParse, onSkip }) {
     const handleSubmit = async () => {
         if (!input.trim()) return
         setParsing(true)
-        // For now, do basic keyword detection. In future, this hits AI.
-        const lower = input.toLowerCase()
-        let goal = null, subType = null, channel = null
+        try {
+            // AI-powered intent parsing via Grok
+            const data = await contentAPI.parseIntent(input)
+            const p = data.parsed || {}
+            onParse({
+                goal: p.goal || null,
+                subType: p.subType || null,
+                channel: p.channel || null,
+                tone: p.tone || null,
+                rawInput: input,
+                brief: p.brief || input,
+                confidence: p.confidence || 0.5,
+                method: data.method || 'ai',
+            })
+        } catch (err) {
+            // Fallback to basic keyword detection
+            console.warn('AI intent parse failed, using basic detection:', err.message)
+            const lower = input.toLowerCase()
+            let goal = null, channel = null
+            if (/promot|offer|sale|discount|deal|product/.test(lower)) goal = 'promote'
+            else if (/festival|diwali|christmas|celebrat/.test(lower)) goal = 'celebrate'
+            else if (/launch|announce|pr |press/.test(lower)) goal = 'launch'
+            else if (/blog|seo|article|guide|educat/.test(lower)) goal = 'educate'
+            else if (/brand|story|about|tagline/.test(lower)) goal = 'brand'
 
-        // Detect goal
-        if (/promot|offer|sale|discount|deal|product/.test(lower)) goal = 'promote'
-        else if (/festival|diwali|christmas|celebrat|occasion|milestone/.test(lower)) goal = 'celebrate'
-        else if (/launch|new|announce|pr |press|collab/.test(lower)) goal = 'launch'
-        else if (/blog|seo|article|guide|how.to|educat|tip/.test(lower)) goal = 'educate'
-        else if (/brand|story|about|tagline|website|vision/.test(lower)) goal = 'brand'
+            if (/instagram|insta/i.test(lower)) channel = 'instagram'
+            else if (/linkedin/i.test(lower)) channel = 'linkedin'
+            else if (/twitter|tweet/i.test(lower)) channel = 'twitter'
+            else if (/youtube|yt /i.test(lower)) channel = 'youtube'
+            else if (/website|blog|web/i.test(lower)) channel = 'website'
 
-        // Detect channel
-        if (/instagram|insta/i.test(lower)) channel = 'instagram'
-        else if (/facebook|fb/i.test(lower)) channel = 'facebook'
-        else if (/linkedin/i.test(lower)) channel = 'linkedin'
-        else if (/twitter|tweet/i.test(lower)) channel = 'twitter'
-        else if (/email|newsletter/i.test(lower)) channel = 'email'
-        else if (/amazon|ecommerce|shopify/i.test(lower)) channel = 'ecommerce'
-        else if (/website|blog|web/i.test(lower)) channel = 'website'
-        else if (/whatsapp/i.test(lower)) channel = 'whatsapp'
-        else if (/youtube|yt |video script|shorts/i.test(lower)) channel = 'youtube'
-
-        setTimeout(() => {
+            onParse({ goal, subType: null, channel, rawInput: input, brief: input, confidence: 0.3, method: 'regex' })
+        } finally {
             setParsing(false)
-            onParse({ goal, subType, channel, rawInput: input })
-        }, 600)
+        }
     }
 
     return (
@@ -799,6 +821,7 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
     const [sellStyle, setSellStyle] = useState('direct')
     const showSellStyle = ['promote', 'launch'].includes(goal)
     const [showAdvanced, setShowAdvanced] = useState(false)
+    const [researchDepth, setResearchDepth] = useState('quick') // 'quick' (Grok) or 'deep' (Perplexity)
 
     // Language — default from brand profile
     const defaultLang = activeBrand?.dna?.defaultLanguage || 'english'
@@ -986,10 +1009,36 @@ function StepTone({ onComplete, onBack, goal, activeBrand, availableProviders, m
                 )}
             </div>
 
+            {/* ── Research Depth Toggle ── */}
+            <div className="mb-6">
+                <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-3">
+                    <span className="material-symbols-outlined text-xs align-middle mr-1">neurology</span>
+                    Research Depth
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                    <button onClick={() => setResearchDepth('quick')}
+                        className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${researchDepth === 'quick' ? 'bg-primary/15 border-primary/40' : 'hover:bg-white/[0.05]'}`}>
+                        <span className={`material-symbols-outlined text-lg block mb-1 ${researchDepth === 'quick' ? 'text-primary' : 'text-slate-500'}`}>bolt</span>
+                        <p className={`text-xs font-bold ${researchDepth === 'quick' ? 'text-white' : 'text-slate-400'}`}>Quick Research</p>
+                        <p className="text-xs text-slate-600 mt-0.5">Fast + trending data</p>
+                    </button>
+                    <button onClick={() => setResearchDepth('deep')}
+                        className={`glass-panel rounded-xl p-3 text-center transition-all cursor-pointer ${researchDepth === 'deep' ? 'bg-indigo-500/15 border-indigo-500/40' : 'hover:bg-white/[0.05]'}`}>
+                        <span className={`material-symbols-outlined text-lg block mb-1 ${researchDepth === 'deep' ? 'text-indigo-400' : 'text-slate-500'}`}>psychology</span>
+                        <p className={`text-xs font-bold ${researchDepth === 'deep' ? 'text-white' : 'text-slate-400'}`}>Deep Research</p>
+                        <p className="text-xs text-slate-600 mt-0.5">Web search + competitor + SEO</p>
+                    </button>
+                </div>
+                <p className="text-xs text-slate-600 mt-2 text-center">
+                    {researchDepth === 'quick' ? '⚡ Uses Grok for fast trending intelligence' : '🔬 Uses Perplexity + full web research for deeper insights'}
+                </p>
+            </div>
+
             <CreditTooltipWrapper action="content">
-                <button onClick={() => onComplete({ tone, length, sellStyle, language, langStyle, scriptType })}
+                <button onClick={() => onComplete({ tone, length, sellStyle, language, langStyle, scriptType, researchDepth })}
                     className="btn-primary w-full py-3.5 rounded-xl text-sm font-bold">
-                    <span className="material-symbols-outlined text-sm">auto_awesome</span> Generate Content <CreditBadge action="content" />
+                    <span className="material-symbols-outlined text-sm">auto_awesome</span>
+                    {researchDepth === 'deep' ? '🔬 Generate with Deep Research' : '⚡ Generate Content'} <CreditBadge action="content" />
                 </button>
             </CreditTooltipWrapper>
         </div>
@@ -2190,10 +2239,787 @@ function YouTubeSeoResultView({ result, youtubeSeoData, onNewContent }) {
 }
 
 // ============================================================================
+// STEP BLOG WIZARD (Topic, Type, Word Count, Keywords)
+// ============================================================================
+
+function StepBlogWizard({ activeBrand, blogType, onGenerate, onBack, generating }) {
+    const [topic, setTopic] = useState('')
+    const [targetWordCount, setTargetWordCount] = useState(1500)
+    const [keywords, setKeywords] = useState('')
+    const [audience, setAudience] = useState('')
+    const [tone, setTone] = useState('professional')
+
+    const TONES = ['professional', 'conversational', 'authoritative', 'friendly', 'witty', 'inspirational']
+    const WORD_MARKS = [800, 1200, 1500, 2000, 2500, 3000]
+
+    return (
+        <div className="max-w-3xl mx-auto animate-fade-in">
+            <div className="flex items-center gap-3 mb-6">
+                <button onClick={onBack} className="size-10 rounded-xl glass-panel flex items-center justify-center hover:bg-white/[0.08] transition-colors cursor-pointer">
+                    <span className="material-symbols-outlined text-lg text-slate-400">arrow_back</span>
+                </button>
+                <div>
+                    <h3 className="text-xl font-extrabold text-white">✍️ Blog <span className="text-primary">Editor</span></h3>
+                    <p className="text-sm text-slate-500">AI-powered blog generation with research intelligence</p>
+                </div>
+            </div>
+
+            {/* Topic */}
+            <div className="glass-panel rounded-2xl p-6 mb-4">
+                <label className="text-sm font-bold text-white mb-2 block">What's your blog about?</label>
+                <textarea
+                    value={topic} onChange={(e) => setTopic(e.target.value)}
+                    placeholder="e.g., '10 ways AI is transforming digital marketing in 2025' or 'Complete guide to building a D2C brand from scratch'"
+                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 resize-none focus:border-primary/40 focus:outline-none transition-colors"
+                    rows={3}
+                />
+            </div>
+
+            {/* Keywords */}
+            <div className="glass-panel rounded-2xl p-6 mb-4">
+                <label className="text-sm font-bold text-white mb-2 block">Target Keywords <span className="text-slate-600 font-normal">(comma separated, optional)</span></label>
+                <input
+                    value={keywords} onChange={(e) => setKeywords(e.target.value)}
+                    placeholder="e.g., digital marketing, AI marketing tools, D2C branding"
+                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-600 focus:border-primary/40 focus:outline-none transition-colors"
+                />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
+                {/* Word Count */}
+                <div className="glass-panel rounded-2xl p-5">
+                    <label className="text-sm font-bold text-white mb-3 block">Word Count: <span className="text-primary">{targetWordCount}+</span></label>
+                    <input type="range" min={800} max={3000} step={100} value={targetWordCount}
+                        onChange={(e) => setTargetWordCount(Number(e.target.value))}
+                        className="w-full accent-primary" />
+                    <div className="flex justify-between mt-1">
+                        {WORD_MARKS.map(w => (
+                            <span key={w} className={`text-[10px] cursor-pointer ${targetWordCount === w ? 'text-primary font-bold' : 'text-slate-600'}`}
+                                onClick={() => setTargetWordCount(w)}>{w >= 1000 ? `${w/1000}k` : w}</span>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Audience */}
+                <div className="glass-panel rounded-2xl p-5">
+                    <label className="text-sm font-bold text-white mb-2 block">Target Audience</label>
+                    <input value={audience} onChange={(e) => setAudience(e.target.value)}
+                        placeholder="e.g., Startup founders, Marketing managers"
+                        className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-600 focus:border-primary/40 focus:outline-none transition-colors" />
+                </div>
+            </div>
+
+            {/* Tone */}
+            <div className="glass-panel rounded-2xl p-5 mb-6">
+                <label className="text-sm font-bold text-white mb-3 block">Tone</label>
+                <div className="flex flex-wrap gap-2">
+                    {TONES.map(t => (
+                        <button key={t} onClick={() => setTone(t)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${tone === t ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-white/[0.04] text-slate-400 border border-white/[0.06] hover:bg-white/[0.08]'}`}>
+                            {t.charAt(0).toUpperCase() + t.slice(1)}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Generate */}
+            <button onClick={() => onGenerate({ topic, blogType, targetWordCount, keywords: keywords.split(',').map(k => k.trim()).filter(Boolean), targetAudience: audience, tone })}
+                disabled={!topic.trim() || generating}
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-primary to-violet-500 text-white font-bold text-base disabled:opacity-30 hover:shadow-lg hover:shadow-primary/20 transition-all cursor-pointer flex items-center justify-center gap-2">
+                <span className="material-symbols-outlined">{generating ? 'progress_activity' : 'auto_awesome'}</span>
+                {generating ? 'Generating your blog...' : '✨ Generate Blog Article'}
+            </button>
+        </div>
+    )
+}
+
+// ============================================================================
+// BLOG EDITOR VIEW — Medium-Style Rich Editor
+// Inline images, formatting toolbar, contentEditable, clean typography
+// Image style picker renders INLINE at each section (not at top)
+// ============================================================================
+
+function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage }) {
+    const [blogData, setBlogData] = useState(() => ({
+        title: content?.title || '',
+        subtitle: content?.blogMeta?.subtitle || '',
+        slug: content?.blogMeta?.slug || '',
+        metaTitle: content?.blogMeta?.metaTitle || '',
+        metaDescription: content?.blogMeta?.metaDescription || '',
+        keywords: content?.blogMeta?.keywords || [],
+        heroImageUrl: content?.blogMeta?.heroImageUrl || '',
+        heroImageAlt: content?.blogMeta?.heroImageAlt || '',
+        sections: (content?.blogMeta?.sections || []).map(s => ({
+            ...s,
+            imageAlt: s.imageAlt || '',
+        })),
+        estimatedReadTime: content?.blogMeta?.estimatedReadTime || '',
+    }))
+    const [showSeo, setShowSeo] = useState(false)
+    const [copied, setCopied] = useState('')
+    const [generatingSection, setGeneratingSection] = useState(null)
+    const [editingSection, setEditingSection] = useState(null)
+    const [linkDialog, setLinkDialog] = useState(null)
+    const [linkUrl, setLinkUrl] = useState('')
+    const [linkText, setLinkText] = useState('')
+    // Image style picker — renders inline per section
+    const [imageStylePicker, setImageStylePicker] = useState(null) // sectionIndex or -1 for hero
+    const [selectedImageStyle, setSelectedImageStyle] = useState('editorial')
+
+    const IMAGE_STYLES = [
+        { id: 'editorial', label: 'Editorial', icon: 'photo_camera', desc: 'Magazine-style photography' },
+        { id: 'infographic', label: 'Infographic', icon: 'bar_chart', desc: 'Charts & data visualization' },
+        { id: 'lifestyle', label: 'Lifestyle', icon: 'sunny', desc: 'Candid, warm photography' },
+        { id: '3d', label: '3D Render', icon: 'view_in_ar', desc: 'Glossy 3D illustration' },
+        { id: 'line_drawing', label: 'Line Art', icon: 'draw', desc: 'Minimalist ink sketches' },
+        { id: 'flat_illustration', label: 'Flat Art', icon: 'palette', desc: 'Modern vector illustration' },
+        { id: 'photorealistic', label: 'Stock Photo', icon: 'image', desc: 'Ultra-realistic stock photography' },
+        { id: 'watercolor', label: 'Watercolor', icon: 'brush', desc: 'Artistic watercolor painting' },
+    ]
+
+    const totalWords = blogData.sections.reduce((sum, s) => sum + (s.body || '').split(/\s+/).filter(Boolean).length, 0)
+    const readTime = Math.max(1, Math.ceil(totalWords / 200))
+
+    const updateSection = (index, field, value) => {
+        setBlogData(prev => {
+            const sections = [...prev.sections]
+            sections[index] = { ...sections[index], [field]: value }
+            return { ...prev, sections, tableOfContents: sections.map(s => s.heading) }
+        })
+    }
+
+    const addSection = (afterIndex) => {
+        setBlogData(prev => {
+            const sections = [...prev.sections]
+            sections.splice(afterIndex + 1, 0, { heading: 'New Section', body: 'Start writing here...', imageUrl: '', imagePrompt: '', imageAlt: '' })
+            return { ...prev, sections }
+        })
+        setEditingSection(afterIndex + 1)
+    }
+
+    const deleteSection = (index) => {
+        if (blogData.sections.length <= 1) return
+        setBlogData(prev => ({ ...prev, sections: prev.sections.filter((_, i) => i !== index) }))
+    }
+
+    const moveSection = (index, direction) => {
+        const newIndex = index + direction
+        if (newIndex < 0 || newIndex >= blogData.sections.length) return
+        setBlogData(prev => {
+            const sections = [...prev.sections]
+            const [moved] = sections.splice(index, 1)
+            sections.splice(newIndex, 0, moved)
+            return { ...prev, sections }
+        })
+    }
+
+    const handleGenerateImage = async (sectionIndex, style) => {
+        setGeneratingSection(sectionIndex)
+        setImageStylePicker(null)
+        try {
+            const result = await onGenerateImage(sectionIndex, style || selectedImageStyle)
+            if (result?.imageUrl) {
+                if (sectionIndex === -1) {
+                    setBlogData(prev => ({ ...prev, heroImageUrl: result.imageUrl, heroImageAlt: result.altText || '' }))
+                } else {
+                    setBlogData(prev => {
+                        const sections = [...prev.sections]
+                        sections[sectionIndex] = { ...sections[sectionIndex], imageUrl: result.imageUrl, imageAlt: result.altText || '' }
+                        return { ...prev, sections }
+                    })
+                }
+            }
+        } catch (err) {
+            console.error('Image gen failed:', err)
+        } finally {
+            setGeneratingSection(null)
+        }
+    }
+
+    const openImageStylePicker = (sectionIndex) => {
+        setImageStylePicker(sectionIndex)
+    }
+
+    const insertLink = (sectionIndex) => {
+        if (!linkUrl.trim()) return
+        const text = linkText.trim() || linkUrl
+        const markdown = `[${text}](${linkUrl})`
+        const el = document.getElementById(`blog-body-${sectionIndex}`)
+        if (el) {
+            const start = el.selectionStart || el.value.length
+            const before = el.value.substring(0, start)
+            const after = el.value.substring(start)
+            updateSection(sectionIndex, 'body', before + markdown + after)
+        } else {
+            const body = blogData.sections[sectionIndex]?.body || ''
+            updateSection(sectionIndex, 'body', body + ' ' + markdown)
+        }
+        setLinkDialog(null); setLinkUrl(''); setLinkText('')
+    }
+
+    const applyFormatting = (sectionIndex, format) => {
+        if (format === 'link') { setLinkDialog({ sectionIndex, show: true }); return }
+        if (format === 'image') { openImageStylePicker(sectionIndex); return }
+        const el = document.getElementById(`blog-body-${sectionIndex}`)
+        if (!el) return
+        const start = el.selectionStart
+        const end = el.selectionEnd
+        const text = el.value
+        const selected = text.substring(start, end)
+        let replacement = ''
+        if (format === 'bold') replacement = `**${selected || 'bold text'}**`
+        else if (format === 'italic') replacement = `*${selected || 'italic text'}*`
+        else if (format === 'heading') replacement = `\n### ${selected || 'Subheading'}\n`
+        else if (format === 'list') replacement = `\n- ${selected || 'List item'}\n- \n`
+        else if (format === 'quote') replacement = `\n> ${selected || 'Quote text'}\n`
+        const newText = text.substring(0, start) + replacement + text.substring(end)
+        updateSection(sectionIndex, 'body', newText)
+        setTimeout(() => { el.focus(); el.setSelectionRange(start + replacement.length, start + replacement.length) }, 50)
+    }
+
+    const renderMarkdown = (text) => {
+        if (!text) return ''
+        return text
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.+?)\*/g, '<em>$1</em>')
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:#818cf8;text-decoration:underline;text-underline-offset:3px">$1</a>')
+            .replace(/^- (.+)$/gm, '<li style="margin-left:1.5rem;list-style:disc;margin-bottom:0.25rem">$1</li>')
+            .replace(/^> (.+)$/gm, '<blockquote style="border-left:3px solid rgba(129,140,248,0.4);padding-left:1rem;margin:1rem 0;color:rgba(148,163,184,1);font-style:italic">$1</blockquote>')
+            .replace(/^### (.+)$/gm, '<h3 style="font-size:1.15rem;font-weight:700;color:white;margin:1.5rem 0 0.5rem">$1</h3>')
+            .replace(/\n\n/g, '</p><p style="margin-bottom:1rem">')
+            .replace(/\n/g, '<br />')
+            .replace(/^/, '<p style="margin-bottom:1rem">')
+            .replace(/$/, '</p>')
+    }
+
+    // Reusable inline image style picker component
+    const [pickerTab, setPickerTab] = useState('ai') // 'ai' or 'brand'
+
+    // Collect brand images (logo + website images)
+    const brandImages = useMemo(() => {
+        const imgs = []
+        if (activeBrand?.dna?.logo?.url) {
+            imgs.push({ url: activeBrand.dna.logo.url, label: 'Brand Logo', source: 'logo' })
+        }
+        if (activeBrand?.dna?.brandImages?.length) {
+            activeBrand.dna.brandImages.forEach((bi, idx) => {
+                if (bi.url) imgs.push({ url: bi.url, label: bi.alt || `Brand Image ${idx + 1}`, source: bi.source || 'website' })
+            })
+        }
+        return imgs
+    }, [activeBrand])
+
+    const handleUseBrandImageDirect = async (sectionIndex, imgUrl) => {
+        setGeneratingSection(sectionIndex)
+        setImageStylePicker(null)
+        try {
+            const result = await onGenerateImage(sectionIndex, 'editorial', { brandImageUrl: imgUrl })
+            if (result?.imageUrl) {
+                if (sectionIndex === -1) {
+                    setBlogData(prev => ({ ...prev, heroImageUrl: result.imageUrl, heroImageAlt: result.altText || '' }))
+                } else {
+                    setBlogData(prev => {
+                        const sections = [...prev.sections]
+                        sections[sectionIndex] = { ...sections[sectionIndex], imageUrl: result.imageUrl, imageAlt: result.altText || '' }
+                        return { ...prev, sections }
+                    })
+                }
+            }
+        } catch (err) { console.error('Brand image direct use error:', err) }
+        finally { setGeneratingSection(null) }
+    }
+
+    const handleUseBrandImageAI = async (sectionIndex, imgUrl, style) => {
+        setGeneratingSection(sectionIndex)
+        setImageStylePicker(null)
+        try {
+            const result = await onGenerateImage(sectionIndex, style || selectedImageStyle, { brandImageRef: imgUrl })
+            if (result?.imageUrl) {
+                if (sectionIndex === -1) {
+                    setBlogData(prev => ({ ...prev, heroImageUrl: result.imageUrl, heroImageAlt: result.altText || '' }))
+                } else {
+                    setBlogData(prev => {
+                        const sections = [...prev.sections]
+                        sections[sectionIndex] = { ...sections[sectionIndex], imageUrl: result.imageUrl, imageAlt: result.altText || '' }
+                        return { ...prev, sections }
+                    })
+                }
+            }
+        } catch (err) { console.error('Brand image AI enhance error:', err) }
+        finally { setGeneratingSection(null) }
+    }
+
+    const ImageStylePickerInline = ({ sectionIndex }) => (
+        <div className="my-4 animate-fade-in rounded-2xl p-5" style={{ background: 'rgba(129,140,248,0.04)', border: '1px solid rgba(129,140,248,0.15)' }}>
+            <div className="flex items-center justify-between mb-4">
+                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm text-primary">palette</span>
+                    {sectionIndex === -1 ? 'Hero Image' : `Section ${sectionIndex + 1} Image`}
+                </h4>
+                <button onClick={() => setImageStylePicker(null)} className="text-slate-500 hover:text-white cursor-pointer">
+                    <span className="material-symbols-outlined text-sm">close</span>
+                </button>
+            </div>
+
+            {/* Tab Switcher */}
+            <div className="flex gap-1 mb-4 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                <button onClick={() => setPickerTab('ai')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-all ${pickerTab === 'ai' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    style={pickerTab === 'ai' ? { background: 'rgba(129,140,248,0.15)', border: '1px solid rgba(129,140,248,0.2)' } : {}}>
+                    <span className="material-symbols-outlined text-sm">auto_awesome</span> AI Generate
+                </button>
+                <button onClick={() => setPickerTab('brand')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-all ${pickerTab === 'brand' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    style={pickerTab === 'brand' ? { background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.2)' } : {}}>
+                    <span className="material-symbols-outlined text-sm">photo_library</span> Brand Gallery
+                    {brandImages.length > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.2)', color: '#34d399' }}>{brandImages.length}</span>}
+                </button>
+            </div>
+
+            {/* AI Generate Tab */}
+            {pickerTab === 'ai' && (
+                <>
+                    <div className="grid grid-cols-4 gap-2 mb-4">
+                        {IMAGE_STYLES.map(style => (
+                            <button key={style.id} onClick={() => setSelectedImageStyle(style.id)}
+                                className={`p-3 rounded-xl text-center cursor-pointer transition-all ${selectedImageStyle === style.id ? 'ring-2 ring-primary' : 'hover:bg-white/[0.03]'}`}
+                                style={{ background: selectedImageStyle === style.id ? 'rgba(129,140,248,0.1)' : 'rgba(255,255,255,0.02)', border: '1px solid ' + (selectedImageStyle === style.id ? 'rgba(129,140,248,0.3)' : 'rgba(255,255,255,0.05)') }}>
+                                <span className="material-symbols-outlined text-xl block mb-1" style={{ color: selectedImageStyle === style.id ? '#818cf8' : '#64748b' }}>{style.icon}</span>
+                                <span className="text-[11px] font-semibold block" style={{ color: selectedImageStyle === style.id ? 'white' : '#94a3b8' }}>{style.label}</span>
+                                <span className="text-[9px] block mt-0.5" style={{ color: '#475569' }}>{style.desc}</span>
+                            </button>
+                        ))}
+                    </div>
+                    <button onClick={() => handleGenerateImage(sectionIndex, selectedImageStyle)}
+                        disabled={generatingSection !== null}
+                        className="w-full py-3 rounded-xl text-sm font-bold text-white cursor-pointer transition-all flex items-center justify-center gap-2"
+                        style={{ background: 'linear-gradient(135deg, #818cf8, #6366f1)' }}>
+                        <span className={`material-symbols-outlined text-sm ${generatingSection !== null ? 'animate-spin' : ''}`}>
+                            {generatingSection !== null ? 'progress_activity' : 'auto_awesome'}
+                        </span>
+                        {generatingSection !== null ? 'Generating with NanoBanana 2...' : `Generate ${IMAGE_STYLES.find(s => s.id === selectedImageStyle)?.label} Image`}
+                    </button>
+                </>
+            )}
+
+            {/* Brand Gallery Tab */}
+            {pickerTab === 'brand' && (
+                <>
+                    {brandImages.length > 0 ? (
+                        <div className="grid grid-cols-3 gap-3 mb-3">
+                            {brandImages.map((img, idx) => (
+                                <div key={idx} className="group/brand rounded-xl overflow-hidden relative" style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
+                                    <img src={img.url} alt={img.label} className="w-full h-24 object-cover" loading="lazy" />
+                                    <div className="p-2">
+                                        <p className="text-[10px] text-slate-500 truncate">{img.label}</p>
+                                        <p className="text-[8px] text-slate-600 uppercase">{img.source}</p>
+                                    </div>
+                                    {/* Action overlay */}
+                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/brand:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                                        <button onClick={() => handleUseBrandImageDirect(sectionIndex, img.url)}
+                                            disabled={generatingSection !== null}
+                                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-bold text-white cursor-pointer transition-all"
+                                            style={{ background: 'rgba(16,185,129,0.8)' }}>
+                                            <span className="material-symbols-outlined text-xs">add_photo_alternate</span>
+                                            Use Directly
+                                        </button>
+                                        <button onClick={() => handleUseBrandImageAI(sectionIndex, img.url, selectedImageStyle)}
+                                            disabled={generatingSection !== null}
+                                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-bold text-white cursor-pointer transition-all"
+                                            style={{ background: 'rgba(129,140,248,0.8)' }}>
+                                            <span className={`material-symbols-outlined text-xs ${generatingSection !== null ? 'animate-spin' : ''}`}>
+                                                {generatingSection !== null ? 'progress_activity' : 'auto_awesome'}
+                                            </span>
+                                            AI Enhance
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-8">
+                            <span className="material-symbols-outlined text-3xl text-slate-700 block mb-2">photo_library</span>
+                            <p className="text-sm text-slate-500">No brand images found</p>
+                            <p className="text-xs text-slate-600 mt-1">Brand images are extracted when you scan a website during brand setup</p>
+                        </div>
+                    )}
+                    <p className="text-[10px] text-slate-600 text-center">
+                        <span className="text-emerald-500 font-bold">Use Directly</span> = place brand image as-is · <span className="text-primary font-bold">AI Enhance</span> = NanoBanana 2 creates a new image inspired by the brand visual + section context
+                    </p>
+                </>
+            )}
+        </div>
+    )
+
+    const copyAsHtml = () => {
+        let html = `<article style="max-width:720px;margin:0 auto;font-family:Georgia,serif;color:#1a1a1a;line-height:1.8">\n`
+        html += `<h1 style="font-size:2.5rem;font-weight:800;margin-bottom:0.5rem">${blogData.title}</h1>\n`
+        if (blogData.subtitle) html += `<p style="font-size:1.25rem;color:#666;margin-bottom:2rem">${blogData.subtitle}</p>\n`
+        if (blogData.heroImageUrl) html += `<img src="${blogData.heroImageUrl}" alt="${blogData.heroImageAlt || blogData.title}" style="width:100%;border-radius:8px;margin-bottom:2rem" />\n`
+        blogData.sections.forEach(s => {
+            html += `\n<h2 style="font-size:1.75rem;font-weight:700;margin:2rem 0 1rem">${s.heading}</h2>\n`
+            if (s.imageUrl) html += `<figure style="margin:1.5rem 0"><img src="${s.imageUrl}" alt="${s.imageAlt || s.heading}" style="width:100%;border-radius:8px" /><figcaption style="text-align:center;color:#999;font-size:0.85rem;margin-top:0.5rem">${s.heading}</figcaption></figure>\n`
+            let body = (s.body || '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*(.+?)\*/g, '<em>$1</em>')
+                .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
+                .replace(/^- (.+)$/gm, '<li>$1</li>')
+                .replace(/^> (.+)$/gm, '<blockquote style="border-left:3px solid #ddd;padding-left:1rem;color:#666;font-style:italic">$1</blockquote>')
+                .replace(/\n\n/g, '</p>\n<p>').replace(/^/, '<p>').replace(/$/, '</p>')
+            html += body + '\n'
+        })
+        html += `</article>`
+        navigator.clipboard.writeText(html)
+        setCopied('html'); setTimeout(() => setCopied(''), 2000)
+    }
+
+    const copyAsMarkdown = () => {
+        let md = `# ${blogData.title}\n\n`
+        if (blogData.subtitle) md += `*${blogData.subtitle}*\n\n`
+        if (blogData.heroImageUrl) md += `![${blogData.heroImageAlt || 'Hero'}](${blogData.heroImageUrl})\n\n`
+        blogData.sections.forEach(s => {
+            md += `## ${s.heading}\n\n`
+            if (s.imageUrl) md += `![${s.imageAlt || s.heading}](${s.imageUrl})\n\n`
+            md += `${s.body}\n\n`
+        })
+        navigator.clipboard.writeText(md)
+        setCopied('md'); setTimeout(() => setCopied(''), 2000)
+    }
+
+    // Prevent blur when clicking toolbar buttons
+    const preventBlur = (e) => { e.preventDefault() }
+
+    return (
+        <div className="animate-fade-in" style={{ maxWidth: '800px', margin: '0 auto' }}>
+
+            {/* Top Action Bar */}
+            <div className="flex items-center justify-between mb-8 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="flex items-center gap-3">
+                    <button onClick={onNewContent} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white transition-colors cursor-pointer" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                        <span className="material-symbols-outlined text-sm">arrow_back</span> Back
+                    </button>
+                    <span className="text-slate-600 text-xs">|</span>
+                    <span className="text-xs text-slate-500">{totalWords} words</span>
+                    <span className="text-slate-700">·</span>
+                    <span className="text-xs text-slate-500">{readTime} min read</span>
+                    <span className="text-slate-700">·</span>
+                    <span className="text-xs text-slate-500">{blogData.sections.length} sections</span>
+                </div>
+                <div className="flex gap-2">
+                    <button onClick={() => setShowSeo(!showSeo)}
+                        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${showSeo ? 'text-emerald-400' : 'text-slate-500 hover:text-white'}`}
+                        style={showSeo ? { background: 'rgba(16,185,129,0.12)' } : { background: 'rgba(255,255,255,0.04)' }}>
+                        <span className="material-symbols-outlined text-sm">search</span> SEO
+                    </button>
+                    <button onClick={copyAsHtml}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:text-white cursor-pointer transition-colors" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                        <span className="material-symbols-outlined text-sm">{copied === 'html' ? 'check' : 'code'}</span> {copied === 'html' ? 'Copied!' : 'HTML'}
+                    </button>
+                    <button onClick={copyAsMarkdown}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:text-white cursor-pointer transition-colors" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                        <span className="material-symbols-outlined text-sm">{copied === 'md' ? 'check' : 'description'}</span> {copied === 'md' ? 'Copied!' : 'MD'}
+                    </button>
+                    <button onClick={async () => {
+                        try {
+                            const res = await contentAPI.blogPublishWebsite(content._id)
+                            if (res.success) { navigator.clipboard.writeText(res.html); setCopied('publish'); setTimeout(() => setCopied(''), 3000) }
+                        } catch (e) { console.error(e) }
+                    }}
+                        className="flex items-center gap-1 px-4 py-1.5 rounded-lg text-xs font-bold text-white cursor-pointer transition-all hover:shadow-lg"
+                        style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                        <span className="material-symbols-outlined text-sm">{copied === 'publish' ? 'check_circle' : 'content_copy'}</span>
+                        {copied === 'publish' ? 'Exported!' : 'Export HTML'}
+                    </button>
+                </div>
+            </div>
+
+            {/* SEO Panel */}
+            {showSeo && (
+                <div className="mb-8 animate-fade-in rounded-2xl p-5" style={{ background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.15)' }}>
+                    <h4 className="text-sm font-bold text-emerald-400 mb-4 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-sm">search</span> SEO Metadata
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label className="text-[10px] text-slate-500 mb-1 block uppercase tracking-wide">URL Slug</label>
+                            <input value={blogData.slug} onChange={(e) => setBlogData(p => ({ ...p, slug: e.target.value }))}
+                                className="w-full rounded-lg px-3 py-2 text-sm text-white focus:outline-none" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }} />
+                        </div>
+                        <div>
+                            <label className="text-[10px] text-slate-500 mb-1 block uppercase tracking-wide">Meta Title <span className="text-slate-600">({(blogData.metaTitle || '').length}/60)</span></label>
+                            <input value={blogData.metaTitle} onChange={(e) => setBlogData(p => ({ ...p, metaTitle: e.target.value }))}
+                                className="w-full rounded-lg px-3 py-2 text-sm text-white focus:outline-none" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }} />
+                        </div>
+                    </div>
+                    <div className="mb-4">
+                        <label className="text-[10px] text-slate-500 mb-1 block uppercase tracking-wide">Meta Description <span className="text-slate-600">({(blogData.metaDescription || '').length}/160)</span></label>
+                        <textarea value={blogData.metaDescription} onChange={(e) => setBlogData(p => ({ ...p, metaDescription: e.target.value }))} rows={2}
+                            className="w-full rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }} />
+                    </div>
+                    <div>
+                        <label className="text-[10px] text-slate-500 mb-1 block uppercase tracking-wide">Keywords</label>
+                        <div className="flex flex-wrap gap-1.5">
+                            {blogData.keywords.map((kw, i) => (
+                                <span key={i} className="text-[10px] px-2.5 py-1 rounded-full font-medium" style={{ background: 'rgba(16,185,129,0.1)', color: '#34d399', border: '1px solid rgba(16,185,129,0.2)' }}>{kw}</span>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Hero Image */}
+            <div className="mb-8" style={{ margin: '0 -1rem 2rem -1rem' }}>
+                {blogData.heroImageUrl ? (
+                    <div className="relative group" style={{ borderRadius: '16px', overflow: 'hidden' }}>
+                        <img src={blogData.heroImageUrl} alt={blogData.heroImageAlt || blogData.title} style={{ width: '100%', maxHeight: '420px', objectFit: 'cover', display: 'block' }} />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => openImageStylePicker(-1)} disabled={generatingSection === -1}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white cursor-pointer"
+                                style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}>
+                                <span className={`material-symbols-outlined text-sm ${generatingSection === -1 ? 'animate-spin' : ''}`}>{generatingSection === -1 ? 'progress_activity' : 'refresh'}</span>
+                                Regenerate
+                            </button>
+                            <button onClick={() => setBlogData(p => ({ ...p, heroImageUrl: '', heroImageAlt: '' }))}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-white/70 cursor-pointer"
+                                style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)' }}>
+                                <span className="material-symbols-outlined text-sm">delete</span>
+                            </button>
+                        </div>
+                        {/* SEO alt text badge */}
+                        {blogData.heroImageAlt && (
+                            <div className="absolute bottom-4 left-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <span className="text-[10px] px-2 py-1 rounded-full text-white/60" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
+                                    alt: {blogData.heroImageAlt.substring(0, 50)}...
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <button onClick={() => openImageStylePicker(-1)} disabled={generatingSection === -1}
+                        className="w-full flex flex-col items-center justify-center gap-3 cursor-pointer transition-all group"
+                        style={{ padding: '3rem 2rem', borderRadius: '16px', border: '2px dashed rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.01)' }}>
+                        <span className={`material-symbols-outlined text-4xl text-slate-600 group-hover:text-primary transition-colors ${generatingSection === -1 ? 'animate-spin' : ''}`}>
+                            {generatingSection === -1 ? 'progress_activity' : 'add_photo_alternate'}
+                        </span>
+                        <span className="text-sm font-semibold text-slate-500 group-hover:text-white transition-colors">
+                            {generatingSection === -1 ? 'Generating hero image...' : '🎨 Generate AI Hero Image'}
+                        </span>
+                        <span className="text-xs text-slate-600">Choose style & NanoBanana 2 generates a contextual image</span>
+                    </button>
+                )}
+                {/* Hero image style picker — appears RIGHT HERE, below the hero */}
+                {imageStylePicker === -1 && <ImageStylePickerInline sectionIndex={-1} />}
+            </div>
+
+            {/* Title */}
+            <div className="mb-2">
+                <input value={blogData.title} onChange={(e) => setBlogData(p => ({ ...p, title: e.target.value }))}
+                    className="w-full bg-transparent text-white focus:outline-none"
+                    style={{ fontSize: '2.5rem', fontWeight: 800, lineHeight: 1.15, letterSpacing: '-0.02em' }}
+                    placeholder="Your blog title..." />
+            </div>
+
+            {/* Subtitle */}
+            <div className="mb-10">
+                <input value={blogData.subtitle} onChange={(e) => setBlogData(p => ({ ...p, subtitle: e.target.value }))}
+                    className="w-full bg-transparent focus:outline-none"
+                    style={{ fontSize: '1.25rem', color: 'rgba(148,163,184,0.8)', lineHeight: 1.6 }}
+                    placeholder="Add a subtitle to hook your readers..." />
+            </div>
+
+            {/* Table of Contents */}
+            {blogData.sections.length > 2 && (
+                <div className="mb-10 py-5 px-6 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Contents</p>
+                    <div className="flex flex-col gap-1.5">
+                        {blogData.sections.map((s, i) => (
+                            <a key={i} href={`#blog-section-${i}`}
+                                className="text-sm hover:text-primary transition-colors cursor-pointer flex items-center gap-2"
+                                style={{ color: 'rgba(129,140,248,0.7)' }}>
+                                <span className="text-[10px] text-slate-600 font-mono">{String(i + 1).padStart(2, '0')}</span>
+                                {s.heading}
+                            </a>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Sections — Medium-style inline flow */}
+            {blogData.sections.map((section, i) => (
+                <div key={i} id={`blog-section-${i}`} className="relative group/section mb-2" style={{ paddingBottom: '1rem', paddingLeft: '2.5rem' }}>
+
+                    {/* Section Heading */}
+                    <div className="flex items-baseline gap-3 mb-3">
+                        <input value={section.heading} onChange={(e) => updateSection(i, 'heading', e.target.value)}
+                            onClick={() => setEditingSection(i)}
+                            className="flex-1 bg-transparent text-white focus:outline-none"
+                            style={{ fontSize: '1.65rem', fontWeight: 700, lineHeight: 1.3, letterSpacing: '-0.01em' }}
+                            placeholder="Section heading..." />
+                    </div>
+
+                    {/* Formatting Toolbar — uses onMouseDown to prevent blur */}
+                    {editingSection === i && (
+                        <div className="flex items-center gap-1 mb-3 animate-fade-in py-1.5 px-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                            {[
+                                { icon: 'format_bold', fmt: 'bold', tip: 'Bold (**text**)' },
+                                { icon: 'format_italic', fmt: 'italic', tip: 'Italic (*text*)' },
+                            ].map(b => (
+                                <button key={b.fmt} onMouseDown={preventBlur} onClick={() => applyFormatting(i, b.fmt)} className="p-1.5 rounded hover:bg-white/10 cursor-pointer transition-colors" title={b.tip}>
+                                    <span className="material-symbols-outlined text-sm text-slate-400">{b.icon}</span>
+                                </button>
+                            ))}
+                            <span className="w-px h-4 mx-1" style={{ background: 'rgba(255,255,255,0.08)' }} />
+                            {[
+                                { icon: 'title', fmt: 'heading', tip: 'Subheading (###)' },
+                                { icon: 'format_list_bulleted', fmt: 'list', tip: 'Bullet List (-)' },
+                                { icon: 'format_quote', fmt: 'quote', tip: 'Blockquote (>)' },
+                            ].map(b => (
+                                <button key={b.fmt} onMouseDown={preventBlur} onClick={() => applyFormatting(i, b.fmt)} className="p-1.5 rounded hover:bg-white/10 cursor-pointer transition-colors" title={b.tip}>
+                                    <span className="material-symbols-outlined text-sm text-slate-400">{b.icon}</span>
+                                </button>
+                            ))}
+                            <span className="w-px h-4 mx-1" style={{ background: 'rgba(255,255,255,0.08)' }} />
+                            <button onMouseDown={preventBlur} onClick={() => applyFormatting(i, 'link')} className="p-1.5 rounded hover:bg-white/10 cursor-pointer transition-colors" title="Insert Link [text](url)">
+                                <span className="material-symbols-outlined text-sm text-slate-400">link</span>
+                            </button>
+                            <button onMouseDown={preventBlur} onClick={() => openImageStylePicker(i)} disabled={generatingSection === i} className="p-1.5 rounded hover:bg-white/10 cursor-pointer transition-colors" title="Generate Image for Section">
+                                <span className={`material-symbols-outlined text-sm text-slate-400 ${generatingSection === i ? 'animate-spin' : ''}`}>
+                                    {generatingSection === i ? 'progress_activity' : 'add_photo_alternate'}
+                                </span>
+                            </button>
+                            <div className="flex-1" />
+                            <span className="text-[10px] text-slate-600 font-mono">{(section.body || '').split(/\s+/).filter(Boolean).length}w</span>
+                        </div>
+                    )}
+
+                    {/* Link Insertion Dialog */}
+                    {linkDialog?.sectionIndex === i && linkDialog?.show && (
+                        <div className="mb-3 p-3 rounded-xl animate-fade-in" style={{ background: 'rgba(129,140,248,0.05)', border: '1px solid rgba(129,140,248,0.15)' }}>
+                            <div className="flex gap-2 items-end">
+                                <div className="flex-1">
+                                    <label className="text-[10px] text-slate-500 mb-1 block">Link Text</label>
+                                    <input value={linkText} onChange={(e) => setLinkText(e.target.value)} placeholder="Display text"
+                                        className="w-full rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }} />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="text-[10px] text-slate-500 mb-1 block">URL</label>
+                                    <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://..."
+                                        className="w-full rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }} />
+                                </div>
+                                <button onClick={() => insertLink(i)} className="px-3 py-1.5 rounded-lg text-xs font-bold text-white cursor-pointer" style={{ background: '#818cf8' }}>Insert</button>
+                                <button onClick={() => setLinkDialog(null)} className="px-2 py-1.5 rounded-lg text-xs text-slate-500 cursor-pointer hover:text-white">✕</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Section Body — Edit mode = textarea, View mode = rendered markdown */}
+                    {editingSection === i ? (
+                        <textarea
+                            id={`blog-body-${i}`}
+                            value={section.body}
+                            onChange={(e) => updateSection(i, 'body', e.target.value)}
+                            onBlur={(e) => {
+                                const related = e.relatedTarget
+                                if (related && related.closest(`#blog-section-${i}`)) return
+                                setTimeout(() => setEditingSection(null), 300)
+                            }}
+                            autoFocus
+                            className="w-full bg-transparent resize-none focus:outline-none"
+                            style={{ fontSize: '1.05rem', lineHeight: 1.85, color: 'rgba(203,213,225,0.9)', minHeight: '200px' }}
+                            rows={Math.max(8, Math.ceil((section.body || '').length / 80))}
+                            placeholder="Write your content here... Use **bold**, *italic*, [link text](url), - bullet lists, > blockquotes"
+                        />
+                    ) : (
+                        <div
+                            onClick={() => setEditingSection(i)}
+                            className="cursor-text rounded-lg transition-colors -mx-2 px-2 py-1"
+                            style={{ fontSize: '1.05rem', lineHeight: 1.85, color: 'rgba(203,213,225,0.9)', minHeight: '60px' }}
+                            dangerouslySetInnerHTML={{ __html: renderMarkdown(section.body) || '<span style="color:rgba(100,116,139,0.5)">Click to start writing...</span>' }}
+                        />
+                    )}
+
+                    {/* Section Image — INLINE below the body text, like Medium */}
+                    {section.imageUrl && (
+                        <div className="relative group/img my-4" style={{ marginLeft: '-2.5rem', marginRight: '-1rem', borderRadius: '12px', overflow: 'hidden' }}>
+                            <img src={section.imageUrl} alt={section.imageAlt || section.heading} style={{ width: '100%', maxHeight: '400px', objectFit: 'cover', display: 'block' }} />
+                            <figcaption className="text-center py-2 text-xs" style={{ color: 'rgba(148,163,184,0.5)' }}>{section.imageAlt || section.heading}</figcaption>
+                            <button onClick={() => openImageStylePicker(i)} disabled={generatingSection === i}
+                                className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] text-white cursor-pointer opacity-0 group-hover/img:opacity-100 transition-opacity"
+                                style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)' }}>
+                                <span className={`material-symbols-outlined text-xs ${generatingSection === i ? 'animate-spin' : ''}`}>{generatingSection === i ? 'progress_activity' : 'refresh'}</span>
+                                Regenerate
+                            </button>
+                            {/* SEO alt badge */}
+                            {section.imageAlt && (
+                                <div className="absolute bottom-8 left-3 opacity-0 group-hover/img:opacity-100 transition-opacity">
+                                    <span className="text-[9px] px-2 py-0.5 rounded-full text-white/50" style={{ background: 'rgba(0,0,0,0.4)' }}>
+                                        alt: {section.imageAlt.substring(0, 40)}...
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Image style picker — renders INLINE right here at this section */}
+                    {imageStylePicker === i && <ImageStylePickerInline sectionIndex={i} />}
+
+                    {/* Generate image button (when no image yet) */}
+                    {!section.imageUrl && imageStylePicker !== i && (
+                        <button onClick={() => openImageStylePicker(i)} disabled={generatingSection === i}
+                            className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-500 hover:text-primary cursor-pointer transition-colors"
+                            style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)' }}>
+                            <span className={`material-symbols-outlined text-sm ${generatingSection === i ? 'animate-spin' : ''}`}>
+                                {generatingSection === i ? 'progress_activity' : 'add_photo_alternate'}
+                            </span>
+                            {generatingSection === i ? 'Generating with NanoBanana 2...' : '🎨 Add AI Image to Section'}
+                        </button>
+                    )}
+
+                    {/* Section Controls — hover sidebar */}
+                    <div className="absolute left-0 top-0 flex flex-col gap-1 opacity-0 group-hover/section:opacity-100 transition-opacity" style={{ width: '1.5rem' }}>
+                        <button onClick={() => moveSection(i, -1)} className="p-0.5 rounded hover:bg-white/10 cursor-pointer" title="Move up">
+                            <span className="material-symbols-outlined text-xs text-slate-600">arrow_upward</span>
+                        </button>
+                        <button onClick={() => moveSection(i, 1)} className="p-0.5 rounded hover:bg-white/10 cursor-pointer" title="Move down">
+                            <span className="material-symbols-outlined text-xs text-slate-600">arrow_downward</span>
+                        </button>
+                        <button onClick={() => deleteSection(i)} className="p-0.5 rounded hover:bg-rose-500/20 cursor-pointer" title="Delete">
+                            <span className="material-symbols-outlined text-xs text-slate-600 hover:text-rose-400">close</span>
+                        </button>
+                    </div>
+
+                    {/* Add Section divider */}
+                    <div className="relative my-4 group/add" style={{ marginLeft: '-2.5rem' }}>
+                        <div style={{ height: '1px', background: 'rgba(255,255,255,0.04)' }} />
+                        <button onClick={() => addSection(i)}
+                            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 px-3 py-1 rounded-full text-[10px] text-slate-600 opacity-0 group-hover/add:opacity-100 transition-all cursor-pointer"
+                            style={{ background: 'rgba(15,23,42,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                            <span className="material-symbols-outlined text-xs">add</span> Add Section
+                        </button>
+                    </div>
+                </div>
+            ))}
+
+            {/* Footer */}
+            <div className="mt-8 mb-4 py-4 text-center" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                <p className="text-xs font-semibold" style={{ color: 'rgba(129,140,248,0.6)' }}>
+                    <span className="material-symbols-outlined text-sm align-middle mr-1">auto_awesome</span>
+                    AI-powered blog — images by NanoBanana 2 · SEO optimized with alt tags
+                </p>
+                <p className="text-[10px] mt-1" style={{ color: 'rgba(100,116,139,0.5)' }}>
+                    Click any text to edit · Format with toolbar · Choose image style before generating
+                </p>
+            </div>
+        </div>
+    )
+}
+
+
+// ============================================================================
 // RESULT VIEW (with Edit & AI Refine)
 // ============================================================================
 
-function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating, activeBrand, onCreateVisual, accepted, onRefine, contentFeedback, imageUrl }) {
+
+function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating, activeBrand, onCreateVisual, accepted, onRefine, contentFeedback, imageUrl, onABTest, abTestData, abTestLoading }) {
     const [copied, setCopied] = useState(false)
     const [editing, setEditing] = useState(false)
     const [editContent, setEditContent] = useState(result?.content || '')
@@ -2211,10 +3037,22 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
         setTimeout(() => setCopied(false), 2000)
     }
 
-    const handleSaveEdit = () => {
+    const handleSaveEdit = async () => {
         if (editContent !== result.content) {
-            // Save manual edit via callback
-            onRefine && onRefine({ manualEdit: editContent })
+            // Use agentic edit endpoint for re-critique
+            if (result._id) {
+                try {
+                    const data = await contentAPI.agenticEdit(result._id, { editedContent: editContent, editedTitle: result.title })
+                    if (data.success) {
+                        onRefine && onRefine({ manualEdit: editContent, aiMeta: data.content?.aiMeta })
+                    }
+                } catch {
+                    // Fallback to generic save
+                    onRefine && onRefine({ manualEdit: editContent })
+                }
+            } else {
+                onRefine && onRefine({ manualEdit: editContent })
+            }
         }
         setEditing(false)
     }
@@ -2264,7 +3102,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     <p className="text-sm text-slate-300 leading-relaxed line-clamp-3">{result.content}</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                     <button onClick={onCreateVisual}
                         className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-primary/30 transition-all cursor-pointer text-left group border border-white/[0.06]">
                         <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-3 group-hover:scale-110 transition-transform">
@@ -2289,11 +3127,72 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                         <h4 className="text-base font-bold text-white mb-1">Create New Content</h4>
                         <p className="text-[11px] text-slate-500">Start a new content generation from scratch</p>
                     </button>
+                    {result?._id && (
+                        <button onClick={onABTest} disabled={abTestLoading}
+                            className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-violet-500/30 transition-all cursor-pointer text-left group border border-white/[0.06] disabled:opacity-40">
+                            <div className="size-12 rounded-xl bg-violet-400/10 flex items-center justify-center text-violet-400 mb-3 group-hover:scale-110 transition-transform">
+                                <span className={`material-symbols-outlined text-2xl ${abTestLoading ? 'animate-spin' : ''}`}>{abTestLoading ? 'progress_activity' : 'science'}</span>
+                            </div>
+                            <h4 className="text-base font-bold text-white mb-1">{abTestLoading ? 'Creating...' : '🔬 A/B Test'}</h4>
+                            <p className="text-[11px] text-slate-500">Generate 2-3 variants to test what performs best</p>
+                        </button>
+                    )}
+                    <button onClick={() => setShowPublish(true)}
+                        className="glass-panel rounded-2xl p-5 hover:bg-white/[0.05] hover:border-blue-500/30 transition-all cursor-pointer text-left group border border-white/[0.06]">
+                        <div className="size-12 rounded-xl bg-blue-400/10 flex items-center justify-center text-blue-400 mb-3 group-hover:scale-110 transition-transform">
+                            <span className="material-symbols-outlined text-2xl">share</span>
+                        </div>
+                        <h4 className="text-base font-bold text-white mb-1">Publish Now</h4>
+                        <p className="text-[11px] text-slate-500">Post directly to your social media accounts</p>
+                    </button>
                 </div>
                 <div className="p-3 rounded-xl bg-primary/5 border border-primary/10 text-center">
                     <p className="text-sm text-primary font-bold">🧠 AI is learning from your acceptance</p>
                     <p className="text-sm text-slate-500">Future content will align closer to this style and tone</p>
                 </div>
+
+                {/* A/B Test Variants in accepted view */}
+                {abTestData && abTestData.variants && abTestData.variants.length > 0 && (
+                    <div className="mt-6 glass-panel rounded-2xl p-5 border border-violet-500/20">
+                        <div className="flex items-center gap-2 mb-4">
+                            <span className="material-symbols-outlined text-violet-400">science</span>
+                            <h4 className="text-sm font-bold text-white">A/B Test Variants</h4>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-400/10 text-violet-400 border border-violet-400/20">
+                                {abTestData.variants.length} variants generated
+                            </span>
+                        </div>
+                        <div className="space-y-3">
+                            {abTestData.variants.map((v, i) => (
+                                <div key={i} className={`rounded-xl p-4 border transition-all ${v.isControl ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-white/[0.02] border-white/[0.06]'}`}>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${v.isControl ? 'bg-emerald-400/10 text-emerald-400' : 'bg-violet-400/10 text-violet-400'}`}>
+                                            {v.variantLabel || `Variant ${String.fromCharCode(65 + i)}`}
+                                        </span>
+                                        {v.abTestChangeType && v.abTestChangeType !== 'control' && (
+                                            <span className="text-[10px] text-slate-500">{v.abTestChangeType} change</span>
+                                        )}
+                                    </div>
+                                    <p className="text-sm text-slate-300 whitespace-pre-line line-clamp-4">{v.content}</p>
+                                    {v.abTestHypothesis && (
+                                        <p className="text-xs text-slate-500 mt-2 italic">💡 {v.abTestHypothesis}</p>
+                                    )}
+                                    <button onClick={() => { navigator.clipboard.writeText(v.content); }}
+                                        className="mt-2 text-xs text-slate-500 hover:text-white flex items-center gap-1 transition-colors cursor-pointer">
+                                        <span className="material-symbols-outlined text-xs">content_copy</span> Copy variant
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                <PublishModal
+                    isOpen={showPublish}
+                    onClose={() => setShowPublish(false)}
+                    defaultText={result?.content || ''}
+                    defaultImage={null}
+                    brandId={activeBrand?._id}
+                />
             </div>
         )
     }
@@ -2307,6 +3206,22 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     <p className="text-sm text-slate-400 mt-1">
                         Generated for {activeBrand?.name} • Brand voice: {activeBrand?.dna?.voice?.personality || 'Active'}
                     </p>
+                    {/* Intelligence Sources */}
+                    {result?.agenticData?.research?.sources && result.agenticData.research.sources.length > 0 && (
+                        <div className="flex items-center gap-1.5 mt-2">
+                            <span className="text-[10px] text-slate-600">Powered by:</span>
+                            {result.agenticData.research.sources.map(s => (
+                                <span key={s} className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium border ${
+                                    s === 'Playbook' ? 'bg-violet-500/10 text-violet-400 border-violet-500/20' :
+                                    s === 'GA4' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                    s === 'Competitors' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                                    'bg-white/[0.04] text-slate-400 border-white/[0.06]'
+                                }`}>
+                                    {s === 'Playbook' ? '📊' : s === 'GA4' ? '📈' : s === 'Competitors' ? '🔍' : s === 'Trending' ? '📰' : s === 'SEO Audit' ? '🔧' : s === 'Web' ? '🌐' : '📝'} {s}
+                                </span>
+                            ))}
+                        </div>
+                    )}
                 </div>
                 <div className="flex gap-2">
                     <button onClick={() => { setEditing(!editing); if (!editing) setTimeout(() => refineRef.current?.focus(), 100) }}
@@ -2411,6 +3326,13 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-[#1877F2]/10 text-[#1877F2] hover:bg-[#1877F2]/20 transition-all cursor-pointer border border-[#1877F2]/30">
                     <span className="material-symbols-outlined text-lg">share</span> Publish
                 </button>
+                {result?._id && (
+                    <button onClick={onABTest} disabled={abTestLoading}
+                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-all cursor-pointer border border-violet-500/30 disabled:opacity-30">
+                        <span className={`material-symbols-outlined text-lg ${abTestLoading ? 'animate-spin' : ''}`}>{abTestLoading ? 'progress_activity' : 'science'}</span>
+                        {abTestLoading ? 'Creating...' : 'A/B Test'}
+                    </button>
+                )}
             </div>
 
             <PublishModal
@@ -2444,6 +3366,55 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     </button>
                 </CreditTooltipWrapper>
             </div>
+
+            {/* A/B Test Variants */}
+            {abTestData && abTestData.variants && abTestData.variants.length > 0 && (
+                <div className="mt-6 glass-panel rounded-2xl p-5 border border-violet-500/20">
+                    <div className="flex items-center gap-2 mb-4">
+                        <span className="material-symbols-outlined text-violet-400">science</span>
+                        <h4 className="text-sm font-bold text-white">A/B Test Variants</h4>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-400/10 text-violet-400 border border-violet-400/20">
+                            {abTestData.testPlan?.primaryMetric?.replace('_', ' ')} • {abTestData.testPlan?.testDuration}
+                        </span>
+                    </div>
+                    <div className="space-y-3">
+                        {abTestData.variants.map((v, i) => (
+                            <div key={i} className={`rounded-xl p-4 border transition-all ${
+                                v.isControl ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-white/[0.02] border-white/[0.06] hover:border-violet-500/30'
+                            }`}>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${v.isControl ? 'bg-emerald-400/10 text-emerald-400' : 'bg-violet-400/10 text-violet-400'}`}>
+                                        {v.variantLabel || `Variant ${String.fromCharCode(65 + i)}`}
+                                    </span>
+                                    {v.abTestChangeType && v.abTestChangeType !== 'control' && (
+                                        <span className="text-[10px] text-slate-500">{v.abTestChangeType} change</span>
+                                    )}
+                                </div>
+                                <p className="text-sm text-slate-300 whitespace-pre-line line-clamp-4">{v.content}</p>
+                                {v.abTestHypothesis && (
+                                    <p className="text-xs text-slate-500 mt-2 italic">💡 {v.abTestHypothesis}</p>
+                                )}
+                                <button onClick={() => { navigator.clipboard.writeText(v.content); }}
+                                    className="mt-2 text-xs text-slate-500 hover:text-white flex items-center gap-1 transition-colors cursor-pointer">
+                                    <span className="material-symbols-outlined text-xs">content_copy</span> Copy variant
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Intelligence Sources */}
+            {result?.agenticData?.research?.sources && result.agenticData.research.sources.length > 0 && (
+                <div className="mt-4 flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] text-slate-600 font-medium">Data sources:</span>
+                    {result.agenticData.research.sources.map(s => (
+                        <span key={s} className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] text-slate-400 border border-white/[0.06] font-medium">
+                            {s === 'Playbook' ? '📊 ' : s === 'GA4' ? '📈 ' : s === 'Competitors' ? '🔍 ' : s === 'Trending' ? '📰 ' : s === 'SEO Audit' ? '🔧 ' : ''}{s}
+                        </span>
+                    ))}
+                </div>
+            )}
 
             {/* Learning note */}
             <div className="mt-6 p-3 rounded-xl bg-primary/5 border border-primary/10 text-center">
@@ -2635,7 +3606,7 @@ export default function ContentStudio() {
     const { activeBrand } = useBrand()
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
-    const [step, setStep] = useState(0)   // 0=goal, 1=subtype, 2=channel, 3=context, 4=tone, 5=result, 6=PR, 7=product, 8=youtube wizard, 9=youtube result, 10=youtube SEO wizard, 11=youtube SEO result
+    const [step, setStep] = useState(0)   // 0=goal, 1=subtype, 2=channel, 3=context, 4=tone, 5=result, 6=PR, 7=product, 8=youtube wizard, 9=youtube result, 10=youtube SEO wizard, 11=youtube SEO result, 12=blog wizard, 13=blog editor
     const [goal, setGoal] = useState(null)
     const [subType, setSubType] = useState(null)
     const [channel, setChannel] = useState(null)
@@ -2652,15 +3623,13 @@ export default function ContentStudio() {
     const [selectedProduct, setSelectedProduct] = useState(null)
     const [youtubeData, setYoutubeData] = useState(null)
     const [youtubeSeoData, setYoutubeSeoData] = useState(null)
+    const [blogResult, setBlogResult] = useState(null)
     const [availableProviders, setAvailableProviders] = useState([
         { id: 'auto', label: 'Auto (Recommended)', icon: 'auto_awesome', desc: 'AI picks the best model' },
     ])
 
     // Blog Module State
-    const [blogBrief, setBlogBrief] = useState('')
-    const [blogHtml, setBlogHtml] = useState('')
-    const [blogTitle, setBlogTitle] = useState('')
-    const [blogGenerating, setBlogGenerating] = useState(false)
+
     const [selectedKeywords, setSelectedKeywords] = useState([])
     const [trendingData, setTrendingData] = useState(null)
 
@@ -2734,8 +3703,7 @@ export default function ContentStudio() {
             if (/promot|offer|sale|discount|deal|product/.test(lower)) detectedGoal = 'promote'
             else if (/festival|diwali|christmas|celebrat|occasion|milestone|holi|eid|navratri/.test(lower)) detectedGoal = 'celebrate'
             else if (/launch|new|announce|pr |press|collab/.test(lower)) detectedGoal = 'launch'
-            else if (/blog|seo|article|guide|how.to|educat|tip/.test(lower)) detectedGoal = 'educate'
-            else if (/blog|seo.?article|how.?to.?guide|listicle|write.?a.?post/.test(lower)) detectedGoal = 'write_blog'
+            else if (/blog|seo|article|guide|how.to|educat|tip/.test(lower)) detectedGoal = 'blog'
             else if (/brand|story|about|tagline|website|vision/.test(lower)) detectedGoal = 'brand'
             else if (/youtube|yt |video script|shorts script/.test(lower)) detectedGoal = 'youtube_content'
 
@@ -2883,23 +3851,52 @@ export default function ContentStudio() {
         const prompt = buildPrompt(settings)
 
         try {
-            const data = await contentAPI.generate({
+            // Use agentic pipeline (v2) — with real intelligence gathering
+            const data = await contentAPI.agenticStart({
                 brandId: activeBrand._id,
-                type: goal,
-                subType,
+                brief: prompt,
+                contentType: goal,
                 platform: Array.isArray(channel) ? channel.join(',') : channel,
-                prompt,
-                toneSettings: settings,
-                options: modelOverride !== 'auto' ? { modelOverride } : {},
+                tone: settings.tone || 'bold',
+                language: settings.language || 'english',
+                targetAudience: activeBrand?.dna?.targetAudience || '',
+                researchDepth: settings.researchDepth || 'quick',
             })
-            setResult(data.content)
+
+            // Map agentic response to our result format
+            const agenticContent = data.content
+            setResult({
+                _id: agenticContent._id,
+                content: agenticContent.agenticData?.draft?.content || agenticContent.content,
+                title: agenticContent.agenticData?.draft?.title || agenticContent.title,
+                hookLine: agenticContent.agenticData?.draft?.hookLine || '',
+                cta: agenticContent.agenticData?.draft?.cta || '',
+                hashtags: agenticContent.agenticData?.draft?.hashtags || [],
+                agenticData: agenticContent.agenticData,
+            })
             setStep(5)
         } catch (err) {
-            setError({ 
-                message: err.message || 'Generation failed.', 
-                isProviderError: err.isProviderError, 
-                provider: err.provider 
-            })
+            // Fallback to single-shot if agentic pipeline fails
+            console.warn('Agentic pipeline failed, falling back to single-shot:', err.message)
+            try {
+                const data = await contentAPI.generate({
+                    brandId: activeBrand._id,
+                    type: goal,
+                    subType,
+                    platform: Array.isArray(channel) ? channel.join(',') : channel,
+                    prompt,
+                    toneSettings: settings,
+                    options: modelOverride !== 'auto' ? { modelOverride } : {},
+                })
+                setResult(data.content)
+                setStep(5)
+            } catch (fallbackErr) {
+                setError({ 
+                    message: fallbackErr.message || 'Generation failed.', 
+                    isProviderError: fallbackErr.isProviderError, 
+                    provider: fallbackErr.provider 
+                })
+            }
         } finally {
             setGenerating(false)
         }
@@ -2919,6 +3916,23 @@ export default function ContentStudio() {
     }
 
     const [contentFeedback, setContentFeedback] = useState(null) // 'liked' | 'disliked'
+    const [abTestData, setAbTestData] = useState(null)
+    const [abTestLoading, setAbTestLoading] = useState(false)
+
+    const handleABTest = async () => {
+        if (!result?._id || abTestLoading) return
+        setAbTestLoading(true)
+        try {
+            const data = await contentAPI.agenticABVariants(result._id)
+            if (data.success) {
+                setAbTestData(data)
+            }
+        } catch (err) {
+            console.error('A/B test error:', err)
+        } finally {
+            setAbTestLoading(false)
+        }
+    }
 
     const handleFeedback = async (signalType, extra = {}) => {
         // Immediate visual feedback regardless of _id
@@ -2950,35 +3964,7 @@ export default function ContentStudio() {
         navigate(`/creative-studio?${params.toString()}`)
     }
 
-    // Blog Generation Handler
-    const handleGenerateBlog = async () => {
-        if (!blogBrief.trim()) { setError({ message: 'Please enter a topic or brief.' }); return }
-        setBlogGenerating(true); setGenerating(true); setError(null)
-        try {
-            const blogType = subType ? `\nBLOG TYPE: ${GOALS.find(g => g.id === 'write_blog')?.subTypes?.find(s => s.id === subType)?.label || subType}` : ''
-            const data = await contentAPI.generate({
-                type: 'blog',
-                brandId: activeBrand?._id,
-                prompt: `INTENT: Write a comprehensive, SEO-optimized blog article${blogType}\n\nTOPIC/BRIEF: ${blogBrief}\n\nSTYLE: Use a professional yet engaging tone. Include a clear H1 title, H2 subheadings, and a conclusion.`,
-                model: modelOverride,
-                signal: getSignal()
-            })
-            
-            if (data.success) {
-                const titleMatch = data.content.match(/^# (.*?)($|\n)/m) || data.content.match(/^TITLE: (.*?)($|\n)/mi)
-                setBlogTitle(titleMatch ? titleMatch[1] : blogBrief.split('|')[0].trim().slice(0, 50))
-                setBlogHtml(data.content)
-                setStep(13)
-            } else {
-                setError({ message: data.error || 'Blog generation failed.', isProviderError: data.isProviderError, provider: data.provider })
-            }
-        } catch (err) {
-            if (err.name === 'AbortError') return
-            setError({ message: err.message || 'Blog generation failed.', isProviderError: err.isProviderError, provider: err.provider })
-        } finally {
-            setBlogGenerating(false); setGenerating(false)
-        }
-    }
+
 
     // Press Release generation handler
     const handleGeneratePR = async (prData) => {
@@ -3077,11 +4063,27 @@ SPOKESPERSON QUOTES:`
         }
     }
 
-    const handleHistorySelect = (item) => {
+    const handleHistorySelect = async (item) => {
+        setShowHistory(false)
+        // Blog content → fetch full blogMeta and open in Blog Editor (Step 13)
+        if (item.type === 'blog' && item._id) {
+            try {
+                const data = await contentAPI.get(item._id)
+                const fullContent = data.content || item
+                if (fullContent.blogMeta?.sections?.length) {
+                    setBlogResult(fullContent)
+                    setGoal('blog')
+                    setStep(13)
+                    return
+                }
+            } catch (err) {
+                console.warn('Failed to load full blog data, falling back to ResultView:', err)
+            }
+        }
+        // All other content → generic ResultView (Step 5)
         setResult(item)
         setStep(5)
         setAccepted(item.status === 'approved')
-        setShowHistory(false)
     }
 
     const resetAll = () => {
@@ -3089,6 +4091,51 @@ SPOKESPERSON QUOTES:`
         setContext(null); setToneSettings(null); setResult(null); setError('')
         setAccepted(false); setPrefilledOccasion(null); setSelectedProduct(null)
         setYoutubeData(null); setYoutubeSeoData(null); setContentFeedback(null)
+        setBlogResult(null)
+    }
+
+    // Blog generation handler
+    const handleGenerateBlog = async (blogSettings) => {
+        if (!activeBrand) { setError({ message: 'Please select a brand first.', isProviderError: false }); return }
+        setGenerating(true)
+        setError('')
+
+        try {
+            const data = await contentAPI.blogGenerate({
+                brandId: activeBrand._id,
+                topic: blogSettings.topic,
+                blogType: blogSettings.blogType || subType || 'seo_blog',
+                targetWordCount: blogSettings.targetWordCount,
+                keywords: blogSettings.keywords,
+                targetAudience: blogSettings.targetAudience,
+                tone: blogSettings.tone,
+            })
+            if (data.success && data.content) {
+                setBlogResult(data.content)
+                setStep(13) // Jump to blog editor
+            } else {
+                setError({ message: data.error || 'Blog generation failed', isProviderError: false })
+            }
+        } catch (err) {
+            console.error('Blog generation error:', err)
+            setError({ message: err.message || 'Blog generation failed', isProviderError: false })
+        } finally {
+            setGenerating(false)
+        }
+    }
+
+    // Blog image generation handler — accepts style from BlogEditorView's style picker
+    const handleBlogImageGenerate = async (sectionIndex, imageStyle, opts = {}) => {
+        try {
+            const payload = { sectionIndex, imageStyle: imageStyle || 'editorial' }
+            if (opts.brandImageUrl) payload.brandImageUrl = opts.brandImageUrl
+            if (opts.brandImageRef) payload.brandImageRef = opts.brandImageRef
+            const data = await contentAPI.blogGenerateImage(blogResult._id, payload)
+            return data // { success, imageUrl, altText, sectionIndex, model }
+        } catch (err) {
+            console.error('Blog image gen error:', err)
+            return null
+        }
     }
 
     // YouTube content generation handler (Script & Ideation)
@@ -3228,6 +4275,8 @@ SPOKESPERSON QUOTES:`
                             setGoal(g); setStep(7)  // Jump to product picker
                         } else if (g === 'youtube_content') {
                             setGoal(g); setStep(1)  // Show YouTube sub-types (Script vs Publish Optimizer)
+                        } else if (g === 'blog') {
+                            setGoal(g); setStep(1)  // Show blog sub-types first
                         } else {
                             setGoal(g); setStep(1)
                         }
@@ -3247,6 +4296,9 @@ SPOKESPERSON QUOTES:`
                     // Platform IS the channel — auto-set and skip channel step
                     setChannel('ecommerce');
                     setStep(context ? 4 : 3);
+                } else if (goal === 'blog') {
+                    // Blog flow: skip channel, go directly to blog wizard
+                    setStep(12);
                 } else {
                     setStep(2);
                 }
@@ -3332,6 +4384,9 @@ SPOKESPERSON QUOTES:`
                     onCreateVisual={handleCreateVisual}
                     onRefine={handleRefine}
                     contentFeedback={contentFeedback}
+                    onABTest={handleABTest}
+                    abTestData={abTestData}
+                    abTestLoading={abTestLoading}
                 />
             )}
 
@@ -3415,107 +4470,42 @@ SPOKESPERSON QUOTES:`
                 />
             )}
 
-            {/* ========== STEP 12: BLOG INPUT ========== */}
+            {/* Blog Wizard (step 12) */}
             {step === 12 && (
-                <div className="animate-fade-in max-w-2xl mx-auto">
-                    <button onClick={() => setStep(0)} className="text-slate-500 text-sm flex items-center gap-1 mb-6 hover:text-white transition-colors cursor-pointer">
-                        <span className="material-symbols-outlined text-sm">arrow_back</span> Back
-                    </button>
-                    <div className="mb-10 text-center">
-                        <span className="material-symbols-outlined text-5xl text-primary mb-3 block">edit_note</span>
-                        <h2 className="text-2xl font-black text-white mb-2">Write a <span className="text-primary">Blog</span></h2>
-                        <p className="text-sm text-slate-400">Enter your topic, keywords, or brief — AI will handle the research and writing.</p>
-                    </div>
-
-                    {/* Blog Type Selection */}
-                    <div className="mb-8">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 block">Choose format</label>
-                        <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-                            {GOALS.find(g => g.id === 'write_blog')?.subTypes?.map(st => (
-                                <button key={st.id} onClick={() => setSubType(st.id)}
-                                    className={`flex-shrink-0 flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer ${subType === st.id ? 'bg-primary text-white' : 'glass-panel text-slate-400 hover:text-white hover:bg-white/5'}`}>
-                                    <span className="material-symbols-outlined text-base">{st.icon}</span>
-                                    {st.label}
-                                </button>
-                            ))}
+                <>
+                    <StepBlogWizard
+                        activeBrand={activeBrand}
+                        blogType={subType || 'seo_blog'}
+                        onGenerate={handleGenerateBlog}
+                        onBack={() => { setGoal(null); setStep(0) }}
+                        generating={generating}
+                    />
+                    <GlobalLoader 
+                        isActive={generating} 
+                        title="Writing your blog article..." 
+                        currentStage="Research Agent → Blog Writer generating structured content with SEO"
+                        icon="edit_note"
+                        estimatedDuration={60}
+                    />
+                    {error && (
+                        <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'} text-sm text-center`}>
+                            <span className="material-symbols-outlined align-middle mr-1">
+                                {error.isProviderError ? 'warning' : 'error'}
+                            </span>
+                            {error.message}
                         </div>
-                    </div>
-
-                    {/* Blog Brief/Topic Input */}
-                    <div className="mb-8">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 block">What is the blog about?</label>
-                        <div className="relative">
-                            <textarea value={blogBrief} onChange={e => setBlogBrief(e.target.value)}
-                                placeholder="e.g. Benefits of AI for small marketing teams, include keywords like 'automation', 'productivity'..."
-                                className="input-glass w-full py-4 resize-none min-h-[140px]" autoFocus />
-                            <div className="absolute right-3 top-3">
-                                <VoiceInput
-                                    onResult={(text) => setBlogBrief(prev => prev ? prev + ' ' + text : text)}
-                                    size="small"
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Trending Keywords for Blog */}
-                    <div className="mb-10">
-                         <div className="flex items-center justify-between mb-3">
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Search Insights</label>
-                            <button onClick={async () => {
-                                if (!blogBrief.trim()) return;
-                                try {
-                                    const data = await contentAPI.trending({ topic: blogBrief, brandId: activeBrand?._id });
-                                    if (data.success) setTrendingData(data.trends);
-                                } catch (err) { console.error('Trending fetch failed', err) }
-                            }} className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer">
-                                <span className="material-symbols-outlined text-xs">analytics</span> Fetch Trending Keywords
-                            </button>
-                         </div>
-                         {trendingData && (
-                            <div className="flex flex-wrap gap-2 p-4 rounded-xl bg-white/[0.03] border border-white/5">
-                                {trendingData.keywords?.map((kw, i) => (
-                                    <button key={i} onClick={() => {
-                                        if (!blogBrief.includes(kw)) setBlogBrief(prev => prev + `, ${kw}`);
-                                    }} className="px-3 py-1.5 rounded-lg bg-white/5 text-xs text-slate-300 hover:text-white hover:bg-primary/20 transition-all border border-white/5 cursor-pointer">
-                                        + {kw}
-                                    </button>
-                                ))}
-                                {(!trendingData.keywords || trendingData.keywords.length === 0) && <p className="text-xs text-slate-500">No specific keywords found for this topic.</p>}
-                            </div>
-                         )}
-                    </div>
-
-                    <button
-                        onClick={handleGenerateBlog}
-                        disabled={blogGenerating || !blogBrief.trim()}
-                        className={`btn-primary w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all ${blogGenerating || !blogBrief.trim() ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02] shadow-lg shadow-primary/20 active:scale-[0.98]'}`}>
-                        {blogGenerating ? (
-                            <><span className="material-symbols-outlined text-lg animate-spin">progress_activity</span> Generating...</>
-                        ) : (
-                            <><span className="material-symbols-outlined text-lg">auto_awesome</span> Generate Blog Post</>
-                        )}
-                    </button>
-                </div>
+                    )}
+                </>
             )}
 
-            {/* ========== STEP 13: BLOG EDITOR ========== */}
-            {step === 13 && (
-                <div className="animate-fade-in">
-                    <Suspense fallback={<div className="flex items-center justify-center h-[600px]"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div></div>}>
-                        <BlogEditor
-                            initialContent={blogHtml}
-                            title={blogTitle}
-                            onBack={() => setStep(12)}
-                            onNew={() => { setStep(0); setBlogHtml(''); setBlogTitle(''); setBlogBrief('') }}
-                            onSave={async (blogData) => {
-                                try {
-                                    // Handle blog save if needed
-                                    console.log('Blog saved:', blogData);
-                                } catch (err) { setError({ message: err.message }) }
-                            }}
-                        />
-                    </Suspense>
-                </div>
+            {/* Blog Editor (step 13) */}
+            {step === 13 && blogResult && (
+                <BlogEditorView
+                    content={blogResult}
+                    activeBrand={activeBrand}
+                    onNewContent={resetAll}
+                    onGenerateImage={handleBlogImageGenerate}
+                />
             )}
 
             {/* Content History Sidebar */}

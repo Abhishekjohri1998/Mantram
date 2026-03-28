@@ -287,6 +287,8 @@ class Orchestrator {
             'linkedin-post': '1024x1024',
             'youtube-thumb': '1792x1024',
             'banner': '1792x1024',
+            'blog_hero': '1792x1024',
+            'blog_section': '1024x1024',
         }[type] || '1024x1024';
     }
 
@@ -298,6 +300,8 @@ class Orchestrator {
             'linkedin-post': { width: 1200, height: 627 },
             'youtube-thumb': { width: 1280, height: 720 },
             'banner': { width: 1920, height: 600 },
+            'blog_hero': { width: 1200, height: 675 },
+            'blog_section': { width: 1200, height: 800 },
         };
         return dims[type] || { width: 1080, height: 1080 };
     }

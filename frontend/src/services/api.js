@@ -140,6 +140,15 @@ export const brands = {
 export const content = {
     providers: () => apiFetch('/content/providers'),
     generate: (data) => apiFetch('/content/generate', { method: 'POST', body: JSON.stringify(data) }),
+    // Agentic pipeline (v2 — with real intelligence gathering)
+    agenticStart: (data) => apiFetch('/content/agentic/start', { method: 'POST', body: JSON.stringify(data) }),
+    agenticEdit: (id, data) => apiFetch(`/content/agentic/${id}/edit`, { method: 'POST', body: JSON.stringify(data) }),
+    agenticABVariants: (id) => apiFetch(`/content/agentic/${id}/ab-variants`, { method: 'POST' }),
+    // Blog-specific agentic pipeline
+    blogGenerate: (data) => apiFetch('/content/agentic/blog/generate', { method: 'POST', body: JSON.stringify(data) }),
+    blogGenerateImage: (id, data) => apiFetch(`/content/agentic/blog/${id}/generate-image`, { method: 'POST', body: JSON.stringify(data) }),
+    blogPublishWebsite: (id) => apiFetch(`/content/agentic/blog/${id}/publish-website`, { method: 'POST' }),
+    parseIntent: (input) => apiFetch('/content/agentic/parse-intent', { method: 'POST', body: JSON.stringify({ input }) }),
     list: (params = {}) => {
         const query = new URLSearchParams(params).toString();
         return apiFetch(`/content?${query}`);
@@ -177,6 +186,10 @@ export const creatives = {
     lifestyleMockup: (data) => apiFetch('/creatives/lifestyle-mockup', { method: 'POST', body: JSON.stringify(data) }),
     virtualTryon: (data) => apiFetch('/creatives/virtual-tryon', { method: 'POST', body: JSON.stringify(data) }),
     vtoStatus: (requestId, brandId) => apiFetch(`/creatives/virtual-tryon/status/${requestId}?brandId=${brandId}`),
+    // Agentic creative pipeline (multi-agent: ArtDirector + PromptEngineer + StyleCritic)
+    agenticStart: (data) => apiFetch('/creatives/agentic/start', { method: 'POST', body: JSON.stringify(data) }),
+    agenticVariations: (id) => apiFetch(`/creatives/agentic/${id}/variations`, { method: 'POST' }),
+    agenticRegenerate: (id, data) => apiFetch(`/creatives/agentic/${id}/regenerate`, { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ============ Agent API ============
@@ -971,6 +984,10 @@ export const socialMediaStudio = {
     profileScore: (data) => apiFetch('/social-media-studio/profile-score', { method: 'POST', body: JSON.stringify(data) }),
     competitorAnalysis: (data) => apiFetch('/social-media-studio/competitor-analysis', { method: 'POST', body: JSON.stringify(data) }),
     // Strategy methods
+    listStrategies: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/social-media-studio/strategies?${query}`);
+    },
     getStrategy: (id) => apiFetch(`/social-media-studio/strategies/${id}`),
     deleteStrategy: (id) => apiFetch(`/social-media-studio/strategies/${id}`, { method: 'DELETE' }),
 };
