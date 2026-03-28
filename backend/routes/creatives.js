@@ -14,6 +14,7 @@ import { overlayLogo, fetchImageBuffer } from '../utils/logoOverlay.js';
 import { GoogleGenAI } from '@google/genai';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { getRouter } from '../ai/router.js';
+import { runCreativePipeline } from '../agents/creativeStudio/nodes.js';
 
 const router = Router();
 
@@ -846,10 +847,6 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
 
         const styleWord = options?.style || 'modern';
         const textOverlayPart = options?.textOverlay ? ` Include the text "${options.textOverlay}" in a clean, readable font.` : '';
-        // CRITICAL: Do NOT inject color directives into Gemini image prompts.
-        // Even descriptive color phrases ("use purple tones") cause Gemini to render
-        // visible color swatches/palettes with hex codes on the generated image.
-        // Colors are handled by the prompt enhancer (text-to-text step) instead.
         const refPart = referenceInstructions.length > 0 ? '\n' + referenceInstructions.join('\n') : '';
         const visualCtx = buildVisualContext(brand);
         const visualPart = visualCtx ? `\nBRAND VISUAL GUIDELINES: ${visualCtx}` : '';
@@ -857,19 +854,137 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
         // Clean the user's prompt — strip @Character tags, replace with natural language
         let cleanedPrompt = prompt;
         if (characterRefs.length > 0) {
-            // Replace @CharacterN with empty string — the reference instruction handles it
             cleanedPrompt = prompt.replace(/@Character\d*/gi, '').replace(/\s+/g, ' ').trim();
         }
 
-        // ── Build the full prompt following official Gemini API patterns ──
-        // Key principles from docs:
-        // 1. "Describe the scene, don't just list keywords"  
-        // 2. Use ordinal refs: "the person from the provided photo", "the first image"
-        // 3. Keep it narrative and concise — no verbose instruction blocks
-        // 4. NEVER mention logos (causes hallucination)
+        // ══════════════════════════════════════════════════════════════════
+        // AGENTIC PROMPT CRAFTING — runs for text-only generation
+        // For inpainting/reference flows, agents can't help (those need
+        // precise image-reference instructions that agents don't handle)
+        // ══════════════════════════════════════════════════════════════════
         let fullPrompt;
-        if (isInpainting) {
-            // Detect if additional changes mention body/gender/outfit — need full person replacement, not just face
+        let agenticMeta = null; // Declared here so it's accessible after the try block
+        const agenticMode = options?.agenticMode !== false; // ON by default
+        const agenticQuality = options?.agenticQuality || 'fast'; // 'fast' | 'quality'
+
+        if (!isInpainting && characterRefs.length === 0 && agenticMode) {
+            // ── AGENTIC PATH: Let agents craft the prompt ──
+            try {
+                console.log(`🤖 AGENTIC MODE (${agenticQuality}): Running creative agent pipeline...`);
+                const pipelineResult = await runCreativePipeline({
+                    brandId,
+                    brief: cleanedPrompt,
+                    format: type || 'instagram-post',
+                    aspectRatio: options?.aspectRatio || '1:1',
+                    style: styleWord,
+                    imageModel: options?.imageModel || 'nanobanana-2',
+                    mode: agenticQuality,
+                });
+
+                // Use agent-crafted prompt + append safety instructions
+                const agentPrompt = pipelineResult.finalPrompt;
+                const negativeInstructions = pipelineResult.engineeredPrompt?.negativePrompt || '';
+                const styleModifiers = pipelineResult.engineeredPrompt?.styleModifiers || '';
+
+                fullPrompt = `${agentPrompt}${textOverlayPart}${refPart}
+${styleModifiers ? styleModifiers + '.' : ''}
+The output must fill the entire canvas edge-to-edge. Do NOT render any color palettes, color swatches, hex codes, dimension labels, brand guidelines, metadata text, frames, borders, or mockup presentations anywhere on the image. The entire image must be pure visual content only.`;
+
+                console.log(`🤖 Agentic prompt crafted in ${pipelineResult.pipelineTimeMs}ms — Art Direction: ${pipelineResult.artDirection?.visualStyle || 'N/A'}`);
+
+                // Store agentic metadata to merge after image generation
+                agenticMeta = {
+                    agenticPipeline: true,
+                    agenticMode: agenticQuality,
+                    pipelineTimeMs: pipelineResult.pipelineTimeMs,
+                    artDirection: pipelineResult.artDirection?.visualStyle || '',
+                    brandAlignmentScore: pipelineResult.styleCritique?.brandAlignmentScore || 85,
+                };
+
+                // ── ANTI-HALLUCINATION: Auto-inject real product images as reference ──
+                const mp = pipelineResult.matchedProduct;
+                const brandImgs = pipelineResult.brandIntel?.brandImages || [];
+                const productCandidates = pipelineResult.brandIntel?.productCandidates || [];
+                const isProductBrand = pipelineResult.brandIntel?.brandType === 'product';
+                let injectedProductImg = false;
+
+                // Step 1: Inject matched product images (for product accuracy)
+                if (mp?.images?.length > 0) {
+                    console.log(`📸 Anti-hallucination: injecting ${mp.images.length} real product image(s) for "${mp.title}"`);
+                    for (const imgUrl of mp.images.slice(0, 2)) {
+                        try {
+                            const resolved = await resolveRefImage(imgUrl, 'catalog-product');
+                            if (resolved) {
+                                imageParts.push({ inlineData: { mimeType: resolved.part.mimeType, data: resolved.part.data } });
+                                referenceInstructions.push(`REAL PRODUCT IMAGE: This is "${mp.title}" — the ACTUAL product being promoted. The generated image MUST feature this exact product. Do NOT invent or imagine a different product.`);
+                                injectedProductImg = true;
+                            } else {
+                                console.warn(`⚠️ Product image could not be resolved (broken link?): ${imgUrl.substring(0, 100)}`);
+                            }
+                        } catch (e) { console.warn('⚠️ Failed to fetch product image:', e.message, imgUrl?.substring(0, 100)); }
+                    }
+                }
+
+                // Step 1b: If matched product images failed, try other product candidates
+                if (!injectedProductImg && isProductBrand && productCandidates.length > 0) {
+                    console.log(`📦 Matched product images failed or missing — trying ${productCandidates.length} other product candidates...`);
+                    // Shuffle candidates for variety
+                    const shuffled = [...productCandidates].sort(() => Math.random() - 0.5);
+                    for (const candidate of shuffled) {
+                        if (injectedProductImg) break;
+                        for (const imgUrl of (candidate.images || []).slice(0, 1)) {
+                            try {
+                                const resolved = await resolveRefImage(imgUrl, 'catalog-product');
+                                if (resolved) {
+                                    imageParts.push({ inlineData: { mimeType: resolved.part.mimeType, data: resolved.part.data } });
+                                    referenceInstructions.push(`REAL PRODUCT IMAGE: This is "${candidate.title}" — a REAL product from this brand's catalog. Feature this actual product in the image. Do NOT invent or imagine a different product.`);
+                                    injectedProductImg = true;
+                                    console.log(`✅ Fallback product image injected: "${candidate.title}"`);
+                                }
+                            } catch (e) { /* skip broken candidate */ }
+                        }
+                    }
+                    if (!injectedProductImg) {
+                        console.warn('⚠️ All product candidate images failed to resolve — no product image injected');
+                    }
+                }
+
+                // Step 2: ALWAYS inject brand DNA images for visual style grounding
+                // These help the AI understand the brand's visual aesthetic
+                if (brandImgs.length > 0) {
+                    const maxBrandImgs = injectedProductImg ? 1 : 2; // fewer if product images already injected
+                    console.log(`🎨 Brand DNA: injecting ${Math.min(brandImgs.length, maxBrandImgs)} brand image(s) for style reference`);
+                    for (const imgUrl of brandImgs.slice(0, maxBrandImgs)) {
+                        try {
+                            const resolved = await resolveRefImage(imgUrl, 'brand-dna');
+                            if (resolved) {
+                                imageParts.push({ inlineData: { mimeType: resolved.part.mimeType, data: resolved.part.data } });
+                                referenceInstructions.push('BRAND STYLE REFERENCE: Match the visual style, quality, color palette, and aesthetic of this real brand image. Use it for style guidance.');
+                            } else {
+                                console.warn(`⚠️ Brand DNA image could not be resolved: ${imgUrl.substring(0, 100)}`);
+                            }
+                        } catch (e) { console.warn('⚠️ Failed to fetch brand DNA image:', e.message); }
+                    }
+                }
+
+                // ── WARN-1 FIX: Re-build fullPrompt with updated referenceInstructions ──
+                // Product/brand images added new referenceInstructions after fullPrompt was built.
+                // Re-append so the text prompt includes anti-hallucination instructions for all injected images.
+                if (referenceInstructions.length > 0) {
+                    const updatedRefPart = '\n' + referenceInstructions.join('\n');
+                    fullPrompt = `${agentPrompt}${textOverlayPart}${updatedRefPart}
+${styleModifiers ? styleModifiers + '.' : ''}
+The output must fill the entire canvas edge-to-edge. Do NOT render any color palettes, color swatches, hex codes, dimension labels, brand guidelines, metadata text, frames, borders, or mockup presentations anywhere on the image. The entire image must be pure visual content only.`;
+                }
+            } catch (agentErr) {
+                // Agent pipeline failed — fall back to static prompt
+                console.warn('⚠️ Agentic pipeline failed, falling back to static prompt:', agentErr.message);
+                fullPrompt = `${cleanedPrompt}${textOverlayPart}
+${styleWord} image for ${brand.name}.${visualPart}${refPart}
+The output must fill the entire canvas edge-to-edge. Do NOT render any color palettes, color swatches, hex codes, dimension labels, brand guidelines, metadata text, frames, borders, or mockup presentations anywhere on the image. The entire image must be pure visual content only.`;
+            }
+        } else if (isInpainting) {
+            // ── INPAINTING: Keep existing precise template instructions ──
             const hasBodyChanges = /\b(male|female|man|woman|gender|outfit|clothing|body|build|muscular|slim|tall|short|hoodie|suit|dress|casual)\b/i.test(cleanedPrompt);
             const bodyInstruction = hasBodyChanges
                 ? 'IMPORTANT: When changing the person, adapt their ENTIRE body, physique, clothing, and build — not just face. Create a completely new person matching the description while keeping the same pose and composition.'
@@ -880,11 +995,13 @@ ${bodyInstruction}
 Keep the exact same layout, composition, text placement, and design style. Replace only the elements described. Output must fill the entire canvas edge-to-edge.
 CRITICAL: Do NOT render any text labels, dimensions, hex codes, color palettes, color swatches, metadata, borders, frames, or mockup presentations on the image.`;
         } else if (characterRefs.length > 0) {
+            // ── CHARACTER REF: Keep existing person-reference instructions ──
             fullPrompt = `Using the provided reference photo of this person: ${cleanedPrompt}
 ${styleWord} image for ${brand.name}.${textOverlayPart}${visualPart}
 ${refPart}
 The output must fill the entire canvas edge-to-edge. Do NOT render any color palettes, color swatches, hex codes, dimension labels, brand guidelines, metadata text, frames, borders, or mockup presentations anywhere on the image. The entire image must be pure visual content only.`;
         } else {
+            // ── STATIC FALLBACK (agenticMode = false) ──
             fullPrompt = `${cleanedPrompt}${textOverlayPart}
 ${styleWord} image for ${brand.name}.${visualPart}${refPart}
 The output must fill the entire canvas edge-to-edge. Do NOT render any color palettes, color swatches, hex codes, dimension labels, brand guidelines, metadata text, frames, borders, or mockup presentations anywhere on the image. The entire image must be pure visual content only.`;
@@ -894,7 +1011,10 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
 
         const selectedImageModel = options?.imageModel || 'nanobanana-2';
 
-        if (hasImages) {
+        // Recompute hasImages — may have changed after agentic product image injection
+        const hasImagesNow = imageParts.filter(p => p.inlineData).length > 0;
+
+        if (hasImagesNow) {
             // Multi-image call — lower temperature (0.2) for higher quality
             console.log(`🎨 Creative Studio: generating with ${imageParts.filter(p => p.inlineData).length} reference image(s) + ${imageParts.filter(p => p.text).length} labels, aspect: ${geminiAspectRatio}, model: ${selectedImageModel}`);
             const genResult = await routedImageGenerate(fullPrompt, imageParts, 0.2, geminiAspectRatio, geminiImageSize, selectedImageModel);
@@ -959,73 +1079,112 @@ The output must fill the entire canvas edge-to-edge. Do NOT render any color pal
             }
         }
 
-        // Watermark disabled for creative output — clean designs only
-        let imageUrl = result.imageUrl || '';
-
-        // Upload to S3 for public access
-        if (imageUrl && imageUrl.startsWith('data:image/')) {
-            try {
-                const s3Url = await uploadToS3(imageUrl, `creatives/${brandId}/${Date.now()}.png`);
-                imageUrl = s3Url;
-                console.log(`[S3] Creative uploaded to S3: ${imageUrl}`);
-            } catch (s3Err) {
-                console.error('[S3] Failed to upload generated creative to S3:', s3Err.message);
-                throw new Error(`S3 Upload Failed. Strict S3-only policy requires valid AWS credentials. Error: ${s3Err.message}`);
-            }
+        // ══════════════════════════════════════════════════════════════════
+        // Merge agentic pipeline metadata (if agents ran)
+        // ══════════════════════════════════════════════════════════════════
+        if (agenticMeta && result?.aiMeta) {
+            result.aiMeta = { ...result.aiMeta, ...agenticMeta };
         }
 
-        // ── SERVER-SIDE LOGO OVERLAY (replaces broken client-side CORS approach) ──
-        if (options?.addLogo && imageUrl) {
-            try {
-                const brand = await Brand.findById(brandId).lean();
-                const logoUrl = brand?.dna?.logo?.url;
-                if (logoUrl) {
-                    console.log(`🏷️  Logo overlay: position=${options.logoPosition || 'bottom-right'}, size=${options.logoSize || 'medium'}`);
-                    const imageBuffer = await fetchImageBuffer(imageUrl);
-                    const logoBuffer = await fetchImageBuffer(logoUrl);
-                    if (imageBuffer && logoBuffer) {
-                        const compositedBuffer = await overlayLogo(
-                            imageBuffer, logoBuffer,
-                            options.logoPosition || 'bottom-right',
-                            options.logoSize || 'medium'
-                        );
-                        // Try S3 re-upload, but keep base64 if it fails
-                        const compositedBase64 = `data:image/png;base64,${compositedBuffer.toString('base64')}`;
-                        try {
-                            const compositedS3 = await uploadToS3(compositedBase64, `creatives/${brandId}/${Date.now()}-logo.png`);
-                            imageUrl = compositedS3;
-                            console.log(`✅ Logo composited & re-uploaded: ${imageUrl}`);
-                        } catch (s3Err) {
-                            // S3 failed — keep the composited base64 image (logo is still applied)
-                            imageUrl = compositedBase64;
-                            console.warn(`⚠️ Logo composited but S3 re-upload failed, keeping base64:`, s3Err.message);
-                        }
-                    } else {
-                        console.warn('⚠️ Failed to fetch image or logo buffers for overlay');
-                    }
-                } else {
-                    console.warn('⚠️ Logo overlay requested but no logo URL in brand DNA');
-                }
-            } catch (logoErr) {
-                console.error('⚠️ Logo overlay failed (keeping original image):', logoErr.message);
-            }
+        // ══════════════════════════════════════════════════════════════════
+        // SPEED OPTIMIZATION: Return image IMMEDIATELY, background S3/logo/DB
+        // ══════════════════════════════════════════════════════════════════
+        const rawImageUrl = result.imageUrl || '';
+
+        if (!rawImageUrl) {
+            throw new Error('Image generation produced no image');
         }
 
+        // Create DB record immediately with raw image URL (base64 or remote)
+        // so the user sees the result in <20s. Background job will update with S3 URL.
         const creative = await Creative.create({
             user: req.user._id,
             brand: brandId,
             type: type || 'instagram-post',
             title: result.title || '',
             prompt,
-            imageUrl: imageUrl,
-            thumbnailUrl: result.thumbnailUrl || imageUrl,
+            imageUrl: rawImageUrl,
+            thumbnailUrl: result.thumbnailUrl || rawImageUrl,
             dimensions: result.dimensions || {},
             designData: result.designData || {},
-            aiMeta: result.aiMeta || {},
+            aiMeta: { ...result.aiMeta || {}, processingStatus: 'uploading' },
         });
 
-        await req.user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } });
+        // Increment usage counter (non-blocking)
+        req.user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } }).catch(() => {});
+
+        // ── RESPOND IMMEDIATELY — user sees image in ~18-22s ──
         res.json({ success: true, creative, warnings: result.warnings || [] });
+
+        // ══════════════════════════════════════════════════════════════════
+        // BACKGROUND POST-PROCESSING (runs AFTER response is sent)
+        // S3 upload + logo overlay + DB update — user doesn't wait for this
+        // ══════════════════════════════════════════════════════════════════
+        (async () => {
+            try {
+                let finalUrl = rawImageUrl;
+                const ts = Date.now();
+
+                // Step 1: Upload raw image to S3
+                if (finalUrl.startsWith('data:image/')) {
+                    try {
+                        finalUrl = await uploadToS3(finalUrl, `creatives/${brandId}/${ts}.png`);
+                        console.log(`[BG-S3] Creative uploaded: ${finalUrl}`);
+                    } catch (s3Err) {
+                        console.error('[BG-S3] Upload failed:', s3Err.message);
+                        return; // Keep base64 in DB — still viewable
+                    }
+                }
+
+                // Step 2: Logo overlay (if requested)
+                if (options?.addLogo && finalUrl) {
+                    try {
+                        const brandData = await Brand.findById(brandId).lean();
+                        const logoUrl = brandData?.dna?.logo?.url;
+                        if (logoUrl) {
+                            console.log(`[BG-LOGO] Overlaying: pos=${options.logoPosition || 'bottom-right'}, size=${options.logoSize || 'medium'}`);
+                            const [imageBuffer, logoBuffer] = await Promise.all([
+                                fetchImageBuffer(finalUrl),
+                                fetchImageBuffer(logoUrl),
+                            ]);
+                            if (imageBuffer && logoBuffer) {
+                                const compositedBuffer = await overlayLogo(
+                                    imageBuffer, logoBuffer,
+                                    options.logoPosition || 'bottom-right',
+                                    options.logoSize || 'medium'
+                                );
+                                const compositedBase64 = `data:image/png;base64,${compositedBuffer.toString('base64')}`;
+                                try {
+                                    finalUrl = await uploadToS3(compositedBase64, `creatives/${brandId}/${ts}-logo.png`);
+                                    console.log(`[BG-LOGO] Composited & uploaded: ${finalUrl}`);
+                                } catch (s3Err) {
+                                    console.warn('[BG-LOGO] S3 re-upload failed:', s3Err.message);
+                                }
+                            }
+                        }
+                    } catch (logoErr) {
+                        console.warn('[BG-LOGO] Overlay failed:', logoErr.message);
+                    }
+                }
+
+                // Step 3: Update DB with final S3 URL (replaces base64)
+                if (finalUrl !== rawImageUrl) {
+                    await Creative.updateOne(
+                        { _id: creative._id },
+                        { $set: { imageUrl: finalUrl, thumbnailUrl: finalUrl, 'aiMeta.processingStatus': 'ready' } }
+                    );
+                    console.log(`[BG-DB] Creative ${creative._id} updated with S3 URL`);
+                } else {
+                    await Creative.updateOne(
+                        { _id: creative._id },
+                        { $set: { 'aiMeta.processingStatus': 'ready' } }
+                    );
+                }
+            } catch (bgErr) {
+                console.error('[BG] Post-processing error:', bgErr.message);
+            }
+        })();
+
     } catch (error) {
         console.error('❌ CREATIVE GENERATE ERROR:', error.message, error.stack?.split('\n').slice(0,3).join('\n'));
         if (req.creditsDeducted > 0) {
@@ -1492,6 +1651,181 @@ router.get('/vto-status/:requestId', protect, async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
+// POST /api/creatives/upscale — Upscale image to 2K (Sharp) or 4K (Fal.ai ESRGAN)
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/upscale', protect, async (req, res) => {
+    try {
+        const { imageUrl, scale = '2k' } = req.body;
+        if (!imageUrl) return res.status(400).json({ success: false, error: 'imageUrl is required' });
+
+        const validScales = ['2k', '4k'];
+        if (!validScales.includes(scale)) {
+            return res.status(400).json({ success: false, error: `Invalid scale: ${scale}. Use: ${validScales.join(', ')}` });
+        }
+
+        console.log(`\n══════ IMAGE UPSCALE (${scale.toUpperCase()}) ══════`);
+        console.log(`📐 Target: ${scale === '2k' ? '2048px' : '4096px'}`);
+        const startTime = Date.now();
+
+        // ── Check S3 cache: if we already upscaled this image, return cached URL ──
+        const urlHash = Buffer.from(imageUrl.substring(0, 200)).toString('base64url').substring(0, 40);
+        const cachedKey = `upscaled/${urlHash}_${scale}.png`;
+        try {
+            const headResp = await fetch(`https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION || 'ap-south-1'}.amazonaws.com/${cachedKey}`, { method: 'HEAD' });
+            if (headResp.ok) {
+                const cachedUrl = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION || 'ap-south-1'}.amazonaws.com/${cachedKey}`;
+                console.log(`⚡ Cache hit — returning cached ${scale} version (${Date.now() - startTime}ms)`);
+                return res.json({ success: true, imageUrl: cachedUrl, scale, resolution: scale === '2k' ? '2048px' : '4096px', method: 'cache', timeMs: Date.now() - startTime });
+            }
+        } catch { /* no cache — proceed */ }
+
+        // ── Fetch original image ──
+        let imgBuffer;
+        if (imageUrl.startsWith('data:image/')) {
+            const base64Data = imageUrl.split(',')[1];
+            imgBuffer = Buffer.from(base64Data, 'base64');
+        } else {
+            const resp = await fetch(imageUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+            if (!resp.ok) throw new Error(`Failed to fetch image: ${resp.status}`);
+            imgBuffer = Buffer.from(await resp.arrayBuffer());
+        }
+
+        console.log(`📦 Original image: ${Math.round(imgBuffer.length / 1024)}KB`);
+
+        let upscaledUrl;
+        let method;
+
+        if (scale === '2k') {
+            // ══════ 2K: Sharp Lanczos upscale (FREE, ~1s) ══════
+            const sharp = (await import('sharp')).default;
+            const metadata = await sharp(imgBuffer).metadata();
+            const targetWidth = Math.max(metadata.width * 2, 2048);
+            const targetHeight = Math.max(metadata.height * 2, 2048);
+
+            console.log(`🔍 Upscaling ${metadata.width}x${metadata.height} → ${targetWidth}x${targetHeight} (Sharp Lanczos3)`);
+
+            const upscaledBuffer = await sharp(imgBuffer)
+                .resize(targetWidth, targetHeight, {
+                    kernel: sharp.kernel.lanczos3,
+                    fit: 'fill',
+                })
+                .png({ quality: 95, compressionLevel: 6 })
+                .toBuffer();
+
+            console.log(`✅ Sharp upscale done: ${Math.round(upscaledBuffer.length / 1024)}KB (${Date.now() - startTime}ms)`);
+
+            // Upload to S3
+            try {
+                upscaledUrl = await uploadToS3(`data:image/png;base64,${upscaledBuffer.toString('base64')}`, cachedKey);
+            } catch {
+                // Fallback: return base64 directly
+                upscaledUrl = `data:image/png;base64,${upscaledBuffer.toString('base64')}`;
+            }
+            method = 'sharp-lanczos3';
+
+        } else if (scale === '4k') {
+            // ══════ 4K: Fal.ai Real-ESRGAN (AI upscale, ~$0.005, ~5s) ══════
+            const falKey = process.env.FAL_KEY || process.env.FAL_API_KEY;
+            if (!falKey) throw new Error('FAL_KEY not configured for 4K upscaling');
+
+            console.log(`🚀 Submitting to Fal.ai Real-ESRGAN for 4× AI upscale...`);
+
+            // Convert buffer to base64 data URL for Fal.ai
+            const inputDataUrl = `data:image/png;base64,${imgBuffer.toString('base64')}`;
+
+            // Submit to Fal.ai queue
+            const submitResp = await fetch('https://queue.fal.run/fal-ai/esrgan', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Key ${falKey}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    image_url: inputDataUrl,
+                    scale: 4,
+                }),
+            });
+
+            if (!submitResp.ok) {
+                const errText = await submitResp.text();
+                throw new Error(`Fal.ai ESRGAN submit failed: ${submitResp.status} ${errText}`);
+            }
+
+            const submitData = await submitResp.json();
+
+            // If we got a direct response (fast path)
+            if (submitData.images?.[0]?.url || submitData.image?.url) {
+                upscaledUrl = submitData.images?.[0]?.url || submitData.image?.url;
+                console.log(`✅ Fal.ai ESRGAN: direct response (${Date.now() - startTime}ms)`);
+            } else if (submitData.request_id) {
+                // Poll for completion
+                const requestId = submitData.request_id;
+                console.log(`⏳ Fal.ai queued: ${requestId}, polling...`);
+
+                let attempts = 0;
+                const maxAttempts = 30; // 30 × 1s = 30s max wait
+                while (attempts < maxAttempts) {
+                    await new Promise(r => setTimeout(r, 1000));
+                    attempts++;
+
+                    const statusResp = await fetch(`https://queue.fal.run/fal-ai/esrgan/requests/${requestId}/status`, {
+                        headers: { 'Authorization': `Key ${falKey}` },
+                    });
+                    const statusData = await statusResp.json();
+
+                    if (statusData.status === 'COMPLETED') {
+                        // Get result
+                        const resultResp = await fetch(`https://queue.fal.run/fal-ai/esrgan/requests/${requestId}`, {
+                            headers: { 'Authorization': `Key ${falKey}` },
+                        });
+                        const resultData = await resultResp.json();
+                        upscaledUrl = resultData.image?.url || resultData.images?.[0]?.url;
+                        console.log(`✅ Fal.ai ESRGAN: completed after ${attempts}s (${Date.now() - startTime}ms)`);
+                        break;
+                    } else if (statusData.status === 'FAILED') {
+                        throw new Error(`Fal.ai ESRGAN failed: ${JSON.stringify(statusData)}`);
+                    }
+                }
+
+                if (!upscaledUrl) throw new Error('Fal.ai ESRGAN timed out after 30s');
+            } else {
+                throw new Error('Unexpected Fal.ai response format');
+            }
+
+            // Cache the 4K result to S3
+            try {
+                const upRes = await fetch(upscaledUrl);
+                if (upRes.ok) {
+                    const upBuf = Buffer.from(await upRes.arrayBuffer());
+                    const s3Url = await uploadToS3(`data:image/png;base64,${upBuf.toString('base64')}`, cachedKey);
+                    upscaledUrl = s3Url;
+                    console.log(`[BG-S3] 4K cached: ${s3Url}`);
+                }
+            } catch (cacheErr) {
+                console.warn('⚠️ 4K S3 cache failed:', cacheErr.message);
+            }
+
+            method = 'fal-esrgan-4x';
+        }
+
+        const totalMs = Date.now() - startTime;
+        console.log(`══════ UPSCALE DONE: ${scale.toUpperCase()} in ${totalMs}ms ══════\n`);
+
+        res.json({
+            success: true,
+            imageUrl: upscaledUrl,
+            scale,
+            resolution: scale === '2k' ? '2048px' : '4096px',
+            method,
+            timeMs: totalMs,
+        });
+    } catch (error) {
+        console.error('❌ Upscale error:', error);
+        res.status(500).json({ success: false, error: error.message || 'Upscale failed' });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 // POST /api/creatives/lifestyle-mockup — Product Lifestyle Mockup (Gemini Flash)
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/lifestyle-mockup', protect, requireStudio('creativeStudio'), requireCredits('creative'), async (req, res) => {
@@ -1501,7 +1835,7 @@ router.post('/lifestyle-mockup', protect, requireStudio('creativeStudio'), requi
             return res.status(400).json({ success: false, error: 'Product image is required' });
         }
 
-        console.log(`\n══════ LIFESTYLE MOCKUP ══════`);
+        console.log(`\n══════ LIFESTYLE MOCKUP (AGENTIC) ══════`);
         console.log(`📐 Aspect ratio: ${aspectRatio}`);
         console.log(`🎬 Scene: ${scenePrompt?.substring(0, 100) || '(auto)'}`);
         console.log(`📸 Template image: ${templateImage ? 'YES' : 'no'}`);
@@ -1539,9 +1873,13 @@ router.post('/lifestyle-mockup', protect, requireStudio('creativeStudio'), requi
             }
         }
 
-        // Get brand context if available
+        // ══════════════════════════════════════════════════════════════════
+        // AGENTIC: Enhance scene prompt with brand-aware art direction
+        // ══════════════════════════════════════════════════════════════════
         let brandContext = '';
         let brandColorHarmonize = '';
+        let enhancedScene = scenePrompt || 'a premium professional product photography setting with beautiful lighting';
+
         if (brandId) {
             const brand = await Brand.findById(brandId).lean();
             if (brand) {
@@ -1553,16 +1891,34 @@ router.post('/lifestyle-mockup', protect, requireStudio('creativeStudio'), requi
                     brandColorHarmonize = `\nBRAND COLOR HARMONIZATION: Adapt the scene's color palette to harmonize with the brand colors: ${colorList}. Use these as accent tones, background tints, surface colors, and atmospheric lighting. The color grading, ambient light, and decorative elements should feel like part of the ${brand.name} visual family. Do NOT recolor the product itself — only the environment, lighting, and scene elements.`;
                     console.log(`🎨 Brand harmonize colors: ${colorList}`);
                 }
+
+                // Agentic scene enhancement — use ArtDirector to create a richer scene
+                try {
+                    const pipelineResult = await runCreativePipeline({
+                        brandId,
+                        brief: `Product lifestyle mockup scene: ${enhancedScene}. Style: professional product photography.`,
+                        format: 'lifestyle-mockup',
+                        aspectRatio,
+                        style: 'photorealistic',
+                        imageModel: 'nanobanana-2',
+                        mode: 'fast', // Always fast for mockups — speed matters
+                    });
+                    if (pipelineResult.finalPrompt) {
+                        enhancedScene = pipelineResult.finalPrompt;
+                        console.log(`🤖 Agentic scene enhanced in ${pipelineResult.pipelineTimeMs}ms`);
+                    }
+                } catch (agentErr) {
+                    console.warn('⚠️ Mockup agent enhancement failed, using original scene:', agentErr.message);
+                }
             }
         }
 
-        const scene = scenePrompt || 'a premium professional product photography setting with beautiful lighting';
-        const hasTemplate = imageParts.length > 1; // second image = template
+        const hasTemplate = imageParts.length > 1;
 
         const mockupPrompt = hasTemplate
             ? `PRODUCT PLACEMENT IN REFERENCE SCENE: Place the product from the FIRST image into the scene shown in the SECOND image.
 
-SCENE DESCRIPTION: ${scene}
+SCENE DESCRIPTION: ${enhancedScene}
 ${brandContext ? `BRAND CONTEXT: ${brandContext}` : ''}${brandColorHarmonize}
 
 CRITICAL RULES:
@@ -1575,7 +1931,7 @@ CRITICAL RULES:
 - No frames, borders, watermarks, or text overlays`
             : `PRODUCT LIFESTYLE MOCKUP: Place the product from the provided image into a new lifestyle scene.
 
-SCENE: ${scene}
+SCENE: ${enhancedScene}
 ${brandContext ? `BRAND CONTEXT: ${brandContext}` : ''}${brandColorHarmonize}
 
 CRITICAL RULES:
@@ -1593,36 +1949,50 @@ CRITICAL RULES:
             return res.status(500).json({ success: false, error: 'Failed to generate lifestyle mockup' });
         }
 
-        // Upload to S3 (fallback to base64 if S3 fails)
-        let imageUrl = genResult.imageUrl;
-        if (imageUrl.startsWith('data:image/')) {
-            try {
-                imageUrl = await uploadToS3(imageUrl, `mockups/${brandId || 'default'}/${Date.now()}.png`);
-            } catch (s3Err) {
-                console.warn('⚠️ Mockup S3 upload failed, returning base64:', s3Err.message);
-            }
-        }
+        // ══════════════════════════════════════════════════════════════════
+        // SPEED: Respond immediately, background S3/DB
+        // ══════════════════════════════════════════════════════════════════
+        const rawImageUrl = genResult.imageUrl;
 
-        // Save to Creative model
+        // Save to Creative model immediately with raw URL
+        let creative = null;
         if (brandId) {
-            await Creative.create({
+            creative = await Creative.create({
                 user: req.user._id,
                 brand: brandId,
                 type: 'lifestyle-mockup',
-                title: `Lifestyle Mockup — ${scene.substring(0, 40)}`,
+                title: `Lifestyle Mockup — ${(scenePrompt || 'Professional setting').substring(0, 40)}`,
                 prompt: scenePrompt || 'Professional lifestyle setting',
-                imageUrl,
-                thumbnailUrl: imageUrl,
-                aiMeta: { provider: 'gemini', model: genResult.model, method: 'lifestyle-mockup' },
+                imageUrl: rawImageUrl,
+                thumbnailUrl: rawImageUrl,
+                aiMeta: { provider: 'gemini', model: genResult.model, method: 'lifestyle-mockup', agenticPipeline: true, processingStatus: 'uploading' },
                 tags: ['lifestyle-mockup', 'product'],
                 status: 'draft',
             });
         }
 
-        await req.user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } });
+        req.user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } }).catch(() => {});
 
-        console.log(`✅ Lifestyle Mockup generated`);
-        res.json({ success: true, imageUrl, model: genResult.model });
+        console.log(`✅ Lifestyle Mockup generated — responding immediately`);
+        res.json({ success: true, imageUrl: rawImageUrl, model: genResult.model });
+
+        // Background S3 upload + DB update
+        (async () => {
+            try {
+                if (rawImageUrl.startsWith('data:image/')) {
+                    const s3Url = await uploadToS3(rawImageUrl, `mockups/${brandId || 'default'}/${Date.now()}.png`);
+                    if (creative) {
+                        await Creative.updateOne({ _id: creative._id }, { $set: { imageUrl: s3Url, thumbnailUrl: s3Url, 'aiMeta.processingStatus': 'ready' } });
+                    }
+                    console.log(`[BG-S3] Mockup uploaded: ${s3Url}`);
+                } else if (creative) {
+                    await Creative.updateOne({ _id: creative._id }, { $set: { 'aiMeta.processingStatus': 'ready' } });
+                }
+            } catch (bgErr) {
+                console.error('[BG] Mockup post-processing error:', bgErr.message);
+            }
+        })();
+
     } catch (error) {
         console.error('❌ Lifestyle Mockup error:', error);
         if (req.creditsDeducted > 0) {

@@ -113,6 +113,7 @@ export const brands = {
     updateStatus: (id, status) => apiFetch(`/brands/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
     updateAutonomy: (id, settings) => apiFetch(`/brands/${id}/autonomy`, { method: 'PUT', body: JSON.stringify(settings) }),
     getAuditLog: (id, page = 1) => apiFetch(`/brands/${id}/audit-log?page=${page}`),
+    rescan: (id) => apiFetch(`/brands/${id}/rescan`, { method: 'POST', timeout: 120000 }),
     delete: (id) => apiFetch(`/brands/${id}`, { method: 'DELETE' }),
     // Custom Templates
     getTemplates: (id) => apiFetch(`/brands/${id}/templates`),
@@ -190,6 +191,8 @@ export const creatives = {
     agenticStart: (data) => apiFetch('/creatives/agentic/start', { method: 'POST', body: JSON.stringify(data) }),
     agenticVariations: (id) => apiFetch(`/creatives/agentic/${id}/variations`, { method: 'POST' }),
     agenticRegenerate: (id, data) => apiFetch(`/creatives/agentic/${id}/regenerate`, { method: 'POST', body: JSON.stringify(data) }),
+    // Image upscaling (2K Sharp / 4K Fal.ai ESRGAN)
+    upscale: (data) => apiFetch('/creatives/upscale', { method: 'POST', body: JSON.stringify(data), timeout: 60000 }),
 };
 
 // ============ Agent API ============
@@ -232,6 +235,8 @@ export const products = {
     generateListing: (id, platform) => apiFetch(`/products/${id}/generate-listing`, { method: 'POST', body: JSON.stringify({ platform }) }),
     platforms: () => apiFetch('/products/meta/platforms'),
     scanWebsite: (data) => apiFetch('/products/scan-website', { method: 'POST', body: JSON.stringify(data) }),
+    scanFromWebsite: (brandId, websiteUrl) => apiFetch('/products/scan-website', { method: 'POST', body: JSON.stringify({ brandId, websiteUrl }) }),
+    repairImages: (brandId) => apiFetch('/products/repair-images', { method: 'POST', body: JSON.stringify({ brandId }) }),
     smartMatch: (data) => apiFetch('/products/smart-match', { method: 'POST', body: JSON.stringify(data) }),
     enrich: (data) => apiFetch('/products/enrich', { method: 'POST', body: JSON.stringify(data) }),
 };
