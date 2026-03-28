@@ -10,20 +10,15 @@
  * 
  * Request format (from docs):
  *   {
- *     "model": "seedance",                    // NOT "seedance-2-0"
- *     "task_type": "seedance-2",              // paid, no watermark (use "seedance-2-preview" for free/trial only)
+ *     "model": "seedance",
+ *     "task_type": "seedance-2-preview",
  *     "input": {
- *       "prompt": "...",                       // For image refs, embed URL in prompt text
- *       "duration": 5,                         // INTEGER, not string
- *       "aspect_ratio": "16:9"
+ *       "prompt": "...",
+ *       "duration": 5,
+ *       "aspect_ratio": "16:9",
+ *       "no_watermark": true        // removes watermark on paid plans
  *     }
  *   }
- * 
- * task_type values:
- *   - "seedance-2"              → quality mode, PAID, no watermark
- *   - "seedance-2-fast"         → fast mode,    PAID, no watermark
- *   - "seedance-2-preview"      → quality mode, FREE/TRIAL, adds watermark
- *   - "seedance-2-fast-preview" → fast mode,    FREE/TRIAL, adds watermark
  * 
  * Response format:
  *   { "code": 200, "data": { "task_id": "...", "status": "pending" } }
@@ -47,7 +42,6 @@ function truncatePrompt(prompt, maxLen = PIAPI_MAX_PROMPT_LENGTH) {
     if (!prompt || prompt.length <= maxLen) return prompt;
     console.warn(`⚠️ Prompt too long (${prompt.length} chars), truncating to ${maxLen}`);
     const truncated = prompt.substring(0, maxLen);
-    // Try to break at last sentence boundary
     const lastPeriod = truncated.lastIndexOf('.');
     const lastNewline = truncated.lastIndexOf('\n');
     const breakPoint = Math.max(lastPeriod, lastNewline);
@@ -80,7 +74,6 @@ async function resizeToAspectRatio(base64DataUri, targetRatio) {
         const mimeType = match[1];
         const buffer = Buffer.from(match[2], 'base64');
 
-        // Parse target ratio
         const [rw, rh] = targetRatio.split(':').map(Number);
         if (!rw || !rh) return base64DataUri;
 
@@ -89,16 +82,13 @@ async function resizeToAspectRatio(base64DataUri, targetRatio) {
         const currentRatio = width / height;
         const targetRatioFloat = rw / rh;
 
-        // If already close enough, skip
         if (Math.abs(currentRatio - targetRatioFloat) < 0.05) return base64DataUri;
 
         let newWidth, newHeight;
         if (currentRatio > targetRatioFloat) {
-            // Image is wider than target — pad top/bottom
             newWidth = width;
             newHeight = Math.round(width / targetRatioFloat);
         } else {
-            // Image is taller than target — pad left/right
             newHeight = height;
             newWidth = Math.round(height * targetRatioFloat);
         }
@@ -121,7 +111,6 @@ async function resizeToAspectRatio(base64DataUri, targetRatio) {
 
 /**
  * Verify that a hosted URL is actually fetchable (returns image content).
- * PiAPI needs to be able to GET the image — this catches redirect pages, 403s, etc.
  */
 async function verifyHostedUrl(url) {
     try {
@@ -138,12 +127,10 @@ async function verifyHostedUrl(url) {
 
 /**
  * Upload a base64 image to a free file hosting service to get a public URL.
- * Uses catbox.moe (primary, proven reliable with PiAPI) and tmpfiles.org (fallback).
- * Includes retry logic and URL verification to ensure external APIs can actually fetch the image.
+ * Uses catbox.moe (primary) and tmpfiles.org / 0x0.st (fallbacks).
  * Returns hosted URL or null.
  */
 export async function uploadImageToHostedUrl(base64DataUri) {
-    // Extract base64 and mime type
     const match = base64DataUri.match(/^data:([\w/+]+);base64,(.+)$/);
     if (!match) {
         console.warn('⚠️ Invalid base64 data URI');
@@ -158,7 +145,7 @@ export async function uploadImageToHostedUrl(base64DataUri) {
 
     console.log(`📤 Uploading ref image (${fileName}, ${Math.round(buffer.length / 1024)}KB)...`);
 
-    // Method 1: catbox.moe — PRIMARY (proven reliable with PiAPI, direct file URLs)
+    // Method 1: catbox.moe — PRIMARY
     for (let attempt = 1; attempt <= 2; attempt++) {
         try {
             const { Blob } = await import('buffer');
@@ -176,14 +163,13 @@ export async function uploadImageToHostedUrl(base64DataUri) {
             console.log(`📥 catbox response attempt ${attempt} (${resp.status}): ${text.trim().substring(0, 200)}`);
             if (resp.ok && text.trim().startsWith('http')) {
                 const url = text.trim();
-                // Verify the URL is actually fetchable
                 const ok = await verifyHostedUrl(url);
                 if (ok) {
                     console.log(`✅ Image hosted at: ${url} (verified)`);
                     return url;
                 }
                 console.warn(`⚠️ catbox URL not fetchable, trying next method`);
-                break; // URL exists but isn't fetchable, skip retries
+                break;
             }
             console.warn(`⚠️ catbox upload failed attempt ${attempt} (${resp.status}): ${text.trim().substring(0, 200)}`);
         } catch (e) {
@@ -210,7 +196,6 @@ export async function uploadImageToHostedUrl(base64DataUri) {
         const json = await resp.json();
         console.log(`📥 tmpfiles.org response (${resp.status}):`, JSON.stringify(json).substring(0, 200));
         if (json.status === 'success' && json.data?.url) {
-            // tmpfiles.org URLs need /dl/ inserted for direct download
             const directUrl = json.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/').replace('http://', 'https://');
             const ok = await verifyHostedUrl(directUrl);
             if (ok) {
@@ -224,7 +209,7 @@ export async function uploadImageToHostedUrl(base64DataUri) {
         console.warn(`⚠️ tmpfiles.org upload error: ${e.message}`);
     }
 
-    // Method 3: 0x0.st — last resort fallback
+    // Method 3: 0x0.st — last resort
     try {
         const { Blob } = await import('buffer');
         const formData = new FormData();
@@ -324,9 +309,6 @@ async function submitPiApiPayload(payload) {
 /**
  * Submit video generation to PiAPI (Seedance 2.0)
  * Returns { taskId, provider: 'piapi', _payload }
- * 
- * The _payload is stored so that auto-retry can resubmit on
- * PiAPI's intermittent "failed to process task" errors.
  */
 export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, aspectRatio, generateAudio = true, referenceImages = [], qualityMode = 'fast' }) {
     const dur = Math.min(Math.max(duration || 5, 4), 15);
@@ -379,8 +361,6 @@ export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, a
 
     // Clean any remaining <img> tags from prompt (legacy)
     finalPrompt = finalPrompt.replace(/<img>[^<]*<\/img>/g, '').trim();
-
-    // Truncate to PiAPI's max prompt length (2000 chars)
     finalPrompt = truncatePrompt(finalPrompt);
 
     // Build task input
@@ -389,6 +369,7 @@ export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, a
         aspect_ratio: aspectRatio || '16:9',
         duration: dur,
         generate_audio: generateAudio !== false,
+        no_watermark: true, // Remove watermark on paid PiAPI plans
     };
 
     if (imageUrls.length > 0) {
@@ -396,8 +377,7 @@ export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, a
         console.log(`📸 Sending ${imageUrls.length} image(s) via input.image_urls:`, imageUrls.map(u => u.substring(0, 60)));
     }
 
-    // Use paid task types (no watermark) — "-preview" suffix is free/trial only
-    const taskType = qualityMode === 'quality' ? 'seedance-2' : 'seedance-2-fast';
+    const taskType = qualityMode === 'quality' ? 'seedance-2-preview' : 'seedance-2-fast-preview';
     console.log(`🎯 PiAPI task_type: ${taskType} (quality mode: ${qualityMode})`);
 
     const payload = {
@@ -412,7 +392,7 @@ export async function submitPiApiVideoGeneration({ prompt, imageUrl, duration, a
         taskId,
         provider: 'piapi',
         model: 'seedance-2.0',
-        _payload: payload, // Store for auto-retry on "failed to process task"
+        _payload: payload,
     };
 }
 
@@ -429,14 +409,6 @@ export async function resubmitPiApiTask(storedPayload) {
 
 /**
  * Submit Image-to-Video generation to PiAPI (Seedance 2.0)
- * Animates a still image into a video.
- * 
- * The key difference from regular generation:
- *   - image_urls contains the SOURCE image (not just a reference)
- *   - Prompt describes the MOTION, not the scene
- *   - @image1 tag tells Seedance to use it as the starting frame
- * 
- * Returns { taskId, provider: 'piapi', model: 'seedance-2.0', mode: 'i2v', _payload }
  */
 export async function submitPiApiImageToVideo({ imageUrl, prompt, duration, aspectRatio, qualityMode = 'fast', referenceImages = [] }) {
     if (!imageUrl) throw new Error('Image URL is required for Image-to-Video');
@@ -448,26 +420,20 @@ export async function submitPiApiImageToVideo({ imageUrl, prompt, duration, aspe
     // Upload to catbox if base64
     let hostedUrl = imageUrl;
     if (imageUrl.startsWith('data:')) {
-        // Resize to match target aspect ratio (PiAPI bug workaround)
         const resized = await resizeToAspectRatio(imageUrl, aspectRatio || '16:9');
         hostedUrl = await uploadImageToHostedUrl(resized);
         if (!hostedUrl) throw new Error('Failed to host image for I2V generation');
     }
 
-    // Build prompt with @image1 as the primary frame source
     let finalPrompt = prompt || 'Animate this image with natural cinematic motion';
     if (!finalPrompt.includes('@image1')) {
         finalPrompt = `@image1 ${finalPrompt}`;
     }
 
-    // Clean residual HTML tags
     finalPrompt = finalPrompt.replace(/<img>[^<]*<\/img>/g, '').trim();
-
-    // Truncate to PiAPI's max prompt length (2000 chars)
     finalPrompt = truncatePrompt(finalPrompt);
 
-    // Use paid task types (no watermark) — "-preview" suffix is free/trial only
-    const taskType = qualityMode === 'quality' ? 'seedance-2' : 'seedance-2-fast';
+    const taskType = qualityMode === 'quality' ? 'seedance-2-preview' : 'seedance-2-fast-preview';
     console.log(`🎯 PiAPI I2V task_type: ${taskType}`);
 
     const payload = {
@@ -478,6 +444,7 @@ export async function submitPiApiImageToVideo({ imageUrl, prompt, duration, aspe
             image_urls: [hostedUrl, ...referenceImages.filter(Boolean)],
             aspect_ratio: aspectRatio || '16:9',
             duration: dur,
+            no_watermark: true, // Remove watermark on paid PiAPI plans
         },
     };
 
@@ -495,13 +462,6 @@ export async function submitPiApiImageToVideo({ imageUrl, prompt, duration, aspe
 
 /**
  * Submit Video Extension to PiAPI (Seedance 2.0)
- * Continues a previously generated video seamlessly.
- * 
- * Uses `parent_task_id` to reference the original PiAPI task,
- * allowing Seedance to extend the video while preserving style,
- * motion, characters, and audio consistency.
- * 
- * Returns { taskId, provider: 'piapi', model: 'seedance-2.0', mode: 'extend', _payload }
  */
 export async function submitPiApiVideoExtend({ parentTaskId, prompt, duration, qualityMode = 'fast' }) {
     if (!parentTaskId) throw new Error('Parent task ID is required for Video Extend');
@@ -510,8 +470,7 @@ export async function submitPiApiVideoExtend({ parentTaskId, prompt, duration, q
 
     console.log(`🔗 PiAPI Extend: parentTaskId=${parentTaskId}, duration=${dur}s, quality=${qualityMode}`);
 
-    // Use paid task types (no watermark) — "-preview" suffix is free/trial only
-    const taskType = qualityMode === 'quality' ? 'seedance-2' : 'seedance-2-fast';
+    const taskType = qualityMode === 'quality' ? 'seedance-2-preview' : 'seedance-2-fast-preview';
 
     const payload = {
         model: 'seedance',
@@ -520,6 +479,7 @@ export async function submitPiApiVideoExtend({ parentTaskId, prompt, duration, q
             prompt: prompt || '',
             duration: dur,
             parent_task_id: parentTaskId,
+            no_watermark: true, // Remove watermark on paid PiAPI plans
         },
     };
 
@@ -538,10 +498,6 @@ export async function submitPiApiVideoExtend({ parentTaskId, prompt, duration, q
 /**
  * Poll PiAPI video generation status
  * Returns { status, progress, videoUrl }
- * 
- * Per PiAPI docs, the get-task response:
- *   - status: "pending", "processing", "completed", "failed"
- *   - output.video: the video URL (NOT output.video_url!)
  */
 export async function getPiApiGenerationStatus(taskId) {
     const apiKey = getPiApiKey();
@@ -568,14 +524,12 @@ export async function getPiApiGenerationStatus(taskId) {
 
     console.log(`📊 PiAPI task status: ${status}`);
 
-    // Completed — per docs: output.video is the video URL
     if (status === 'completed' || status === 'success') {
         const output = task.output || {};
 
-        // Per PiAPI docs: the video URL is at output.video (NOT output.video_url)
         const videoUrl =
-            output.video            // ← Primary per docs
-            || output.video_url     // Fallback
+            output.video
+            || output.video_url
             || output.url
             || (Array.isArray(output.videos) ? output.videos[0]?.url : null)
             || (Array.isArray(output.result_urls) ? output.result_urls[0] : null)
@@ -594,14 +548,11 @@ export async function getPiApiGenerationStatus(taskId) {
         };
     }
 
-    // Failed — check if retryable
     if (status === 'failed' || status === 'error') {
         const errorInfo = task.error || {};
         const errorMsg = errorInfo.message || errorInfo.raw_message || task.message || 'PiAPI video generation failed';
         const errorCode = errorInfo.code || 0;
 
-        // PiAPI error code 10000 "failed to process task" is intermittent
-        // and usually succeeds on retry — signal auto-retry
         const isRetryable = errorCode === 10000 || errorMsg.includes('failed to process task');
         if (isRetryable) {
             console.warn(`⚠️ PiAPI task ${taskId} failed with retryable error (code ${errorCode}): ${errorMsg}`);
@@ -615,11 +566,9 @@ export async function getPiApiGenerationStatus(taskId) {
         };
     }
 
-    // Processing
     if (status === 'processing' || status === 'in_progress') {
         return { status: 'IN_PROGRESS', progress: 50 };
     }
 
-    // Pending / queued
     return { status: 'IN_QUEUE', progress: 10 };
 }
