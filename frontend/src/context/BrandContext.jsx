@@ -1,18 +1,24 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { brands as brandsAPI } from '../services/api.js';
 import { useAuth } from './AuthContext.jsx';
+import { useBrandSession } from '../hooks/useBrandSession.js';
 
 const BrandContext = createContext(null);
 const STORAGE_KEY = 'mantram_active_brand';
 
 export function BrandProvider({ children }) {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, user } = useAuth();
+    const navigate = useNavigate();
     const [brands, setBrands] = useState([]);
     const [activeBrand, setActiveBrandState] = useState(null);
     const [loading, setLoading] = useState(false);
     const initializedRef = useRef(false);
+    const prevBrandIdRef = useRef(null);
 
-    // Wrapper that also persists to localStorage
+    const { saveSession, restoreSession, saveActiveJob, removeActiveJob, getActiveJobs } = useBrandSession(user?._id);
+
+    // Wrapper that persists to localStorage
     const setActiveBrand = useCallback((brand) => {
         setActiveBrandState(brand);
         if (brand?._id) {
@@ -32,11 +38,9 @@ export function BrandProvider({ children }) {
                     const pendingBrand = JSON.parse(pendingBrandJson);
                     console.log('📦 Found pending brand from onboarding:', pendingBrand.name);
 
-                    // ── Duplicate check: match by normalized website URL ──
                     const normalizeUrl = (u) => (u || '').replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '').toLowerCase();
                     const pendingWebsite = normalizeUrl(pendingBrand.website);
 
-                    // Fetch current brands to check for duplicates
                     const currentData = await brandsAPI.list();
                     const currentBrands = (currentData.brands || []).filter(b => b.status !== 'archived');
                     const existingBrand = pendingWebsite
@@ -44,7 +48,6 @@ export function BrandProvider({ children }) {
                         : null;
 
                     if (existingBrand) {
-                        // ── UPDATE existing brand instead of creating duplicate ──
                         console.log('🔄 Brand with same website found, updating:', existingBrand.name, '→', pendingBrand.name);
                         const updated = await brandsAPI.update(existingBrand._id, {
                             name: pendingBrand.name || existingBrand.name,
@@ -53,11 +56,8 @@ export function BrandProvider({ children }) {
                             dna: { ...existingBrand.dna, ...pendingBrand.dna },
                             rawScanData: pendingBrand.rawScanData || existingBrand.rawScanData,
                         });
-                        if (updated.brand) {
-                            console.log('✅ Existing brand updated:', updated.brand.name);
-                        }
+                        if (updated.brand) console.log('✅ Existing brand updated:', updated.brand.name);
                     } else {
-                        // ── No duplicate — create new brand ──
                         const saved = await brandsAPI.create({
                             name: pendingBrand.name,
                             website: pendingBrand.website,
@@ -65,9 +65,7 @@ export function BrandProvider({ children }) {
                             dna: pendingBrand.dna,
                             rawScanData: pendingBrand.rawScanData,
                         });
-                        if (saved.brand) {
-                            console.log('✅ New brand created:', saved.brand.name);
-                        }
+                        if (saved.brand) console.log('✅ New brand created:', saved.brand.name);
                     }
                 } catch (saveErr) {
                     console.error('Failed to save pending brand:', saveErr);
@@ -76,8 +74,6 @@ export function BrandProvider({ children }) {
             }
 
             const data = await brandsAPI.list();
-            // Safety filter: exclude archived brands from global state
-            // (backend already filters, but this is a double-safety layer)
             const brandList = (data.brands || []).filter(b => b.status !== 'archived');
             setBrands(brandList);
 
@@ -92,12 +88,18 @@ export function BrandProvider({ children }) {
                 ? brandList.find(b => b._id === savedBrandId && b.status !== 'archived')
                 : null;
 
-            if (savedBrand) {
-                // Restore saved brand (even if activeBrand is already set, refresh the data)
-                setActiveBrand(savedBrand);
-            } else if (!activeBrand || !brandList.find(b => b._id === activeBrand._id)) {
-                // No saved brand or saved brand no longer exists → pick first
-                setActiveBrand(brandList[0]);
+            const brandToActivate = savedBrand || (!activeBrand || !brandList.find(b => b._id === activeBrand._id) ? brandList[0] : null);
+
+            if (brandToActivate) {
+                setActiveBrand(brandToActivate);
+                // On initial load, restore last active page for this brand
+                if (!initializedRef.current) {
+                    const session = restoreSession(brandToActivate._id);
+                    if (session.lastActivePage && session.lastActivePage !== window.location.pathname) {
+                        console.log(`🔁 Resuming brand "${brandToActivate.name}" at: ${session.lastActivePage}`);
+                        navigate(session.lastActivePage, { replace: true });
+                    }
+                }
             }
 
             initializedRef.current = true;
@@ -110,11 +112,41 @@ export function BrandProvider({ children }) {
 
     useEffect(() => { fetchBrands(); }, [fetchBrands]);
 
-    // Public selectBrand — updates state + localStorage
+    /**
+     * selectBrand — called from Header when user picks a brand
+     * 1. Save current page for the OUTGOING brand
+     * 2. Switch active brand
+     * 3. Navigate to last known page for the INCOMING brand
+     */
     const selectBrand = useCallback((brand) => {
+        const currentPath = window.location.pathname;
+
+        // 1. Save current page for outgoing brand
+        if (activeBrand?._id && activeBrand._id !== brand._id) {
+            saveSession(activeBrand._id, { lastActivePage: currentPath });
+            console.log(`💾 Saved session for "${activeBrand.name}": ${currentPath}`);
+        }
+
+        // 2. Switch brand
         setActiveBrand(brand);
+        prevBrandIdRef.current = brand._id;
         console.log(`🏷️ Brand switched to: ${brand?.name || 'none'}`);
-    }, [setActiveBrand]);
+
+        // 3. Restore last page for incoming brand (or go to dashboard)
+        const session = restoreSession(brand._id);
+        const targetPage = session.lastActivePage || '/dashboard';
+        console.log(`🔁 Navigating to "${brand.name}" last page: ${targetPage}`);
+        navigate(targetPage);
+    }, [activeBrand, setActiveBrand, saveSession, restoreSession, navigate]);
+
+    // Auto-save current page every time the route changes
+    useEffect(() => {
+        if (!activeBrand?._id || !initializedRef.current) return;
+        const currentPath = window.location.pathname;
+        // Don't save auth / onboarding pages
+        if (currentPath.startsWith('/auth') || currentPath.startsWith('/onboarding')) return;
+        saveSession(activeBrand._id, { lastActivePage: currentPath });
+    }, [activeBrand?._id, window.location.pathname]);
 
     const addBrand = useCallback((brand) => {
         setBrands(prev => [brand, ...prev]);
@@ -139,7 +171,6 @@ export function BrandProvider({ children }) {
         await brandsAPI.delete(id);
         setBrands(prev => {
             const remaining = prev.filter(b => b._id !== id);
-            // If deleted brand was active, switch to next available
             if (activeBrand?._id === id) {
                 if (remaining.length > 0) {
                     setActiveBrand(remaining[0]);
@@ -157,6 +188,10 @@ export function BrandProvider({ children }) {
             brands, activeBrand, loading,
             hasBrands: brands.length > 0,
             selectBrand, addBrand, updateBrand, updateBrandDNA, deleteBrand, fetchBrands,
+            // Session helpers — exposed so Video Studio / other modules can save jobs
+            saveActiveJob: (jobId, meta) => saveActiveJob(activeBrand?._id, jobId, meta),
+            removeActiveJob: (jobId) => removeActiveJob(activeBrand?._id, jobId),
+            getActiveJobs: () => getActiveJobs(activeBrand?._id),
         }}>
             {children}
         </BrandContext.Provider>
