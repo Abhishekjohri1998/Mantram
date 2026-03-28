@@ -1,4 +1,10 @@
 const path = require('path');
+const fs = require('fs');
+const dotenv = require('dotenv');
+
+// Load .env from backend root — works whether running from Mantram/backend or deployments/TIMESTAMP/backend
+const envPath = path.resolve(__dirname, '../.env');
+const envVars = fs.existsSync(envPath) ? dotenv.parse(fs.readFileSync(envPath)) : {};
 
 module.exports = {
   apps: [
@@ -11,6 +17,7 @@ module.exports = {
       env: {
         NODE_OPTIONS: '--max-old-space-size=2048',
         NODE_ENV: 'production',
+        ...envVars,
       },
       error_file: '/home/ec2-user/Mantram/backend/logs/error.log',
       out_file: '/home/ec2-user/Mantram/backend/logs/out.log',
