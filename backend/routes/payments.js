@@ -8,6 +8,7 @@ import Subscription from '../models/Subscription.js';
 import User from '../models/User.js';
 import { getSetting } from '../models/SystemSettings.js';
 import RetentionOffer from '../models/RetentionOffer.js';
+import Coupon from '../models/Coupon.js';
 
 const router = Router();
 
@@ -75,12 +76,87 @@ function calcProRata(activeSub, newPlanPrice) {
     return { unusedCredit, proRataAmount, daysRemaining, totalDays, dailyRate: Math.round(dailyRate * 100) / 100 };
 }
 
+// @desc    Validate Coupon
+// @route   POST /api/payments/validate-coupon
+// @access  Private
+router.post('/validate-coupon', protect, async (req, res) => {
+    try {
+        const { code, packageId, packId, billingCycle = 'monthly' } = req.body;
+        if (!code) return res.status(400).json({ success: false, error: 'Coupon code required' });
+
+        const coupon = await Coupon.findOne({ code: code.toUpperCase(), isActive: true });
+        if (!coupon) return res.status(404).json({ success: false, error: 'Invalid coupon code' });
+
+        // Validity checks
+        const now = new Date();
+        if (coupon.validFrom && now < coupon.validFrom) return res.status(400).json({ success: false, error: 'Coupon is not yet active' });
+        if (coupon.validUntil && now > coupon.validUntil) return res.status(400).json({ success: false, error: 'Coupon has expired' });
+        if (coupon.maxUses > 0 && coupon.usedCount >= coupon.maxUses) return res.status(400).json({ success: false, error: 'Coupon usage limit reached' });
+
+        // Per-user limit
+        const userUses = coupon.usedBy.filter(u => u.user.toString() === req.user._id.toString()).length;
+        if (coupon.maxUsesPerUser > 0 && userUses >= coupon.maxUsesPerUser) {
+            return res.status(400).json({ success: false, error: 'You have already used this coupon' });
+        }
+
+        // Get original price
+        let originalPrice = 0;
+        let planSlug = '';
+        if (packageId) {
+            const pkg = await SubscriptionPackage.findById(packageId);
+            if (!pkg) return res.status(404).json({ success: false, error: 'Package not found' });
+            originalPrice = pkg.pricing[billingCycle] || pkg.pricing.monthly;
+            planSlug = pkg.slug;
+        } else if (packId) {
+            const pack = await CreditPack.findById(packId);
+            if (!pack) return res.status(404).json({ success: false, error: 'Credit pack not found' });
+            originalPrice = pack.price;
+        } else {
+            return res.status(400).json({ success: false, error: 'packageId or packId required for validation' });
+        }
+
+        // Plan restriction
+        if (coupon.applicablePlans?.length > 0 && planSlug && !coupon.applicablePlans.includes(planSlug)) {
+            return res.status(400).json({ success: false, error: `This coupon is not valid for the ${planSlug} plan` });
+        }
+
+        // Min purchase amount
+        if (coupon.minPurchaseAmount > 0 && originalPrice < coupon.minPurchaseAmount) {
+            return res.status(400).json({ success: false, error: `Minimum purchase of ₹${coupon.minPurchaseAmount} required for this coupon` });
+        }
+
+        // Calculate discount
+        let discount = 0;
+        if (coupon.discountType === 'percentage') {
+            discount = Math.round((originalPrice * coupon.discountValue) / 100);
+        } else if (coupon.discountType === 'fixed') {
+            discount = Math.min(coupon.discountValue, originalPrice);
+        }
+
+        res.json({
+            success: true,
+            coupon: {
+                code: coupon.code,
+                discountType: coupon.discountType,
+                discountValue: coupon.discountValue,
+                description: coupon.description,
+            },
+            originalPrice,
+            discount,
+            finalPrice: Math.max(0, originalPrice - discount),
+        });
+    } catch (error) {
+        console.error('❌ Validate Coupon Error:', error);
+        res.status(500).json({ success: false, error: 'Validation failed' });
+    }
+});
+
 // @desc    Create Razorpay Order (with pro-rata for upgrades)
 // @route   POST /api/payments/create-order
 // @access  Private
 router.post('/create-order', protect, async (req, res) => {
     try {
-        const { packageId, billingCycle } = req.body;
+        const { packageId, billingCycle, couponCode } = req.body;
 
         const pkg = await SubscriptionPackage.findById(packageId);
         if (!pkg) {
@@ -100,7 +176,23 @@ router.post('/create-order', protect, async (req, res) => {
         }
 
         // Minimum Razorpay order is ₹1 (100 paise)
-        const chargeAmount = Math.max(1, Math.round(proRata.proRataAmount));
+        let chargeAmount = Math.max(1, Math.round(proRata.proRataAmount));
+
+        // Apply Coupon
+        let discountApplied = 0;
+        let appliedCouponCode = null;
+        if (couponCode) {
+            const coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true });
+            if (coupon && (!coupon.validUntil || new Date(coupon.validUntil) > new Date())) {
+                if (coupon.discountType === 'percentage') {
+                    discountApplied = Math.round((chargeAmount * coupon.discountValue) / 100);
+                } else if (coupon.discountType === 'fixed') {
+                    discountApplied = Math.min(coupon.discountValue, chargeAmount);
+                }
+                chargeAmount = Math.max(1, chargeAmount - discountApplied);
+                appliedCouponCode = coupon.code;
+            }
+        }
 
         const options = {
             amount: chargeAmount * 100, // Amount in paise
@@ -113,6 +205,8 @@ router.post('/create-order', protect, async (req, res) => {
                 proRataCredit: proRata.unusedCredit.toString(),
                 fullPrice: fullPrice.toString(),
                 isProRata: (proRata.unusedCredit > 0).toString(),
+                couponCode: appliedCouponCode || '',
+                discountApplied: discountApplied.toString(),
             },
         };
 
@@ -128,6 +222,8 @@ router.post('/create-order', protect, async (req, res) => {
                 unusedCredit: proRata.unusedCredit,
                 chargeAmount,
                 daysRemaining: proRata.daysRemaining,
+                discountApplied,
+                couponCode: appliedCouponCode,
             },
         });
     } catch (error) {
@@ -197,9 +293,10 @@ router.post('/verify', protect, async (req, res) => {
         // Read pro-rata data from order notes
         const proRataCredit = parseFloat(order.notes?.proRataCredit) || 0;
         const isProRata = order.notes?.isProRata === 'true';
+        const couponCode = order.notes?.couponCode;
 
         // Create subscription entry
-        const subscription = await Subscription.create({
+        const subData = {
             user: req.user._id,
             plan: pkg.slug,
             billingCycle,
@@ -216,7 +313,21 @@ router.post('/verify', protect, async (req, res) => {
             transactionId: razorpay_payment_id,
             proRataCredit: isProRata ? proRataCredit : 0,
             proRataCharged: isProRata ? (order.amount / 100) : 0,
-        });
+        };
+
+        if (couponCode) {
+            const coupon = await Coupon.findOne({ code: couponCode.toUpperCase() });
+            if (coupon) {
+                subData.couponApplied = coupon._id;
+                // Track usage
+                await Coupon.findByIdAndUpdate(coupon._id, {
+                    $inc: { usedCount: 1 },
+                    $push: { usedBy: { user: req.user._id, usedAt: new Date() } }
+                });
+            }
+        }
+
+        const subscription = await Subscription.create(subData);
 
         // Update user
         await User.findByIdAndUpdate(req.user._id, {
@@ -324,7 +435,7 @@ router.get('/topup-packs', protect, async (req, res) => {
  */
 router.post('/create-topup-order', protect, async (req, res) => {
     try {
-        const { packId } = req.body;
+        const { packId, couponCode } = req.body;
 
         // Look up pack from DB
         const pack = await CreditPack.findById(packId);
@@ -347,8 +458,25 @@ router.post('/create-topup-order', protect, async (req, res) => {
         const totalCredits = pack.credits + (pack.bonusCredits || 0);
         const finalCredits = (isFirstPurchase && pack.isFirstPurchaseEligible) ? totalCredits * 2 : totalCredits;
 
+        // Apply Coupon
+        let chargeAmount = pack.price;
+        let discountApplied = 0;
+        let appliedCouponCode = null;
+        if (couponCode) {
+            const coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true });
+            if (coupon && (!coupon.validUntil || new Date(coupon.validUntil) > new Date())) {
+                if (coupon.discountType === 'percentage') {
+                    discountApplied = Math.round((chargeAmount * coupon.discountValue) / 100);
+                } else if (coupon.discountType === 'fixed') {
+                    discountApplied = Math.min(coupon.discountValue, chargeAmount);
+                }
+                chargeAmount = Math.max(1, chargeAmount - discountApplied);
+                appliedCouponCode = coupon.code;
+            }
+        }
+
         const options = {
-            amount: pack.price * 100, // paise
+            amount: chargeAmount * 100, // paise
             currency: pack.currency || 'INR',
             receipt: `topup_${Date.now()}`,
             notes: {
@@ -359,6 +487,8 @@ router.post('/create-topup-order', protect, async (req, res) => {
                 validityDays: pack.validityDays || 180,
                 isFirstPurchase: isFirstPurchase ? 'true' : 'false',
                 type: 'credit_topup',
+                couponCode: appliedCouponCode || '',
+                discountApplied: discountApplied.toString(),
             },
         };
 
@@ -422,6 +552,17 @@ router.post('/verify-topup', protect, async (req, res) => {
             await CreditPack.findByIdAndUpdate(order.notes.packId, {
                 $inc: { purchaseCount: 1, totalRevenue: order.amount / 100 },
             });
+        }
+
+        // Track coupon usage
+        if (order.notes.couponCode) {
+            await Coupon.findOneAndUpdate(
+                { code: order.notes.couponCode.toUpperCase() },
+                {
+                    $inc: { usedCount: 1 },
+                    $push: { usedBy: { user: req.user._id, usedAt: new Date() } }
+                }
+            );
         }
 
         console.log(`💎 Top-up verified: +${credits} credits for ${user.email}, expires ${expiry.toISOString()}`);

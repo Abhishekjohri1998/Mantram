@@ -76,6 +76,12 @@ export default function CreditsPage() {
     const [cancelReason, setCancelReason] = useState('')
     const [cancelLoading, setCancelLoading] = useState(false)
 
+    // Coupon state
+    const [couponInput, setCouponInput] = useState('')
+    const [appliedCoupon, setAppliedCoupon] = useState(null) // { coupon, discount, finalPrice, originalPrice }
+    const [couponLoading, setCouponLoading] = useState(false)
+    const [couponError, setCouponError] = useState('')
+
 
     useEffect(() => { loadSummary(); loadUsage(); loadStoreVisibility(); loadSubStatus() }, [])
     useEffect(() => { loadUsage() }, [page])
@@ -159,7 +165,7 @@ export default function CreditsPage() {
 
     const handleUpgrade = async (pkg) => {
         try {
-            const { orderId, amount, currency, proRata } = await paymentsAPI.createOrder(pkg._id, billingCycle)
+            const { orderId, amount, currency, proRata } = await paymentsAPI.createOrder(pkg._id, billingCycle, appliedCoupon?.coupon?.code)
             const options = {
                 key: import.meta.env.VITE_RAZORPAY_KEY_ID,
                 amount,
@@ -218,7 +224,7 @@ export default function CreditsPage() {
 
     const handleTopup = async (pack) => {
         try {
-            const { orderId, amount, currency, creditsToAdd } = await paymentsAPI.createTopupOrder(pack.id)
+            const { orderId, amount, currency, creditsToAdd } = await paymentsAPI.createTopupOrder(pack.id, appliedCoupon?.coupon?.code)
             const options = {
                 key: import.meta.env.VITE_RAZORPAY_KEY_ID,
                 amount,
@@ -259,6 +265,33 @@ export default function CreditsPage() {
             loadRewards()
             loadSummary()
         } catch (e) { setReferralMsg(e.message) }
+    }
+
+    const handleApplyCoupon = async () => {
+        if (!couponInput.trim()) return
+        setCouponLoading(true)
+        setCouponError('')
+        try {
+            // We just validate globally first, or we can validate against the "first" item 
+            // but in Razorpay flow, we'll re-validate anyway.
+            // For UI feedback, let's just check if the code exists and is active.
+            const data = await paymentsAPI.validateCoupon({ 
+                code: couponInput.trim(),
+                // If we're in topup tab, we could pick a representative pack, but let's just check validity
+            })
+            setAppliedCoupon(data)
+            setCouponInput('')
+        } catch (e) {
+            setCouponError(e.message)
+            setAppliedCoupon(null)
+        } finally {
+            setCouponLoading(false)
+        }
+    }
+
+    const removeCoupon = () => {
+        setAppliedCoupon(null)
+        setCouponError('')
     }
 
     const balance = summary?.balance
@@ -470,6 +503,44 @@ export default function CreditsPage() {
                                 </div>
                             )}
 
+                            {/* Coupon Section */}
+                            <div className="glass-panel p-6 rounded-2xl border border-white/[0.08] flex flex-wrap items-center justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                    <span className="material-symbols-outlined text-2xl text-primary">local_offer</span>
+                                    <div>
+                                        <h4 className="text-sm font-bold text-white">Have a Coupon?</h4>
+                                        <p className="text-xs text-slate-500">Apply a code to get extra discounts on your purchase.</p>
+                                    </div>
+                                </div>
+                                {appliedCoupon ? (
+                                    <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-xl">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-bold text-emerald-400">{appliedCoupon.coupon.code}</span>
+                                            <span className="text-xs text-emerald-500">Applied</span>
+                                        </div>
+                                        <button onClick={removeCoupon} className="material-symbols-outlined text-sm text-emerald-500 hover:text-white transition-all">cancel</button>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Enter code..." 
+                                            value={couponInput}
+                                            onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                                            className="bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-primary/50"
+                                        />
+                                        <button 
+                                            onClick={handleApplyCoupon}
+                                            disabled={couponLoading || !couponInput.trim()}
+                                            className="px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl text-sm font-bold hover:bg-primary/20 transition-all disabled:opacity-50"
+                                        >
+                                            {couponLoading ? '...' : 'Apply'}
+                                        </button>
+                                    </div>
+                                )}
+                                {couponError && <p className="w-full text-xs text-rose-500">{couponError}</p>}
+                            </div>
+
                             {/* ── Promo Section (Kling-style green border) ── */}
                             {promoPacks.length > 0 && (
                                 <div className="bg-gradient-to-r from-emerald-500/10 to-green-500/5 border border-emerald-500/30 rounded-2xl p-6">
@@ -548,7 +619,14 @@ export default function CreditsPage() {
                                         </div>
                                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/[0.06]">
                                             <div>
-                                                <span className="text-lg font-black text-white">₹ {pack.price?.toLocaleString()}</span>
+                                                {appliedCoupon ? (
+                                                    <div className="flex flex-col">
+                                                         <span className="text-lg font-black text-emerald-400">₹ {(Math.max(0, pack.price - (appliedCoupon.coupon.discountType === 'percentage' ? Math.round(pack.price * appliedCoupon.coupon.discountValue / 100) : appliedCoupon.coupon.discountValue))).toLocaleString()}</span>
+                                                         <span className="text-[10px] text-slate-500 line-through">₹ {pack.price?.toLocaleString()}</span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-lg font-black text-white">₹ {pack.price?.toLocaleString()}</span>
+                                                )}
                                                 <p className="text-[10px] text-slate-500">₹{pack.perCredit}/cr • {pack.validityDays}d</p>
                                             </div>
                                             <button
@@ -745,6 +823,44 @@ export default function CreditsPage() {
                                 ))}
                             </div>
 
+                            {/* Coupon Section (Plans) */}
+                            <div className="glass-panel p-6 rounded-2xl border border-white/[0.08] flex flex-wrap items-center justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                    <span className="material-symbols-outlined text-2xl text-primary">local_offer</span>
+                                    <div>
+                                        <h4 className="text-sm font-bold text-white">Have a Coupon?</h4>
+                                        <p className="text-xs text-slate-500">Get additional discounts on your subscription.</p>
+                                    </div>
+                                </div>
+                                {appliedCoupon ? (
+                                    <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-xl">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-bold text-emerald-400">{appliedCoupon.coupon.code}</span>
+                                            <span className="text-xs text-emerald-500">Applied</span>
+                                        </div>
+                                        <button onClick={removeCoupon} className="material-symbols-outlined text-sm text-emerald-500 hover:text-white transition-all">cancel</button>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Enter code..." 
+                                            value={couponInput}
+                                            onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                                            className="bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-primary/50"
+                                        />
+                                        <button 
+                                            onClick={handleApplyCoupon}
+                                            disabled={couponLoading || !couponInput.trim()}
+                                            className="px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl text-sm font-bold hover:bg-primary/20 transition-all disabled:opacity-50"
+                                        >
+                                            {couponLoading ? '...' : 'Apply'}
+                                        </button>
+                                    </div>
+                                )}
+                                {couponError && <p className="w-full text-xs text-rose-500">{couponError}</p>}
+                            </div>
+
                             {packagesLoading ? (
                                 <div className="flex items-center justify-center h-64">
                                     <div className="size-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -769,8 +885,20 @@ export default function CreditsPage() {
                                                     </div>
                                                     <p className="text-sm text-slate-500 mb-6">{pkg.description}</p>
                                                     <div className="mb-6">
-                                                        <span className="text-3xl font-black text-white">{pkg.pricing.currency === 'INR' ? '₹' : '$'}{price?.toLocaleString()}</span>
-                                                        <span className="text-slate-500 text-sm">/{billingCycle === 'yearly' ? 'yr' : billingCycle === 'quarterly' ? 'qtr' : 'mo'}</span>
+                                                        {appliedCoupon ? (
+                                                            <div className="flex flex-col">
+                                                                <div className="flex items-baseline gap-1">
+                                                                    <span className="text-3xl font-black text-emerald-400">{pkg.pricing.currency === 'INR' ? '₹' : '$'}{(Math.max(0, price - (appliedCoupon.coupon.discountType === 'percentage' ? Math.round(price * appliedCoupon.coupon.discountValue / 100) : appliedCoupon.coupon.discountValue))).toLocaleString()}</span>
+                                                                    <span className="text-slate-500 text-sm">/{billingCycle === 'yearly' ? 'yr' : billingCycle === 'quarterly' ? 'qtr' : 'mo'}</span>
+                                                                </div>
+                                                                <span className="text-slate-600 text-xs line-through">₹ {price?.toLocaleString()}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <span className="text-3xl font-black text-white">{pkg.pricing.currency === 'INR' ? '₹' : '$'}{price?.toLocaleString()}</span>
+                                                                <span className="text-slate-500 text-sm">/{billingCycle === 'yearly' ? 'yr' : billingCycle === 'quarterly' ? 'qtr' : 'mo'}</span>
+                                                            </>
+                                                        )}
                                                         {savings > 0 && (
                                                             <span className="ml-2 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold">
                                                                 Save {savings}%

@@ -816,20 +816,24 @@ export const routingRules = {
 // ============ Payments & Subscriptions API ============
 export const payments = {
     getPackages: () => apiFetch('/payments/packages'),
-    createOrder: (packageId, billingCycle = 'monthly') =>
+    validateCoupon: (data) => apiFetch('/payments/validate-coupon', {
+        method: 'POST',
+        body: JSON.stringify(data)
+    }),
+    createOrder: (packageId, billingCycle = 'monthly', couponCode = null) =>
         apiFetch('/payments/create-order', {
             method: 'POST',
-            body: JSON.stringify({ packageId, billingCycle })
+            body: JSON.stringify({ packageId, billingCycle, couponCode })
         }),
     verify: (paymentData) =>
         apiFetch('/payments/verify', {
             method: 'POST',
             body: JSON.stringify(paymentData)
         }),
-    createTopupOrder: (packId) =>
+    createTopupOrder: (packId, couponCode = null) =>
         apiFetch('/payments/create-topup-order', {
             method: 'POST',
-            body: JSON.stringify({ packId })
+            body: JSON.stringify({ packId, couponCode })
         }),
     verifyTopup: (paymentData) =>
         apiFetch('/payments/verify-topup', {
