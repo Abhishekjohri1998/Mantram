@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { CreditTooltipWrapper } from '../CreditBadge'
 
 const API = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -743,10 +744,12 @@ export default function UGCCreator({ activeBrand }) {
                             <div className="ugc2-panel">
                                 <div className="ugc2-panel-header">
                                     <h3>Write your script</h3>
-                                    <button className="ugc2-ai-btn" onClick={handleAIScript} disabled={generatingScript}>
-                                        {generatingScript ? <span className="material-symbols-outlined ugc2-spin" style={{ fontSize: 14 }}>progress_activity</span> : <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_awesome</span>}
-                                        AI Write
-                                    </button>
+                                    <CreditTooltipWrapper action="promptEnhance">
+                                        <button className="ugc2-ai-btn" onClick={handleAIScript} disabled={generatingScript}>
+                                            {generatingScript ? <span className="material-symbols-outlined ugc2-spin" style={{ fontSize: 14 }}>progress_activity</span> : <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_awesome</span>}
+                                            AI Write
+                                        </button>
+                                    </CreditTooltipWrapper>
                                 </div>
 
                                 {/* ── Product Selector ── */}
@@ -920,10 +923,12 @@ export default function UGCCreator({ activeBrand }) {
                                                     </div>
                                                     <div className="ugc2-enhance-input-row">
                                                         <input value={enhancePrompt} onChange={e => setEnhancePrompt(e.target.value)} placeholder="E.g., Professional outfit, luxury hotel lobby, warm lighting" />
-                                                        <button className="ugc2-btn-pri" onClick={handleEnhancePhoto} disabled={enhancing || !enhancePrompt.trim()}>
-                                                            {enhancing ? <span className="material-symbols-outlined ugc2-spin" style={{ fontSize: 16 }}>progress_activity</span> : <span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_fix_high</span>}
-                                                            {enhancing ? 'Enhancing...' : 'Enhance'}
-                                                        </button>
+                                                        <CreditTooltipWrapper action="imageEnhance">
+                                                            <button className="ugc2-btn-pri" onClick={handleEnhancePhoto} disabled={enhancing || !enhancePrompt.trim()}>
+                                                                {enhancing ? <span className="material-symbols-outlined ugc2-spin" style={{ fontSize: 16 }}>progress_activity</span> : <span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_fix_high</span>}
+                                                                {enhancing ? 'Enhancing...' : 'Enhance'}
+                                                            </button>
+                                                        </CreditTooltipWrapper>
                                                     </div>
                                                     {enhancing && <p className="ugc2-enhance-status">🎨 AI is enhancing your photo... This takes 10-30 seconds</p>}
                                                 </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { creatives as creativesAPI } from '../../services/api'
+import { CreditTooltipWrapper } from '../CreditBadge'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -745,9 +746,11 @@ export default function AdvancedMode({ activeBrand, initialData }) {
                             )}
                             <div className="adv-prompt-footer">
                                 <span className="adv-chars">{prompt.length} chars</span>
-                                <button className="adv-enhance" onClick={handleEnhance} disabled={enhancing || !prompt.trim()}>
-                                    {enhancing ? <><span className="material-symbols-outlined adv-spin" style={{ fontSize: '14px' }}>progress_activity</span> Enhancing...</> : <><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>auto_awesome</span> Enhance as Ad Film</>}
-                                </button>
+                                <CreditTooltipWrapper action="promptEnhance">
+                                    <button className="adv-enhance" onClick={handleEnhance} disabled={enhancing || !prompt.trim()}>
+                                        {enhancing ? <><span className="material-symbols-outlined adv-spin" style={{ fontSize: '14px' }}>progress_activity</span> Enhancing...</> : <><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>auto_awesome</span> Enhance as Ad Film</>}
+                                    </button>
+                                </CreditTooltipWrapper>
                             </div>
                         </div>
                     )}

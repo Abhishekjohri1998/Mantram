@@ -391,7 +391,7 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/creatives/enhance-prompt — AI-powered prompt enhancement
 // ══════════════════════════════════════════════════════════════════════════════
-router.post('/enhance-prompt', protect, async (req, res) => {
+router.post('/enhance-prompt', protect, requireCredits('promptEnhance'), async (req, res) => {
     try {
         const { brandId, prompt, style, format, referenceDescriptions, aspectRatio } = req.body;
         if (!prompt) return res.status(400).json({ success: false, error: 'Prompt is required' });

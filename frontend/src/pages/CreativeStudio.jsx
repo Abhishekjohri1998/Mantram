@@ -1953,6 +1953,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             {/* Bottom bar inside textarea: Enhance + Character tags */}
                             <div className="absolute left-2 right-2 bottom-2 flex items-center gap-1.5 pointer-events-none">
                                 {prompt.trim() && (
+                                <CreditTooltipWrapper action="promptEnhance">
                                     <button onClick={handleEnhancePrompt} disabled={enhancing || !activeBrand}
                                         className={`pointer-events-auto flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${enhancing
                                             ? 'bg-amber-500/20 text-amber-400'
@@ -1962,6 +1963,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         </span>
                                         {enhancing ? 'Enhancing...' : 'Enhance'}
                                     </button>
+                                </CreditTooltipWrapper>
                                 )}
                                 {/* Quick tag chips */}
                                 {characters.map((char, idx) => {
@@ -3181,30 +3183,32 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         </div>
                         {photoshootBrief.trim() && (
                             <div className="flex items-center gap-2 -mt-1">
-                                <button onClick={async () => {
-                                    if (!photoshootBrief.trim() || !activeBrand || enhancing) return
-                                    setEnhancing(true)
-                                    try {
-                                        const data = await creativesAPI.enhancePrompt({
-                                            brandId: activeBrand._id,
-                                            prompt: `Photoshoot scene: ${photoshootBrief.trim()}`,
-                                            style: 'photorealistic',
-                                            format: 'photoshoot',
-                                            aspectRatio,
-                                        })
-                                        if (data.enhancedPrompt) setPhotoshootBrief(data.enhancedPrompt)
-                                    } catch (err) { console.error('Enhance failed:', err) }
-                                    finally { setEnhancing(false) }
-                                }}
-                                    disabled={enhancing || !activeBrand}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${enhancing
-                                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                                        : 'bg-gradient-to-r from-amber-500/15 to-orange-500/10 text-amber-400 hover:from-amber-500/25 hover:to-orange-500/20 border border-amber-500/20 hover:border-amber-500/40'}`}>
-                                    <span className={`material-symbols-outlined text-sm ${enhancing ? 'animate-spin' : ''}`}>
-                                        {enhancing ? 'progress_activity' : 'auto_awesome'}
-                                    </span>
-                                    {enhancing ? 'Enhancing...' : '✨ Enhance'}
-                                </button>
+                                <CreditTooltipWrapper action="promptEnhance">
+                                    <button onClick={async () => {
+                                        if (!photoshootBrief.trim() || !activeBrand || enhancing) return
+                                        setEnhancing(true)
+                                        try {
+                                            const data = await creativesAPI.enhancePrompt({
+                                                brandId: activeBrand._id,
+                                                prompt: `Photoshoot scene: ${photoshootBrief.trim()}`,
+                                                style: 'photorealistic',
+                                                format: 'photoshoot',
+                                                aspectRatio,
+                                            })
+                                            if (data.enhancedPrompt) setPhotoshootBrief(data.enhancedPrompt)
+                                        } catch (err) { console.error('Enhance failed:', err) }
+                                        finally { setEnhancing(false) }
+                                    }}
+                                        disabled={enhancing || !activeBrand}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${enhancing
+                                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                            : 'bg-gradient-to-r from-amber-500/15 to-orange-500/10 text-amber-400 hover:from-amber-500/25 hover:to-orange-500/20 border border-amber-500/20 hover:border-amber-500/40'}`}>
+                                        <span className={`material-symbols-outlined text-sm ${enhancing ? 'animate-spin' : ''}`}>
+                                            {enhancing ? 'progress_activity' : 'auto_awesome'}
+                                        </span>
+                                        {enhancing ? 'Enhancing...' : '✨ Enhance'}
+                                    </button>
+                                </CreditTooltipWrapper>
                             </div>
                         )}
 
@@ -5708,30 +5712,32 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             {/* Enhance Additional Instructions */}
                                             {templateFields._additionalInstructions && (
                                                 <div className="flex items-center gap-2">
-                                                    <button onClick={async () => {
-                                                        if (!templateFields._additionalInstructions?.trim() || !activeBrand || enhancing) return
-                                                        setEnhancing(true)
-                                                        try {
-                                                            const data = await creativesAPI.enhancePrompt({
-                                                                brandId: activeBrand._id,
-                                                                prompt: `Image modification instructions: ${templateFields._additionalInstructions.trim()}`,
-                                                                style: 'photorealistic',
-                                                                format: 'template-edit',
-                                                                aspectRatio: templateResolution?.ratio || '1:1',
-                                                            })
-                                                            if (data.enhancedPrompt) setTemplateFields(prev => ({ ...prev, _additionalInstructions: data.enhancedPrompt }))
-                                                        } catch (err) { console.error('Enhance failed:', err) }
-                                                        finally { setEnhancing(false) }
-                                                    }}
-                                                        disabled={enhancing || !activeBrand}
-                                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${enhancing
-                                                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                                                            : 'bg-gradient-to-r from-amber-500/15 to-orange-500/10 text-amber-400 hover:from-amber-500/25 hover:to-orange-500/20 border border-amber-500/20 hover:border-amber-500/40'}`}>
-                                                        <span className={`material-symbols-outlined text-sm ${enhancing ? 'animate-spin' : ''}`}>
-                                                            {enhancing ? 'progress_activity' : 'auto_awesome'}
-                                                        </span>
-                                                        {enhancing ? 'Enhancing...' : '✨ Enhance'}
-                                                    </button>
+                                                    <CreditTooltipWrapper action="promptEnhance">
+                                                        <button onClick={async () => {
+                                                            if (!templateFields._additionalInstructions?.trim() || !activeBrand || enhancing) return
+                                                            setEnhancing(true)
+                                                            try {
+                                                                const data = await creativesAPI.enhancePrompt({
+                                                                    brandId: activeBrand._id,
+                                                                    prompt: `Image modification instructions: ${templateFields._additionalInstructions.trim()}`,
+                                                                    style: 'photorealistic',
+                                                                    format: 'template-edit',
+                                                                    aspectRatio: templateResolution?.ratio || '1:1',
+                                                                })
+                                                                if (data.enhancedPrompt) setTemplateFields(prev => ({ ...prev, _additionalInstructions: data.enhancedPrompt }))
+                                                            } catch (err) { console.error('Enhance failed:', err) }
+                                                            finally { setEnhancing(false) }
+                                                        }}
+                                                            disabled={enhancing || !activeBrand}
+                                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${enhancing
+                                                                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                                                : 'bg-gradient-to-r from-amber-500/15 to-orange-500/10 text-amber-400 hover:from-amber-500/25 hover:to-orange-500/20 border border-amber-500/20 hover:border-amber-500/40'}`}>
+                                                            <span className={`material-symbols-outlined text-sm ${enhancing ? 'animate-spin' : ''}`}>
+                                                                {enhancing ? 'progress_activity' : 'auto_awesome'}
+                                                            </span>
+                                                            {enhancing ? 'Enhancing...' : '✨ Enhance'}
+                                                        </button>
+                                                    </CreditTooltipWrapper>
                                                     <span className="text-xs text-emerald-400 flex items-center gap-1">
                                                         <span className="material-symbols-outlined text-xs">visibility</span>
                                                         AI Vision will apply these changes

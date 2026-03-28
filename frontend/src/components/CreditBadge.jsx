@@ -18,6 +18,8 @@ const ACTION_LABELS = {
     brainstormChat: 'Brainstorm Chat',
     brainstormScreenplay: 'Screenplay',
     trendRefresh: 'Trend Refresh',
+    promptEnhance: 'AI Prompt Enhancement',
+    imageEnhance: 'AI Image Enhancement',
 }
 
 /**

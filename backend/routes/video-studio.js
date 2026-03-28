@@ -1857,7 +1857,7 @@ ${language && language !== 'english' ? `The script is in ${language}. Keep the l
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/video-studio/ugc/enhance-photo — Enhance avatar photo with AI (Nanobanana 2)
 // ══════════════════════════════════════════════════════════════════════════════
-router.post('/ugc/enhance-photo', protect, async (req, res) => {
+router.post('/ugc/enhance-photo', protect, requireCredits('imageEnhance'), async (req, res) => {
     try {
         const { imageBase64, imageUrl, prompt } = req.body;
         if (!prompt?.trim()) return res.status(400).json({ success: false, error: 'Enhancement prompt is required' });
@@ -2335,7 +2335,7 @@ router.post('/ugc/generate-agent', protect, requireCredits('videoGenerate'), asy
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/video-studio/ugc/generate-script — AI-generate UGC script from brand DNA
 // ══════════════════════════════════════════════════════════════════════════════
-router.post('/ugc/generate-script', protect, async (req, res) => {
+router.post('/ugc/generate-script', protect, requireCredits('promptEnhance'), async (req, res) => {
     try {
         const {
             brandId, style, productId, productName, productDescription,
@@ -3455,7 +3455,7 @@ router.post('/generate-first-frame', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/video-studio/enhance-prompt — AI-enhance a raw video prompt
 // ══════════════════════════════════════════════════════════════════════════════
-router.post('/enhance-prompt', protect, async (req, res) => {
+router.post('/enhance-prompt', protect, requireCredits('promptEnhance'), async (req, res) => {
     try {
         const { prompt, model, duration, aspectRatio, brandId, style } = req.body;
         if (!prompt || !prompt.trim()) {
